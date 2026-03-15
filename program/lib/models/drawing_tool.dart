@@ -1,1 +1,0 @@
-enum DrawingTool { pen, eraser }

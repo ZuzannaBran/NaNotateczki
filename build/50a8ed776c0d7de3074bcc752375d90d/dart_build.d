@@ -1,0 +1,1 @@
+ /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/50a8ed776c0d7de3074bcc752375d90d/dart_build_result.json:  /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/.dart_tool/package_config.json /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/pubspec.yaml /home/zuzanna-baran-linux/Pobrane/programy/flutter/bin/cache/dart-sdk/version
