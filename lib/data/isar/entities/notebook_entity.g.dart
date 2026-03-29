@@ -53,11 +53,10 @@ const NotebookEntitySchema = CollectionSchema(
   links: {},
   embeddedSchemas: {
     r'NotePageEntity': NotePageEntitySchema,
-    r'StrokeEntity': StrokeEntitySchema,
-    r'StrokePointEntity': StrokePointEntitySchema,
-    r'ShapeEntity': ShapeEntitySchema,
     r'TextBlockEntity': TextBlockEntitySchema,
-    r'ImageBlockEntity': ImageBlockEntitySchema
+    r'ImageBlockEntity': ImageBlockEntitySchema,
+    r'InkStrokeEntity': InkStrokeEntitySchema,
+    r'InkPointEntity': InkPointEntitySchema
   },
   getId: _notebookEntityGetId,
   getLinks: _notebookEntityGetLinks,
@@ -1002,36 +1001,30 @@ const NotePageEntitySchema = Schema(
       name: r'index',
       type: IsarType.long,
     ),
-    r'isBookmarked': PropertySchema(
+    r'inkStrokes': PropertySchema(
       id: 2,
+      name: r'inkStrokes',
+      type: IsarType.objectList,
+      target: r'InkStrokeEntity',
+    ),
+    r'isBookmarked': PropertySchema(
+      id: 3,
       name: r'isBookmarked',
       type: IsarType.bool,
     ),
-    r'shapes': PropertySchema(
-      id: 3,
-      name: r'shapes',
-      type: IsarType.objectList,
-      target: r'ShapeEntity',
-    ),
-    r'strokes': PropertySchema(
-      id: 4,
-      name: r'strokes',
-      type: IsarType.objectList,
-      target: r'StrokeEntity',
-    ),
     r'textBlocks': PropertySchema(
-      id: 5,
+      id: 4,
       name: r'textBlocks',
       type: IsarType.objectList,
       target: r'TextBlockEntity',
     ),
     r'title': PropertySchema(
-      id: 6,
+      id: 5,
       name: r'title',
       type: IsarType.string,
     ),
     r'uid': PropertySchema(
-      id: 7,
+      id: 6,
       name: r'uid',
       type: IsarType.string,
     )
@@ -1057,20 +1050,13 @@ int _notePageEntityEstimateSize(
           ImageBlockEntitySchema.estimateSize(value, offsets, allOffsets);
     }
   }
-  bytesCount += 3 + object.shapes.length * 3;
+  bytesCount += 3 + object.inkStrokes.length * 3;
   {
-    final offsets = allOffsets[ShapeEntity]!;
-    for (var i = 0; i < object.shapes.length; i++) {
-      final value = object.shapes[i];
-      bytesCount += ShapeEntitySchema.estimateSize(value, offsets, allOffsets);
-    }
-  }
-  bytesCount += 3 + object.strokes.length * 3;
-  {
-    final offsets = allOffsets[StrokeEntity]!;
-    for (var i = 0; i < object.strokes.length; i++) {
-      final value = object.strokes[i];
-      bytesCount += StrokeEntitySchema.estimateSize(value, offsets, allOffsets);
+    final offsets = allOffsets[InkStrokeEntity]!;
+    for (var i = 0; i < object.inkStrokes.length; i++) {
+      final value = object.inkStrokes[i];
+      bytesCount +=
+          InkStrokeEntitySchema.estimateSize(value, offsets, allOffsets);
     }
   }
   bytesCount += 3 + object.textBlocks.length * 3;
@@ -1100,27 +1086,21 @@ void _notePageEntitySerialize(
     object.imageBlocks,
   );
   writer.writeLong(offsets[1], object.index);
-  writer.writeBool(offsets[2], object.isBookmarked);
-  writer.writeObjectList<ShapeEntity>(
-    offsets[3],
+  writer.writeObjectList<InkStrokeEntity>(
+    offsets[2],
     allOffsets,
-    ShapeEntitySchema.serialize,
-    object.shapes,
+    InkStrokeEntitySchema.serialize,
+    object.inkStrokes,
   );
-  writer.writeObjectList<StrokeEntity>(
-    offsets[4],
-    allOffsets,
-    StrokeEntitySchema.serialize,
-    object.strokes,
-  );
+  writer.writeBool(offsets[3], object.isBookmarked);
   writer.writeObjectList<TextBlockEntity>(
-    offsets[5],
+    offsets[4],
     allOffsets,
     TextBlockEntitySchema.serialize,
     object.textBlocks,
   );
-  writer.writeString(offsets[6], object.title);
-  writer.writeString(offsets[7], object.uid);
+  writer.writeString(offsets[5], object.title);
+  writer.writeString(offsets[6], object.uid);
 }
 
 NotePageEntity _notePageEntityDeserialize(
@@ -1138,30 +1118,23 @@ NotePageEntity _notePageEntityDeserialize(
       ) ??
       [];
   object.index = reader.readLong(offsets[1]);
-  object.isBookmarked = reader.readBool(offsets[2]);
-  object.shapes = reader.readObjectList<ShapeEntity>(
-        offsets[3],
-        ShapeEntitySchema.deserialize,
+  object.inkStrokes = reader.readObjectList<InkStrokeEntity>(
+        offsets[2],
+        InkStrokeEntitySchema.deserialize,
         allOffsets,
-        ShapeEntity(),
+        InkStrokeEntity(),
       ) ??
       [];
-  object.strokes = reader.readObjectList<StrokeEntity>(
-        offsets[4],
-        StrokeEntitySchema.deserialize,
-        allOffsets,
-        StrokeEntity(),
-      ) ??
-      [];
+  object.isBookmarked = reader.readBool(offsets[3]);
   object.textBlocks = reader.readObjectList<TextBlockEntity>(
-        offsets[5],
+        offsets[4],
         TextBlockEntitySchema.deserialize,
         allOffsets,
         TextBlockEntity(),
       ) ??
       [];
-  object.title = reader.readString(offsets[6]);
-  object.uid = reader.readString(offsets[7]);
+  object.title = reader.readString(offsets[5]);
+  object.uid = reader.readString(offsets[6]);
   return object;
 }
 
@@ -1183,24 +1156,16 @@ P _notePageEntityDeserializeProp<P>(
     case 1:
       return (reader.readLong(offset)) as P;
     case 2:
-      return (reader.readBool(offset)) as P;
+      return (reader.readObjectList<InkStrokeEntity>(
+            offset,
+            InkStrokeEntitySchema.deserialize,
+            allOffsets,
+            InkStrokeEntity(),
+          ) ??
+          []) as P;
     case 3:
-      return (reader.readObjectList<ShapeEntity>(
-            offset,
-            ShapeEntitySchema.deserialize,
-            allOffsets,
-            ShapeEntity(),
-          ) ??
-          []) as P;
+      return (reader.readBool(offset)) as P;
     case 4:
-      return (reader.readObjectList<StrokeEntity>(
-            offset,
-            StrokeEntitySchema.deserialize,
-            allOffsets,
-            StrokeEntity(),
-          ) ??
-          []) as P;
-    case 5:
       return (reader.readObjectList<TextBlockEntity>(
             offset,
             TextBlockEntitySchema.deserialize,
@@ -1208,9 +1173,9 @@ P _notePageEntityDeserializeProp<P>(
             TextBlockEntity(),
           ) ??
           []) as P;
-    case 6:
+    case 5:
       return (reader.readString(offset)) as P;
-    case 7:
+    case 6:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1365,190 +1330,101 @@ extension NotePageEntityQueryFilter
   }
 
   QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
+      inkStrokesLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'inkStrokes',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
+      inkStrokesIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'inkStrokes',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
+      inkStrokesIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'inkStrokes',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
+      inkStrokesLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'inkStrokes',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
+      inkStrokesLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'inkStrokes',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
+      inkStrokesLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'inkStrokes',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
       isBookmarkedEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'isBookmarked',
         value: value,
       ));
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      shapesLengthEqualTo(int length) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'shapes',
-        length,
-        true,
-        length,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      shapesIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'shapes',
-        0,
-        true,
-        0,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      shapesIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'shapes',
-        0,
-        false,
-        999999,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      shapesLengthLessThan(
-    int length, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'shapes',
-        0,
-        true,
-        length,
-        include,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      shapesLengthGreaterThan(
-    int length, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'shapes',
-        length,
-        include,
-        999999,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      shapesLengthBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'shapes',
-        lower,
-        includeLower,
-        upper,
-        includeUpper,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      strokesLengthEqualTo(int length) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'strokes',
-        length,
-        true,
-        length,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      strokesIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'strokes',
-        0,
-        true,
-        0,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      strokesIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'strokes',
-        0,
-        false,
-        999999,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      strokesLengthLessThan(
-    int length, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'strokes',
-        0,
-        true,
-        length,
-        include,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      strokesLengthGreaterThan(
-    int length, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'strokes',
-        length,
-        include,
-        999999,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      strokesLengthBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'strokes',
-        lower,
-        includeLower,
-        upper,
-        includeUpper,
-      );
     });
   }
 
@@ -1924,16 +1800,9 @@ extension NotePageEntityQueryObject
   }
 
   QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      shapesElement(FilterQuery<ShapeEntity> q) {
+      inkStrokesElement(FilterQuery<InkStrokeEntity> q) {
     return QueryBuilder.apply(this, (query) {
-      return query.object(q, r'shapes');
-    });
-  }
-
-  QueryBuilder<NotePageEntity, NotePageEntity, QAfterFilterCondition>
-      strokesElement(FilterQuery<StrokeEntity> q) {
-    return QueryBuilder.apply(this, (query) {
-      return query.object(q, r'strokes');
+      return query.object(q, r'inkStrokes');
     });
   }
 
@@ -1944,1226 +1813,6 @@ extension NotePageEntityQueryObject
     });
   }
 }
-
-// coverage:ignore-file
-// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
-
-const StrokeEntitySchema = Schema(
-  name: r'StrokeEntity',
-  id: 1652844139129545802,
-  properties: {
-    r'colorValue': PropertySchema(
-      id: 0,
-      name: r'colorValue',
-      type: IsarType.long,
-    ),
-    r'points': PropertySchema(
-      id: 1,
-      name: r'points',
-      type: IsarType.objectList,
-      target: r'StrokePointEntity',
-    ),
-    r'tool': PropertySchema(
-      id: 2,
-      name: r'tool',
-      type: IsarType.long,
-    ),
-    r'uid': PropertySchema(
-      id: 3,
-      name: r'uid',
-      type: IsarType.string,
-    ),
-    r'width': PropertySchema(
-      id: 4,
-      name: r'width',
-      type: IsarType.double,
-    )
-  },
-  estimateSize: _strokeEntityEstimateSize,
-  serialize: _strokeEntitySerialize,
-  deserialize: _strokeEntityDeserialize,
-  deserializeProp: _strokeEntityDeserializeProp,
-);
-
-int _strokeEntityEstimateSize(
-  StrokeEntity object,
-  List<int> offsets,
-  Map<Type, List<int>> allOffsets,
-) {
-  var bytesCount = offsets.last;
-  bytesCount += 3 + object.points.length * 3;
-  {
-    final offsets = allOffsets[StrokePointEntity]!;
-    for (var i = 0; i < object.points.length; i++) {
-      final value = object.points[i];
-      bytesCount +=
-          StrokePointEntitySchema.estimateSize(value, offsets, allOffsets);
-    }
-  }
-  bytesCount += 3 + object.uid.length * 3;
-  return bytesCount;
-}
-
-void _strokeEntitySerialize(
-  StrokeEntity object,
-  IsarWriter writer,
-  List<int> offsets,
-  Map<Type, List<int>> allOffsets,
-) {
-  writer.writeLong(offsets[0], object.colorValue);
-  writer.writeObjectList<StrokePointEntity>(
-    offsets[1],
-    allOffsets,
-    StrokePointEntitySchema.serialize,
-    object.points,
-  );
-  writer.writeLong(offsets[2], object.tool);
-  writer.writeString(offsets[3], object.uid);
-  writer.writeDouble(offsets[4], object.width);
-}
-
-StrokeEntity _strokeEntityDeserialize(
-  Id id,
-  IsarReader reader,
-  List<int> offsets,
-  Map<Type, List<int>> allOffsets,
-) {
-  final object = StrokeEntity();
-  object.colorValue = reader.readLong(offsets[0]);
-  object.points = reader.readObjectList<StrokePointEntity>(
-        offsets[1],
-        StrokePointEntitySchema.deserialize,
-        allOffsets,
-        StrokePointEntity(),
-      ) ??
-      [];
-  object.tool = reader.readLong(offsets[2]);
-  object.uid = reader.readString(offsets[3]);
-  object.width = reader.readDouble(offsets[4]);
-  return object;
-}
-
-P _strokeEntityDeserializeProp<P>(
-  IsarReader reader,
-  int propertyId,
-  int offset,
-  Map<Type, List<int>> allOffsets,
-) {
-  switch (propertyId) {
-    case 0:
-      return (reader.readLong(offset)) as P;
-    case 1:
-      return (reader.readObjectList<StrokePointEntity>(
-            offset,
-            StrokePointEntitySchema.deserialize,
-            allOffsets,
-            StrokePointEntity(),
-          ) ??
-          []) as P;
-    case 2:
-      return (reader.readLong(offset)) as P;
-    case 3:
-      return (reader.readString(offset)) as P;
-    case 4:
-      return (reader.readDouble(offset)) as P;
-    default:
-      throw IsarError('Unknown property with id $propertyId');
-  }
-}
-
-extension StrokeEntityQueryFilter
-    on QueryBuilder<StrokeEntity, StrokeEntity, QFilterCondition> {
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      colorValueEqualTo(int value) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'colorValue',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      colorValueGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'colorValue',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      colorValueLessThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'colorValue',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      colorValueBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'colorValue',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      pointsLengthEqualTo(int length) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'points',
-        length,
-        true,
-        length,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      pointsIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'points',
-        0,
-        true,
-        0,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      pointsIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'points',
-        0,
-        false,
-        999999,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      pointsLengthLessThan(
-    int length, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'points',
-        0,
-        true,
-        length,
-        include,
-      );
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      pointsLengthGreaterThan(
-    int length, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'points',
-        length,
-        include,
-        999999,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      pointsLengthBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'points',
-        lower,
-        includeLower,
-        upper,
-        includeUpper,
-      );
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> toolEqualTo(
-      int value) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'tool',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      toolGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'tool',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> toolLessThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'tool',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> toolBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'tool',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> uidEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      uidGreaterThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> uidLessThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> uidBetween(
-    String lower,
-    String upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'uid',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> uidStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> uidEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> uidContains(
-      String value,
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> uidMatches(
-      String pattern,
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'uid',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> uidIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'uid',
-        value: '',
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      uidIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'uid',
-        value: '',
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> widthEqualTo(
-    double value, {
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'width',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition>
-      widthGreaterThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'width',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> widthLessThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'width',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> widthBetween(
-    double lower,
-    double upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'width',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
-    });
-  }
-}
-
-extension StrokeEntityQueryObject
-    on QueryBuilder<StrokeEntity, StrokeEntity, QFilterCondition> {
-  QueryBuilder<StrokeEntity, StrokeEntity, QAfterFilterCondition> pointsElement(
-      FilterQuery<StrokePointEntity> q) {
-    return QueryBuilder.apply(this, (query) {
-      return query.object(q, r'points');
-    });
-  }
-}
-
-// coverage:ignore-file
-// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
-
-const ShapeEntitySchema = Schema(
-  name: r'ShapeEntity',
-  id: -2287486071440297147,
-  properties: {
-    r'colorValue': PropertySchema(
-      id: 0,
-      name: r'colorValue',
-      type: IsarType.long,
-    ),
-    r'endDx': PropertySchema(
-      id: 1,
-      name: r'endDx',
-      type: IsarType.double,
-    ),
-    r'endDy': PropertySchema(
-      id: 2,
-      name: r'endDy',
-      type: IsarType.double,
-    ),
-    r'startDx': PropertySchema(
-      id: 3,
-      name: r'startDx',
-      type: IsarType.double,
-    ),
-    r'startDy': PropertySchema(
-      id: 4,
-      name: r'startDy',
-      type: IsarType.double,
-    ),
-    r'type': PropertySchema(
-      id: 5,
-      name: r'type',
-      type: IsarType.long,
-    ),
-    r'uid': PropertySchema(
-      id: 6,
-      name: r'uid',
-      type: IsarType.string,
-    ),
-    r'width': PropertySchema(
-      id: 7,
-      name: r'width',
-      type: IsarType.double,
-    )
-  },
-  estimateSize: _shapeEntityEstimateSize,
-  serialize: _shapeEntitySerialize,
-  deserialize: _shapeEntityDeserialize,
-  deserializeProp: _shapeEntityDeserializeProp,
-);
-
-int _shapeEntityEstimateSize(
-  ShapeEntity object,
-  List<int> offsets,
-  Map<Type, List<int>> allOffsets,
-) {
-  var bytesCount = offsets.last;
-  bytesCount += 3 + object.uid.length * 3;
-  return bytesCount;
-}
-
-void _shapeEntitySerialize(
-  ShapeEntity object,
-  IsarWriter writer,
-  List<int> offsets,
-  Map<Type, List<int>> allOffsets,
-) {
-  writer.writeLong(offsets[0], object.colorValue);
-  writer.writeDouble(offsets[1], object.endDx);
-  writer.writeDouble(offsets[2], object.endDy);
-  writer.writeDouble(offsets[3], object.startDx);
-  writer.writeDouble(offsets[4], object.startDy);
-  writer.writeLong(offsets[5], object.type);
-  writer.writeString(offsets[6], object.uid);
-  writer.writeDouble(offsets[7], object.width);
-}
-
-ShapeEntity _shapeEntityDeserialize(
-  Id id,
-  IsarReader reader,
-  List<int> offsets,
-  Map<Type, List<int>> allOffsets,
-) {
-  final object = ShapeEntity();
-  object.colorValue = reader.readLong(offsets[0]);
-  object.endDx = reader.readDouble(offsets[1]);
-  object.endDy = reader.readDouble(offsets[2]);
-  object.startDx = reader.readDouble(offsets[3]);
-  object.startDy = reader.readDouble(offsets[4]);
-  object.type = reader.readLong(offsets[5]);
-  object.uid = reader.readString(offsets[6]);
-  object.width = reader.readDouble(offsets[7]);
-  return object;
-}
-
-P _shapeEntityDeserializeProp<P>(
-  IsarReader reader,
-  int propertyId,
-  int offset,
-  Map<Type, List<int>> allOffsets,
-) {
-  switch (propertyId) {
-    case 0:
-      return (reader.readLong(offset)) as P;
-    case 1:
-      return (reader.readDouble(offset)) as P;
-    case 2:
-      return (reader.readDouble(offset)) as P;
-    case 3:
-      return (reader.readDouble(offset)) as P;
-    case 4:
-      return (reader.readDouble(offset)) as P;
-    case 5:
-      return (reader.readLong(offset)) as P;
-    case 6:
-      return (reader.readString(offset)) as P;
-    case 7:
-      return (reader.readDouble(offset)) as P;
-    default:
-      throw IsarError('Unknown property with id $propertyId');
-  }
-}
-
-extension ShapeEntityQueryFilter
-    on QueryBuilder<ShapeEntity, ShapeEntity, QFilterCondition> {
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      colorValueEqualTo(int value) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'colorValue',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      colorValueGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'colorValue',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      colorValueLessThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'colorValue',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      colorValueBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'colorValue',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> endDxEqualTo(
-    double value, {
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'endDx',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      endDxGreaterThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'endDx',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> endDxLessThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'endDx',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> endDxBetween(
-    double lower,
-    double upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'endDx',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> endDyEqualTo(
-    double value, {
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'endDy',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      endDyGreaterThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'endDy',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> endDyLessThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'endDy',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> endDyBetween(
-    double lower,
-    double upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'endDy',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> startDxEqualTo(
-    double value, {
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'startDx',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      startDxGreaterThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'startDx',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> startDxLessThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'startDx',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> startDxBetween(
-    double lower,
-    double upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'startDx',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> startDyEqualTo(
-    double value, {
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'startDy',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      startDyGreaterThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'startDy',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> startDyLessThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'startDy',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> startDyBetween(
-    double lower,
-    double upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'startDy',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> typeEqualTo(
-      int value) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'type',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> typeGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'type',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> typeLessThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'type',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> typeBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'type',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> uidEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> uidGreaterThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> uidLessThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> uidBetween(
-    String lower,
-    String upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'uid',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> uidStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> uidEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> uidContains(
-      String value,
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'uid',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> uidMatches(
-      String pattern,
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'uid',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> uidIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'uid',
-        value: '',
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      uidIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'uid',
-        value: '',
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> widthEqualTo(
-    double value, {
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'width',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition>
-      widthGreaterThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'width',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> widthLessThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'width',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<ShapeEntity, ShapeEntity, QAfterFilterCondition> widthBetween(
-    double lower,
-    double upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'width',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
-    });
-  }
-}
-
-extension ShapeEntityQueryObject
-    on QueryBuilder<ShapeEntity, ShapeEntity, QFilterCondition> {}
 
 // coverage:ignore-file
 // ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
@@ -4681,9 +3330,551 @@ extension ImageBlockEntityQueryObject
 // coverage:ignore-file
 // ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
 
-const StrokePointEntitySchema = Schema(
-  name: r'StrokePointEntity',
-  id: 4341863075139481104,
+const InkStrokeEntitySchema = Schema(
+  name: r'InkStrokeEntity',
+  id: -3118898537458629589,
+  properties: {
+    r'colorValue': PropertySchema(
+      id: 0,
+      name: r'colorValue',
+      type: IsarType.long,
+    ),
+    r'points': PropertySchema(
+      id: 1,
+      name: r'points',
+      type: IsarType.objectList,
+      target: r'InkPointEntity',
+    ),
+    r'toolIndex': PropertySchema(
+      id: 2,
+      name: r'toolIndex',
+      type: IsarType.long,
+    ),
+    r'uid': PropertySchema(
+      id: 3,
+      name: r'uid',
+      type: IsarType.string,
+    ),
+    r'width': PropertySchema(
+      id: 4,
+      name: r'width',
+      type: IsarType.double,
+    )
+  },
+  estimateSize: _inkStrokeEntityEstimateSize,
+  serialize: _inkStrokeEntitySerialize,
+  deserialize: _inkStrokeEntityDeserialize,
+  deserializeProp: _inkStrokeEntityDeserializeProp,
+);
+
+int _inkStrokeEntityEstimateSize(
+  InkStrokeEntity object,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  var bytesCount = offsets.last;
+  bytesCount += 3 + object.points.length * 3;
+  {
+    final offsets = allOffsets[InkPointEntity]!;
+    for (var i = 0; i < object.points.length; i++) {
+      final value = object.points[i];
+      bytesCount +=
+          InkPointEntitySchema.estimateSize(value, offsets, allOffsets);
+    }
+  }
+  bytesCount += 3 + object.uid.length * 3;
+  return bytesCount;
+}
+
+void _inkStrokeEntitySerialize(
+  InkStrokeEntity object,
+  IsarWriter writer,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  writer.writeLong(offsets[0], object.colorValue);
+  writer.writeObjectList<InkPointEntity>(
+    offsets[1],
+    allOffsets,
+    InkPointEntitySchema.serialize,
+    object.points,
+  );
+  writer.writeLong(offsets[2], object.toolIndex);
+  writer.writeString(offsets[3], object.uid);
+  writer.writeDouble(offsets[4], object.width);
+}
+
+InkStrokeEntity _inkStrokeEntityDeserialize(
+  Id id,
+  IsarReader reader,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  final object = InkStrokeEntity();
+  object.colorValue = reader.readLong(offsets[0]);
+  object.points = reader.readObjectList<InkPointEntity>(
+        offsets[1],
+        InkPointEntitySchema.deserialize,
+        allOffsets,
+        InkPointEntity(),
+      ) ??
+      [];
+  object.toolIndex = reader.readLong(offsets[2]);
+  object.uid = reader.readString(offsets[3]);
+  object.width = reader.readDouble(offsets[4]);
+  return object;
+}
+
+P _inkStrokeEntityDeserializeProp<P>(
+  IsarReader reader,
+  int propertyId,
+  int offset,
+  Map<Type, List<int>> allOffsets,
+) {
+  switch (propertyId) {
+    case 0:
+      return (reader.readLong(offset)) as P;
+    case 1:
+      return (reader.readObjectList<InkPointEntity>(
+            offset,
+            InkPointEntitySchema.deserialize,
+            allOffsets,
+            InkPointEntity(),
+          ) ??
+          []) as P;
+    case 2:
+      return (reader.readLong(offset)) as P;
+    case 3:
+      return (reader.readString(offset)) as P;
+    case 4:
+      return (reader.readDouble(offset)) as P;
+    default:
+      throw IsarError('Unknown property with id $propertyId');
+  }
+}
+
+extension InkStrokeEntityQueryFilter
+    on QueryBuilder<InkStrokeEntity, InkStrokeEntity, QFilterCondition> {
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      colorValueEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'colorValue',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      colorValueGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'colorValue',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      colorValueLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'colorValue',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      colorValueBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'colorValue',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      pointsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'points',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      pointsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'points',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      pointsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'points',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      pointsLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'points',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      pointsLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'points',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      pointsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'points',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      toolIndexEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'toolIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      toolIndexGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'toolIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      toolIndexLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'toolIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      toolIndexBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'toolIndex',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'uid',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'uid',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'uid',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'uid',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'uid',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'uid',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'uid',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'uid',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'uid',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      uidIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'uid',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      widthEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'width',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      widthGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'width',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      widthLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'width',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      widthBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'width',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+}
+
+extension InkStrokeEntityQueryObject
+    on QueryBuilder<InkStrokeEntity, InkStrokeEntity, QFilterCondition> {
+  QueryBuilder<InkStrokeEntity, InkStrokeEntity, QAfterFilterCondition>
+      pointsElement(FilterQuery<InkPointEntity> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.object(q, r'points');
+    });
+  }
+}
+
+// coverage:ignore-file
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
+
+const InkPointEntitySchema = Schema(
+  name: r'InkPointEntity',
+  id: -2068597980036642517,
   properties: {
     r'dx': PropertySchema(
       id: 0,
@@ -4701,14 +3892,14 @@ const StrokePointEntitySchema = Schema(
       type: IsarType.double,
     )
   },
-  estimateSize: _strokePointEntityEstimateSize,
-  serialize: _strokePointEntitySerialize,
-  deserialize: _strokePointEntityDeserialize,
-  deserializeProp: _strokePointEntityDeserializeProp,
+  estimateSize: _inkPointEntityEstimateSize,
+  serialize: _inkPointEntitySerialize,
+  deserialize: _inkPointEntityDeserialize,
+  deserializeProp: _inkPointEntityDeserializeProp,
 );
 
-int _strokePointEntityEstimateSize(
-  StrokePointEntity object,
+int _inkPointEntityEstimateSize(
+  InkPointEntity object,
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
@@ -4716,8 +3907,8 @@ int _strokePointEntityEstimateSize(
   return bytesCount;
 }
 
-void _strokePointEntitySerialize(
-  StrokePointEntity object,
+void _inkPointEntitySerialize(
+  InkPointEntity object,
   IsarWriter writer,
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
@@ -4727,20 +3918,20 @@ void _strokePointEntitySerialize(
   writer.writeDouble(offsets[2], object.pressure);
 }
 
-StrokePointEntity _strokePointEntityDeserialize(
+InkPointEntity _inkPointEntityDeserialize(
   Id id,
   IsarReader reader,
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  final object = StrokePointEntity();
+  final object = InkPointEntity();
   object.dx = reader.readDouble(offsets[0]);
   object.dy = reader.readDouble(offsets[1]);
   object.pressure = reader.readDouble(offsets[2]);
   return object;
 }
 
-P _strokePointEntityDeserializeProp<P>(
+P _inkPointEntityDeserializeProp<P>(
   IsarReader reader,
   int propertyId,
   int offset,
@@ -4758,10 +3949,9 @@ P _strokePointEntityDeserializeProp<P>(
   }
 }
 
-extension StrokePointEntityQueryFilter
-    on QueryBuilder<StrokePointEntity, StrokePointEntity, QFilterCondition> {
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
-      dxEqualTo(
+extension InkPointEntityQueryFilter
+    on QueryBuilder<InkPointEntity, InkPointEntity, QFilterCondition> {
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition> dxEqualTo(
     double value, {
     double epsilon = Query.epsilon,
   }) {
@@ -4774,7 +3964,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition>
       dxGreaterThan(
     double value, {
     bool include = false,
@@ -4790,7 +3980,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition>
       dxLessThan(
     double value, {
     bool include = false,
@@ -4806,8 +3996,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
-      dxBetween(
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition> dxBetween(
     double lower,
     double upper, {
     bool includeLower = true,
@@ -4826,8 +4015,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
-      dyEqualTo(
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition> dyEqualTo(
     double value, {
     double epsilon = Query.epsilon,
   }) {
@@ -4840,7 +4028,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition>
       dyGreaterThan(
     double value, {
     bool include = false,
@@ -4856,7 +4044,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition>
       dyLessThan(
     double value, {
     bool include = false,
@@ -4872,8 +4060,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
-      dyBetween(
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition> dyBetween(
     double lower,
     double upper, {
     bool includeLower = true,
@@ -4892,7 +4079,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition>
       pressureEqualTo(
     double value, {
     double epsilon = Query.epsilon,
@@ -4906,7 +4093,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition>
       pressureGreaterThan(
     double value, {
     bool include = false,
@@ -4922,7 +4109,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition>
       pressureLessThan(
     double value, {
     bool include = false,
@@ -4938,7 +4125,7 @@ extension StrokePointEntityQueryFilter
     });
   }
 
-  QueryBuilder<StrokePointEntity, StrokePointEntity, QAfterFilterCondition>
+  QueryBuilder<InkPointEntity, InkPointEntity, QAfterFilterCondition>
       pressureBetween(
     double lower,
     double upper, {
@@ -4959,5 +4146,5 @@ extension StrokePointEntityQueryFilter
   }
 }
 
-extension StrokePointEntityQueryObject
-    on QueryBuilder<StrokePointEntity, StrokePointEntity, QFilterCondition> {}
+extension InkPointEntityQueryObject
+    on QueryBuilder<InkPointEntity, InkPointEntity, QFilterCondition> {}

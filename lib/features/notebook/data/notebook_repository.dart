@@ -6,11 +6,9 @@ import 'package:uuid/uuid.dart';
 import '../../../data/isar/entities/notebook_entity.dart';
 import '../domain/drawing_tool.dart';
 import '../domain/image_block.dart';
+import '../domain/ink_stroke.dart';
 import '../domain/notebook.dart';
 import '../domain/note_page.dart';
-import '../domain/shape.dart';
-import '../domain/stroke.dart';
-import '../domain/stroke_point.dart';
 import '../domain/text_block.dart';
 
 class NotebookRepository {
@@ -38,11 +36,9 @@ class NotebookRepository {
         NotePage(
           id: _uuid.v4(),
           title: 'Page 1',
-          strokes: <Stroke>[],
-          shapes: <Shape>[],
           textBlocks: <TextBlock>[],
           imageBlocks: <ImageBlock>[],
-          redoStack: <Stroke>[],
+          inkStrokes: <InkStroke>[],
           isBookmarked: false,
         ),
       ],
@@ -112,30 +108,10 @@ class NotebookRepository {
     return NotePage(
       id: entity.uid,
       title: entity.title,
-      strokes: entity.strokes.map(_strokeFromEntity).toList(),
-      shapes: entity.shapes.map(_shapeFromEntity).toList(),
       textBlocks: entity.textBlocks.map(_textFromEntity).toList(),
       imageBlocks: entity.imageBlocks.map(_imageFromEntity).toList(),
-      redoStack: <Stroke>[],
+      inkStrokes: entity.inkStrokes.map(_strokeFromEntity).toList(),
       isBookmarked: entity.isBookmarked,
-    );
-  }
-
-  Stroke _strokeFromEntity(StrokeEntity entity) {
-    return Stroke(
-      id: entity.uid.isEmpty ? _uuid.v4() : entity.uid,
-      points: entity.points
-          .map(
-            (point) => StrokePoint(
-              dx: point.dx,
-              dy: point.dy,
-              pressure: point.pressure,
-            ),
-          )
-          .toList(),
-      color: Color(entity.colorValue),
-      width: entity.width,
-      tool: DrawingTool.values[entity.tool],
     );
   }
 
@@ -161,49 +137,9 @@ class NotebookRepository {
       ..index = index
       ..title = page.title
       ..isBookmarked = page.isBookmarked
-      ..strokes = page.strokes.map(_strokeToEntity).toList()
-      ..shapes = page.shapes.map(_shapeToEntity).toList()
       ..textBlocks = page.textBlocks.map(_textToEntity).toList()
-      ..imageBlocks = page.imageBlocks.map(_imageToEntity).toList();
-  }
-
-  StrokeEntity _strokeToEntity(Stroke stroke) {
-    return StrokeEntity()
-      ..uid = stroke.id
-      ..tool = stroke.tool.index
-      ..colorValue = stroke.color.toARGB32()
-      ..width = stroke.width
-      ..points = stroke.points
-          .map(
-            (point) => StrokePointEntity()
-              ..dx = point.dx
-              ..dy = point.dy
-              ..pressure = point.pressure,
-          )
-          .toList();
-  }
-
-  Shape _shapeFromEntity(ShapeEntity entity) {
-    return Shape(
-      id: entity.uid,
-      type: ShapeType.values[entity.type],
-      color: Color(entity.colorValue),
-      width: entity.width,
-      start: Offset(entity.startDx, entity.startDy),
-      end: Offset(entity.endDx, entity.endDy),
-    );
-  }
-
-  ShapeEntity _shapeToEntity(Shape shape) {
-    return ShapeEntity()
-      ..uid = shape.id
-      ..type = shape.type.index
-      ..colorValue = shape.color.toARGB32()
-      ..width = shape.width
-      ..startDx = shape.start.dx
-      ..startDy = shape.start.dy
-      ..endDx = shape.end.dx
-      ..endDy = shape.end.dy;
+        ..imageBlocks = page.imageBlocks.map(_imageToEntity).toList()
+        ..inkStrokes = page.inkStrokes.map(_strokeToEntity).toList();
   }
 
   TextBlock _textFromEntity(TextBlockEntity entity) {
@@ -250,6 +186,37 @@ class NotebookRepository {
       ..dy = block.position.dy;
   }
 
+  InkStroke _strokeFromEntity(InkStrokeEntity entity) {
+    final tool = _toolFromIndex(entity.toolIndex);
+    return InkStroke(
+      id: entity.uid,
+      points: entity.points
+          .map((item) => InkPoint(
+                dx: item.dx,
+                dy: item.dy,
+                pressure: item.pressure,
+              ))
+          .toList(),
+      color: Color(entity.colorValue),
+      width: entity.width,
+      tool: tool,
+    );
+  }
+
+  InkStrokeEntity _strokeToEntity(InkStroke stroke) {
+    return InkStrokeEntity()
+      ..uid = stroke.id
+      ..colorValue = stroke.color.toARGB32()
+      ..width = stroke.width
+      ..toolIndex = _toolToIndex(stroke.tool)
+      ..points = stroke.points
+          .map((point) => InkPointEntity()
+            ..dx = point.dx
+            ..dy = point.dy
+            ..pressure = point.pressure)
+          .toList();
+  }
+
   Map<String, dynamic> _notebookToJson(Notebook notebook) {
     return {
       'uid': notebook.uid,
@@ -278,10 +245,9 @@ class NotebookRepository {
       'id': page.id,
       'title': page.title,
       'isBookmarked': page.isBookmarked,
-      'strokes': page.strokes.map(_strokeToJson).toList(),
-      'shapes': page.shapes.map(_shapeToJson).toList(),
       'textBlocks': page.textBlocks.map(_textToJson).toList(),
       'imageBlocks': page.imageBlocks.map(_imageToJson).toList(),
+      'inkStrokes': page.inkStrokes.map(_strokeToJson).toList(),
     };
   }
 
@@ -289,14 +255,6 @@ class NotebookRepository {
     return NotePage(
       id: json['id'] as String,
       title: json['title'] as String,
-      strokes: (json['strokes'] as List<dynamic>)
-          .whereType<Map<String, dynamic>>()
-          .map(_strokeFromJson)
-          .toList(),
-      shapes: (json['shapes'] as List<dynamic>)
-          .whereType<Map<String, dynamic>>()
-          .map(_shapeFromJson)
-          .toList(),
       textBlocks: (json['textBlocks'] as List<dynamic>)
           .whereType<Map<String, dynamic>>()
           .map(_textFromJson)
@@ -305,75 +263,11 @@ class NotebookRepository {
           .whereType<Map<String, dynamic>>()
           .map(_imageFromJson)
           .toList(),
-      redoStack: <Stroke>[],
-      isBookmarked: json['isBookmarked'] as bool? ?? false,
-    );
-  }
-
-  Map<String, dynamic> _strokeToJson(Stroke stroke) {
-    return {
-      'id': stroke.id,
-      'tool': stroke.tool.index,
-      'color': stroke.color.toARGB32(),
-      'width': stroke.width,
-      'points': stroke.points
-          .map(
-            (point) => {
-              'dx': point.dx,
-              'dy': point.dy,
-              'pressure': point.pressure,
-            },
-          )
-          .toList(),
-    };
-  }
-
-  Stroke _strokeFromJson(Map<String, dynamic> json) {
-    return Stroke(
-      id: json['id'] as String,
-      tool: DrawingTool.values[json['tool'] as int],
-      color: Color(json['color'] as int),
-      width: (json['width'] as num).toDouble(),
-      points: (json['points'] as List<dynamic>)
+        inkStrokes: (json['inkStrokes'] as List<dynamic>? ?? <dynamic>[])
           .whereType<Map<String, dynamic>>()
-          .map(
-            (point) => StrokePoint(
-              dx: (point['dx'] as num).toDouble(),
-              dy: (point['dy'] as num).toDouble(),
-              pressure: (point['pressure'] as num).toDouble(),
-            ),
-          )
+          .map(_strokeFromJson)
           .toList(),
-    );
-  }
-
-  Map<String, dynamic> _shapeToJson(Shape shape) {
-    return {
-      'id': shape.id,
-      'type': shape.type.index,
-      'color': shape.color.toARGB32(),
-      'width': shape.width,
-      'startDx': shape.start.dx,
-      'startDy': shape.start.dy,
-      'endDx': shape.end.dx,
-      'endDy': shape.end.dy,
-    };
-  }
-
-  Shape _shapeFromJson(Map<String, dynamic> json) {
-    return Shape(
-      id: json['id'] as String,
-      type: ShapeType.values[json['type'] as int],
-      color: Color(json['color'] as int),
-      width: (json['width'] as num).toDouble(),
-      start: Offset(
-        (json['startDx'] as num).toDouble(),
-        (json['startDy'] as num).toDouble(),
-      ),
-      end: Offset(
-        (json['endDx'] as num).toDouble(),
-        (json['endDy'] as num).toDouble(),
-      ),
+      isBookmarked: json['isBookmarked'] as bool? ?? false,
     );
   }
 
@@ -427,5 +321,64 @@ class NotebookRepository {
       width: (json['width'] as num).toDouble(),
       height: (json['height'] as num).toDouble(),
     );
+  }
+
+  Map<String, dynamic> _strokeToJson(InkStroke stroke) {
+    return {
+      'id': stroke.id,
+      'color': stroke.color.toARGB32(),
+      'width': stroke.width,
+      'tool': _toolToIndex(stroke.tool),
+      'points': stroke.points
+          .map(
+            (point) => {
+              'dx': point.dx,
+              'dy': point.dy,
+              'pressure': point.pressure,
+            },
+          )
+          .toList(),
+    };
+  }
+
+  InkStroke _strokeFromJson(Map<String, dynamic> json) {
+    final toolIndex = (json['tool'] as num?)?.toInt() ?? 0;
+    final tool = _toolFromIndex(toolIndex);
+    return InkStroke(
+      id: json['id'] as String,
+      color: Color(json['color'] as int),
+      width: (json['width'] as num).toDouble(),
+      tool: tool,
+      points: (json['points'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (point) => InkPoint(
+              dx: (point['dx'] as num).toDouble(),
+              dy: (point['dy'] as num).toDouble(),
+              pressure: (point['pressure'] as num?)?.toDouble() ?? 0.5,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  DrawingTool _toolFromIndex(int index) {
+    if (index == 1) {
+      return DrawingTool.pen;
+    }
+    if (index >= 2) {
+      index -= 1;
+    }
+    return DrawingTool.values.elementAt(
+      index.clamp(0, DrawingTool.values.length - 1),
+    );
+  }
+
+  int _toolToIndex(DrawingTool tool) {
+    final index = tool.index;
+    if (index >= 1) {
+      return index + 1;
+    }
+    return index;
   }
 }

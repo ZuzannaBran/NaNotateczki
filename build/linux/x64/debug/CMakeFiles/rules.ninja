@@ -80,7 +80,7 @@ rule CXX_SHARED_LIBRARY_LINKER__isar_flutter_libs_plugin_Debug
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug
+  command = /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug
   description = Re-running CMake...
   generator = 1
 

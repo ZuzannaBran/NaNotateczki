@@ -9,14 +9,12 @@ class EditorToolbar extends StatelessWidget {
     required this.controller,
     required this.onExportPng,
     required this.onExportPdf,
-    required this.onToolUnavailable,
     super.key,
   });
 
   final EditorController controller;
   final VoidCallback onExportPng;
   final VoidCallback onExportPdf;
-  final ValueChanged<DrawingTool> onToolUnavailable;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +22,7 @@ class EditorToolbar extends StatelessWidget {
       animation: controller,
       builder: (context, child) {
         return Container(
+          width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           color: AppColors.toolbar,
           child: SingleChildScrollView(
@@ -31,34 +30,14 @@ class EditorToolbar extends StatelessWidget {
             child: Row(
               children: [
                 _toolButton(
-                  icon: Icons.edit,
+                  icon: Icons.brush_outlined,
                   label: 'Pen',
                   tool: DrawingTool.pen,
                 ),
                 _toolButton(
-                  icon: Icons.create_outlined,
-                  label: 'Pencil',
-                  tool: DrawingTool.pencil,
-                ),
-                _toolButton(
-                  icon: Icons.border_color_outlined,
+                  icon: Icons.highlight,
                   label: 'Highlighter',
                   tool: DrawingTool.highlighter,
-                ),
-                _toolButton(
-                  icon: Icons.auto_fix_off,
-                  label: 'Eraser',
-                  tool: DrawingTool.eraser,
-                ),
-                _toolButton(
-                  icon: Icons.select_all,
-                  label: 'Lasso',
-                  tool: DrawingTool.lasso,
-                ),
-                _toolButton(
-                  icon: Icons.square_foot,
-                  label: 'Shapes',
-                  tool: DrawingTool.shape,
                 ),
                 _toolButton(
                   icon: Icons.text_fields,
@@ -71,19 +50,22 @@ class EditorToolbar extends StatelessWidget {
                   tool: DrawingTool.image,
                 ),
                 const SizedBox(width: 12),
-                for (final color in AppColors.inkPalette)
+                for (var i = 0; i < controller.quickColors.length; i++)
                   _colorDot(
-                    color: color,
-                    selected: controller.inkColor == color,
-                    onTap: () => controller.setColor(color),
+                    context,
+                    color: controller.quickColors[i],
+                    selected: controller.inkColor == controller.quickColors[i],
+                    onSelect: () => controller.setColor(
+                      controller.quickColors[i],
+                    ),
+                    onEdit: (color) => controller.setQuickColor(i, color),
                   ),
-                const SizedBox(width: 12),
                 SizedBox(
                   width: 140,
                   child: Slider(
-                    value: controller.strokeWidth,
-                    min: 1,
-                    max: 14,
+                    value: controller.inkStrokeWidth,
+                    min: 1.0,
+                    max: 12.0,
                     onChanged: controller.setStrokeWidth,
                   ),
                 ),
@@ -120,7 +102,7 @@ class EditorToolbar extends StatelessWidget {
     required IconData icon,
     required String label,
     required DrawingTool tool,
-    bool available = true,
+    VoidCallback? onPressed,
   }) {
     final selected = controller.tool == tool;
     return Padding(
@@ -129,27 +111,35 @@ class EditorToolbar extends StatelessWidget {
         icon: Icon(icon),
         tooltip: label,
         color: selected ? AppColors.inkBlack : null,
-        onPressed: () {
-          controller.setTool(tool);
-          if (!available) {
-            onToolUnavailable(tool);
-          }
-        },
+        onPressed: onPressed ?? () => controller.setTool(tool),
       ),
     );
   }
 
-  Widget _colorDot({
+  Widget _colorDot(
+    BuildContext context, {
     required Color color,
     required bool selected,
-    required VoidCallback onTap,
+    required VoidCallback onSelect,
+    required ValueChanged<Color> onEdit,
   }) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () async {
+        final updated = await _pickColor(
+          context,
+          color,
+          controller.recentColors,
+        );
+        if (updated == null) {
+          return;
+        }
+        onEdit(updated);
+      },
+      onLongPress: onSelect,
       child: Container(
         margin: const EdgeInsets.only(right: 6),
-        width: 22,
-        height: 22,
+        width: 24,
+        height: 24,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: color,
@@ -159,6 +149,159 @@ class EditorToolbar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Future<Color?> _pickColor(
+    BuildContext context,
+    Color current,
+    List<Color> recentColors,
+  ) async {
+    var red = current.red.toDouble();
+    var green = current.green.toDouble();
+    var blue = current.blue.toDouble();
+    var shade = 0.5;
+
+    return showDialog<Color>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final base = Color.fromARGB(255, red.round(), green.round(), blue.round());
+            final preview = _applyShade(base, shade);
+            return AlertDialog(
+              title: const Text('Pick color'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: preview,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _channelSlider(
+                    label: 'R',
+                    value: red,
+                    color: Colors.red,
+                    onChanged: (value) => setState(() => red = value),
+                  ),
+                  _channelSlider(
+                    label: 'G',
+                    value: green,
+                    color: Colors.green,
+                    onChanged: (value) => setState(() => green = value),
+                  ),
+                  _channelSlider(
+                    label: 'B',
+                    value: blue,
+                    color: Colors.blue,
+                    onChanged: (value) => setState(() => blue = value),
+                  ),
+                  _channelSlider(
+                    label: 'B/W',
+                    value: shade * 100,
+                    color: Colors.grey,
+                    min: 0,
+                    max: 100,
+                    onChanged: (value) => setState(() => shade = value / 100),
+                  ),
+                  if (recentColors.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Recent',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final color in recentColors)
+                          GestureDetector(
+                            onTap: () => Navigator.of(context).pop(color),
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: color,
+                                border: Border.all(color: AppColors.divider),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(preview),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _channelSlider({
+    required String label,
+    required double value,
+    required Color color,
+    double min = 0,
+    double max = 255,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Row(
+      children: [
+        SizedBox(width: 18, child: Text(label)),
+        Expanded(
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            activeColor: color,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _applyShade(Color base, double shade) {
+    if (shade == 0.5) {
+      return base;
+    }
+    if (shade < 0.5) {
+      final t = shade / 0.5;
+      return Color.fromARGB(
+        255,
+        (base.red * t).round(),
+        (base.green * t).round(),
+        (base.blue * t).round(),
+      );
+    }
+    final t = (shade - 0.5) / 0.5;
+    return Color.fromARGB(
+      255,
+      (base.red + (255 - base.red) * t).round(),
+      (base.green + (255 - base.green) * t).round(),
+      (base.blue + (255 - base.blue) * t).round(),
     );
   }
 }

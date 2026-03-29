@@ -1,50 +1,13 @@
 import 'dart:ui';
 
 import '../../notebook/domain/image_block.dart';
+import '../../notebook/domain/ink_stroke.dart';
 import '../../notebook/domain/note_page.dart';
-import '../../notebook/domain/shape.dart';
-import '../../notebook/domain/stroke.dart';
 import '../../notebook/domain/text_block.dart';
 
 abstract class EditorAction {
   NotePage apply(NotePage page);
   NotePage revert(NotePage page);
-}
-
-class AddStrokeAction extends EditorAction {
-  AddStrokeAction(this.stroke);
-
-  final Stroke stroke;
-
-  @override
-  NotePage apply(NotePage page) {
-    return page.copyWith(strokes: [...page.strokes, stroke]);
-  }
-
-  @override
-  NotePage revert(NotePage page) {
-    return page.copyWith(
-      strokes: page.strokes.where((item) => item.id != stroke.id).toList(),
-    );
-  }
-}
-
-class AddShapeAction extends EditorAction {
-  AddShapeAction(this.shape);
-
-  final Shape shape;
-
-  @override
-  NotePage apply(NotePage page) {
-    return page.copyWith(shapes: [...page.shapes, shape]);
-  }
-
-  @override
-  NotePage revert(NotePage page) {
-    return page.copyWith(
-      shapes: page.shapes.where((item) => item.id != shape.id).toList(),
-    );
-  }
 }
 
 class AddTextAction extends EditorAction {
@@ -80,6 +43,26 @@ class AddImageAction extends EditorAction {
     return page.copyWith(
       imageBlocks: page.imageBlocks
           .where((item) => item.id != block.id)
+          .toList(),
+    );
+  }
+}
+
+class AddInkStrokeAction extends EditorAction {
+  AddInkStrokeAction(this.stroke);
+
+  final InkStroke stroke;
+
+  @override
+  NotePage apply(NotePage page) {
+    return page.copyWith(inkStrokes: [...page.inkStrokes, stroke]);
+  }
+
+  @override
+  NotePage revert(NotePage page) {
+    return page.copyWith(
+      inkStrokes: page.inkStrokes
+          .where((item) => item.id != stroke.id)
           .toList(),
     );
   }
@@ -193,23 +176,6 @@ class UpdateImageOcrAction extends EditorAction {
   @override
   NotePage revert(NotePage page) {
     return page.copyWith(imageBlocks: before);
-  }
-}
-
-class MoveStrokesAction extends EditorAction {
-  MoveStrokesAction({required this.before, required this.after});
-
-  final List<Stroke> before;
-  final List<Stroke> after;
-
-  @override
-  NotePage apply(NotePage page) {
-    return page.copyWith(strokes: after);
-  }
-
-  @override
-  NotePage revert(NotePage page) {
-    return page.copyWith(strokes: before);
   }
 }
 

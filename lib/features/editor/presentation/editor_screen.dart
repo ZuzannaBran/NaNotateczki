@@ -9,7 +9,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../notebook/domain/drawing_tool.dart';
 import '../state/editor_controller.dart';
 import 'widgets/drawing_canvas.dart';
 import 'widgets/editor_toolbar.dart';
@@ -42,7 +41,6 @@ class EditorScreen extends StatelessWidget {
             controller: controller,
             onExportPng: () => _exportPng(context),
             onExportPdf: () => _exportPdf(context),
-            onToolUnavailable: (tool) => _showToolHint(context, tool),
           ),
           Expanded(
             child: Container(
@@ -64,12 +62,7 @@ class EditorScreen extends StatelessWidget {
                   key: _canvasKey,
                   child: Stack(
                     children: [
-                      IgnorePointer(
-                        ignoring:
-                            controller.tool == DrawingTool.text ||
-                            controller.tool == DrawingTool.image,
-                        child: DrawingCanvas(controller: controller),
-                      ),
+                      const DrawingCanvas(),
                       PageOverlay(controller: controller),
                     ],
                   ),
@@ -134,9 +127,4 @@ class EditorScreen extends StatelessWidget {
     return data?.buffer.asUint8List();
   }
 
-  void _showToolHint(BuildContext context, DrawingTool tool) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${tool.name} tool is coming soon.')),
-    );
-  }
 }

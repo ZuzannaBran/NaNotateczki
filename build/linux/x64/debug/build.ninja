@@ -39,13 +39,13 @@ include CMakeFiles/rules.ninja
 #############################################
 # Logical path to working directory; prefix for absolute paths.
 
-cmake_ninja_workdir = /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/
+cmake_ninja_workdir = /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/
 
 #############################################
 # Utility command for edit_cache
 
 build CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
   DESC = No interactive CMake dialog available...
   restat = 1
 
@@ -56,7 +56,7 @@ build edit_cache: phony CMakeFiles/edit_cache.util
 # Utility command for rebuild_cache
 
 build CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -74,7 +74,7 @@ build list_install_components: phony
 # Utility command for install
 
 build CMakeFiles/install.util: CUSTOM_COMMAND all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug && /usr/bin/cmake -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug && /usr/bin/cmake -P cmake_install.cmake
   DESC = Install the project...
   pool = console
   restat = 1
@@ -86,7 +86,7 @@ build install: phony CMakeFiles/install.util
 # Utility command for install/local
 
 build CMakeFiles/install/local.util: CUSTOM_COMMAND all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
   DESC = Installing only the local directory...
   pool = console
   restat = 1
@@ -98,7 +98,7 @@ build install/local: phony CMakeFiles/install/local.util
 # Utility command for install/strip
 
 build CMakeFiles/install/strip.util: CUSTOM_COMMAND all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
   DESC = Installing the project stripped...
   pool = console
   restat = 1
@@ -107,21 +107,21 @@ build install/strip: phony CMakeFiles/install/strip.util
 
 # =============================================================================
 # Write statements declared in CMakeLists.txt:
-# /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/CMakeLists.txt
+# /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/CMakeLists.txt
 # =============================================================================
 
 
 #############################################
 # Utility command for flutter_assemble
 
-build flutter/flutter_assemble: phony flutter/CMakeFiles/flutter_assemble /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_basic_message_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_binary_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_binary_messenger.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_dart_project.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_engine.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_json_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_json_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_call.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_response.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_plugin_registrar.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_plugin_registry.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_standard_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_standard_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_string_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_value.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_view.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/flutter_linux.h flutter/_phony_
+build flutter/flutter_assemble: phony flutter/CMakeFiles/flutter_assemble /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_basic_message_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_binary_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_binary_messenger.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_dart_project.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_engine.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_json_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_json_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_call.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_response.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_plugin_registrar.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_plugin_registry.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_standard_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_standard_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_string_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_value.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_view.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/flutter_linux.h flutter/_phony_
 
 
 #############################################
 # Utility command for edit_cache
 
 build flutter/CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/flutter && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/flutter && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
   DESC = No interactive CMake dialog available...
   restat = 1
 
@@ -132,7 +132,7 @@ build flutter/edit_cache: phony flutter/CMakeFiles/edit_cache.util
 # Utility command for rebuild_cache
 
 build flutter/CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/flutter && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/flutter && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -150,7 +150,7 @@ build flutter/list_install_components: phony
 # Utility command for install
 
 build flutter/CMakeFiles/install.util: CUSTOM_COMMAND flutter/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/flutter && /usr/bin/cmake -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/flutter && /usr/bin/cmake -P cmake_install.cmake
   DESC = Install the project...
   pool = console
   restat = 1
@@ -162,7 +162,7 @@ build flutter/install: phony flutter/CMakeFiles/install.util
 # Utility command for install/local
 
 build flutter/CMakeFiles/install/local.util: CUSTOM_COMMAND flutter/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/flutter && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/flutter && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
   DESC = Installing only the local directory...
   pool = console
   restat = 1
@@ -174,7 +174,7 @@ build flutter/install/local: phony flutter/CMakeFiles/install/local.util
 # Utility command for install/strip
 
 build flutter/CMakeFiles/install/strip.util: CUSTOM_COMMAND flutter/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/flutter && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/flutter && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
   DESC = Installing the project stripped...
   pool = console
   restat = 1
@@ -185,20 +185,20 @@ build flutter/install/strip: phony flutter/CMakeFiles/install/strip.util
 #############################################
 # Phony custom command for flutter/CMakeFiles/flutter_assemble
 
-build flutter/CMakeFiles/flutter_assemble | ${cmake_ninja_workdir}flutter/CMakeFiles/flutter_assemble: phony /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_basic_message_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_binary_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_binary_messenger.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_dart_project.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_engine.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_json_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_json_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_call.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_response.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_plugin_registrar.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_plugin_registry.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_standard_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_standard_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_string_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_value.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_view.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/flutter_linux.h
+build flutter/CMakeFiles/flutter_assemble | ${cmake_ninja_workdir}flutter/CMakeFiles/flutter_assemble: phony /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_basic_message_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_binary_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_binary_messenger.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_dart_project.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_engine.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_json_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_json_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_call.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_response.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_plugin_registrar.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_plugin_registry.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_standard_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_standard_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_string_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_value.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_view.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/flutter_linux.h
 
 
 #############################################
-# Custom command for /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so
+# Custom command for /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so
 
-build /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_basic_message_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_binary_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_binary_messenger.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_dart_project.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_engine.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_json_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_json_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_call.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_response.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_plugin_registrar.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_plugin_registry.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_standard_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_standard_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_string_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_value.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_view.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/flutter_linux.h flutter/_phony_ | ${cmake_ninja_workdir}flutter/_phony_: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/flutter && /usr/bin/cmake -E env FLUTTER_ROOT=/home/zuzanna-baran-linux/Pobrane/programy/flutter PROJECT_DIR=/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuNDEuNA==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049ZmYzN2JlZjYwMw==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049ZTRiOGRjYTNmMQ==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMS4x DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false PACKAGE_CONFIG=/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/.dart_tool/package_config.json FLUTTER_TARGET=/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/lib/main.dart /home/zuzanna-baran-linux/Pobrane/programy/flutter/packages/flutter_tools/bin/tool_backend.sh linux-x64 Debug
-  DESC = Generating /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_basic_message_channel.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_binary_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_binary_messenger.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_dart_project.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_engine.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_json_message_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_json_method_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_message_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_call.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_channel.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_method_response.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_plugin_registrar.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_plugin_registry.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_standard_message_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_standard_method_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_string_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_value.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/fl_view.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/flutter_linux/flutter_linux.h, _phony_
+build /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_basic_message_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_binary_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_binary_messenger.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_dart_project.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_engine.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_json_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_json_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_call.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_channel.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_response.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_plugin_registrar.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_plugin_registry.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_standard_message_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_standard_method_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_string_codec.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_value.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_view.h /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/flutter_linux.h flutter/_phony_ | ${cmake_ninja_workdir}flutter/_phony_: CUSTOM_COMMAND
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/flutter && /usr/bin/cmake -E env FLUTTER_ROOT=/home/zuzanna-baran-linux/Pobrane/programy/flutter PROJECT_DIR=/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuNDEuNA==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049ZmYzN2JlZjYwMw==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049ZTRiOGRjYTNmMQ==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMS4x DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false PACKAGE_CONFIG=/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/.dart_tool/package_config.json FLUTTER_TARGET=/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/lib/main.dart /home/zuzanna-baran-linux/Pobrane/programy/flutter/packages/flutter_tools/bin/tool_backend.sh linux-x64 Debug
+  DESC = Generating /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_basic_message_channel.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_binary_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_binary_messenger.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_dart_project.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_engine.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_json_message_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_json_method_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_message_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_call.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_channel.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_method_response.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_plugin_registrar.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_plugin_registry.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_standard_message_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_standard_method_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_string_codec.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_value.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/fl_view.h, /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/flutter_linux/flutter_linux.h, _phony_
   restat = 1
 
 # =============================================================================
 # Write statements declared in CMakeLists.txt:
-# /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/CMakeLists.txt
+# /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/CMakeLists.txt
 # =============================================================================
 
 # =============================================================================
@@ -210,27 +210,27 @@ build /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/eph
 
 build cmake_object_order_depends_target_program: phony || cmake_object_order_depends_target_file_selector_linux_plugin cmake_object_order_depends_target_isar_flutter_libs_plugin flutter/flutter_assemble
 
-build runner/CMakeFiles/program.dir/main.cc.o: CXX_COMPILER__program_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/runner/main.cc || cmake_object_order_depends_target_program
+build runner/CMakeFiles/program.dir/main.cc.o: CXX_COMPILER__program_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/runner/main.cc || cmake_object_order_depends_target_program
   DEFINES = -DAPPLICATION_ID=\"com.example.program\"
   DEP_FILE = runner/CMakeFiles/program.dir/main.cc.o.d
   FLAGS = -g -Wall -Werror -pthread
-  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/include -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/include -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
+  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/include -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/include -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
   OBJECT_DIR = runner/CMakeFiles/program.dir
   OBJECT_FILE_DIR = runner/CMakeFiles/program.dir
 
-build runner/CMakeFiles/program.dir/my_application.cc.o: CXX_COMPILER__program_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/runner/my_application.cc || cmake_object_order_depends_target_program
+build runner/CMakeFiles/program.dir/my_application.cc.o: CXX_COMPILER__program_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/runner/my_application.cc || cmake_object_order_depends_target_program
   DEFINES = -DAPPLICATION_ID=\"com.example.program\"
   DEP_FILE = runner/CMakeFiles/program.dir/my_application.cc.o.d
   FLAGS = -g -Wall -Werror -pthread
-  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/include -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/include -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
+  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/include -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/include -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
   OBJECT_DIR = runner/CMakeFiles/program.dir
   OBJECT_FILE_DIR = runner/CMakeFiles/program.dir
 
-build runner/CMakeFiles/program.dir/__/flutter/generated_plugin_registrant.cc.o: CXX_COMPILER__program_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/generated_plugin_registrant.cc || cmake_object_order_depends_target_program
+build runner/CMakeFiles/program.dir/__/flutter/generated_plugin_registrant.cc.o: CXX_COMPILER__program_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/generated_plugin_registrant.cc || cmake_object_order_depends_target_program
   DEFINES = -DAPPLICATION_ID=\"com.example.program\"
   DEP_FILE = runner/CMakeFiles/program.dir/__/flutter/generated_plugin_registrant.cc.o.d
   FLAGS = -g -Wall -Werror -pthread
-  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/include -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/include -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
+  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/include -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/include -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
   OBJECT_DIR = runner/CMakeFiles/program.dir
   OBJECT_FILE_DIR = runner/CMakeFiles/program.dir/__/flutter
 
@@ -242,9 +242,9 @@ build runner/CMakeFiles/program.dir/__/flutter/generated_plugin_registrant.cc.o:
 #############################################
 # Link the executable intermediates_do_not_run/program
 
-build intermediates_do_not_run/program: CXX_EXECUTABLE_LINKER__program_Debug runner/CMakeFiles/program.dir/main.cc.o runner/CMakeFiles/program.dir/my_application.cc.o runner/CMakeFiles/program.dir/__/flutter/generated_plugin_registrant.cc.o | plugins/file_selector_linux/libfile_selector_linux_plugin.so plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so /usr/lib/x86_64-linux-gnu/libgtk-3.so /usr/lib/x86_64-linux-gnu/libgdk-3.so /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so /usr/lib/x86_64-linux-gnu/libpango-1.0.so /usr/lib/x86_64-linux-gnu/libharfbuzz.so /usr/lib/x86_64-linux-gnu/libatk-1.0.so /usr/lib/x86_64-linux-gnu/libcairo-gobject.so /usr/lib/x86_64-linux-gnu/libcairo.so /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so /usr/lib/x86_64-linux-gnu/libgio-2.0.so /usr/lib/x86_64-linux-gnu/libgobject-2.0.so /usr/lib/x86_64-linux-gnu/libglib-2.0.so || flutter/flutter_assemble plugins/file_selector_linux/libfile_selector_linux_plugin.so plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so
+build intermediates_do_not_run/program: CXX_EXECUTABLE_LINKER__program_Debug runner/CMakeFiles/program.dir/main.cc.o runner/CMakeFiles/program.dir/my_application.cc.o runner/CMakeFiles/program.dir/__/flutter/generated_plugin_registrant.cc.o | plugins/file_selector_linux/libfile_selector_linux_plugin.so plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so /usr/lib/x86_64-linux-gnu/libgtk-3.so /usr/lib/x86_64-linux-gnu/libgdk-3.so /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so /usr/lib/x86_64-linux-gnu/libpango-1.0.so /usr/lib/x86_64-linux-gnu/libharfbuzz.so /usr/lib/x86_64-linux-gnu/libatk-1.0.so /usr/lib/x86_64-linux-gnu/libcairo-gobject.so /usr/lib/x86_64-linux-gnu/libcairo.so /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so /usr/lib/x86_64-linux-gnu/libgio-2.0.so /usr/lib/x86_64-linux-gnu/libgobject-2.0.so /usr/lib/x86_64-linux-gnu/libglib-2.0.so || flutter/flutter_assemble plugins/file_selector_linux/libfile_selector_linux_plugin.so plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so
   FLAGS = -g
-  LINK_LIBRARIES = -Wl,-rpath,/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/file_selector_linux:/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/isar_flutter_libs:/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral:  plugins/file_selector_linux/libfile_selector_linux_plugin.so  plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so  /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so  /usr/lib/x86_64-linux-gnu/libgtk-3.so  /usr/lib/x86_64-linux-gnu/libgdk-3.so  /usr/lib/x86_64-linux-gnu/libz.so  /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so  /usr/lib/x86_64-linux-gnu/libpango-1.0.so  /usr/lib/x86_64-linux-gnu/libharfbuzz.so  /usr/lib/x86_64-linux-gnu/libatk-1.0.so  /usr/lib/x86_64-linux-gnu/libcairo-gobject.so  /usr/lib/x86_64-linux-gnu/libcairo.so  /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so  /usr/lib/x86_64-linux-gnu/libgio-2.0.so  /usr/lib/x86_64-linux-gnu/libgobject-2.0.so  /usr/lib/x86_64-linux-gnu/libglib-2.0.so
+  LINK_LIBRARIES = -Wl,-rpath,/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/file_selector_linux:/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs:/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral:  plugins/file_selector_linux/libfile_selector_linux_plugin.so  plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so  /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so  /usr/lib/x86_64-linux-gnu/libgtk-3.so  /usr/lib/x86_64-linux-gnu/libgdk-3.so  /usr/lib/x86_64-linux-gnu/libz.so  /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so  /usr/lib/x86_64-linux-gnu/libpango-1.0.so  /usr/lib/x86_64-linux-gnu/libharfbuzz.so  /usr/lib/x86_64-linux-gnu/libatk-1.0.so  /usr/lib/x86_64-linux-gnu/libcairo-gobject.so  /usr/lib/x86_64-linux-gnu/libcairo.so  /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so  /usr/lib/x86_64-linux-gnu/libgio-2.0.so  /usr/lib/x86_64-linux-gnu/libgobject-2.0.so  /usr/lib/x86_64-linux-gnu/libglib-2.0.so
   OBJECT_DIR = runner/CMakeFiles/program.dir
   POST_BUILD = :
   PRE_LINK = :
@@ -256,7 +256,7 @@ build intermediates_do_not_run/program: CXX_EXECUTABLE_LINKER__program_Debug run
 # Utility command for edit_cache
 
 build runner/CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/runner && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/runner && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
   DESC = No interactive CMake dialog available...
   restat = 1
 
@@ -267,7 +267,7 @@ build runner/edit_cache: phony runner/CMakeFiles/edit_cache.util
 # Utility command for rebuild_cache
 
 build runner/CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/runner && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/runner && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -285,7 +285,7 @@ build runner/list_install_components: phony
 # Utility command for install
 
 build runner/CMakeFiles/install.util: CUSTOM_COMMAND runner/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/runner && /usr/bin/cmake -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/runner && /usr/bin/cmake -P cmake_install.cmake
   DESC = Install the project...
   pool = console
   restat = 1
@@ -297,7 +297,7 @@ build runner/install: phony runner/CMakeFiles/install.util
 # Utility command for install/local
 
 build runner/CMakeFiles/install/local.util: CUSTOM_COMMAND runner/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/runner && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/runner && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
   DESC = Installing only the local directory...
   pool = console
   restat = 1
@@ -309,7 +309,7 @@ build runner/install/local: phony runner/CMakeFiles/install/local.util
 # Utility command for install/strip
 
 build runner/CMakeFiles/install/strip.util: CUSTOM_COMMAND runner/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/runner && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/runner && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
   DESC = Installing the project stripped...
   pool = console
   restat = 1
@@ -318,7 +318,7 @@ build runner/install/strip: phony runner/CMakeFiles/install/strip.util
 
 # =============================================================================
 # Write statements declared in CMakeLists.txt:
-# /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/generated_plugins.cmake
+# /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/generated_plugins.cmake
 # =============================================================================
 
 # =============================================================================
@@ -330,19 +330,19 @@ build runner/install/strip: phony runner/CMakeFiles/install/strip.util
 
 build cmake_object_order_depends_target_file_selector_linux_plugin: phony || flutter/flutter_assemble
 
-build plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/file_selector_plugin.cc.o: CXX_COMPILER__file_selector_linux_plugin_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/file_selector_plugin.cc || cmake_object_order_depends_target_file_selector_linux_plugin
+build plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/file_selector_plugin.cc.o: CXX_COMPILER__file_selector_linux_plugin_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/file_selector_plugin.cc || cmake_object_order_depends_target_file_selector_linux_plugin
   DEFINES = -DFLUTTER_PLUGIN_IMPL -Dfile_selector_linux_plugin_EXPORTS
   DEP_FILE = plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/file_selector_plugin.cc.o.d
   FLAGS = -g -fPIC -fvisibility=hidden -Wall -Werror -pthread
-  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
+  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
   OBJECT_DIR = plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir
   OBJECT_FILE_DIR = plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir
 
-build plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/messages.g.cc.o: CXX_COMPILER__file_selector_linux_plugin_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/messages.g.cc || cmake_object_order_depends_target_file_selector_linux_plugin
+build plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/messages.g.cc.o: CXX_COMPILER__file_selector_linux_plugin_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/messages.g.cc || cmake_object_order_depends_target_file_selector_linux_plugin
   DEFINES = -DFLUTTER_PLUGIN_IMPL -Dfile_selector_linux_plugin_EXPORTS
   DEP_FILE = plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/messages.g.cc.o.d
   FLAGS = -g -fPIC -fvisibility=hidden -Wall -Werror -pthread
-  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
+  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
   OBJECT_DIR = plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir
   OBJECT_FILE_DIR = plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir
 
@@ -354,9 +354,9 @@ build plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/mess
 #############################################
 # Link the shared library plugins/file_selector_linux/libfile_selector_linux_plugin.so
 
-build plugins/file_selector_linux/libfile_selector_linux_plugin.so: CXX_SHARED_LIBRARY_LINKER__file_selector_linux_plugin_Debug plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/file_selector_plugin.cc.o plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/messages.g.cc.o | /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so /usr/lib/x86_64-linux-gnu/libgtk-3.so /usr/lib/x86_64-linux-gnu/libgdk-3.so /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so /usr/lib/x86_64-linux-gnu/libpango-1.0.so /usr/lib/x86_64-linux-gnu/libharfbuzz.so /usr/lib/x86_64-linux-gnu/libatk-1.0.so /usr/lib/x86_64-linux-gnu/libcairo-gobject.so /usr/lib/x86_64-linux-gnu/libcairo.so /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so /usr/lib/x86_64-linux-gnu/libgio-2.0.so /usr/lib/x86_64-linux-gnu/libgobject-2.0.so /usr/lib/x86_64-linux-gnu/libglib-2.0.so || flutter/flutter_assemble
+build plugins/file_selector_linux/libfile_selector_linux_plugin.so: CXX_SHARED_LIBRARY_LINKER__file_selector_linux_plugin_Debug plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/file_selector_plugin.cc.o plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir/messages.g.cc.o | /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so /usr/lib/x86_64-linux-gnu/libgtk-3.so /usr/lib/x86_64-linux-gnu/libgdk-3.so /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so /usr/lib/x86_64-linux-gnu/libpango-1.0.so /usr/lib/x86_64-linux-gnu/libharfbuzz.so /usr/lib/x86_64-linux-gnu/libatk-1.0.so /usr/lib/x86_64-linux-gnu/libcairo-gobject.so /usr/lib/x86_64-linux-gnu/libcairo.so /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so /usr/lib/x86_64-linux-gnu/libgio-2.0.so /usr/lib/x86_64-linux-gnu/libgobject-2.0.so /usr/lib/x86_64-linux-gnu/libglib-2.0.so || flutter/flutter_assemble
   LANGUAGE_COMPILE_FLAGS = -g
-  LINK_LIBRARIES = -Wl,-rpath,/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral  /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so  /usr/lib/x86_64-linux-gnu/libgtk-3.so  /usr/lib/x86_64-linux-gnu/libgdk-3.so  /usr/lib/x86_64-linux-gnu/libz.so  /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so  /usr/lib/x86_64-linux-gnu/libpango-1.0.so  /usr/lib/x86_64-linux-gnu/libharfbuzz.so  /usr/lib/x86_64-linux-gnu/libatk-1.0.so  /usr/lib/x86_64-linux-gnu/libcairo-gobject.so  /usr/lib/x86_64-linux-gnu/libcairo.so  /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so  /usr/lib/x86_64-linux-gnu/libgio-2.0.so  /usr/lib/x86_64-linux-gnu/libgobject-2.0.so  /usr/lib/x86_64-linux-gnu/libglib-2.0.so
+  LINK_LIBRARIES = -Wl,-rpath,/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral  /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so  /usr/lib/x86_64-linux-gnu/libgtk-3.so  /usr/lib/x86_64-linux-gnu/libgdk-3.so  /usr/lib/x86_64-linux-gnu/libz.so  /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so  /usr/lib/x86_64-linux-gnu/libpango-1.0.so  /usr/lib/x86_64-linux-gnu/libharfbuzz.so  /usr/lib/x86_64-linux-gnu/libatk-1.0.so  /usr/lib/x86_64-linux-gnu/libcairo-gobject.so  /usr/lib/x86_64-linux-gnu/libcairo.so  /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so  /usr/lib/x86_64-linux-gnu/libgio-2.0.so  /usr/lib/x86_64-linux-gnu/libgobject-2.0.so  /usr/lib/x86_64-linux-gnu/libglib-2.0.so
   OBJECT_DIR = plugins/file_selector_linux/CMakeFiles/file_selector_linux_plugin.dir
   POST_BUILD = :
   PRE_LINK = :
@@ -370,7 +370,7 @@ build plugins/file_selector_linux/libfile_selector_linux_plugin.so: CXX_SHARED_L
 # Utility command for edit_cache
 
 build plugins/file_selector_linux/CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
   DESC = No interactive CMake dialog available...
   restat = 1
 
@@ -381,7 +381,7 @@ build plugins/file_selector_linux/edit_cache: phony plugins/file_selector_linux/
 # Utility command for rebuild_cache
 
 build plugins/file_selector_linux/CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -399,7 +399,7 @@ build plugins/file_selector_linux/list_install_components: phony
 # Utility command for install
 
 build plugins/file_selector_linux/CMakeFiles/install.util: CUSTOM_COMMAND plugins/file_selector_linux/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake -P cmake_install.cmake
   DESC = Install the project...
   pool = console
   restat = 1
@@ -411,7 +411,7 @@ build plugins/file_selector_linux/install: phony plugins/file_selector_linux/CMa
 # Utility command for install/local
 
 build plugins/file_selector_linux/CMakeFiles/install/local.util: CUSTOM_COMMAND plugins/file_selector_linux/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
   DESC = Installing only the local directory...
   pool = console
   restat = 1
@@ -423,7 +423,7 @@ build plugins/file_selector_linux/install/local: phony plugins/file_selector_lin
 # Utility command for install/strip
 
 build plugins/file_selector_linux/CMakeFiles/install/strip.util: CUSTOM_COMMAND plugins/file_selector_linux/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/file_selector_linux && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
   DESC = Installing the project stripped...
   pool = console
   restat = 1
@@ -432,7 +432,7 @@ build plugins/file_selector_linux/install/strip: phony plugins/file_selector_lin
 
 # =============================================================================
 # Write statements declared in CMakeLists.txt:
-# /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/generated_plugins.cmake
+# /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/generated_plugins.cmake
 # =============================================================================
 
 # =============================================================================
@@ -444,11 +444,11 @@ build plugins/file_selector_linux/install/strip: phony plugins/file_selector_lin
 
 build cmake_object_order_depends_target_isar_flutter_libs_plugin: phony || flutter/flutter_assemble
 
-build plugins/isar_flutter_libs/CMakeFiles/isar_flutter_libs_plugin.dir/isar_flutter_libs_plugin.cc.o: CXX_COMPILER__isar_flutter_libs_plugin_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/isar_flutter_libs_plugin.cc || cmake_object_order_depends_target_isar_flutter_libs_plugin
+build plugins/isar_flutter_libs/CMakeFiles/isar_flutter_libs_plugin.dir/isar_flutter_libs_plugin.cc.o: CXX_COMPILER__isar_flutter_libs_plugin_unscanned_Debug /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/isar_flutter_libs_plugin.cc || cmake_object_order_depends_target_isar_flutter_libs_plugin
   DEFINES = -DFLUTTER_PLUGIN_IMPL -Disar_flutter_libs_plugin_EXPORTS
   DEP_FILE = plugins/isar_flutter_libs/CMakeFiles/isar_flutter_libs_plugin.dir/isar_flutter_libs_plugin.cc.o.d
   FLAGS = -g -fPIC -fvisibility=hidden -Wall -Werror -pthread
-  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
+  INCLUDES = -I/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral -isystem /usr/include/gtk-3.0 -isystem /usr/include/pango-1.0 -isystem /usr/include/glib-2.0 -isystem /usr/lib/x86_64-linux-gnu/glib-2.0/include -isystem /usr/include/harfbuzz -isystem /usr/include/freetype2 -isystem /usr/include/libpng16 -isystem /usr/include/libmount -isystem /usr/include/blkid -isystem /usr/include/fribidi -isystem /usr/include/cairo -isystem /usr/include/pixman-1 -isystem /usr/include/gdk-pixbuf-2.0 -isystem /usr/include/webp -isystem /usr/include/gio-unix-2.0 -isystem /usr/include/atk-1.0 -isystem /usr/include/at-spi2-atk/2.0 -isystem /usr/include/at-spi-2.0 -isystem /usr/include/dbus-1.0 -isystem /usr/lib/x86_64-linux-gnu/dbus-1.0/include
   OBJECT_DIR = plugins/isar_flutter_libs/CMakeFiles/isar_flutter_libs_plugin.dir
   OBJECT_FILE_DIR = plugins/isar_flutter_libs/CMakeFiles/isar_flutter_libs_plugin.dir
 
@@ -460,9 +460,9 @@ build plugins/isar_flutter_libs/CMakeFiles/isar_flutter_libs_plugin.dir/isar_flu
 #############################################
 # Link the shared library plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so
 
-build plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so: CXX_SHARED_LIBRARY_LINKER__isar_flutter_libs_plugin_Debug plugins/isar_flutter_libs/CMakeFiles/isar_flutter_libs_plugin.dir/isar_flutter_libs_plugin.cc.o | /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so /usr/lib/x86_64-linux-gnu/libgtk-3.so /usr/lib/x86_64-linux-gnu/libgdk-3.so /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so /usr/lib/x86_64-linux-gnu/libpango-1.0.so /usr/lib/x86_64-linux-gnu/libharfbuzz.so /usr/lib/x86_64-linux-gnu/libatk-1.0.so /usr/lib/x86_64-linux-gnu/libcairo-gobject.so /usr/lib/x86_64-linux-gnu/libcairo.so /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so /usr/lib/x86_64-linux-gnu/libgio-2.0.so /usr/lib/x86_64-linux-gnu/libgobject-2.0.so /usr/lib/x86_64-linux-gnu/libglib-2.0.so || flutter/flutter_assemble
+build plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so: CXX_SHARED_LIBRARY_LINKER__isar_flutter_libs_plugin_Debug plugins/isar_flutter_libs/CMakeFiles/isar_flutter_libs_plugin.dir/isar_flutter_libs_plugin.cc.o | /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so /usr/lib/x86_64-linux-gnu/libgtk-3.so /usr/lib/x86_64-linux-gnu/libgdk-3.so /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so /usr/lib/x86_64-linux-gnu/libpango-1.0.so /usr/lib/x86_64-linux-gnu/libharfbuzz.so /usr/lib/x86_64-linux-gnu/libatk-1.0.so /usr/lib/x86_64-linux-gnu/libcairo-gobject.so /usr/lib/x86_64-linux-gnu/libcairo.so /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so /usr/lib/x86_64-linux-gnu/libgio-2.0.so /usr/lib/x86_64-linux-gnu/libgobject-2.0.so /usr/lib/x86_64-linux-gnu/libglib-2.0.so || flutter/flutter_assemble
   LANGUAGE_COMPILE_FLAGS = -g
-  LINK_LIBRARIES = -Wl,-rpath,/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral  /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/libflutter_linux_gtk.so  /usr/lib/x86_64-linux-gnu/libgtk-3.so  /usr/lib/x86_64-linux-gnu/libgdk-3.so  /usr/lib/x86_64-linux-gnu/libz.so  /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so  /usr/lib/x86_64-linux-gnu/libpango-1.0.so  /usr/lib/x86_64-linux-gnu/libharfbuzz.so  /usr/lib/x86_64-linux-gnu/libatk-1.0.so  /usr/lib/x86_64-linux-gnu/libcairo-gobject.so  /usr/lib/x86_64-linux-gnu/libcairo.so  /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so  /usr/lib/x86_64-linux-gnu/libgio-2.0.so  /usr/lib/x86_64-linux-gnu/libgobject-2.0.so  /usr/lib/x86_64-linux-gnu/libglib-2.0.so
+  LINK_LIBRARIES = -Wl,-rpath,/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral  /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/libflutter_linux_gtk.so  /usr/lib/x86_64-linux-gnu/libgtk-3.so  /usr/lib/x86_64-linux-gnu/libgdk-3.so  /usr/lib/x86_64-linux-gnu/libz.so  /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so  /usr/lib/x86_64-linux-gnu/libpango-1.0.so  /usr/lib/x86_64-linux-gnu/libharfbuzz.so  /usr/lib/x86_64-linux-gnu/libatk-1.0.so  /usr/lib/x86_64-linux-gnu/libcairo-gobject.so  /usr/lib/x86_64-linux-gnu/libcairo.so  /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so  /usr/lib/x86_64-linux-gnu/libgio-2.0.so  /usr/lib/x86_64-linux-gnu/libgobject-2.0.so  /usr/lib/x86_64-linux-gnu/libglib-2.0.so
   OBJECT_DIR = plugins/isar_flutter_libs/CMakeFiles/isar_flutter_libs_plugin.dir
   POST_BUILD = :
   PRE_LINK = :
@@ -476,7 +476,7 @@ build plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so: CXX_SHARED_LIBRA
 # Utility command for edit_cache
 
 build plugins/isar_flutter_libs/CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
   DESC = No interactive CMake dialog available...
   restat = 1
 
@@ -487,7 +487,7 @@ build plugins/isar_flutter_libs/edit_cache: phony plugins/isar_flutter_libs/CMak
 # Utility command for rebuild_cache
 
 build plugins/isar_flutter_libs/CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake --regenerate-during-build -S/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux -B/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -505,7 +505,7 @@ build plugins/isar_flutter_libs/list_install_components: phony
 # Utility command for install
 
 build plugins/isar_flutter_libs/CMakeFiles/install.util: CUSTOM_COMMAND plugins/isar_flutter_libs/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake -P cmake_install.cmake
   DESC = Install the project...
   pool = console
   restat = 1
@@ -517,7 +517,7 @@ build plugins/isar_flutter_libs/install: phony plugins/isar_flutter_libs/CMakeFi
 # Utility command for install/local
 
 build plugins/isar_flutter_libs/CMakeFiles/install/local.util: CUSTOM_COMMAND plugins/isar_flutter_libs/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
   DESC = Installing only the local directory...
   pool = console
   restat = 1
@@ -529,7 +529,7 @@ build plugins/isar_flutter_libs/install/local: phony plugins/isar_flutter_libs/C
 # Utility command for install/strip
 
 build plugins/isar_flutter_libs/CMakeFiles/install/strip.util: CUSTOM_COMMAND plugins/isar_flutter_libs/all
-  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+  COMMAND = cd /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
   DESC = Installing the project stripped...
   pool = console
   restat = 1
@@ -557,35 +557,35 @@ build program: phony intermediates_do_not_run/program
 # =============================================================================
 
 #############################################
-# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug
+# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug
 
 build all: phony flutter/all runner/all plugins/file_selector_linux/all plugins/isar_flutter_libs/all
 
 # =============================================================================
 
 #############################################
-# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/flutter
+# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/flutter
 
 build flutter/all: phony
 
 # =============================================================================
 
 #############################################
-# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/file_selector_linux
+# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/file_selector_linux
 
 build plugins/file_selector_linux/all: phony plugins/file_selector_linux/libfile_selector_linux_plugin.so
 
 # =============================================================================
 
 #############################################
-# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/plugins/isar_flutter_libs
+# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs
 
 build plugins/isar_flutter_libs/all: phony plugins/isar_flutter_libs/libisar_flutter_libs_plugin.so
 
 # =============================================================================
 
 #############################################
-# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/build/linux/x64/debug/runner
+# Folder: /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/runner
 
 build runner/all: phony intermediates_do_not_run/program
 
@@ -596,14 +596,14 @@ build runner/all: phony intermediates_do_not_run/program
 #############################################
 # Re-run CMake if any of its inputs changed.
 
-build build.ninja: RERUN_CMAKE | /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/generated_config.cmake /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/generated_plugins.cmake /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/runner/CMakeLists.txt /usr/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /usr/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /usr/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU.cmake /usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-3.28/Modules/FindPackageMessage.cmake /usr/share/cmake-3.28/Modules/FindPkgConfig.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-3.28/Modules/Platform/Linux.cmake /usr/share/cmake-3.28/Modules/Platform/UnixPaths.cmake CMakeCache.txt CMakeFiles/3.28.3/CMakeCXXCompiler.cmake CMakeFiles/3.28.3/CMakeSystem.cmake
+build build.ninja: RERUN_CMAKE | /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/generated_config.cmake /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/generated_plugins.cmake /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/runner/CMakeLists.txt /usr/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /usr/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /usr/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU.cmake /usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-3.28/Modules/FindPackageMessage.cmake /usr/share/cmake-3.28/Modules/FindPkgConfig.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-3.28/Modules/Platform/Linux.cmake /usr/share/cmake-3.28/Modules/Platform/UnixPaths.cmake CMakeCache.txt CMakeFiles/3.28.3/CMakeCXXCompiler.cmake CMakeFiles/3.28.3/CMakeSystem.cmake
   pool = console
 
 
 #############################################
 # A missing CMake input file is not an error.
 
-build /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/ephemeral/generated_config.cmake /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/flutter/generated_plugins.cmake /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/program/linux/runner/CMakeLists.txt /usr/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /usr/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /usr/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU.cmake /usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-3.28/Modules/FindPackageMessage.cmake /usr/share/cmake-3.28/Modules/FindPkgConfig.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-3.28/Modules/Platform/Linux.cmake /usr/share/cmake-3.28/Modules/Platform/UnixPaths.cmake CMakeCache.txt CMakeFiles/3.28.3/CMakeCXXCompiler.cmake CMakeFiles/3.28.3/CMakeSystem.cmake: phony
+build /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/file_selector_linux/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/.plugin_symlinks/isar_flutter_libs/linux/CMakeLists.txt /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/ephemeral/generated_config.cmake /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/flutter/generated_plugins.cmake /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux/runner/CMakeLists.txt /usr/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /usr/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /usr/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU.cmake /usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-3.28/Modules/FindPackageMessage.cmake /usr/share/cmake-3.28/Modules/FindPkgConfig.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-3.28/Modules/Platform/Linux.cmake /usr/share/cmake-3.28/Modules/Platform/UnixPaths.cmake CMakeCache.txt CMakeFiles/3.28.3/CMakeCXXCompiler.cmake CMakeFiles/3.28.3/CMakeSystem.cmake: phony
 
 
 #############################################

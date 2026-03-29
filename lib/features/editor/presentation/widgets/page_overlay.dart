@@ -17,30 +17,34 @@ class PageOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tool = controller.tool;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTapDown: (details) async {
-              if (tool == DrawingTool.text || tool == DrawingTool.image) {
-                final message = await controller.handleTap(
-                  details.localPosition,
-                );
-                if (message != null && context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(message)));
+    return IgnorePointer(
+      ignoring: tool == DrawingTool.pen ||
+          tool == DrawingTool.highlighter,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTapDown: (details) async {
+                if (tool == DrawingTool.text || tool == DrawingTool.image) {
+                  final message = await controller.handleTap(
+                    details.localPosition,
+                  );
+                  if (message != null && context.mounted) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(message)));
+                  }
                 }
-              }
-            },
+              },
+            ),
           ),
-        ),
-        for (final block in controller.currentPage.textBlocks)
-          _TextBlockWidget(block: block),
-        for (final block in controller.currentPage.imageBlocks)
-          _ImageBlockWidget(block: block),
-      ],
+          for (final block in controller.currentPage.textBlocks)
+            _TextBlockWidget(block: block),
+          for (final block in controller.currentPage.imageBlocks)
+            _ImageBlockWidget(block: block),
+        ],
+      ),
     );
   }
 }
@@ -61,9 +65,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   @override
   Widget build(BuildContext context) {
     final controller = context.read<EditorController>();
-    final canDrag =
-        controller.tool == DrawingTool.lasso ||
-        controller.tool == DrawingTool.text;
+    final canDrag = controller.tool == DrawingTool.text;
 
     return Positioned(
       left: widget.block.position.dx,
@@ -172,9 +174,7 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   @override
   Widget build(BuildContext context) {
     final controller = context.read<EditorController>();
-    final canDrag =
-        controller.tool == DrawingTool.lasso ||
-        controller.tool == DrawingTool.image;
+    final canDrag = controller.tool == DrawingTool.image;
 
     return Positioned(
       left: widget.block.position.dx,

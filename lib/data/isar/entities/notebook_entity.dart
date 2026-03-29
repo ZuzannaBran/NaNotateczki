@@ -18,31 +18,9 @@ class NotePageEntity {
   late int index;
   late String title;
   late bool isBookmarked;
-  late List<StrokeEntity> strokes;
-  late List<ShapeEntity> shapes;
   late List<TextBlockEntity> textBlocks;
   late List<ImageBlockEntity> imageBlocks;
-}
-
-@embedded
-class StrokeEntity {
-  late String uid;
-  late int tool;
-  late int colorValue;
-  late double width;
-  late List<StrokePointEntity> points;
-}
-
-@embedded
-class ShapeEntity {
-  late String uid;
-  late int type;
-  late int colorValue;
-  late double width;
-  late double startDx;
-  late double startDy;
-  late double endDx;
-  late double endDy;
+  late List<InkStrokeEntity> inkStrokes;
 }
 
 @embedded
@@ -68,7 +46,16 @@ class ImageBlockEntity {
 }
 
 @embedded
-class StrokePointEntity {
+class InkStrokeEntity {
+  late String uid;
+  late int colorValue;
+  late double width;
+  late int toolIndex;
+  late List<InkPointEntity> points;
+}
+
+@embedded
+class InkPointEntity {
   late double dx;
   late double dy;
   late double pressure;
