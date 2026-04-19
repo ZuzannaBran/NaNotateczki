@@ -7,6 +7,8 @@ class NotebookEntity {
   Id id = Isar.autoIncrement;
   late String uid;
   late String title;
+  late int kindIndex;
+  late String folder;
   late DateTime createdAt;
   late DateTime updatedAt;
   late List<NotePageEntity> pages;

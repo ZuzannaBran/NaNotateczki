@@ -8,6 +8,7 @@ import '../domain/drawing_tool.dart';
 import '../domain/image_block.dart';
 import '../domain/ink_stroke.dart';
 import '../domain/notebook.dart';
+import '../domain/notebook_kind.dart';
 import '../domain/note_page.dart';
 import '../domain/text_block.dart';
 
@@ -25,11 +26,16 @@ class NotebookRepository {
     return entities.map(_fromEntity).toList();
   }
 
-  Future<Notebook> createNotebook({String? title}) async {
+  Future<Notebook> createNotebook({
+    String? title,
+    String? folder,
+  }) async {
     final now = DateTime.now();
     final notebook = Notebook(
       uid: _uuid.v4(),
       title: title ?? 'New Notebook',
+      kind: NotebookKind.notebook,
+      folder: folder ?? 'Inbox',
       createdAt: now,
       updatedAt: now,
       pages: [
@@ -46,6 +52,34 @@ class NotebookRepository {
 
     await saveNotebook(notebook);
     return notebook;
+  }
+
+  Future<Notebook> createBoard({
+    String? title,
+    String? folder,
+  }) async {
+    final now = DateTime.now();
+    final board = Notebook(
+      uid: _uuid.v4(),
+      title: title ?? 'New Board',
+      kind: NotebookKind.board,
+      folder: folder ?? 'Inbox',
+      createdAt: now,
+      updatedAt: now,
+      pages: [
+        NotePage(
+          id: _uuid.v4(),
+          title: 'Canvas',
+          textBlocks: <TextBlock>[],
+          imageBlocks: <ImageBlock>[],
+          inkStrokes: <InkStroke>[],
+          isBookmarked: false,
+        ),
+      ],
+    );
+
+    await saveNotebook(board);
+    return board;
   }
 
   Future<Notebook?> getNotebook(String uid) async {
@@ -98,6 +132,8 @@ class NotebookRepository {
     return Notebook(
       uid: entity.uid,
       title: entity.title,
+      kind: NotebookKindValue.fromIndex(entity.kindIndex),
+      folder: entity.folder,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
       pages: entity.pages.map(_pageFromEntity).toList(),
@@ -120,6 +156,8 @@ class NotebookRepository {
       ..id = existingId ?? Isar.autoIncrement
       ..uid = notebook.uid
       ..title = notebook.title
+      ..kindIndex = notebook.kind.indexValue
+      ..folder = notebook.folder
       ..createdAt = notebook.createdAt
       ..updatedAt = notebook.updatedAt
       ..pages = notebook.pages
@@ -223,6 +261,8 @@ class NotebookRepository {
     return {
       'uid': notebook.uid,
       'title': notebook.title,
+      'kind': notebook.kind.indexValue,
+      'folder': notebook.folder,
       'createdAt': notebook.createdAt.toIso8601String(),
       'updatedAt': notebook.updatedAt.toIso8601String(),
       'pages': notebook.pages.map(_pageToJson).toList(),
@@ -233,6 +273,10 @@ class NotebookRepository {
     return Notebook(
       uid: json['uid'] as String,
       title: json['title'] as String,
+      kind: NotebookKindValue.fromIndex(
+        (json['kind'] as num?)?.toInt() ?? 0,
+      ),
+      folder: (json['folder'] as String?) ?? 'Inbox',
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       pages: (json['pages'] as List<dynamic>)

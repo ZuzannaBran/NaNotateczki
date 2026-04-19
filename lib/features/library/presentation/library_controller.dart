@@ -15,24 +15,33 @@ class LibraryController extends ChangeNotifier {
   final CloudSyncService cloudSyncService;
   bool isLoading = false;
   bool isSyncing = false;
-  List<Notebook> notebooks = <Notebook>[];
-  String? selectedNotebookId;
+  List<Notebook> items = <Notebook>[];
+  String? selectedItemId;
+  String selectedFolder = 'Inbox';
   String searchQuery = '';
   String? cloudPath;
   DateTime? lastSyncedAt;
   CloudSyncResult? lastSyncResult;
+  final Set<String> _folders = <String>{};
+
+  static const String _foldersFileName = 'library_folders.json';
 
   Future<void> initialize() async {
-    await loadNotebooks();
+    await _loadFolders();
+    await loadItems();
     await _loadCloudPath();
   }
 
-  Future<void> loadNotebooks() async {
+  Future<void> loadItems() async {
     isLoading = true;
     notifyListeners();
-    notebooks = await repository.fetchNotebooks();
-    if (notebooks.isNotEmpty && selectedNotebookId == null) {
-      selectedNotebookId = notebooks.first.uid;
+    items = await repository.fetchNotebooks();
+    if (items.isNotEmpty) {
+      final folders = folderNames;
+      if (folders.isNotEmpty) {
+        selectedFolder = folders.first;
+      }
+      selectedItemId ??= _firstItemInFolder(selectedFolder)?.uid;
     }
     isLoading = false;
     notifyListeners();
@@ -41,10 +50,10 @@ class LibraryController extends ChangeNotifier {
   Future<void> syncNow() async {
     isSyncing = true;
     notifyListeners();
-    lastSyncResult = await cloudSyncService.sync(notebooks);
+    lastSyncResult = await cloudSyncService.sync(items);
     lastSyncedAt = DateTime.now();
     isSyncing = false;
-    await loadNotebooks();
+    await loadItems();
     notifyListeners();
   }
 
@@ -54,32 +63,74 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<Notebook> get visibleNotebooks {
+  List<Notebook> get visibleItems {
+    final folderFiltered = items
+        .where((item) => item.folder == selectedFolder)
+        .toList();
     if (searchQuery.isEmpty) {
-      return notebooks;
+      return folderFiltered;
     }
     final query = searchQuery.toLowerCase().trim();
-    return notebooks.where((notebook) => _matches(notebook, query)).toList();
+    return folderFiltered
+        .where((notebook) => _matches(notebook, query))
+        .toList();
+  }
+
+  List<String> get folderNames {
+    final names = <String>{
+      ..._folders,
+      ...items
+          .map((item) => item.folder)
+          .where((name) => name.trim().isNotEmpty),
+      'Inbox',
+    };
+    final list = names.toList()..sort();
+    return list;
+  }
+
+  Future<void> createFolder(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    _folders.add(trimmed);
+    selectedFolder = trimmed;
+    selectedItemId = _firstItemInFolder(trimmed)?.uid;
+    await _saveFolders();
+    notifyListeners();
   }
 
   Future<void> createNotebook() async {
-    final notebook = await repository.createNotebook();
-    notebooks = [notebook, ...notebooks];
-    selectedNotebookId = notebook.uid;
+    final notebook = await repository.createNotebook(folder: selectedFolder);
+    items = [notebook, ...items];
+    selectedItemId = notebook.uid;
     notifyListeners();
   }
 
-  Future<void> deleteNotebook(String uid) async {
+  Future<void> createBoard() async {
+    final board = await repository.createBoard(folder: selectedFolder);
+    items = [board, ...items];
+    selectedItemId = board.uid;
+    notifyListeners();
+  }
+
+  Future<void> deleteItem(String uid) async {
     await repository.deleteNotebook(uid);
-    notebooks = notebooks.where((item) => item.uid != uid).toList();
-    if (selectedNotebookId == uid) {
-      selectedNotebookId = notebooks.isEmpty ? null : notebooks.first.uid;
+    items = items.where((item) => item.uid != uid).toList();
+    if (selectedItemId == uid) {
+      selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
     }
     notifyListeners();
   }
 
-  void selectNotebook(String uid) {
-    selectedNotebookId = uid;
+  void selectItem(String uid) {
+    selectedItemId = uid;
+    notifyListeners();
+  }
+
+  void selectFolder(String folder) {
+    selectedFolder = folder;
+    selectedItemId = _firstItemInFolder(folder)?.uid;
     notifyListeners();
   }
 
@@ -93,7 +144,7 @@ class LibraryController extends ChangeNotifier {
     final file = File(
       '${dir.path}/notatek_backup_${DateTime.now().millisecondsSinceEpoch}.json',
     );
-    final payload = repository.encodeNotebooks(notebooks);
+    final payload = repository.encodeNotebooks(items);
     await file.writeAsString(jsonEncode(payload));
     return file.path;
   }
@@ -109,22 +160,64 @@ class LibraryController extends ChangeNotifier {
     for (final notebook in decoded) {
       await repository.saveNotebook(notebook);
     }
-    await loadNotebooks();
+    await loadItems();
   }
 
-  Notebook? selectedNotebook() {
-    if (selectedNotebookId == null) {
+  Notebook? selectedItem() {
+    if (selectedItemId == null) {
       return null;
     }
-    return notebooks.firstWhere(
-      (item) => item.uid == selectedNotebookId,
-      orElse: () => notebooks.first,
+    return items.firstWhere(
+      (item) => item.uid == selectedItemId,
+      orElse: () => items.first,
     );
+  }
+
+  Notebook? _firstItemInFolder(String folder) {
+    final folderItems = items.where((item) => item.folder == folder).toList();
+    if (folderItems.isEmpty) {
+      return null;
+    }
+    return folderItems.first;
   }
 
   Future<void> _loadCloudPath() async {
     cloudPath = await cloudSyncService.getCloudPath();
     notifyListeners();
+  }
+
+  Future<void> _loadFolders() async {
+    try {
+      final file = await _foldersFile();
+      if (!await file.exists()) {
+        return;
+      }
+      final content = await file.readAsString();
+      final decoded = jsonDecode(content);
+      if (decoded is! List) {
+        return;
+      }
+      _folders
+        ..clear()
+        ..addAll(
+          decoded.whereType<String>().map((item) => item.trim()).where(
+                (item) => item.isNotEmpty,
+              ),
+        );
+    } catch (_) {}
+  }
+
+  Future<void> _saveFolders() async {
+    try {
+      final file = await _foldersFile();
+      final payload = _folders.toList()..sort();
+      await file.writeAsString(jsonEncode(payload));
+    } catch (_) {}
+  }
+
+  Future<File> _foldersFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/$_foldersFileName');
   }
 
   bool _matches(Notebook notebook, String query) {

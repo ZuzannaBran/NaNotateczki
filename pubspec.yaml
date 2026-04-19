@@ -43,6 +43,7 @@ dependencies:
   provider: ^6.1.2
   uuid: ^4.5.1
   flutter_quill: ^11.5.0
+  vector_math: ^2.1.4
 
 dev_dependencies:
   flutter_test:

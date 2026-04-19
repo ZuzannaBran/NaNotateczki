@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -22,6 +23,9 @@ import '../../notebook/domain/text_block.dart';
 import 'editor_actions.dart';
 
 class EditorController extends ChangeNotifier {
+  static const double minViewScale = 0.35;
+  static const double maxViewScale = 4.0;
+
   EditorController({required this.repository, required this.notebook}) {
     pages = notebook.pages;
     currentPageIndex = 0;
@@ -58,11 +62,59 @@ class EditorController extends ChangeNotifier {
   String? activeTextBlockId;
   quill.QuillController? activeTextController;
   bool _suppressBackgroundTap = false;
+  double viewScale = 1.0;
+  Offset viewPan = Offset.zero;
 
   NotePage get currentPage => pages[currentPageIndex];
 
   bool get canUndo => _undoActions.isNotEmpty;
   bool get canRedo => _redoActions.isNotEmpty;
+  Rect get contentBounds => _computeContentBounds();
+
+  void setViewTransform({Offset? pan, double? scale}) {
+    final targetScale = (scale ?? viewScale).clamp(
+      minViewScale,
+      maxViewScale,
+    ).toDouble();
+    final targetPan = pan ?? viewPan;
+    final changed = targetScale != viewScale || targetPan != viewPan;
+    if (!changed) {
+      return;
+    }
+    viewScale = targetScale;
+    viewPan = targetPan;
+    notifyListeners();
+  }
+
+  void panBy(Offset delta) {
+    if (delta == Offset.zero) {
+      return;
+    }
+    setViewTransform(pan: viewPan + delta);
+  }
+
+  void zoomBy(double factor, {required Offset focalPoint}) {
+    if (factor == 1.0) {
+      return;
+    }
+    final currentScale = viewScale <= 0 ? 1.0 : viewScale;
+    final worldAtFocal = (focalPoint - viewPan) / currentScale;
+    final targetScale = (currentScale * factor).clamp(
+      minViewScale,
+      maxViewScale,
+    ).toDouble();
+    final targetPan = focalPoint - (worldAtFocal * targetScale);
+    setViewTransform(scale: targetScale, pan: targetPan);
+  }
+
+  Offset viewportToWorld(Offset viewportPoint) {
+    final safeScale = viewScale <= 0 ? 1.0 : viewScale;
+    return (viewportPoint - viewPan) / safeScale;
+  }
+
+  Offset worldToViewport(Offset worldPoint) {
+    return worldPoint * viewScale + viewPan;
+  }
 
   void setTool(DrawingTool newTool) {
     tool = newTool;
@@ -543,6 +595,57 @@ class EditorController extends ChangeNotifier {
       return false;
     }
     return Platform.isAndroid || Platform.isIOS;
+  }
+
+  Rect _computeContentBounds() {
+    Rect? bounds;
+
+    for (final stroke in currentPage.inkStrokes) {
+      if (stroke.points.isEmpty) {
+        continue;
+      }
+      var minX = stroke.points.first.dx;
+      var minY = stroke.points.first.dy;
+      var maxX = minX;
+      var maxY = minY;
+      for (final point in stroke.points) {
+        minX = math.min(minX, point.dx);
+        minY = math.min(minY, point.dy);
+        maxX = math.max(maxX, point.dx);
+        maxY = math.max(maxY, point.dy);
+      }
+      final extra = math.max(8.0, stroke.width * 0.5 + 4.0);
+      final rect = Rect.fromLTRB(
+        minX - extra,
+        minY - extra,
+        maxX + extra,
+        maxY + extra,
+      );
+      bounds = bounds == null ? rect : bounds.expandToInclude(rect);
+    }
+
+    for (final block in currentPage.textBlocks) {
+      final estimatedHeight = math.max(44.0, block.fontSize * 2.8);
+      final rect = Rect.fromLTWH(
+        block.position.dx,
+        block.position.dy,
+        block.width,
+        estimatedHeight,
+      );
+      bounds = bounds == null ? rect : bounds.expandToInclude(rect);
+    }
+
+    for (final block in currentPage.imageBlocks) {
+      final rect = Rect.fromLTWH(
+        block.position.dx,
+        block.position.dy,
+        block.width,
+        block.height,
+      );
+      bounds = bounds == null ? rect : bounds.expandToInclude(rect);
+    }
+
+    return bounds ?? const Rect.fromLTWH(-600, -600, 1200, 1200);
   }
 
   void _applyAction(EditorAction action) {

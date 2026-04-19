@@ -11,26 +11,24 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../state/editor_controller.dart';
-import 'widgets/drawing_canvas.dart';
-import 'widgets/editor_toolbar.dart';
-import 'widgets/page_overlay.dart';
-import 'widgets/page_strip.dart';
-import 'widgets/text_edit_toolbar.dart';
+import '../../editor/presentation/widgets/drawing_canvas.dart';
+import '../../editor/presentation/widgets/editor_toolbar.dart';
+import '../../editor/presentation/widgets/page_overlay.dart';
+import '../../editor/presentation/widgets/text_edit_toolbar.dart';
+import '../../editor/state/editor_controller.dart';
 
-class EditorScreen extends StatefulWidget {
-  const EditorScreen({super.key});
+class BoardScreen extends StatefulWidget {
+  const BoardScreen({super.key});
 
   @override
-  State<EditorScreen> createState() => _EditorScreenState();
+  State<BoardScreen> createState() => _BoardScreenState();
 }
 
-class _EditorScreenState extends State<EditorScreen> {
+class _BoardScreenState extends State<BoardScreen> {
   static const double _touchPanSensitivity = 0.55;
   static const double _trackpadPanSensitivity = 0.6;
   static const double _scrollPanSensitivity = 0.38;
 
-  final GlobalKey _canvasKey = GlobalKey();
   bool _isViewportNavigating = false;
   bool _panZoomSessionActive = false;
   final Map<int, Offset> _activePointers = <int, Offset>{};
@@ -270,13 +268,6 @@ class _EditorScreenState extends State<EditorScreen> {
       appBar: AppBar(
         titleSpacing: useWideTitleInset ? 44 : null,
         title: Text(controller.notebook.title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bookmark_outline),
-            tooltip: 'Bookmark page',
-            onPressed: controller.toggleBookmark,
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -305,125 +296,118 @@ class _EditorScreenState extends State<EditorScreen> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: RepaintBoundary(
-                  key: _canvasKey,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final viewportSize = Size(
-                        constraints.maxWidth,
-                        constraints.maxHeight,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final viewportSize = Size(
+                      constraints.maxWidth,
+                      constraints.maxHeight,
+                    );
+                    final boardRect = _buildBoardRect(controller, viewportSize);
+                    final transformedOffset = Offset(
+                      controller.viewPan.dx +
+                        (boardRect.left * controller.viewScale),
+                      controller.viewPan.dy +
+                        (boardRect.top * controller.viewScale),
+                    );
+                    final transform = Matrix4.diagonal3Values(
+                      controller.viewScale,
+                      controller.viewScale,
+                      1.0,
+                    )..setTranslationRaw(
+                        transformedOffset.dx,
+                        transformedOffset.dy,
+                        0.0,
                       );
-                      final boardRect = _buildBoardRect(
-                        controller,
-                        viewportSize,
-                      );
-                      final transformedOffset = Offset(
-                        controller.viewPan.dx +
-                          (boardRect.left * controller.viewScale),
-                        controller.viewPan.dy +
-                          (boardRect.top * controller.viewScale),
-                      );
-                      final transform = Matrix4.diagonal3Values(
-                        controller.viewScale,
-                        controller.viewScale,
-                        1.0,
-                      )..setTranslationRaw(
-                          transformedOffset.dx,
-                          transformedOffset.dy,
-                          0.0,
-                        );
-                      final viewportCenter = Offset(
-                        viewportSize.width / 2,
-                        viewportSize.height / 2,
-                      );
+                    final viewportCenter = Offset(
+                      viewportSize.width / 2,
+                      viewportSize.height / 2,
+                    );
 
-                      return Listener(
-                        behavior: HitTestBehavior.translucent,
-                        onPointerDown: (event) =>
-                            _onPointerDown(event, controller),
-                        onPointerMove: (event) =>
-                            _onPointerMove(event, controller),
-                        onPointerUp: (event) =>
+                    return Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (event) =>
+                          _onPointerDown(event, controller),
+                      onPointerMove: (event) =>
+                          _onPointerMove(event, controller),
+                      onPointerUp: (event) =>
                           _onPointerUpOrCancel(event),
-                        onPointerCancel: (event) =>
+                      onPointerCancel: (event) =>
                           _onPointerUpOrCancel(event),
-                          onPointerPanZoomStart: (event) =>
-                            _onPointerPanZoomStart(event, controller),
-                          onPointerPanZoomUpdate: (event) =>
-                            _onPointerPanZoomUpdate(event, controller),
-                          onPointerPanZoomEnd: _onPointerPanZoomEnd,
-                            onPointerSignal: (event) =>
-                              _onPointerSignal(event, controller),
-                        child: Stack(
-                          children: [
-                            Positioned.fill(
-                              child: OverflowBox(
-                                alignment: Alignment.topLeft,
-                                minWidth: 0,
-                                minHeight: 0,
-                                maxWidth: double.infinity,
-                                maxHeight: double.infinity,
-                                child: Transform(
-                                  transform: transform,
-                                  child: SizedBox(
-                                    width: boardRect.width,
-                                    height: boardRect.height,
-                                    child: Stack(
-                                      children: [
-                                        DrawingCanvas(
-                                          allowMultiTouch: false,
-                                          interactionEnabled:
-                                              !_isViewportNavigating,
-                                          worldOrigin: boardRect.topLeft,
-                                        ),
-                                        PageOverlay(
-                                          controller: controller,
-                                          interactionEnabled:
-                                              !_isViewportNavigating,
-                                          worldOrigin: boardRect.topLeft,
-                                        ),
-                                      ],
-                                    ),
+                        onPointerPanZoomStart: (event) =>
+                          _onPointerPanZoomStart(event, controller),
+                        onPointerPanZoomUpdate: (event) =>
+                          _onPointerPanZoomUpdate(event, controller),
+                        onPointerPanZoomEnd: _onPointerPanZoomEnd,
+                          onPointerSignal: (event) =>
+                            _onPointerSignal(event, controller),
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: OverflowBox(
+                              alignment: Alignment.topLeft,
+                              minWidth: 0,
+                              minHeight: 0,
+                              maxWidth: double.infinity,
+                              maxHeight: double.infinity,
+                              child: Transform(
+                                transform: transform,
+                                child: SizedBox(
+                                  width: boardRect.width,
+                                  height: boardRect.height,
+                                  child: Stack(
+                                    children: [
+                                      DrawingCanvas(
+                                        allowMultiTouch: false,
+                                        interactionEnabled:
+                                            !_isViewportNavigating,
+                                        worldOrigin: boardRect.topLeft,
+                                      ),
+                                      PageOverlay(
+                                        controller: controller,
+                                        interactionEnabled:
+                                            !_isViewportNavigating,
+                                        worldOrigin: boardRect.topLeft,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ),
-                            Positioned(
-                              right: 12,
-                              bottom: 12,
-                              child: _ZoomControls(
-                                zoomPercent:
-                                    (controller.viewScale * 100).round(),
-                                onZoomIn: () => controller.zoomBy(
-                                  1.15,
-                                  focalPoint: viewportCenter,
-                                ),
-                                onZoomOut: () => controller.zoomBy(
-                                  1 / 1.15,
-                                  focalPoint: viewportCenter,
-                                ),
-                                onFitView: () =>
-                                    _fitToContent(controller, viewportSize),
+                          ),
+                          Positioned(
+                            right: 12,
+                            bottom: 12,
+                            child: _BoardZoomControls(
+                              zoomPercent: (controller.viewScale * 100)
+                                  .round(),
+                              onZoomIn: () => controller.zoomBy(
+                                1.15,
+                                focalPoint: viewportCenter,
                               ),
+                              onZoomOut: () => controller.zoomBy(
+                                1 / 1.15,
+                                focalPoint: viewportCenter,
+                              ),
+                              onFitView: () =>
+                                  _fitToContent(controller, viewportSize),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
           ),
-          PageStrip(controller: controller),
         ],
       ),
     );
   }
 }
 
-class _ZoomControls extends StatelessWidget {
-  const _ZoomControls({
+class _BoardZoomControls extends StatelessWidget {
+  const _BoardZoomControls({
     required this.zoomPercent,
     required this.onZoomIn,
     required this.onZoomOut,

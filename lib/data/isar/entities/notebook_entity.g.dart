@@ -22,24 +22,34 @@ const NotebookEntitySchema = CollectionSchema(
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
-    r'pages': PropertySchema(
+    r'folder': PropertySchema(
       id: 1,
+      name: r'folder',
+      type: IsarType.string,
+    ),
+    r'kindIndex': PropertySchema(
+      id: 2,
+      name: r'kindIndex',
+      type: IsarType.long,
+    ),
+    r'pages': PropertySchema(
+      id: 3,
       name: r'pages',
       type: IsarType.objectList,
       target: r'NotePageEntity',
     ),
     r'title': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'title',
       type: IsarType.string,
     ),
     r'uid': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'uid',
       type: IsarType.string,
     ),
     r'updatedAt': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'updatedAt',
       type: IsarType.dateTime,
     )
@@ -70,6 +80,7 @@ int _notebookEntityEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.folder.length * 3;
   bytesCount += 3 + object.pages.length * 3;
   {
     final offsets = allOffsets[NotePageEntity]!;
@@ -91,15 +102,17 @@ void _notebookEntitySerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDateTime(offsets[0], object.createdAt);
+  writer.writeString(offsets[1], object.folder);
+  writer.writeLong(offsets[2], object.kindIndex);
   writer.writeObjectList<NotePageEntity>(
-    offsets[1],
+    offsets[3],
     allOffsets,
     NotePageEntitySchema.serialize,
     object.pages,
   );
-  writer.writeString(offsets[2], object.title);
-  writer.writeString(offsets[3], object.uid);
-  writer.writeDateTime(offsets[4], object.updatedAt);
+  writer.writeString(offsets[4], object.title);
+  writer.writeString(offsets[5], object.uid);
+  writer.writeDateTime(offsets[6], object.updatedAt);
 }
 
 NotebookEntity _notebookEntityDeserialize(
@@ -110,17 +123,19 @@ NotebookEntity _notebookEntityDeserialize(
 ) {
   final object = NotebookEntity();
   object.createdAt = reader.readDateTime(offsets[0]);
+  object.folder = reader.readString(offsets[1]);
   object.id = id;
+  object.kindIndex = reader.readLong(offsets[2]);
   object.pages = reader.readObjectList<NotePageEntity>(
-        offsets[1],
+        offsets[3],
         NotePageEntitySchema.deserialize,
         allOffsets,
         NotePageEntity(),
       ) ??
       [];
-  object.title = reader.readString(offsets[2]);
-  object.uid = reader.readString(offsets[3]);
-  object.updatedAt = reader.readDateTime(offsets[4]);
+  object.title = reader.readString(offsets[4]);
+  object.uid = reader.readString(offsets[5]);
+  object.updatedAt = reader.readDateTime(offsets[6]);
   return object;
 }
 
@@ -134,6 +149,10 @@ P _notebookEntityDeserializeProp<P>(
     case 0:
       return (reader.readDateTime(offset)) as P;
     case 1:
+      return (reader.readString(offset)) as P;
+    case 2:
+      return (reader.readLong(offset)) as P;
+    case 3:
       return (reader.readObjectList<NotePageEntity>(
             offset,
             NotePageEntitySchema.deserialize,
@@ -141,11 +160,11 @@ P _notebookEntityDeserializeProp<P>(
             NotePageEntity(),
           ) ??
           []) as P;
-    case 2:
-      return (reader.readString(offset)) as P;
-    case 3:
-      return (reader.readString(offset)) as P;
     case 4:
+      return (reader.readString(offset)) as P;
+    case 5:
+      return (reader.readString(offset)) as P;
+    case 6:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -304,6 +323,142 @@ extension NotebookEntityQueryFilter
     });
   }
 
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'folder',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'folder',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'folder',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'folder',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'folder',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'folder',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'folder',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'folder',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'folder',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      folderIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'folder',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition> idEqualTo(
       Id value) {
     return QueryBuilder.apply(this, (query) {
@@ -351,6 +506,62 @@ extension NotebookEntityQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      kindIndexEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'kindIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      kindIndexGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'kindIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      kindIndexLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'kindIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterFilterCondition>
+      kindIndexBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'kindIndex',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -805,6 +1016,32 @@ extension NotebookEntityQuerySortBy
     });
   }
 
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy> sortByFolder() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'folder', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy>
+      sortByFolderDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'folder', Sort.desc);
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy> sortByKindIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'kindIndex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy>
+      sortByKindIndexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'kindIndex', Sort.desc);
+    });
+  }
+
   QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy> sortByTitle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'title', Sort.asc);
@@ -858,6 +1095,19 @@ extension NotebookEntityQuerySortThenBy
     });
   }
 
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy> thenByFolder() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'folder', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy>
+      thenByFolderDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'folder', Sort.desc);
+    });
+  }
+
   QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -867,6 +1117,19 @@ extension NotebookEntityQuerySortThenBy
   QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy> thenByKindIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'kindIndex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QAfterSortBy>
+      thenByKindIndexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'kindIndex', Sort.desc);
     });
   }
 
@@ -917,6 +1180,20 @@ extension NotebookEntityQueryWhereDistinct
     });
   }
 
+  QueryBuilder<NotebookEntity, NotebookEntity, QDistinct> distinctByFolder(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'folder', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<NotebookEntity, NotebookEntity, QDistinct>
+      distinctByKindIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'kindIndex');
+    });
+  }
+
   QueryBuilder<NotebookEntity, NotebookEntity, QDistinct> distinctByTitle(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -950,6 +1227,18 @@ extension NotebookEntityQueryProperty
   QueryBuilder<NotebookEntity, DateTime, QQueryOperations> createdAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<NotebookEntity, String, QQueryOperations> folderProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'folder');
+    });
+  }
+
+  QueryBuilder<NotebookEntity, int, QQueryOperations> kindIndexProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'kindIndex');
     });
   }
 

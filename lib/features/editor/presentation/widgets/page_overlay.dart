@@ -15,15 +15,22 @@ import '../../../notebook/domain/text_block.dart';
 import '../../state/editor_controller.dart';
 
 class PageOverlay extends StatelessWidget {
-  const PageOverlay({required this.controller, super.key});
+  const PageOverlay({
+    required this.controller,
+    this.interactionEnabled = true,
+    this.worldOrigin = Offset.zero,
+    super.key,
+  });
 
   final EditorController controller;
+  final bool interactionEnabled;
+  final Offset worldOrigin;
 
   @override
   Widget build(BuildContext context) {
     final tool = controller.tool;
     return IgnorePointer(
-      ignoring: tool.isInk,
+      ignoring: tool.isInk || !interactionEnabled,
       child: Stack(
         children: [
           Positioned.fill(
@@ -39,7 +46,7 @@ class PageOverlay extends StatelessWidget {
                 }
                 if (tool == DrawingTool.text || tool == DrawingTool.image) {
                   final message = await controller.handleTap(
-                    details.localPosition,
+                    details.localPosition + worldOrigin,
                   );
                   if (message != null && context.mounted) {
                     ScaffoldMessenger.of(
@@ -51,9 +58,17 @@ class PageOverlay extends StatelessWidget {
             ),
           ),
           for (final block in controller.currentPage.textBlocks)
-            _TextBlockWidget(block: block),
+            _TextBlockWidget(
+              block: block,
+              worldOrigin: worldOrigin,
+              interactionEnabled: interactionEnabled,
+            ),
           for (final block in controller.currentPage.imageBlocks)
-            _ImageBlockWidget(block: block),
+            _ImageBlockWidget(
+              block: block,
+              worldOrigin: worldOrigin,
+              interactionEnabled: interactionEnabled,
+            ),
         ],
       ),
     );
@@ -61,9 +76,15 @@ class PageOverlay extends StatelessWidget {
 }
 
 class _TextBlockWidget extends StatefulWidget {
-  const _TextBlockWidget({required this.block});
+  const _TextBlockWidget({
+    required this.block,
+    required this.worldOrigin,
+    required this.interactionEnabled,
+  });
 
   final TextBlock block;
+  final Offset worldOrigin;
+  final bool interactionEnabled;
 
   @override
   State<_TextBlockWidget> createState() => _TextBlockWidgetState();
@@ -124,7 +145,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
     final isActive = controller.activeTextBlockId == widget.block.id;
-    final canDrag = controller.tool == DrawingTool.text;
+    final canDrag =
+      controller.tool == DrawingTool.text && widget.interactionEnabled;
     _quillController.readOnly = !isActive;
 
     if (isActive && controller.activeTextController != _quillController) {
@@ -137,14 +159,14 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     }
 
     return Positioned(
-      left: widget.block.position.dx,
-      top: widget.block.position.dy,
+      left: widget.block.position.dx - widget.worldOrigin.dx,
+      top: widget.block.position.dy - widget.worldOrigin.dy,
       child: IgnorePointer(
-        ignoring: controller.tool != DrawingTool.text,
+        ignoring: controller.tool != DrawingTool.text || !widget.interactionEnabled,
         child: Builder(
           builder: (context) {
             return GestureDetector(
-              onTapDown: controller.tool == DrawingTool.text
+              onTapDown: canDrag
                   ? (_) {
                       controller.markTextTap();
                       controller.setActiveTextBlock(
@@ -438,9 +460,15 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 }
 
 class _ImageBlockWidget extends StatefulWidget {
-  const _ImageBlockWidget({required this.block});
+  const _ImageBlockWidget({
+    required this.block,
+    required this.worldOrigin,
+    required this.interactionEnabled,
+  });
 
   final ImageBlock block;
+  final Offset worldOrigin;
+  final bool interactionEnabled;
 
   @override
   State<_ImageBlockWidget> createState() => _ImageBlockWidgetState();
@@ -453,11 +481,12 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   @override
   Widget build(BuildContext context) {
     final controller = context.read<EditorController>();
-    final canDrag = controller.tool == DrawingTool.image;
+    final canDrag =
+        controller.tool == DrawingTool.image && widget.interactionEnabled;
 
     return Positioned(
-      left: widget.block.position.dx,
-      top: widget.block.position.dy,
+      left: widget.block.position.dx - widget.worldOrigin.dx,
+      top: widget.block.position.dy - widget.worldOrigin.dy,
       child: GestureDetector(
         onTap: () => context.read<EditorController>().clearActiveTextBlock(),
         onDoubleTap: () => _editOcr(context, controller),

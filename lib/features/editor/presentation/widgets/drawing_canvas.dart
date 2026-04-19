@@ -8,7 +8,16 @@ import '../../../notebook/domain/ink_stroke.dart';
 import '../../state/editor_controller.dart';
 
 class DrawingCanvas extends StatefulWidget {
-  const DrawingCanvas({super.key});
+  const DrawingCanvas({
+    this.allowMultiTouch = true,
+    this.interactionEnabled = true,
+    this.worldOrigin = Offset.zero,
+    super.key,
+  });
+
+  final bool allowMultiTouch;
+  final bool interactionEnabled;
+  final Offset worldOrigin;
 
   @override
   State<DrawingCanvas> createState() => _DrawingCanvasState();
@@ -17,6 +26,7 @@ class DrawingCanvas extends StatefulWidget {
 class _DrawingCanvasState extends State<DrawingCanvas> {
   final List<InkPoint> _currentPoints = <InkPoint>[];
   final Set<String> _eraseStrokeIds = <String>{};
+  final Set<int> _activePointers = <int>{};
   Offset? _eraserPosition;
   Timer? _snapTimer;
   bool _snappedStraight = false;
@@ -35,7 +45,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     final controller = context.watch<EditorController>();
     final isInkTool = _isInkTool(controller.tool);
 
-    if (!isInkTool && _currentPoints.isNotEmpty) {
+    if ((!isInkTool || !widget.interactionEnabled) &&
+        _currentPoints.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(_resetCurrent);
@@ -45,7 +56,6 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = Size(constraints.maxWidth, constraints.maxHeight);
         final eraserRadius = controller.tool == DrawingTool.eraserBrush
             ? controller.inkStrokeWidth / 2
             : max(8.0, controller.inkStrokeWidth * 3.0);
@@ -54,13 +64,13 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
           controller.inkStrokeWidth,
         );
         return IgnorePointer(
-          ignoring: !isInkTool,
+          ignoring: !isInkTool || !widget.interactionEnabled,
           child: Listener(
             behavior: HitTestBehavior.opaque,
-            onPointerDown: (event) => _onPointerDown(event, size, controller),
-            onPointerMove: (event) => _onPointerMove(event, size, controller),
-            onPointerUp: (event) => _onPointerUp(controller),
-            onPointerCancel: (_) => _resetCurrent(),
+            onPointerDown: (event) => _onPointerDown(event, controller),
+            onPointerMove: (event) => _onPointerMove(event, controller),
+            onPointerUp: (event) => _onPointerUp(event, controller),
+            onPointerCancel: (event) => _onPointerCancel(event),
             child: CustomPaint(
               painter: _InkPainter(
                 strokes: controller.currentPage.inkStrokes,
@@ -68,6 +78,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
                 currentColor: controller.inkColor,
                 currentWidth: currentWidth,
                 currentTool: controller.tool,
+                worldOrigin: widget.worldOrigin,
                 snapHintStart: _snapHintStart,
                 snapHintEnd: _snapHintEnd,
                 eraserPosition: _eraserPosition,
@@ -83,13 +94,17 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
   void _onPointerDown(
     PointerDownEvent event,
-    Size size,
     EditorController controller,
   ) {
+    _activePointers.add(event.pointer);
+    if (!widget.allowMultiTouch && _activePointers.length > 1) {
+      _resetCurrent();
+      return;
+    }
     if (!_isInkTool(controller.tool)) {
       return;
     }
-    final offset = _clamp(event.localPosition, size);
+    final offset = _toWorld(event.localPosition);
     if (controller.tool.isShape) {
       _shapeStart = offset;
       setState(() {
@@ -135,11 +150,14 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
   void _onPointerMove(
     PointerMoveEvent event,
-    Size size,
     EditorController controller,
   ) {
+    if (!widget.allowMultiTouch && _activePointers.length > 1) {
+      _resetCurrent();
+      return;
+    }
     if (controller.tool == DrawingTool.eraserStroke) {
-      final offset = _clamp(event.localPosition, size);
+      final offset = _toWorld(event.localPosition);
       _eraserPosition = offset;
       _eraseAt(offset, controller);
       if (mounted) {
@@ -151,7 +169,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       if (_shapeStart == null) {
         return;
       }
-      final offset = _clamp(event.localPosition, size);
+      final offset = _toWorld(event.localPosition);
       setState(() {
         _currentPoints
           ..clear()
@@ -164,7 +182,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     if (_currentPoints.isEmpty) {
       return;
     }
-    final offset = _clamp(event.localPosition, size);
+    final offset = _toWorld(event.localPosition);
     if (_isSnapTool(controller.tool)) {
       _startSnapTimer(offset);
     }
@@ -219,7 +237,12 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     });
   }
 
-  void _onPointerUp(EditorController controller) {
+  void _onPointerUp(PointerUpEvent event, EditorController controller) {
+    _activePointers.remove(event.pointer);
+    if (!widget.allowMultiTouch && _activePointers.length > 1) {
+      _resetCurrent();
+      return;
+    }
     if (controller.tool.isShape) {
       if (_currentPoints.isEmpty) {
         _resetCurrent();
@@ -262,6 +285,11 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     _resetCurrent();
   }
 
+  void _onPointerCancel(PointerCancelEvent event) {
+    _activePointers.remove(event.pointer);
+    _resetCurrent();
+  }
+
   void _resetCurrent() {
     _snapTimer?.cancel();
     _snapHintTimer?.cancel();
@@ -288,11 +316,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     }
   }
 
-  Offset _clamp(Offset offset, Size size) {
-    return Offset(
-      min(max(0, offset.dx), size.width),
-      min(max(0, offset.dy), size.height),
-    );
+  Offset _toWorld(Offset localPosition) {
+    return localPosition + widget.worldOrigin;
   }
 
 
@@ -717,6 +742,7 @@ class _InkPainter extends CustomPainter {
     required this.currentColor,
     required this.currentWidth,
     required this.currentTool,
+    required this.worldOrigin,
     this.snapHintStart,
     this.snapHintEnd,
     this.eraserPosition,
@@ -728,6 +754,7 @@ class _InkPainter extends CustomPainter {
   final Color currentColor;
   final double currentWidth;
   final DrawingTool currentTool;
+  final Offset worldOrigin;
   final Offset? snapHintStart;
   final Offset? snapHintEnd;
   final Offset? eraserPosition;
@@ -762,7 +789,11 @@ class _InkPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.stroke
         ..strokeWidth = currentWidth + 1.5;
-      canvas.drawLine(snapHintStart!, snapHintEnd!, paint);
+      canvas.drawLine(
+        snapHintStart! - worldOrigin,
+        snapHintEnd! - worldOrigin,
+        paint,
+      );
     }
 
     if (eraserPosition != null &&
@@ -773,7 +804,7 @@ class _InkPainter extends CustomPainter {
         ..color = Colors.black.withValues(alpha: 0.35)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2;
-      canvas.drawCircle(eraserPosition!, radius, ringPaint);
+      canvas.drawCircle(eraserPosition! - worldOrigin, radius, ringPaint);
     }
     canvas.restore();
   }
@@ -805,7 +836,7 @@ class _InkPainter extends CustomPainter {
 
     final path = Path();
     for (var i = 0; i < points.length; i++) {
-      final offset = points[i].toOffset();
+      final offset = points[i].toOffset() - worldOrigin;
       if (i == 0) {
         path.moveTo(offset.dx, offset.dy);
       } else {
