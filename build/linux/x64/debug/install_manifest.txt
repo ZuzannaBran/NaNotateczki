@@ -4,6 +4,7 @@
 /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/bundle/lib/libfile_selector_linux_plugin.so
 /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/bundle/lib/libisar_flutter_libs_plugin.so
 /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/bundle/lib/libisar.so
+/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/bundle/lib/liburl_launcher_linux_plugin.so
 /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/bundle/data/flutter_assets/NOTICES
 /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/bundle/data/flutter_assets/AssetManifest.bin.json
 /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/bundle/data/flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf

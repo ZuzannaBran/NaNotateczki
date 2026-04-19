@@ -7,14 +7,10 @@ import '../../state/editor_controller.dart';
 class EditorToolbar extends StatelessWidget {
   const EditorToolbar({
     required this.controller,
-    required this.onExportPng,
-    required this.onExportPdf,
     super.key,
   });
 
   final EditorController controller;
-  final VoidCallback onExportPng;
-  final VoidCallback onExportPdf;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +35,8 @@ class EditorToolbar extends StatelessWidget {
                   label: 'Highlighter',
                   tool: DrawingTool.highlighter,
                 ),
+                _eraserSelector(),
+                _shapeSelector(),
                 _toolButton(
                   icon: Icons.text_fields,
                   label: 'Text',
@@ -80,16 +78,6 @@ class EditorToolbar extends StatelessWidget {
                   onPressed: controller.canRedo ? controller.redo : null,
                   tooltip: 'Redo',
                 ),
-                IconButton(
-                  icon: const Icon(Icons.picture_as_pdf),
-                  onPressed: onExportPdf,
-                  tooltip: 'Export PDF',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.image_outlined),
-                  onPressed: onExportPng,
-                  tooltip: 'Export PNG',
-                ),
               ],
             ),
           ),
@@ -114,6 +102,156 @@ class EditorToolbar extends StatelessWidget {
         onPressed: onPressed ?? () => controller.setTool(tool),
       ),
     );
+  }
+
+  Widget _eraserSelector() {
+    final activeTool = controller.tool.isEraser
+      ? controller.tool
+      : controller.lastEraserTool;
+    final isSelected = controller.tool.isEraser;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.cleaning_services),
+            tooltip: activeTool == DrawingTool.eraserStroke
+                ? 'Erase stroke'
+                : 'Eraser brush',
+            color: isSelected ? AppColors.inkBlack : null,
+            onPressed: () => controller.setTool(activeTool),
+          ),
+          PopupMenuButton<DrawingTool>(
+            tooltip: 'Eraser options',
+            initialValue: activeTool,
+            icon: const Icon(Icons.arrow_drop_down),
+            onSelected: controller.setTool,
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: DrawingTool.eraserBrush,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cleaning_services),
+                    SizedBox(width: 8),
+                    Text('Eraser brush'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: DrawingTool.eraserStroke,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_fix_off),
+                    SizedBox(width: 8),
+                    Text('Erase stroke'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _shapeSelector() {
+    final activeTool = controller.tool.isShape
+        ? controller.tool
+        : controller.lastShapeTool;
+    final isSelected = controller.tool.isShape;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(_shapeIcon(activeTool)),
+            tooltip: _shapeLabel(activeTool),
+            color: isSelected ? AppColors.inkBlack : null,
+            onPressed: () => controller.setTool(activeTool),
+          ),
+          PopupMenuButton<DrawingTool>(
+            tooltip: 'Shape options',
+            initialValue: activeTool,
+            icon: const Icon(Icons.arrow_drop_down),
+            onSelected: controller.setTool,
+            itemBuilder: (context) => [
+              _shapeItem(DrawingTool.line),
+              _shapeItem(DrawingTool.arrow),
+              _shapeItem(DrawingTool.blockArrow),
+              _shapeItem(DrawingTool.rectangle),
+              _shapeItem(DrawingTool.square),
+              _shapeItem(DrawingTool.triangle),
+              _shapeItem(DrawingTool.ellipse),
+              _shapeItem(DrawingTool.circle),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<DrawingTool> _shapeItem(DrawingTool tool) {
+    return PopupMenuItem(
+      value: tool,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_shapeIcon(tool)),
+          const SizedBox(width: 8),
+          Text(_shapeLabel(tool)),
+        ],
+      ),
+    );
+  }
+
+  IconData _shapeIcon(DrawingTool tool) {
+    switch (tool) {
+      case DrawingTool.line:
+        return Icons.show_chart;
+      case DrawingTool.arrow:
+        return Icons.arrow_right_alt;
+      case DrawingTool.blockArrow:
+        return Icons.arrow_forward;
+      case DrawingTool.rectangle:
+        return Icons.rectangle_outlined;
+      case DrawingTool.square:
+        return Icons.crop_square;
+      case DrawingTool.ellipse:
+        return Icons.panorama_fish_eye;
+      case DrawingTool.circle:
+        return Icons.circle_outlined;
+      case DrawingTool.triangle:
+        return Icons.change_history;
+      default:
+        return Icons.show_chart;
+    }
+  }
+
+  String _shapeLabel(DrawingTool tool) {
+    switch (tool) {
+      case DrawingTool.line:
+        return 'Line';
+      case DrawingTool.arrow:
+        return 'Arrow';
+      case DrawingTool.blockArrow:
+        return 'Block Arrow';
+      case DrawingTool.rectangle:
+        return 'Rectangle';
+      case DrawingTool.square:
+        return 'Square';
+      case DrawingTool.ellipse:
+        return 'Ellipse';
+      case DrawingTool.circle:
+        return 'Circle';
+      case DrawingTool.triangle:
+        return 'Triangle';
+      default:
+        return 'Shape';
+    }
   }
 
   Widget _colorDot(
@@ -157,9 +295,9 @@ class EditorToolbar extends StatelessWidget {
     Color current,
     List<Color> recentColors,
   ) async {
-    var red = current.red.toDouble();
-    var green = current.green.toDouble();
-    var blue = current.blue.toDouble();
+    var red = _toByte(current.r).toDouble();
+    var green = _toByte(current.g).toDouble();
+    var blue = _toByte(current.b).toDouble();
     var shade = 0.5;
 
     return showDialog<Color>(
@@ -167,7 +305,12 @@ class EditorToolbar extends StatelessWidget {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            final base = Color.fromARGB(255, red.round(), green.round(), blue.round());
+            final base = Color.fromARGB(
+              255,
+              red.round(),
+              green.round(),
+              blue.round(),
+            );
             final preview = _applyShade(base, shade);
             return AlertDialog(
               title: const Text('Pick color'),
@@ -291,17 +434,24 @@ class EditorToolbar extends StatelessWidget {
       final t = shade / 0.5;
       return Color.fromARGB(
         255,
-        (base.red * t).round(),
-        (base.green * t).round(),
-        (base.blue * t).round(),
+        (_toByte(base.r) * t).round(),
+        (_toByte(base.g) * t).round(),
+        (_toByte(base.b) * t).round(),
       );
     }
     final t = (shade - 0.5) / 0.5;
+    final r = _toByte(base.r);
+    final g = _toByte(base.g);
+    final b = _toByte(base.b);
     return Color.fromARGB(
       255,
-      (base.red + (255 - base.red) * t).round(),
-      (base.green + (255 - base.green) * t).round(),
-      (base.blue + (255 - base.blue) * t).round(),
+      (r + (255 - r) * t).round(),
+      (g + (255 - g) * t).round(),
+      (b + (255 - b) * t).round(),
     );
+  }
+
+  int _toByte(double component) {
+    return (component * 255.0).round().clamp(0, 255).toInt();
   }
 }

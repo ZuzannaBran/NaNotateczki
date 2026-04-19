@@ -32,3 +32,10 @@
 /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs/CMakeFiles/install.dir
 /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs/CMakeFiles/install/local.dir
 /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/isar_flutter_libs/CMakeFiles/install/strip.dir
+/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/url_launcher_linux/CMakeFiles/url_launcher_linux_plugin.dir
+/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/url_launcher_linux/CMakeFiles/edit_cache.dir
+/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/url_launcher_linux/CMakeFiles/rebuild_cache.dir
+/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/url_launcher_linux/CMakeFiles/list_install_components.dir
+/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/url_launcher_linux/CMakeFiles/install.dir
+/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/url_launcher_linux/CMakeFiles/install/local.dir
+/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/build/linux/x64/debug/plugins/url_launcher_linux/CMakeFiles/install/strip.dir

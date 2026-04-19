@@ -1,11 +1,4 @@
-import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -14,6 +7,7 @@ import 'widgets/drawing_canvas.dart';
 import 'widgets/editor_toolbar.dart';
 import 'widgets/page_overlay.dart';
 import 'widgets/page_strip.dart';
+import 'widgets/text_edit_toolbar.dart';
 
 class EditorScreen extends StatelessWidget {
   EditorScreen({super.key});
@@ -39,9 +33,13 @@ class EditorScreen extends StatelessWidget {
         children: [
           EditorToolbar(
             controller: controller,
-            onExportPng: () => _exportPng(context),
-            onExportPdf: () => _exportPdf(context),
           ),
+          if (controller.activeTextController != null)
+            TextEditToolbar(
+              controller: controller.activeTextController!,
+              editorController: controller,
+              activeTextBlockId: controller.activeTextBlockId,
+            ),
           Expanded(
             child: Container(
               margin: const EdgeInsets.all(16),
@@ -74,57 +72,6 @@ class EditorScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _exportPng(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final bytes = await _capturePngBytes();
-    if (bytes == null) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Nothing to export yet.')),
-      );
-      return;
-    }
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File(
-      '${dir.path}/note_${DateTime.now().millisecondsSinceEpoch}.png',
-    );
-    await file.writeAsBytes(bytes);
-    messenger.showSnackBar(
-      SnackBar(content: Text('Saved PNG to ${file.path}')),
-    );
-  }
-
-  Future<void> _exportPdf(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final bytes = await _capturePngBytes();
-    if (bytes == null) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Nothing to export yet.')),
-      );
-      return;
-    }
-    final doc = pw.Document();
-    final image = pw.MemoryImage(bytes);
-    doc.addPage(pw.Page(build: (context) => pw.Center(child: pw.Image(image))));
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File(
-      '${dir.path}/note_${DateTime.now().millisecondsSinceEpoch}.pdf',
-    );
-    await file.writeAsBytes(await doc.save());
-    messenger.showSnackBar(
-      SnackBar(content: Text('Saved PDF to ${file.path}')),
-    );
-  }
-
-  Future<Uint8List?> _capturePngBytes() async {
-    final boundary = _canvasKey.currentContext?.findRenderObject();
-    if (boundary is! RenderRepaintBoundary) {
-      return null;
-    }
-    final image = await boundary.toImage(pixelRatio: 3.0);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return data?.buffer.asUint8List();
   }
 
 }

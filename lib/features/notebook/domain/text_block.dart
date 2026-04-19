@@ -4,6 +4,7 @@ class TextBlock {
   TextBlock({
     required this.id,
     required this.text,
+    this.deltaJson,
     required this.position,
     required this.fontSize,
     required this.color,
@@ -12,6 +13,7 @@ class TextBlock {
 
   final String id;
   final String text;
+  final String? deltaJson;
   final Offset position;
   final double fontSize;
   final Color color;
@@ -20,6 +22,7 @@ class TextBlock {
   TextBlock copyWith({
     String? id,
     String? text,
+    String? deltaJson,
     Offset? position,
     double? fontSize,
     Color? color,
@@ -28,6 +31,7 @@ class TextBlock {
     return TextBlock(
       id: id ?? this.id,
       text: text ?? this.text,
+      deltaJson: deltaJson ?? this.deltaJson,
       position: position ?? this.position,
       fontSize: fontSize ?? this.fontSize,
       color: color ?? this.color,

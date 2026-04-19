@@ -1,5 +1,8 @@
 {
     "cmake.sourceDirectory": "/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux",
     "dart.flutterHotReloadOnSave": true,
-    "dart.flutterHotRestartOnSave": true
+    "dart.flutterHotRestartOnSave": true,
+    "chat.tools.terminal.autoApprove": {
+        "flutter": true
+    }
 }

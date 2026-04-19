@@ -68,6 +68,23 @@ class AddInkStrokeAction extends EditorAction {
   }
 }
 
+class RemoveInkStrokesAction extends EditorAction {
+  RemoveInkStrokesAction({required this.before, required this.after});
+
+  final List<InkStroke> before;
+  final List<InkStroke> after;
+
+  @override
+  NotePage apply(NotePage page) {
+    return page.copyWith(inkStrokes: after);
+  }
+
+  @override
+  NotePage revert(NotePage page) {
+    return page.copyWith(inkStrokes: before);
+  }
+}
+
 class UpdateTextAction extends EditorAction {
   UpdateTextAction({required this.before, required this.after});
 
@@ -90,6 +107,26 @@ class UpdateTextAction extends EditorAction {
           .map((item) => item.id == before.id ? before : item)
           .toList(),
     );
+  }
+}
+
+class DeleteTextAction extends EditorAction {
+  DeleteTextAction(this.block);
+
+  final TextBlock block;
+
+  @override
+  NotePage apply(NotePage page) {
+    return page.copyWith(
+      textBlocks: page.textBlocks
+          .where((item) => item.id != block.id)
+          .toList(),
+    );
+  }
+
+  @override
+  NotePage revert(NotePage page) {
+    return page.copyWith(textBlocks: [...page.textBlocks, block]);
   }
 }
 

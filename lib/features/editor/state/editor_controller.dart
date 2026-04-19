@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'
     as mlkit;
 import 'package:image_picker/image_picker.dart';
@@ -21,6 +25,7 @@ class EditorController extends ChangeNotifier {
   EditorController({required this.repository, required this.notebook}) {
     pages = notebook.pages;
     currentPageIndex = 0;
+    _loadEditorPrefs();
   }
 
   final NotebookRepository repository;
@@ -31,6 +36,8 @@ class EditorController extends ChangeNotifier {
   late List<NotePage> pages;
   int currentPageIndex = 0;
   DrawingTool tool = DrawingTool.pen;
+  DrawingTool lastEraserTool = DrawingTool.eraserBrush;
+  DrawingTool lastShapeTool = DrawingTool.line;
   Color inkColor = const Color(0xFF1E1E1E);
   double inkStrokeWidth = 2.5;
   final List<Color> quickColors = [
@@ -42,6 +49,15 @@ class EditorController extends ChangeNotifier {
 
   final List<EditorAction> _undoActions = <EditorAction>[];
   final List<EditorAction> _redoActions = <EditorAction>[];
+  Timer? _prefsSaveDebounce;
+
+  String? lastTextFontFamily;
+  double lastTextFontSize = 18.0;
+  Color lastTextColor = const Color(0xFF1E1E1E);
+
+  String? activeTextBlockId;
+  quill.QuillController? activeTextController;
+  bool _suppressBackgroundTap = false;
 
   NotePage get currentPage => pages[currentPageIndex];
 
@@ -50,13 +66,64 @@ class EditorController extends ChangeNotifier {
 
   void setTool(DrawingTool newTool) {
     tool = newTool;
+    if (newTool.isEraser) {
+      lastEraserTool = newTool;
+    }
+    if (newTool.isShape) {
+      lastShapeTool = newTool;
+    }
+    if (tool != DrawingTool.text) {
+      clearActiveTextBlock();
+    }
     notifyListeners();
+  }
+
+  void setActiveTextBlock(
+    String? blockId,
+    quill.QuillController? controller,
+  ) {
+    activeTextBlockId = blockId;
+    activeTextController = controller;
+    notifyListeners();
+  }
+
+  void clearActiveTextBlock() {
+    activeTextBlockId = null;
+    activeTextController = null;
+    notifyListeners();
+  }
+
+  void markTextTap() {
+    _suppressBackgroundTap = true;
+  }
+
+  bool consumeBackgroundTapSuppression() {
+    final value = _suppressBackgroundTap;
+    _suppressBackgroundTap = false;
+    return value;
   }
 
   void setColor(Color newColor) {
     inkColor = newColor;
     _addRecentColor(newColor);
+    _schedulePrefsSave();
     notifyListeners();
+  }
+
+  void setLastTextFontFamily(String? family) {
+    lastTextFontFamily = family;
+    _schedulePrefsSave();
+  }
+
+  void setLastTextFontSize(double size) {
+    lastTextFontSize = size;
+    _schedulePrefsSave();
+  }
+
+  void setLastTextColor(Color color) {
+    lastTextColor = color;
+    _addRecentColor(color);
+    _schedulePrefsSave();
   }
 
   void setStrokeWidth(double value) {
@@ -70,14 +137,121 @@ class EditorController extends ChangeNotifier {
     }
     quickColors[index] = newColor;
     setColor(newColor);
+    _schedulePrefsSave();
   }
 
   void _addRecentColor(Color color) {
-    recentColors.removeWhere((item) => item.value == color.value);
+    recentColors.removeWhere(
+      (item) => item.toARGB32() == color.toARGB32(),
+    );
     recentColors.insert(0, color);
     if (recentColors.length > 12) {
       recentColors.removeRange(12, recentColors.length);
     }
+  }
+
+  Future<void> _loadEditorPrefs() async {
+    try {
+      final file = await _prefsFile();
+      if (!await file.exists()) {
+        return;
+      }
+      final raw = await file.readAsString();
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        return;
+      }
+      final inkHex = decoded['inkColor']?.toString();
+      final lastTextHex = decoded['lastTextColor']?.toString();
+      final lastFont = decoded['lastTextFontFamily']?.toString();
+      final lastSize = decoded['lastTextFontSize'];
+      final quick = decoded['quickColors'];
+      final recent = decoded['recentColors'];
+
+      final inkParsed = _colorFromHex(inkHex);
+      if (inkParsed != null) {
+        inkColor = inkParsed;
+      }
+      final textParsed = _colorFromHex(lastTextHex);
+      if (textParsed != null) {
+        lastTextColor = textParsed;
+      }
+      if (lastFont != null && lastFont.isNotEmpty) {
+        lastTextFontFamily = lastFont;
+      }
+      final sizeParsed = lastSize is num ? lastSize.toDouble() : null;
+      if (sizeParsed != null) {
+        lastTextFontSize = sizeParsed;
+      }
+      if (quick is List) {
+        final mapped = quick
+            .map((item) => _colorFromHex(item?.toString()))
+            .whereType<Color>()
+            .toList();
+        if (mapped.isNotEmpty) {
+          quickColors
+            ..clear()
+            ..addAll(mapped);
+        }
+      }
+      if (recent is List) {
+        final mapped = recent
+            .map((item) => _colorFromHex(item?.toString()))
+            .whereType<Color>()
+            .toList();
+        if (mapped.isNotEmpty) {
+          recentColors
+            ..clear()
+            ..addAll(mapped);
+        }
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void _schedulePrefsSave() {
+    _prefsSaveDebounce?.cancel();
+    _prefsSaveDebounce = Timer(
+      const Duration(milliseconds: 250),
+      () {
+        _saveEditorPrefs();
+      },
+    );
+  }
+
+  Future<void> _saveEditorPrefs() async {
+    try {
+      final file = await _prefsFile();
+      final payload = <String, dynamic>{
+        'inkColor': _colorToHex(inkColor),
+        'quickColors': quickColors.map(_colorToHex).toList(),
+        'recentColors': recentColors.map(_colorToHex).toList(),
+        'lastTextColor': _colorToHex(lastTextColor),
+        'lastTextFontFamily': lastTextFontFamily,
+        'lastTextFontSize': lastTextFontSize,
+      };
+      await file.writeAsString(jsonEncode(payload));
+    } catch (_) {}
+  }
+
+  Future<File> _prefsFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/editor_prefs.json');
+  }
+
+  Color? _colorFromHex(String? value) {
+    if (value == null) {
+      return null;
+    }
+    final normalized = value.replaceAll('#', '').trim();
+    if (normalized.length != 6) {
+      return null;
+    }
+    final parsed = int.tryParse(normalized, radix: 16);
+    if (parsed == null) {
+      return null;
+    }
+    return Color(0xFF000000 | parsed);
   }
 
   Future<String?> handleTap(Offset point) async {
@@ -144,20 +318,40 @@ class EditorController extends ChangeNotifier {
   }
 
   void addTextBlock(Offset position) {
+    final baseSize = lastTextFontSize;
+    final baseColor = lastTextColor;
+    final delta = quill_delta.Delta()
+      ..insert(
+        'Text',
+        <String, dynamic>{
+          'size': baseSize.toInt().toString(),
+          'color': _colorToHex(baseColor),
+          if (lastTextFontFamily != null) 'font': lastTextFontFamily,
+        },
+      )
+      ..insert('\n');
+    final doc = quill.Document.fromDelta(delta);
     final block = TextBlock(
       id: _uuid.v4(),
       text: 'Text',
+      deltaJson: jsonEncode(doc.toDelta().toJson()),
       position: position,
-      fontSize: 18,
-      color: inkColor,
+      fontSize: baseSize,
+      color: baseColor,
       width: 240,
     );
     _applyAction(AddTextAction(block));
+    setActiveTextBlock(block.id, null);
     _save();
   }
 
-  void updateTextBlockText(TextBlock before, String text) {
-    final after = before.copyWith(text: text);
+  void updateTextBlockContent(
+    TextBlock before, {
+    required String plainText,
+    required String deltaJson,
+  }) {
+    final normalizedText = plainText.trimRight();
+    final after = before.copyWith(text: normalizedText, deltaJson: deltaJson);
     _applyAction(UpdateTextAction(before: before, after: after));
     _save();
   }
@@ -167,6 +361,15 @@ class EditorController extends ChangeNotifier {
         .map((item) => item.id == id ? item.copyWith(position: position) : item)
         .toList();
     _updatePage(currentPage.copyWith(textBlocks: updated));
+  }
+
+  void deleteTextBlock(String id) {
+    final block = currentPage.textBlocks.firstWhere(
+      (item) => item.id == id,
+    );
+    _applyAction(DeleteTextAction(block));
+    clearActiveTextBlock();
+    _save();
   }
 
   void commitTextMove(String id, Offset start, Offset end) {
@@ -244,21 +447,39 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
-  void addInkStroke(List<InkPoint> points) {
+  void addInkStroke(
+    List<InkPoint> points, {
+    double? widthOverride,
+    DrawingTool? toolOverride,
+  }) {
     if (points.isEmpty) {
       return;
     }
-    final baseWidth = tool == DrawingTool.highlighter
-      ? inkStrokeWidth * 8.0
+    final strokeTool = toolOverride ?? tool;
+    final baseWidth = strokeTool == DrawingTool.highlighter
+        ? inkStrokeWidth * 8.0
         : inkStrokeWidth;
     final stroke = InkStroke(
       id: _uuid.v4(),
       points: points,
       color: inkColor,
-      width: baseWidth,
-      tool: tool,
+      width: widthOverride ?? baseWidth,
+      tool: strokeTool,
     );
     _applyAction(AddInkStrokeAction(stroke));
+    _save();
+  }
+
+  void eraseInkStrokesById(Set<String> ids) {
+    if (ids.isEmpty) {
+      return;
+    }
+    final before = List<InkStroke>.from(currentPage.inkStrokes);
+    final after = before.where((item) => !ids.contains(item.id)).toList();
+    if (after.length == before.length) {
+      return;
+    }
+    _applyAction(RemoveInkStrokesAction(before: before, after: after));
     _save();
   }
 
@@ -286,6 +507,11 @@ class EditorController extends ChangeNotifier {
     final extension = picked.path.split('.').last;
     final target = File('${imagesDir.path}/img_$timestamp.$extension');
     return File(picked.path).copy(target.path);
+  }
+
+  String _colorToHex(Color color) {
+    final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
+    return '#${value.substring(2)}';
   }
 
   Future<Size> _imageSize(File file) async {

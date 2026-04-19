@@ -146,6 +146,7 @@ class NotebookRepository {
     return TextBlock(
       id: entity.uid,
       text: entity.text,
+      deltaJson: entity.deltaJson,
       position: Offset(entity.dx, entity.dy),
       fontSize: entity.fontSize,
       color: Color(entity.colorValue),
@@ -157,6 +158,7 @@ class NotebookRepository {
     return TextBlockEntity()
       ..uid = block.id
       ..text = block.text
+      ..deltaJson = block.deltaJson
       ..fontSize = block.fontSize
       ..colorValue = block.color.toARGB32()
       ..width = block.width
@@ -275,6 +277,7 @@ class NotebookRepository {
     return {
       'id': block.id,
       'text': block.text,
+      'deltaJson': block.deltaJson,
       'fontSize': block.fontSize,
       'color': block.color.toARGB32(),
       'width': block.width,
@@ -287,6 +290,7 @@ class NotebookRepository {
     return TextBlock(
       id: json['id'] as String,
       text: json['text'] as String,
+      deltaJson: json['deltaJson'] as String?,
       position: Offset(
         (json['dx'] as num).toDouble(),
         (json['dy'] as num).toDouble(),
@@ -363,10 +367,19 @@ class NotebookRepository {
   }
 
   DrawingTool _toolFromIndex(int index) {
+    if (index == 14) {
+      return DrawingTool.blockArrow;
+    }
     if (index == 1) {
       return DrawingTool.pen;
     }
     if (index >= 2) {
+      index -= 1;
+    }
+    if (index == 6) {
+      return DrawingTool.arrow;
+    }
+    if (index > 6) {
       index -= 1;
     }
     return DrawingTool.values.elementAt(

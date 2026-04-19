@@ -1822,33 +1822,38 @@ const TextBlockEntitySchema = Schema(
       name: r'colorValue',
       type: IsarType.long,
     ),
-    r'dx': PropertySchema(
+    r'deltaJson': PropertySchema(
       id: 1,
+      name: r'deltaJson',
+      type: IsarType.string,
+    ),
+    r'dx': PropertySchema(
+      id: 2,
       name: r'dx',
       type: IsarType.double,
     ),
     r'dy': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'dy',
       type: IsarType.double,
     ),
     r'fontSize': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'fontSize',
       type: IsarType.double,
     ),
     r'text': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'text',
       type: IsarType.string,
     ),
     r'uid': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'uid',
       type: IsarType.string,
     ),
     r'width': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'width',
       type: IsarType.double,
     )
@@ -1865,6 +1870,12 @@ int _textBlockEntityEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.deltaJson;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.text.length * 3;
   bytesCount += 3 + object.uid.length * 3;
   return bytesCount;
@@ -1877,12 +1888,13 @@ void _textBlockEntitySerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeLong(offsets[0], object.colorValue);
-  writer.writeDouble(offsets[1], object.dx);
-  writer.writeDouble(offsets[2], object.dy);
-  writer.writeDouble(offsets[3], object.fontSize);
-  writer.writeString(offsets[4], object.text);
-  writer.writeString(offsets[5], object.uid);
-  writer.writeDouble(offsets[6], object.width);
+  writer.writeString(offsets[1], object.deltaJson);
+  writer.writeDouble(offsets[2], object.dx);
+  writer.writeDouble(offsets[3], object.dy);
+  writer.writeDouble(offsets[4], object.fontSize);
+  writer.writeString(offsets[5], object.text);
+  writer.writeString(offsets[6], object.uid);
+  writer.writeDouble(offsets[7], object.width);
 }
 
 TextBlockEntity _textBlockEntityDeserialize(
@@ -1893,12 +1905,13 @@ TextBlockEntity _textBlockEntityDeserialize(
 ) {
   final object = TextBlockEntity();
   object.colorValue = reader.readLong(offsets[0]);
-  object.dx = reader.readDouble(offsets[1]);
-  object.dy = reader.readDouble(offsets[2]);
-  object.fontSize = reader.readDouble(offsets[3]);
-  object.text = reader.readString(offsets[4]);
-  object.uid = reader.readString(offsets[5]);
-  object.width = reader.readDouble(offsets[6]);
+  object.deltaJson = reader.readStringOrNull(offsets[1]);
+  object.dx = reader.readDouble(offsets[2]);
+  object.dy = reader.readDouble(offsets[3]);
+  object.fontSize = reader.readDouble(offsets[4]);
+  object.text = reader.readString(offsets[5]);
+  object.uid = reader.readString(offsets[6]);
+  object.width = reader.readDouble(offsets[7]);
   return object;
 }
 
@@ -1912,16 +1925,18 @@ P _textBlockEntityDeserializeProp<P>(
     case 0:
       return (reader.readLong(offset)) as P;
     case 1:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 2:
       return (reader.readDouble(offset)) as P;
     case 3:
       return (reader.readDouble(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 5:
       return (reader.readString(offset)) as P;
     case 6:
+      return (reader.readString(offset)) as P;
+    case 7:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1982,6 +1997,160 @@ extension TextBlockEntityQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'deltaJson',
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'deltaJson',
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'deltaJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'deltaJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'deltaJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'deltaJson',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'deltaJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'deltaJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'deltaJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'deltaJson',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'deltaJson',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      deltaJsonIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'deltaJson',
+        value: '',
       ));
     });
   }

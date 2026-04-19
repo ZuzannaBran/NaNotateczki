@@ -27,6 +27,7 @@ class NotePageEntity {
 class TextBlockEntity {
   late String uid;
   late String text;
+  String? deltaJson;
   late double fontSize;
   late int colorValue;
   late double width;

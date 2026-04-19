@@ -16,6 +16,8 @@ class DrawingCanvas extends StatefulWidget {
 
 class _DrawingCanvasState extends State<DrawingCanvas> {
   final List<InkPoint> _currentPoints = <InkPoint>[];
+  final Set<String> _eraseStrokeIds = <String>{};
+  Offset? _eraserPosition;
   Timer? _snapTimer;
   bool _snappedStraight = false;
   bool _snappedRect = false;
@@ -26,6 +28,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   Offset? _snapAnchor;
   Offset? _rectFixedCorner;
   Offset? _ellipseFixedCorner;
+  Offset? _shapeStart;
 
   @override
   Widget build(BuildContext context) {
@@ -43,12 +46,19 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
+        final eraserRadius = controller.tool == DrawingTool.eraserBrush
+            ? controller.inkStrokeWidth / 2
+            : max(8.0, controller.inkStrokeWidth * 3.0);
+        final currentWidth = _effectiveStrokeWidth(
+          controller.tool,
+          controller.inkStrokeWidth,
+        );
         return IgnorePointer(
           ignoring: !isInkTool,
           child: Listener(
             behavior: HitTestBehavior.opaque,
             onPointerDown: (event) => _onPointerDown(event, size, controller),
-            onPointerMove: (event) => _onPointerMove(event, size),
+            onPointerMove: (event) => _onPointerMove(event, size, controller),
             onPointerUp: (event) => _onPointerUp(controller),
             onPointerCancel: (_) => _resetCurrent(),
             child: CustomPaint(
@@ -56,12 +66,12 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
                 strokes: controller.currentPage.inkStrokes,
                 currentPoints: _currentPoints,
                 currentColor: controller.inkColor,
-                currentWidth: controller.tool == DrawingTool.highlighter
-                  ? controller.inkStrokeWidth * 8.0
-                    : controller.inkStrokeWidth,
+                currentWidth: currentWidth,
                 currentTool: controller.tool,
                 snapHintStart: _snapHintStart,
                 snapHintEnd: _snapHintEnd,
+                eraserPosition: _eraserPosition,
+                eraserRadius: eraserRadius,
               ),
               size: Size.infinite,
             ),
@@ -80,6 +90,29 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       return;
     }
     final offset = _clamp(event.localPosition, size);
+    if (controller.tool.isShape) {
+      _shapeStart = offset;
+      setState(() {
+        _currentPoints
+          ..clear()
+          ..addAll(
+            _buildShapePoints(controller.tool, offset, offset),
+          );
+      });
+      return;
+    }
+    if (controller.tool == DrawingTool.eraserStroke) {
+      _eraseStrokeIds.clear();
+      _eraserPosition = offset;
+      _eraseAt(offset, controller);
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+    if (controller.tool == DrawingTool.eraserBrush) {
+      _eraserPosition = offset;
+    }
     setState(() {
       _currentPoints
         ..clear()
@@ -95,15 +128,51 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       _rectFixedCorner = null;
       _ellipseFixedCorner = null;
     });
-    _startSnapTimer(offset);
+    if (_isSnapTool(controller.tool)) {
+      _startSnapTimer(offset);
+    }
   }
 
-  void _onPointerMove(PointerMoveEvent event, Size size) {
+  void _onPointerMove(
+    PointerMoveEvent event,
+    Size size,
+    EditorController controller,
+  ) {
+    if (controller.tool == DrawingTool.eraserStroke) {
+      final offset = _clamp(event.localPosition, size);
+      _eraserPosition = offset;
+      _eraseAt(offset, controller);
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+    if (controller.tool.isShape) {
+      if (_shapeStart == null) {
+        return;
+      }
+      final offset = _clamp(event.localPosition, size);
+      setState(() {
+        _currentPoints
+          ..clear()
+          ..addAll(
+            _buildShapePoints(controller.tool, _shapeStart!, offset),
+          );
+      });
+      return;
+    }
     if (_currentPoints.isEmpty) {
       return;
     }
     final offset = _clamp(event.localPosition, size);
-    _startSnapTimer(offset);
+    if (_isSnapTool(controller.tool)) {
+      _startSnapTimer(offset);
+    }
+    if (controller.tool == DrawingTool.eraserBrush) {
+      setState(() {
+        _eraserPosition = offset;
+      });
+    }
     if (_snappedStraight) {
       setState(() {
         if (_currentPoints.length >= 2) {
@@ -151,6 +220,30 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   }
 
   void _onPointerUp(EditorController controller) {
+    if (controller.tool.isShape) {
+      if (_currentPoints.isEmpty) {
+        _resetCurrent();
+        return;
+      }
+      controller.addInkStroke(
+        List<InkPoint>.from(_currentPoints),
+        widthOverride: _effectiveStrokeWidth(
+          controller.tool,
+          controller.inkStrokeWidth,
+        ),
+      );
+      _resetCurrent();
+      return;
+    }
+    if (controller.tool == DrawingTool.eraserStroke) {
+      if (_eraseStrokeIds.isNotEmpty) {
+        controller.eraseInkStrokesById(_eraseStrokeIds);
+        _eraseStrokeIds.clear();
+      }
+      _eraserPosition = null;
+      _resetCurrent();
+      return;
+    }
     if (_currentPoints.isEmpty) {
       return;
     }
@@ -172,10 +265,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   void _resetCurrent() {
     _snapTimer?.cancel();
     _snapHintTimer?.cancel();
-    if (_currentPoints.isEmpty) {
-      return;
-    }
-    _currentPoints.clear();
+    _eraseStrokeIds.clear();
+    _eraserPosition = null;
     _snappedStraight = false;
     _snappedRect = false;
     _snappedEllipse = false;
@@ -184,6 +275,14 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     _snapAnchor = null;
     _rectFixedCorner = null;
     _ellipseFixedCorner = null;
+    _shapeStart = null;
+    if (_currentPoints.isEmpty) {
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+    _currentPoints.clear();
     if (mounted) {
       setState(() {});
     }
@@ -212,6 +311,50 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       _snapTimer?.cancel();
       _snapTimer = Timer(const Duration(milliseconds: 1200), _snapToShape);
     }
+  }
+
+  void _eraseAt(Offset offset, EditorController controller) {
+    final radius = max(8.0, controller.inkStrokeWidth * 3.0);
+    for (final stroke in controller.currentPage.inkStrokes) {
+      if (_eraseStrokeIds.contains(stroke.id)) {
+        continue;
+      }
+      if (_strokeHitTest(stroke, offset, radius)) {
+        _eraseStrokeIds.add(stroke.id);
+      }
+    }
+  }
+
+  bool _strokeHitTest(InkStroke stroke, Offset point, double radius) {
+    final points = stroke.points;
+    if (points.isEmpty) {
+      return false;
+    }
+    final r2 = radius * radius;
+    if (points.length == 1) {
+      return (points.first.toOffset() - point).distanceSquared <= r2;
+    }
+    for (var i = 0; i < points.length - 1; i++) {
+      final a = points[i].toOffset();
+      final b = points[i + 1].toOffset();
+      if (_distanceSquaredToSegment(point, a, b) <= r2) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  double _distanceSquaredToSegment(Offset p, Offset a, Offset b) {
+    final ab = b - a;
+    final ap = p - a;
+    final abLen2 = ab.dx * ab.dx + ab.dy * ab.dy;
+    if (abLen2 == 0) {
+      return (p - a).distanceSquared;
+    }
+    final t = (ap.dx * ab.dx + ap.dy * ab.dy) / abLen2;
+    final clamped = t.clamp(0.0, 1.0);
+    final closest = Offset(a.dx + ab.dx * clamped, a.dy + ab.dy * clamped);
+    return (p - closest).distanceSquared;
   }
 
   void _snapToShape() {
@@ -423,7 +566,147 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   }
 
   bool _isInkTool(DrawingTool tool) {
+    return tool.isInk;
+  }
+
+  bool _isSnapTool(DrawingTool tool) {
     return tool == DrawingTool.pen || tool == DrawingTool.highlighter;
+  }
+
+  double _effectiveStrokeWidth(DrawingTool tool, double baseWidth) {
+    if (tool == DrawingTool.highlighter) {
+      return baseWidth * 8.0;
+    }
+    return baseWidth;
+  }
+
+  List<InkPoint> _buildShapePoints(
+    DrawingTool tool,
+    Offset start,
+    Offset end,
+  ) {
+    switch (tool) {
+      case DrawingTool.line:
+        return [
+          InkPoint.fromOffset(start, 1.0),
+          InkPoint.fromOffset(end, 1.0),
+        ];
+      case DrawingTool.arrow:
+        return _buildArrowPoints(start, end);
+      case DrawingTool.blockArrow:
+        return _buildBlockArrowPoints(start, end);
+      case DrawingTool.rectangle:
+        return _buildRectanglePoints(start, end, 1.0);
+      case DrawingTool.square:
+        final adjusted = _squareCorner(start, end);
+        return _buildRectanglePoints(start, adjusted, 1.0);
+      case DrawingTool.triangle:
+        return _buildTrianglePoints(start, end);
+      case DrawingTool.ellipse:
+        return _buildEllipsePoints(start, end, 1.0);
+      case DrawingTool.circle:
+        final adjusted = _squareCorner(start, end);
+        return _buildEllipsePoints(start, adjusted, 1.0);
+      default:
+        return [
+          InkPoint.fromOffset(start, 1.0),
+          InkPoint.fromOffset(end, 1.0),
+        ];
+    }
+  }
+
+  Offset _squareCorner(Offset start, Offset end) {
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final size = max(dx.abs(), dy.abs());
+    final sx = dx == 0 ? 1.0 : dx.sign;
+    final sy = dy == 0 ? 1.0 : dy.sign;
+    return Offset(start.dx + size * sx, start.dy + size * sy);
+  }
+
+  List<InkPoint> _buildArrowPoints(Offset start, Offset end) {
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final length = sqrt(dx * dx + dy * dy);
+    if (length < 1.0) {
+      return [
+        InkPoint.fromOffset(start, 1.0),
+        InkPoint.fromOffset(end, 1.0),
+      ];
+    }
+    final dir = Offset(dx / length, dy / length);
+    final normal = Offset(-dir.dy, dir.dx);
+    final headLength = max(12.0, length * 0.18);
+    final headWidth = headLength * 0.55;
+    final left = end - dir * headLength + normal * headWidth;
+    final right = end - dir * headLength - normal * headWidth;
+    return [
+      InkPoint.fromOffset(start, 1.0),
+      InkPoint.fromOffset(end, 1.0),
+      InkPoint.fromOffset(left, 1.0),
+      InkPoint.fromOffset(end, 1.0),
+      InkPoint.fromOffset(right, 1.0),
+    ];
+  }
+
+  List<InkPoint> _buildTrianglePoints(Offset start, Offset end) {
+    final left = min(start.dx, end.dx);
+    final right = max(start.dx, end.dx);
+    final top = min(start.dy, end.dy);
+    final bottom = max(start.dy, end.dy);
+    final midX = (left + right) / 2;
+    final p1 = Offset(left, bottom);
+    final p2 = Offset(right, bottom);
+    final p3 = Offset(midX, top);
+    return [
+      InkPoint.fromOffset(p1, 1.0),
+      InkPoint.fromOffset(p2, 1.0),
+      InkPoint.fromOffset(p3, 1.0),
+      InkPoint.fromOffset(p1, 1.0),
+    ];
+  }
+
+  List<InkPoint> _buildBlockArrowPoints(Offset start, Offset end) {
+    final left = min(start.dx, end.dx);
+    final right = max(start.dx, end.dx);
+    final top = min(start.dy, end.dy);
+    final bottom = max(start.dy, end.dy);
+    final width = right - left;
+    final height = bottom - top;
+    if (width < 8 || height < 8) {
+      return _buildRectanglePoints(Offset(left, top), Offset(right, bottom), 1.0);
+    }
+
+    final minBodyWidth = max(6.0, width * 0.15);
+    var headWidth = max(12.0, width * 0.35);
+    if (headWidth > width - minBodyWidth) {
+      headWidth = width - minBodyWidth;
+    }
+    if (headWidth <= 0) {
+      return _buildRectanglePoints(Offset(left, top), Offset(right, bottom), 1.0);
+    }
+    final bodyRight = right - headWidth;
+    final midY = (top + bottom) / 2;
+    final headHalfHeight = height * 0.8;
+    final headTop = midY - headHalfHeight;
+    final headBottom = midY + headHalfHeight;
+    final p1 = Offset(left, top);
+    final p2 = Offset(bodyRight, top);
+    final p3 = Offset(right, midY);
+    final p4 = Offset(bodyRight, bottom);
+    final p5 = Offset(left, bottom);
+    final p6 = Offset(bodyRight, headBottom);
+    final p7 = Offset(bodyRight, headTop);
+    return [
+      InkPoint.fromOffset(p1, 1.0),
+      InkPoint.fromOffset(p2, 1.0),
+      InkPoint.fromOffset(p7, 1.0),
+      InkPoint.fromOffset(p3, 1.0),
+      InkPoint.fromOffset(p6, 1.0),
+      InkPoint.fromOffset(p4, 1.0),
+      InkPoint.fromOffset(p5, 1.0),
+      InkPoint.fromOffset(p1, 1.0),
+    ];
   }
 }
 
@@ -436,6 +719,8 @@ class _InkPainter extends CustomPainter {
     required this.currentTool,
     this.snapHintStart,
     this.snapHintEnd,
+    this.eraserPosition,
+    this.eraserRadius,
   });
 
   final List<InkStroke> strokes;
@@ -445,9 +730,12 @@ class _InkPainter extends CustomPainter {
   final DrawingTool currentTool;
   final Offset? snapHintStart;
   final Offset? snapHintEnd;
+  final Offset? eraserPosition;
+  final double? eraserRadius;
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.saveLayer(Offset.zero & size, Paint());
     for (final stroke in strokes) {
       _drawStroke(
         canvas,
@@ -476,6 +764,18 @@ class _InkPainter extends CustomPainter {
         ..strokeWidth = currentWidth + 1.5;
       canvas.drawLine(snapHintStart!, snapHintEnd!, paint);
     }
+
+    if (eraserPosition != null &&
+        (currentTool == DrawingTool.eraserBrush ||
+            currentTool == DrawingTool.eraserStroke)) {
+      final radius = eraserRadius ?? 12.0;
+      final ringPaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      canvas.drawCircle(eraserPosition!, radius, ringPaint);
+    }
+    canvas.restore();
   }
 
   void _drawStroke(
@@ -489,13 +789,19 @@ class _InkPainter extends CustomPainter {
       return;
     }
     final paint = Paint()
-      ..color = _toolColor(color, tool)
       ..strokeCap = tool == DrawingTool.highlighter
           ? StrokeCap.square
           : StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
       ..strokeWidth = width;
+    if (tool == DrawingTool.eraserBrush) {
+      paint
+        ..color = Colors.transparent
+        ..blendMode = BlendMode.clear;
+    } else {
+      paint.color = _toolColor(color, tool);
+    }
 
     final path = Path();
     for (var i = 0; i < points.length; i++) {
@@ -506,7 +812,6 @@ class _InkPainter extends CustomPainter {
         path.lineTo(offset.dx, offset.dy);
       }
     }
-    // Zamknij ścieżkę jeśli pierwszy i ostatni punkt są takie same.
     if (points.first.dx == points.last.dx && points.first.dy == points.last.dy) {
       path.close();
     }
@@ -528,6 +833,8 @@ class _InkPainter extends CustomPainter {
         oldDelegate.currentWidth != currentWidth ||
       oldDelegate.currentTool != currentTool ||
         oldDelegate.snapHintStart != snapHintStart ||
-        oldDelegate.snapHintEnd != snapHintEnd;
+        oldDelegate.snapHintEnd != snapHintEnd ||
+        oldDelegate.eraserPosition != eraserPosition ||
+        oldDelegate.eraserRadius != eraserRadius;
   }
 }
