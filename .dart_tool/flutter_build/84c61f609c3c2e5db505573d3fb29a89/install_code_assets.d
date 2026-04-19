@@ -1,1 +1,0 @@
- /home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/.dart_tool/flutter_build/84c61f609c3c2e5db505573d3fb29a89/native_assets.json: 
