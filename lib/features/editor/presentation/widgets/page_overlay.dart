@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/image_block.dart';
+import '../../../notebook/domain/note_page.dart';
 import '../../../notebook/domain/text_block.dart';
 import '../../state/editor_controller.dart';
 
@@ -19,15 +20,21 @@ class PageOverlay extends StatelessWidget {
     required this.controller,
     this.interactionEnabled = true,
     this.worldOrigin = Offset.zero,
+    this.page,
+    this.pageIndex,
     super.key,
   });
 
   final EditorController controller;
   final bool interactionEnabled;
   final Offset worldOrigin;
+  final NotePage? page;
+  final int? pageIndex;
 
   @override
   Widget build(BuildContext context) {
+    final effectivePageIndex = pageIndex ?? controller.currentPageIndex;
+    final effectivePage = page ?? controller.pageAt(effectivePageIndex);
     final tool = controller.tool;
     return IgnorePointer(
       ignoring: tool.isInk || !interactionEnabled,
@@ -45,7 +52,8 @@ class PageOverlay extends StatelessWidget {
                   return;
                 }
                 if (tool == DrawingTool.text || tool == DrawingTool.image) {
-                  final message = await controller.handleTap(
+                  final message = await controller.handleTapOnPage(
+                    effectivePageIndex,
                     details.localPosition + worldOrigin,
                   );
                   if (message != null && context.mounted) {
@@ -57,15 +65,17 @@ class PageOverlay extends StatelessWidget {
               },
             ),
           ),
-          for (final block in controller.currentPage.textBlocks)
+          for (final block in effectivePage.textBlocks)
             _TextBlockWidget(
               block: block,
+              pageIndex: effectivePageIndex,
               worldOrigin: worldOrigin,
               interactionEnabled: interactionEnabled,
             ),
-          for (final block in controller.currentPage.imageBlocks)
+          for (final block in effectivePage.imageBlocks)
             _ImageBlockWidget(
               block: block,
+              pageIndex: effectivePageIndex,
               worldOrigin: worldOrigin,
               interactionEnabled: interactionEnabled,
             ),
@@ -75,14 +85,58 @@ class PageOverlay extends StatelessWidget {
   }
 }
 
+class DocumentPageOverlay extends StatelessWidget {
+  const DocumentPageOverlay({
+    required this.controller,
+    required this.pages,
+    required this.pageSize,
+    required this.pageGap,
+    this.interactionEnabled = true,
+    this.worldOrigin = Offset.zero,
+    super.key,
+  });
+
+  final EditorController controller;
+  final List<NotePage> pages;
+  final Size pageSize;
+  final double pageGap;
+  final bool interactionEnabled;
+  final Offset worldOrigin;
+
+  @override
+  Widget build(BuildContext context) {
+    final stride = pageSize.height + pageGap;
+    return Stack(
+      children: [
+        for (var i = 0; i < pages.length; i++)
+          Positioned(
+            left: 0,
+            top: i * stride,
+            width: pageSize.width,
+            height: pageSize.height,
+            child: PageOverlay(
+              controller: controller,
+              interactionEnabled: interactionEnabled,
+              worldOrigin: worldOrigin + Offset(0, i * stride),
+              page: pages[i],
+              pageIndex: i,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _TextBlockWidget extends StatefulWidget {
   const _TextBlockWidget({
     required this.block,
+    required this.pageIndex,
     required this.worldOrigin,
     required this.interactionEnabled,
   });
 
   final TextBlock block;
+  final int pageIndex;
   final Offset worldOrigin;
   final bool interactionEnabled;
 
@@ -123,9 +177,11 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   @override
   void didUpdateWidget(covariant _TextBlockWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final hasDeltaChange = widget.block.deltaJson != null &&
+    final hasDeltaChange =
+        widget.block.deltaJson != null &&
         widget.block.deltaJson != _lastDeltaJson;
-    final hasTextChange = widget.block.deltaJson == null &&
+    final hasTextChange =
+        widget.block.deltaJson == null &&
         oldWidget.block.text != widget.block.text;
     if (hasDeltaChange || hasTextChange) {
       _initQuill();
@@ -146,7 +202,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     final controller = context.watch<EditorController>();
     final isActive = controller.activeTextBlockId == widget.block.id;
     final canDrag =
-      controller.tool == DrawingTool.text && widget.interactionEnabled;
+        controller.tool == DrawingTool.text && widget.interactionEnabled;
     _quillController.readOnly = !isActive;
 
     if (isActive && controller.activeTextController != _quillController) {
@@ -162,12 +218,16 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       left: widget.block.position.dx - widget.worldOrigin.dx,
       top: widget.block.position.dy - widget.worldOrigin.dy,
       child: IgnorePointer(
-        ignoring: controller.tool != DrawingTool.text || !widget.interactionEnabled,
+        ignoring:
+            controller.tool != DrawingTool.text || !widget.interactionEnabled,
         child: Builder(
           builder: (context) {
             return GestureDetector(
               onTapDown: canDrag
                   ? (_) {
+                      if (controller.currentPageIndex != widget.pageIndex) {
+                        controller.setCurrentPage(widget.pageIndex);
+                      }
                       controller.markTextTap();
                       controller.setActiveTextBlock(
                         widget.block.id,
@@ -216,8 +276,9 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                     ),
                     constraints: BoxConstraints(maxWidth: widget.block.width),
                     decoration: BoxDecoration(
-                      color: AppColors.paper
-                          .withValues(alpha: isActive ? 0.85 : 0.0),
+                      color: AppColors.paper.withValues(
+                        alpha: isActive ? 0.85 : 0.0,
+                      ),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: isActive
@@ -236,8 +297,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                         autoFocus: false,
                         expands: false,
                         // ignore: experimental_member_use
-                        onKeyPressed: (event, node) =>
-                          _handleKeyPressed(event),
+                        onKeyPressed: (event, node) => _handleKeyPressed(event),
                       ),
                     ),
                   ),
@@ -261,8 +321,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   bool _isOnFrame(Offset local, Size size) {
     const frameHit = 8.0;
     final left = local.dx <= frameHit;
-    final right = local.dx >=
-      size.width - (_handleLineLength + _handleHitSize);
+    final right = local.dx >= size.width - (_handleLineLength + _handleHitSize);
     final top = local.dy <= frameHit;
     final bottom = local.dy >= size.height - frameHit;
     return left || right || top || bottom;
@@ -270,8 +329,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 
   Widget _dragHandle(EditorController controller) {
     final handleColor = (_isHandleDragging || _isHandleHovered)
-      ? AppColors.inkBlack
-      : Colors.grey.shade500;
+        ? AppColors.inkBlack
+        : Colors.grey.shade500;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onPanStart: (details) {
@@ -332,7 +391,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       return;
     }
     final delta = globalPosition - _dragStart!;
-    controller.updateTextBlockPosition(
+    controller.updateTextBlockPositionOnPage(
+      widget.pageIndex,
       widget.block.id,
       _startPosition! + delta,
     );
@@ -342,14 +402,15 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     if (_dragStart == null || _startPosition == null) {
       return;
     }
-    final current = controller.currentPage.textBlocks
-        .firstWhere((item) => item.id == widget.block.id)
-        .position;
-    controller.commitTextMove(
-      widget.block.id,
-      _startPosition!,
-      current,
-    );
+    final current = controller.findTextBlockById(widget.block.id)?.position;
+    if (current != null) {
+      controller.commitTextMoveOnPage(
+        widget.pageIndex,
+        widget.block.id,
+        _startPosition!,
+        current,
+      );
+    }
     _dragStart = null;
     _startPosition = null;
     _dragFromFrame = false;
@@ -360,7 +421,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       return null;
     }
     if (event.logicalKey == LogicalKeyboardKey.delete) {
-      _editorController.deleteTextBlock(widget.block.id);
+      _editorController.deleteTextBlockOnPage(
+        widget.pageIndex,
+        widget.block.id,
+      );
       return KeyEventResult.handled;
     }
     if (event.logicalKey != LogicalKeyboardKey.backspace) {
@@ -402,15 +466,17 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         });
         return;
       }
-      final current = _editorController.currentPage.textBlocks.firstWhere(
-        (item) => item.id == widget.block.id,
-      );
+      final current = _editorController.findTextBlockById(widget.block.id);
+      if (current == null) {
+        return;
+      }
       final deltaJson = jsonEncode(
         _quillController.document.toDelta().toJson(),
       );
       _lastDeltaJson = deltaJson;
       final plain = _quillController.document.toPlainText();
-      _editorController.updateTextBlockContent(
+      _editorController.updateTextBlockContentOnPage(
+        widget.pageIndex,
         current,
         plainText: plain,
         deltaJson: deltaJson,
@@ -430,13 +496,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     }
     final delta = quill_delta.Delta();
     if (block.text.isNotEmpty) {
-      delta.insert(
-        block.text,
-        <String, dynamic>{
-          'size': block.fontSize.toInt().toString(),
-          'color': _colorToHex(block.color),
-        },
-      );
+      delta.insert(block.text, <String, dynamic>{
+        'size': block.fontSize.toInt().toString(),
+        'color': _colorToHex(block.color),
+      });
     }
     delta.insert('\n');
     return quill.Document.fromDelta(delta);
@@ -462,11 +525,13 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 class _ImageBlockWidget extends StatefulWidget {
   const _ImageBlockWidget({
     required this.block,
+    required this.pageIndex,
     required this.worldOrigin,
     required this.interactionEnabled,
   });
 
   final ImageBlock block;
+  final int pageIndex;
   final Offset worldOrigin;
   final bool interactionEnabled;
 
@@ -502,7 +567,8 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                   return;
                 }
                 final delta = details.globalPosition - _dragStart!;
-                controller.updateImageBlockPosition(
+                controller.updateImageBlockPositionOnPage(
+                  widget.pageIndex,
                   widget.block.id,
                   _startPosition! + delta,
                 );
@@ -513,14 +579,17 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                 if (_dragStart == null || _startPosition == null) {
                   return;
                 }
-                final current = controller.currentPage.imageBlocks
-                    .firstWhere((item) => item.id == widget.block.id)
-                    .position;
-                controller.commitImageMove(
-                  widget.block.id,
-                  _startPosition!,
-                  current,
-                );
+                final current = controller
+                    .findImageBlockById(widget.block.id)
+                    ?.position;
+                if (current != null) {
+                  controller.commitImageMoveOnPage(
+                    widget.pageIndex,
+                    widget.block.id,
+                    _startPosition!,
+                    current,
+                  );
+                }
                 _dragStart = null;
                 _startPosition = null;
               }
@@ -578,7 +647,8 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                       ? null
                       : () async {
                           setState(() => isRunning = true);
-                          final message = await controller.runOcrForImage(
+                          final message = await controller.runOcrForImageOnPage(
+                            widget.pageIndex,
                             widget.block,
                           );
                           if (message != null && context.mounted) {
@@ -586,11 +656,10 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                               context,
                             ).showSnackBar(SnackBar(content: Text(message)));
                           }
-                          final updatedBlock = controller
-                              .currentPage
-                              .imageBlocks
-                              .firstWhere((item) => item.id == widget.block.id);
-                          textController.text = updatedBlock.ocrText;
+                          final updatedBlock = controller.findImageBlockById(
+                            widget.block.id,
+                          );
+                          textController.text = updatedBlock?.ocrText ?? '';
                           setState(() => isRunning = false);
                         },
                   child: const Text('Run OCR'),
@@ -614,6 +683,10 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     if (updated == null || updated == widget.block.ocrText) {
       return;
     }
-    controller.updateImageBlockOcrText(widget.block.id, updated);
+    controller.updateImageBlockOcrTextOnPage(
+      widget.pageIndex,
+      widget.block.id,
+      updated,
+    );
   }
 }

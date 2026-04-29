@@ -2149,6 +2149,11 @@ const TextBlockEntitySchema = Schema(
       id: 7,
       name: r'width',
       type: IsarType.double,
+    ),
+    r'rotation': PropertySchema(
+      id: 8,
+      name: r'rotation',
+      type: IsarType.double,
     )
   },
   estimateSize: _textBlockEntityEstimateSize,
@@ -2188,6 +2193,7 @@ void _textBlockEntitySerialize(
   writer.writeString(offsets[5], object.text);
   writer.writeString(offsets[6], object.uid);
   writer.writeDouble(offsets[7], object.width);
+  writer.writeDouble(offsets[8], object.rotation);
 }
 
 TextBlockEntity _textBlockEntityDeserialize(
@@ -2205,6 +2211,7 @@ TextBlockEntity _textBlockEntityDeserialize(
   object.text = reader.readString(offsets[5]);
   object.uid = reader.readString(offsets[6]);
   object.width = reader.readDouble(offsets[7]);
+  object.rotation = reader.readDouble(offsets[8]);
   return object;
 }
 
@@ -2230,6 +2237,8 @@ P _textBlockEntityDeserializeProp<P>(
     case 6:
       return (reader.readString(offset)) as P;
     case 7:
+      return (reader.readDouble(offset)) as P;
+    case 8:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -3029,6 +3038,11 @@ const ImageBlockEntitySchema = Schema(
       id: 6,
       name: r'width',
       type: IsarType.double,
+    ),
+    r'rotation': PropertySchema(
+      id: 7,
+      name: r'rotation',
+      type: IsarType.double,
     )
   },
   estimateSize: _imageBlockEntityEstimateSize,
@@ -3062,6 +3076,7 @@ void _imageBlockEntitySerialize(
   writer.writeString(offsets[4], object.path);
   writer.writeString(offsets[5], object.uid);
   writer.writeDouble(offsets[6], object.width);
+  writer.writeDouble(offsets[7], object.rotation);
 }
 
 ImageBlockEntity _imageBlockEntityDeserialize(
@@ -3078,6 +3093,7 @@ ImageBlockEntity _imageBlockEntityDeserialize(
   object.path = reader.readString(offsets[4]);
   object.uid = reader.readString(offsets[5]);
   object.width = reader.readDouble(offsets[6]);
+  object.rotation = reader.readDouble(offsets[7]);
   return object;
 }
 
@@ -3101,6 +3117,8 @@ P _imageBlockEntityDeserializeProp<P>(
     case 5:
       return (reader.readString(offset)) as P;
     case 6:
+      return (reader.readDouble(offset)) as P;
+    case 7:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');

@@ -9,6 +9,7 @@ class TextBlock {
     required this.fontSize,
     required this.color,
     required this.width,
+    this.rotation = 0.0,
   });
 
   final String id;
@@ -18,6 +19,7 @@ class TextBlock {
   final double fontSize;
   final Color color;
   final double width;
+  final double rotation;
 
   TextBlock copyWith({
     String? id,
@@ -27,6 +29,7 @@ class TextBlock {
     double? fontSize,
     Color? color,
     double? width,
+    double? rotation,
   }) {
     return TextBlock(
       id: id ?? this.id,
@@ -36,6 +39,7 @@ class TextBlock {
       fontSize: fontSize ?? this.fontSize,
       color: color ?? this.color,
       width: width ?? this.width,
+      rotation: rotation ?? this.rotation,
     );
   }
 }

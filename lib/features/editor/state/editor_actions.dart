@@ -216,6 +216,51 @@ class UpdateImageOcrAction extends EditorAction {
   }
 }
 
+class UpdateImageAction extends EditorAction {
+  UpdateImageAction({required this.before, required this.after});
+
+  final ImageBlock before;
+  final ImageBlock after;
+
+  @override
+  NotePage apply(NotePage page) {
+    return page.copyWith(
+      imageBlocks: page.imageBlocks
+          .map((item) => item.id == after.id ? after : item)
+          .toList(),
+    );
+  }
+
+  @override
+  NotePage revert(NotePage page) {
+    return page.copyWith(
+      imageBlocks: page.imageBlocks
+          .map((item) => item.id == before.id ? before : item)
+          .toList(),
+    );
+  }
+}
+
+class DeleteImageAction extends EditorAction {
+  DeleteImageAction(this.block);
+
+  final ImageBlock block;
+
+  @override
+  NotePage apply(NotePage page) {
+    return page.copyWith(
+      imageBlocks: page.imageBlocks
+          .where((item) => item.id != block.id)
+          .toList(),
+    );
+  }
+
+  @override
+  NotePage revert(NotePage page) {
+    return page.copyWith(imageBlocks: [...page.imageBlocks, block]);
+  }
+}
+
 class OffsetPosition {
   const OffsetPosition(this.dx, this.dy);
 

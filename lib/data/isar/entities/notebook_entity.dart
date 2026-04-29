@@ -33,6 +33,7 @@ class TextBlockEntity {
   late double fontSize;
   late int colorValue;
   late double width;
+  late double rotation;
   late double dx;
   late double dy;
 }
@@ -44,6 +45,7 @@ class ImageBlockEntity {
   late String ocrText;
   late double width;
   late double height;
+  late double rotation;
   late double dx;
   late double dy;
 }

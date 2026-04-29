@@ -189,6 +189,7 @@ class NotebookRepository {
       fontSize: entity.fontSize,
       color: Color(entity.colorValue),
       width: entity.width,
+      rotation: entity.rotation,
     );
   }
 
@@ -200,6 +201,7 @@ class NotebookRepository {
       ..fontSize = block.fontSize
       ..colorValue = block.color.toARGB32()
       ..width = block.width
+      ..rotation = block.rotation
       ..dx = block.position.dx
       ..dy = block.position.dy;
   }
@@ -212,6 +214,7 @@ class NotebookRepository {
       position: Offset(entity.dx, entity.dy),
       width: entity.width,
       height: entity.height,
+      rotation: entity.rotation,
     );
   }
 
@@ -222,6 +225,7 @@ class NotebookRepository {
       ..ocrText = block.ocrText
       ..width = block.width
       ..height = block.height
+      ..rotation = block.rotation
       ..dx = block.position.dx
       ..dy = block.position.dy;
   }
@@ -325,6 +329,7 @@ class NotebookRepository {
       'fontSize': block.fontSize,
       'color': block.color.toARGB32(),
       'width': block.width,
+      'rotation': block.rotation,
       'dx': block.position.dx,
       'dy': block.position.dy,
     };
@@ -342,6 +347,7 @@ class NotebookRepository {
       fontSize: (json['fontSize'] as num).toDouble(),
       color: Color(json['color'] as int),
       width: (json['width'] as num).toDouble(),
+      rotation: (json['rotation'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -352,6 +358,7 @@ class NotebookRepository {
       'ocrText': block.ocrText,
       'width': block.width,
       'height': block.height,
+      'rotation': block.rotation,
       'dx': block.position.dx,
       'dy': block.position.dy,
     };
@@ -368,6 +375,7 @@ class NotebookRepository {
       ),
       width: (json['width'] as num).toDouble(),
       height: (json['height'] as num).toDouble(),
+      rotation: (json['rotation'] as num?)?.toDouble() ?? 0.0,
     );
   }
 

@@ -8,6 +8,7 @@ class ImageBlock {
     required this.position,
     required this.width,
     required this.height,
+    this.rotation = 0.0,
   });
 
   final String id;
@@ -16,6 +17,7 @@ class ImageBlock {
   final Offset position;
   final double width;
   final double height;
+  final double rotation;
 
   ImageBlock copyWith({
     String? id,
@@ -24,6 +26,7 @@ class ImageBlock {
     Offset? position,
     double? width,
     double? height,
+    double? rotation,
   }) {
     return ImageBlock(
       id: id ?? this.id,
@@ -32,6 +35,7 @@ class ImageBlock {
       position: position ?? this.position,
       width: width ?? this.width,
       height: height ?? this.height,
+      rotation: rotation ?? this.rotation,
     );
   }
 }

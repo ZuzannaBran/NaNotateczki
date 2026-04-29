@@ -72,10 +72,9 @@ class EditorController extends ChangeNotifier {
   Rect get contentBounds => _computeContentBounds();
 
   void setViewTransform({Offset? pan, double? scale}) {
-    final targetScale = (scale ?? viewScale).clamp(
-      minViewScale,
-      maxViewScale,
-    ).toDouble();
+    final targetScale = (scale ?? viewScale)
+        .clamp(minViewScale, maxViewScale)
+        .toDouble();
     final targetPan = pan ?? viewPan;
     final changed = targetScale != viewScale || targetPan != viewPan;
     if (!changed) {
@@ -99,10 +98,9 @@ class EditorController extends ChangeNotifier {
     }
     final currentScale = viewScale <= 0 ? 1.0 : viewScale;
     final worldAtFocal = (focalPoint - viewPan) / currentScale;
-    final targetScale = (currentScale * factor).clamp(
-      minViewScale,
-      maxViewScale,
-    ).toDouble();
+    final targetScale = (currentScale * factor)
+        .clamp(minViewScale, maxViewScale)
+        .toDouble();
     final targetPan = focalPoint - (worldAtFocal * targetScale);
     setViewTransform(scale: targetScale, pan: targetPan);
   }
@@ -114,6 +112,139 @@ class EditorController extends ChangeNotifier {
 
   Offset worldToViewport(Offset worldPoint) {
     return worldPoint * viewScale + viewPan;
+  }
+
+  NotePage pageAt(int index) {
+    return pages[index];
+  }
+
+  TextBlock? findTextBlockById(String id) {
+    for (final page in pages) {
+      for (final block in page.textBlocks) {
+        if (block.id == id) {
+          return block;
+        }
+      }
+    }
+    return null;
+  }
+
+  ImageBlock? findImageBlockById(String id) {
+    for (final page in pages) {
+      for (final block in page.imageBlocks) {
+        if (block.id == id) {
+          return block;
+        }
+      }
+    }
+    return null;
+  }
+
+  void _ensurePageSelected(int pageIndex) {
+    if (pageIndex < 0 || pageIndex >= pages.length) {
+      return;
+    }
+    if (pageIndex == currentPageIndex) {
+      return;
+    }
+    setCurrentPage(pageIndex);
+  }
+
+  Future<String?> handleTapOnPage(int pageIndex, Offset point) async {
+    _ensurePageSelected(pageIndex);
+    return handleTap(point);
+  }
+
+  void addTextBlockOnPage(int pageIndex, Offset position) {
+    _ensurePageSelected(pageIndex);
+    addTextBlock(position);
+  }
+
+  void updateTextBlockContentOnPage(
+    int pageIndex,
+    TextBlock before, {
+    required String plainText,
+    required String deltaJson,
+  }) {
+    _ensurePageSelected(pageIndex);
+    updateTextBlockContent(before, plainText: plainText, deltaJson: deltaJson);
+  }
+
+  void updateTextBlockPositionOnPage(
+    int pageIndex,
+    String id,
+    Offset position,
+  ) {
+    _ensurePageSelected(pageIndex);
+    updateTextBlockPosition(id, position);
+  }
+
+  void deleteTextBlockOnPage(int pageIndex, String id) {
+    _ensurePageSelected(pageIndex);
+    deleteTextBlock(id);
+  }
+
+  void commitTextMoveOnPage(
+    int pageIndex,
+    String id,
+    Offset start,
+    Offset end,
+  ) {
+    _ensurePageSelected(pageIndex);
+    commitTextMove(id, start, end);
+  }
+
+  Future<String?> addImageBlockOnPage(int pageIndex, Offset position) async {
+    _ensurePageSelected(pageIndex);
+    return addImageBlock(position);
+  }
+
+  Future<String?> runOcrForImageOnPage(int pageIndex, ImageBlock block) async {
+    _ensurePageSelected(pageIndex);
+    return runOcrForImage(block);
+  }
+
+  void updateImageBlockPositionOnPage(
+    int pageIndex,
+    String id,
+    Offset position,
+  ) {
+    _ensurePageSelected(pageIndex);
+    updateImageBlockPosition(id, position);
+  }
+
+  void updateImageBlockOcrTextOnPage(int pageIndex, String id, String text) {
+    _ensurePageSelected(pageIndex);
+    updateImageBlockOcrText(id, text);
+  }
+
+  void addInkStrokeOnPage(
+    int pageIndex,
+    List<InkPoint> points, {
+    double? widthOverride,
+    DrawingTool? toolOverride,
+  }) {
+    _ensurePageSelected(pageIndex);
+    addInkStroke(
+      points,
+      widthOverride: widthOverride,
+      toolOverride: toolOverride,
+    );
+  }
+
+  void eraseInkStrokesByIdOnPage(int pageIndex, Set<String> ids) {
+    _ensurePageSelected(pageIndex);
+    eraseInkStrokesById(ids);
+  }
+
+  void commitImageMoveOnPage(
+    int pageIndex,
+    String id,
+    Offset start,
+    Offset end,
+  ) {
+    _ensurePageSelected(pageIndex);
+    commitImageMove(id, start, end);
   }
 
   void setTool(DrawingTool newTool) {
@@ -130,10 +261,7 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setActiveTextBlock(
-    String? blockId,
-    quill.QuillController? controller,
-  ) {
+  void setActiveTextBlock(String? blockId, quill.QuillController? controller) {
     activeTextBlockId = blockId;
     activeTextController = controller;
     notifyListeners();
@@ -193,9 +321,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void _addRecentColor(Color color) {
-    recentColors.removeWhere(
-      (item) => item.toARGB32() == color.toARGB32(),
-    );
+    recentColors.removeWhere((item) => item.toARGB32() == color.toARGB32());
     recentColors.insert(0, color);
     if (recentColors.length > 12) {
       recentColors.removeRange(12, recentColors.length);
@@ -263,12 +389,9 @@ class EditorController extends ChangeNotifier {
 
   void _schedulePrefsSave() {
     _prefsSaveDebounce?.cancel();
-    _prefsSaveDebounce = Timer(
-      const Duration(milliseconds: 250),
-      () {
-        _saveEditorPrefs();
-      },
-    );
+    _prefsSaveDebounce = Timer(const Duration(milliseconds: 250), () {
+      _saveEditorPrefs();
+    });
   }
 
   Future<void> _saveEditorPrefs() async {
@@ -351,6 +474,8 @@ class EditorController extends ChangeNotifier {
     );
     pages = [...pages, page];
     currentPageIndex = pages.length - 1;
+    activeTextBlockId = null;
+    activeTextController = null;
     _save();
     notifyListeners();
   }
@@ -359,6 +484,11 @@ class EditorController extends ChangeNotifier {
     if (index < 0 || index >= pages.length) {
       return;
     }
+    if (currentPageIndex == index) {
+      return;
+    }
+    activeTextBlockId = null;
+    activeTextController = null;
     currentPageIndex = index;
     notifyListeners();
   }
@@ -373,14 +503,11 @@ class EditorController extends ChangeNotifier {
     final baseSize = lastTextFontSize;
     final baseColor = lastTextColor;
     final delta = quill_delta.Delta()
-      ..insert(
-        'Text',
-        <String, dynamic>{
-          'size': baseSize.toInt().toString(),
-          'color': _colorToHex(baseColor),
-          if (lastTextFontFamily != null) 'font': lastTextFontFamily,
-        },
-      )
+      ..insert('Text', <String, dynamic>{
+        'size': baseSize.toInt().toString(),
+        'color': _colorToHex(baseColor),
+        if (lastTextFontFamily != null) 'font': lastTextFontFamily,
+      })
       ..insert('\n');
     final doc = quill.Document.fromDelta(delta);
     final block = TextBlock(
@@ -416,9 +543,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void deleteTextBlock(String id) {
-    final block = currentPage.textBlocks.firstWhere(
-      (item) => item.id == id,
-    );
+    final block = currentPage.textBlocks.firstWhere((item) => item.id == id);
     _applyAction(DeleteTextAction(block));
     clearActiveTextBlock();
     _save();

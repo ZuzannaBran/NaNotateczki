@@ -13,6 +13,7 @@ enum DrawingTool {
   text,
   image,
   blockArrow,
+  edit,
 }
 
 extension DrawingToolX on DrawingTool {
