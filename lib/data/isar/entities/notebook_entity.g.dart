@@ -3004,43 +3004,63 @@ const ImageBlockEntitySchema = Schema(
   name: r'ImageBlockEntity',
   id: -5828569072254127974,
   properties: {
-    r'dx': PropertySchema(
+    r'cropBottom': PropertySchema(
       id: 0,
+      name: r'cropBottom',
+      type: IsarType.double,
+    ),
+    r'cropLeft': PropertySchema(
+      id: 1,
+      name: r'cropLeft',
+      type: IsarType.double,
+    ),
+    r'cropRight': PropertySchema(
+      id: 2,
+      name: r'cropRight',
+      type: IsarType.double,
+    ),
+    r'cropTop': PropertySchema(
+      id: 3,
+      name: r'cropTop',
+      type: IsarType.double,
+    ),
+    r'dx': PropertySchema(
+      id: 4,
       name: r'dx',
       type: IsarType.double,
     ),
     r'dy': PropertySchema(
-      id: 1,
+      id: 5,
       name: r'dy',
       type: IsarType.double,
     ),
     r'height': PropertySchema(
-      id: 2,
+      id: 6,
       name: r'height',
       type: IsarType.double,
     ),
     r'ocrText': PropertySchema(
-      id: 3,
+      id: 7,
       name: r'ocrText',
       type: IsarType.string,
     ),
     r'path': PropertySchema(
-      id: 4,
+      id: 8,
       name: r'path',
       type: IsarType.string,
     ),
     r'uid': PropertySchema(
-      id: 5,
+      id: 9,
       name: r'uid',
       type: IsarType.string,
     ),
     r'width': PropertySchema(
-      id: 6,
+      id: 10,
       name: r'width',
       type: IsarType.double,
     ),
     r'rotation': PropertySchema(
-      id: 7,
+      id: 11,
       name: r'rotation',
       type: IsarType.double,
     )
@@ -3069,14 +3089,18 @@ void _imageBlockEntitySerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDouble(offsets[0], object.dx);
-  writer.writeDouble(offsets[1], object.dy);
-  writer.writeDouble(offsets[2], object.height);
-  writer.writeString(offsets[3], object.ocrText);
-  writer.writeString(offsets[4], object.path);
-  writer.writeString(offsets[5], object.uid);
-  writer.writeDouble(offsets[6], object.width);
-  writer.writeDouble(offsets[7], object.rotation);
+  writer.writeDouble(offsets[0], object.cropBottom);
+  writer.writeDouble(offsets[1], object.cropLeft);
+  writer.writeDouble(offsets[2], object.cropRight);
+  writer.writeDouble(offsets[3], object.cropTop);
+  writer.writeDouble(offsets[4], object.dx);
+  writer.writeDouble(offsets[5], object.dy);
+  writer.writeDouble(offsets[6], object.height);
+  writer.writeString(offsets[7], object.ocrText);
+  writer.writeString(offsets[8], object.path);
+  writer.writeString(offsets[9], object.uid);
+  writer.writeDouble(offsets[10], object.width);
+  writer.writeDouble(offsets[11], object.rotation);
 }
 
 ImageBlockEntity _imageBlockEntityDeserialize(
@@ -3086,14 +3110,18 @@ ImageBlockEntity _imageBlockEntityDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = ImageBlockEntity();
-  object.dx = reader.readDouble(offsets[0]);
-  object.dy = reader.readDouble(offsets[1]);
-  object.height = reader.readDouble(offsets[2]);
-  object.ocrText = reader.readString(offsets[3]);
-  object.path = reader.readString(offsets[4]);
-  object.uid = reader.readString(offsets[5]);
-  object.width = reader.readDouble(offsets[6]);
-  object.rotation = reader.readDouble(offsets[7]);
+  object.cropBottom = reader.readDoubleOrNull(offsets[0]) ?? 1.0;
+  object.cropLeft = reader.readDoubleOrNull(offsets[1]) ?? 0.0;
+  object.cropRight = reader.readDoubleOrNull(offsets[2]) ?? 1.0;
+  object.cropTop = reader.readDoubleOrNull(offsets[3]) ?? 0.0;
+  object.dx = reader.readDouble(offsets[4]);
+  object.dy = reader.readDouble(offsets[5]);
+  object.height = reader.readDouble(offsets[6]);
+  object.ocrText = reader.readString(offsets[7]);
+  object.path = reader.readString(offsets[8]);
+  object.uid = reader.readString(offsets[9]);
+  object.width = reader.readDouble(offsets[10]);
+  object.rotation = reader.readDouble(offsets[11]);
   return object;
 }
 
@@ -3105,20 +3133,28 @@ P _imageBlockEntityDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDoubleOrNull(offset) ?? 1.0) as P;
     case 1:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDoubleOrNull(offset) ?? 0.0) as P;
     case 2:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDoubleOrNull(offset) ?? 1.0) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readDoubleOrNull(offset) ?? 0.0) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 6:
       return (reader.readDouble(offset)) as P;
     case 7:
+      return (reader.readString(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
+      return (reader.readString(offset)) as P;
+    case 10:
+      return (reader.readDouble(offset)) as P;
+    case 11:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');

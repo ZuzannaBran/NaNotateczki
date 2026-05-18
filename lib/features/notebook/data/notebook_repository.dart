@@ -215,6 +215,10 @@ class NotebookRepository {
       width: entity.width,
       height: entity.height,
       rotation: entity.rotation,
+      cropLeft: entity.cropLeft,
+      cropTop: entity.cropTop,
+      cropRight: entity.cropRight,
+      cropBottom: entity.cropBottom,
     );
   }
 
@@ -227,7 +231,11 @@ class NotebookRepository {
       ..height = block.height
       ..rotation = block.rotation
       ..dx = block.position.dx
-      ..dy = block.position.dy;
+      ..dy = block.position.dy
+      ..cropLeft = block.cropLeft
+      ..cropTop = block.cropTop
+      ..cropRight = block.cropRight
+      ..cropBottom = block.cropBottom;
   }
 
   InkStroke _strokeFromEntity(InkStrokeEntity entity) {
@@ -359,6 +367,10 @@ class NotebookRepository {
       'width': block.width,
       'height': block.height,
       'rotation': block.rotation,
+      'cropLeft': block.cropLeft,
+      'cropTop': block.cropTop,
+      'cropRight': block.cropRight,
+      'cropBottom': block.cropBottom,
       'dx': block.position.dx,
       'dy': block.position.dy,
     };
@@ -376,6 +388,10 @@ class NotebookRepository {
       width: (json['width'] as num).toDouble(),
       height: (json['height'] as num).toDouble(),
       rotation: (json['rotation'] as num?)?.toDouble() ?? 0.0,
+      cropLeft: (json['cropLeft'] as num?)?.toDouble() ?? 0.0,
+      cropTop: (json['cropTop'] as num?)?.toDouble() ?? 0.0,
+      cropRight: (json['cropRight'] as num?)?.toDouble() ?? 1.0,
+      cropBottom: (json['cropBottom'] as num?)?.toDouble() ?? 1.0,
     );
   }
 

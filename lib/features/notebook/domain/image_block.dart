@@ -9,6 +9,10 @@ class ImageBlock {
     required this.width,
     required this.height,
     this.rotation = 0.0,
+    this.cropLeft = 0.0,
+    this.cropTop = 0.0,
+    this.cropRight = 1.0,
+    this.cropBottom = 1.0,
   });
 
   final String id;
@@ -18,6 +22,10 @@ class ImageBlock {
   final double width;
   final double height;
   final double rotation;
+  final double cropLeft;
+  final double cropTop;
+  final double cropRight;
+  final double cropBottom;
 
   ImageBlock copyWith({
     String? id,
@@ -27,6 +35,10 @@ class ImageBlock {
     double? width,
     double? height,
     double? rotation,
+    double? cropLeft,
+    double? cropTop,
+    double? cropRight,
+    double? cropBottom,
   }) {
     return ImageBlock(
       id: id ?? this.id,
@@ -36,6 +48,10 @@ class ImageBlock {
       width: width ?? this.width,
       height: height ?? this.height,
       rotation: rotation ?? this.rotation,
+      cropLeft: cropLeft ?? this.cropLeft,
+      cropTop: cropTop ?? this.cropTop,
+      cropRight: cropRight ?? this.cropRight,
+      cropBottom: cropBottom ?? this.cropBottom,
     );
   }
 }

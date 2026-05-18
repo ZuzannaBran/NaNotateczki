@@ -7,10 +7,14 @@ import '../../state/editor_controller.dart';
 class EditorToolbar extends StatelessWidget {
   const EditorToolbar({
     required this.controller,
+    required this.onInsertPressed,
+    required this.isInsertOpen,
     super.key,
   });
 
   final EditorController controller;
+  final VoidCallback onInsertPressed;
+  final bool isInsertOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -43,9 +47,15 @@ class EditorToolbar extends StatelessWidget {
                   tool: DrawingTool.text,
                 ),
                 _toolButton(
-                  icon: Icons.image_outlined,
-                  label: 'Image',
-                  tool: DrawingTool.image,
+                  icon: Icons.open_with,
+                  label: 'Select',
+                  tool: DrawingTool.edit,
+                ),
+                _actionButton(
+                  icon: Icons.add,
+                  label: 'Insert',
+                  isActive: isInsertOpen,
+                  onPressed: onInsertPressed,
                 ),
                 const SizedBox(width: 12),
                 for (var i = 0; i < controller.quickColors.length; i++)
@@ -83,6 +93,23 @@ class EditorToolbar extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _actionButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: IconButton(
+        icon: Icon(icon),
+        tooltip: label,
+        color: isActive ? AppColors.inkBlack : null,
+        onPressed: onPressed,
+      ),
     );
   }
 

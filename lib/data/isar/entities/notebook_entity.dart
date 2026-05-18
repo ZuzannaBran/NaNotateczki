@@ -48,6 +48,10 @@ class ImageBlockEntity {
   late double rotation;
   late double dx;
   late double dy;
+  late double cropLeft;
+  late double cropTop;
+  late double cropRight;
+  late double cropBottom;
 }
 
 @embedded

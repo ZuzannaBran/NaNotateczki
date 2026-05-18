@@ -32,5 +32,9 @@ organization, and export, with local persistence and optional folder sync.
 ## Notes
 - OCR works on Android/iOS only (ML Kit). On desktop/web, it shows a
 	"not supported" message.
+- Linux file picker depends on "zenity". Install it with:
+	`sudo apt-get install zenity`.
+- Linux PDF import uses "pdftoppm" from poppler-utils:
+	`sudo apt-get install poppler-utils`.
 - Folder sync writes a shared JSON to a user-selected directory and merges
 	by updated time.

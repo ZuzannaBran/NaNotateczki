@@ -8,11 +8,14 @@ import 'package:flutter/gestures.dart' show
   PointerScrollEvent,
   PointerSignalEvent;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../notebook/domain/drawing_tool.dart';
 import '../../editor/presentation/widgets/drawing_canvas.dart';
 import '../../editor/presentation/widgets/editor_toolbar.dart';
+import '../../editor/presentation/widgets/insert_toolbar.dart';
 import '../../editor/presentation/widgets/page_overlay.dart';
 import '../../editor/presentation/widgets/text_edit_toolbar.dart';
 import '../../editor/state/editor_controller.dart';
@@ -29,6 +32,9 @@ class _BoardScreenState extends State<BoardScreen> {
   static const double _trackpadPanSensitivity = 0.6;
   static const double _scrollPanSensitivity = 0.38;
 
+  bool _isInsertToolbarVisible = false;
+  Offset _insertPosition = const Offset(120, 120);
+  final GlobalKey _boardKey = GlobalKey();
   bool _isViewportNavigating = false;
   bool _panZoomSessionActive = false;
   final Map<int, Offset> _activePointers = <int, Offset>{};
@@ -259,87 +265,200 @@ class _BoardScreenState extends State<BoardScreen> {
         kind != PointerDeviceKind.invertedStylus;
   }
 
+  Offset _boardInsertPosition(
+    Rect boardRect,
+    Size viewportSize,
+    EditorController controller,
+  ) {
+    final safeScale = controller.viewScale <= 0 ? 1.0 : controller.viewScale;
+    final viewportCenter = Offset(
+      viewportSize.width / 2,
+      viewportSize.height / 2,
+    );
+    return (viewportCenter - controller.viewPan) / safeScale;
+  }
+
+  Future<void> _handleInsertFile(EditorController controller) async {
+    final message = await controller.insertFromFilePicker(_insertPosition);
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+    controller.setTool(DrawingTool.edit);
+  }
+
+  Future<void> _handlePaste(EditorController controller) async {
+    final message = await controller.insertFromClipboard(_insertPosition);
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _handleCopyImage(EditorController controller) async {
+    final message = await controller.copyActiveImageToClipboard();
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _showBoardContextMenu(
+    Offset globalPosition,
+    Rect boardRect,
+    EditorController controller,
+  ) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) {
+      return;
+    }
+    final targetPosition = _contextMenuInsertPosition(
+      globalPosition: globalPosition,
+      boardRect: boardRect,
+      controller: controller,
+    );
+    if (targetPosition != null) {
+      _insertPosition = targetPosition;
+    }
+
+    final choice = await showMenu<_BoardContextAction>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        overlay.size.width - globalPosition.dx,
+        overlay.size.height - globalPosition.dy,
+      ),
+      items: const [
+        PopupMenuItem(
+          value: _BoardContextAction.paste,
+          child: Text('Paste'),
+        ),
+      ],
+    );
+
+    if (choice == _BoardContextAction.paste) {
+      await _handlePaste(controller);
+    }
+  }
+
+  Offset? _contextMenuInsertPosition({
+    required Offset globalPosition,
+    required Rect boardRect,
+    required EditorController controller,
+  }) {
+    final renderBox = _boardKey.currentContext?.findRenderObject()
+        as RenderBox?;
+    if (renderBox == null) {
+      return null;
+    }
+    final local = renderBox.globalToLocal(globalPosition);
+    final scale = controller.viewScale <= 0 ? 1.0 : controller.viewScale;
+    return (local - controller.viewPan) / scale;
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
     final useWideTitleInset = MediaQuery.sizeOf(context).width >= 600;
 
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: useWideTitleInset ? 44 : null,
-        title: Text(controller.notebook.title),
-      ),
-      body: Column(
-        children: [
-          EditorToolbar(
-            controller: controller,
+    final boardContent = Column(
+      children: [
+        EditorToolbar(
+          controller: controller,
+          isInsertOpen: _isInsertToolbarVisible,
+          onInsertPressed: () {
+            setState(() {
+              _isInsertToolbarVisible = !_isInsertToolbarVisible;
+            });
+          },
+        ),
+        if (controller.activeTextController != null)
+          TextEditToolbar(
+            controller: controller.activeTextController!,
+            editorController: controller,
+            activeTextBlockId: controller.activeTextBlockId,
           ),
-          if (controller.activeTextController != null)
-            TextEditToolbar(
-              controller: controller.activeTextController!,
-              editorController: controller,
-              activeTextBlockId: controller.activeTextBlockId,
+        if (_isInsertToolbarVisible)
+          InsertToolbar(
+            onPickFile: () => _handleInsertFile(controller),
+            onPaste: () => _handlePaste(controller),
+            onClose: () => setState(() => _isInsertToolbarVisible = false),
+          ),
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 12,
+                  offset: Offset(0, 6),
+                ),
+              ],
             ),
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.paper,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.shadow,
-                    blurRadius: 12,
-                    offset: Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final viewportSize = Size(
-                      constraints.maxWidth,
-                      constraints.maxHeight,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final viewportSize = Size(
+                    constraints.maxWidth,
+                    constraints.maxHeight,
+                  );
+                  final boardRect = _buildBoardRect(controller, viewportSize);
+                  _insertPosition = _boardInsertPosition(
+                    boardRect,
+                    viewportSize,
+                    controller,
+                  );
+                  final transformedOffset = Offset(
+                    controller.viewPan.dx +
+                      (boardRect.left * controller.viewScale),
+                    controller.viewPan.dy +
+                      (boardRect.top * controller.viewScale),
+                  );
+                  final transform = Matrix4.diagonal3Values(
+                    controller.viewScale,
+                    controller.viewScale,
+                    1.0,
+                  )..setTranslationRaw(
+                      transformedOffset.dx,
+                      transformedOffset.dy,
+                      0.0,
                     );
-                    final boardRect = _buildBoardRect(controller, viewportSize);
-                    final transformedOffset = Offset(
-                      controller.viewPan.dx +
-                        (boardRect.left * controller.viewScale),
-                      controller.viewPan.dy +
-                        (boardRect.top * controller.viewScale),
-                    );
-                    final transform = Matrix4.diagonal3Values(
-                      controller.viewScale,
-                      controller.viewScale,
-                      1.0,
-                    )..setTranslationRaw(
-                        transformedOffset.dx,
-                        transformedOffset.dy,
-                        0.0,
-                      );
-                    final viewportCenter = Offset(
-                      viewportSize.width / 2,
-                      viewportSize.height / 2,
-                    );
+                  final viewportCenter = Offset(
+                    viewportSize.width / 2,
+                    viewportSize.height / 2,
+                  );
 
-                    return Listener(
-                      behavior: HitTestBehavior.translucent,
-                      onPointerDown: (event) =>
-                          _onPointerDown(event, controller),
-                      onPointerMove: (event) =>
-                          _onPointerMove(event, controller),
-                      onPointerUp: (event) =>
-                          _onPointerUpOrCancel(event),
-                      onPointerCancel: (event) =>
-                          _onPointerUpOrCancel(event),
-                        onPointerPanZoomStart: (event) =>
-                          _onPointerPanZoomStart(event, controller),
-                        onPointerPanZoomUpdate: (event) =>
-                          _onPointerPanZoomUpdate(event, controller),
-                        onPointerPanZoomEnd: _onPointerPanZoomEnd,
-                          onPointerSignal: (event) =>
-                            _onPointerSignal(event, controller),
+                  return Listener(
+                    key: _boardKey,
+                    behavior: HitTestBehavior.translucent,
+                    onPointerDown: (event) =>
+                        _onPointerDown(event, controller),
+                    onPointerMove: (event) =>
+                        _onPointerMove(event, controller),
+                    onPointerUp: (event) =>
+                        _onPointerUpOrCancel(event),
+                    onPointerCancel: (event) =>
+                        _onPointerUpOrCancel(event),
+                      onPointerPanZoomStart: (event) =>
+                        _onPointerPanZoomStart(event, controller),
+                      onPointerPanZoomUpdate: (event) =>
+                        _onPointerPanZoomUpdate(event, controller),
+                      onPointerPanZoomEnd: _onPointerPanZoomEnd,
+                        onPointerSignal: (event) =>
+                          _onPointerSignal(event, controller),
+                    child: GestureDetector(
+                      onSecondaryTapDown: (details) =>
+                          _showBoardContextMenu(
+                        details.globalPosition,
+                        boardRect,
+                        controller,
+                      ),
                       child: Stack(
                         children: [
                           Positioned.fill(
@@ -394,16 +513,67 @@ class _BoardScreenState extends State<BoardScreen> {
                           ),
                         ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
-        ],
+        ),
+      ],
+    );
+
+    final shortcutsEnabled = controller.activeTextController == null;
+    final content = shortcutsEnabled
+        ? Shortcuts(
+            shortcuts: const <ShortcutActivator, Intent>{
+              SingleActivator(LogicalKeyboardKey.keyV, control: true):
+                  _PasteFromClipboardIntent(),
+              SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+                  _PasteFromClipboardIntent(),
+              SingleActivator(LogicalKeyboardKey.keyC, control: true):
+                  _CopyImageIntent(),
+              SingleActivator(LogicalKeyboardKey.keyC, meta: true):
+                  _CopyImageIntent(),
+            },
+            child: Actions(
+              actions: <Type, Action<Intent>>{
+                _PasteFromClipboardIntent: CallbackAction<Intent>(
+                  onInvoke: (_) {
+                    _handlePaste(controller);
+                    return null;
+                  },
+                ),
+                _CopyImageIntent: CallbackAction<Intent>(
+                  onInvoke: (_) {
+                    _handleCopyImage(controller);
+                    return null;
+                  },
+                ),
+              },
+              child: Focus(autofocus: true, child: boardContent),
+            ),
+          )
+        : boardContent;
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: useWideTitleInset ? 44 : null,
+        title: Text(controller.notebook.title),
       ),
+      body: content,
     );
   }
+}
+
+enum _BoardContextAction { paste }
+
+class _PasteFromClipboardIntent extends Intent {
+  const _PasteFromClipboardIntent();
+}
+
+class _CopyImageIntent extends Intent {
+  const _CopyImageIntent();
 }
 
 class _BoardZoomControls extends StatelessWidget {

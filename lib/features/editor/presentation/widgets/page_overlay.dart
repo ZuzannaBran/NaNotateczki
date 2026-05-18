@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,8 +48,10 @@ class PageOverlay extends StatelessWidget {
                 if (controller.consumeBackgroundTapSuppression()) {
                   return;
                 }
-                if (controller.activeTextBlockId != null) {
+                if (controller.activeTextBlockId != null ||
+                    controller.activeImageBlockId != null) {
                   controller.clearActiveTextBlock();
+                  controller.clearActiveImageBlock();
                   return;
                 }
                 if (tool == DrawingTool.text || tool == DrawingTool.image) {
@@ -148,6 +151,9 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   Offset? _dragStart;
   Offset? _startPosition;
   bool _dragFromFrame = false;
+  Offset? _resizeStart;
+  double? _startWidth;
+  TextBlock? _resizeBefore;
   static const double _handleLineLength = 12.0;
   static const double _handleDotRadius = 4.0;
   static const double _handleDotDiameter = _handleDotRadius * 2;
@@ -201,11 +207,14 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
     final isActive = controller.activeTextBlockId == widget.block.id;
-    final canDrag =
+    final canEdit =
         controller.tool == DrawingTool.text && widget.interactionEnabled;
-    _quillController.readOnly = !isActive;
+    final canTransform = !controller.tool.isInk && widget.interactionEnabled;
+    _quillController.readOnly = !(isActive && canEdit);
 
-    if (isActive && controller.activeTextController != _quillController) {
+    if (isActive &&
+        controller.activeTextController != _quillController &&
+        canEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           controller.setActiveTextBlock(widget.block.id, _quillController);
@@ -223,7 +232,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         child: Builder(
           builder: (context) {
             return GestureDetector(
-              onTapDown: canDrag
+              onTapDown: canTransform
                   ? (_) {
                       if (controller.currentPageIndex != widget.pageIndex) {
                         controller.setCurrentPage(widget.pageIndex);
@@ -231,12 +240,14 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                       controller.markTextTap();
                       controller.setActiveTextBlock(
                         widget.block.id,
-                        _quillController,
+                        canEdit ? _quillController : null,
                       );
-                      _focusNode.requestFocus();
+                      if (canEdit) {
+                        _focusNode.requestFocus();
+                      }
                     }
                   : null,
-              onPanStart: canDrag
+              onPanStart: canTransform
                   ? (details) {
                       final box = context.findRenderObject() as RenderBox?;
                       final size = box?.size ?? Size.zero;
@@ -248,7 +259,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                       _startMove(details.globalPosition);
                     }
                   : null,
-              onPanUpdate: canDrag
+              onPanUpdate: canTransform
                   ? (details) {
                       if (!_dragFromFrame) {
                         return;
@@ -256,7 +267,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                       _updateMove(details.globalPosition, controller);
                     }
                   : null,
-              onPanEnd: canDrag
+              onPanEnd: canTransform
                   ? (_) {
                       if (!_dragFromFrame) {
                         return;
@@ -268,40 +279,53 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 4,
-                    ),
-                    constraints: BoxConstraints(maxWidth: widget.block.width),
-                    decoration: BoxDecoration(
-                      color: AppColors.paper.withValues(
-                        alpha: isActive ? 0.85 : 0.0,
+                  Stack(
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        constraints: BoxConstraints(
+                          maxWidth: widget.block.width,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.paper.withValues(
+                            alpha: isActive ? 0.85 : 0.0,
+                          ),
+                          borderRadius: BorderRadius.zero,
+                          border: Border.all(
+                            color: isActive
+                                ? AppColors.inkBlack
+                                : Colors.transparent,
+                            width: 1.2,
+                          ),
+                        ),
+                        child: quill.QuillEditor(
+                          controller: _quillController,
+                          focusNode: _focusNode,
+                          scrollController: _scrollController,
+                          config: quill.QuillEditorConfig(
+                            scrollable: false,
+                            padding: EdgeInsets.zero,
+                            autoFocus: false,
+                            expands: false,
+                            // ignore: experimental_member_use
+                            onKeyPressed: (event, node) =>
+                                _handleKeyPressed(event),
+                          ),
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isActive
-                            ? AppColors.inkBlack
-                            : Colors.transparent,
-                        width: 1.2,
-                      ),
-                    ),
-                    child: quill.QuillEditor(
-                      controller: _quillController,
-                      focusNode: _focusNode,
-                      scrollController: _scrollController,
-                      config: quill.QuillEditorConfig(
-                        scrollable: false,
-                        padding: EdgeInsets.zero,
-                        autoFocus: false,
-                        expands: false,
-                        // ignore: experimental_member_use
-                        onKeyPressed: (event, node) => _handleKeyPressed(event),
-                      ),
-                    ),
+                      if (isActive && canTransform)
+                        Positioned(
+                          right: 2,
+                          bottom: 2,
+                          child: _resizeHandle(controller),
+                        ),
+                    ],
                   ),
-                  if (isActive && canDrag)
+                  if (isActive && canTransform)
                     SizedBox(
                       width: _handleLineLength + _handleDotDiameter,
                       child: Align(
@@ -381,6 +405,25 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     );
   }
 
+  Widget _resizeHandle(EditorController controller) {
+    const size = 12.0;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (details) => _startResize(details.globalPosition),
+      onPanUpdate: (details) =>
+          _updateResize(details.globalPosition, controller),
+      onPanEnd: (_) => _endResize(controller),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: AppColors.inkBlack,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+
   void _startMove(Offset globalPosition) {
     _dragStart = globalPosition;
     _startPosition = widget.block.position;
@@ -414,6 +457,38 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _dragStart = null;
     _startPosition = null;
     _dragFromFrame = false;
+  }
+
+  void _startResize(Offset globalPosition) {
+    _resizeStart = globalPosition;
+    _startWidth = widget.block.width;
+    _resizeBefore = widget.block;
+  }
+
+  void _updateResize(Offset globalPosition, EditorController controller) {
+    if (_resizeStart == null || _startWidth == null) {
+      return;
+    }
+    final delta = globalPosition - _resizeStart!;
+    final target = (_startWidth! + delta.dx).clamp(140.0, 620.0).toDouble();
+    controller.updateTextBlockWidthOnPage(
+      widget.pageIndex,
+      widget.block.id,
+      target,
+    );
+  }
+
+  void _endResize(EditorController controller) {
+    final before = _resizeBefore;
+    if (before != null) {
+      final current = controller.findTextBlockById(widget.block.id);
+      if (current != null) {
+        controller.commitTextResizeOnPage(widget.pageIndex, before, current);
+      }
+    }
+    _resizeStart = null;
+    _startWidth = null;
+    _resizeBefore = null;
   }
 
   KeyEventResult? _handleKeyPressed(KeyEvent event) {
@@ -542,26 +617,40 @@ class _ImageBlockWidget extends StatefulWidget {
 class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   Offset? _dragStart;
   Offset? _startPosition;
+  Offset? _resizeStart;
+  Size? _startSize;
+  ImageBlock? _resizeBefore;
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.read<EditorController>();
-    final canDrag =
-        controller.tool == DrawingTool.image && widget.interactionEnabled;
+    final controller = context.watch<EditorController>();
+    final canTransform = !controller.tool.isInk && widget.interactionEnabled;
+    final isSelected = controller.activeImageBlockId == widget.block.id;
 
     return Positioned(
       left: widget.block.position.dx - widget.worldOrigin.dx,
       top: widget.block.position.dy - widget.worldOrigin.dy,
       child: GestureDetector(
-        onTap: () => context.read<EditorController>().clearActiveTextBlock(),
+        onTap: () {
+          if (controller.currentPageIndex != widget.pageIndex) {
+            controller.setCurrentPage(widget.pageIndex);
+          }
+          controller.clearActiveTextBlock();
+          controller.setActiveImageBlock(widget.block.id);
+        },
+        onSecondaryTapDown: (details) => _showImageContextMenu(
+          context,
+          details.globalPosition,
+          controller,
+        ),
         onDoubleTap: () => _editOcr(context, controller),
-        onPanStart: canDrag
+        onPanStart: canTransform
             ? (details) {
                 _dragStart = details.globalPosition;
                 _startPosition = widget.block.position;
               }
             : null,
-        onPanUpdate: canDrag
+        onPanUpdate: canTransform
             ? (details) {
                 if (_dragStart == null || _startPosition == null) {
                   return;
@@ -574,7 +663,7 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                 );
               }
             : null,
-        onPanEnd: canDrag
+        onPanEnd: canTransform
             ? (_) {
                 if (_dragStart == null || _startPosition == null) {
                   return;
@@ -583,7 +672,7 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                     .findImageBlockById(widget.block.id)
                     ?.position;
                 if (current != null) {
-                  controller.commitImageMoveOnPage(
+                  controller.finalizeImageMoveOnPage(
                     widget.pageIndex,
                     widget.block.id,
                     _startPosition!,
@@ -599,10 +688,22 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
           height: widget.block.height,
           decoration: BoxDecoration(
             color: AppColors.toolbar,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.divider),
+            borderRadius: BorderRadius.zero,
+            border: Border.all(
+              color: isSelected ? AppColors.inkBlack : AppColors.divider,
+            ),
           ),
-          child: _imageChild(),
+          child: Stack(
+            children: [
+              Positioned.fill(child: _imageChild()),
+              if (isSelected && canTransform)
+                Positioned(
+                  right: 4,
+                  bottom: 4,
+                  child: _resizeHandle(controller),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -621,10 +722,64 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
         child: Icon(Icons.broken_image_outlined, color: AppColors.inkBlack),
       );
     }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Image.file(file, fit: BoxFit.cover),
+    return ClipRect(child: Image.file(file, fit: BoxFit.cover));
+  }
+
+  Widget _resizeHandle(EditorController controller) {
+    const size = 14.0;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (details) => _startResize(details.globalPosition),
+      onPanUpdate: (details) =>
+          _updateResize(details.globalPosition, controller),
+      onPanEnd: (_) => _endResize(controller),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: AppColors.inkBlack,
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
     );
+  }
+
+  void _startResize(Offset globalPosition) {
+    _resizeStart = globalPosition;
+    _startSize = Size(widget.block.width, widget.block.height);
+    _resizeBefore = widget.block;
+  }
+
+  void _updateResize(Offset globalPosition, EditorController controller) {
+    if (_resizeStart == null || _startSize == null) {
+      return;
+    }
+    final delta = globalPosition - _resizeStart!;
+    final deltaValue = math.max(delta.dx, delta.dy);
+    final baseWidth = _startSize!.width;
+    final baseHeight = _startSize!.height;
+    final ratio = baseHeight == 0 ? 1.0 : baseWidth / baseHeight;
+    final nextWidth = (baseWidth + deltaValue).clamp(80.0, 720.0).toDouble();
+    final nextHeight = (nextWidth / ratio).clamp(60.0, 720.0).toDouble();
+    controller.updateImageBlockSizeOnPage(
+      widget.pageIndex,
+      widget.block.id,
+      width: nextWidth,
+      height: nextHeight,
+    );
+  }
+
+  void _endResize(EditorController controller) {
+    final before = _resizeBefore;
+    if (before != null) {
+      final current = controller.findImageBlockById(widget.block.id);
+      if (current != null) {
+        controller.commitImageResizeOnPage(widget.pageIndex, before, current);
+      }
+    }
+    _resizeStart = null;
+    _startSize = null;
+    _resizeBefore = null;
   }
 
   Future<void> _editOcr(
@@ -689,4 +844,54 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
       updated,
     );
   }
+
+  Future<void> _showImageContextMenu(
+    BuildContext context,
+    Offset globalPosition,
+    EditorController controller,
+  ) async {
+    if (controller.currentPageIndex != widget.pageIndex) {
+      controller.setCurrentPage(widget.pageIndex);
+    }
+    controller.clearActiveTextBlock();
+    controller.setActiveImageBlock(widget.block.id);
+
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) {
+      return;
+    }
+
+    final choice = await showMenu<_ImageContextAction>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        overlay.size.width - globalPosition.dx,
+        overlay.size.height - globalPosition.dy,
+      ),
+      items: const [
+        PopupMenuItem(
+          value: _ImageContextAction.copy,
+          child: Text('Copy image'),
+        ),
+      ],
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (choice == _ImageContextAction.copy) {
+      final message = await controller.copyActiveImageToClipboard();
+      if (!context.mounted) {
+        return;
+      }
+      if (message != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
+  }
 }
+
+enum _ImageContextAction { copy }

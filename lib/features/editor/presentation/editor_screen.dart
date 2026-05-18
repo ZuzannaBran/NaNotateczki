@@ -10,13 +10,16 @@ import 'package:flutter/gestures.dart'
         PointerSignalEvent;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/note_page.dart';
 import '../state/editor_controller.dart';
 import 'widgets/drawing_canvas.dart';
 import 'widgets/editor_toolbar.dart';
+import 'widgets/insert_toolbar.dart';
 import 'widgets/page_overlay.dart';
 import 'widgets/text_edit_toolbar.dart';
 
@@ -41,6 +44,7 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _scrollPanSensitivity = 0.38;
 
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _canvasKey = GlobalKey();
   bool _isAutoAddingPage = false;
   bool _wasScrollingDown = false;
   DateTime _lastAutoAddAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -57,6 +61,8 @@ class _EditorScreenState extends State<EditorScreen> {
   Offset _pagePan = Offset.zero;
   double _pageMinScale = 1.0;
   double _pageMaxScale = 1.0;
+  bool _isInsertToolbarVisible = false;
+  Offset _insertPosition = const Offset(120, 120);
 
   @override
   void initState() {
@@ -587,111 +593,240 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  Offset _insertPositionForViewport({
+    required Rect visibleDocumentRect,
+    required Size pageWorldSize,
+    required int currentPageIndex,
+  }) {
+    final pageTop =
+      currentPageIndex.toDouble() * (_pageExtent == 0 ? 1 : _pageExtent);
+    final pageRect = Rect.fromLTWH(
+      0,
+      pageTop,
+      pageWorldSize.width,
+      pageWorldSize.height,
+    );
+    final safeRect = visibleDocumentRect.intersect(pageRect);
+    if (safeRect.isEmpty) {
+      return Offset(
+        pageWorldSize.width * 0.5,
+        pageTop + pageWorldSize.height * 0.5,
+      );
+    }
+    return safeRect.center;
+  }
+
+  Future<void> _handleInsertFile(EditorController controller) async {
+    final message = await controller.insertFromFilePicker(_insertPosition);
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+    controller.setTool(DrawingTool.edit);
+  }
+
+  Future<void> _handlePaste(EditorController controller) async {
+    final message = await controller.insertFromClipboard(_insertPosition);
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _handleCopyImage(EditorController controller) async {
+    final message = await controller.copyActiveImageToClipboard();
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _showCanvasContextMenu(
+    Offset globalPosition,
+    EditorController controller,
+    Size docWorldSize,
+  ) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) {
+      return;
+    }
+    final targetPosition = _contextMenuInsertPosition(
+      globalPosition: globalPosition,
+      docWorldSize: docWorldSize,
+    );
+    if (targetPosition != null) {
+      _insertPosition = targetPosition;
+      if (_pageExtent > 0 && controller.pages.isNotEmpty) {
+        final pageIndex = (_insertPosition.dy / _pageExtent)
+            .floor()
+            .clamp(0, controller.pages.length - 1);
+        controller.setCurrentPage(pageIndex);
+      }
+    }
+
+    final choice = await showMenu<_CanvasContextAction>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        overlay.size.width - globalPosition.dx,
+        overlay.size.height - globalPosition.dy,
+      ),
+      items: const [
+        PopupMenuItem(
+          value: _CanvasContextAction.paste,
+          child: Text('Paste'),
+        ),
+      ],
+    );
+
+    if (choice == _CanvasContextAction.paste) {
+      await _handlePaste(controller);
+    }
+  }
+
+  Offset? _contextMenuInsertPosition({
+    required Offset globalPosition,
+    required Size docWorldSize,
+  }) {
+    final renderBox = _canvasKey.currentContext?.findRenderObject()
+        as RenderBox?;
+    if (renderBox == null) {
+      return null;
+    }
+    final local = renderBox.globalToLocal(globalPosition);
+    final scale = _pageScale <= 0 ? 1.0 : _pageScale;
+    final world = (local - _pagePan) / scale;
+    return Offset(
+      world.dx.clamp(0.0, docWorldSize.width),
+      world.dy.clamp(0.0, docWorldSize.height),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
     final useWideTitleInset = MediaQuery.sizeOf(context).width >= 600;
 
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: useWideTitleInset ? 44 : null,
-        title: Text(controller.notebook.title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bookmark_outline),
-            tooltip: 'Bookmark page',
-            onPressed: controller.toggleBookmark,
+    final editorContent = Column(
+      children: [
+        EditorToolbar(
+          controller: controller,
+          isInsertOpen: _isInsertToolbarVisible,
+          onInsertPressed: () {
+            setState(() {
+              _isInsertToolbarVisible = !_isInsertToolbarVisible;
+            });
+          },
+        ),
+        if (controller.activeTextController != null)
+          TextEditToolbar(
+            controller: controller.activeTextController!,
+            editorController: controller,
+            activeTextBlockId: controller.activeTextBlockId,
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          EditorToolbar(controller: controller),
-          if (controller.activeTextController != null)
-            TextEditToolbar(
-              controller: controller.activeTextController!,
-              editorController: controller,
-              activeTextBlockId: controller.activeTextBlockId,
-            ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final maxPageWidth = math.max(
-                  260.0,
-                  constraints.maxWidth - (_leftMargin + _rightMargin),
-                );
-                final pageWidth = math.min(820.0, maxPageWidth);
-                final pageHeight = pageWidth * _a4HeightRatio;
-                final pageWorldSize = Size(pageWidth, pageHeight);
-                final docHeight = _documentHeight(
-                  pageHeight: pageWorldSize.height,
-                  pageCount: controller.pages.length,
-                );
-                final docWorldSize = Size(pageWorldSize.width, docHeight);
-                final fitToWidthScale = (maxPageWidth / pageWidth)
-                    .clamp(1.0, 4.0)
-                    .toDouble();
-                final clipScale = math.min(_pageScale, fitToWidthScale);
-                final clipSize = Size(
-                  docWorldSize.width * clipScale,
-                  docWorldSize.height * clipScale,
-                );
-                final viewportSize = Size(
-                  clipSize.width,
-                  math.max(1.0, constraints.maxHeight - (_topBottomPadding * 2)),
-                );
-                final zoomPercent = (_pageScale * 100).round();
-                final visibleDocumentRect = _visibleDocumentRect(
-                  docWorldSize: docWorldSize,
-                  viewportSize: viewportSize,
-                );
-                final minimapBoundaryVisibility =
-                    _pageBoundaryVisibilityInDocument(
-                      visibleDocumentRect: visibleDocumentRect,
-                      pageWorldSize: pageWorldSize,
-                      pageIndex: controller.currentPageIndex,
-                    );
-                final minimapPanelHeight = math.min(
-                  pageWorldSize.height * 0.5,
-                  math.max(180.0, constraints.maxHeight - 24),
-                );
-                _pageExtent = pageWorldSize.height + _pageGap;
-                _syncPageTransformBounds(
-                  docWorldSize: docWorldSize,
-                  fitToWidthScale: fitToWidthScale,
-                  viewportSize: viewportSize,
-                );
-                final pageTransform = Matrix4.diagonal3Values(
-                  _pageScale,
-                  _pageScale,
-                  1.0,
-                )..setTranslationRaw(_pagePan.dx, _pagePan.dy, 0.0);
+        if (_isInsertToolbarVisible)
+          InsertToolbar(
+            onPickFile: () => _handleInsertFile(controller),
+            onPaste: () => _handlePaste(controller),
+            onClose: () => setState(() => _isInsertToolbarVisible = false),
+          ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxPageWidth = math.max(
+                260.0,
+                constraints.maxWidth - (_leftMargin + _rightMargin),
+              );
+              final pageWidth = math.min(820.0, maxPageWidth);
+              final pageHeight = pageWidth * _a4HeightRatio;
+              final pageWorldSize = Size(pageWidth, pageHeight);
+              controller.updatePageLayout(
+                pageWidth: pageWorldSize.width,
+                pageHeight: pageWorldSize.height,
+                pageGap: _pageGap,
+              );
+              final docHeight = _documentHeight(
+                pageHeight: pageWorldSize.height,
+                pageCount: controller.pages.length,
+              );
+              final docWorldSize = Size(pageWorldSize.width, docHeight);
+              final fitToWidthScale = (maxPageWidth / pageWidth)
+                  .clamp(1.0, 4.0)
+                  .toDouble();
+              final clipScale = math.min(_pageScale, fitToWidthScale);
+              final clipSize = Size(
+                docWorldSize.width * clipScale,
+                docWorldSize.height * clipScale,
+              );
+              final viewportSize = Size(
+                clipSize.width,
+                math.max(1.0, constraints.maxHeight - (_topBottomPadding * 2)),
+              );
+              final zoomPercent = (_pageScale * 100).round();
+              final visibleDocumentRect = _visibleDocumentRect(
+                docWorldSize: docWorldSize,
+                viewportSize: viewportSize,
+              );
+              final minimapBoundaryVisibility =
+                  _pageBoundaryVisibilityInDocument(
+                    visibleDocumentRect: visibleDocumentRect,
+                    pageWorldSize: pageWorldSize,
+                    pageIndex: controller.currentPageIndex,
+                  );
+              final insertPosition = _insertPositionForViewport(
+                visibleDocumentRect: visibleDocumentRect,
+                pageWorldSize: pageWorldSize,
+                currentPageIndex: controller.currentPageIndex,
+              );
+              _insertPosition = insertPosition;
+              final minimapPanelHeight = math.min(
+                pageWorldSize.height * 0.5,
+                math.max(180.0, constraints.maxHeight - 24),
+              );
+              _pageExtent = pageWorldSize.height + _pageGap;
+              _syncPageTransformBounds(
+                docWorldSize: docWorldSize,
+                fitToWidthScale: fitToWidthScale,
+                viewportSize: viewportSize,
+              );
+              final pageTransform = Matrix4.diagonal3Values(
+                _pageScale,
+                _pageScale,
+                1.0,
+              )..setTranslationRaw(_pagePan.dx, _pagePan.dy, 0.0);
 
-                return Container(
-                  color: AppColors.paper.withValues(alpha: 0.35),
-                  child: Stack(
-                    children: [
-                      NotificationListener<ScrollNotification>(
-                        onNotification: (notification) =>
-                            _onPagesScroll(notification, controller),
-                        child: SingleChildScrollView(
-                          controller: _scrollController,
-                          physics: (_isViewportNavigating || _pageScale > 1.001)
-                              ? const NeverScrollableScrollPhysics()
-                              : const ClampingScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(
-                            _leftMargin,
-                            _topBottomPadding,
-                            _rightMargin,
-                            _topBottomPadding,
-                          ),
-                          child: Align(
-                            alignment: Alignment.topRight,
-                            child: SizedBox(
-                              width: clipSize.width,
-                              height: clipSize.height,
-                              child: ClipRect(
+              return Container(
+                color: AppColors.paper.withValues(alpha: 0.35),
+                child: Stack(
+                  children: [
+                    NotificationListener<ScrollNotification>(
+                      onNotification: (notification) =>
+                          _onPagesScroll(notification, controller),
+                      child: SingleChildScrollView(
+                        controller: _scrollController,
+                        physics: (_isViewportNavigating || _pageScale > 1.001)
+                            ? const NeverScrollableScrollPhysics()
+                            : const ClampingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(
+                          _leftMargin,
+                          _topBottomPadding,
+                          _rightMargin,
+                          _topBottomPadding,
+                        ),
+                        child: Align(
+                          alignment: Alignment.topRight,
+                          child: SizedBox(
+                            width: clipSize.width,
+                            height: clipSize.height,
+                            child: ClipRect(
+                              child: GestureDetector(
+                                onSecondaryTapDown: (details) =>
+                                    _showCanvasContextMenu(
+                                  details.globalPosition,
+                                  controller,
+                                  docWorldSize,
+                                ),
                                 child: Listener(
+                                  key: _canvasKey,
                                   behavior: HitTestBehavior.translucent,
                                   onPointerDown: (event) => _onPointerDown(
                                     event,
@@ -820,37 +955,95 @@ class _EditorScreenState extends State<EditorScreen> {
                           ),
                         ),
                       ),
-                      Positioned(
-                        top: 10,
-                        right: 12,
-                        child: IgnorePointer(
-                          child: _ZoomPercentBadge(zoomPercent: zoomPercent),
-                        ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 12,
+                      child: IgnorePointer(
+                        child: _ZoomPercentBadge(zoomPercent: zoomPercent),
                       ),
-                      Positioned(
-                        top: 10,
-                        left: 10,
-                        child: _ProjectMiniMapOverlay(
-                          pages: controller.pages,
-                          currentPageIndex: controller.currentPageIndex,
-                          pageWorldSize: pageWorldSize,
-                          pageGap: _pageGap,
-                          panelHeight: minimapPanelHeight,
-                          visibleDocumentRect: visibleDocumentRect,
-                          boundaryVisibility: minimapBoundaryVisibility,
-                        ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: _ProjectMiniMapOverlay(
+                        pages: controller.pages,
+                        currentPageIndex: controller.currentPageIndex,
+                        pageWorldSize: pageWorldSize,
+                        pageGap: _pageGap,
+                        panelHeight: minimapPanelHeight,
+                        visibleDocumentRect: visibleDocumentRect,
+                        boundaryVisibility: minimapBoundaryVisibility,
                       ),
-                    ],
-                  ),
-                );
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+
+    final shortcutsEnabled = controller.activeTextController == null;
+    final content = shortcutsEnabled
+        ? Shortcuts(
+            shortcuts: const <ShortcutActivator, Intent>{
+              SingleActivator(LogicalKeyboardKey.keyV, control: true):
+                  _PasteFromClipboardIntent(),
+              SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+                  _PasteFromClipboardIntent(),
+              SingleActivator(LogicalKeyboardKey.keyC, control: true):
+                  _CopyImageIntent(),
+              SingleActivator(LogicalKeyboardKey.keyC, meta: true):
+                  _CopyImageIntent(),
+            },
+            child: Actions(
+              actions: <Type, Action<Intent>>{
+                _PasteFromClipboardIntent: CallbackAction<Intent>(
+                  onInvoke: (_) {
+                    _handlePaste(controller);
+                    return null;
+                  },
+                ),
+                _CopyImageIntent: CallbackAction<Intent>(
+                  onInvoke: (_) {
+                    _handleCopyImage(controller);
+                    return null;
+                  },
+                ),
               },
+              child: Focus(autofocus: true, child: editorContent),
             ),
+          )
+        : editorContent;
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: useWideTitleInset ? 44 : null,
+        title: Text(controller.notebook.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bookmark_outline),
+            tooltip: 'Bookmark page',
+            onPressed: controller.toggleBookmark,
           ),
         ],
       ),
+      body: content,
     );
   }
 }
+
+class _PasteFromClipboardIntent extends Intent {
+  const _PasteFromClipboardIntent();
+}
+
+class _CopyImageIntent extends Intent {
+  const _CopyImageIntent();
+}
+
+enum _CanvasContextAction { paste }
 
 class _BoundaryVisibility {
   const _BoundaryVisibility({
@@ -1290,12 +1483,8 @@ class _ProjectMiniMapPainter extends CustomPainter {
           block.width * scaleX,
           block.height * scaleY,
         );
-        final rounded = RRect.fromRectAndRadius(
-          rect,
-          const Radius.circular(1.5),
-        );
-        canvas.drawRRect(rounded, imageFill);
-        canvas.drawRRect(rounded, imageBorder);
+        canvas.drawRect(rect, imageFill);
+        canvas.drawRect(rect, imageBorder);
       }
 
       final textPaint = Paint()..color = const Color(0xFF95A2B4);
@@ -1305,11 +1494,10 @@ class _ProjectMiniMapPainter extends CustomPainter {
             .clamp(6.0, size.width * 0.84)
             .toDouble();
         final lineHeight = math.max(1.0, block.fontSize * scaleY * 0.18);
-        final rect = RRect.fromRectAndRadius(
+        canvas.drawRect(
           Rect.fromLTWH(topLeft.dx, topLeft.dy, lineWidth, lineHeight),
-          const Radius.circular(0.8),
+          textPaint,
         );
-        canvas.drawRRect(rect, textPaint);
       }
 
       for (final stroke in page.inkStrokes) {

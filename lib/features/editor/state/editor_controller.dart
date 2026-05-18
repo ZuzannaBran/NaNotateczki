@@ -5,19 +5,24 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart' as quill_delta;
+import 'package:file_picker/file_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'
     as mlkit;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdfx/pdfx.dart';
 import 'package:uuid/uuid.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/ink_stroke.dart';
 import '../../notebook/domain/notebook.dart';
+import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/text_block.dart';
 import 'editor_actions.dart';
@@ -61,15 +66,34 @@ class EditorController extends ChangeNotifier {
 
   String? activeTextBlockId;
   quill.QuillController? activeTextController;
+  String? activeImageBlockId;
   bool _suppressBackgroundTap = false;
   double viewScale = 1.0;
   Offset viewPan = Offset.zero;
+  double _pageWidth = 0.0;
+  double _pageHeight = 0.0;
+  double _pageGap = 0.0;
 
   NotePage get currentPage => pages[currentPageIndex];
 
   bool get canUndo => _undoActions.isNotEmpty;
   bool get canRedo => _redoActions.isNotEmpty;
   Rect get contentBounds => _computeContentBounds();
+
+  void updatePageLayout({
+    required double pageWidth,
+    required double pageHeight,
+    required double pageGap,
+  }) {
+    if (_pageWidth == pageWidth &&
+        _pageHeight == pageHeight &&
+        _pageGap == pageGap) {
+      return;
+    }
+    _pageWidth = pageWidth;
+    _pageHeight = pageHeight;
+    _pageGap = pageGap;
+  }
 
   void setViewTransform({Offset? pan, double? scale}) {
     final targetScale = (scale ?? viewScale)
@@ -116,6 +140,26 @@ class EditorController extends ChangeNotifier {
 
   NotePage pageAt(int index) {
     return pages[index];
+  }
+
+  double get _pageExtent => _pageHeight + _pageGap;
+
+  Offset _pageOriginForIndex(int index) {
+    if (_pageExtent <= 0) {
+      return Offset.zero;
+    }
+    return Offset(0, _pageExtent * index);
+  }
+
+  int _pageIndexForPosition(Offset position) {
+    if (pages.isEmpty) {
+      return 0;
+    }
+    if (_pageExtent <= 0) {
+      return currentPageIndex;
+    }
+    final raw = (position.dy / _pageExtent).floor();
+    return raw.clamp(0, pages.length - 1);
   }
 
   TextBlock? findTextBlockById(String id) {
@@ -179,6 +223,11 @@ class EditorController extends ChangeNotifier {
     updateTextBlockPosition(id, position);
   }
 
+  void updateTextBlockWidthOnPage(int pageIndex, String id, double width) {
+    _ensurePageSelected(pageIndex);
+    updateTextBlockWidth(id, width);
+  }
+
   void deleteTextBlockOnPage(int pageIndex, String id) {
     _ensurePageSelected(pageIndex);
     deleteTextBlock(id);
@@ -192,6 +241,15 @@ class EditorController extends ChangeNotifier {
   ) {
     _ensurePageSelected(pageIndex);
     commitTextMove(id, start, end);
+  }
+
+  void commitTextResizeOnPage(
+    int pageIndex,
+    TextBlock before,
+    TextBlock after,
+  ) {
+    _ensurePageSelected(pageIndex);
+    commitTextResize(before, after);
   }
 
   Future<String?> addImageBlockOnPage(int pageIndex, Offset position) async {
@@ -211,6 +269,16 @@ class EditorController extends ChangeNotifier {
   ) {
     _ensurePageSelected(pageIndex);
     updateImageBlockPosition(id, position);
+  }
+
+  void updateImageBlockSizeOnPage(
+    int pageIndex,
+    String id, {
+    required double width,
+    required double height,
+  }) {
+    _ensurePageSelected(pageIndex);
+    updateImageBlockSize(id, width: width, height: height);
   }
 
   void updateImageBlockOcrTextOnPage(int pageIndex, String id, String text) {
@@ -247,6 +315,32 @@ class EditorController extends ChangeNotifier {
     commitImageMove(id, start, end);
   }
 
+  void finalizeImageMoveOnPage(
+    int pageIndex,
+    String id,
+    Offset start,
+    Offset end,
+  ) {
+    if (start == end) {
+      return;
+    }
+    final targetIndex = _pageIndexForPosition(end);
+    if (targetIndex == pageIndex || _pageExtent <= 0) {
+      commitImageMoveOnPage(pageIndex, id, start, end);
+      return;
+    }
+    _moveImageBlockToPage(pageIndex, targetIndex, id, end);
+  }
+
+  void commitImageResizeOnPage(
+    int pageIndex,
+    ImageBlock before,
+    ImageBlock after,
+  ) {
+    _ensurePageSelected(pageIndex);
+    commitImageResize(before, after);
+  }
+
   void setTool(DrawingTool newTool) {
     tool = newTool;
     if (newTool.isEraser) {
@@ -264,12 +358,27 @@ class EditorController extends ChangeNotifier {
   void setActiveTextBlock(String? blockId, quill.QuillController? controller) {
     activeTextBlockId = blockId;
     activeTextController = controller;
+    activeImageBlockId = null;
     notifyListeners();
   }
 
   void clearActiveTextBlock() {
     activeTextBlockId = null;
     activeTextController = null;
+    notifyListeners();
+  }
+
+  void setActiveImageBlock(String? blockId) {
+    activeImageBlockId = blockId;
+    if (blockId != null) {
+      activeTextBlockId = null;
+      activeTextController = null;
+    }
+    notifyListeners();
+  }
+
+  void clearActiveImageBlock() {
+    activeImageBlockId = null;
     notifyListeners();
   }
 
@@ -464,20 +573,31 @@ class EditorController extends ChangeNotifier {
 
   void addPage() {
     final nextIndex = pages.length + 1;
-    final page = NotePage(
+    final page = _createPage(nextIndex);
+    pages = [...pages, page];
+    currentPageIndex = pages.length - 1;
+    activeTextBlockId = null;
+    activeTextController = null;
+    activeImageBlockId = null;
+    _save();
+    notifyListeners();
+  }
+
+  NotePage _createPage(int index) {
+    return NotePage(
       id: _uuid.v4(),
-      title: 'Page $nextIndex',
+      title: 'Page $index',
       textBlocks: <TextBlock>[],
       imageBlocks: <ImageBlock>[],
       inkStrokes: <InkStroke>[],
       isBookmarked: false,
     );
-    pages = [...pages, page];
-    currentPageIndex = pages.length - 1;
-    activeTextBlockId = null;
-    activeTextController = null;
-    _save();
-    notifyListeners();
+  }
+
+  void _ensurePageCount(List<NotePage> working, int count) {
+    while (working.length < count) {
+      working.add(_createPage(working.length + 1));
+    }
   }
 
   void setCurrentPage(int index) {
@@ -489,6 +609,7 @@ class EditorController extends ChangeNotifier {
     }
     activeTextBlockId = null;
     activeTextController = null;
+    activeImageBlockId = null;
     currentPageIndex = index;
     notifyListeners();
   }
@@ -524,6 +645,34 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
+  void addTextBlockFromText(Offset position, String text) {
+    final baseSize = lastTextFontSize;
+    final baseColor = lastTextColor;
+    final normalized = text.trimRight();
+    final delta = quill_delta.Delta();
+    if (normalized.isNotEmpty) {
+      delta.insert(normalized, <String, dynamic>{
+        'size': baseSize.toInt().toString(),
+        'color': _colorToHex(baseColor),
+        if (lastTextFontFamily != null) 'font': lastTextFontFamily,
+      });
+    }
+    delta.insert('\n');
+    final doc = quill.Document.fromDelta(delta);
+    final block = TextBlock(
+      id: _uuid.v4(),
+      text: normalized,
+      deltaJson: jsonEncode(doc.toDelta().toJson()),
+      position: position,
+      fontSize: baseSize,
+      color: baseColor,
+      width: 260,
+    );
+    _applyAction(AddTextAction(block));
+    setActiveTextBlock(block.id, null);
+    _save();
+  }
+
   void updateTextBlockContent(
     TextBlock before, {
     required String plainText,
@@ -538,6 +687,13 @@ class EditorController extends ChangeNotifier {
   void updateTextBlockPosition(String id, Offset position) {
     final updated = currentPage.textBlocks
         .map((item) => item.id == id ? item.copyWith(position: position) : item)
+        .toList();
+    _updatePage(currentPage.copyWith(textBlocks: updated));
+  }
+
+  void updateTextBlockWidth(String id, double width) {
+    final updated = currentPage.textBlocks
+        .map((item) => item.id == id ? item.copyWith(width: width) : item)
         .toList();
     _updatePage(currentPage.copyWith(textBlocks: updated));
   }
@@ -563,14 +719,177 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
+  void commitTextResize(TextBlock before, TextBlock after) {
+    if (before.width == after.width) {
+      return;
+    }
+    _applyAction(UpdateTextAction(before: before, after: after));
+    _save();
+  }
+
   Future<String?> addImageBlock(Offset position) async {
     final picked = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (picked == null) {
       return null;
     }
     final file = await _persistImage(picked);
+    return _addImageBlockFromFile(file, position);
+  }
+
+  Future<String?> insertFromFilePicker(Offset position) async {
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.custom,
+        allowedExtensions: ['png', 'jpg', 'jpeg', 'pdf', 'txt'],
+      );
+    } catch (_) {
+      if (Platform.isLinux) {
+        return 'Missing "zenity". Install it: sudo apt-get install zenity.';
+      }
+      return 'File picker failed to open.';
+    }
+    if (result == null) {
+      return null;
+    }
+    final path = result.files.single.path;
+    if (path == null || path.isEmpty) {
+      return 'Selected file is not accessible.';
+    }
+    try {
+      return await _insertFile(File(path), position);
+    } on PlatformNotSupportedException {
+      return 'PDF rendering is not supported on this platform.';
+    } on MissingPluginException {
+      return 'PDF renderer plugin is missing for this platform.';
+    } catch (_) {
+      return 'Failed to insert file.';
+    }
+  }
+
+  Future<String?> insertFromClipboard(Offset position) async {
+    final clipboard = SystemClipboard.instance;
+    if (clipboard != null) {
+      final reader = await clipboard.read();
+      final imageInserted = await _tryInsertImageFromClipboard(
+        reader,
+        position,
+      );
+      if (imageInserted) {
+        return null;
+      }
+      final text = await _readTextFromClipboard(reader);
+      if (text != null && text.trim().isNotEmpty) {
+        addTextBlockFromText(position, text);
+        return null;
+      }
+    }
+
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final fallbackText = data?.text;
+    if (fallbackText == null || fallbackText.trim().isEmpty) {
+      return 'Clipboard is empty. Use Attach file for images or PDFs.';
+    }
+    addTextBlockFromText(position, fallbackText);
+    return null;
+  }
+
+  Future<String?> copyActiveImageToClipboard() async {
+    final id = activeImageBlockId;
+    if (id == null) {
+      return 'Select an image to copy.';
+    }
+    final block = findImageBlockById(id);
+    if (block == null) {
+      return 'Selected image is no longer available.';
+    }
+    final file = File(block.path);
+    if (!await file.exists()) {
+      return 'Image file not found.';
+    }
+    final clipboard = SystemClipboard.instance;
+    if (clipboard == null) {
+      return 'Clipboard is not available.';
+    }
+    final bytes = await file.readAsBytes();
+    final item = DataWriterItem();
+    final lower = block.path.toLowerCase();
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      item.add(Formats.jpeg(bytes));
+    } else {
+      item.add(Formats.png(bytes));
+    }
+    await clipboard.write([item]);
+    return null;
+  }
+
+  Future<bool> _tryInsertImageFromClipboard(
+    ClipboardReader reader,
+    Offset position,
+  ) async {
+    final pngBytes = await _readClipboardImageBytes(reader, Formats.png);
+    if (pngBytes != null && pngBytes.isNotEmpty) {
+      await _addImageBlockFromBytes(pngBytes, position, 'png');
+      return true;
+    }
+    final jpegBytes = await _readClipboardImageBytes(reader, Formats.jpeg);
+    if (jpegBytes != null && jpegBytes.isNotEmpty) {
+      await _addImageBlockFromBytes(jpegBytes, position, 'jpg');
+      return true;
+    }
+    return false;
+  }
+
+  Future<String?> _readTextFromClipboard(ClipboardReader reader) async {
+    if (!reader.canProvide(Formats.plainText)) {
+      return null;
+    }
+    final text = await reader.readValue(Formats.plainText);
+    return text is String ? text : null;
+  }
+
+  Future<Uint8List?> _readClipboardImageBytes(
+    ClipboardReader reader,
+    SimpleFileFormat format,
+  ) async {
+    if (!reader.canProvide(format)) {
+      return null;
+    }
+    final completer = Completer<Uint8List?>();
+    reader.getFile(format, (file) async {
+      try {
+        final bytes = await _readStreamBytes(file.getStream());
+        if (!completer.isCompleted) {
+          completer.complete(bytes);
+        }
+      } catch (_) {
+        if (!completer.isCompleted) {
+          completer.complete(null);
+        }
+      }
+    });
+    return completer.future;
+  }
+
+  Future<Uint8List> _readStreamBytes(Stream<Uint8List> stream) async {
+    final chunks = <int>[];
+    await for (final chunk in stream) {
+      chunks.addAll(chunk);
+    }
+    return Uint8List.fromList(chunks);
+  }
+
+  Future<String?> _addImageBlockFromBytes(
+    Uint8List bytes,
+    Offset position,
+    String extension,
+  ) async {
+    final filename =
+        'clip_${DateTime.now().millisecondsSinceEpoch}.$extension';
+    final file = await _persistImageBytes(bytes, filename);
     final size = await _imageSize(file);
-    final targetWidth = 240.0;
+    final targetWidth = 260.0;
     final ratio = size.width == 0 ? 1.0 : size.height / size.width;
     final targetHeight = targetWidth * ratio;
     final block = ImageBlock(
@@ -579,18 +898,222 @@ class EditorController extends ChangeNotifier {
       ocrText: '',
       position: position,
       width: targetWidth,
-      height: targetHeight.clamp(80, 320).toDouble(),
+      height: targetHeight.clamp(80, 420).toDouble(),
     );
     _applyAction(AddImageAction(block));
     _save();
+    return null;
+  }
 
-    final ocrText = await _runOcr(file);
+  Future<String?> _insertFile(File file, Offset position) async {
+    final path = file.path.toLowerCase();
+    if (path.endsWith('.png') ||
+        path.endsWith('.jpg') ||
+        path.endsWith('.jpeg')) {
+      return _addImageBlockFromFile(file, position);
+    }
+    if (path.endsWith('.pdf')) {
+      return _addPdfAsImages(file, position);
+    }
+    if (path.endsWith('.txt')) {
+      final content = await file.readAsString();
+      addTextBlockFromText(position, content);
+      return null;
+    }
+    return 'Unsupported file type.';
+  }
+
+  Future<String?> _addImageBlockFromFile(
+    File file,
+    Offset position, {
+    bool runOcr = true,
+  }) async {
+    final persisted = await _persistImageFile(file);
+    final size = await _imageSize(persisted);
+    final targetWidth = 260.0;
+    final ratio = size.width == 0 ? 1.0 : size.height / size.width;
+    final targetHeight = targetWidth * ratio;
+    final block = ImageBlock(
+      id: _uuid.v4(),
+      path: persisted.path,
+      ocrText: '',
+      position: position,
+      width: targetWidth,
+      height: targetHeight.clamp(80, 420).toDouble(),
+    );
+    _applyAction(AddImageAction(block));
+    _save();
+    if (!runOcr) {
+      return null;
+    }
+    final ocrText = await _runOcr(persisted);
     if (ocrText == null) {
       return 'OCR is not supported on this platform.';
     }
     if (ocrText.trim().isNotEmpty) {
       updateImageBlockOcrText(block.id, ocrText.trim());
     }
+    return null;
+  }
+
+  Future<String?> _addPdfAsImages(File pdfFile, Offset position) async {
+    if (Platform.isLinux) {
+      return _addPdfAsImagesWithPoppler(pdfFile, position);
+    }
+    try {
+      final document = await PdfDocument.openFile(pdfFile.path);
+      final pageExtent = _pageExtent;
+      final basePageIndex = _pageIndexForPosition(position);
+      final localOffset = notebook.kind == NotebookKind.board
+          ? position
+          : Offset.zero;
+      final workingPages = List<NotePage>.from(pages);
+      var pageOffset = 0.0;
+      for (var pageIndex = 1; pageIndex <= document.pagesCount; pageIndex++) {
+        final page = await document.getPage(pageIndex);
+        final render = await page.render(
+          width: page.width * 2,
+          height: page.height * 2,
+          format: PdfPageImageFormat.png,
+        );
+        await page.close();
+        if (render == null) {
+          continue;
+        }
+        final file = await _persistImageBytes(
+          render.bytes,
+          'pdf_${DateTime.now().millisecondsSinceEpoch}_$pageIndex.png',
+        );
+        final renderWidth = (render.width ?? page.width).toDouble();
+        final renderHeight = (render.height ?? page.height).toDouble();
+        final size = Size(renderWidth, renderHeight);
+        final targetWidth = notebook.kind == NotebookKind.notebook
+          ? (_pageWidth > 0 ? _pageWidth : 260.0)
+          : 260.0;
+        final targetHeight = notebook.kind == NotebookKind.notebook
+          ? (_pageHeight > 0 ? _pageHeight : 420.0)
+          : targetWidth * (size.width == 0 ? 1.0 : size.height / size.width);
+        final targetIndex = notebook.kind == NotebookKind.board
+            ? basePageIndex
+            : basePageIndex + (pageIndex - 1);
+        _ensurePageCount(workingPages, targetIndex + 1);
+        final targetOrigin = notebook.kind == NotebookKind.board
+            ? Offset.zero
+            : (pageExtent <= 0
+                ? Offset.zero
+                : _pageOriginForIndex(targetIndex));
+        final targetPosition = notebook.kind == NotebookKind.board
+            ? localOffset + Offset(0, pageOffset)
+            : targetOrigin + localOffset;
+        final block = ImageBlock(
+          id: _uuid.v4(),
+          path: file.path,
+          ocrText: '',
+          position: targetPosition,
+          width: targetWidth,
+          height: notebook.kind == NotebookKind.notebook
+              ? targetHeight
+              : targetHeight.clamp(80, 520).toDouble(),
+        );
+        final targetPage = workingPages[targetIndex];
+        workingPages[targetIndex] = targetPage.copyWith(
+          imageBlocks: [...targetPage.imageBlocks, block],
+        );
+        if (notebook.kind == NotebookKind.board) {
+          pageOffset += block.height + 12;
+        }
+      }
+      await document.close();
+      pages = workingPages;
+      notifyListeners();
+      _save();
+      return null;
+    } on PlatformNotSupportedException {
+      return 'PDF rendering is not supported on this platform.';
+    } on MissingPluginException {
+      return 'PDF renderer plugin is missing for this platform.';
+    } catch (_) {
+      return 'Failed to render PDF.';
+    }
+  }
+
+  Future<String?> _addPdfAsImagesWithPoppler(
+    File pdfFile,
+    Offset position,
+  ) async {
+    final tempDir = await getTemporaryDirectory();
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final prefix = '${tempDir.path}/pdf_$stamp';
+    final test = await Process.run('pdftoppm', ['-h']);
+    if (test.exitCode != 0) {
+      return 'Missing "pdftoppm". Install: sudo apt-get install poppler-utils.';
+    }
+    final result = await Process.run(
+      'pdftoppm',
+      ['-png', '-r', '144', pdfFile.path, prefix],
+    );
+    if (result.exitCode != 0) {
+      return 'Failed to render PDF pages.';
+    }
+    final dir = Directory(tempDir.path);
+    final files = dir
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.startsWith(prefix) && file.path.endsWith('.png'))
+        .toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+    if (files.isEmpty) {
+      return 'No PDF pages were rendered.';
+    }
+    final pageExtent = _pageExtent;
+    final basePageIndex = _pageIndexForPosition(position);
+    final localOffset = notebook.kind == NotebookKind.board
+        ? position
+      : Offset.zero;
+    final workingPages = List<NotePage>.from(pages);
+    var pageOffset = 0.0;
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
+      final size = await _imageSize(file);
+      final targetWidth = notebook.kind == NotebookKind.notebook
+        ? (_pageWidth > 0 ? _pageWidth : 260.0)
+        : 260.0;
+      final targetHeight = notebook.kind == NotebookKind.notebook
+        ? (_pageHeight > 0 ? _pageHeight : 420.0)
+        : targetWidth * (size.width == 0 ? 1.0 : size.height / size.width);
+      final targetIndex = notebook.kind == NotebookKind.board
+          ? basePageIndex
+          : basePageIndex + i;
+      _ensurePageCount(workingPages, targetIndex + 1);
+      final targetOrigin = notebook.kind == NotebookKind.board
+          ? Offset.zero
+          : (pageExtent <= 0
+              ? Offset.zero
+              : _pageOriginForIndex(targetIndex));
+      final targetPosition = notebook.kind == NotebookKind.board
+          ? localOffset + Offset(0, pageOffset)
+          : targetOrigin + localOffset;
+      final block = ImageBlock(
+        id: _uuid.v4(),
+        path: (await _persistImageFile(file)).path,
+        ocrText: '',
+        position: targetPosition,
+        width: targetWidth,
+        height: notebook.kind == NotebookKind.notebook
+            ? targetHeight
+            : targetHeight.clamp(80, 520).toDouble(),
+      );
+      final targetPage = workingPages[targetIndex];
+      workingPages[targetIndex] = targetPage.copyWith(
+        imageBlocks: [...targetPage.imageBlocks, block],
+      );
+      if (notebook.kind == NotebookKind.board) {
+        pageOffset += block.height + 12;
+      }
+    }
+    pages = workingPages;
+    notifyListeners();
+    _save();
     return null;
   }
 
@@ -610,6 +1133,21 @@ class EditorController extends ChangeNotifier {
   void updateImageBlockPosition(String id, Offset position) {
     final updated = currentPage.imageBlocks
         .map((item) => item.id == id ? item.copyWith(position: position) : item)
+        .toList();
+    _updatePage(currentPage.copyWith(imageBlocks: updated));
+  }
+
+  void updateImageBlockSize(
+    String id, {
+    required double width,
+    required double height,
+  }) {
+    final updated = currentPage.imageBlocks
+        .map(
+          (item) => item.id == id
+              ? item.copyWith(width: width, height: height)
+              : item,
+        )
         .toList();
     _updatePage(currentPage.copyWith(imageBlocks: updated));
   }
@@ -674,6 +1212,60 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
+  void commitImageResize(ImageBlock before, ImageBlock after) {
+    if (before.width == after.width && before.height == after.height) {
+      return;
+    }
+    _applyAction(UpdateImageAction(before: before, after: after));
+    _save();
+  }
+
+  void _moveImageBlockToPage(
+    int fromPageIndex,
+    int toPageIndex,
+    String id,
+    Offset position,
+  ) {
+    if (fromPageIndex < 0 || fromPageIndex >= pages.length) {
+      return;
+    }
+    if (toPageIndex < 0 || toPageIndex >= pages.length) {
+      return;
+    }
+    final fromPage = pages[fromPageIndex];
+    final blockIndex = fromPage.imageBlocks.indexWhere((item) => item.id == id);
+    if (blockIndex == -1) {
+      return;
+    }
+    final moved = fromPage.imageBlocks[blockIndex].copyWith(
+      position: position,
+    );
+    final updatedFrom = fromPage.copyWith(
+      imageBlocks: fromPage.imageBlocks
+          .where((item) => item.id != id)
+          .toList(),
+    );
+    final toPage = pages[toPageIndex];
+    final updatedTo = toPage.copyWith(
+      imageBlocks: [...toPage.imageBlocks, moved],
+    );
+    pages = [
+      for (var i = 0; i < pages.length; i++)
+        if (i == fromPageIndex)
+          updatedFrom
+        else if (i == toPageIndex)
+          updatedTo
+        else
+          pages[i],
+    ];
+    currentPageIndex = toPageIndex;
+    activeTextBlockId = null;
+    activeTextController = null;
+    activeImageBlockId = id;
+    notifyListeners();
+    _save();
+  }
+
   Future<File> _persistImage(XFile picked) async {
     final dir = await getApplicationDocumentsDirectory();
     final imagesDir = Directory('${dir.path}/images');
@@ -684,6 +1276,29 @@ class EditorController extends ChangeNotifier {
     final extension = picked.path.split('.').last;
     final target = File('${imagesDir.path}/img_$timestamp.$extension');
     return File(picked.path).copy(target.path);
+  }
+
+  Future<File> _persistImageFile(File source) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final imagesDir = Directory('${dir.path}/images');
+    if (!await imagesDir.exists()) {
+      await imagesDir.create(recursive: true);
+    }
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final extension = source.path.split('.').last;
+    final target = File('${imagesDir.path}/img_$timestamp.$extension');
+    return source.copy(target.path);
+  }
+
+  Future<File> _persistImageBytes(Uint8List bytes, String filename) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final imagesDir = Directory('${dir.path}/images');
+    if (!await imagesDir.exists()) {
+      await imagesDir.create(recursive: true);
+    }
+    final target = File('${imagesDir.path}/$filename');
+    await target.writeAsBytes(bytes, flush: true);
+    return target;
   }
 
   String _colorToHex(Color color) {
