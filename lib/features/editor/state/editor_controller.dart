@@ -67,6 +67,7 @@ class EditorController extends ChangeNotifier {
   String? activeTextBlockId;
   quill.QuillController? activeTextController;
   String? activeImageBlockId;
+  _ElementClipboardItem? _elementClipboard;
   bool _suppressBackgroundTap = false;
   double viewScale = 1.0;
   Offset viewPan = Offset.zero;
@@ -184,6 +185,24 @@ class EditorController extends ChangeNotifier {
     return null;
   }
 
+  int? _pageIndexContainingTextBlock(String id) {
+    for (var i = 0; i < pages.length; i++) {
+      if (pages[i].textBlocks.any((item) => item.id == id)) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  int? _pageIndexContainingImageBlock(String id) {
+    for (var i = 0; i < pages.length; i++) {
+      if (pages[i].imageBlocks.any((item) => item.id == id)) {
+        return i;
+      }
+    }
+    return null;
+  }
+
   void _ensurePageSelected(int pageIndex) {
     if (pageIndex < 0 || pageIndex >= pages.length) {
       return;
@@ -226,6 +245,14 @@ class EditorController extends ChangeNotifier {
   void updateTextBlockWidthOnPage(int pageIndex, String id, double width) {
     _ensurePageSelected(pageIndex);
     updateTextBlockWidth(id, width);
+  }
+
+  void updateTextBlockOnPage(int pageIndex, TextBlock block) {
+    _ensurePageSelected(pageIndex);
+    final updated = currentPage.textBlocks
+        .map((item) => item.id == block.id ? block : item)
+        .toList();
+    _updatePage(currentPage.copyWith(textBlocks: updated));
   }
 
   void deleteTextBlockOnPage(int pageIndex, String id) {
@@ -281,9 +308,32 @@ class EditorController extends ChangeNotifier {
     updateImageBlockSize(id, width: width, height: height);
   }
 
+  void updateImageBlockOnPage(int pageIndex, ImageBlock block) {
+    _ensurePageSelected(pageIndex);
+    final updated = currentPage.imageBlocks
+        .map((item) => item.id == block.id ? block : item)
+        .toList();
+    _updatePage(currentPage.copyWith(imageBlocks: updated));
+  }
+
+  void commitImageBlockOnPage(
+    int pageIndex,
+    ImageBlock before,
+    ImageBlock after,
+  ) {
+    _ensurePageSelected(pageIndex);
+    _applyAction(UpdateImageAction(before: before, after: after));
+    _save();
+  }
+
   void updateImageBlockOcrTextOnPage(int pageIndex, String id, String text) {
     _ensurePageSelected(pageIndex);
     updateImageBlockOcrText(id, text);
+  }
+
+  void deleteImageBlockOnPage(int pageIndex, String id) {
+    _ensurePageSelected(pageIndex);
+    deleteImageBlock(id);
   }
 
   void addInkStrokeOnPage(
@@ -795,6 +845,85 @@ class EditorController extends ChangeNotifier {
     return null;
   }
 
+  Future<String?> pasteElementOrClipboard(Offset position) async {
+    final clipboardItem = _elementClipboard;
+    if (clipboardItem == null) {
+      return insertFromClipboard(position);
+    }
+
+    switch (clipboardItem) {
+      case _TextElementClipboardItem(:final block):
+        final pasted = block.copyWith(id: _uuid.v4(), position: position);
+        _applyAction(AddTextAction(pasted));
+        setActiveTextBlock(pasted.id, null);
+        _save();
+        return null;
+      case _ImageElementClipboardItem(:final block):
+        final pasted = block.copyWith(id: _uuid.v4(), position: position);
+        _applyAction(AddImageAction(pasted));
+        _activateInsertedImage(pasted.id);
+        _save();
+        return null;
+    }
+  }
+
+  Future<String?> copyActiveElementToClipboard() async {
+    final textId = activeTextBlockId;
+    if (textId != null) {
+      final block = findTextBlockById(textId);
+      if (block == null) {
+        return 'Selected text is no longer available.';
+      }
+      _elementClipboard = _TextElementClipboardItem(block);
+      await Clipboard.setData(ClipboardData(text: block.text));
+      return null;
+    }
+
+    final imageId = activeImageBlockId;
+    if (imageId != null) {
+      final block = findImageBlockById(imageId);
+      if (block == null) {
+        return 'Selected image is no longer available.';
+      }
+      _elementClipboard = _ImageElementClipboardItem(block);
+      final imageMessage = await copyActiveImageToClipboard();
+      if (imageMessage == 'Image file not found.') {
+        return imageMessage;
+      }
+      return null;
+    }
+
+    return 'Select text or image to copy.';
+  }
+
+  Future<String?> cutActiveElementToClipboard() async {
+    final message = await copyActiveElementToClipboard();
+    if (message != null) {
+      return message;
+    }
+    deleteActiveElement();
+    return null;
+  }
+
+  void deleteActiveElement() {
+    final textId = activeTextBlockId;
+    if (textId != null) {
+      final pageIndex = _pageIndexContainingTextBlock(textId);
+      if (pageIndex != null) {
+        deleteTextBlockOnPage(pageIndex, textId);
+      }
+      return;
+    }
+
+    final imageId = activeImageBlockId;
+    if (imageId != null) {
+      final pageIndex = _pageIndexContainingImageBlock(imageId);
+      if (pageIndex != null) {
+        deleteImageBlockOnPage(pageIndex, imageId);
+      }
+    }
+  }
+
   Future<String?> copyActiveImageToClipboard() async {
     final id = activeImageBlockId;
     if (id == null) {
@@ -880,27 +1009,45 @@ class EditorController extends ChangeNotifier {
     return Uint8List.fromList(chunks);
   }
 
+  Size _initialImageBlockSize(Size sourceSize) {
+    final sourceWidth = sourceSize.width > 0 ? sourceSize.width : 1.0;
+    final sourceHeight = sourceSize.height > 0 ? sourceSize.height : 1.0;
+    final sourceAspect = sourceWidth / sourceHeight;
+    final maxWidth = notebook.kind == NotebookKind.notebook
+        ? (_pageWidth > 0 ? _pageWidth : 260.0)
+        : 360.0;
+    final maxHeight = notebook.kind == NotebookKind.notebook
+        ? (_pageHeight > 0 ? _pageHeight : 420.0)
+        : 520.0;
+    final pageAspect = maxWidth / maxHeight;
+    if (!sourceAspect.isFinite || sourceAspect <= 0 || !pageAspect.isFinite) {
+      return const Size(260, 260);
+    }
+    if (sourceAspect >= pageAspect) {
+      return Size(maxWidth, maxWidth / sourceAspect);
+    }
+    return Size(maxHeight * sourceAspect, maxHeight);
+  }
+
   Future<String?> _addImageBlockFromBytes(
     Uint8List bytes,
     Offset position,
     String extension,
   ) async {
-    final filename =
-        'clip_${DateTime.now().millisecondsSinceEpoch}.$extension';
+    final filename = 'clip_${DateTime.now().millisecondsSinceEpoch}.$extension';
     final file = await _persistImageBytes(bytes, filename);
     final size = await _imageSize(file);
-    final targetWidth = 260.0;
-    final ratio = size.width == 0 ? 1.0 : size.height / size.width;
-    final targetHeight = targetWidth * ratio;
+    final initialSize = _initialImageBlockSize(size);
     final block = ImageBlock(
       id: _uuid.v4(),
       path: file.path,
       ocrText: '',
       position: position,
-      width: targetWidth,
-      height: targetHeight.clamp(80, 420).toDouble(),
+      width: initialSize.width,
+      height: initialSize.height,
     );
     _applyAction(AddImageAction(block));
+    _activateInsertedImage(block.id);
     _save();
     return null;
   }
@@ -930,18 +1077,17 @@ class EditorController extends ChangeNotifier {
   }) async {
     final persisted = await _persistImageFile(file);
     final size = await _imageSize(persisted);
-    final targetWidth = 260.0;
-    final ratio = size.width == 0 ? 1.0 : size.height / size.width;
-    final targetHeight = targetWidth * ratio;
+    final initialSize = _initialImageBlockSize(size);
     final block = ImageBlock(
       id: _uuid.v4(),
       path: persisted.path,
       ocrText: '',
       position: position,
-      width: targetWidth,
-      height: targetHeight.clamp(80, 420).toDouble(),
+      width: initialSize.width,
+      height: initialSize.height,
     );
     _applyAction(AddImageAction(block));
+    _activateInsertedImage(block.id);
     _save();
     if (!runOcr) {
       return null;
@@ -954,6 +1100,14 @@ class EditorController extends ChangeNotifier {
       updateImageBlockOcrText(block.id, ocrText.trim());
     }
     return null;
+  }
+
+  void _activateInsertedImage(String id) {
+    tool = DrawingTool.edit;
+    activeImageBlockId = id;
+    activeTextBlockId = null;
+    activeTextController = null;
+    notifyListeners();
   }
 
   Future<String?> _addPdfAsImages(File pdfFile, Offset position) async {
@@ -988,11 +1142,11 @@ class EditorController extends ChangeNotifier {
         final renderHeight = (render.height ?? page.height).toDouble();
         final size = Size(renderWidth, renderHeight);
         final targetWidth = notebook.kind == NotebookKind.notebook
-          ? (_pageWidth > 0 ? _pageWidth : 260.0)
-          : 260.0;
+            ? (_pageWidth > 0 ? _pageWidth : 260.0)
+            : 260.0;
         final targetHeight = notebook.kind == NotebookKind.notebook
-          ? (_pageHeight > 0 ? _pageHeight : 420.0)
-          : targetWidth * (size.width == 0 ? 1.0 : size.height / size.width);
+            ? (_pageHeight > 0 ? _pageHeight : 420.0)
+            : targetWidth * (size.width == 0 ? 1.0 : size.height / size.width);
         final targetIndex = notebook.kind == NotebookKind.board
             ? basePageIndex
             : basePageIndex + (pageIndex - 1);
@@ -1000,8 +1154,8 @@ class EditorController extends ChangeNotifier {
         final targetOrigin = notebook.kind == NotebookKind.board
             ? Offset.zero
             : (pageExtent <= 0
-                ? Offset.zero
-                : _pageOriginForIndex(targetIndex));
+                  ? Offset.zero
+                  : _pageOriginForIndex(targetIndex));
         final targetPosition = notebook.kind == NotebookKind.board
             ? localOffset + Offset(0, pageOffset)
             : targetOrigin + localOffset;
@@ -1048,20 +1202,27 @@ class EditorController extends ChangeNotifier {
     if (test.exitCode != 0) {
       return 'Missing "pdftoppm". Install: sudo apt-get install poppler-utils.';
     }
-    final result = await Process.run(
-      'pdftoppm',
-      ['-png', '-r', '144', pdfFile.path, prefix],
-    );
+    final result = await Process.run('pdftoppm', [
+      '-png',
+      '-r',
+      '144',
+      pdfFile.path,
+      prefix,
+    ]);
     if (result.exitCode != 0) {
       return 'Failed to render PDF pages.';
     }
     final dir = Directory(tempDir.path);
-    final files = dir
-        .listSync()
-        .whereType<File>()
-        .where((file) => file.path.startsWith(prefix) && file.path.endsWith('.png'))
-        .toList()
-      ..sort((a, b) => a.path.compareTo(b.path));
+    final files =
+        dir
+            .listSync()
+            .whereType<File>()
+            .where(
+              (file) =>
+                  file.path.startsWith(prefix) && file.path.endsWith('.png'),
+            )
+            .toList()
+          ..sort((a, b) => a.path.compareTo(b.path));
     if (files.isEmpty) {
       return 'No PDF pages were rendered.';
     }
@@ -1069,27 +1230,25 @@ class EditorController extends ChangeNotifier {
     final basePageIndex = _pageIndexForPosition(position);
     final localOffset = notebook.kind == NotebookKind.board
         ? position
-      : Offset.zero;
+        : Offset.zero;
     final workingPages = List<NotePage>.from(pages);
     var pageOffset = 0.0;
     for (var i = 0; i < files.length; i++) {
       final file = files[i];
       final size = await _imageSize(file);
       final targetWidth = notebook.kind == NotebookKind.notebook
-        ? (_pageWidth > 0 ? _pageWidth : 260.0)
-        : 260.0;
+          ? (_pageWidth > 0 ? _pageWidth : 260.0)
+          : 260.0;
       final targetHeight = notebook.kind == NotebookKind.notebook
-        ? (_pageHeight > 0 ? _pageHeight : 420.0)
-        : targetWidth * (size.width == 0 ? 1.0 : size.height / size.width);
+          ? (_pageHeight > 0 ? _pageHeight : 420.0)
+          : targetWidth * (size.width == 0 ? 1.0 : size.height / size.width);
       final targetIndex = notebook.kind == NotebookKind.board
           ? basePageIndex
           : basePageIndex + i;
       _ensurePageCount(workingPages, targetIndex + 1);
       final targetOrigin = notebook.kind == NotebookKind.board
           ? Offset.zero
-          : (pageExtent <= 0
-              ? Offset.zero
-              : _pageOriginForIndex(targetIndex));
+          : (pageExtent <= 0 ? Offset.zero : _pageOriginForIndex(targetIndex));
       final targetPosition = notebook.kind == NotebookKind.board
           ? localOffset + Offset(0, pageOffset)
           : targetOrigin + localOffset;
@@ -1162,6 +1321,13 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
+  void deleteImageBlock(String id) {
+    final block = currentPage.imageBlocks.firstWhere((item) => item.id == id);
+    _applyAction(DeleteImageAction(block));
+    clearActiveImageBlock();
+    _save();
+  }
+
   void addInkStroke(
     List<InkPoint> points, {
     double? widthOverride,
@@ -1213,7 +1379,13 @@ class EditorController extends ChangeNotifier {
   }
 
   void commitImageResize(ImageBlock before, ImageBlock after) {
-    if (before.width == after.width && before.height == after.height) {
+    if (before.position == after.position &&
+        before.width == after.width &&
+        before.height == after.height &&
+        before.cropLeft == after.cropLeft &&
+        before.cropTop == after.cropTop &&
+        before.cropRight == after.cropRight &&
+        before.cropBottom == after.cropBottom) {
       return;
     }
     _applyAction(UpdateImageAction(before: before, after: after));
@@ -1237,13 +1409,9 @@ class EditorController extends ChangeNotifier {
     if (blockIndex == -1) {
       return;
     }
-    final moved = fromPage.imageBlocks[blockIndex].copyWith(
-      position: position,
-    );
+    final moved = fromPage.imageBlocks[blockIndex].copyWith(position: position);
     final updatedFrom = fromPage.copyWith(
-      imageBlocks: fromPage.imageBlocks
-          .where((item) => item.id != id)
-          .toList(),
+      imageBlocks: fromPage.imageBlocks.where((item) => item.id != id).toList(),
     );
     final toPage = pages[toPageIndex];
     final updatedTo = toPage.copyWith(
@@ -1407,4 +1575,20 @@ class EditorController extends ChangeNotifier {
     final updated = notebook.copyWith(pages: pages, updatedAt: DateTime.now());
     await repository.saveNotebook(updated);
   }
+}
+
+sealed class _ElementClipboardItem {
+  const _ElementClipboardItem();
+}
+
+class _TextElementClipboardItem extends _ElementClipboardItem {
+  const _TextElementClipboardItem(this.block);
+
+  final TextBlock block;
+}
+
+class _ImageElementClipboardItem extends _ElementClipboardItem {
+  const _ImageElementClipboardItem(this.block);
+
+  final ImageBlock block;
 }

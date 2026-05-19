@@ -1,12 +1,13 @@
 import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
-import 'package:flutter/gestures.dart' show
-  PointerPanZoomEndEvent,
-  PointerPanZoomStartEvent,
-  PointerPanZoomUpdateEvent,
-  PointerScrollEvent,
-  PointerSignalEvent;
+import 'package:flutter/gestures.dart'
+    show
+        PointerPanZoomEndEvent,
+        PointerPanZoomStartEvent,
+        PointerPanZoomUpdateEvent,
+        PointerScrollEvent,
+        PointerSignalEvent;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -137,7 +138,10 @@ class _BoardScreenState extends State<BoardScreen> {
       return;
     }
     _touchLastFocal = _midpoint(pointers[0], pointers[1]);
-    _touchLastDistance = math.max(0.001, _distanceBetween(pointers[0], pointers[1]));
+    _touchLastDistance = math.max(
+      0.001,
+      _distanceBetween(pointers[0], pointers[1]),
+    );
     if (!_isViewportNavigating) {
       setState(() {
         _isViewportNavigating = true;
@@ -228,10 +232,10 @@ class _BoardScreenState extends State<BoardScreen> {
     final contentHeight = math.max(1.0, content.height);
     final scaleX = viewportSize.width / contentWidth;
     final scaleY = viewportSize.height / contentHeight;
-    final targetScale = math.min(scaleX, scaleY).clamp(
-      EditorController.minViewScale,
-      EditorController.maxViewScale,
-    ).toDouble();
+    final targetScale = math
+        .min(scaleX, scaleY)
+        .clamp(EditorController.minViewScale, EditorController.maxViewScale)
+        .toDouble();
     final viewportCenter = Offset(
       viewportSize.width / 2,
       viewportSize.height / 2,
@@ -250,10 +254,7 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   Offset _midpoint(Offset a, Offset b) {
-    return Offset(
-      (a.dx + b.dx) / 2,
-      (a.dy + b.dy) / 2,
-    );
+    return Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
   }
 
   double _distanceBetween(Offset a, Offset b) {
@@ -281,27 +282,43 @@ class _BoardScreenState extends State<BoardScreen> {
   Future<void> _handleInsertFile(EditorController controller) async {
     final message = await controller.insertFromFilePicker(_insertPosition);
     if (message != null && mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
       return;
     }
     controller.setTool(DrawingTool.edit);
   }
 
   Future<void> _handlePaste(EditorController controller) async {
-    final message = await controller.insertFromClipboard(_insertPosition);
+    final message = await controller.pasteElementOrClipboard(_insertPosition);
     if (message != null && mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
-  Future<void> _handleCopyImage(EditorController controller) async {
-    final message = await controller.copyActiveImageToClipboard();
+  Future<void> _handleCopy(EditorController controller) async {
+    final message = await controller.copyActiveElementToClipboard();
     if (message != null && mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
+  }
+
+  Future<void> _handleCut(EditorController controller) async {
+    final message = await controller.cutActiveElementToClipboard();
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  void _handleDelete(EditorController controller) {
+    controller.deleteActiveElement();
   }
 
   Future<void> _showBoardContextMenu(
@@ -309,7 +326,8 @@ class _BoardScreenState extends State<BoardScreen> {
     Rect boardRect,
     EditorController controller,
   ) async {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (overlay == null) {
       return;
     }
@@ -331,10 +349,7 @@ class _BoardScreenState extends State<BoardScreen> {
         overlay.size.height - globalPosition.dy,
       ),
       items: const [
-        PopupMenuItem(
-          value: _BoardContextAction.paste,
-          child: Text('Paste'),
-        ),
+        PopupMenuItem(value: _BoardContextAction.paste, child: Text('Paste')),
       ],
     );
 
@@ -348,8 +363,8 @@ class _BoardScreenState extends State<BoardScreen> {
     required Rect boardRect,
     required EditorController controller,
   }) {
-    final renderBox = _boardKey.currentContext?.findRenderObject()
-        as RenderBox?;
+    final renderBox =
+        _boardKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) {
       return null;
     }
@@ -416,19 +431,20 @@ class _BoardScreenState extends State<BoardScreen> {
                   );
                   final transformedOffset = Offset(
                     controller.viewPan.dx +
-                      (boardRect.left * controller.viewScale),
+                        (boardRect.left * controller.viewScale),
                     controller.viewPan.dy +
-                      (boardRect.top * controller.viewScale),
+                        (boardRect.top * controller.viewScale),
                   );
-                  final transform = Matrix4.diagonal3Values(
-                    controller.viewScale,
-                    controller.viewScale,
-                    1.0,
-                  )..setTranslationRaw(
-                      transformedOffset.dx,
-                      transformedOffset.dy,
-                      0.0,
-                    );
+                  final transform =
+                      Matrix4.diagonal3Values(
+                        controller.viewScale,
+                        controller.viewScale,
+                        1.0,
+                      )..setTranslationRaw(
+                        transformedOffset.dx,
+                        transformedOffset.dy,
+                        0.0,
+                      );
                   final viewportCenter = Offset(
                     viewportSize.width / 2,
                     viewportSize.height / 2,
@@ -437,24 +453,19 @@ class _BoardScreenState extends State<BoardScreen> {
                   return Listener(
                     key: _boardKey,
                     behavior: HitTestBehavior.translucent,
-                    onPointerDown: (event) =>
-                        _onPointerDown(event, controller),
-                    onPointerMove: (event) =>
-                        _onPointerMove(event, controller),
-                    onPointerUp: (event) =>
-                        _onPointerUpOrCancel(event),
-                    onPointerCancel: (event) =>
-                        _onPointerUpOrCancel(event),
-                      onPointerPanZoomStart: (event) =>
+                    onPointerDown: (event) => _onPointerDown(event, controller),
+                    onPointerMove: (event) => _onPointerMove(event, controller),
+                    onPointerUp: (event) => _onPointerUpOrCancel(event),
+                    onPointerCancel: (event) => _onPointerUpOrCancel(event),
+                    onPointerPanZoomStart: (event) =>
                         _onPointerPanZoomStart(event, controller),
-                      onPointerPanZoomUpdate: (event) =>
+                    onPointerPanZoomUpdate: (event) =>
                         _onPointerPanZoomUpdate(event, controller),
-                      onPointerPanZoomEnd: _onPointerPanZoomEnd,
-                        onPointerSignal: (event) =>
-                          _onPointerSignal(event, controller),
+                    onPointerPanZoomEnd: _onPointerPanZoomEnd,
+                    onPointerSignal: (event) =>
+                        _onPointerSignal(event, controller),
                     child: GestureDetector(
-                      onSecondaryTapDown: (details) =>
-                          _showBoardContextMenu(
+                      onSecondaryTapDown: (details) => _showBoardContextMenu(
                         details.globalPosition,
                         boardRect,
                         controller,
@@ -497,8 +508,7 @@ class _BoardScreenState extends State<BoardScreen> {
                             right: 12,
                             bottom: 12,
                             child: _BoardZoomControls(
-                              zoomPercent: (controller.viewScale * 100)
-                                  .round(),
+                              zoomPercent: (controller.viewScale * 100).round(),
                               onZoomIn: () => controller.zoomBy(
                                 1.15,
                                 focalPoint: viewportCenter,
@@ -532,9 +542,15 @@ class _BoardScreenState extends State<BoardScreen> {
               SingleActivator(LogicalKeyboardKey.keyV, meta: true):
                   _PasteFromClipboardIntent(),
               SingleActivator(LogicalKeyboardKey.keyC, control: true):
-                  _CopyImageIntent(),
+                  _CopyElementIntent(),
               SingleActivator(LogicalKeyboardKey.keyC, meta: true):
-                  _CopyImageIntent(),
+                  _CopyElementIntent(),
+              SingleActivator(LogicalKeyboardKey.keyX, control: true):
+                  _CutElementIntent(),
+              SingleActivator(LogicalKeyboardKey.keyX, meta: true):
+                  _CutElementIntent(),
+              SingleActivator(LogicalKeyboardKey.delete):
+                  _DeleteElementIntent(),
             },
             child: Actions(
               actions: <Type, Action<Intent>>{
@@ -544,9 +560,21 @@ class _BoardScreenState extends State<BoardScreen> {
                     return null;
                   },
                 ),
-                _CopyImageIntent: CallbackAction<Intent>(
+                _CopyElementIntent: CallbackAction<Intent>(
                   onInvoke: (_) {
-                    _handleCopyImage(controller);
+                    _handleCopy(controller);
+                    return null;
+                  },
+                ),
+                _CutElementIntent: CallbackAction<Intent>(
+                  onInvoke: (_) {
+                    _handleCut(controller);
+                    return null;
+                  },
+                ),
+                _DeleteElementIntent: CallbackAction<Intent>(
+                  onInvoke: (_) {
+                    _handleDelete(controller);
                     return null;
                   },
                 ),
@@ -572,8 +600,16 @@ class _PasteFromClipboardIntent extends Intent {
   const _PasteFromClipboardIntent();
 }
 
-class _CopyImageIntent extends Intent {
-  const _CopyImageIntent();
+class _CopyElementIntent extends Intent {
+  const _CopyElementIntent();
+}
+
+class _CutElementIntent extends Intent {
+  const _CutElementIntent();
+}
+
+class _DeleteElementIntent extends Intent {
+  const _DeleteElementIntent();
 }
 
 class _BoardZoomControls extends StatelessWidget {

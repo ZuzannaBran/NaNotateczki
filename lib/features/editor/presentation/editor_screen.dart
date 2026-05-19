@@ -535,15 +535,22 @@ class _EditorScreenState extends State<EditorScreen> {
           metrics.pixels + metrics.viewportDimension - _topBottomPadding;
     }
 
-    final worldLeft =
-      ((-_pagePan.dx) / safeScale).clamp(0.0, docWorldSize.width);
-    final worldRight =
-        ((viewportSize.width - _pagePan.dx) / safeScale)
-            .clamp(0.0, docWorldSize.width);
-    final worldTop =
-        ((clipTop - _pagePan.dy) / safeScale).clamp(0.0, docHeight);
-    final worldBottom =
-        ((clipBottom - _pagePan.dy) / safeScale).clamp(0.0, docHeight);
+    final worldLeft = ((-_pagePan.dx) / safeScale).clamp(
+      0.0,
+      docWorldSize.width,
+    );
+    final worldRight = ((viewportSize.width - _pagePan.dx) / safeScale).clamp(
+      0.0,
+      docWorldSize.width,
+    );
+    final worldTop = ((clipTop - _pagePan.dy) / safeScale).clamp(
+      0.0,
+      docHeight,
+    );
+    final worldBottom = ((clipBottom - _pagePan.dy) / safeScale).clamp(
+      0.0,
+      docHeight,
+    );
 
     final width = math.max(1.0, worldRight - worldLeft);
     final height = math.max(1.0, worldBottom - worldTop);
@@ -599,7 +606,7 @@ class _EditorScreenState extends State<EditorScreen> {
     required int currentPageIndex,
   }) {
     final pageTop =
-      currentPageIndex.toDouble() * (_pageExtent == 0 ? 1 : _pageExtent);
+        currentPageIndex.toDouble() * (_pageExtent == 0 ? 1 : _pageExtent);
     final pageRect = Rect.fromLTWH(
       0,
       pageTop,
@@ -619,24 +626,43 @@ class _EditorScreenState extends State<EditorScreen> {
   Future<void> _handleInsertFile(EditorController controller) async {
     final message = await controller.insertFromFilePicker(_insertPosition);
     if (message != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
       return;
     }
     controller.setTool(DrawingTool.edit);
   }
 
   Future<void> _handlePaste(EditorController controller) async {
-    final message = await controller.insertFromClipboard(_insertPosition);
+    final message = await controller.pasteElementOrClipboard(_insertPosition);
     if (message != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
-  Future<void> _handleCopyImage(EditorController controller) async {
-    final message = await controller.copyActiveImageToClipboard();
+  Future<void> _handleCopy(EditorController controller) async {
+    final message = await controller.copyActiveElementToClipboard();
     if (message != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
+  }
+
+  Future<void> _handleCut(EditorController controller) async {
+    final message = await controller.cutActiveElementToClipboard();
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  void _handleDelete(EditorController controller) {
+    controller.deleteActiveElement();
   }
 
   Future<void> _showCanvasContextMenu(
@@ -644,7 +670,8 @@ class _EditorScreenState extends State<EditorScreen> {
     EditorController controller,
     Size docWorldSize,
   ) async {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (overlay == null) {
       return;
     }
@@ -655,9 +682,10 @@ class _EditorScreenState extends State<EditorScreen> {
     if (targetPosition != null) {
       _insertPosition = targetPosition;
       if (_pageExtent > 0 && controller.pages.isNotEmpty) {
-        final pageIndex = (_insertPosition.dy / _pageExtent)
-            .floor()
-            .clamp(0, controller.pages.length - 1);
+        final pageIndex = (_insertPosition.dy / _pageExtent).floor().clamp(
+          0,
+          controller.pages.length - 1,
+        );
         controller.setCurrentPage(pageIndex);
       }
     }
@@ -671,10 +699,7 @@ class _EditorScreenState extends State<EditorScreen> {
         overlay.size.height - globalPosition.dy,
       ),
       items: const [
-        PopupMenuItem(
-          value: _CanvasContextAction.paste,
-          child: Text('Paste'),
-        ),
+        PopupMenuItem(value: _CanvasContextAction.paste, child: Text('Paste')),
       ],
     );
 
@@ -687,8 +712,8 @@ class _EditorScreenState extends State<EditorScreen> {
     required Offset globalPosition,
     required Size docWorldSize,
   }) {
-    final renderBox = _canvasKey.currentContext?.findRenderObject()
-        as RenderBox?;
+    final renderBox =
+        _canvasKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) {
       return null;
     }
@@ -821,10 +846,10 @@ class _EditorScreenState extends State<EditorScreen> {
                               child: GestureDetector(
                                 onSecondaryTapDown: (details) =>
                                     _showCanvasContextMenu(
-                                  details.globalPosition,
-                                  controller,
-                                  docWorldSize,
-                                ),
+                                      details.globalPosition,
+                                      controller,
+                                      docWorldSize,
+                                    ),
                                 child: Listener(
                                   key: _canvasKey,
                                   behavior: HitTestBehavior.translucent,
@@ -842,16 +867,16 @@ class _EditorScreenState extends State<EditorScreen> {
                                   onPointerCancel: _onPointerUpOrCancel,
                                   onPointerPanZoomStart: (event) =>
                                       _onPointerPanZoomStart(
-                                    event,
-                                    docWorldSize,
-                                    viewportSize,
-                                  ),
+                                        event,
+                                        docWorldSize,
+                                        viewportSize,
+                                      ),
                                   onPointerPanZoomUpdate: (event) =>
                                       _onPointerPanZoomUpdate(
-                                    event,
-                                    docWorldSize,
-                                    viewportSize,
-                                  ),
+                                        event,
+                                        docWorldSize,
+                                        viewportSize,
+                                      ),
                                   onPointerPanZoomEnd: _onPointerPanZoomEnd,
                                   onPointerSignal: (event) => _onPointerSignal(
                                     event,
@@ -866,9 +891,11 @@ class _EditorScreenState extends State<EditorScreen> {
                                       height: docWorldSize.height,
                                       child: Stack(
                                         children: [
-                                          for (var i = 0;
-                                              i < controller.pages.length;
-                                              i++)
+                                          for (
+                                            var i = 0;
+                                            i < controller.pages.length;
+                                            i++
+                                          )
                                             Positioned(
                                               left: 0,
                                               top: i * _pageExtent,
@@ -883,11 +910,13 @@ class _EditorScreenState extends State<EditorScreen> {
                                                         color: AppColors.paper,
                                                         boxShadow: const [
                                                           BoxShadow(
-                                                            color:
-                                                                AppColors.shadow,
+                                                            color: AppColors
+                                                                .shadow,
                                                             blurRadius: 14,
-                                                            offset:
-                                                                Offset(0, 6),
+                                                            offset: Offset(
+                                                              0,
+                                                              6,
+                                                            ),
                                                           ),
                                                         ],
                                                       ),
@@ -896,28 +925,33 @@ class _EditorScreenState extends State<EditorScreen> {
                                                       builder: (context) {
                                                         final visibility =
                                                             _pageBoundaryVisibilityInDocument(
-                                                          visibleDocumentRect:
-                                                              visibleDocumentRect,
-                                                          pageWorldSize:
-                                                              pageWorldSize,
-                                                          pageIndex: i,
-                                                        );
+                                                              visibleDocumentRect:
+                                                                  visibleDocumentRect,
+                                                              pageWorldSize:
+                                                                  pageWorldSize,
+                                                              pageIndex: i,
+                                                            );
                                                         return CustomPaint(
-                                                          painter:
-                                                              _PageFramePainter(
+                                                          painter: _PageFramePainter(
                                                             showLeft:
                                                                 visibility.left,
-                                                            showTop: visibility.top,
+                                                            showTop:
+                                                                visibility.top,
                                                             showRight:
-                                                                visibility.right,
+                                                                visibility
+                                                                    .right,
                                                             showBottom:
-                                                                visibility.bottom,
+                                                                visibility
+                                                                    .bottom,
                                                             highlightColor:
-                                                                Theme.of(context)
+                                                                Theme.of(
+                                                                      context,
+                                                                    )
                                                                     .colorScheme
                                                                     .primary
                                                                     .withValues(
-                                                                      alpha: 0.75,
+                                                                      alpha:
+                                                                          0.75,
                                                                     ),
                                                           ),
                                                         );
@@ -994,9 +1028,15 @@ class _EditorScreenState extends State<EditorScreen> {
               SingleActivator(LogicalKeyboardKey.keyV, meta: true):
                   _PasteFromClipboardIntent(),
               SingleActivator(LogicalKeyboardKey.keyC, control: true):
-                  _CopyImageIntent(),
+                  _CopyElementIntent(),
               SingleActivator(LogicalKeyboardKey.keyC, meta: true):
-                  _CopyImageIntent(),
+                  _CopyElementIntent(),
+              SingleActivator(LogicalKeyboardKey.keyX, control: true):
+                  _CutElementIntent(),
+              SingleActivator(LogicalKeyboardKey.keyX, meta: true):
+                  _CutElementIntent(),
+              SingleActivator(LogicalKeyboardKey.delete):
+                  _DeleteElementIntent(),
             },
             child: Actions(
               actions: <Type, Action<Intent>>{
@@ -1006,9 +1046,21 @@ class _EditorScreenState extends State<EditorScreen> {
                     return null;
                   },
                 ),
-                _CopyImageIntent: CallbackAction<Intent>(
+                _CopyElementIntent: CallbackAction<Intent>(
                   onInvoke: (_) {
-                    _handleCopyImage(controller);
+                    _handleCopy(controller);
+                    return null;
+                  },
+                ),
+                _CutElementIntent: CallbackAction<Intent>(
+                  onInvoke: (_) {
+                    _handleCut(controller);
+                    return null;
+                  },
+                ),
+                _DeleteElementIntent: CallbackAction<Intent>(
+                  onInvoke: (_) {
+                    _handleDelete(controller);
                     return null;
                   },
                 ),
@@ -1039,8 +1091,16 @@ class _PasteFromClipboardIntent extends Intent {
   const _PasteFromClipboardIntent();
 }
 
-class _CopyImageIntent extends Intent {
-  const _CopyImageIntent();
+class _CopyElementIntent extends Intent {
+  const _CopyElementIntent();
+}
+
+class _CutElementIntent extends Intent {
+  const _CutElementIntent();
+}
+
+class _DeleteElementIntent extends Intent {
+  const _DeleteElementIntent();
 }
 
 enum _CanvasContextAction { paste }
