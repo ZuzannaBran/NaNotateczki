@@ -43,6 +43,9 @@ class ImageBlockEntity {
   late String uid;
   late String path;
   late String ocrText;
+  List<int>? bytes;
+  String? imageExt;
+  String? imageMime;
   late double width;
   late double height;
   late double rotation;

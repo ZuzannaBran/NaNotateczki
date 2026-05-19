@@ -691,6 +691,7 @@ class EditorController extends ChangeNotifier {
       width: 240,
     );
     _applyAction(AddTextAction(block));
+    setTool(DrawingTool.text);
     setActiveTextBlock(block.id, null);
     _save();
   }
@@ -719,6 +720,7 @@ class EditorController extends ChangeNotifier {
       width: 260,
     );
     _applyAction(AddTextAction(block));
+    setTool(DrawingTool.text);
     setActiveTextBlock(block.id, null);
     _save();
   }
@@ -855,6 +857,7 @@ class EditorController extends ChangeNotifier {
       case _TextElementClipboardItem(:final block):
         final pasted = block.copyWith(id: _uuid.v4(), position: position);
         _applyAction(AddTextAction(pasted));
+        setTool(DrawingTool.text);
         setActiveTextBlock(pasted.id, null);
         _save();
         return null;
@@ -1045,6 +1048,9 @@ class EditorController extends ChangeNotifier {
       position: position,
       width: initialSize.width,
       height: initialSize.height,
+      bytes: bytes,
+      imageExt: extension,
+      imageMime: 'image/$extension',
     );
     _applyAction(AddImageAction(block));
     _activateInsertedImage(block.id);
@@ -1076,8 +1082,14 @@ class EditorController extends ChangeNotifier {
     bool runOcr = true,
   }) async {
     final persisted = await _persistImageFile(file);
+    final bytes = await file.readAsBytes();
     final size = await _imageSize(persisted);
     final initialSize = _initialImageBlockSize(size);
+    final extension = file.path.split('.').last.toLowerCase();
+    String mime = 'image/jpeg';
+    if (extension == 'png') mime = 'image/png';
+    else if (extension == 'gif') mime = 'image/gif';
+    else if (extension == 'webp') mime = 'image/webp';
     final block = ImageBlock(
       id: _uuid.v4(),
       path: persisted.path,
@@ -1085,6 +1097,9 @@ class EditorController extends ChangeNotifier {
       position: position,
       width: initialSize.width,
       height: initialSize.height,
+      bytes: bytes,
+      imageExt: extension,
+      imageMime: mime,
     );
     _applyAction(AddImageAction(block));
     _activateInsertedImage(block.id);
@@ -1321,6 +1336,25 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
+  Future<void> restoreImageCache(int pageIndex, String blockId) async {
+    _ensurePageSelected(pageIndex);
+    final block = currentPage.imageBlocks.where((b) => b.id == blockId).firstOrNull;
+    if (block == null || block.bytes == null) return;
+    
+    if (block.path.isNotEmpty && File(block.path).existsSync()) return;
+
+    final extension = block.imageExt ?? 'png';
+    final filename = 'restored_${block.id}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+    final file = await _persistImageBytes(block.bytes!, filename);
+    
+    final updatedBlock = block.copyWith(path: file.path);
+    final updated = currentPage.imageBlocks
+        .map((item) => item.id == blockId ? updatedBlock : item)
+        .toList();
+    _updatePage(currentPage.copyWith(imageBlocks: updated));
+    _save();
+  }
+
   void deleteImageBlock(String id) {
     final block = currentPage.imageBlocks.firstWhere((item) => item.id == id);
     _applyAction(DeleteImageAction(block));
@@ -1435,8 +1469,8 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<File> _persistImage(XFile picked) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final imagesDir = Directory('${dir.path}/images');
+    final dir = await getTemporaryDirectory();
+    final imagesDir = Directory('${dir.path}/images_cache');
     if (!await imagesDir.exists()) {
       await imagesDir.create(recursive: true);
     }
@@ -1447,8 +1481,8 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<File> _persistImageFile(File source) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final imagesDir = Directory('${dir.path}/images');
+    final dir = await getTemporaryDirectory();
+    final imagesDir = Directory('${dir.path}/images_cache');
     if (!await imagesDir.exists()) {
       await imagesDir.create(recursive: true);
     }
@@ -1459,8 +1493,8 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<File> _persistImageBytes(Uint8List bytes, String filename) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final imagesDir = Directory('${dir.path}/images');
+    final dir = await getTemporaryDirectory();
+    final imagesDir = Directory('${dir.path}/images_cache');
     if (!await imagesDir.exists()) {
       await imagesDir.create(recursive: true);
     }

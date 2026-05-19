@@ -24,6 +24,9 @@ class PageOverlay extends StatelessWidget {
     this.worldOrigin = Offset.zero,
     this.page,
     this.pageIndex,
+    this.renderBackground = true,
+    this.renderActive = true,
+    this.renderInactive = true,
     super.key,
   });
 
@@ -32,57 +35,68 @@ class PageOverlay extends StatelessWidget {
   final Offset worldOrigin;
   final NotePage? page;
   final int? pageIndex;
+  final bool renderBackground;
+  final bool renderActive;
+  final bool renderInactive;
 
   @override
   Widget build(BuildContext context) {
     final effectivePageIndex = pageIndex ?? controller.currentPageIndex;
     final effectivePage = page ?? controller.pageAt(effectivePageIndex);
     final tool = controller.tool;
+    final activeTextId = controller.activeTextBlockId;
+    final activeImageId = controller.activeImageBlockId;
+
     return IgnorePointer(
       ignoring: tool.isInk || !interactionEnabled,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTapDown: (details) async {
-                if (controller.consumeBackgroundTapSuppression()) {
-                  return;
-                }
-                if (controller.activeTextBlockId != null ||
-                    controller.activeImageBlockId != null) {
-                  controller.clearActiveTextBlock();
-                  controller.clearActiveImageBlock();
-                  return;
-                }
-                if (tool == DrawingTool.text || tool == DrawingTool.image) {
-                  final message = await controller.handleTapOnPage(
-                    effectivePageIndex,
-                    details.localPosition + worldOrigin,
-                  );
-                  if (message != null && context.mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(message)));
+          if (renderBackground)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTapDown: (details) async {
+                  if (controller.consumeBackgroundTapSuppression()) {
+                    return;
                   }
-                }
-              },
+                  if (controller.activeTextBlockId != null ||
+                      controller.activeImageBlockId != null) {
+                    controller.clearActiveTextBlock();
+                    controller.clearActiveImageBlock();
+                    return;
+                  }
+                  if (tool == DrawingTool.text || tool == DrawingTool.image) {
+                    final message = await controller.handleTapOnPage(
+                      effectivePageIndex,
+                      details.localPosition + worldOrigin,
+                    );
+                    if (message != null && context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(message)));
+                    }
+                  }
+                },
+              ),
             ),
-          ),
           for (final block in effectivePage.textBlocks)
-            _TextBlockWidget(
-              block: block,
-              pageIndex: effectivePageIndex,
-              worldOrigin: worldOrigin,
-              interactionEnabled: interactionEnabled,
-            ),
+            if ((block.id == activeTextId && renderActive) ||
+                (block.id != activeTextId && renderInactive))
+              _TextBlockWidget(
+                block: block,
+                pageIndex: effectivePageIndex,
+                worldOrigin: worldOrigin,
+                interactionEnabled: interactionEnabled,
+              ),
           for (final block in effectivePage.imageBlocks)
-            _ImageBlockWidget(
-              block: block,
-              pageIndex: effectivePageIndex,
-              worldOrigin: worldOrigin,
-              interactionEnabled: interactionEnabled,
-            ),
+            if ((block.id == activeImageId && renderActive) ||
+                (block.id != activeImageId && renderInactive))
+              _ImageBlockWidget(
+                block: block,
+                pageIndex: effectivePageIndex,
+                worldOrigin: worldOrigin,
+                interactionEnabled: interactionEnabled,
+              ),
         ],
       ),
     );
@@ -97,6 +111,9 @@ class DocumentPageOverlay extends StatelessWidget {
     required this.pageGap,
     this.interactionEnabled = true,
     this.worldOrigin = Offset.zero,
+    this.renderBackground = true,
+    this.renderActive = true,
+    this.renderInactive = true,
     super.key,
   });
 
@@ -106,6 +123,9 @@ class DocumentPageOverlay extends StatelessWidget {
   final double pageGap;
   final bool interactionEnabled;
   final Offset worldOrigin;
+  final bool renderBackground;
+  final bool renderActive;
+  final bool renderInactive;
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +144,9 @@ class DocumentPageOverlay extends StatelessWidget {
               worldOrigin: worldOrigin + Offset(0, i * stride),
               page: pages[i],
               pageIndex: i,
+              renderBackground: renderBackground,
+              renderActive: renderActive,
+              renderInactive: renderInactive,
             ),
           ),
       ],
@@ -152,9 +175,6 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   Offset? _dragStart;
   Offset? _startPosition;
   bool _dragFromFrame = false;
-  Offset? _resizeStart;
-  double? _startWidth;
-  TextBlock? _resizeBefore;
   static const double _handleLineLength = 12.0;
   static const double _handleDotRadius = 4.0;
   static const double _handleDotDiameter = _handleDotRadius * 2;
@@ -275,13 +295,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                       _endMove(controller);
                     }
                   : null,
-              child: ResizableFrame(
-                isSelected: isActive && canTransform,
-                onResizeStart: _startResize,
-                onResizeUpdate: (direction, delta) =>
-                    _updateResize(direction, delta, controller),
-                onResizeEnd: (_) => _endResize(controller),
-                child: Row(
+              child: Row(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -335,7 +349,6 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                       ),
                   ],
                 ),
-              ),
             );
           },
         ),
@@ -443,73 +456,6 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _dragStart = null;
     _startPosition = null;
     _dragFromFrame = false;
-  }
-
-  void _startResize(ResizeDirection direction) {
-    _resizeStart = Offset.zero;
-    _startWidth = widget.block.width;
-    _resizeBefore = widget.block;
-  }
-
-  void _updateResize(
-    ResizeDirection direction,
-    Offset delta,
-    EditorController controller,
-  ) {
-    if (_resizeStart == null || _startWidth == null) {
-      return;
-    }
-    _resizeStart = _resizeStart! + delta;
-    final baseWidth = _startWidth!;
-    final before = _resizeBefore ?? widget.block;
-    final totalDelta = _resizeStart!;
-
-    final isLeft =
-        direction == ResizeDirection.centerLeft ||
-        direction == ResizeDirection.topLeft ||
-        direction == ResizeDirection.bottomLeft;
-    final isRight =
-        direction == ResizeDirection.centerRight ||
-        direction == ResizeDirection.topRight ||
-        direction == ResizeDirection.bottomRight;
-
-    if (!isLeft && !isRight) {
-      return;
-    }
-
-    final rawWidth = isLeft
-        ? baseWidth - totalDelta.dx
-        : baseWidth + totalDelta.dx;
-    final nextWidth = rawWidth.clamp(140.0, 620.0).toDouble();
-
-    if (isLeft) {
-      final widthDelta = baseWidth - nextWidth;
-      final nextPosition = before.position.translate(widthDelta, 0);
-      controller.updateTextBlockOnPage(
-        widget.pageIndex,
-        before.copyWith(position: nextPosition, width: nextWidth),
-      );
-      return;
-    }
-
-    controller.updateTextBlockWidthOnPage(
-      widget.pageIndex,
-      widget.block.id,
-      nextWidth,
-    );
-  }
-
-  void _endResize(EditorController controller) {
-    final before = _resizeBefore;
-    if (before != null) {
-      final current = controller.findTextBlockById(widget.block.id);
-      if (current != null) {
-        controller.commitTextResizeOnPage(widget.pageIndex, before, current);
-      }
-    }
-    _resizeStart = null;
-    _startWidth = null;
-    _resizeBefore = null;
   }
 
   KeyEventResult? _handleKeyPressed(KeyEvent event) {
@@ -840,10 +786,18 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   Future<void> _loadImageSize() async {
     final path = widget.block.path;
     if (path.isEmpty || path == _loadedImageSizePath) {
+      if (path.isEmpty && widget.block.bytes != null) {
+        if (!mounted) return;
+        context.read<EditorController>().restoreImageCache(widget.pageIndex, widget.block.id);
+      }
       return;
     }
     final file = File(path);
     if (!file.existsSync()) {
+      if (widget.block.bytes != null) {
+        if (!mounted) return;
+        context.read<EditorController>().restoreImageCache(widget.pageIndex, widget.block.id);
+      }
       return;
     }
     try {

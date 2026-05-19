@@ -609,6 +609,10 @@ class _LibraryWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final controller = context.watch<LibraryController>();
+    if (controller.isLoadingSelectedItem) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (item == null) {
       return const EmptyState(
         title: 'Pick an item',
@@ -634,10 +638,22 @@ class _LibraryRoute extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repository = context.read<NotebookRepository>();
-    final isBoard = item.kind == NotebookKind.board;
-    return ChangeNotifierProvider(
-      create: (_) => EditorController(repository: repository, notebook: item),
-      child: isBoard ? const BoardScreen() : const NotebookScreen(),
+    return FutureBuilder<Notebook?>(
+      future: repository.getNotebook(item.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final resolved = snapshot.data ?? item;
+        final isBoard = resolved.kind == NotebookKind.board;
+        return ChangeNotifierProvider(
+          create: (_) => EditorController(
+            repository: repository,
+            notebook: resolved,
+          ),
+          child: isBoard ? const BoardScreen() : const NotebookScreen(),
+        );
+      },
     );
   }
 }

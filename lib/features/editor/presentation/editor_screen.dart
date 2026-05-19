@@ -961,6 +961,18 @@ class _EditorScreenState extends State<EditorScreen> {
                                                 ),
                                               ),
                                             ),
+                                          DocumentPageOverlay(
+                                            controller: controller,
+                                            interactionEnabled:
+                                                !_isViewportNavigating,
+                                            worldOrigin: Offset.zero,
+                                            pages: controller.pages,
+                                            pageSize: pageWorldSize,
+                                            pageGap: _pageGap,
+                                            renderBackground: true,
+                                            renderInactive: true,
+                                            renderActive: false,
+                                          ),
                                           DocumentDrawingCanvas(
                                             allowMultiTouch: false,
                                             interactionEnabled:
@@ -978,6 +990,9 @@ class _EditorScreenState extends State<EditorScreen> {
                                             pages: controller.pages,
                                             pageSize: pageWorldSize,
                                             pageGap: _pageGap,
+                                            renderBackground: false,
+                                            renderInactive: false,
+                                            renderActive: true,
                                           ),
                                         ],
                                       ),

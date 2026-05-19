@@ -15,6 +15,7 @@ class LibraryController extends ChangeNotifier {
   final CloudSyncService cloudSyncService;
   bool isLoading = false;
   bool isSyncing = false;
+  bool isLoadingSelectedItem = false;
   List<Notebook> items = <Notebook>[];
   String? selectedItemId;
   String selectedFolder = 'Inbox';
@@ -23,6 +24,7 @@ class LibraryController extends ChangeNotifier {
   DateTime? lastSyncedAt;
   CloudSyncResult? lastSyncResult;
   final Set<String> _folders = <String>{};
+  Notebook? _activeNotebook;
 
   static const String _foldersFileName = 'library_folders.json';
 
@@ -42,6 +44,9 @@ class LibraryController extends ChangeNotifier {
         selectedFolder = folders.first;
       }
       selectedItemId ??= _firstItemInFolder(selectedFolder)?.uid;
+      if (_activeNotebook == null && selectedItemId != null) {
+        _activeNotebook = _itemById(selectedItemId!);
+      }
     }
     isLoading = false;
     notifyListeners();
@@ -123,8 +128,15 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectItem(String uid) {
+  Future<void> selectItem(String uid) async {
     selectedItemId = uid;
+    isLoadingSelectedItem = true;
+    _activeNotebook = null;
+    notifyListeners();
+
+    final fresh = await repository.getNotebook(uid);
+    _activeNotebook = fresh ?? _itemById(uid);
+    isLoadingSelectedItem = false;
     notifyListeners();
   }
 
@@ -164,11 +176,21 @@ class LibraryController extends ChangeNotifier {
   }
 
   Notebook? selectedItem() {
+    if (_activeNotebook != null) {
+      return _activeNotebook;
+    }
     if (selectedItemId == null) {
       return null;
     }
+    return _itemById(selectedItemId!);
+  }
+
+  Notebook? _itemById(String uid) {
+    if (items.isEmpty) {
+      return null;
+    }
     return items.firstWhere(
-      (item) => item.uid == selectedItemId,
+      (item) => item.uid == uid,
       orElse: () => items.first,
     );
   }

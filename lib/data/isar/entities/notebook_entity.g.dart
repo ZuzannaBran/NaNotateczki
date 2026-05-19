@@ -2135,24 +2135,24 @@ const TextBlockEntitySchema = Schema(
       name: r'fontSize',
       type: IsarType.double,
     ),
-    r'text': PropertySchema(
+    r'rotation': PropertySchema(
       id: 5,
+      name: r'rotation',
+      type: IsarType.double,
+    ),
+    r'text': PropertySchema(
+      id: 6,
       name: r'text',
       type: IsarType.string,
     ),
     r'uid': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'uid',
       type: IsarType.string,
     ),
     r'width': PropertySchema(
-      id: 7,
-      name: r'width',
-      type: IsarType.double,
-    ),
-    r'rotation': PropertySchema(
       id: 8,
-      name: r'rotation',
+      name: r'width',
       type: IsarType.double,
     )
   },
@@ -2190,10 +2190,10 @@ void _textBlockEntitySerialize(
   writer.writeDouble(offsets[2], object.dx);
   writer.writeDouble(offsets[3], object.dy);
   writer.writeDouble(offsets[4], object.fontSize);
-  writer.writeString(offsets[5], object.text);
-  writer.writeString(offsets[6], object.uid);
-  writer.writeDouble(offsets[7], object.width);
-  writer.writeDouble(offsets[8], object.rotation);
+  writer.writeDouble(offsets[5], object.rotation);
+  writer.writeString(offsets[6], object.text);
+  writer.writeString(offsets[7], object.uid);
+  writer.writeDouble(offsets[8], object.width);
 }
 
 TextBlockEntity _textBlockEntityDeserialize(
@@ -2208,10 +2208,10 @@ TextBlockEntity _textBlockEntityDeserialize(
   object.dx = reader.readDouble(offsets[2]);
   object.dy = reader.readDouble(offsets[3]);
   object.fontSize = reader.readDouble(offsets[4]);
-  object.text = reader.readString(offsets[5]);
-  object.uid = reader.readString(offsets[6]);
-  object.width = reader.readDouble(offsets[7]);
-  object.rotation = reader.readDouble(offsets[8]);
+  object.rotation = reader.readDouble(offsets[5]);
+  object.text = reader.readString(offsets[6]);
+  object.uid = reader.readString(offsets[7]);
+  object.width = reader.readDouble(offsets[8]);
   return object;
 }
 
@@ -2233,11 +2233,11 @@ P _textBlockEntityDeserializeProp<P>(
     case 4:
       return (reader.readDouble(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 6:
       return (reader.readString(offset)) as P;
     case 7:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 8:
       return (reader.readDouble(offset)) as P;
     default:
@@ -2656,6 +2656,72 @@ extension TextBlockEntityQueryFilter
   }
 
   QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      rotationEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'rotation',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      rotationGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'rotation',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      rotationLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'rotation',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
+      rotationBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'rotation',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TextBlockEntity, TextBlockEntity, QAfterFilterCondition>
       textEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -3004,64 +3070,79 @@ const ImageBlockEntitySchema = Schema(
   name: r'ImageBlockEntity',
   id: -5828569072254127974,
   properties: {
-    r'cropBottom': PropertySchema(
+    r'bytes': PropertySchema(
       id: 0,
+      name: r'bytes',
+      type: IsarType.longList,
+    ),
+    r'cropBottom': PropertySchema(
+      id: 1,
       name: r'cropBottom',
       type: IsarType.double,
     ),
     r'cropLeft': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'cropLeft',
       type: IsarType.double,
     ),
     r'cropRight': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'cropRight',
       type: IsarType.double,
     ),
     r'cropTop': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'cropTop',
       type: IsarType.double,
     ),
     r'dx': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'dx',
       type: IsarType.double,
     ),
     r'dy': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'dy',
       type: IsarType.double,
     ),
     r'height': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'height',
       type: IsarType.double,
     ),
+    r'imageExt': PropertySchema(
+      id: 8,
+      name: r'imageExt',
+      type: IsarType.string,
+    ),
+    r'imageMime': PropertySchema(
+      id: 9,
+      name: r'imageMime',
+      type: IsarType.string,
+    ),
     r'ocrText': PropertySchema(
-      id: 7,
+      id: 10,
       name: r'ocrText',
       type: IsarType.string,
     ),
     r'path': PropertySchema(
-      id: 8,
+      id: 11,
       name: r'path',
       type: IsarType.string,
     ),
+    r'rotation': PropertySchema(
+      id: 12,
+      name: r'rotation',
+      type: IsarType.double,
+    ),
     r'uid': PropertySchema(
-      id: 9,
+      id: 13,
       name: r'uid',
       type: IsarType.string,
     ),
     r'width': PropertySchema(
-      id: 10,
+      id: 14,
       name: r'width',
-      type: IsarType.double,
-    ),
-    r'rotation': PropertySchema(
-      id: 11,
-      name: r'rotation',
       type: IsarType.double,
     )
   },
@@ -3077,6 +3158,24 @@ int _imageBlockEntityEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.bytes;
+    if (value != null) {
+      bytesCount += 3 + value.length * 8;
+    }
+  }
+  {
+    final value = object.imageExt;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.imageMime;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.ocrText.length * 3;
   bytesCount += 3 + object.path.length * 3;
   bytesCount += 3 + object.uid.length * 3;
@@ -3089,18 +3188,21 @@ void _imageBlockEntitySerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDouble(offsets[0], object.cropBottom);
-  writer.writeDouble(offsets[1], object.cropLeft);
-  writer.writeDouble(offsets[2], object.cropRight);
-  writer.writeDouble(offsets[3], object.cropTop);
-  writer.writeDouble(offsets[4], object.dx);
-  writer.writeDouble(offsets[5], object.dy);
-  writer.writeDouble(offsets[6], object.height);
-  writer.writeString(offsets[7], object.ocrText);
-  writer.writeString(offsets[8], object.path);
-  writer.writeString(offsets[9], object.uid);
-  writer.writeDouble(offsets[10], object.width);
-  writer.writeDouble(offsets[11], object.rotation);
+  writer.writeLongList(offsets[0], object.bytes);
+  writer.writeDouble(offsets[1], object.cropBottom);
+  writer.writeDouble(offsets[2], object.cropLeft);
+  writer.writeDouble(offsets[3], object.cropRight);
+  writer.writeDouble(offsets[4], object.cropTop);
+  writer.writeDouble(offsets[5], object.dx);
+  writer.writeDouble(offsets[6], object.dy);
+  writer.writeDouble(offsets[7], object.height);
+  writer.writeString(offsets[8], object.imageExt);
+  writer.writeString(offsets[9], object.imageMime);
+  writer.writeString(offsets[10], object.ocrText);
+  writer.writeString(offsets[11], object.path);
+  writer.writeDouble(offsets[12], object.rotation);
+  writer.writeString(offsets[13], object.uid);
+  writer.writeDouble(offsets[14], object.width);
 }
 
 ImageBlockEntity _imageBlockEntityDeserialize(
@@ -3110,18 +3212,21 @@ ImageBlockEntity _imageBlockEntityDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = ImageBlockEntity();
-  object.cropBottom = reader.readDoubleOrNull(offsets[0]) ?? 1.0;
-  object.cropLeft = reader.readDoubleOrNull(offsets[1]) ?? 0.0;
-  object.cropRight = reader.readDoubleOrNull(offsets[2]) ?? 1.0;
-  object.cropTop = reader.readDoubleOrNull(offsets[3]) ?? 0.0;
-  object.dx = reader.readDouble(offsets[4]);
-  object.dy = reader.readDouble(offsets[5]);
-  object.height = reader.readDouble(offsets[6]);
-  object.ocrText = reader.readString(offsets[7]);
-  object.path = reader.readString(offsets[8]);
-  object.uid = reader.readString(offsets[9]);
-  object.width = reader.readDouble(offsets[10]);
-  object.rotation = reader.readDouble(offsets[11]);
+  object.bytes = reader.readLongList(offsets[0]);
+  object.cropBottom = reader.readDouble(offsets[1]);
+  object.cropLeft = reader.readDouble(offsets[2]);
+  object.cropRight = reader.readDouble(offsets[3]);
+  object.cropTop = reader.readDouble(offsets[4]);
+  object.dx = reader.readDouble(offsets[5]);
+  object.dy = reader.readDouble(offsets[6]);
+  object.height = reader.readDouble(offsets[7]);
+  object.imageExt = reader.readStringOrNull(offsets[8]);
+  object.imageMime = reader.readStringOrNull(offsets[9]);
+  object.ocrText = reader.readString(offsets[10]);
+  object.path = reader.readString(offsets[11]);
+  object.rotation = reader.readDouble(offsets[12]);
+  object.uid = reader.readString(offsets[13]);
+  object.width = reader.readDouble(offsets[14]);
   return object;
 }
 
@@ -3133,13 +3238,13 @@ P _imageBlockEntityDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDoubleOrNull(offset) ?? 1.0) as P;
+      return (reader.readLongList(offset)) as P;
     case 1:
-      return (reader.readDoubleOrNull(offset) ?? 0.0) as P;
+      return (reader.readDouble(offset)) as P;
     case 2:
-      return (reader.readDoubleOrNull(offset) ?? 1.0) as P;
+      return (reader.readDouble(offset)) as P;
     case 3:
-      return (reader.readDoubleOrNull(offset) ?? 0.0) as P;
+      return (reader.readDouble(offset)) as P;
     case 4:
       return (reader.readDouble(offset)) as P;
     case 5:
@@ -3147,14 +3252,20 @@ P _imageBlockEntityDeserializeProp<P>(
     case 6:
       return (reader.readDouble(offset)) as P;
     case 7:
-      return (reader.readString(offset)) as P;
-    case 8:
-      return (reader.readString(offset)) as P;
-    case 9:
-      return (reader.readString(offset)) as P;
-    case 10:
       return (reader.readDouble(offset)) as P;
+    case 8:
+      return (reader.readStringOrNull(offset)) as P;
+    case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
+      return (reader.readString(offset)) as P;
     case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
+      return (reader.readDouble(offset)) as P;
+    case 13:
+      return (reader.readString(offset)) as P;
+    case 14:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -3163,6 +3274,433 @@ P _imageBlockEntityDeserializeProp<P>(
 
 extension ImageBlockEntityQueryFilter
     on QueryBuilder<ImageBlockEntity, ImageBlockEntity, QFilterCondition> {
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'bytes',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'bytes',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesElementEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'bytes',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesElementGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'bytes',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesElementLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'bytes',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesElementBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'bytes',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'bytes',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'bytes',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'bytes',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'bytes',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'bytes',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      bytesLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'bytes',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropBottomEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cropBottom',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropBottomGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cropBottom',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropBottomLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cropBottom',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropBottomBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cropBottom',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropLeftEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cropLeft',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropLeftGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cropLeft',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropLeftLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cropLeft',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropLeftBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cropLeft',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropRightEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cropRight',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropRightGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cropRight',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropRightLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cropRight',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropRightBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cropRight',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropTopEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cropTop',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropTopGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cropTop',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropTopLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cropTop',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      cropTopBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cropTop',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
   QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
       dxEqualTo(
     double value, {
@@ -3357,6 +3895,314 @@ extension ImageBlockEntityQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'imageExt',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'imageExt',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imageExt',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'imageExt',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'imageExt',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'imageExt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'imageExt',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'imageExt',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'imageExt',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'imageExt',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imageExt',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageExtIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'imageExt',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'imageMime',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'imageMime',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imageMime',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'imageMime',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'imageMime',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'imageMime',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'imageMime',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'imageMime',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'imageMime',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'imageMime',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imageMime',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      imageMimeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'imageMime',
+        value: '',
       ));
     });
   }
@@ -3629,6 +4475,72 @@ extension ImageBlockEntityQueryFilter
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'path',
         value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      rotationEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'rotation',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      rotationGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'rotation',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      rotationLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'rotation',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ImageBlockEntity, ImageBlockEntity, QAfterFilterCondition>
+      rotationBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'rotation',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
       ));
     });
   }

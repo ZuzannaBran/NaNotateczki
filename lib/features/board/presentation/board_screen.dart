@@ -485,22 +485,33 @@ class _BoardScreenState extends State<BoardScreen> {
                                   width: boardRect.width,
                                   height: boardRect.height,
                                   child: Stack(
-                                    children: [
-                                      DrawingCanvas(
-                                        allowMultiTouch: false,
-                                        interactionEnabled:
-                                            !_isViewportNavigating,
-                                        worldOrigin: boardRect.topLeft,
-                                      ),
-                                      PageOverlay(
-                                        controller: controller,
-                                        interactionEnabled:
-                                            !_isViewportNavigating,
-                                        worldOrigin: boardRect.topLeft,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                      children: [
+                                        PageOverlay(
+                                          controller: controller,
+                                          interactionEnabled:
+                                              !_isViewportNavigating,
+                                          worldOrigin: boardRect.topLeft,
+                                          renderBackground: true,
+                                          renderInactive: true,
+                                          renderActive: false,
+                                        ),
+                                        DrawingCanvas(
+                                          allowMultiTouch: false,
+                                          interactionEnabled:
+                                              !_isViewportNavigating,
+                                          worldOrigin: boardRect.topLeft,
+                                        ),
+                                        PageOverlay(
+                                          controller: controller,
+                                          interactionEnabled:
+                                              !_isViewportNavigating,
+                                          worldOrigin: boardRect.topLeft,
+                                          renderBackground: false,
+                                          renderInactive: false,
+                                          renderActive: true,
+                                        ),
+                                      ],
+                                    ),                                ),
                               ),
                             ),
                           ),

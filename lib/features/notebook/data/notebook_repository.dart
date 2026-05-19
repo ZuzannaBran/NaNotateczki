@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:isar/isar.dart';
@@ -94,12 +97,43 @@ class NotebookRepository {
   }
 
   Future<void> saveNotebook(Notebook notebook) async {
+    final migratedPages = <NotePage>[];
+    bool migrated = false;
+    for (final page in notebook.pages) {
+      final migratedBlocks = <ImageBlock>[];
+      bool pageMigrated = false;
+      for (final block in page.imageBlocks) {
+        if (block.bytes == null && block.path.isNotEmpty) {
+          final file = File(block.path);
+          if (file.existsSync()) {
+            try {
+              final bytes = await file.readAsBytes();
+              final ext = block.path.split('.').last.toLowerCase();
+              String mime = 'image/jpeg';
+              if (ext == 'png') mime = 'image/png';
+              else if (ext == 'gif') mime = 'image/gif';
+              else if (ext == 'webp') mime = 'image/webp';
+              
+              migratedBlocks.add(block.copyWith(bytes: bytes, imageExt: ext, imageMime: mime));
+              pageMigrated = true;
+              migrated = true;
+              continue;
+            } catch (_) {}
+          }
+        }
+        migratedBlocks.add(block);
+      }
+      migratedPages.add(pageMigrated ? page.copyWith(imageBlocks: migratedBlocks) : page);
+    }
+    
+    final notebookToSave = migrated ? notebook.copyWith(pages: migratedPages) : notebook;
+
     await isar.writeTxn(() async {
       final existing = await isar.notebookEntitys
           .filter()
-          .uidEqualTo(notebook.uid)
+          .uidEqualTo(notebookToSave.uid)
           .findFirst();
-      final entity = _toEntity(notebook, existing?.id);
+      final entity = _toEntity(notebookToSave, existing?.id);
       await isar.notebookEntitys.put(entity);
     });
   }
@@ -214,6 +248,9 @@ class NotebookRepository {
       position: Offset(entity.dx, entity.dy),
       width: entity.width,
       height: entity.height,
+      bytes: _bytesFromEntity(entity.bytes),
+      imageExt: entity.imageExt,
+      imageMime: entity.imageMime,
       rotation: entity.rotation,
       cropLeft: entity.cropLeft,
       cropTop: entity.cropTop,
@@ -227,6 +264,9 @@ class NotebookRepository {
       ..uid = block.id
       ..path = block.path
       ..ocrText = block.ocrText
+      ..bytes = block.bytes?.toList()
+      ..imageExt = block.imageExt
+      ..imageMime = block.imageMime
       ..width = block.width
       ..height = block.height
       ..rotation = block.rotation
@@ -360,10 +400,14 @@ class NotebookRepository {
   }
 
   Map<String, dynamic> _imageToJson(ImageBlock block) {
+    final bytesBase64 = _bytesToBase64(block.bytes);
     return {
       'id': block.id,
       'path': block.path,
       'ocrText': block.ocrText,
+      'bytes': bytesBase64,
+      'imageExt': block.imageExt,
+      'imageMime': block.imageMime,
       'width': block.width,
       'height': block.height,
       'rotation': block.rotation,
@@ -381,6 +425,9 @@ class NotebookRepository {
       id: json['id'] as String,
       path: json['path'] as String? ?? '',
       ocrText: json['ocrText'] as String? ?? '',
+      bytes: _bytesFromBase64(json['bytes']),
+      imageExt: json['imageExt'] as String?,
+      imageMime: json['imageMime'] as String?,
       position: Offset(
         (json['dx'] as num).toDouble(),
         (json['dy'] as num).toDouble(),
@@ -461,5 +508,30 @@ class NotebookRepository {
       return index + 1;
     }
     return index;
+  }
+
+  Uint8List? _bytesFromEntity(List<int>? bytes) {
+    if (bytes == null || bytes.isEmpty) {
+      return null;
+    }
+    return Uint8List.fromList(bytes);
+  }
+
+  String? _bytesToBase64(Uint8List? bytes) {
+    if (bytes == null || bytes.isEmpty) {
+      return null;
+    }
+    return base64Encode(bytes);
+  }
+
+  Uint8List? _bytesFromBase64(Object? value) {
+    if (value is! String || value.isEmpty) {
+      return null;
+    }
+    try {
+      return base64Decode(value);
+    } catch (_) {
+      return null;
+    }
   }
 }
