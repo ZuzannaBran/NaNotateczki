@@ -218,11 +218,6 @@ class EditorController extends ChangeNotifier {
     return handleTap(point);
   }
 
-  void addTextBlockOnPage(int pageIndex, Offset position) {
-    _ensurePageSelected(pageIndex);
-    addTextBlock(position);
-  }
-
   void updateTextBlockContentOnPage(
     int pageIndex,
     TextBlock before, {
@@ -242,19 +237,6 @@ class EditorController extends ChangeNotifier {
     updateTextBlockPosition(id, position);
   }
 
-  void updateTextBlockWidthOnPage(int pageIndex, String id, double width) {
-    _ensurePageSelected(pageIndex);
-    updateTextBlockWidth(id, width);
-  }
-
-  void updateTextBlockOnPage(int pageIndex, TextBlock block) {
-    _ensurePageSelected(pageIndex);
-    final updated = currentPage.textBlocks
-        .map((item) => item.id == block.id ? block : item)
-        .toList();
-    _updatePage(currentPage.copyWith(textBlocks: updated));
-  }
-
   void deleteTextBlockOnPage(int pageIndex, String id) {
     _ensurePageSelected(pageIndex);
     deleteTextBlock(id);
@@ -268,20 +250,6 @@ class EditorController extends ChangeNotifier {
   ) {
     _ensurePageSelected(pageIndex);
     commitTextMove(id, start, end);
-  }
-
-  void commitTextResizeOnPage(
-    int pageIndex,
-    TextBlock before,
-    TextBlock after,
-  ) {
-    _ensurePageSelected(pageIndex);
-    commitTextResize(before, after);
-  }
-
-  Future<String?> addImageBlockOnPage(int pageIndex, Offset position) async {
-    _ensurePageSelected(pageIndex);
-    return addImageBlock(position);
   }
 
   Future<String?> runOcrForImageOnPage(int pageIndex, ImageBlock block) async {
@@ -298,32 +266,12 @@ class EditorController extends ChangeNotifier {
     updateImageBlockPosition(id, position);
   }
 
-  void updateImageBlockSizeOnPage(
-    int pageIndex,
-    String id, {
-    required double width,
-    required double height,
-  }) {
-    _ensurePageSelected(pageIndex);
-    updateImageBlockSize(id, width: width, height: height);
-  }
-
   void updateImageBlockOnPage(int pageIndex, ImageBlock block) {
     _ensurePageSelected(pageIndex);
     final updated = currentPage.imageBlocks
         .map((item) => item.id == block.id ? block : item)
         .toList();
     _updatePage(currentPage.copyWith(imageBlocks: updated));
-  }
-
-  void commitImageBlockOnPage(
-    int pageIndex,
-    ImageBlock before,
-    ImageBlock after,
-  ) {
-    _ensurePageSelected(pageIndex);
-    _applyAction(UpdateImageAction(before: before, after: after));
-    _save();
   }
 
   void updateImageBlockOcrTextOnPage(int pageIndex, String id, String text) {
@@ -543,7 +491,9 @@ class EditorController extends ChangeNotifier {
         }
       }
       notifyListeners();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('EditorController._loadEditorPrefs failed: $e');
+    }
   }
 
   void _schedulePrefsSave() {
@@ -565,7 +515,9 @@ class EditorController extends ChangeNotifier {
         'lastTextFontSize': lastTextFontSize,
       };
       await file.writeAsString(jsonEncode(payload));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('EditorController._saveEditorPrefs failed: $e');
+    }
   }
 
   Future<File> _prefsFile() async {
@@ -796,7 +748,8 @@ class EditorController extends ChangeNotifier {
         type: FileType.custom,
         allowedExtensions: ['png', 'jpg', 'jpeg', 'pdf', 'txt'],
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('EditorController.insertFromFilePicker: picker failed: $e');
       if (Platform.isLinux) {
         return 'Missing "zenity". Install it: sudo apt-get install zenity.';
       }
@@ -815,7 +768,8 @@ class EditorController extends ChangeNotifier {
       return 'PDF rendering is not supported on this platform.';
     } on MissingPluginException {
       return 'PDF renderer plugin is missing for this platform.';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('EditorController.insertFromFilePicker: insert failed: $e');
       return 'Failed to insert file.';
     }
   }
@@ -995,7 +949,8 @@ class EditorController extends ChangeNotifier {
         if (!completer.isCompleted) {
           completer.complete(bytes);
         }
-      } catch (_) {
+      } catch (e) {
+        debugPrint('EditorController._readClipboardImageBytes failed: $e');
         if (!completer.isCompleted) {
           completer.complete(null);
         }
@@ -1087,9 +1042,13 @@ class EditorController extends ChangeNotifier {
     final initialSize = _initialImageBlockSize(size);
     final extension = file.path.split('.').last.toLowerCase();
     String mime = 'image/jpeg';
-    if (extension == 'png') mime = 'image/png';
-    else if (extension == 'gif') mime = 'image/gif';
-    else if (extension == 'webp') mime = 'image/webp';
+    if (extension == 'png') {
+      mime = 'image/png';
+    } else if (extension == 'gif') {
+      mime = 'image/gif';
+    } else if (extension == 'webp') {
+      mime = 'image/webp';
+    }
     final block = ImageBlock(
       id: _uuid.v4(),
       path: persisted.path,
@@ -1201,7 +1160,8 @@ class EditorController extends ChangeNotifier {
       return 'PDF rendering is not supported on this platform.';
     } on MissingPluginException {
       return 'PDF renderer plugin is missing for this platform.';
-    } catch (_) {
+    } catch (e) {
+      debugPrint('EditorController._addPdfAsImages failed: $e');
       return 'Failed to render PDF.';
     }
   }
@@ -1338,15 +1298,18 @@ class EditorController extends ChangeNotifier {
 
   Future<void> restoreImageCache(int pageIndex, String blockId) async {
     _ensurePageSelected(pageIndex);
-    final block = currentPage.imageBlocks.where((b) => b.id == blockId).firstOrNull;
+    final block = currentPage.imageBlocks
+        .where((b) => b.id == blockId)
+        .firstOrNull;
     if (block == null || block.bytes == null) return;
-    
+
     if (block.path.isNotEmpty && File(block.path).existsSync()) return;
 
     final extension = block.imageExt ?? 'png';
-    final filename = 'restored_${block.id}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+    final filename =
+        'restored_${block.id}_${DateTime.now().millisecondsSinceEpoch}.$extension';
     final file = await _persistImageBytes(block.bytes!, filename);
-    
+
     final updatedBlock = block.copyWith(path: file.path);
     final updated = currentPage.imageBlocks
         .map((item) => item.id == blockId ? updatedBlock : item)

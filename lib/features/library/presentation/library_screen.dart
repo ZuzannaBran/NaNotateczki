@@ -60,151 +60,184 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final selectedItem = controller.selectedItem();
 
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= _wideBreakpoint;
-          if (isWide) {
-            final maxSideWidth = math.max(
-              _folderPaneMinWidth + _itemsPaneMinWidth,
-              constraints.maxWidth - 320,
-            );
-            var folderWidth = _folderPaneWidth.clamp(
-              _folderPaneMinWidth,
-              _folderPaneMaxWidth,
-            ).toDouble();
-            var itemsWidth = _itemsPaneWidth.clamp(
-              _itemsPaneMinWidth,
-              _itemsPaneMaxWidth,
-            ).toDouble();
-            final totalWidth = folderWidth + itemsWidth;
-            if (totalWidth > maxSideWidth) {
-              final overflow = totalWidth - maxSideWidth;
-              final shrinkFromItems = math.min(
-                overflow,
-                itemsWidth - _itemsPaneMinWidth,
-              );
-              itemsWidth -= shrinkFromItems;
-              final restOverflow = overflow - shrinkFromItems;
-              if (restOverflow > 0) {
-                folderWidth = math.max(
-                  _folderPaneMinWidth,
-                  folderWidth - restOverflow,
-                );
-              }
-            }
-
-            final folderCompact = folderWidth < 165;
-            final folderIconOnly = folderWidth < 96;
-            final itemsCompact = itemsWidth < 260;
-            final folderTextScale = _textScaleForPane(
-              width: folderWidth,
-              minWidth: _folderPaneMinWidth,
-              maxWidth: 260,
-              minScale: 0.68,
-            );
-            final itemsTextScale = _textScaleForPane(
-              width: itemsWidth,
-              minWidth: _itemsPaneMinWidth,
-              maxWidth: 360,
-              minScale: 0.72,
-            );
-            final expandedLeftZoneWidth =
-                folderWidth + _resizeHandleWidth + itemsWidth + _resizeHandleWidth;
-            final leftZoneWidth = _showLeftNavigation ? expandedLeftZoneWidth : 0.0;
-
-            return Stack(
-              children: [
-                Row(
-                  children: [
-                    SizedBox(
-                      width: leftZoneWidth,
-                      child: _showLeftNavigation
-                          ? Row(
-                              children: [
-                                SizedBox(
-                                  width: folderWidth,
-                                  child: _FolderListPane(
-                                    controller: controller,
-                                    onSelect: controller.selectFolder,
-                                    compact: folderCompact,
-                                    iconOnly: folderIconOnly,
-                                    textScale: folderTextScale,
-                                  ),
-                                ),
-                                _PaneResizeHandle(
-                                  onDragDelta: (delta) {
-                                    setState(() {
-                                      _folderPaneWidth = (_folderPaneWidth + delta).clamp(
-                                        _folderPaneMinWidth,
-                                        _folderPaneMaxWidth,
-                                      ).toDouble();
-                                    });
-                                  },
-                                ),
-                                SizedBox(
-                                  width: itemsWidth,
-                                  child: _LibraryItemsPane(
-                                    controller: controller,
-                                    onOpen: (item) => controller.selectItem(item.uid),
-                                    compact: itemsCompact,
-                                    textScale: itemsTextScale,
-                                  ),
-                                ),
-                                _PaneResizeHandle(
-                                  onDragDelta: (delta) {
-                                    setState(() {
-                                      _itemsPaneWidth = (_itemsPaneWidth + delta).clamp(
-                                        _itemsPaneMinWidth,
-                                        _itemsPaneMaxWidth,
-                                      ).toDouble();
-                                    });
-                                  },
-                                ),
-                              ],
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                    Expanded(child: _LibraryWorkspace(item: selectedItem)),
-                  ],
-                ),
-                Positioned(
-                  left: math.max(0.0, leftZoneWidth - 1),
-                  top: 0,
-                  child: _LeftZoneToggleTab(
-                    expanded: _showLeftNavigation,
-                    onPressed: _toggleLeftNavigation,
-                  ),
-                ),
-              ],
-            );
-          }
-
-          return Column(
-            children: [
-              if (_showLeftNavigation) ...[
-                _FolderChipBar(
-                  controller: controller,
-                  onSelect: controller.selectFolder,
-                ),
-                const Divider(height: 1),
-              ],
-              Expanded(
-                child: _LibraryItemsPane(
-                  controller: controller,
-                  compact: false,
-                  textScale: 1.0,
-                  onOpen: (item) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => _LibraryRoute(item: item),
-                      ),
-                    );
-                  },
-                ),
+      body: Column(
+        children: [
+          if (controller.shouldShowResetBanner)
+            MaterialBanner(
+              backgroundColor: Colors.amber.shade100,
+              content: Text(
+                controller.autoRestoreCount > 0
+                    ? 'Baza została zresetowana po zmianie struktury. Przywrócono ${controller.autoRestoreCount} notatek z lokalnego backupu.'
+                    : 'Baza została zresetowana po zmianie struktury danych. Lokalny backup nie był dostępny.',
               ),
-            ],
-          );
-        },
+              actions: [
+                TextButton(
+                  onPressed: controller.dismissResetBanner,
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= _wideBreakpoint;
+                if (isWide) {
+                  final maxSideWidth = math.max(
+                    _folderPaneMinWidth + _itemsPaneMinWidth,
+                    constraints.maxWidth - 320,
+                  );
+                  var folderWidth = _folderPaneWidth
+                      .clamp(_folderPaneMinWidth, _folderPaneMaxWidth)
+                      .toDouble();
+                  var itemsWidth = _itemsPaneWidth
+                      .clamp(_itemsPaneMinWidth, _itemsPaneMaxWidth)
+                      .toDouble();
+                  final totalWidth = folderWidth + itemsWidth;
+                  if (totalWidth > maxSideWidth) {
+                    final overflow = totalWidth - maxSideWidth;
+                    final shrinkFromItems = math.min(
+                      overflow,
+                      itemsWidth - _itemsPaneMinWidth,
+                    );
+                    itemsWidth -= shrinkFromItems;
+                    final restOverflow = overflow - shrinkFromItems;
+                    if (restOverflow > 0) {
+                      folderWidth = math.max(
+                        _folderPaneMinWidth,
+                        folderWidth - restOverflow,
+                      );
+                    }
+                  }
+
+                  final folderCompact = folderWidth < 165;
+                  final folderIconOnly = folderWidth < 96;
+                  final itemsCompact = itemsWidth < 260;
+                  final folderTextScale = _textScaleForPane(
+                    width: folderWidth,
+                    minWidth: _folderPaneMinWidth,
+                    maxWidth: 260,
+                    minScale: 0.68,
+                  );
+                  final itemsTextScale = _textScaleForPane(
+                    width: itemsWidth,
+                    minWidth: _itemsPaneMinWidth,
+                    maxWidth: 360,
+                    minScale: 0.72,
+                  );
+                  final expandedLeftZoneWidth =
+                      folderWidth +
+                      _resizeHandleWidth +
+                      itemsWidth +
+                      _resizeHandleWidth;
+                  final leftZoneWidth = _showLeftNavigation
+                      ? expandedLeftZoneWidth
+                      : 0.0;
+
+                  return Stack(
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: leftZoneWidth,
+                            child: _showLeftNavigation
+                                ? Row(
+                                    children: [
+                                      SizedBox(
+                                        width: folderWidth,
+                                        child: _FolderListPane(
+                                          controller: controller,
+                                          onSelect: controller.selectFolder,
+                                          compact: folderCompact,
+                                          iconOnly: folderIconOnly,
+                                          textScale: folderTextScale,
+                                        ),
+                                      ),
+                                      _PaneResizeHandle(
+                                        onDragDelta: (delta) {
+                                          setState(() {
+                                            _folderPaneWidth =
+                                                (_folderPaneWidth + delta)
+                                                    .clamp(
+                                                      _folderPaneMinWidth,
+                                                      _folderPaneMaxWidth,
+                                                    )
+                                                    .toDouble();
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(
+                                        width: itemsWidth,
+                                        child: _LibraryItemsPane(
+                                          controller: controller,
+                                          onOpen: (item) =>
+                                              controller.selectItem(item.uid),
+                                          compact: itemsCompact,
+                                          textScale: itemsTextScale,
+                                        ),
+                                      ),
+                                      _PaneResizeHandle(
+                                        onDragDelta: (delta) {
+                                          setState(() {
+                                            _itemsPaneWidth =
+                                                (_itemsPaneWidth + delta)
+                                                    .clamp(
+                                                      _itemsPaneMinWidth,
+                                                      _itemsPaneMaxWidth,
+                                                    )
+                                                    .toDouble();
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                          Expanded(
+                            child: _LibraryWorkspace(item: selectedItem),
+                          ),
+                        ],
+                      ),
+                      Positioned(
+                        left: math.max(0.0, leftZoneWidth - 1),
+                        top: 0,
+                        child: _LeftZoneToggleTab(
+                          expanded: _showLeftNavigation,
+                          onPressed: _toggleLeftNavigation,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return Column(
+                  children: [
+                    if (_showLeftNavigation) ...[
+                      _FolderChipBar(
+                        controller: controller,
+                        onSelect: controller.selectFolder,
+                      ),
+                      const Divider(height: 1),
+                    ],
+                    Expanded(
+                      child: _LibraryItemsPane(
+                        controller: controller,
+                        compact: false,
+                        textScale: 1.0,
+                        onOpen: (item) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => _LibraryRoute(item: item),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -233,8 +266,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(textController.text),
+              onPressed: () => Navigator.of(context).pop(textController.text),
               child: const Text('Create'),
             ),
           ],
@@ -267,10 +299,9 @@ class _FolderListPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (iconOnly) {
-      final selectedColor = Theme.of(context)
-          .colorScheme
-          .primary
-          .withValues(alpha: 0.14);
+      final selectedColor = Theme.of(
+        context,
+      ).colorScheme.primary.withValues(alpha: 0.14);
       return ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
@@ -279,8 +310,8 @@ class _FolderListPane extends StatelessWidget {
               tooltip: 'New folder',
               icon: const Icon(Icons.create_new_folder_outlined),
               visualDensity: VisualDensity.compact,
-              onPressed: () =>
-                  context.findAncestorStateOfType<_LibraryScreenState>()
+              onPressed: () => context
+                  .findAncestorStateOfType<_LibraryScreenState>()
                   ?._promptNewFolder(controller),
             ),
           ),
@@ -332,14 +363,17 @@ class _FolderListPane extends StatelessWidget {
                   child: AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 120),
                     curve: Curves.easeOutCubic,
-                    style: (Theme.of(context).textTheme.titleSmall ??
-                            const TextStyle())
-                        .copyWith(
-                          fontSize:
-                              (Theme.of(context).textTheme.titleSmall?.fontSize ??
+                    style:
+                        (Theme.of(context).textTheme.titleSmall ??
+                                const TextStyle())
+                            .copyWith(
+                              fontSize:
+                                  (Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall?.fontSize ??
                                       14) *
                                   textScale,
-                        ),
+                            ),
                     child: const Text(
                       'Folders',
                       maxLines: 1,
@@ -354,8 +388,8 @@ class _FolderListPane extends StatelessWidget {
                 visualDensity: compact
                     ? VisualDensity.compact
                     : VisualDensity.standard,
-                onPressed: () =>
-                    context.findAncestorStateOfType<_LibraryScreenState>()
+                onPressed: () => context
+                    .findAncestorStateOfType<_LibraryScreenState>()
                     ?._promptNewFolder(controller),
               ),
             ],
@@ -367,25 +401,19 @@ class _FolderListPane extends StatelessWidget {
             visualDensity: compact
                 ? VisualDensity.compact
                 : VisualDensity.standard,
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: compact ? 8 : 16,
-            ),
+            contentPadding: EdgeInsets.symmetric(horizontal: compact ? 8 : 16),
             title: AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 120),
               curve: Curves.easeOutCubic,
-              style: (Theme.of(context).textTheme.bodyMedium ??
-                      const TextStyle())
-                  .copyWith(
-                    fontSize:
-                        (Theme.of(context).textTheme.bodyMedium?.fontSize ??
+              style:
+                  (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
+                      .copyWith(
+                        fontSize:
+                            (Theme.of(context).textTheme.bodyMedium?.fontSize ??
                                 14) *
                             textScale,
-                  ),
-              child: Text(
-                folder,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+                      ),
+              child: Text(folder, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
             selected: folder == controller.selectedFolder,
             onTap: () => onSelect(folder),
@@ -411,8 +439,8 @@ class _FolderChipBar extends StatelessWidget {
           IconButton(
             tooltip: 'New folder',
             icon: const Icon(Icons.create_new_folder_outlined),
-            onPressed: () =>
-                context.findAncestorStateOfType<_LibraryScreenState>()
+            onPressed: () => context
+                .findAncestorStateOfType<_LibraryScreenState>()
                 ?._promptNewFolder(controller),
           ),
           const SizedBox(width: 8),
@@ -540,14 +568,17 @@ class _LibraryItemsPane extends StatelessWidget {
                 child: AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 120),
                   curve: Curves.easeOutCubic,
-                  style: (Theme.of(context).textTheme.titleMedium ??
-                          const TextStyle())
-                      .copyWith(
-                        fontSize:
-                            (Theme.of(context).textTheme.titleMedium?.fontSize ??
+                  style:
+                      (Theme.of(context).textTheme.titleMedium ??
+                              const TextStyle())
+                          .copyWith(
+                            fontSize:
+                                (Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium?.fontSize ??
                                     16) *
                                 textScale,
-                      ),
+                          ),
                   child: Text(
                     controller.selectedFolder,
                     maxLines: 1,
@@ -647,10 +678,8 @@ class _LibraryRoute extends StatelessWidget {
         final resolved = snapshot.data ?? item;
         final isBoard = resolved.kind == NotebookKind.board;
         return ChangeNotifierProvider(
-          create: (_) => EditorController(
-            repository: repository,
-            notebook: resolved,
-          ),
+          create: (_) =>
+              EditorController(repository: repository, notebook: resolved),
           child: isBoard ? const BoardScreen() : const NotebookScreen(),
         );
       },
@@ -675,12 +704,7 @@ class _PaneResizeHandle extends StatelessWidget {
         onHorizontalDragUpdate: (details) => onDragDelta(details.delta.dx),
         child: SizedBox(
           width: _LibraryScreenState._resizeHandleWidth,
-          child: Center(
-            child: Container(
-              width: 1,
-              color: dividerColor,
-            ),
-          ),
+          child: Center(child: Container(width: 1, color: dividerColor)),
         ),
       ),
     );
@@ -688,10 +712,7 @@ class _PaneResizeHandle extends StatelessWidget {
 }
 
 class _LeftZoneToggleTab extends StatelessWidget {
-  const _LeftZoneToggleTab({
-    required this.expanded,
-    required this.onPressed,
-  });
+  const _LeftZoneToggleTab({required this.expanded, required this.onPressed});
 
   final bool expanded;
   final VoidCallback onPressed;

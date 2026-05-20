@@ -1,7 +1,4 @@
-enum NotebookKind {
-  notebook,
-  board,
-}
+enum NotebookKind { notebook, board }
 
 extension NotebookKindValue on NotebookKind {
   int get indexValue => index;

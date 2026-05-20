@@ -296,59 +296,59 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                     }
                   : null,
               child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Stack(
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 120),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 4,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Stack(
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        constraints: BoxConstraints(
+                          maxWidth: widget.block.width,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.paper.withValues(
+                            alpha: isActive ? 0.85 : 0.0,
                           ),
-                          constraints: BoxConstraints(
-                            maxWidth: widget.block.width,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.paper.withValues(
-                              alpha: isActive ? 0.85 : 0.0,
-                            ),
-                            borderRadius: BorderRadius.zero,
-                            border: Border.all(
-                              color: isActive
-                                  ? AppColors.inkBlack
-                                  : Colors.transparent,
-                              width: 1.2,
-                            ),
-                          ),
-                          child: quill.QuillEditor(
-                            controller: _quillController,
-                            focusNode: _focusNode,
-                            scrollController: _scrollController,
-                            config: quill.QuillEditorConfig(
-                              scrollable: false,
-                              padding: EdgeInsets.zero,
-                              autoFocus: false,
-                              expands: false,
-                              // ignore: experimental_member_use
-                              onKeyPressed: (event, node) =>
-                                  _handleKeyPressed(event),
-                            ),
+                          borderRadius: BorderRadius.zero,
+                          border: Border.all(
+                            color: isActive
+                                ? AppColors.inkBlack
+                                : Colors.transparent,
+                            width: 1.2,
                           ),
                         ),
-                      ],
-                    ),
-                    if (isActive && canTransform)
-                      SizedBox(
-                        width: _handleLineLength + _handleDotDiameter,
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: _dragHandle(controller),
+                        child: quill.QuillEditor(
+                          controller: _quillController,
+                          focusNode: _focusNode,
+                          scrollController: _scrollController,
+                          config: quill.QuillEditorConfig(
+                            scrollable: false,
+                            padding: EdgeInsets.zero,
+                            autoFocus: false,
+                            expands: false,
+                            // ignore: experimental_member_use
+                            onKeyPressed: (event, node) =>
+                                _handleKeyPressed(event),
+                          ),
                         ),
                       ),
-                  ],
-                ),
+                    ],
+                  ),
+                  if (isActive && canTransform)
+                    SizedBox(
+                      width: _handleLineLength + _handleDotDiameter,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: _dragHandle(controller),
+                      ),
+                    ),
+                ],
+              ),
             );
           },
         ),
@@ -534,7 +534,9 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         if (decoded is List) {
           return quill.Document.fromJson(decoded);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('_TextBlockWidget: failed to decode Quill delta: $e');
+      }
     }
     final delta = quill_delta.Delta();
     if (block.text.isNotEmpty) {
@@ -631,10 +633,13 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
       widget.block.height * cropTop,
     );
 
+    final double extraHitArea = isSelected ? 32.0 : 0.0;
+
     return Positioned(
-      left: displayPosition.dx - widget.worldOrigin.dx,
-      top: displayPosition.dy - widget.worldOrigin.dy,
+      left: displayPosition.dx - widget.worldOrigin.dx - extraHitArea,
+      top: displayPosition.dy - widget.worldOrigin.dy - extraHitArea,
       child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
         onTap: () {
           if (controller.currentPageIndex != widget.pageIndex) {
             controller.setCurrentPage(widget.pageIndex);
@@ -688,38 +693,42 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                 _startPosition = null;
               }
             : null,
-        child: ResizableFrame(
-          isSelected: isSelected && canTransform,
-          onResizeStart: _startResize,
-          onResizeUpdate: (direction, delta) =>
-              _updateResize(direction, delta, controller),
-          onResizeEnd: (_) => _endResize(controller),
-          child: Container(
-            width: visibleWidth,
-            height: visibleHeight,
-            decoration: BoxDecoration(
-              color: AppColors.toolbar,
-              borderRadius: BorderRadius.zero,
-              border: Border.all(
-                color: isSelected ? AppColors.inkBlack : AppColors.divider,
-              ),
-            ),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: _imageChild(
-                    cropLeft: cropLeft,
-                    cropTop: cropTop,
-                    cropRight: cropRight,
-                    cropBottom: cropBottom,
-                    fullWidth: widget.block.width,
-                    fullHeight: widget.block.height,
-                    visibleWidth: visibleWidth,
-                    visibleHeight: visibleHeight,
-                    anchor: _anchorForDirection(_activeResizeDirection),
-                  ),
+        child: Container(
+          padding: EdgeInsets.all(extraHitArea),
+          color: isSelected ? Colors.transparent : null,
+          child: ResizableFrame(
+            isSelected: isSelected && canTransform,
+            onResizeStart: _startResize,
+            onResizeUpdate: (direction, delta) =>
+                _updateResize(direction, delta, controller),
+            onResizeEnd: (_) => _endResize(controller),
+            child: Container(
+              width: visibleWidth,
+              height: visibleHeight,
+              decoration: BoxDecoration(
+                color: AppColors.toolbar,
+                borderRadius: BorderRadius.zero,
+                border: Border.all(
+                  color: isSelected ? AppColors.inkBlack : AppColors.divider,
                 ),
-              ],
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: _imageChild(
+                      cropLeft: cropLeft,
+                      cropTop: cropTop,
+                      cropRight: cropRight,
+                      cropBottom: cropBottom,
+                      fullWidth: widget.block.width,
+                      fullHeight: widget.block.height,
+                      visibleWidth: visibleWidth,
+                      visibleHeight: visibleHeight,
+                      anchor: _anchorForDirection(_activeResizeDirection),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -788,7 +797,10 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     if (path.isEmpty || path == _loadedImageSizePath) {
       if (path.isEmpty && widget.block.bytes != null) {
         if (!mounted) return;
-        context.read<EditorController>().restoreImageCache(widget.pageIndex, widget.block.id);
+        context.read<EditorController>().restoreImageCache(
+          widget.pageIndex,
+          widget.block.id,
+        );
       }
       return;
     }
@@ -796,7 +808,10 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     if (!file.existsSync()) {
       if (widget.block.bytes != null) {
         if (!mounted) return;
-        context.read<EditorController>().restoreImageCache(widget.pageIndex, widget.block.id);
+        context.read<EditorController>().restoreImageCache(
+          widget.pageIndex,
+          widget.block.id,
+        );
       }
       return;
     }
@@ -818,7 +833,9 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
         _loadedImageSize = size;
       });
       _normalizeBlockToImageBounds();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('_ImageBlockWidget: failed to load image bounds: $e');
+    }
   }
 
   void _normalizeBlockToImageBounds() {

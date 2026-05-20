@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_metrics.dart';
 import '../../../notebook/domain/note_page.dart';
 import '../../../notebook/domain/notebook.dart';
 import '../../../notebook/domain/notebook_kind.dart';
@@ -31,9 +32,7 @@ class LibraryItemCard extends StatelessWidget {
     return ListTile(
       selected: selected,
       dense: compact,
-      visualDensity: compact
-          ? VisualDensity.compact
-          : VisualDensity.standard,
+      visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
       minLeadingWidth: compact ? 20 : 40,
       contentPadding: EdgeInsets.symmetric(
         horizontal: compact ? 8 : 16,
@@ -43,10 +42,7 @@ class LibraryItemCard extends StatelessWidget {
         context,
       ).colorScheme.primary.withValues(alpha: 0.08),
       leading: compact
-          ? Icon(
-              isBoard ? Icons.dashboard_outlined : Icons.menu_book,
-              size: 18,
-            )
+          ? Icon(isBoard ? Icons.dashboard_outlined : Icons.menu_book, size: 18)
           : _NotebookPreview(
               item: item,
               size: previewSize,
@@ -59,27 +55,23 @@ class LibraryItemCard extends StatelessWidget {
             .copyWith(
               fontSize:
                   (Theme.of(context).textTheme.bodyLarge?.fontSize ?? 16) *
-                      textScale,
+                  textScale,
             ),
-        child: Text(
-          item.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
       subtitle: compact
           ? null
           : AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 120),
               curve: Curves.easeOutCubic,
-              style: (Theme.of(context).textTheme.bodySmall ??
-                      const TextStyle())
-                  .copyWith(
-                    fontSize:
-                        (Theme.of(context).textTheme.bodySmall?.fontSize ??
+              style:
+                  (Theme.of(context).textTheme.bodySmall ?? const TextStyle())
+                      .copyWith(
+                        fontSize:
+                            (Theme.of(context).textTheme.bodySmall?.fontSize ??
                                 12) *
                             textScale,
-                  ),
+                      ),
               child: Text(
                 isBoard ? 'Board' : '${item.pages.length} pages',
                 maxLines: 1,
@@ -125,9 +117,7 @@ class _NotebookPreview extends StatelessWidget {
               ),
               child: item.pages.isEmpty
                   ? const SizedBox.shrink()
-                  : CustomPaint(
-                      painter: _NotebookPreviewPainter(item: item),
-                    ),
+                  : CustomPaint(painter: _NotebookPreviewPainter(item: item)),
             ),
           ),
           Positioned(
@@ -144,7 +134,6 @@ class _NotebookPreview extends StatelessWidget {
 class _NotebookPreviewPainter extends CustomPainter {
   _NotebookPreviewPainter({required this.item});
 
-  static const double _a4Ratio = 297 / 210;
   static const double _pageWidth = 820.0;
   static const double _pageGap = 26.0;
 
@@ -183,7 +172,7 @@ class _NotebookPreviewPainter extends CustomPainter {
     Offset Function(Offset) map,
     double scale,
   ) {
-    final pageHeight = _pageWidth * _a4Ratio;
+    final pageHeight = _pageWidth * AppMetrics.a4HeightRatio;
     for (var i = 0; i < item.pages.length; i++) {
       final pageTop = i * (pageHeight + _pageGap);
       final pageRect = Rect.fromLTWH(0, pageTop, _pageWidth, pageHeight);
@@ -202,14 +191,7 @@ class _NotebookPreviewPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 0.6,
       );
-      _paintPage(
-        canvas,
-        size,
-        map,
-        scale,
-        item.pages[i],
-        Offset(0, pageTop),
-      );
+      _paintPage(canvas, size, map, scale, item.pages[i], Offset(0, pageTop));
     }
   }
 
@@ -286,9 +268,10 @@ class _NotebookPreviewPainter extends CustomPainter {
       return Rect.zero;
     }
     if (item.kind == NotebookKind.notebook) {
-      final pageHeight = _pageWidth * _a4Ratio;
+      final pageHeight = _pageWidth * AppMetrics.a4HeightRatio;
       final totalHeight =
-          (item.pages.length * pageHeight) + ((item.pages.length - 1) * _pageGap);
+          (item.pages.length * pageHeight) +
+          ((item.pages.length - 1) * _pageGap);
       return Rect.fromLTWH(0, 0, _pageWidth, totalHeight);
     }
 

@@ -118,9 +118,7 @@ class DeleteTextAction extends EditorAction {
   @override
   NotePage apply(NotePage page) {
     return page.copyWith(
-      textBlocks: page.textBlocks
-          .where((item) => item.id != block.id)
-          .toList(),
+      textBlocks: page.textBlocks.where((item) => item.id != block.id).toList(),
     );
   }
 

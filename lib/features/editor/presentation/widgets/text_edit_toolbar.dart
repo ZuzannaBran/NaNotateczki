@@ -73,20 +73,19 @@ class TextEditToolbar extends StatelessWidget {
                 _styleButton(
                   icon: Icons.format_bold,
                   isActive: isBold,
-                  onPressed: () =>
-                    _applyFormat(quill.Attribute.bold, isBold),
+                  onPressed: () => _applyFormat(quill.Attribute.bold, isBold),
                 ),
                 _styleButton(
                   icon: Icons.format_italic,
                   isActive: isItalic,
                   onPressed: () =>
-                    _applyFormat(quill.Attribute.italic, isItalic),
+                      _applyFormat(quill.Attribute.italic, isItalic),
                 ),
                 _styleButton(
                   icon: Icons.format_underline,
                   isActive: isUnderline,
                   onPressed: () =>
-                    _applyFormat(quill.Attribute.underline, isUnderline),
+                      _applyFormat(quill.Attribute.underline, isUnderline),
                 ),
                 const SizedBox(width: 8),
                 _fontDropdown(currentFont),
@@ -100,8 +99,9 @@ class TextEditToolbar extends StatelessWidget {
                   tooltip: 'Delete text',
                   onPressed: activeTextBlockId == null
                       ? null
-                      : () => editorController
-                          .deleteTextBlock(activeTextBlockId!),
+                      : () => editorController.deleteTextBlock(
+                          activeTextBlockId!,
+                        ),
                 ),
               ],
             ),
@@ -141,12 +141,7 @@ class TextEditToolbar extends StatelessWidget {
         _applyFormat(attribute, false);
       },
       items: _fontFamilies
-          .map(
-            (font) => DropdownMenuItem(
-              value: font,
-              child: Text(font),
-            ),
-          )
+          .map((font) => DropdownMenuItem(value: font, child: Text(font)))
           .toList(),
     );
   }
@@ -167,12 +162,7 @@ class TextEditToolbar extends StatelessWidget {
         _applyFormat(attribute, false);
       },
       items: _fontSizes
-          .map(
-            (size) => DropdownMenuItem(
-              value: size,
-              child: Text(size),
-            ),
-          )
+          .map((size) => DropdownMenuItem(value: size, child: Text(size)))
           .toList(),
     );
   }
@@ -294,8 +284,7 @@ class TextEditToolbar extends StatelessWidget {
                     color: Colors.grey,
                     min: 0,
                     max: 100,
-                    onChanged: (value) =>
-                        setState(() => shade = value / 100),
+                    onChanged: (value) => setState(() => shade = value / 100),
                   ),
                   if (recentColors.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -420,24 +409,16 @@ class TextEditToolbar extends StatelessWidget {
     controller.updateSelection(selection, quill.ChangeSource.local);
   }
 
-  quill.Attribute _resolveAttribute(
-    quill.Attribute attribute,
-    bool isActive,
-  ) {
+  quill.Attribute _resolveAttribute(quill.Attribute attribute, bool isActive) {
     if (!isActive) {
       return attribute;
     }
     return quill.Attribute.fromKeyValue(attribute.key, null) ?? attribute;
   }
 
-  void _storeLastTextStyle(
-    quill.Attribute original,
-    quill.Attribute resolved,
-  ) {
+  void _storeLastTextStyle(quill.Attribute original, quill.Attribute resolved) {
     if (original.key == quill.Attribute.font.key) {
-      editorController.setLastTextFontFamily(
-        resolved.value?.toString(),
-      );
+      editorController.setLastTextFontFamily(resolved.value?.toString());
       return;
     }
     if (original.key == quill.Attribute.size.key) {

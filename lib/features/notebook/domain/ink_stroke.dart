@@ -35,11 +35,7 @@ class InkStroke {
 }
 
 class InkPoint {
-  const InkPoint({
-    required this.dx,
-    required this.dy,
-    required this.pressure,
-  });
+  const InkPoint({required this.dx, required this.dy, required this.pressure});
 
   final double dx;
   final double dy;

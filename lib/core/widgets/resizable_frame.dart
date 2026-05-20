@@ -21,7 +21,7 @@ class ResizableFrame extends StatefulWidget {
     this.onResizeUpdate,
     this.onResizeEnd,
     this.handleSize = 8.0,
-    this.handleHitSize = 26.0,
+    this.handleHitSize = 48.0,
     super.key,
   });
 
@@ -107,41 +107,44 @@ class _ResizableFrameState extends State<ResizableFrame> {
   }) {
     return Align(
       alignment: alignment,
-      child: MouseRegion(
-        cursor: cursor,
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onPanStart: (details) {
-            _lastResizeGlobalPosition = details.globalPosition;
-            widget.onResizeStart?.call(direction);
-          },
-          onPanUpdate: (details) {
-            final previousGlobal =
-                _lastResizeGlobalPosition ?? details.globalPosition;
-            final delta =
-                _globalToFrameLocal(details.globalPosition) -
-                _globalToFrameLocal(previousGlobal);
-            _lastResizeGlobalPosition = details.globalPosition;
-            widget.onResizeUpdate?.call(direction, delta);
-          },
-          onPanEnd: (_) {
-            _lastResizeGlobalPosition = null;
-            widget.onResizeEnd?.call(direction);
-          },
-          onPanCancel: () {
-            _lastResizeGlobalPosition = null;
-            widget.onResizeEnd?.call(direction);
-          },
-          child: SizedBox(
-            width: widget.handleHitSize,
-            height: widget.handleHitSize,
-            child: Center(
-              child: Container(
-                width: widget.handleSize,
-                height: widget.handleSize,
-                decoration: BoxDecoration(
-                  color: AppColors.paper,
-                  border: Border.all(color: AppColors.inkBlack, width: 1.2),
+      child: FractionalTranslation(
+        translation: Offset(alignment.x * 0.5, alignment.y * 0.5),
+        child: MouseRegion(
+          cursor: cursor,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onPanStart: (details) {
+              _lastResizeGlobalPosition = details.globalPosition;
+              widget.onResizeStart?.call(direction);
+            },
+            onPanUpdate: (details) {
+              final previousGlobal =
+                  _lastResizeGlobalPosition ?? details.globalPosition;
+              final delta =
+                  _globalToFrameLocal(details.globalPosition) -
+                  _globalToFrameLocal(previousGlobal);
+              _lastResizeGlobalPosition = details.globalPosition;
+              widget.onResizeUpdate?.call(direction, delta);
+            },
+            onPanEnd: (_) {
+              _lastResizeGlobalPosition = null;
+              widget.onResizeEnd?.call(direction);
+            },
+            onPanCancel: () {
+              _lastResizeGlobalPosition = null;
+              widget.onResizeEnd?.call(direction);
+            },
+            child: SizedBox(
+              width: widget.handleHitSize,
+              height: widget.handleHitSize,
+              child: Center(
+                child: Container(
+                  width: widget.handleSize,
+                  height: widget.handleSize,
+                  decoration: BoxDecoration(
+                    color: AppColors.paper,
+                    border: Border.all(color: AppColors.inkBlack, width: 1.2),
+                  ),
                 ),
               ),
             ),

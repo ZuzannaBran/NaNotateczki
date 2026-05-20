@@ -4,15 +4,29 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../data/backup/local_backup_service.dart';
 import '../../../data/sync/cloud_sync_service.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
 
 class LibraryController extends ChangeNotifier {
-  LibraryController(this.repository, this.cloudSyncService);
+  LibraryController(
+    this.repository,
+    this.cloudSyncService,
+    this.backup, {
+    this.wasReset = false,
+    this.freshFile = false,
+    this.resetReason,
+  });
 
   final NotebookRepository repository;
   final CloudSyncService cloudSyncService;
+  final LocalBackupService backup;
+  final bool wasReset;
+  final bool freshFile;
+  final String? resetReason;
+  int autoRestoreCount = 0;
+  bool _bannerDismissed = false;
   bool isLoading = false;
   bool isSyncing = false;
   bool isLoadingSelectedItem = false;
@@ -28,6 +42,14 @@ class LibraryController extends ChangeNotifier {
 
   static const String _foldersFileName = 'library_folders.json';
 
+  bool get shouldShowResetBanner =>
+      (wasReset || (freshFile && autoRestoreCount > 0)) && !_bannerDismissed;
+
+  void dismissResetBanner() {
+    _bannerDismissed = true;
+    notifyListeners();
+  }
+
   Future<void> initialize() async {
     await _loadFolders();
     await loadItems();
@@ -38,6 +60,14 @@ class LibraryController extends ChangeNotifier {
     isLoading = true;
     notifyListeners();
     items = await repository.fetchNotebooks();
+
+    if (items.isEmpty && (wasReset || freshFile) && await backup.hasLatest()) {
+      autoRestoreCount = await backup.restoreFromLatest();
+      if (autoRestoreCount > 0) {
+        items = await repository.fetchNotebooks();
+      }
+    }
+
     if (items.isNotEmpty) {
       final folders = folderNames;
       if (folders.isNotEmpty) {
@@ -222,11 +252,14 @@ class LibraryController extends ChangeNotifier {
       _folders
         ..clear()
         ..addAll(
-          decoded.whereType<String>().map((item) => item.trim()).where(
-                (item) => item.isNotEmpty,
-              ),
+          decoded
+              .whereType<String>()
+              .map((item) => item.trim())
+              .where((item) => item.isNotEmpty),
         );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('LibraryController._loadFolders failed: $e');
+    }
   }
 
   Future<void> _saveFolders() async {
@@ -234,7 +267,9 @@ class LibraryController extends ChangeNotifier {
       final file = await _foldersFile();
       final payload = _folders.toList()..sort();
       await file.writeAsString(jsonEncode(payload));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('LibraryController._saveFolders failed: $e');
+    }
   }
 
   Future<File> _foldersFile() async {

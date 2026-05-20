@@ -17,10 +17,11 @@ enum DrawingTool {
 }
 
 extension DrawingToolX on DrawingTool {
-  bool get isEraser => this == DrawingTool.eraserBrush ||
-      this == DrawingTool.eraserStroke;
+  bool get isEraser =>
+      this == DrawingTool.eraserBrush || this == DrawingTool.eraserStroke;
 
-  bool get isShape => this == DrawingTool.line ||
+  bool get isShape =>
+      this == DrawingTool.line ||
       this == DrawingTool.arrow ||
       this == DrawingTool.blockArrow ||
       this == DrawingTool.rectangle ||
@@ -29,7 +30,8 @@ extension DrawingToolX on DrawingTool {
       this == DrawingTool.ellipse ||
       this == DrawingTool.circle;
 
-  bool get isInk => this == DrawingTool.pen ||
+  bool get isInk =>
+      this == DrawingTool.pen ||
       this == DrawingTool.highlighter ||
       isEraser ||
       isShape;

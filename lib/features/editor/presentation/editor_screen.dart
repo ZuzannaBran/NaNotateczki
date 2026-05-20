@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/note_page.dart';
 import '../state/editor_controller.dart';
@@ -31,7 +32,6 @@ class EditorScreen extends StatefulWidget {
 }
 
 class _EditorScreenState extends State<EditorScreen> {
-  static const double _a4HeightRatio = 297 / 210;
   static const double _pageGap = 26;
   static const double _leftMargin = 24;
   static const double _rightMargin = 56;
@@ -762,7 +762,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 constraints.maxWidth - (_leftMargin + _rightMargin),
               );
               final pageWidth = math.min(820.0, maxPageWidth);
-              final pageHeight = pageWidth * _a4HeightRatio;
+              final pageHeight = pageWidth * AppMetrics.a4HeightRatio;
               final pageWorldSize = Size(pageWidth, pageHeight);
               controller.updatePageLayout(
                 pageWidth: pageWorldSize.width,

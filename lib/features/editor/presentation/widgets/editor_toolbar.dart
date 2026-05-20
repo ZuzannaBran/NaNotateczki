@@ -63,9 +63,8 @@ class EditorToolbar extends StatelessWidget {
                     context,
                     color: controller.quickColors[i],
                     selected: controller.inkColor == controller.quickColors[i],
-                    onSelect: () => controller.setColor(
-                      controller.quickColors[i],
-                    ),
+                    onSelect: () =>
+                        controller.setColor(controller.quickColors[i]),
                     onEdit: (color) => controller.setQuickColor(i, color),
                   ),
                 SizedBox(
@@ -133,8 +132,8 @@ class EditorToolbar extends StatelessWidget {
 
   Widget _eraserSelector() {
     final activeTool = controller.tool.isEraser
-      ? controller.tool
-      : controller.lastEraserTool;
+        ? controller.tool
+        : controller.lastEraserTool;
     final isSelected = controller.tool.isEraser;
     return Padding(
       padding: const EdgeInsets.only(right: 4),

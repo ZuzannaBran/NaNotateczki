@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 import 'package:uuid/uuid.dart';
 
@@ -16,23 +16,52 @@ import '../domain/note_page.dart';
 import '../domain/text_block.dart';
 
 class NotebookRepository {
-  NotebookRepository(this.isar);
+  NotebookRepository(this.isar, {this.onChanged});
 
   final Isar isar;
+  final void Function()? onChanged;
   final Uuid _uuid = const Uuid();
 
   Future<List<Notebook>> fetchNotebooks() async {
-    final entities = await isar.notebookEntitys
-        .where()
-        .sortByUpdatedAtDesc()
-        .findAll();
-    return entities.map(_fromEntity).toList();
+    try {
+      final entities = await isar.notebookEntitys
+          .where()
+          .sortByUpdatedAtDesc()
+          .findAll();
+      return entities.map(_fromEntity).toList();
+    } catch (e, st) {
+      debugPrint('fetchNotebooks failed, falling back to defensive: $e\n$st');
+      return _fetchNotebooksDefensively();
+    }
   }
 
-  Future<Notebook> createNotebook({
-    String? title,
-    String? folder,
-  }) async {
+  Future<List<Notebook>> _fetchNotebooksDefensively() async {
+    final List<Notebook> results = <Notebook>[];
+    int skipped = 0;
+    try {
+      final ids = await isar.notebookEntitys.where().idProperty().findAll();
+      for (final id in ids) {
+        try {
+          final entity = await isar.notebookEntitys.get(id);
+          if (entity != null) {
+            results.add(_fromEntity(entity));
+          }
+        } catch (e) {
+          skipped++;
+          debugPrint('Skipped corrupt notebook id=$id: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Defensive fetch failed at idProperty stage: $e');
+    }
+    if (skipped > 0) {
+      debugPrint('Defensive fetch: skipped $skipped corrupt rows');
+    }
+    results.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return results;
+  }
+
+  Future<Notebook> createNotebook({String? title, String? folder}) async {
     final now = DateTime.now();
     final notebook = Notebook(
       uid: _uuid.v4(),
@@ -57,10 +86,7 @@ class NotebookRepository {
     return notebook;
   }
 
-  Future<Notebook> createBoard({
-    String? title,
-    String? folder,
-  }) async {
+  Future<Notebook> createBoard({String? title, String? folder}) async {
     final now = DateTime.now();
     final board = Notebook(
       uid: _uuid.v4(),
@@ -110,23 +136,38 @@ class NotebookRepository {
               final bytes = await file.readAsBytes();
               final ext = block.path.split('.').last.toLowerCase();
               String mime = 'image/jpeg';
-              if (ext == 'png') mime = 'image/png';
-              else if (ext == 'gif') mime = 'image/gif';
-              else if (ext == 'webp') mime = 'image/webp';
-              
-              migratedBlocks.add(block.copyWith(bytes: bytes, imageExt: ext, imageMime: mime));
+              if (ext == 'png') {
+                mime = 'image/png';
+              } else if (ext == 'gif') {
+                mime = 'image/gif';
+              } else if (ext == 'webp') {
+                mime = 'image/webp';
+              }
+
+              migratedBlocks.add(
+                block.copyWith(bytes: bytes, imageExt: ext, imageMime: mime),
+              );
               pageMigrated = true;
               migrated = true;
               continue;
-            } catch (_) {}
+            } catch (e) {
+              debugPrint(
+                'NotebookRepository.saveNotebook: image migration '
+                'failed for ${block.id}: $e',
+              );
+            }
           }
         }
         migratedBlocks.add(block);
       }
-      migratedPages.add(pageMigrated ? page.copyWith(imageBlocks: migratedBlocks) : page);
+      migratedPages.add(
+        pageMigrated ? page.copyWith(imageBlocks: migratedBlocks) : page,
+      );
     }
-    
-    final notebookToSave = migrated ? notebook.copyWith(pages: migratedPages) : notebook;
+
+    final notebookToSave = migrated
+        ? notebook.copyWith(pages: migratedPages)
+        : notebook;
 
     await isar.writeTxn(() async {
       final existing = await isar.notebookEntitys
@@ -136,6 +177,7 @@ class NotebookRepository {
       final entity = _toEntity(notebookToSave, existing?.id);
       await isar.notebookEntitys.put(entity);
     });
+    onChanged?.call();
   }
 
   Future<void> deleteNotebook(String uid) async {
@@ -149,6 +191,7 @@ class NotebookRepository {
       }
       await isar.notebookEntitys.delete(existing.id);
     });
+    onChanged?.call();
   }
 
   List<Map<String, dynamic>> encodeNotebooks(List<Notebook> items) {
@@ -210,8 +253,8 @@ class NotebookRepository {
       ..title = page.title
       ..isBookmarked = page.isBookmarked
       ..textBlocks = page.textBlocks.map(_textToEntity).toList()
-        ..imageBlocks = page.imageBlocks.map(_imageToEntity).toList()
-        ..inkStrokes = page.inkStrokes.map(_strokeToEntity).toList();
+      ..imageBlocks = page.imageBlocks.map(_imageToEntity).toList()
+      ..inkStrokes = page.inkStrokes.map(_strokeToEntity).toList();
   }
 
   TextBlock _textFromEntity(TextBlockEntity entity) {
@@ -283,11 +326,10 @@ class NotebookRepository {
     return InkStroke(
       id: entity.uid,
       points: entity.points
-          .map((item) => InkPoint(
-                dx: item.dx,
-                dy: item.dy,
-                pressure: item.pressure,
-              ))
+          .map(
+            (item) =>
+                InkPoint(dx: item.dx, dy: item.dy, pressure: item.pressure),
+          )
           .toList(),
       color: Color(entity.colorValue),
       width: entity.width,
@@ -302,10 +344,12 @@ class NotebookRepository {
       ..width = stroke.width
       ..toolIndex = _toolToIndex(stroke.tool)
       ..points = stroke.points
-          .map((point) => InkPointEntity()
-            ..dx = point.dx
-            ..dy = point.dy
-            ..pressure = point.pressure)
+          .map(
+            (point) => InkPointEntity()
+              ..dx = point.dx
+              ..dy = point.dy
+              ..pressure = point.pressure,
+          )
           .toList();
   }
 
@@ -325,9 +369,7 @@ class NotebookRepository {
     return Notebook(
       uid: json['uid'] as String,
       title: json['title'] as String,
-      kind: NotebookKindValue.fromIndex(
-        (json['kind'] as num?)?.toInt() ?? 0,
-      ),
+      kind: NotebookKindValue.fromIndex((json['kind'] as num?)?.toInt() ?? 0),
       folder: (json['folder'] as String?) ?? 'Inbox',
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
@@ -361,7 +403,7 @@ class NotebookRepository {
           .whereType<Map<String, dynamic>>()
           .map(_imageFromJson)
           .toList(),
-        inkStrokes: (json['inkStrokes'] as List<dynamic>? ?? <dynamic>[])
+      inkStrokes: (json['inkStrokes'] as List<dynamic>? ?? <dynamic>[])
           .whereType<Map<String, dynamic>>()
           .map(_strokeFromJson)
           .toList(),
@@ -482,33 +524,14 @@ class NotebookRepository {
   }
 
   DrawingTool _toolFromIndex(int index) {
-    if (index == 14) {
-      return DrawingTool.blockArrow;
-    }
-    if (index == 1) {
+    final values = DrawingTool.values;
+    if (index < 0 || index >= values.length) {
       return DrawingTool.pen;
     }
-    if (index >= 2) {
-      index -= 1;
-    }
-    if (index == 6) {
-      return DrawingTool.arrow;
-    }
-    if (index > 6) {
-      index -= 1;
-    }
-    return DrawingTool.values.elementAt(
-      index.clamp(0, DrawingTool.values.length - 1),
-    );
+    return values[index];
   }
 
-  int _toolToIndex(DrawingTool tool) {
-    final index = tool.index;
-    if (index >= 1) {
-      return index + 1;
-    }
-    return index;
-  }
+  int _toolToIndex(DrawingTool tool) => tool.index;
 
   Uint8List? _bytesFromEntity(List<int>? bytes) {
     if (bytes == null || bytes.isEmpty) {

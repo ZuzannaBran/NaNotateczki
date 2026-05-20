@@ -879,7 +879,9 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       setState(() {
         _currentPoints
           ..clear()
-          ..addAll(_buildShapePoints(controller.tool, _shapeStart!, _shapeStart!));
+          ..addAll(
+            _buildShapePoints(controller.tool, _shapeStart!, _shapeStart!),
+          );
       });
       return;
     }
@@ -976,7 +978,11 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       setState(() {
         if (_currentPoints.length == 5) {
           final fixed = _rectFixedCorner ?? _currentPoints.first.toOffset();
-          final points = _buildRectanglePoints(fixed, docOffset, event.pressure);
+          final points = _buildRectanglePoints(
+            fixed,
+            docOffset,
+            event.pressure,
+          );
           _currentPoints
             ..clear()
             ..addAll(points);
@@ -1158,7 +1164,10 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
 
   void _eraseAt(Offset localOffset, int pageIndex) {
     final page = widget.pages[pageIndex];
-    final radius = max(8.0, context.read<EditorController>().inkStrokeWidth * 3.0);
+    final radius = max(
+      8.0,
+      context.read<EditorController>().inkStrokeWidth * 3.0,
+    );
     for (final stroke in page.inkStrokes) {
       if (_eraseStrokeIds.contains(stroke.id)) {
         continue;
@@ -1204,11 +1213,13 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   List<InkPoint> _toPageLocalPoints(List<InkPoint> points, int pageIndex) {
     final origin = _pageOrigin(pageIndex) - widget.worldOrigin;
     return points
-        .map((point) => InkPoint(
-              dx: point.dx - origin.dx,
-              dy: point.dy - origin.dy,
-              pressure: point.pressure,
-            ))
+        .map(
+          (point) => InkPoint(
+            dx: point.dx - origin.dx,
+            dy: point.dy - origin.dy,
+            pressure: point.pressure,
+          ),
+        )
         .toList();
   }
 

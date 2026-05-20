@@ -19,15 +19,6 @@ class NotebookScreen extends StatelessWidget {
       );
     }
 
-    return const _PagesView();
-  }
-}
-
-class _PagesView extends StatelessWidget {
-  const _PagesView();
-
-  @override
-  Widget build(BuildContext context) {
     return const EditorScreen();
   }
 }
