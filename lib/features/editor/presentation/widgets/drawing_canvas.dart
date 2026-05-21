@@ -309,12 +309,26 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       );
     }
     if (widget.pageIndex != null) {
-      controller.addInkStrokeOnPage(
-        pageIndex,
-        List<InkPoint>.from(_currentPoints),
-      );
+      if (controller.tool == DrawingTool.lasso) {
+        controller.selectWithLasso(
+          _currentPoints.map((p) => p.toOffset()).toList(),
+          pageIndex,
+        );
+      } else {
+        controller.addInkStrokeOnPage(
+          pageIndex,
+          List<InkPoint>.from(_currentPoints),
+        );
+      }
     } else {
-      controller.addInkStroke(List<InkPoint>.from(_currentPoints));
+      if (controller.tool == DrawingTool.lasso) {
+        controller.selectWithLasso(
+          _currentPoints.map((p) => p.toOffset()).toList(),
+          pageIndex,
+        );
+      } else {
+        controller.addInkStroke(List<InkPoint>.from(_currentPoints));
+      }
     }
     _resetCurrent();
   }
@@ -1692,6 +1706,9 @@ class _InkPainter extends CustomPainter {
   }
 
   Color _toolColor(Color base, DrawingTool tool) {
+    if (tool == DrawingTool.lasso) {
+      return const Color(0x882196F3); // Semi-transparent blue for lasso
+    }
     if (tool == DrawingTool.highlighter) {
       return base.withValues(alpha: 0.5);
     }
@@ -1843,6 +1860,9 @@ class _DocumentInkPainter extends CustomPainter {
   }
 
   Color _toolColor(Color base, DrawingTool tool) {
+    if (tool == DrawingTool.lasso) {
+      return const Color(0x882196F3); // Semi-transparent blue for lasso
+    }
     if (tool == DrawingTool.highlighter) {
       return base.withValues(alpha: 0.5);
     }

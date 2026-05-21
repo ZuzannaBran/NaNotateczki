@@ -16,7 +16,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../editor/presentation/widgets/drawing_canvas.dart';
 import '../../editor/presentation/widgets/editor_toolbar.dart';
-import '../../editor/presentation/widgets/insert_toolbar.dart';
 import '../../editor/presentation/widgets/page_overlay.dart';
 import '../../editor/presentation/widgets/text_edit_toolbar.dart';
 import '../../editor/state/editor_controller.dart';
@@ -33,7 +32,6 @@ class _BoardScreenState extends State<BoardScreen> {
   static const double _trackpadPanSensitivity = 0.6;
   static const double _scrollPanSensitivity = 0.38;
 
-  bool _isInsertToolbarVisible = false;
   Offset _insertPosition = const Offset(120, 120);
   final GlobalKey _boardKey = GlobalKey();
   bool _isViewportNavigating = false;
@@ -92,7 +90,7 @@ class _BoardScreenState extends State<BoardScreen> {
       return;
     }
     if (_activePointers.length < 2) {
-      _stopViewportNavigation();
+      _stopViewportNavigation(controller);
       return;
     }
     final pointers = _activePointers.values.take(2).toList(growable: false);
@@ -104,6 +102,15 @@ class _BoardScreenState extends State<BoardScreen> {
     _touchLastFocal = focal;
     _touchLastDistance = math.max(0.001, distance);
 
+    if (controller.isPinchToScaleImageActive) {
+      final safeScale = controller.viewScale <= 0 ? 1.0 : controller.viewScale;
+      controller.updatePinchToScaleActiveImage(
+        scaleDelta,
+        panDelta * _touchPanSensitivity / safeScale,
+      );
+      return;
+    }
+
     if ((scaleDelta - 1.0).abs() > 0.0001) {
       controller.zoomBy(scaleDelta, focalPoint: focal);
     }
@@ -112,7 +119,7 @@ class _BoardScreenState extends State<BoardScreen> {
     }
   }
 
-  void _onPointerUpOrCancel(PointerEvent event) {
+  void _onPointerUpOrCancel(PointerEvent event, EditorController controller) {
     final removed = _activePointers.remove(event.pointer) != null;
     if (!removed) {
       return;
@@ -124,7 +131,7 @@ class _BoardScreenState extends State<BoardScreen> {
       return;
     }
     if (_isViewportNavigating && !_panZoomSessionActive) {
-      _stopViewportNavigation();
+      _stopViewportNavigation(controller);
       return;
     }
     if (mounted) {
@@ -137,6 +144,7 @@ class _BoardScreenState extends State<BoardScreen> {
     if (pointers.length < 2) {
       return;
     }
+    controller.startPinchToScaleActiveImage();
     _touchLastFocal = _midpoint(pointers[0], pointers[1]);
     _touchLastDistance = math.max(
       0.001,
@@ -153,6 +161,7 @@ class _BoardScreenState extends State<BoardScreen> {
     PointerPanZoomStartEvent event,
     EditorController controller,
   ) {
+    controller.startPinchToScaleActiveImage();
     _panZoomSessionActive = true;
     _panZoomLastPan = Offset.zero;
     _panZoomLastScale = 1.0;
@@ -190,6 +199,15 @@ class _BoardScreenState extends State<BoardScreen> {
     _panZoomLastScale = event.scale;
     _panZoomLastLocalPosition = event.localPosition;
 
+    if (controller.isPinchToScaleImageActive) {
+      final safeScale = controller.viewScale <= 0 ? 1.0 : controller.viewScale;
+      controller.updatePinchToScaleActiveImage(
+        scaleDelta,
+        panDelta * _trackpadPanSensitivity / safeScale,
+      );
+      return;
+    }
+
     if ((scaleDelta - 1.0).abs() > 0.0001) {
       controller.zoomBy(scaleDelta, focalPoint: event.localPosition);
     }
@@ -198,15 +216,19 @@ class _BoardScreenState extends State<BoardScreen> {
     }
   }
 
-  void _onPointerPanZoomEnd(PointerPanZoomEndEvent event) {
+  void _onPointerPanZoomEnd(
+    PointerPanZoomEndEvent event,
+    EditorController controller,
+  ) {
     _panZoomSessionActive = false;
+    controller.endPinchToScaleActiveImage();
     if (_activePointers.length >= 2) {
       if (mounted) {
         setState(() {});
       }
       return;
     }
-    _stopViewportNavigation();
+    _stopViewportNavigation(controller);
   }
 
   void _onPointerSignal(PointerSignalEvent event, EditorController controller) {
@@ -244,7 +266,8 @@ class _BoardScreenState extends State<BoardScreen> {
     controller.setViewTransform(scale: targetScale, pan: targetPan);
   }
 
-  void _stopViewportNavigation() {
+  void _stopViewportNavigation(EditorController controller) {
+    controller.endPinchToScaleActiveImage();
     if (!_isViewportNavigating) {
       return;
     }
@@ -382,24 +405,13 @@ class _BoardScreenState extends State<BoardScreen> {
       children: [
         EditorToolbar(
           controller: controller,
-          isInsertOpen: _isInsertToolbarVisible,
-          onInsertPressed: () {
-            setState(() {
-              _isInsertToolbarVisible = !_isInsertToolbarVisible;
-            });
-          },
+          onInsertPressed: () => _handleInsertFile(controller),
         ),
         if (controller.activeTextController != null)
           TextEditToolbar(
             controller: controller.activeTextController!,
             editorController: controller,
             activeTextBlockId: controller.activeTextBlockId,
-          ),
-        if (_isInsertToolbarVisible)
-          InsertToolbar(
-            onPickFile: () => _handleInsertFile(controller),
-            onPaste: () => _handlePaste(controller),
-            onClose: () => setState(() => _isInsertToolbarVisible = false),
           ),
         Expanded(
           child: Container(
@@ -455,13 +467,16 @@ class _BoardScreenState extends State<BoardScreen> {
                     behavior: HitTestBehavior.translucent,
                     onPointerDown: (event) => _onPointerDown(event, controller),
                     onPointerMove: (event) => _onPointerMove(event, controller),
-                    onPointerUp: (event) => _onPointerUpOrCancel(event),
-                    onPointerCancel: (event) => _onPointerUpOrCancel(event),
+                    onPointerUp: (event) =>
+                        _onPointerUpOrCancel(event, controller),
+                    onPointerCancel: (event) =>
+                        _onPointerUpOrCancel(event, controller),
                     onPointerPanZoomStart: (event) =>
                         _onPointerPanZoomStart(event, controller),
                     onPointerPanZoomUpdate: (event) =>
                         _onPointerPanZoomUpdate(event, controller),
-                    onPointerPanZoomEnd: _onPointerPanZoomEnd,
+                    onPointerPanZoomEnd: (event) =>
+                        _onPointerPanZoomEnd(event, controller),
                     onPointerSignal: (event) =>
                         _onPointerSignal(event, controller),
                     child: GestureDetector(

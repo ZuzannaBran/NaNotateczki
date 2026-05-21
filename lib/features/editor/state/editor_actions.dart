@@ -259,6 +259,134 @@ class DeleteImageAction extends EditorAction {
   }
 }
 
+class MoveSelectionAction extends EditorAction {
+  MoveSelectionAction({
+    required this.strokeIds,
+    required this.textBlockIds,
+    required this.imageBlockIds,
+    required this.delta,
+  });
+
+  final List<String> strokeIds;
+  final List<String> textBlockIds;
+  final List<String> imageBlockIds;
+  final OffsetPosition delta;
+
+  @override
+  NotePage apply(NotePage page) => _applyDelta(page, delta.toOffset());
+
+  @override
+  NotePage revert(NotePage page) => _applyDelta(page, -delta.toOffset());
+
+  NotePage _applyDelta(NotePage page, Offset d) {
+    return page.copyWith(
+      inkStrokes: page.inkStrokes
+          .map((s) => strokeIds.contains(s.id) ? _moveStroke(s, d) : s)
+          .toList(),
+      textBlocks: page.textBlocks
+          .map(
+            (t) => textBlockIds.contains(t.id)
+                ? t.copyWith(position: t.position + d)
+                : t,
+          )
+          .toList(),
+      imageBlocks: page.imageBlocks
+          .map(
+            (i) => imageBlockIds.contains(i.id)
+                ? i.copyWith(position: i.position + d)
+                : i,
+          )
+          .toList(),
+    );
+  }
+
+  InkStroke _moveStroke(InkStroke stroke, Offset d) {
+    return stroke.copyWith(
+      points: stroke.points
+          .map(
+            (p) => InkPoint(
+              dx: p.dx + d.dx,
+              dy: p.dy + d.dy,
+              pressure: p.pressure,
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class DeleteSelectionAction extends EditorAction {
+  DeleteSelectionAction({
+    required this.deletedStrokes,
+    required this.deletedTextBlocks,
+    required this.deletedImageBlocks,
+  });
+
+  final List<InkStroke> deletedStrokes;
+  final List<TextBlock> deletedTextBlocks;
+  final List<ImageBlock> deletedImageBlocks;
+
+  @override
+  NotePage apply(NotePage page) {
+    return page.copyWith(
+      inkStrokes: page.inkStrokes
+          .where((s) => !deletedStrokes.any((d) => d.id == s.id))
+          .toList(),
+      textBlocks: page.textBlocks
+          .where((t) => !deletedTextBlocks.any((d) => d.id == t.id))
+          .toList(),
+      imageBlocks: page.imageBlocks
+          .where((i) => !deletedImageBlocks.any((d) => d.id == i.id))
+          .toList(),
+    );
+  }
+
+  @override
+  NotePage revert(NotePage page) {
+    return page.copyWith(
+      inkStrokes: [...page.inkStrokes, ...deletedStrokes],
+      textBlocks: [...page.textBlocks, ...deletedTextBlocks],
+      imageBlocks: [...page.imageBlocks, ...deletedImageBlocks],
+    );
+  }
+}
+
+class PasteSelectionAction extends EditorAction {
+  PasteSelectionAction({
+    required this.strokes,
+    required this.textBlocks,
+    required this.imageBlocks,
+  });
+
+  final List<InkStroke> strokes;
+  final List<TextBlock> textBlocks;
+  final List<ImageBlock> imageBlocks;
+
+  @override
+  NotePage apply(NotePage page) {
+    return page.copyWith(
+      inkStrokes: [...page.inkStrokes, ...strokes],
+      textBlocks: [...page.textBlocks, ...textBlocks],
+      imageBlocks: [...page.imageBlocks, ...imageBlocks],
+    );
+  }
+
+  @override
+  NotePage revert(NotePage page) {
+    return page.copyWith(
+      inkStrokes: page.inkStrokes
+          .where((s) => !strokes.any((d) => d.id == s.id))
+          .toList(),
+      textBlocks: page.textBlocks
+          .where((t) => !textBlocks.any((d) => d.id == t.id))
+          .toList(),
+      imageBlocks: page.imageBlocks
+          .where((i) => !imageBlocks.any((d) => d.id == i.id))
+          .toList(),
+    );
+  }
+}
+
 class OffsetPosition {
   const OffsetPosition(this.dx, this.dy);
 

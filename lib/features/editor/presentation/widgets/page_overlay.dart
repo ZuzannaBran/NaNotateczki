@@ -60,9 +60,11 @@ class PageOverlay extends StatelessWidget {
                     return;
                   }
                   if (controller.activeTextBlockId != null ||
-                      controller.activeImageBlockId != null) {
+                      controller.activeImageBlockId != null ||
+                      controller.lassoSelection != null) {
                     controller.clearActiveTextBlock();
                     controller.clearActiveImageBlock();
+                    controller.clearLassoSelection();
                     return;
                   }
                   if (tool == DrawingTool.text || tool == DrawingTool.image) {
@@ -97,6 +99,14 @@ class PageOverlay extends StatelessWidget {
                 worldOrigin: worldOrigin,
                 interactionEnabled: interactionEnabled,
               ),
+          if (renderActive &&
+              controller.lassoSelection?.pageIndex == effectivePageIndex)
+            _LassoSelectionWidget(
+              selection: controller.lassoSelection!,
+              pageIndex: effectivePageIndex,
+              worldOrigin: worldOrigin,
+              interactionEnabled: interactionEnabled,
+            ),
         ],
       ),
     );
@@ -1271,6 +1281,145 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
         ).showSnackBar(SnackBar(content: Text(message)));
       }
     }
+  }
+}
+
+class _LassoSelectionWidget extends StatefulWidget {
+  const _LassoSelectionWidget({
+    required this.selection,
+    required this.pageIndex,
+    required this.worldOrigin,
+    required this.interactionEnabled,
+  });
+
+  final LassoSelection selection;
+  final int pageIndex;
+  final Offset worldOrigin;
+  final bool interactionEnabled;
+
+  @override
+  State<_LassoSelectionWidget> createState() => _LassoSelectionWidgetState();
+}
+
+class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
+  Offset? _dragStartPos;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<EditorController>();
+    final rect = widget.selection.bounds.shift(widget.selection.delta);
+
+    return Positioned(
+      left: rect.left + widget.worldOrigin.dx,
+      top: rect.top + widget.worldOrigin.dy,
+      width: rect.width,
+      height: rect.height,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onPanStart: widget.interactionEnabled
+            ? (details) {
+                _dragStartPos = details.globalPosition;
+              }
+            : null,
+        onPanUpdate: widget.interactionEnabled
+            ? (details) {
+                if (_dragStartPos == null) return;
+                final start = _dragStartPos!;
+                final current = details.globalPosition;
+                final localDelta = _globalDeltaToLocalDelta(
+                  context,
+                  start: start,
+                  end: current,
+                );
+
+                _dragStartPos = current;
+                controller.updateLassoMove(widget.selection.delta + localDelta);
+              }
+            : null,
+        onPanEnd: widget.interactionEnabled
+            ? (_) {
+                _dragStartPos = null;
+                controller.commitLassoMove();
+              }
+            : null,
+        onPanCancel: widget.interactionEnabled
+            ? () {
+                _dragStartPos = null;
+                controller.commitLassoMove();
+              }
+            : null,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.blue,
+                  width: 1.5,
+                  style: BorderStyle.solid,
+                ),
+                color: const Color(0x112196F3),
+              ),
+            ),
+            if (widget.interactionEnabled)
+              Positioned(
+                top: -20,
+                right: -20,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Material(
+                      type: MaterialType.circle,
+                      color: AppColors.paper,
+                      elevation: 2,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () async {
+                          final message = await controller
+                              .copyActiveElementToClipboard();
+                          if (!context.mounted) return;
+                          if (message != null) {
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(SnackBar(content: Text(message)));
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Copied selection')),
+                            );
+                            controller.clearLassoSelection();
+                          }
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Icon(Icons.copy, size: 18, color: Colors.blue),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Material(
+                      type: MaterialType.circle,
+                      color: AppColors.paper,
+                      elevation: 2,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: controller.deleteLassoSelection,
+                        child: const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'entities/notebook_entity.dart';
 
-const int kManualSchemaRevision = 2;
+const int kManualSchemaRevision = 3;
 
 class IsarOpenResult {
   IsarOpenResult({

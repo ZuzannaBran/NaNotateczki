@@ -21,7 +21,7 @@ class ResizableFrame extends StatefulWidget {
     this.onResizeUpdate,
     this.onResizeEnd,
     this.handleSize = 8.0,
-    this.handleHitSize = 48.0,
+    this.handleHitSize = 112.0,
     super.key,
   });
 
@@ -39,6 +39,7 @@ class ResizableFrame extends StatefulWidget {
 
 class _ResizableFrameState extends State<ResizableFrame> {
   Offset? _lastResizeGlobalPosition;
+  ResizeDirection? _activeHandle;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +53,7 @@ class _ResizableFrameState extends State<ResizableFrame> {
         widget.child,
         Positioned.fill(
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
               _buildHandle(
                 alignment: Alignment.topLeft,
@@ -113,11 +115,12 @@ class _ResizableFrameState extends State<ResizableFrame> {
           cursor: cursor,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onPanStart: (details) {
+            onLongPressStart: (details) {
+              setState(() => _activeHandle = direction);
               _lastResizeGlobalPosition = details.globalPosition;
               widget.onResizeStart?.call(direction);
             },
-            onPanUpdate: (details) {
+            onLongPressMoveUpdate: (details) {
               final previousGlobal =
                   _lastResizeGlobalPosition ?? details.globalPosition;
               final delta =
@@ -126,11 +129,18 @@ class _ResizableFrameState extends State<ResizableFrame> {
               _lastResizeGlobalPosition = details.globalPosition;
               widget.onResizeUpdate?.call(direction, delta);
             },
-            onPanEnd: (_) {
+            onLongPressEnd: (_) {
+              setState(() => _activeHandle = null);
               _lastResizeGlobalPosition = null;
               widget.onResizeEnd?.call(direction);
             },
-            onPanCancel: () {
+            onLongPressUp: () {
+              setState(() => _activeHandle = null);
+              _lastResizeGlobalPosition = null;
+              widget.onResizeEnd?.call(direction);
+            },
+            onLongPressCancel: () {
+              setState(() => _activeHandle = null);
               _lastResizeGlobalPosition = null;
               widget.onResizeEnd?.call(direction);
             },
@@ -138,12 +148,17 @@ class _ResizableFrameState extends State<ResizableFrame> {
               width: widget.handleHitSize,
               height: widget.handleHitSize,
               child: Center(
-                child: Container(
-                  width: widget.handleSize,
-                  height: widget.handleSize,
-                  decoration: BoxDecoration(
-                    color: AppColors.paper,
-                    border: Border.all(color: AppColors.inkBlack, width: 1.2),
+                child: AnimatedScale(
+                  scale: _activeHandle == direction ? 1.8 : 1.0,
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOutBack,
+                  child: Container(
+                    width: widget.handleSize,
+                    height: widget.handleSize,
+                    decoration: BoxDecoration(
+                      color: AppColors.paper,
+                      border: Border.all(color: AppColors.inkBlack, width: 1.2),
+                    ),
                   ),
                 ),
               ),

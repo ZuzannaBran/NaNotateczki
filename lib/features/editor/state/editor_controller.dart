@@ -27,6 +27,38 @@ import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/text_block.dart';
 import 'editor_actions.dart';
 
+class LassoSelection {
+  LassoSelection({
+    required this.pageIndex,
+    required this.bounds,
+    required this.strokeIds,
+    required this.textBlockIds,
+    required this.imageBlockIds,
+    this.delta = Offset.zero,
+  });
+
+  final int pageIndex;
+  final Rect bounds;
+  final List<String> strokeIds;
+  final List<String> textBlockIds;
+  final List<String> imageBlockIds;
+  final Offset delta;
+
+  LassoSelection copyWith({Offset? delta, Rect? bounds}) {
+    return LassoSelection(
+      pageIndex: pageIndex,
+      bounds: bounds ?? this.bounds,
+      strokeIds: strokeIds,
+      textBlockIds: textBlockIds,
+      imageBlockIds: imageBlockIds,
+      delta: delta ?? this.delta,
+    );
+  }
+
+  bool get isEmpty =>
+      strokeIds.isEmpty && textBlockIds.isEmpty && imageBlockIds.isEmpty;
+}
+
 class EditorController extends ChangeNotifier {
   static const double minViewScale = 0.35;
   static const double maxViewScale = 4.0;
@@ -67,6 +99,7 @@ class EditorController extends ChangeNotifier {
   String? activeTextBlockId;
   quill.QuillController? activeTextController;
   String? activeImageBlockId;
+  LassoSelection? lassoSelection;
   _ElementClipboardItem? _elementClipboard;
   bool _suppressBackgroundTap = false;
   double viewScale = 1.0;
@@ -350,6 +383,7 @@ class EditorController extends ChangeNotifier {
     if (tool != DrawingTool.text) {
       clearActiveTextBlock();
     }
+    lassoSelection = null;
     notifyListeners();
   }
 
@@ -375,9 +409,205 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void clearLassoSelection() {
+    if (lassoSelection != null) {
+      lassoSelection = null;
+      notifyListeners();
+    }
+  }
+
+  void selectWithLasso(List<Offset> points, int pageIndex) {
+    if (points.length < 3) {
+      clearLassoSelection();
+      return;
+    }
+
+    final page = pages[pageIndex];
+    final selectedStrokes = <String>[];
+    final selectedTextBlocks = <String>[];
+    final selectedImages = <String>[];
+
+    bool isInside(Offset point) {
+      var inside = false;
+      for (var i = 0, j = points.length - 1; i < points.length; j = i++) {
+        final xi = points[i].dx, yi = points[i].dy;
+        final xj = points[j].dx, yj = points[j].dy;
+        final intersect =
+            ((yi > point.dy) != (yj > point.dy)) &&
+            (point.dx < (xj - xi) * (point.dy - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    for (final s in page.inkStrokes) {
+      if (s.points.any((p) => isInside(Offset(p.dx, p.dy)))) {
+        selectedStrokes.add(s.id);
+      }
+    }
+
+    for (final t in page.textBlocks) {
+      final center = Offset(t.position.dx + t.width / 2, t.position.dy + 20);
+      if (isInside(center)) selectedTextBlocks.add(t.id);
+    }
+
+    for (final i in page.imageBlocks) {
+      final center = Offset(
+        i.position.dx + i.width / 2,
+        i.position.dy + i.height / 2,
+      );
+      if (isInside(center)) selectedImages.add(i.id);
+    }
+
+    if (selectedStrokes.isEmpty &&
+        selectedTextBlocks.isEmpty &&
+        selectedImages.isEmpty) {
+      clearLassoSelection();
+      return;
+    }
+
+    double minX = double.infinity, minY = double.infinity;
+    double maxX = double.negativeInfinity, maxY = double.negativeInfinity;
+    for (final p in points) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+
+    lassoSelection = LassoSelection(
+      pageIndex: pageIndex,
+      bounds: Rect.fromLTRB(minX, minY, maxX, maxY),
+      strokeIds: selectedStrokes,
+      textBlockIds: selectedTextBlocks,
+      imageBlockIds: selectedImages,
+    );
+
+    activeTextBlockId = null;
+    activeImageBlockId = null;
+    notifyListeners();
+  }
+
+  void updateLassoMove(Offset delta) {
+    if (lassoSelection == null) return;
+    lassoSelection = lassoSelection!.copyWith(delta: delta);
+    notifyListeners();
+  }
+
+  void commitLassoMove() {
+    final sel = lassoSelection;
+    if (sel == null || sel.delta == Offset.zero) return;
+
+    final action = MoveSelectionAction(
+      strokeIds: sel.strokeIds,
+      textBlockIds: sel.textBlockIds,
+      imageBlockIds: sel.imageBlockIds,
+      delta: OffsetPosition.fromOffset(sel.delta),
+    );
+
+    _applyAction(action);
+
+    lassoSelection = sel.copyWith(
+      bounds: sel.bounds.shift(sel.delta),
+      delta: Offset.zero,
+    );
+    notifyListeners();
+    _save();
+  }
+
+  void deleteLassoSelection() {
+    final sel = lassoSelection;
+    if (sel == null) return;
+
+    final page = pages[sel.pageIndex];
+    final strokes = page.inkStrokes
+        .where((s) => sel.strokeIds.contains(s.id))
+        .toList();
+    final texts = page.textBlocks
+        .where((t) => sel.textBlockIds.contains(t.id))
+        .toList();
+    final images = page.imageBlocks
+        .where((i) => sel.imageBlockIds.contains(i.id))
+        .toList();
+
+    if (strokes.isEmpty && texts.isEmpty && images.isEmpty) return;
+
+    final action = DeleteSelectionAction(
+      deletedStrokes: strokes,
+      deletedTextBlocks: texts,
+      deletedImageBlocks: images,
+    );
+    _applyAction(action);
+    clearLassoSelection();
+    _save();
+  }
+
   void clearActiveImageBlock() {
     activeImageBlockId = null;
     notifyListeners();
+  }
+
+  ImageBlock? _activeImageGestureBefore;
+
+  bool get isPinchToScaleImageActive => _activeImageGestureBefore != null;
+
+  void startPinchToScaleActiveImage() {
+    final activeId = activeImageBlockId;
+    if (activeId != null) {
+      _activeImageGestureBefore = findImageBlockById(activeId);
+    } else {
+      _activeImageGestureBefore = null;
+    }
+  }
+
+  void updatePinchToScaleActiveImage(double scaleDelta, Offset panDeltaWorld) {
+    if (_activeImageGestureBefore == null) return;
+    final activeId = activeImageBlockId;
+    if (activeId == null) return;
+
+    final currentBlock = findImageBlockById(activeId);
+    if (currentBlock == null) return;
+
+    final pageIndex = _pageIndexContainingImageBlock(activeId);
+    if (pageIndex == null) return;
+
+    final newWidth = currentBlock.width * scaleDelta;
+    final newHeight = currentBlock.height * scaleDelta;
+    final center = Offset(
+      currentBlock.position.dx + currentBlock.width / 2,
+      currentBlock.position.dy + currentBlock.height / 2,
+    );
+    final newCenter = center + panDeltaWorld;
+    final newPosition = newCenter - Offset(newWidth / 2, newHeight / 2);
+
+    final updatedBlock = currentBlock.copyWith(
+      position: newPosition,
+      width: newWidth,
+      height: newHeight,
+    );
+
+    updateImageBlockOnPage(pageIndex, updatedBlock);
+  }
+
+  void endPinchToScaleActiveImage() {
+    final before = _activeImageGestureBefore;
+    _activeImageGestureBefore = null;
+
+    if (before == null) return;
+    final activeId = activeImageBlockId;
+    if (activeId == null) return;
+
+    final after = findImageBlockById(activeId);
+    if (after == null) return;
+
+    if (before.width != after.width ||
+        before.height != after.height ||
+        before.position != after.position) {
+      final pageIndex = _pageIndexContainingImageBlock(activeId);
+      if (pageIndex != null) {
+        commitImageResizeOnPage(pageIndex, before, after);
+      }
+    }
   }
 
   void markTextTap() {
@@ -821,10 +1051,83 @@ class EditorController extends ChangeNotifier {
         _activateInsertedImage(pasted.id);
         _save();
         return null;
+      case _LassoElementClipboardItem(
+          :final strokes,
+          :final textBlocks,
+          :final imageBlocks,
+          :final bounds
+        ):
+        final delta = position - bounds.topLeft;
+        final newStrokes = strokes
+            .map(
+              (s) => s.copyWith(
+                id: _uuid.v4(),
+                points: s.points
+                    .map(
+                      (p) => InkPoint(
+                        dx: p.dx + delta.dx,
+                        dy: p.dy + delta.dy,
+                        pressure: p.pressure,
+                      ),
+                    )
+                    .toList(),
+              ),
+            )
+            .toList();
+        final newTextBlocks = textBlocks
+            .map(
+              (t) => t.copyWith(id: _uuid.v4(), position: t.position + delta),
+            )
+            .toList();
+        final newImageBlocks = imageBlocks
+            .map(
+              (i) => i.copyWith(id: _uuid.v4(), position: i.position + delta),
+            )
+            .toList();
+
+        _applyAction(
+          PasteSelectionAction(
+            strokes: newStrokes,
+            textBlocks: newTextBlocks,
+            imageBlocks: newImageBlocks,
+          ),
+        );
+
+        lassoSelection = LassoSelection(
+          pageIndex: currentPageIndex,
+          bounds: bounds.shift(delta),
+          strokeIds: newStrokes.map((s) => s.id).toList(),
+          textBlockIds: newTextBlocks.map((t) => t.id).toList(),
+          imageBlockIds: newImageBlocks.map((i) => i.id).toList(),
+        );
+        _save();
+        return null;
     }
   }
 
   Future<String?> copyActiveElementToClipboard() async {
+    final sel = lassoSelection;
+    if (sel != null && !sel.isEmpty) {
+      final page = pages[sel.pageIndex];
+      final strokes = page.inkStrokes
+          .where((s) => sel.strokeIds.contains(s.id))
+          .toList();
+      final texts = page.textBlocks
+          .where((t) => sel.textBlockIds.contains(t.id))
+          .toList();
+      final images = page.imageBlocks
+          .where((i) => sel.imageBlockIds.contains(i.id))
+          .toList();
+
+      _elementClipboard = _LassoElementClipboardItem(
+        strokes: strokes,
+        textBlocks: texts,
+        imageBlocks: images,
+        bounds: sel.bounds.shift(sel.delta),
+      );
+      return null;
+    }
+
     final textId = activeTextBlockId;
     if (textId != null) {
       final block = findTextBlockById(textId);
@@ -863,6 +1166,12 @@ class EditorController extends ChangeNotifier {
   }
 
   void deleteActiveElement() {
+    final sel = lassoSelection;
+    if (sel != null && !sel.isEmpty) {
+      deleteLassoSelection();
+      return;
+    }
+
     final textId = activeTextBlockId;
     if (textId != null) {
       final pageIndex = _pageIndexContainingTextBlock(textId);
@@ -1588,4 +1897,18 @@ class _ImageElementClipboardItem extends _ElementClipboardItem {
   const _ImageElementClipboardItem(this.block);
 
   final ImageBlock block;
+}
+
+class _LassoElementClipboardItem extends _ElementClipboardItem {
+  const _LassoElementClipboardItem({
+    required this.strokes,
+    required this.textBlocks,
+    required this.imageBlocks,
+    required this.bounds,
+  });
+
+  final List<InkStroke> strokes;
+  final List<TextBlock> textBlocks;
+  final List<ImageBlock> imageBlocks;
+  final Rect bounds;
 }

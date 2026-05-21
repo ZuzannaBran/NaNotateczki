@@ -8,13 +8,11 @@ class EditorToolbar extends StatelessWidget {
   const EditorToolbar({
     required this.controller,
     required this.onInsertPressed,
-    required this.isInsertOpen,
     super.key,
   });
 
   final EditorController controller;
   final VoidCallback onInsertPressed;
-  final bool isInsertOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -47,14 +45,19 @@ class EditorToolbar extends StatelessWidget {
                   tool: DrawingTool.text,
                 ),
                 _toolButton(
+                  icon: Icons.ads_click,
+                  label: 'Lasso / Select',
+                  tool: DrawingTool.lasso,
+                ),
+                _toolButton(
                   icon: Icons.open_with,
-                  label: 'Select',
+                  label: 'Move',
                   tool: DrawingTool.edit,
                 ),
                 _actionButton(
                   icon: Icons.add,
                   label: 'Insert',
-                  isActive: isInsertOpen,
+                  isActive: false,
                   onPressed: onInsertPressed,
                 ),
                 const SizedBox(width: 12),

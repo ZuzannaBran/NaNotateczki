@@ -20,7 +20,6 @@ import '../../notebook/domain/note_page.dart';
 import '../state/editor_controller.dart';
 import 'widgets/drawing_canvas.dart';
 import 'widgets/editor_toolbar.dart';
-import 'widgets/insert_toolbar.dart';
 import 'widgets/page_overlay.dart';
 import 'widgets/text_edit_toolbar.dart';
 
@@ -61,7 +60,6 @@ class _EditorScreenState extends State<EditorScreen> {
   Offset _pagePan = Offset.zero;
   double _pageMinScale = 1.0;
   double _pageMaxScale = 1.0;
-  bool _isInsertToolbarVisible = false;
   Offset _insertPosition = const Offset(120, 120);
 
   @override
@@ -268,6 +266,16 @@ class _EditorScreenState extends State<EditorScreen> {
     _touchLastFocal = focal;
     _touchLastDistance = math.max(0.001, distance);
 
+    final controller = context.read<EditorController>();
+    if (controller.isPinchToScaleImageActive) {
+      final safeScale = _pageScale <= 0 ? 1.0 : _pageScale;
+      controller.updatePinchToScaleActiveImage(
+        scaleDelta,
+        panDelta * _touchPanSensitivity / safeScale,
+      );
+      return;
+    }
+
     _applyPageTransform(
       scaleDelta: scaleDelta,
       panDelta: panDelta * _touchPanSensitivity,
@@ -298,6 +306,7 @@ class _EditorScreenState extends State<EditorScreen> {
     if (pointers.length < 2) {
       return;
     }
+    context.read<EditorController>().startPinchToScaleActiveImage();
     _touchLastFocal = _midpoint(pointers[0], pointers[1]);
     _touchLastDistance = math.max(
       0.001,
@@ -323,6 +332,7 @@ class _EditorScreenState extends State<EditorScreen> {
     Size docWorldSize,
     Size viewportSize,
   ) {
+    context.read<EditorController>().startPinchToScaleActiveImage();
     _panZoomSessionActive = true;
     _panZoomLastPan = Offset.zero;
     _panZoomLastScale = 1.0;
@@ -365,6 +375,16 @@ class _EditorScreenState extends State<EditorScreen> {
     _panZoomLastScale = event.scale;
     _panZoomLastLocalPosition = event.localPosition;
 
+    final controller = context.read<EditorController>();
+    if (controller.isPinchToScaleImageActive) {
+      final safeScale = _pageScale <= 0 ? 1.0 : _pageScale;
+      controller.updatePinchToScaleActiveImage(
+        scaleDelta,
+        panDelta * _trackpadPanSensitivity / safeScale,
+      );
+      return;
+    }
+
     _applyPageTransform(
       scaleDelta: scaleDelta,
       panDelta: panDelta * _trackpadPanSensitivity,
@@ -376,6 +396,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   void _onPointerPanZoomEnd(PointerPanZoomEndEvent event) {
     _panZoomSessionActive = false;
+    context.read<EditorController>().endPinchToScaleActiveImage();
     if (_activePointers.length >= 2) {
       return;
     }
@@ -496,6 +517,7 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _stopViewportNavigation() {
+    context.read<EditorController>().endPinchToScaleActiveImage();
     if (!_isViewportNavigating) {
       return;
     }
@@ -735,24 +757,13 @@ class _EditorScreenState extends State<EditorScreen> {
       children: [
         EditorToolbar(
           controller: controller,
-          isInsertOpen: _isInsertToolbarVisible,
-          onInsertPressed: () {
-            setState(() {
-              _isInsertToolbarVisible = !_isInsertToolbarVisible;
-            });
-          },
+          onInsertPressed: () => _handleInsertFile(controller),
         ),
         if (controller.activeTextController != null)
           TextEditToolbar(
             controller: controller.activeTextController!,
             editorController: controller,
             activeTextBlockId: controller.activeTextBlockId,
-          ),
-        if (_isInsertToolbarVisible)
-          InsertToolbar(
-            onPickFile: () => _handleInsertFile(controller),
-            onPaste: () => _handlePaste(controller),
-            onClose: () => setState(() => _isInsertToolbarVisible = false),
           ),
         Expanded(
           child: LayoutBuilder(

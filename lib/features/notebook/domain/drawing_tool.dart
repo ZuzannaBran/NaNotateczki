@@ -14,6 +14,7 @@ enum DrawingTool {
   image,
   blockArrow,
   edit,
+  lasso,
 }
 
 extension DrawingToolX on DrawingTool {
@@ -34,5 +35,6 @@ extension DrawingToolX on DrawingTool {
       this == DrawingTool.pen ||
       this == DrawingTool.highlighter ||
       isEraser ||
-      isShape;
+      isShape ||
+      this == DrawingTool.lasso;
 }

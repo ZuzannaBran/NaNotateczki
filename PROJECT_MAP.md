@@ -82,15 +82,15 @@ Entry point.
 ### `lib/core/widgets/empty_state.dart` (30 linii)
 - 3: `class EmptyState` — wycentrowane `title + message`, max width 360.
 
-### `lib/core/widgets/resizable_frame.dart` (164 linii)
+### `lib/core/widgets/resizable_frame.dart` (179 linii)
 - 5: `enum ResizeDirection` (8 kierunków: topLeft…bottomRight).
 - 16: `class ResizableFrame extends StatefulWidget` — owija dziecko,
   pokazuje 8 uchwytów gdy `isSelected`.
-- 40: `_ResizableFrameState`.
-- 43–101: `build` — gdy nie wybrany, zwraca samo dziecko; inaczej `Stack` z 8 `_buildHandle`.
-- 103: `_buildHandle({alignment, direction, cursor})` — `MouseRegion + GestureDetector`,
-  liczy delta w lokalnej przestrzeni.
-- 157: `_globalToFrameLocal` — `RenderBox.globalToLocal`.
+- 40: `_ResizableFrameState` — z `_activeHandle` do podświetlania.
+- 45: `build` — gdy nie wybrany, zwraca samo dziecko; inaczej `Stack` z 8 `_buildHandle`.
+- 105: `_buildHandle({alignment, direction, cursor})` — `MouseRegion + GestureDetector` (onLongPress z opóźnieniem),
+  liczy delta w lokalnej przestrzeni, animuje skalę uchwytu.
+- 172: `_globalToFrameLocal` — `RenderBox.globalToLocal`.
 
 ---
 
@@ -285,7 +285,7 @@ Trójkolumnowy layout (folders | items | workspace) z resizable pane.
 ### `lib/features/notebook/presentation/notebook_screen.dart` (24 linie)
 - 8: `class NotebookScreen` — empty state albo bezpośrednio `EditorScreen()`.
 
-### `lib/features/editor/state/editor_actions.dart` (275 linii)
+### `lib/features/editor/state/editor_actions.dart` (401 linii)
 Wszystkie operacje undoowalne. Każda akcja: `apply(page)` + `revert(page)`.
 - 8: `abstract class EditorAction`.
 - 13: `class AddTextAction(block)`.
@@ -300,13 +300,17 @@ Wszystkie operacje undoowalne. Każda akcja: `apply(page)` + `revert(page)`.
   lista, żeby rollback miał wartość poprzednią.
 - 219: `class UpdateImageAction({before, after})` — pozycja/rozmiar/crop/rotation.
 - 244: `class DeleteImageAction(block)`.
-- 264: `class OffsetPosition(dx, dy)` — wartościowy odpowiednik `Offset`
+- 264: `class MoveSelectionAction` - transluje lasso.
+- 319: `class DeleteSelectionAction` - usuwa grupę z lasso.
+- 366: `class PasteSelectionAction` - duplikuje/wkleja lasso.
+- 390: `class OffsetPosition(dx, dy)` — wartościowy odpowiednik `Offset`
   (`fromOffset`, `toOffset`).
 
-### `lib/features/editor/state/editor_controller.dart` (1591 linii)
+### `lib/features/editor/state/editor_controller.dart` (1914 linii)
 Mózg edytora. **Najczęściej modyfikowany plik aplikacji.** Trzyma stan stron,
 narzędzia, kolory, undo/redo, zoom/pan, schowek elementów.
-- 30: `class EditorController extends ChangeNotifier`.
+- 30: `class LassoSelection` - trzyma metadane zaznaczenia (Ray-Casting, delty).
+- 62: `class EditorController extends ChangeNotifier`.
 - 31–32: `minViewScale=0.35`, `maxViewScale=4.0`.
 - 34: konstruktor — `pages = notebook.pages`, ładuje prefs.
 - 40–76: pola — `repository, notebook, _uuid, _imagePicker, pages,
@@ -445,7 +449,7 @@ Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`
 
 ---
 
-### `lib/features/editor/presentation/editor_screen.dart` (1680 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (1691 linii)
 Layout edytora notebooka (stronicowy). Listener gestów, transformacja zoom/pan
 strony, mini-mapa, podgląd skali, podgląd ramki strony.
 - 27: `class EditorScreen extends StatefulWidget`.
@@ -453,7 +457,7 @@ strony, mini-mapa, podgląd skali, podgląd ramki strony.
   pan/scroll, scale floors). A4 ratio czytane z `AppMetrics.a4HeightRatio`.
 - 46–65: pola stanu (ScrollController, GlobalKey canvas, `_isAutoAddingPage`,
   `_pageExtent`, `_isViewportNavigating`, gesty multi-touch, `_pageScale=1`,
-  `_pagePan`, `_pageMin/MaxScale`, `_isInsertToolbarVisible`, `_insertPosition`).
+  `_pagePan`, `_pageMin/MaxScale`).
 - 68: `initState` — `_scrollController.addListener(_handleScroll)`.
 - 74: `dispose`.
 - 80: `_handleScroll()`.
@@ -581,10 +585,7 @@ Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
 - 1286: `enum _ImageContextAction { copy }`.
 - ~1288: top-level `Offset _globalDeltaToLocalDelta(...)`.
 
-### `lib/features/editor/presentation/widgets/insert_toolbar.dart` (48 linii)
-- 5: `class InsertToolbar` — 3 akcje: `onPickFile`, `onPaste`, `onClose`.
-
-### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (484 linii)
+### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (481 linii)
 Główny pasek narzędzi nad canvasem (undo/redo, narzędzia, kolory, stroke width).
 - 7: `class EditorToolbar extends StatelessWidget`.
 - 20: `build` — undo/redo, pen/highlighter, eraser selector, shape selector,
@@ -616,29 +617,29 @@ Pasek formatowania tekstu (pokazywany gdy aktywny TextBlock).
 
 ---
 
-### `lib/features/board/presentation/board_screen.dart` (689 linii)
+### `lib/features/board/presentation/board_screen.dart` (705 linii)
 Edytor canvas (kind=board): jedna „strona" o nieograniczonych granicach,
 swobodne rozmieszczanie + zoom/pan z trackpada/touch.
 - 24: `class BoardScreen extends StatefulWidget`.
-- 31: `_BoardScreenState`.
+- 38: `_BoardScreenState`.
 - 48: `_buildBoardRect(controller, viewportSize)` — content bounds + padding.
-- 66: `_onPointerDown` / 80 Move / 115 Up/Cancel.
-- 135: `_startViewportNavigation(controller)`.
-- 152: `_onPointerPanZoomStart(event, controller)` / 171 Update / 201 End.
-- 212: `_onPointerSignal(event, controller)` — myszka kółkiem zoom.
-- 226: `_fitToContent(controller, viewportSize)` — przycisk „fit to content".
-- 247: `_stopViewportNavigation`.
-- 256: `_midpoint(a, b)` / 260 `_distanceBetween`.
-- 264: `_isNavigationPointerKind(kind)`.
-- 269: `_boardInsertPosition(controller, viewportSize)` — gdzie wstawić nowy element.
-- 320: `_handleDelete(controller)`.
-- 377: `build` — Scaffold(AppBar tytuł boarda+bookmark) + Column(EditorToolbar,
-  TextEditToolbar opcjonalnie, InsertToolbar opcjonalnie, Stack(Transform pan/zoom
+- 66: `_onPointerDown` / 80 Move / 124 Up/Cancel.
+- 142: `_startViewportNavigation(controller)`.
+- 160: `_onPointerPanZoomStart(event, controller)` / 179 Update / 221 End.
+- 236: `_onPointerSignal(event, controller)` — myszka kółkiem zoom.
+- 250: `_fitToContent(controller, viewportSize)` — przycisk „fit to content".
+- 271: `_stopViewportNavigation(controller)`.
+- 280: `_midpoint(a, b)` / 284 `_distanceBetween`.
+- 288: `_isNavigationPointerKind(kind)`.
+- 293: `_boardInsertPosition(controller, viewportSize)` — gdzie wstawić nowy element.
+- 344: `_handleDelete(controller)`.
+- 401: `build` — Scaffold(AppBar tytuł boarda+bookmark) + Column(EditorToolbar,
+  TextEditToolbar opcjonalnie, Stack(Transform pan/zoom
   z DrawingCanvas i PageOverlay, `_BoardZoomControls` pozycjonowane).
-- 608: `enum _BoardContextAction { paste }`.
-- 610: `_PasteFromClipboardIntent` / 614 Copy / 618 Cut / 622 Delete (te same
+- 632: `enum _BoardContextAction { paste }`.
+- 634: `_PasteFromClipboardIntent` / 638 Copy / 642 Cut / 646 Delete (te same
   intent klasy co w editor_screen ale lokalne).
-- 626: `class _BoardZoomControls` — przyciski +/–/fit/reset zoom.
+- 650: `class _BoardZoomControls` — przyciski +/–/fit/reset zoom.
 
 ---
 
