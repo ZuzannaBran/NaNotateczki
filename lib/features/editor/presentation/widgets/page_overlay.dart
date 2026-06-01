@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -46,9 +47,14 @@ class PageOverlay extends StatelessWidget {
     final tool = controller.tool;
     final activeTextId = controller.activeTextBlockId;
     final activeImageId = controller.activeImageBlockId;
+    final lassoSelection =
+        controller.lassoSelection?.pageIndex == effectivePageIndex
+        ? controller.lassoSelection
+        : null;
+    final hasActiveLasso = renderActive && lassoSelection != null;
 
     return IgnorePointer(
-      ignoring: tool.isInk || !interactionEnabled,
+      ignoring: (tool.isInk && !hasActiveLasso) || !interactionEnabled,
       child: Stack(
         children: [
           if (renderBackground)
@@ -89,6 +95,12 @@ class PageOverlay extends StatelessWidget {
                 pageIndex: effectivePageIndex,
                 worldOrigin: worldOrigin,
                 interactionEnabled: interactionEnabled,
+                lassoDragDelta:
+                    lassoSelection?.textBlockIds.contains(block.id) == true
+                    ? controller.lassoDragDelta
+                    : null,
+                isLassoSelected:
+                    lassoSelection?.textBlockIds.contains(block.id) == true,
               ),
           for (final block in effectivePage.imageBlocks)
             if ((block.id == activeImageId && renderActive) ||
@@ -98,14 +110,20 @@ class PageOverlay extends StatelessWidget {
                 pageIndex: effectivePageIndex,
                 worldOrigin: worldOrigin,
                 interactionEnabled: interactionEnabled,
+                lassoDragDelta:
+                    lassoSelection?.imageBlockIds.contains(block.id) == true
+                    ? controller.lassoDragDelta
+                    : null,
+                isLassoSelected:
+                    lassoSelection?.imageBlockIds.contains(block.id) == true,
               ),
-          if (renderActive &&
-              controller.lassoSelection?.pageIndex == effectivePageIndex)
+          if (renderActive && lassoSelection != null)
             _LassoSelectionWidget(
-              selection: controller.lassoSelection!,
+              selection: lassoSelection,
               pageIndex: effectivePageIndex,
               worldOrigin: worldOrigin,
               interactionEnabled: interactionEnabled,
+              dragDeltaListenable: controller.lassoDragDelta,
             ),
         ],
       ),
@@ -170,12 +188,16 @@ class _TextBlockWidget extends StatefulWidget {
     required this.pageIndex,
     required this.worldOrigin,
     required this.interactionEnabled,
+    required this.lassoDragDelta,
+    required this.isLassoSelected,
   });
 
   final TextBlock block;
   final int pageIndex;
   final Offset worldOrigin;
   final bool interactionEnabled;
+  final ValueListenable<Offset>? lassoDragDelta;
+  final bool isLassoSelected;
 
   @override
   State<_TextBlockWidget> createState() => _TextBlockWidgetState();
@@ -254,115 +276,146 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       });
     }
 
-    return Positioned(
-      left: widget.block.position.dx - widget.worldOrigin.dx,
-      top: widget.block.position.dy - widget.worldOrigin.dy,
-      child: IgnorePointer(
-        ignoring: !canTransform,
-        child: Builder(
-          builder: (context) {
-            return GestureDetector(
-              onTapDown: canTransform
-                  ? (_) {
-                      if (controller.currentPageIndex != widget.pageIndex) {
-                        controller.setCurrentPage(widget.pageIndex);
-                      }
-                      controller.markTextTap();
-                      controller.setActiveTextBlock(
-                        widget.block.id,
-                        canEdit ? _quillController : null,
-                      );
-                      if (canEdit) {
-                        _focusNode.requestFocus();
-                      }
+    final child = IgnorePointer(
+      ignoring: !canTransform,
+      child: Builder(
+        builder: (context) {
+          return GestureDetector(
+            onTapDown: canTransform
+                ? (_) {
+                    if (controller.currentPageIndex != widget.pageIndex) {
+                      controller.setCurrentPage(widget.pageIndex);
                     }
-                  : null,
-              onPanStart: canTransform
-                  ? (details) {
-                      final box = context.findRenderObject() as RenderBox?;
-                      final size = box?.size ?? Size.zero;
-                      final local = details.localPosition;
-                      _dragFromFrame = !isActive || _isOnFrame(local, size);
-                      if (!_dragFromFrame) {
-                        return;
-                      }
-                      _startMove(details.globalPosition);
+                    controller.markTextTap();
+                    controller.setActiveTextBlock(
+                      widget.block.id,
+                      canEdit ? _quillController : null,
+                    );
+                    if (canEdit) {
+                      _focusNode.requestFocus();
                     }
-                  : null,
-              onPanUpdate: canTransform
-                  ? (details) {
-                      if (!_dragFromFrame) {
-                        return;
-                      }
-                      _updateMove(details.globalPosition, controller);
+                  }
+                : null,
+            onPanStart: canTransform
+                ? (details) {
+                    final box = context.findRenderObject() as RenderBox?;
+                    final size = box?.size ?? Size.zero;
+                    final local = details.localPosition;
+                    _dragFromFrame = !isActive || _isOnFrame(local, size);
+                    if (!_dragFromFrame) {
+                      return;
                     }
-                  : null,
-              onPanEnd: canTransform
-                  ? (_) {
-                      if (!_dragFromFrame) {
-                        return;
-                      }
-                      _endMove(controller);
+                    _startMove(details.globalPosition);
+                  }
+                : null,
+            onPanUpdate: canTransform
+                ? (details) {
+                    if (!_dragFromFrame) {
+                      return;
                     }
-                  : null,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Stack(
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 120),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 4,
-                        ),
-                        constraints: BoxConstraints(
-                          maxWidth: widget.block.width,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.paper.withValues(
-                            alpha: isActive ? 0.85 : 0.0,
-                          ),
-                          borderRadius: BorderRadius.zero,
-                          border: Border.all(
-                            color: isActive
-                                ? AppColors.inkBlack
-                                : Colors.transparent,
-                            width: 1.2,
-                          ),
-                        ),
-                        child: quill.QuillEditor(
-                          controller: _quillController,
-                          focusNode: _focusNode,
-                          scrollController: _scrollController,
-                          config: quill.QuillEditorConfig(
-                            scrollable: false,
-                            padding: EdgeInsets.zero,
-                            autoFocus: false,
-                            expands: false,
-                            // ignore: experimental_member_use
-                            onKeyPressed: (event, node) =>
-                                _handleKeyPressed(event),
-                          ),
-                        ),
+                    _updateMove(details.globalPosition, controller);
+                  }
+                : null,
+            onPanEnd: canTransform
+                ? (_) {
+                    if (!_dragFromFrame) {
+                      return;
+                    }
+                    _endMove(controller);
+                  }
+                : null,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Stack(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 120),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
                       ),
-                    ],
-                  ),
-                  if (isActive && canTransform)
-                    SizedBox(
-                      width: _handleLineLength + _handleDotDiameter,
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: _dragHandle(controller),
+                      constraints: BoxConstraints(maxWidth: widget.block.width),
+                      decoration: BoxDecoration(
+                        color: AppColors.paper.withValues(
+                          alpha: isActive
+                              ? 0.85
+                              : widget.isLassoSelected
+                              ? 0.18
+                              : 0.0,
+                        ),
+                        borderRadius: BorderRadius.zero,
+                        border: Border.all(
+                          color: isActive
+                              ? AppColors.inkBlack
+                              : widget.isLassoSelected
+                              ? Colors.blue.withValues(alpha: 0.55)
+                              : Colors.transparent,
+                          width: 1.2,
+                        ),
+                        boxShadow: widget.isLassoSelected
+                            ? [
+                                BoxShadow(
+                                  color: Colors.blue.withValues(alpha: 0.18),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: quill.QuillEditor(
+                        controller: _quillController,
+                        focusNode: _focusNode,
+                        scrollController: _scrollController,
+                        config: quill.QuillEditorConfig(
+                          scrollable: false,
+                          padding: EdgeInsets.zero,
+                          autoFocus: false,
+                          expands: false,
+                          // ignore: experimental_member_use
+                          onKeyPressed: (event, node) =>
+                              _handleKeyPressed(event),
+                        ),
                       ),
                     ),
-                ],
-              ),
-            );
-          },
-        ),
+                  ],
+                ),
+                if (isActive && canTransform)
+                  SizedBox(
+                    width: _handleLineLength + _handleDotDiameter,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _dragHandle(controller),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
+    );
+
+    Widget positioned(Offset lassoDelta, Widget child) {
+      final displayPosition = widget.block.position + lassoDelta;
+      return Positioned(
+        left: displayPosition.dx - widget.worldOrigin.dx,
+        top: displayPosition.dy - widget.worldOrigin.dy,
+        child: child,
+      );
+    }
+
+    final lassoDragDelta = widget.lassoDragDelta;
+    if (lassoDragDelta == null) {
+      return positioned(Offset.zero, child);
+    }
+
+    return ValueListenableBuilder<Offset>(
+      valueListenable: lassoDragDelta,
+      child: child,
+      builder: (context, lassoDelta, child) {
+        return positioned(lassoDelta, child!);
+      },
     );
   }
 
@@ -582,12 +635,16 @@ class _ImageBlockWidget extends StatefulWidget {
     required this.pageIndex,
     required this.worldOrigin,
     required this.interactionEnabled,
+    required this.lassoDragDelta,
+    required this.isLassoSelected,
   });
 
   final ImageBlock block;
   final int pageIndex;
   final Offset worldOrigin;
   final bool interactionEnabled;
+  final ValueListenable<Offset>? lassoDragDelta;
+  final bool isLassoSelected;
 
   @override
   State<_ImageBlockWidget> createState() => _ImageBlockWidgetState();
@@ -638,111 +695,141 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     final heightFactor = (cropBottom - cropTop).clamp(0.08, 1.0);
     final visibleWidth = widget.block.width * widthFactor;
     final visibleHeight = widget.block.height * heightFactor;
-    final displayPosition = widget.block.position.translate(
-      widget.block.width * cropLeft,
-      widget.block.height * cropTop,
-    );
-
     final double extraHitArea = isSelected ? 32.0 : 0.0;
 
-    return Positioned(
-      left: displayPosition.dx - widget.worldOrigin.dx - extraHitArea,
-      top: displayPosition.dy - widget.worldOrigin.dy - extraHitArea,
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () {
-          if (controller.currentPageIndex != widget.pageIndex) {
-            controller.setCurrentPage(widget.pageIndex);
-          }
-          controller.clearActiveTextBlock();
-          controller.setActiveImageBlock(widget.block.id);
-        },
-        onSecondaryTapDown: (details) =>
-            _showImageContextMenu(context, details.globalPosition, controller),
-        onDoubleTap: () => _editOcr(context, controller),
-        onPanStart: canTransform
-            ? (details) {
-                _dragStart = details.globalPosition;
-                _startPosition = widget.block.position;
+    final child = GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () {
+        if (controller.currentPageIndex != widget.pageIndex) {
+          controller.setCurrentPage(widget.pageIndex);
+        }
+        controller.clearActiveTextBlock();
+        controller.setActiveImageBlock(widget.block.id);
+      },
+      onSecondaryTapDown: (details) =>
+          _showImageContextMenu(context, details.globalPosition, controller),
+      onDoubleTap: () => _editOcr(context, controller),
+      onPanStart: canTransform
+          ? (details) {
+              _dragStart = details.globalPosition;
+              _startPosition = widget.block.position;
+            }
+          : null,
+      onPanUpdate: canTransform
+          ? (details) {
+              if (_dragStart == null || _startPosition == null) {
+                return;
               }
-            : null,
-        onPanUpdate: canTransform
-            ? (details) {
-                if (_dragStart == null || _startPosition == null) {
-                  return;
-                }
-                final delta = _globalDeltaToLocalDelta(
-                  context,
-                  start: _dragStart!,
-                  end: details.globalPosition,
-                );
-                controller.updateImageBlockPositionOnPage(
+              final delta = _globalDeltaToLocalDelta(
+                context,
+                start: _dragStart!,
+                end: details.globalPosition,
+              );
+              controller.updateImageBlockPositionOnPage(
+                widget.pageIndex,
+                widget.block.id,
+                _startPosition! + delta,
+              );
+            }
+          : null,
+      onPanEnd: canTransform
+          ? (_) {
+              if (_dragStart == null || _startPosition == null) {
+                return;
+              }
+              final current = controller
+                  .findImageBlockById(widget.block.id)
+                  ?.position;
+              if (current != null) {
+                controller.finalizeImageMoveOnPage(
                   widget.pageIndex,
                   widget.block.id,
-                  _startPosition! + delta,
+                  _startPosition!,
+                  current,
                 );
               }
-            : null,
-        onPanEnd: canTransform
-            ? (_) {
-                if (_dragStart == null || _startPosition == null) {
-                  return;
-                }
-                final current = controller
-                    .findImageBlockById(widget.block.id)
-                    ?.position;
-                if (current != null) {
-                  controller.finalizeImageMoveOnPage(
-                    widget.pageIndex,
-                    widget.block.id,
-                    _startPosition!,
-                    current,
-                  );
-                }
-                _dragStart = null;
-                _startPosition = null;
-              }
-            : null,
-        child: Container(
-          padding: EdgeInsets.all(extraHitArea),
-          color: isSelected ? Colors.transparent : null,
-          child: ResizableFrame(
-            isSelected: isSelected && canTransform,
-            onResizeStart: _startResize,
-            onResizeUpdate: (direction, delta) =>
-                _updateResize(direction, delta, controller),
-            onResizeEnd: (_) => _endResize(controller),
-            child: Container(
-              width: visibleWidth,
-              height: visibleHeight,
-              decoration: BoxDecoration(
-                color: AppColors.toolbar,
-                borderRadius: BorderRadius.zero,
-                border: Border.all(
-                  color: isSelected ? AppColors.inkBlack : AppColors.divider,
-                ),
+              _dragStart = null;
+              _startPosition = null;
+            }
+          : null,
+      child: Container(
+        padding: EdgeInsets.all(extraHitArea),
+        color: isSelected ? Colors.transparent : null,
+        child: ResizableFrame(
+          isSelected: isSelected && canTransform,
+          onResizeStart: _startResize,
+          onResizeUpdate: (direction, delta) =>
+              _updateResize(direction, delta, controller),
+          onResizeEnd: (_) => _endResize(controller),
+          child: Container(
+            width: visibleWidth,
+            height: visibleHeight,
+            decoration: BoxDecoration(
+              color: AppColors.toolbar,
+              borderRadius: BorderRadius.zero,
+              border: Border.all(
+                color: isSelected
+                    ? AppColors.inkBlack
+                    : widget.isLassoSelected
+                    ? Colors.blue.withValues(alpha: 0.8)
+                    : AppColors.divider,
+                width: widget.isLassoSelected ? 2.0 : 1.0,
               ),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: _imageChild(
-                      cropLeft: cropLeft,
-                      cropTop: cropTop,
-                      cropRight: cropRight,
-                      cropBottom: cropBottom,
-                      fullWidth: widget.block.width,
-                      fullHeight: widget.block.height,
-                      visibleWidth: visibleWidth,
-                      visibleHeight: visibleHeight,
-                      anchor: _anchorForDirection(_activeResizeDirection),
-                    ),
+              boxShadow: widget.isLassoSelected
+                  ? [
+                      BoxShadow(
+                        color: Colors.blue.withValues(alpha: 0.22),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _imageChild(
+                    cropLeft: cropLeft,
+                    cropTop: cropTop,
+                    cropRight: cropRight,
+                    cropBottom: cropBottom,
+                    fullWidth: widget.block.width,
+                    fullHeight: widget.block.height,
+                    visibleWidth: visibleWidth,
+                    visibleHeight: visibleHeight,
+                    anchor: _anchorForDirection(_activeResizeDirection),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
       ),
+    );
+
+    Widget positioned(Offset lassoDelta, Widget child) {
+      final displayPosition = (widget.block.position + lassoDelta).translate(
+        widget.block.width * cropLeft,
+        widget.block.height * cropTop,
+      );
+      return Positioned(
+        left: displayPosition.dx - widget.worldOrigin.dx - extraHitArea,
+        top: displayPosition.dy - widget.worldOrigin.dy - extraHitArea,
+        child: child,
+      );
+    }
+
+    final lassoDragDelta = widget.lassoDragDelta;
+    if (lassoDragDelta == null) {
+      return positioned(Offset.zero, child);
+    }
+
+    return ValueListenableBuilder<Offset>(
+      valueListenable: lassoDragDelta,
+      child: child,
+      builder: (context, lassoDelta, child) {
+        return positioned(lassoDelta, child!);
+      },
     );
   }
 
@@ -1290,12 +1377,14 @@ class _LassoSelectionWidget extends StatefulWidget {
     required this.pageIndex,
     required this.worldOrigin,
     required this.interactionEnabled,
+    required this.dragDeltaListenable,
   });
 
   final LassoSelection selection;
   final int pageIndex;
   final Offset worldOrigin;
   final bool interactionEnabled;
+  final ValueListenable<Offset> dragDeltaListenable;
 
   @override
   State<_LassoSelectionWidget> createState() => _LassoSelectionWidgetState();
@@ -1306,119 +1395,123 @@ class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.watch<EditorController>();
-    final rect = widget.selection.bounds.shift(widget.selection.delta);
+    final controller = context.read<EditorController>();
 
-    return Positioned(
-      left: rect.left + widget.worldOrigin.dx,
-      top: rect.top + widget.worldOrigin.dy,
-      width: rect.width,
-      height: rect.height,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onPanStart: widget.interactionEnabled
-            ? (details) {
-                _dragStartPos = details.globalPosition;
-              }
-            : null,
-        onPanUpdate: widget.interactionEnabled
-            ? (details) {
-                if (_dragStartPos == null) return;
-                final start = _dragStartPos!;
-                final current = details.globalPosition;
-                final localDelta = _globalDeltaToLocalDelta(
-                  context,
-                  start: start,
-                  end: current,
-                );
+    final child = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: widget.interactionEnabled
+          ? (details) {
+              _dragStartPos = details.globalPosition;
+            }
+          : null,
+      onPanUpdate: widget.interactionEnabled
+          ? (details) {
+              if (_dragStartPos == null) return;
+              final start = _dragStartPos!;
+              final current = details.globalPosition;
+              final localDelta = _globalDeltaToLocalDelta(
+                context,
+                start: start,
+                end: current,
+              );
 
-                _dragStartPos = current;
-                controller.updateLassoMove(widget.selection.delta + localDelta);
-              }
-            : null,
-        onPanEnd: widget.interactionEnabled
-            ? (_) {
-                _dragStartPos = null;
-                controller.commitLassoMove();
-              }
-            : null,
-        onPanCancel: widget.interactionEnabled
-            ? () {
-                _dragStartPos = null;
-                controller.commitLassoMove();
-              }
-            : null,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.blue,
-                  width: 1.5,
-                  style: BorderStyle.solid,
-                ),
-                color: const Color(0x112196F3),
+              _dragStartPos = current;
+              controller.updateLassoMove(
+                controller.lassoDragDelta.value + localDelta,
+              );
+            }
+          : null,
+      onPanEnd: widget.interactionEnabled
+          ? (_) {
+              _dragStartPos = null;
+              controller.commitLassoMove();
+            }
+          : null,
+      onPanCancel: widget.interactionEnabled
+          ? () {
+              _dragStartPos = null;
+              controller.commitLassoMove();
+            }
+          : null,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (widget.interactionEnabled)
+            Positioned(
+              top: -20,
+              right: -20,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Material(
+                    type: MaterialType.circle,
+                    color: AppColors.paper,
+                    elevation: 2,
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () async {
+                        final message = await controller
+                            .copyActiveElementToClipboard();
+                        if (!context.mounted) return;
+                        if (message != null) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(message)));
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Copied selection')),
+                          );
+                          controller.clearLassoSelection();
+                        }
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(Icons.copy, size: 18, color: Colors.blue),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Material(
+                    type: MaterialType.circle,
+                    color: AppColors.paper,
+                    elevation: 2,
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: controller.deleteLassoSelection,
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (widget.interactionEnabled)
-              Positioned(
-                top: -20,
-                right: -20,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Material(
-                      type: MaterialType.circle,
-                      color: AppColors.paper,
-                      elevation: 2,
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () async {
-                          final message = await controller
-                              .copyActiveElementToClipboard();
-                          if (!context.mounted) return;
-                          if (message != null) {
-                            ScaffoldMessenger.of(
-                              context,
-                            ).showSnackBar(SnackBar(content: Text(message)));
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Copied selection')),
-                            );
-                            controller.clearLassoSelection();
-                          }
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Icon(Icons.copy, size: 18, color: Colors.blue),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Material(
-                      type: MaterialType.circle,
-                      color: AppColors.paper,
-                      elevation: 2,
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: controller.deleteLassoSelection,
-                        child: const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Icon(
-                            Icons.delete_outline,
-                            size: 18,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
+    );
+
+    Widget positioned(Offset dragDelta, Widget child) {
+      final rect = widget.selection.bounds.shift(dragDelta);
+      return Positioned(
+        left: rect.left - widget.worldOrigin.dx,
+        top: rect.top - widget.worldOrigin.dy,
+        width: rect.width,
+        height: rect.height,
+        child: child,
+      );
+    }
+
+    return ValueListenableBuilder<Offset>(
+      valueListenable: widget.dragDeltaListenable,
+      child: child,
+      builder: (context, dragDelta, child) {
+        return positioned(dragDelta, child!);
+      },
     );
   }
 }

@@ -100,6 +100,7 @@ class EditorController extends ChangeNotifier {
   quill.QuillController? activeTextController;
   String? activeImageBlockId;
   LassoSelection? lassoSelection;
+  final ValueNotifier<Offset> lassoDragDelta = ValueNotifier(Offset.zero);
   _ElementClipboardItem? _elementClipboard;
   bool _suppressBackgroundTap = false;
   double viewScale = 1.0;
@@ -113,6 +114,7 @@ class EditorController extends ChangeNotifier {
   bool get canUndo => _undoActions.isNotEmpty;
   bool get canRedo => _redoActions.isNotEmpty;
   Rect get contentBounds => _computeContentBounds();
+  Size get layoutPageSize => Size(_pageWidth, _pageHeight);
 
   void updatePageLayout({
     required double pageWidth,
@@ -412,6 +414,7 @@ class EditorController extends ChangeNotifier {
   void clearLassoSelection() {
     if (lassoSelection != null) {
       lassoSelection = null;
+      lassoDragDelta.value = Offset.zero;
       notifyListeners();
     }
   }
@@ -422,16 +425,19 @@ class EditorController extends ChangeNotifier {
       return;
     }
 
+    _ensurePageSelected(pageIndex);
     final page = pages[pageIndex];
+    final pageOrigin = _pageOriginForIndex(pageIndex);
+    final documentPoints = points.map((point) => point + pageOrigin).toList();
     final selectedStrokes = <String>[];
     final selectedTextBlocks = <String>[];
     final selectedImages = <String>[];
 
-    bool isInside(Offset point) {
+    bool isInsidePath(Offset point, List<Offset> path) {
       var inside = false;
-      for (var i = 0, j = points.length - 1; i < points.length; j = i++) {
-        final xi = points[i].dx, yi = points[i].dy;
-        final xj = points[j].dx, yj = points[j].dy;
+      for (var i = 0, j = path.length - 1; i < path.length; j = i++) {
+        final xi = path[i].dx, yi = path[i].dy;
+        final xj = path[j].dx, yj = path[j].dy;
         final intersect =
             ((yi > point.dy) != (yj > point.dy)) &&
             (point.dx < (xj - xi) * (point.dy - yi) / (yj - yi) + xi);
@@ -440,23 +446,47 @@ class EditorController extends ChangeNotifier {
       return inside;
     }
 
+    bool isInsidePagePath(Offset point) => isInsidePath(point, points);
+    bool isInsideDocumentPath(Offset point) {
+      return isInsidePath(point, documentPoints);
+    }
+
+    bool rectTouchesDocumentPath(Rect rect) {
+      final pointsToTest = [
+        rect.center,
+        rect.topLeft,
+        rect.topRight,
+        rect.bottomLeft,
+        rect.bottomRight,
+      ];
+      return pointsToTest.any(isInsideDocumentPath);
+    }
+
     for (final s in page.inkStrokes) {
-      if (s.points.any((p) => isInside(Offset(p.dx, p.dy)))) {
+      if (s.points.any((p) => isInsidePagePath(Offset(p.dx, p.dy)))) {
         selectedStrokes.add(s.id);
       }
     }
 
     for (final t in page.textBlocks) {
-      final center = Offset(t.position.dx + t.width / 2, t.position.dy + 20);
-      if (isInside(center)) selectedTextBlocks.add(t.id);
+      final estimatedHeight = math.max(44.0, t.fontSize * 2.8);
+      final rect = Rect.fromLTWH(
+        t.position.dx,
+        t.position.dy,
+        t.width,
+        estimatedHeight,
+      );
+      if (rectTouchesDocumentPath(rect)) selectedTextBlocks.add(t.id);
     }
 
     for (final i in page.imageBlocks) {
-      final center = Offset(
-        i.position.dx + i.width / 2,
-        i.position.dy + i.height / 2,
+      final rect = Rect.fromLTWH(
+        i.position.dx,
+        i.position.dy,
+        i.width,
+        i.height,
       );
-      if (isInside(center)) selectedImages.add(i.id);
+      if (rectTouchesDocumentPath(rect)) selectedImages.add(i.id);
     }
 
     if (selectedStrokes.isEmpty &&
@@ -468,7 +498,7 @@ class EditorController extends ChangeNotifier {
 
     double minX = double.infinity, minY = double.infinity;
     double maxX = double.negativeInfinity, maxY = double.negativeInfinity;
-    for (final p in points) {
+    for (final p in documentPoints) {
       if (p.dx < minX) minX = p.dx;
       if (p.dy < minY) minY = p.dy;
       if (p.dx > maxX) maxX = p.dx;
@@ -482,6 +512,7 @@ class EditorController extends ChangeNotifier {
       textBlockIds: selectedTextBlocks,
       imageBlockIds: selectedImages,
     );
+    lassoDragDelta.value = Offset.zero;
 
     activeTextBlockId = null;
     activeImageBlockId = null;
@@ -490,27 +521,29 @@ class EditorController extends ChangeNotifier {
 
   void updateLassoMove(Offset delta) {
     if (lassoSelection == null) return;
-    lassoSelection = lassoSelection!.copyWith(delta: delta);
-    notifyListeners();
+    lassoDragDelta.value = delta;
   }
 
   void commitLassoMove() {
     final sel = lassoSelection;
-    if (sel == null || sel.delta == Offset.zero) return;
+    final delta = lassoDragDelta.value;
+    if (sel == null || delta == Offset.zero) return;
+    _ensurePageSelected(sel.pageIndex);
 
     final action = MoveSelectionAction(
       strokeIds: sel.strokeIds,
       textBlockIds: sel.textBlockIds,
       imageBlockIds: sel.imageBlockIds,
-      delta: OffsetPosition.fromOffset(sel.delta),
+      delta: OffsetPosition.fromOffset(delta),
     );
 
-    _applyAction(action);
+    _applyActionWithoutNotify(action);
 
     lassoSelection = sel.copyWith(
-      bounds: sel.bounds.shift(sel.delta),
+      bounds: sel.bounds.shift(delta),
       delta: Offset.zero,
     );
+    lassoDragDelta.value = Offset.zero;
     notifyListeners();
     _save();
   }
@@ -518,6 +551,7 @@ class EditorController extends ChangeNotifier {
   void deleteLassoSelection() {
     final sel = lassoSelection;
     if (sel == null) return;
+    _ensurePageSelected(sel.pageIndex);
 
     final page = pages[sel.pageIndex];
     final strokes = page.inkStrokes
@@ -1052,12 +1086,17 @@ class EditorController extends ChangeNotifier {
         _save();
         return null;
       case _LassoElementClipboardItem(
-          :final strokes,
-          :final textBlocks,
-          :final imageBlocks,
-          :final bounds
-        ):
+        :final strokes,
+        :final textBlocks,
+        :final imageBlocks,
+        :final bounds,
+        :final pageIndex,
+      ):
+        final targetPageIndex = _pageIndexForPosition(position);
+        _ensurePageSelected(targetPageIndex);
         final delta = position - bounds.topLeft;
+        final sourceOrigin = _pageOriginForIndex(pageIndex);
+        final targetOrigin = _pageOriginForIndex(targetPageIndex);
         final newStrokes = strokes
             .map(
               (s) => s.copyWith(
@@ -1065,8 +1104,8 @@ class EditorController extends ChangeNotifier {
                 points: s.points
                     .map(
                       (p) => InkPoint(
-                        dx: p.dx + delta.dx,
-                        dy: p.dy + delta.dy,
+                        dx: p.dx + sourceOrigin.dx + delta.dx - targetOrigin.dx,
+                        dy: p.dy + sourceOrigin.dy + delta.dy - targetOrigin.dy,
                         pressure: p.pressure,
                       ),
                     )
@@ -1094,12 +1133,13 @@ class EditorController extends ChangeNotifier {
         );
 
         lassoSelection = LassoSelection(
-          pageIndex: currentPageIndex,
+          pageIndex: targetPageIndex,
           bounds: bounds.shift(delta),
           strokeIds: newStrokes.map((s) => s.id).toList(),
           textBlockIds: newTextBlocks.map((t) => t.id).toList(),
           imageBlockIds: newImageBlocks.map((i) => i.id).toList(),
         );
+        lassoDragDelta.value = Offset.zero;
         _save();
         return null;
     }
@@ -1124,6 +1164,7 @@ class EditorController extends ChangeNotifier {
         textBlocks: texts,
         imageBlocks: images,
         bounds: sel.bounds.shift(sel.delta),
+        pageIndex: sel.pageIndex,
       );
       return null;
     }
@@ -1451,6 +1492,9 @@ class EditorController extends ChangeNotifier {
           height: notebook.kind == NotebookKind.notebook
               ? targetHeight
               : targetHeight.clamp(80, 520).toDouble(),
+          bytes: render.bytes,
+          imageExt: 'png',
+          imageMime: 'image/png',
         );
         final targetPage = workingPages[targetIndex];
         workingPages[targetIndex] = targetPage.copyWith(
@@ -1545,6 +1589,9 @@ class EditorController extends ChangeNotifier {
         height: notebook.kind == NotebookKind.notebook
             ? targetHeight
             : targetHeight.clamp(80, 520).toDouble(),
+        bytes: await file.readAsBytes(),
+        imageExt: 'png',
+        imageMime: 'image/png',
       );
       final targetPage = workingPages[targetIndex];
       workingPages[targetIndex] = targetPage.copyWith(
@@ -1869,6 +1916,16 @@ class EditorController extends ChangeNotifier {
     _updatePage(updated);
   }
 
+  void _applyActionWithoutNotify(EditorAction action) {
+    final updated = action.apply(currentPage);
+    _undoActions.add(action);
+    _redoActions.clear();
+    pages = [
+      for (var i = 0; i < pages.length; i++)
+        if (i == currentPageIndex) updated else pages[i],
+    ];
+  }
+
   void _updatePage(NotePage page) {
     pages = [
       for (var i = 0; i < pages.length; i++)
@@ -1905,10 +1962,12 @@ class _LassoElementClipboardItem extends _ElementClipboardItem {
     required this.textBlocks,
     required this.imageBlocks,
     required this.bounds,
+    required this.pageIndex,
   });
 
   final List<InkStroke> strokes;
   final List<TextBlock> textBlocks;
   final List<ImageBlock> imageBlocks;
   final Rect bounds;
+  final int pageIndex;
 }

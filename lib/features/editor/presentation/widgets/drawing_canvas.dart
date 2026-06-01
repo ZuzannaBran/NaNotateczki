@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:math';
+
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -51,9 +54,16 @@ class DocumentDrawingCanvas extends StatefulWidget {
 }
 
 class _DrawingCanvasState extends State<DrawingCanvas> {
+  static const double _touchStrokeStartSlop = 6.0;
+  static const double _palmContactRadius = 22.0;
+
   final List<InkPoint> _currentPoints = <InkPoint>[];
   final Set<String> _eraseStrokeIds = <String>{};
   final Set<int> _activePointers = <int>{};
+  int? _primaryPointer;
+  PointerDeviceKind? _primaryPointerKind;
+  Offset? _pendingTouchStart;
+  bool _activePointerAllowsTapStroke = false;
   Offset? _eraserPosition;
   Timer? _snapTimer;
   bool _snappedStraight = false;
@@ -85,6 +95,11 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final lassoSelection =
+            controller.lassoSelection?.pageIndex ==
+                _resolvedPageIndex(controller)
+            ? controller.lassoSelection
+            : null;
         final eraserRadius = controller.tool == DrawingTool.eraserBrush
             ? controller.inkStrokeWidth / 2
             : max(8.0, controller.inkStrokeWidth * 3.0);
@@ -100,20 +115,27 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
             onPointerMove: (event) => _onPointerMove(event, controller),
             onPointerUp: (event) => _onPointerUp(event, controller),
             onPointerCancel: (event) => _onPointerCancel(event),
-            child: CustomPaint(
-              painter: _InkPainter(
-                strokes: page.inkStrokes,
-                currentPoints: _currentPoints,
-                currentColor: controller.inkColor,
-                currentWidth: currentWidth,
-                currentTool: controller.tool,
-                worldOrigin: widget.worldOrigin,
-                snapHintStart: _snapHintStart,
-                snapHintEnd: _snapHintEnd,
-                eraserPosition: _eraserPosition,
-                eraserRadius: eraserRadius,
+            child: ValueListenableBuilder<Offset>(
+              valueListenable: controller.lassoDragDelta,
+              builder: (context, lassoDelta, _) => CustomPaint(
+                painter: _InkPainter(
+                  strokes: page.inkStrokes,
+                  currentPoints: _currentPoints,
+                  currentColor: controller.inkColor,
+                  currentWidth: currentWidth,
+                  currentTool: controller.tool,
+                  worldOrigin: widget.worldOrigin,
+                  selectedStrokeIds: lassoSelection?.strokeIds.toSet() ?? {},
+                  selectionDelta: lassoSelection == null
+                      ? Offset.zero
+                      : lassoDelta,
+                  snapHintStart: _snapHintStart,
+                  snapHintEnd: _snapHintEnd,
+                  eraserPosition: _eraserPosition,
+                  eraserRadius: eraserRadius,
+                ),
+                size: Size.infinite,
               ),
-              size: Size.infinite,
             ),
           ),
         );
@@ -122,6 +144,20 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   }
 
   void _onPointerDown(PointerDownEvent event, EditorController controller) {
+    if (_primaryPointer != null) {
+      if (!_shouldDelayTouchStroke(_primaryPointerKind!)) {
+        return;
+      }
+      _activePointers.add(event.pointer);
+      if (_activePointers.length > 1) {
+        _suspendInk = true;
+        _resetCurrent();
+      }
+      return;
+    }
+    if (_isPalmLikeTouch(event)) {
+      return;
+    }
     final page = _resolvedPage(controller);
     _activePointers.add(event.pointer);
     if (_activePointers.length > 1) {
@@ -133,6 +169,22 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       return;
     }
     final offset = _toWorld(event.localPosition);
+    _primaryPointer = event.pointer;
+    _primaryPointerKind = event.kind;
+    _activePointerAllowsTapStroke = _canCommitTapStroke(event.kind);
+    if (_shouldDelayTouchStroke(event.kind)) {
+      _pendingTouchStart = offset;
+      return;
+    }
+    _beginStrokeAt(offset, controller, page, event.pressure);
+  }
+
+  void _beginStrokeAt(
+    Offset offset,
+    EditorController controller,
+    NotePage page,
+    double pressure,
+  ) {
     if (controller.tool.isShape) {
       _shapeStart = offset;
       setState(() {
@@ -157,7 +209,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     setState(() {
       _currentPoints
         ..clear()
-        ..add(InkPoint.fromOffset(offset, 1.0));
+        ..add(InkPoint.fromOffset(offset, pressure));
       _snappedStraight = false;
       _snappedRect = false;
       _snappedEllipse = false;
@@ -171,11 +223,22 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
   void _onPointerMove(PointerMoveEvent event, EditorController controller) {
     final page = _resolvedPage(controller);
+    if (event.pointer != _primaryPointer) {
+      return;
+    }
     if (_suspendInk || _activePointers.length > 1) {
       return;
     }
+    final offset = _toWorld(event.localPosition);
+    final pendingStart = _pendingTouchStart;
+    if (pendingStart != null) {
+      if ((offset - pendingStart).distance < _touchStrokeStartSlop) {
+        return;
+      }
+      _pendingTouchStart = null;
+      _beginStrokeAt(pendingStart, controller, page, event.pressure);
+    }
     if (controller.tool == DrawingTool.eraserStroke) {
-      final offset = _toWorld(event.localPosition);
       _eraserPosition = offset;
       _eraseAt(offset, page, controller);
       if (mounted) {
@@ -187,7 +250,6 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       if (_shapeStart == null) {
         return;
       }
-      final offset = _toWorld(event.localPosition);
       setState(() {
         _currentPoints
           ..clear()
@@ -198,7 +260,6 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     if (_currentPoints.isEmpty) {
       return;
     }
-    final offset = _toWorld(event.localPosition);
     if (_isSnapTool(controller.tool)) {
       _startSnapTimer(offset);
     }
@@ -212,7 +273,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         if (_currentPoints.length >= 2) {
           _currentPoints[_currentPoints.length - 1] = InkPoint.fromOffset(
             offset,
-            1.0,
+            event.pressure,
           );
         }
       });
@@ -244,19 +305,29 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       return;
     }
     setState(() {
-      _currentPoints.add(InkPoint.fromOffset(offset, 1.0));
+      _currentPoints.add(InkPoint.fromOffset(offset, event.pressure));
     });
   }
 
   void _onPointerUp(PointerUpEvent event, EditorController controller) {
     final pageIndex = _resolvedPageIndex(controller);
     _activePointers.remove(event.pointer);
+    if (event.pointer != _primaryPointer) {
+      if (_primaryPointer == null && _activePointers.length <= 1) {
+        _suspendInk = false;
+      }
+      return;
+    }
     if (_activePointers.length > 1) {
       _resetCurrent();
       return;
     }
     if (_suspendInk && _activePointers.length <= 1) {
       _suspendInk = false;
+    }
+    if (_pendingTouchStart != null) {
+      _resetCurrent();
+      return;
     }
     if (controller.tool.isShape) {
       if (_currentPoints.isEmpty) {
@@ -303,6 +374,10 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     }
     _snapTimer?.cancel();
     if (_currentPoints.length == 1) {
+      if (!_activePointerAllowsTapStroke) {
+        _resetCurrent();
+        return;
+      }
       final point = _currentPoints.first;
       _currentPoints.add(
         InkPoint(dx: point.dx + 0.5, dy: point.dy, pressure: point.pressure),
@@ -335,6 +410,12 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
   void _onPointerCancel(PointerCancelEvent event) {
     _activePointers.remove(event.pointer);
+    if (event.pointer != _primaryPointer) {
+      if (_primaryPointer == null && _activePointers.length <= 1) {
+        _suspendInk = false;
+      }
+      return;
+    }
     if (_activePointers.length <= 1) {
       _suspendInk = false;
     }
@@ -355,6 +436,10 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     _rectFixedCorner = null;
     _ellipseFixedCorner = null;
     _shapeStart = null;
+    _primaryPointer = null;
+    _primaryPointerKind = null;
+    _pendingTouchStart = null;
+    _activePointerAllowsTapStroke = false;
     if (_currentPoints.isEmpty) {
       if (mounted) {
         setState(() {});
@@ -377,6 +462,23 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     }
     final last = _currentPoints.last.toOffset();
     return (offset - last).distanceSquared > 0.5;
+  }
+
+  bool _shouldDelayTouchStroke(PointerDeviceKind kind) {
+    return kind == PointerDeviceKind.touch;
+  }
+
+  bool _canCommitTapStroke(PointerDeviceKind kind) {
+    return kind == PointerDeviceKind.stylus ||
+        kind == PointerDeviceKind.invertedStylus ||
+        kind == PointerDeviceKind.mouse;
+  }
+
+  bool _isPalmLikeTouch(PointerEvent event) {
+    if (event.kind != PointerDeviceKind.touch) {
+      return false;
+    }
+    return max(event.radiusMajor, event.radiusMinor) >= _palmContactRadius;
   }
 
   void _startSnapTimer(Offset offset) {
@@ -795,9 +897,17 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 }
 
 class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
+  static const double _touchStrokeStartSlop = 6.0;
+  static const double _palmContactRadius = 22.0;
+
   final List<InkPoint> _currentPoints = <InkPoint>[];
   final Set<String> _eraseStrokeIds = <String>{};
   final Set<int> _activePointers = <int>{};
+  int? _primaryPointer;
+  PointerDeviceKind? _primaryPointerKind;
+  Offset? _pendingTouchStart;
+  int? _pendingTouchPageIndex;
+  bool _activePointerAllowsTapStroke = false;
   Offset? _eraserPosition;
   Timer? _snapTimer;
   bool _snappedStraight = false;
@@ -829,6 +939,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final lassoSelection = controller.lassoSelection;
         final eraserRadius = controller.tool == DrawingTool.eraserBrush
             ? controller.inkStrokeWidth / 2
             : max(8.0, controller.inkStrokeWidth * 3.0);
@@ -844,22 +955,30 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
             onPointerMove: (event) => _onPointerMove(event, controller),
             onPointerUp: (event) => _onPointerUp(event, controller),
             onPointerCancel: (event) => _onPointerCancel(event),
-            child: CustomPaint(
-              painter: _DocumentInkPainter(
-                pages: widget.pages,
-                pageSize: widget.pageSize,
-                pageGap: widget.pageGap,
-                currentPoints: _currentPoints,
-                currentColor: controller.inkColor,
-                currentWidth: currentWidth,
-                currentTool: controller.tool,
-                worldOrigin: widget.worldOrigin,
-                snapHintStart: _snapHintStart,
-                snapHintEnd: _snapHintEnd,
-                eraserPosition: _eraserPosition,
-                eraserRadius: eraserRadius,
+            child: ValueListenableBuilder<Offset>(
+              valueListenable: controller.lassoDragDelta,
+              builder: (context, lassoDelta, _) => CustomPaint(
+                painter: _DocumentInkPainter(
+                  pages: widget.pages,
+                  pageSize: widget.pageSize,
+                  pageGap: widget.pageGap,
+                  currentPoints: _currentPoints,
+                  currentColor: controller.inkColor,
+                  currentWidth: currentWidth,
+                  currentTool: controller.tool,
+                  worldOrigin: widget.worldOrigin,
+                  selectedPageIndex: lassoSelection?.pageIndex,
+                  selectedStrokeIds: lassoSelection?.strokeIds.toSet() ?? {},
+                  selectionDelta: lassoSelection == null
+                      ? Offset.zero
+                      : lassoDelta,
+                  snapHintStart: _snapHintStart,
+                  snapHintEnd: _snapHintEnd,
+                  eraserPosition: _eraserPosition,
+                  eraserRadius: eraserRadius,
+                ),
+                size: Size.infinite,
               ),
-              size: Size.infinite,
             ),
           ),
         );
@@ -868,6 +987,20 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   }
 
   void _onPointerDown(PointerDownEvent event, EditorController controller) {
+    if (_primaryPointer != null) {
+      if (!_shouldDelayTouchStroke(_primaryPointerKind!)) {
+        return;
+      }
+      _activePointers.add(event.pointer);
+      if (_activePointers.length > 1) {
+        _suspendInk = true;
+        _resetCurrent();
+      }
+      return;
+    }
+    if (_isPalmLikeTouch(event)) {
+      return;
+    }
     _activePointers.add(event.pointer);
     if (_activePointers.length > 1) {
       _suspendInk = true;
@@ -888,8 +1021,35 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     }
     _activePageIndex = pageIndex;
     final localOffset = _toPageLocal(worldOffset, pageIndex);
+    final docOffset = _toDocument(localOffset, pageIndex);
+    _primaryPointer = event.pointer;
+    _primaryPointerKind = event.kind;
+    _activePointerAllowsTapStroke = _canCommitTapStroke(event.kind);
+    if (_shouldDelayTouchStroke(event.kind)) {
+      _pendingTouchStart = docOffset;
+      _pendingTouchPageIndex = pageIndex;
+      return;
+    }
+    _beginStrokeAt(
+      docOffset,
+      worldOffset,
+      localOffset,
+      pageIndex,
+      controller,
+      event.pressure,
+    );
+  }
+
+  void _beginStrokeAt(
+    Offset docOffset,
+    Offset worldOffset,
+    Offset localOffset,
+    int pageIndex,
+    EditorController controller,
+    double pressure,
+  ) {
     if (controller.tool.isShape) {
-      _shapeStart = _toDocument(localOffset, pageIndex);
+      _shapeStart = docOffset;
       setState(() {
         _currentPoints
           ..clear()
@@ -914,7 +1074,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     setState(() {
       _currentPoints
         ..clear()
-        ..add(InkPoint.fromOffset(_toDocument(localOffset, pageIndex), 1.0));
+        ..add(InkPoint.fromOffset(docOffset, pressure));
       _snappedStraight = false;
       _snappedRect = false;
       _snappedEllipse = false;
@@ -922,11 +1082,14 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       _ellipseFixedCorner = null;
     });
     if (_isSnapTool(controller.tool)) {
-      _startSnapTimer(_toDocument(localOffset, pageIndex));
+      _startSnapTimer(docOffset);
     }
   }
 
   void _onPointerMove(PointerMoveEvent event, EditorController controller) {
+    if (event.pointer != _primaryPointer) {
+      return;
+    }
     if (_suspendInk || _activePointers.length > 1) {
       return;
     }
@@ -947,6 +1110,25 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       return;
     }
     final docOffset = _toDocument(localOffset, pageIndex);
+    final pendingStart = _pendingTouchStart;
+    final pendingPageIndex = _pendingTouchPageIndex;
+    if (pendingStart != null) {
+      if (pendingPageIndex != pageIndex ||
+          (docOffset - pendingStart).distance < _touchStrokeStartSlop) {
+        return;
+      }
+      _pendingTouchStart = null;
+      _pendingTouchPageIndex = null;
+      final pendingLocal = _toPageLocalFromDocument(pendingStart, pageIndex);
+      _beginStrokeAt(
+        pendingStart,
+        _toWorldFromDocument(pendingStart),
+        pendingLocal,
+        pageIndex,
+        controller,
+        event.pressure,
+      );
+    }
     if (controller.tool == DrawingTool.eraserStroke) {
       _eraserPosition = worldOffset;
       _eraseAt(localOffset, pageIndex);
@@ -982,7 +1164,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         if (_currentPoints.length >= 2) {
           _currentPoints[_currentPoints.length - 1] = InkPoint.fromOffset(
             docOffset,
-            1.0,
+            event.pressure,
           );
         }
       });
@@ -1017,18 +1199,28 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       return;
     }
     setState(() {
-      _currentPoints.add(InkPoint.fromOffset(docOffset, 1.0));
+      _currentPoints.add(InkPoint.fromOffset(docOffset, event.pressure));
     });
   }
 
   void _onPointerUp(PointerUpEvent event, EditorController controller) {
     _activePointers.remove(event.pointer);
+    if (event.pointer != _primaryPointer) {
+      if (_primaryPointer == null && _activePointers.length <= 1) {
+        _suspendInk = false;
+      }
+      return;
+    }
     if (_activePointers.length > 1) {
       _resetCurrent();
       return;
     }
     if (_suspendInk && _activePointers.length <= 1) {
       _suspendInk = false;
+    }
+    if (_pendingTouchStart != null) {
+      _resetCurrent();
+      return;
     }
     final pageIndex = _activePageIndex;
     if (pageIndex == null) {
@@ -1066,20 +1258,35 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     }
     _snapTimer?.cancel();
     if (_currentPoints.length == 1) {
+      if (!_activePointerAllowsTapStroke) {
+        _resetCurrent();
+        return;
+      }
       final point = _currentPoints.first;
       _currentPoints.add(
         InkPoint(dx: point.dx + 0.5, dy: point.dy, pressure: point.pressure),
       );
     }
-    controller.addInkStrokeOnPage(
-      pageIndex,
-      _toPageLocalPoints(_currentPoints, pageIndex),
-    );
+    final pageLocalPoints = _toPageLocalPoints(_currentPoints, pageIndex);
+    if (controller.tool == DrawingTool.lasso) {
+      controller.selectWithLasso(
+        pageLocalPoints.map((p) => p.toOffset()).toList(),
+        pageIndex,
+      );
+    } else {
+      controller.addInkStrokeOnPage(pageIndex, pageLocalPoints);
+    }
     _resetCurrent();
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
     _activePointers.remove(event.pointer);
+    if (event.pointer != _primaryPointer) {
+      if (_primaryPointer == null && _activePointers.length <= 1) {
+        _suspendInk = false;
+      }
+      return;
+    }
     if (_activePointers.length <= 1) {
       _suspendInk = false;
     }
@@ -1101,6 +1308,11 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     _ellipseFixedCorner = null;
     _shapeStart = null;
     _activePageIndex = null;
+    _primaryPointer = null;
+    _primaryPointerKind = null;
+    _pendingTouchStart = null;
+    _pendingTouchPageIndex = null;
+    _activePointerAllowsTapStroke = false;
     if (_currentPoints.isEmpty) {
       if (mounted) {
         setState(() {});
@@ -1143,12 +1355,25 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     return Offset(0, pageIndex * stride) + widget.worldOrigin;
   }
 
+  Offset _documentPageOrigin(int pageIndex) {
+    final stride = widget.pageSize.height + widget.pageGap;
+    return Offset(0, pageIndex * stride);
+  }
+
   Offset _toPageLocal(Offset worldOffset, int pageIndex) {
     return worldOffset - _pageOrigin(pageIndex);
   }
 
+  Offset _toPageLocalFromDocument(Offset documentOffset, int pageIndex) {
+    return documentOffset - _documentPageOrigin(pageIndex);
+  }
+
   Offset _toDocument(Offset pageLocal, int pageIndex) {
     return pageLocal + _pageOrigin(pageIndex) - widget.worldOrigin;
+  }
+
+  Offset _toWorldFromDocument(Offset documentOffset) {
+    return documentOffset + widget.worldOrigin;
   }
 
   bool _isInsidePage(Offset pageLocal) {
@@ -1164,6 +1389,23 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     }
     final last = _currentPoints.last.toOffset();
     return (offset - last).distanceSquared > 0.5;
+  }
+
+  bool _shouldDelayTouchStroke(PointerDeviceKind kind) {
+    return kind == PointerDeviceKind.touch;
+  }
+
+  bool _canCommitTapStroke(PointerDeviceKind kind) {
+    return kind == PointerDeviceKind.stylus ||
+        kind == PointerDeviceKind.invertedStylus ||
+        kind == PointerDeviceKind.mouse;
+  }
+
+  bool _isPalmLikeTouch(PointerEvent event) {
+    if (event.kind != PointerDeviceKind.touch) {
+      return false;
+    }
+    return max(event.radiusMajor, event.radiusMinor) >= _palmContactRadius;
   }
 
   void _startSnapTimer(Offset offset) {
@@ -1598,6 +1840,8 @@ class _InkPainter extends CustomPainter {
     required this.currentWidth,
     required this.currentTool,
     required this.worldOrigin,
+    required this.selectedStrokeIds,
+    required this.selectionDelta,
     this.snapHintStart,
     this.snapHintEnd,
     this.eraserPosition,
@@ -1610,6 +1854,8 @@ class _InkPainter extends CustomPainter {
   final double currentWidth;
   final DrawingTool currentTool;
   final Offset worldOrigin;
+  final Set<String> selectedStrokeIds;
+  final Offset selectionDelta;
   final Offset? snapHintStart;
   final Offset? snapHintEnd;
   final Offset? eraserPosition;
@@ -1619,12 +1865,15 @@ class _InkPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Offset.zero & size, Paint());
     for (final stroke in strokes) {
+      final isSelected = selectedStrokeIds.contains(stroke.id);
       _drawStroke(
         canvas,
         stroke.points,
         stroke.color,
         stroke.width,
         stroke.tool,
+        isSelected: isSelected,
+        delta: isSelected ? selectionDelta : Offset.zero,
       );
     }
 
@@ -1669,8 +1918,10 @@ class _InkPainter extends CustomPainter {
     List<InkPoint> points,
     Color color,
     double width,
-    DrawingTool tool,
-  ) {
+    DrawingTool tool, {
+    bool isSelected = false,
+    Offset delta = Offset.zero,
+  }) {
     if (points.isEmpty) {
       return;
     }
@@ -1691,7 +1942,7 @@ class _InkPainter extends CustomPainter {
 
     final path = Path();
     for (var i = 0; i < points.length; i++) {
-      final offset = points[i].toOffset() - worldOrigin;
+      final offset = points[i].toOffset() + delta - worldOrigin;
       if (i == 0) {
         path.moveTo(offset.dx, offset.dy);
       } else {
@@ -1701,6 +1952,17 @@ class _InkPainter extends CustomPainter {
     if (points.first.dx == points.last.dx &&
         points.first.dy == points.last.dy) {
       path.close();
+    }
+    if (isSelected) {
+      final highlightPaint = Paint()
+        ..color = Colors.blue.withValues(alpha: 0.24)
+        ..strokeCap = tool == DrawingTool.highlighter
+            ? StrokeCap.square
+            : StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width + 8.0;
+      canvas.drawPath(path, highlightPaint);
     }
     canvas.drawPath(path, paint);
   }
@@ -1722,6 +1984,8 @@ class _InkPainter extends CustomPainter {
         oldDelegate.currentColor != currentColor ||
         oldDelegate.currentWidth != currentWidth ||
         oldDelegate.currentTool != currentTool ||
+        oldDelegate.selectedStrokeIds != selectedStrokeIds ||
+        oldDelegate.selectionDelta != selectionDelta ||
         oldDelegate.snapHintStart != snapHintStart ||
         oldDelegate.snapHintEnd != snapHintEnd ||
         oldDelegate.eraserPosition != eraserPosition ||
@@ -1739,6 +2003,9 @@ class _DocumentInkPainter extends CustomPainter {
     required this.currentWidth,
     required this.currentTool,
     required this.worldOrigin,
+    required this.selectedPageIndex,
+    required this.selectedStrokeIds,
+    required this.selectionDelta,
     this.snapHintStart,
     this.snapHintEnd,
     this.eraserPosition,
@@ -1753,6 +2020,9 @@ class _DocumentInkPainter extends CustomPainter {
   final double currentWidth;
   final DrawingTool currentTool;
   final Offset worldOrigin;
+  final int? selectedPageIndex;
+  final Set<String> selectedStrokeIds;
+  final Offset selectionDelta;
   final Offset? snapHintStart;
   final Offset? snapHintEnd;
   final Offset? eraserPosition;
@@ -1764,6 +2034,8 @@ class _DocumentInkPainter extends CustomPainter {
     for (var i = 0; i < pages.length; i++) {
       final origin = _pageOrigin(i);
       for (final stroke in pages[i].inkStrokes) {
+        final isSelected =
+            selectedPageIndex == i && selectedStrokeIds.contains(stroke.id);
         _drawStroke(
           canvas,
           stroke.points,
@@ -1771,6 +2043,8 @@ class _DocumentInkPainter extends CustomPainter {
           stroke.width,
           stroke.tool,
           origin,
+          isSelected: isSelected,
+          delta: isSelected ? selectionDelta : Offset.zero,
         );
       }
     }
@@ -1823,8 +2097,10 @@ class _DocumentInkPainter extends CustomPainter {
     Color color,
     double width,
     DrawingTool tool,
-    Offset origin,
-  ) {
+    Offset origin, {
+    bool isSelected = false,
+    Offset delta = Offset.zero,
+  }) {
     if (points.isEmpty) {
       return;
     }
@@ -1845,7 +2121,7 @@ class _DocumentInkPainter extends CustomPainter {
 
     final path = Path();
     for (var i = 0; i < points.length; i++) {
-      final offset = points[i].toOffset() + origin - worldOrigin;
+      final offset = points[i].toOffset() + origin + delta - worldOrigin;
       if (i == 0) {
         path.moveTo(offset.dx, offset.dy);
       } else {
@@ -1855,6 +2131,17 @@ class _DocumentInkPainter extends CustomPainter {
     if (points.first.dx == points.last.dx &&
         points.first.dy == points.last.dy) {
       path.close();
+    }
+    if (isSelected) {
+      final highlightPaint = Paint()
+        ..color = Colors.blue.withValues(alpha: 0.24)
+        ..strokeCap = tool == DrawingTool.highlighter
+            ? StrokeCap.square
+            : StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width + 8.0;
+      canvas.drawPath(path, highlightPaint);
     }
     canvas.drawPath(path, paint);
   }
@@ -1878,6 +2165,9 @@ class _DocumentInkPainter extends CustomPainter {
         oldDelegate.currentColor != currentColor ||
         oldDelegate.currentWidth != currentWidth ||
         oldDelegate.currentTool != currentTool ||
+        oldDelegate.selectedPageIndex != selectedPageIndex ||
+        oldDelegate.selectedStrokeIds != selectedStrokeIds ||
+        oldDelegate.selectionDelta != selectionDelta ||
         oldDelegate.snapHintStart != snapHintStart ||
         oldDelegate.snapHintEnd != snapHintEnd ||
         oldDelegate.eraserPosition != eraserPosition ||

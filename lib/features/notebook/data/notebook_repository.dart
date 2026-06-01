@@ -21,6 +21,9 @@ class NotebookRepository {
   final Isar isar;
   final void Function()? onChanged;
   final Uuid _uuid = const Uuid();
+  bool _lastFetchSkippedCorruptRows = false;
+
+  bool get lastFetchSkippedCorruptRows => _lastFetchSkippedCorruptRows;
 
   Future<List<Notebook>> fetchNotebooks() async {
     try {
@@ -28,6 +31,7 @@ class NotebookRepository {
           .where()
           .sortByUpdatedAtDesc()
           .findAll();
+      _lastFetchSkippedCorruptRows = false;
       return entities.map(_fromEntity).toList();
     } catch (e, st) {
       debugPrint('fetchNotebooks failed, falling back to defensive: $e\n$st');
@@ -37,7 +41,7 @@ class NotebookRepository {
 
   Future<List<Notebook>> _fetchNotebooksDefensively() async {
     final List<Notebook> results = <Notebook>[];
-    int skipped = 0;
+    final corruptIds = <int>[];
     try {
       final ids = await isar.notebookEntitys.where().idProperty().findAll();
       for (final id in ids) {
@@ -47,18 +51,29 @@ class NotebookRepository {
             results.add(_fromEntity(entity));
           }
         } catch (e) {
-          skipped++;
+          corruptIds.add(id);
           debugPrint('Skipped corrupt notebook id=$id: $e');
         }
       }
     } catch (e) {
       debugPrint('Defensive fetch failed at idProperty stage: $e');
     }
-    if (skipped > 0) {
-      debugPrint('Defensive fetch: skipped $skipped corrupt rows');
+    _lastFetchSkippedCorruptRows = corruptIds.isNotEmpty;
+    if (corruptIds.isNotEmpty) {
+      debugPrint('Defensive fetch: skipped ${corruptIds.length} corrupt rows');
+      await _deleteCorruptRows(corruptIds);
     }
     results.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return results;
+  }
+
+  Future<void> _deleteCorruptRows(List<int> ids) async {
+    try {
+      await isar.writeTxn(() => isar.notebookEntitys.deleteAll(ids));
+      debugPrint('Deleted ${ids.length} corrupt notebook rows');
+    } catch (e) {
+      debugPrint('Failed to delete corrupt notebook rows $ids: $e');
+    }
   }
 
   Future<Notebook> createNotebook({String? title, String? folder}) async {
@@ -67,7 +82,7 @@ class NotebookRepository {
       uid: _uuid.v4(),
       title: title ?? 'New Notebook',
       kind: NotebookKind.notebook,
-      folder: folder ?? 'Inbox',
+      folder: folder ?? 'Notes',
       createdAt: now,
       updatedAt: now,
       pages: [
@@ -92,7 +107,7 @@ class NotebookRepository {
       uid: _uuid.v4(),
       title: title ?? 'New Board',
       kind: NotebookKind.board,
-      folder: folder ?? 'Inbox',
+      folder: folder ?? 'Notes',
       createdAt: now,
       updatedAt: now,
       pages: [
@@ -112,14 +127,19 @@ class NotebookRepository {
   }
 
   Future<Notebook?> getNotebook(String uid) async {
-    final entity = await isar.notebookEntitys
-        .filter()
-        .uidEqualTo(uid)
-        .findFirst();
-    if (entity == null) {
+    try {
+      final entity = await isar.notebookEntitys
+          .filter()
+          .uidEqualTo(uid)
+          .findFirst();
+      if (entity == null) {
+        return null;
+      }
+      return _fromEntity(entity);
+    } catch (e) {
+      debugPrint('getNotebook failed for uid=$uid: $e');
       return null;
     }
-    return _fromEntity(entity);
   }
 
   Future<void> saveNotebook(Notebook notebook) async {
@@ -370,7 +390,7 @@ class NotebookRepository {
       uid: json['uid'] as String,
       title: json['title'] as String,
       kind: NotebookKindValue.fromIndex((json['kind'] as num?)?.toInt() ?? 0),
-      folder: (json['folder'] as String?) ?? 'Inbox',
+      folder: (json['folder'] as String?) ?? 'Notes',
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       pages: (json['pages'] as List<dynamic>)

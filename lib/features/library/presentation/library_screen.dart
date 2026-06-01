@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/widgets/empty_state.dart';
+import '../../board/presentation/board_screen.dart';
+import '../../editor/state/editor_controller.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/presentation/notebook_screen.dart';
-import '../../editor/state/editor_controller.dart';
-import '../../board/presentation/board_screen.dart';
 import 'library_controller.dart';
 import 'widgets/library_item_card.dart';
 
@@ -109,15 +109,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     }
                   }
 
-                  final folderCompact = folderWidth < 165;
-                  final folderIconOnly = folderWidth < 96;
+                  final folderIconOnly = folderWidth < 165;
                   final itemsCompact = itemsWidth < 260;
-                  final folderTextScale = _textScaleForPane(
-                    width: folderWidth,
-                    minWidth: _folderPaneMinWidth,
-                    maxWidth: 260,
-                    minScale: 0.68,
-                  );
                   final itemsTextScale = _textScaleForPane(
                     width: itemsWidth,
                     minWidth: _itemsPaneMinWidth,
@@ -147,9 +140,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                         child: _FolderListPane(
                                           controller: controller,
                                           onSelect: controller.selectFolder,
-                                          compact: folderCompact,
                                           iconOnly: folderIconOnly,
-                                          textScale: folderTextScale,
                                         ),
                                       ),
                                       _PaneResizeHandle(
@@ -279,74 +270,138 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     await controller.createFolder(result);
   }
+
+  Future<void> _promptRenameFolder(
+    LibraryController controller,
+    String folder,
+  ) async {
+    final textController = TextEditingController(text: folder);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Rename folder'),
+          content: TextField(
+            controller: textController,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Folder name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(textController.text),
+              child: const Text('Rename'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null) {
+      return;
+    }
+    await controller.renameFolder(folder, result);
+  }
+
+  Future<void> _confirmDeleteFolder(
+    LibraryController controller,
+    String folder,
+  ) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete folder?'),
+          content: const Text(
+            'This will delete the folder and all items inside it.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != true) {
+      return;
+    }
+    await controller.deleteFolder(folder);
+  }
 }
+
+enum _FolderAction { rename, delete }
 
 class _FolderListPane extends StatelessWidget {
   const _FolderListPane({
     required this.controller,
     required this.onSelect,
-    this.compact = false,
     this.iconOnly = false,
-    this.textScale = 1.0,
   });
 
   final LibraryController controller;
   final ValueChanged<String> onSelect;
-  final bool compact;
   final bool iconOnly;
-  final double textScale;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final selectedColor = colorScheme.primary.withValues(alpha: 0.08);
+    final folders = controller.folderNames;
+
     if (iconOnly) {
-      final selectedColor = Theme.of(
-        context,
-      ).colorScheme.primary.withValues(alpha: 0.14);
       return ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          Center(
-            child: IconButton(
-              tooltip: 'New folder',
-              icon: const Icon(Icons.create_new_folder_outlined),
-              visualDensity: VisualDensity.compact,
-              onPressed: () => context
-                  .findAncestorStateOfType<_LibraryScreenState>()
-                  ?._promptNewFolder(controller),
-            ),
-          ),
-          const Divider(height: 1),
-          for (final folder in controller.folderNames)
-            Tooltip(
-              message: folder,
-              waitDuration: const Duration(milliseconds: 350),
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: InkResponse(
-                    onTap: () => onSelect(folder),
-                    radius: 20,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: folder == controller.selectedFolder
-                            ? selectedColor
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        folder == controller.selectedFolder
-                            ? Icons.folder
-                            : Icons.folder_outlined,
-                        size: 20,
-                      ),
-                    ),
-                  ),
+          SizedBox(
+            height: 64,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: IconButton(
+                  tooltip: 'New folder',
+                  icon: const Icon(Icons.add),
+                  onPressed: () => context
+                      .findAncestorStateOfType<_LibraryScreenState>()
+                      ?._promptNewFolder(controller),
                 ),
               ),
             ),
+          ),
+          const Divider(height: 1),
+          for (var index = 0; index < folders.length; index++) ...[
+            if (index > 0) const Divider(height: 1),
+            Tooltip(
+              message: folders[index],
+              waitDuration: const Duration(milliseconds: 350),
+              child: ListTile(
+                contentPadding: const EdgeInsets.only(left: 16, right: 2),
+                title: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Icon(
+                    folders[index] == controller.selectedFolder
+                        ? Icons.folder
+                        : Icons.folder_outlined,
+                    size: 20,
+                  ),
+                ),
+                selected: folders[index] == controller.selectedFolder,
+                selectedColor: colorScheme.primary,
+                selectedTileColor: selectedColor,
+                onTap: () => onSelect(folders[index]),
+              ),
+            ),
+          ],
         ],
       );
     }
@@ -358,36 +413,18 @@ class _FolderListPane extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              if (!compact)
-                Expanded(
-                  child: AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 120),
-                    curve: Curves.easeOutCubic,
-                    style:
-                        (Theme.of(context).textTheme.titleSmall ??
-                                const TextStyle())
-                            .copyWith(
-                              fontSize:
-                                  (Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall?.fontSize ??
-                                      14) *
-                                  textScale,
-                            ),
-                    child: const Text(
-                      'Folders',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+              Expanded(
+                child: Text(
+                  'Folders',
+                  style: Theme.of(context).textTheme.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ),
               const Spacer(),
               IconButton(
                 tooltip: 'New folder',
-                icon: const Icon(Icons.create_new_folder_outlined),
-                visualDensity: compact
-                    ? VisualDensity.compact
-                    : VisualDensity.standard,
+                icon: const Icon(Icons.add),
                 onPressed: () => context
                     .findAncestorStateOfType<_LibraryScreenState>()
                     ?._promptNewFolder(controller),
@@ -395,29 +432,53 @@ class _FolderListPane extends StatelessWidget {
             ],
           ),
         ),
-        for (final folder in controller.folderNames)
+        const Divider(height: 1),
+        for (var index = 0; index < folders.length; index++) ...[
+          if (index > 0) const Divider(height: 1),
           ListTile(
-            dense: compact,
-            visualDensity: compact
-                ? VisualDensity.compact
-                : VisualDensity.standard,
-            contentPadding: EdgeInsets.symmetric(horizontal: compact ? 8 : 16),
-            title: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOutCubic,
-              style:
-                  (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
-                      .copyWith(
-                        fontSize:
-                            (Theme.of(context).textTheme.bodyMedium?.fontSize ??
-                                14) *
-                            textScale,
-                      ),
-              child: Text(folder, maxLines: 1, overflow: TextOverflow.ellipsis),
+            contentPadding: const EdgeInsets.only(left: 16, right: 2),
+            title: Text(
+              folders[index],
+              style: Theme.of(context).textTheme.bodyLarge,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            selected: folder == controller.selectedFolder,
-            onTap: () => onSelect(folder),
+            selected: folders[index] == controller.selectedFolder,
+            selectedColor: colorScheme.primary,
+            selectedTileColor: selectedColor,
+            trailing: PopupMenuButton<_FolderAction>(
+              tooltip: 'Folder actions',
+              icon: const Icon(Icons.more_vert),
+              padding: EdgeInsets.zero,
+              onSelected: (action) {
+                final state = context
+                    .findAncestorStateOfType<_LibraryScreenState>();
+                if (action == _FolderAction.rename) {
+                  state?._promptRenameFolder(controller, folders[index]);
+                } else {
+                  state?._confirmDeleteFolder(controller, folders[index]);
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: _FolderAction.rename,
+                  child: ListTile(
+                    leading: Icon(Icons.drive_file_rename_outline),
+                    title: Text('Rename'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _FolderAction.delete,
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline),
+                    title: Text('Delete'),
+                  ),
+                ),
+              ],
+            ),
+            onTap: () => onSelect(folders[index]),
           ),
+        ],
       ],
     );
   }
@@ -431,6 +492,7 @@ class _FolderChipBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -438,7 +500,7 @@ class _FolderChipBar extends StatelessWidget {
         children: [
           IconButton(
             tooltip: 'New folder',
-            icon: const Icon(Icons.create_new_folder_outlined),
+            icon: const Icon(Icons.add),
             onPressed: () => context
                 .findAncestorStateOfType<_LibraryScreenState>()
                 ?._promptNewFolder(controller),
@@ -447,10 +509,42 @@ class _FolderChipBar extends StatelessWidget {
           for (final folder in controller.folderNames)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(folder),
-                selected: folder == controller.selectedFolder,
-                onSelected: (_) => onSelect(folder),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ChoiceChip(
+                    label: Text(folder),
+                    selected: folder == controller.selectedFolder,
+                    selectedColor: colorScheme.primary.withValues(alpha: 0.08),
+                    labelStyle: folder == controller.selectedFolder
+                        ? TextStyle(color: colorScheme.primary)
+                        : null,
+                    onSelected: (_) => onSelect(folder),
+                  ),
+                  PopupMenuButton<_FolderAction>(
+                    tooltip: 'Folder actions',
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (action) {
+                      final state = context
+                          .findAncestorStateOfType<_LibraryScreenState>();
+                      if (action == _FolderAction.rename) {
+                        state?._promptRenameFolder(controller, folder);
+                      } else {
+                        state?._confirmDeleteFolder(controller, folder);
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: _FolderAction.rename,
+                        child: Text('Rename'),
+                      ),
+                      PopupMenuItem(
+                        value: _FolderAction.delete,
+                        child: Text('Delete'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
         ],

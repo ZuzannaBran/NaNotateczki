@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Trwałe instrukcje dla Claude'a (oraz innych agentów AI) pracujących w tym
 repozytorium. **Czytaj ten plik na początku każdej sesji.** Plik jest

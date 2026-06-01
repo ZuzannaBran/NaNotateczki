@@ -32,7 +32,7 @@ class LibraryController extends ChangeNotifier {
   bool isLoadingSelectedItem = false;
   List<Notebook> items = <Notebook>[];
   String? selectedItemId;
-  String selectedFolder = 'Inbox';
+  String selectedFolder = '';
   String searchQuery = '';
   String? cloudPath;
   DateTime? lastSyncedAt;
@@ -40,6 +40,7 @@ class LibraryController extends ChangeNotifier {
   final Set<String> _folders = <String>{};
   Notebook? _activeNotebook;
 
+  static const String _defaultFolderName = 'Notes';
   static const String _foldersFileName = 'library_folders.json';
 
   bool get shouldShowResetBanner =>
@@ -116,10 +117,10 @@ class LibraryController extends ChangeNotifier {
       ..._folders,
       ...items
           .map((item) => item.folder)
+          .map((name) => name.trim())
           .where((name) => name.trim().isNotEmpty),
-      'Inbox',
     };
-    final list = names.toList()..sort();
+    final list = names.toList()..sort(_compareFolderNames);
     return list;
   }
 
@@ -135,16 +136,89 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> renameFolder(String oldName, String newName) async {
+    final trimmedOldName = oldName.trim();
+    final trimmedNewName = newName.trim();
+    if (trimmedOldName.isEmpty ||
+        trimmedNewName.isEmpty ||
+        trimmedOldName == trimmedNewName) {
+      return;
+    }
+
+    _folders
+      ..remove(trimmedOldName)
+      ..add(trimmedNewName);
+    final updatedItems = <Notebook>[];
+    for (final item in items) {
+      if (item.folder != trimmedOldName) {
+        updatedItems.add(item);
+        continue;
+      }
+
+      final updated = item.copyWith(folder: trimmedNewName);
+      await repository.saveNotebook(updated);
+      updatedItems.add(updated);
+    }
+
+    items = updatedItems;
+    if (selectedFolder == trimmedOldName) {
+      selectedFolder = trimmedNewName;
+    }
+    _activeNotebook = _activeNotebook?.folder == trimmedOldName
+        ? _activeNotebook!.copyWith(folder: trimmedNewName)
+        : _activeNotebook;
+    if (!_selectedItemIsInFolder(selectedFolder)) {
+      selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
+    }
+    await _saveFolders();
+    notifyListeners();
+  }
+
+  Future<void> deleteFolder(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+
+    _folders.remove(trimmed);
+    for (final item in items) {
+      if (item.folder != trimmed) {
+        continue;
+      }
+
+      await repository.deleteNotebook(item.uid);
+    }
+
+    items = items.where((item) => item.folder != trimmed).toList();
+    if (selectedFolder == trimmed) {
+      selectedFolder = folderNames.isEmpty ? '' : folderNames.first;
+    }
+    if (_activeNotebook?.folder == trimmed) {
+      _activeNotebook = null;
+    }
+    if (!_selectedItemIsInFolder(selectedFolder)) {
+      selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
+    }
+    await _saveFolders();
+    notifyListeners();
+  }
+
   Future<void> createNotebook() async {
-    final notebook = await repository.createNotebook(folder: selectedFolder);
+    final notebook = await repository.createNotebook(
+      folder: _targetFolderForNewItem(),
+    );
     items = [notebook, ...items];
+    selectedFolder = notebook.folder;
     selectedItemId = notebook.uid;
     notifyListeners();
   }
 
   Future<void> createBoard() async {
-    final board = await repository.createBoard(folder: selectedFolder);
+    final board = await repository.createBoard(
+      folder: _targetFolderForNewItem(),
+    );
     items = [board, ...items];
+    selectedFolder = board.folder;
     selectedItemId = board.uid;
     notifyListeners();
   }
@@ -233,6 +307,25 @@ class LibraryController extends ChangeNotifier {
     return folderItems.first;
   }
 
+  bool _selectedItemIsInFolder(String folder) {
+    final uid = selectedItemId;
+    if (uid == null) {
+      return false;
+    }
+    return items.any((item) => item.uid == uid && item.folder == folder);
+  }
+
+  String _targetFolderForNewItem() {
+    if (selectedFolder.trim().isNotEmpty) {
+      return selectedFolder;
+    }
+    final folders = folderNames;
+    if (folders.isNotEmpty) {
+      return folders.first;
+    }
+    return _defaultFolderName;
+  }
+
   Future<void> _loadCloudPath() async {
     cloudPath = await cloudSyncService.getCloudPath();
     notifyListeners();
@@ -265,7 +358,7 @@ class LibraryController extends ChangeNotifier {
   Future<void> _saveFolders() async {
     try {
       final file = await _foldersFile();
-      final payload = _folders.toList()..sort();
+      final payload = _folders.toList()..sort(_compareFolderNames);
       await file.writeAsString(jsonEncode(payload));
     } catch (e) {
       debugPrint('LibraryController._saveFolders failed: $e');
@@ -275,6 +368,14 @@ class LibraryController extends ChangeNotifier {
   Future<File> _foldersFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/$_foldersFileName');
+  }
+
+  int _compareFolderNames(String a, String b) {
+    final lowerCompare = a.toLowerCase().compareTo(b.toLowerCase());
+    if (lowerCompare != 0) {
+      return lowerCompare;
+    }
+    return a.compareTo(b);
   }
 
   bool _matches(Notebook notebook, String query) {

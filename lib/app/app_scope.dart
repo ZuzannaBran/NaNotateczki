@@ -34,6 +34,12 @@ class AppScope extends StatelessWidget {
         Future<void> runBackup() async {
           try {
             final items = await repository.fetchNotebooks();
+            if (repository.lastFetchSkippedCorruptRows) {
+              debugPrint(
+                'AppScope backup hook skipped after partial Isar fetch',
+              );
+              return;
+            }
             await backupService.snapshot(items);
           } catch (e) {
             debugPrint('AppScope backup hook failed: $e');

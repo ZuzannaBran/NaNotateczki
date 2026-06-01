@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../data/export/notebook_export_service.dart';
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../state/editor_controller.dart';
 
@@ -8,11 +9,13 @@ class EditorToolbar extends StatelessWidget {
   const EditorToolbar({
     required this.controller,
     required this.onInsertPressed,
+    required this.onExportSelected,
     super.key,
   });
 
   final EditorController controller;
   final VoidCallback onInsertPressed;
+  final ValueChanged<NotebookExportFormat> onExportSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -23,78 +26,113 @@ class EditorToolbar extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           color: AppColors.toolbar,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _toolButton(
-                  icon: Icons.brush_outlined,
-                  label: 'Pen',
-                  tool: DrawingTool.pen,
-                ),
-                _toolButton(
-                  icon: Icons.highlight,
-                  label: 'Highlighter',
-                  tool: DrawingTool.highlighter,
-                ),
-                _eraserSelector(),
-                _shapeSelector(),
-                _toolButton(
-                  icon: Icons.text_fields,
-                  label: 'Text',
-                  tool: DrawingTool.text,
-                ),
-                _toolButton(
-                  icon: Icons.ads_click,
-                  label: 'Lasso / Select',
-                  tool: DrawingTool.lasso,
-                ),
-                _toolButton(
-                  icon: Icons.open_with,
-                  label: 'Move',
-                  tool: DrawingTool.edit,
-                ),
-                _actionButton(
-                  icon: Icons.add,
-                  label: 'Insert',
-                  isActive: false,
-                  onPressed: onInsertPressed,
-                ),
-                const SizedBox(width: 12),
-                for (var i = 0; i < controller.quickColors.length; i++)
-                  _colorDot(
-                    context,
-                    color: controller.quickColors[i],
-                    selected: controller.inkColor == controller.quickColors[i],
-                    onSelect: () =>
-                        controller.setColor(controller.quickColors[i]),
-                    onEdit: (color) => controller.setQuickColor(i, color),
+          child: Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _toolButton(
+                        icon: Icons.brush_outlined,
+                        label: 'Pen',
+                        tool: DrawingTool.pen,
+                      ),
+                      _toolButton(
+                        icon: Icons.highlight,
+                        label: 'Highlighter',
+                        tool: DrawingTool.highlighter,
+                      ),
+                      _eraserSelector(),
+                      _shapeSelector(),
+                      _toolButton(
+                        icon: Icons.text_fields,
+                        label: 'Text',
+                        tool: DrawingTool.text,
+                      ),
+                      _toolButton(
+                        icon: Icons.ads_click,
+                        label: 'Lasso / Select',
+                        tool: DrawingTool.lasso,
+                      ),
+                      _toolButton(
+                        icon: Icons.open_with,
+                        label: 'Move',
+                        tool: DrawingTool.edit,
+                      ),
+                      _actionButton(
+                        icon: Icons.add,
+                        label: 'Insert',
+                        isActive: false,
+                        onPressed: onInsertPressed,
+                      ),
+                      const SizedBox(width: 12),
+                      for (var i = 0; i < controller.quickColors.length; i++)
+                        _colorDot(
+                          context,
+                          color: controller.quickColors[i],
+                          selected:
+                              controller.inkColor == controller.quickColors[i],
+                          onSelect: () =>
+                              controller.setColor(controller.quickColors[i]),
+                          onEdit: (color) => controller.setQuickColor(i, color),
+                        ),
+                      SizedBox(
+                        width: 140,
+                        child: Slider(
+                          value: controller.inkStrokeWidth,
+                          min: 1.0,
+                          max: 12.0,
+                          onChanged: controller.setStrokeWidth,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        icon: const Icon(Icons.undo),
+                        onPressed: controller.canUndo ? controller.undo : null,
+                        tooltip: 'Undo',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.redo),
+                        onPressed: controller.canRedo ? controller.redo : null,
+                        tooltip: 'Redo',
+                      ),
+                    ],
                   ),
-                SizedBox(
-                  width: 140,
-                  child: Slider(
-                    value: controller.inkStrokeWidth,
-                    min: 1.0,
-                    max: 12.0,
-                    onChanged: controller.setStrokeWidth,
-                  ),
                 ),
-                const SizedBox(width: 12),
-                IconButton(
-                  icon: const Icon(Icons.undo),
-                  onPressed: controller.canUndo ? controller.undo : null,
-                  tooltip: 'Undo',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.redo),
-                  onPressed: controller.canRedo ? controller.redo : null,
-                  tooltip: 'Redo',
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              _exportButton(),
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _exportButton() {
+    return PopupMenuButton<NotebookExportFormat>(
+      tooltip: 'Export',
+      icon: const Icon(Icons.ios_share),
+      onSelected: onExportSelected,
+      itemBuilder: (context) => [
+        for (final format in NotebookExportFormat.values)
+          PopupMenuItem(
+            value: format,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  format == NotebookExportFormat.pdf
+                      ? Icons.picture_as_pdf
+                      : Icons.image,
+                ),
+                const SizedBox(width: 8),
+                Text(format.label),
+              ],
+            ),
+          ),
+      ],
     );
   }
 

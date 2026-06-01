@@ -15,6 +15,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
+import '../../../data/export/notebook_export_service.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/note_page.dart';
 import '../state/editor_controller.dart';
@@ -41,6 +42,7 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _touchPanSensitivity = 0.55;
   static const double _trackpadPanSensitivity = 0.6;
   static const double _scrollPanSensitivity = 0.38;
+  static const double _inkNavigationTouchSlop = 8.0;
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _canvasKey = GlobalKey();
@@ -51,6 +53,8 @@ class _EditorScreenState extends State<EditorScreen> {
   bool _isViewportNavigating = false;
   bool _panZoomSessionActive = false;
   final Map<int, Offset> _activePointers = <int, Offset>{};
+  int? _pendingNavigationPointer;
+  Offset? _pendingNavigationPosition;
   Offset _touchLastFocal = Offset.zero;
   double _touchLastDistance = 1.0;
   Offset _panZoomLastPan = Offset.zero;
@@ -226,6 +230,21 @@ class _EditorScreenState extends State<EditorScreen> {
     if (!_isNavigationPointerKind(event.kind)) {
       return;
     }
+    final controller = context.read<EditorController>();
+    if (controller.tool.isInk && event.kind == PointerDeviceKind.touch) {
+      if (_pendingNavigationPointer == null && _activePointers.isEmpty) {
+        _pendingNavigationPointer = event.pointer;
+        _pendingNavigationPosition = event.localPosition;
+        return;
+      }
+      final pendingPointer = _pendingNavigationPointer;
+      final pendingPosition = _pendingNavigationPosition;
+      if (pendingPointer != null && pendingPosition != null) {
+        _activePointers[pendingPointer] = pendingPosition;
+        _pendingNavigationPointer = null;
+        _pendingNavigationPosition = null;
+      }
+    }
     _activePointers[event.pointer] = event.localPosition;
     if (_activePointers.length < 2) {
       return;
@@ -239,6 +258,16 @@ class _EditorScreenState extends State<EditorScreen> {
     Size viewportSize,
   ) {
     if (!_isNavigationPointerKind(event.kind)) {
+      return;
+    }
+    if (event.pointer == _pendingNavigationPointer) {
+      final pendingPosition = _pendingNavigationPosition;
+      if (pendingPosition != null &&
+          (event.localPosition - pendingPosition).distance >
+              _inkNavigationTouchSlop) {
+        _pendingNavigationPointer = null;
+        _pendingNavigationPosition = null;
+      }
       return;
     }
     if (!_activePointers.containsKey(event.pointer)) {
@@ -286,6 +315,11 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _onPointerUpOrCancel(PointerEvent event) {
+    if (event.pointer == _pendingNavigationPointer) {
+      _pendingNavigationPointer = null;
+      _pendingNavigationPosition = null;
+      return;
+    }
     final removed = _activePointers.remove(event.pointer) != null;
     if (!removed) {
       return;
@@ -656,6 +690,37 @@ class _EditorScreenState extends State<EditorScreen> {
     controller.setTool(DrawingTool.edit);
   }
 
+  Future<void> _handleExport(
+    EditorController controller,
+    NotebookExportFormat format,
+  ) async {
+    try {
+      final path = await NotebookExportService.exportController(
+        controller,
+        format,
+      );
+      if (!mounted) {
+        return;
+      }
+      if (path == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Export cancelled')));
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Exported to $path')));
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
   Future<void> _handlePaste(EditorController controller) async {
     final message = await controller.pasteElementOrClipboard(_insertPosition);
     if (message != null && mounted) {
@@ -758,6 +823,7 @@ class _EditorScreenState extends State<EditorScreen> {
         EditorToolbar(
           controller: controller,
           onInsertPressed: () => _handleInsertFile(controller),
+          onExportSelected: (format) => _handleExport(controller, format),
         ),
         if (controller.activeTextController != null)
           TextEditToolbar(
@@ -839,7 +905,10 @@ class _EditorScreenState extends State<EditorScreen> {
                           _onPagesScroll(notification, controller),
                       child: SingleChildScrollView(
                         controller: _scrollController,
-                        physics: (_isViewportNavigating || _pageScale > 1.001)
+                        physics:
+                            (_isViewportNavigating ||
+                                _pageScale > 1.001 ||
+                                controller.tool.isInk)
                             ? const NeverScrollableScrollPhysics()
                             : const ClampingScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(
