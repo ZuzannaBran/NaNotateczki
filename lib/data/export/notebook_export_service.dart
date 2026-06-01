@@ -374,19 +374,62 @@ class NotebookExportService {
       paint.color = _strokeColor(stroke.color, stroke.tool);
     }
 
+    final path = _buildInkPath(stroke.points, stroke.tool, origin);
+    canvas.drawPath(path, paint);
+  }
+
+  static Path _buildInkPath(
+    List<InkPoint> points,
+    DrawingTool tool,
+    Offset origin,
+  ) {
+    final offsets = points.map((point) => point.toOffset() - origin).toList();
     final path = Path();
-    for (var i = 0; i < stroke.points.length; i++) {
-      final point = stroke.points[i].toOffset() - origin;
-      if (i == 0) {
-        path.moveTo(point.dx, point.dy);
-      } else {
-        path.lineTo(point.dx, point.dy);
-      }
+    if (offsets.isEmpty) {
+      return path;
     }
-    if (_samePoint(stroke.points.first, stroke.points.last)) {
+    path.moveTo(offsets.first.dx, offsets.first.dy);
+    if (!_shouldSmoothStroke(points, tool)) {
+      for (var i = 1; i < offsets.length; i++) {
+        path.lineTo(offsets[i].dx, offsets[i].dy);
+      }
+    } else {
+      for (var i = 1; i < offsets.length - 1; i++) {
+        final current = offsets[i];
+        final next = offsets[i + 1];
+        final midpoint = Offset(
+          (current.dx + next.dx) / 2,
+          (current.dy + next.dy) / 2,
+        );
+        path.quadraticBezierTo(
+          current.dx,
+          current.dy,
+          midpoint.dx,
+          midpoint.dy,
+        );
+      }
+      path.lineTo(offsets.last.dx, offsets.last.dy);
+    }
+    if (_samePoint(points.first, points.last)) {
       path.close();
     }
-    canvas.drawPath(path, paint);
+    return path;
+  }
+
+  static bool _shouldSmoothStroke(List<InkPoint> points, DrawingTool tool) {
+    if (tool != DrawingTool.pen && tool != DrawingTool.highlighter) {
+      return false;
+    }
+    if (points.length < 4 || _samePoint(points.first, points.last)) {
+      return false;
+    }
+    var longestSegmentSquared = 0.0;
+    for (var i = 0; i < points.length - 1; i++) {
+      final distanceSquared =
+          (points[i + 1].toOffset() - points[i].toOffset()).distanceSquared;
+      longestSegmentSquared = math.max(longestSegmentSquared, distanceSquared);
+    }
+    return longestSegmentSquared > 64.0;
   }
 
   static Future<ui.Image?> _decodeImage(ImageBlock block) async {

@@ -139,6 +139,8 @@ class DocumentPageOverlay extends StatelessWidget {
     required this.pageGap,
     this.interactionEnabled = true,
     this.worldOrigin = Offset.zero,
+    this.firstPageIndex = 0,
+    this.lastPageIndex,
     this.renderBackground = true,
     this.renderActive = true,
     this.renderInactive = true,
@@ -151,6 +153,8 @@ class DocumentPageOverlay extends StatelessWidget {
   final double pageGap;
   final bool interactionEnabled;
   final Offset worldOrigin;
+  final int firstPageIndex;
+  final int? lastPageIndex;
   final bool renderBackground;
   final bool renderActive;
   final bool renderInactive;
@@ -158,9 +162,13 @@ class DocumentPageOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stride = pageSize.height + pageGap;
+    final start = firstPageIndex.clamp(0, pages.length).toInt();
+    final end = (lastPageIndex ?? pages.length)
+        .clamp(start, pages.length)
+        .toInt();
     return Stack(
       children: [
-        for (var i = 0; i < pages.length; i++)
+        for (var i = start; i < end; i++)
           Positioned(
             left: 0,
             top: i * stride,

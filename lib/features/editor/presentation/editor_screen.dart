@@ -9,7 +9,6 @@ import 'package:flutter/gestures.dart'
         PointerScrollEvent,
         PointerSignalEvent;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -36,6 +35,8 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _leftMargin = 24;
   static const double _rightMargin = 56;
   static const double _topBottomPadding = 22;
+  static const double _addPageButtonGap = 10;
+  static const double _addPageFooterHeight = 56;
   static const double _minPageScaleFactor = 1.0;
   static const double _maxPageScaleFloor = 1.8;
   static const double _postFitZoomFactor = 2.0;
@@ -46,13 +47,11 @@ class _EditorScreenState extends State<EditorScreen> {
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _canvasKey = GlobalKey();
-  bool _isAutoAddingPage = false;
-  bool _wasScrollingDown = false;
-  DateTime _lastAutoAddAt = DateTime.fromMillisecondsSinceEpoch(0);
   double _pageExtent = 0;
   bool _isViewportNavigating = false;
   bool _panZoomSessionActive = false;
   final Map<int, Offset> _activePointers = <int, Offset>{};
+  int? _activeInkPointer;
   int? _pendingNavigationPointer;
   Offset? _pendingNavigationPosition;
   Offset _touchLastFocal = Offset.zero;
@@ -94,25 +93,8 @@ class _EditorScreenState extends State<EditorScreen> {
       return false;
     }
 
-    if (notification is ScrollUpdateNotification) {
-      final delta = notification.scrollDelta ?? 0;
-      _wasScrollingDown = delta > 0;
-      if (_pageScale > 1.001 || _isViewportNavigating) {
-        if (delta > 0) {
-          _tryAutoAddPage(notification.metrics, controller);
-        }
-      }
-      return false;
-    }
-
-    if (notification is ScrollEndNotification ||
-        (notification is UserScrollNotification &&
-            notification.direction == ScrollDirection.idle)) {
+    if (notification is ScrollEndNotification) {
       _syncCurrentPageToViewport(controller);
-      if (_wasScrollingDown) {
-        _tryAutoAddPage(notification.metrics, controller);
-      }
-      _wasScrollingDown = false;
     }
 
     return false;
@@ -141,43 +123,8 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
-  void _tryAutoAddPage(ScrollMetrics metrics, EditorController controller) {
-    if (_isAutoAddingPage) {
-      return;
-    }
-    if (metrics.extentAfter > 80) {
-      return;
-    }
-    final now = DateTime.now();
-    if (now.difference(_lastAutoAddAt) < const Duration(milliseconds: 450)) {
-      return;
-    }
-
-    _isAutoAddingPage = true;
-    _lastAutoAddAt = now;
-    final previousCount = controller.pages.length;
+  void _addPageBelow(EditorController controller) {
     controller.addPage();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted || !_scrollController.hasClients) {
-        _isAutoAddingPage = false;
-        return;
-      }
-      final targetOffset = (_pageExtent * previousCount).clamp(
-        0.0,
-        _scrollController.position.maxScrollExtent,
-      );
-      try {
-        await _scrollController.animateTo(
-          targetOffset,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-        );
-      } catch (_) {}
-      if (mounted) {
-        _isAutoAddingPage = false;
-      }
-    });
   }
 
   void _syncPageTransformBounds({
@@ -222,15 +169,31 @@ class _EditorScreenState extends State<EditorScreen> {
         kind != PointerDeviceKind.invertedStylus;
   }
 
+  bool _isStylusPointerKind(PointerDeviceKind kind) {
+    return kind == PointerDeviceKind.stylus ||
+        kind == PointerDeviceKind.invertedStylus;
+  }
+
   void _onPointerDown(
     PointerDownEvent event,
     Size docWorldSize,
     Size viewportSize,
   ) {
+    final controller = context.read<EditorController>();
+    if (controller.tool.isInk && _isStylusPointerKind(event.kind)) {
+      _activeInkPointer = event.pointer;
+      _pendingNavigationPointer = null;
+      _pendingNavigationPosition = null;
+      return;
+    }
+    if (controller.tool.isInk &&
+        event.kind == PointerDeviceKind.touch &&
+        _activeInkPointer != null) {
+      return;
+    }
     if (!_isNavigationPointerKind(event.kind)) {
       return;
     }
-    final controller = context.read<EditorController>();
     if (controller.tool.isInk && event.kind == PointerDeviceKind.touch) {
       if (_pendingNavigationPointer == null && _activePointers.isEmpty) {
         _pendingNavigationPointer = event.pointer;
@@ -257,6 +220,12 @@ class _EditorScreenState extends State<EditorScreen> {
     Size docWorldSize,
     Size viewportSize,
   ) {
+    if (event.pointer == _activeInkPointer) {
+      return;
+    }
+    if (event.kind == PointerDeviceKind.touch && _activeInkPointer != null) {
+      return;
+    }
     if (!_isNavigationPointerKind(event.kind)) {
       return;
     }
@@ -265,8 +234,12 @@ class _EditorScreenState extends State<EditorScreen> {
       if (pendingPosition != null &&
           (event.localPosition - pendingPosition).distance >
               _inkNavigationTouchSlop) {
+        _activePointers[event.pointer] = event.localPosition;
         _pendingNavigationPointer = null;
         _pendingNavigationPosition = null;
+        if (_activePointers.length >= 2) {
+          _startViewportNavigation(docWorldSize, viewportSize);
+        }
       }
       return;
     }
@@ -315,6 +288,10 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _onPointerUpOrCancel(PointerEvent event) {
+    if (event.pointer == _activeInkPointer) {
+      _activeInkPointer = null;
+      return;
+    }
     if (event.pointer == _pendingNavigationPointer) {
       _pendingNavigationPointer = null;
       _pendingNavigationPosition = null;
@@ -499,10 +476,6 @@ class _EditorScreenState extends State<EditorScreen> {
           .toDouble();
       if ((targetOffset - position.pixels).abs() > 0.5) {
         _scrollController.jumpTo(targetOffset);
-        final controller = context.read<EditorController>();
-        if (overflow.dy < 0) {
-          _tryAutoAddPage(position, controller);
-        }
       }
     }
 
@@ -654,6 +627,15 @@ class _EditorScreenState extends State<EditorScreen> {
       right: touchesRight,
       bottom: touchesBottom,
     );
+  }
+
+  _PageRenderRange _visiblePageRange({
+    required Rect visibleDocumentRect,
+    required Size pageWorldSize,
+    required int pageCount,
+    required int currentPageIndex,
+  }) {
+    return _PageRenderRange(0, math.max(0, pageCount));
   }
 
   Offset _insertPositionForViewport({
@@ -859,6 +841,10 @@ class _EditorScreenState extends State<EditorScreen> {
                 docWorldSize.width * clipScale,
                 docWorldSize.height * clipScale,
               );
+              final documentContentSize = Size(
+                clipSize.width,
+                clipSize.height + (_addPageFooterHeight * clipScale),
+              );
               final viewportSize = Size(
                 clipSize.width,
                 math.max(1.0, constraints.maxHeight - (_topBottomPadding * 2)),
@@ -874,6 +860,12 @@ class _EditorScreenState extends State<EditorScreen> {
                     pageWorldSize: pageWorldSize,
                     pageIndex: controller.currentPageIndex,
                   );
+              final visiblePageRange = _visiblePageRange(
+                visibleDocumentRect: visibleDocumentRect,
+                pageWorldSize: pageWorldSize,
+                pageCount: controller.pages.length,
+                currentPageIndex: controller.currentPageIndex,
+              );
               final insertPosition = _insertPositionForViewport(
                 visibleDocumentRect: visibleDocumentRect,
                 pageWorldSize: pageWorldSize,
@@ -906,9 +898,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       child: SingleChildScrollView(
                         controller: _scrollController,
                         physics:
-                            (_isViewportNavigating ||
-                                _pageScale > 1.001 ||
-                                controller.tool.isInk)
+                            (controller.tool.isInk ||
+                                _isViewportNavigating ||
+                                _pageScale > 1.001)
                             ? const NeverScrollableScrollPhysics()
                             : const ClampingScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(
@@ -920,166 +912,225 @@ class _EditorScreenState extends State<EditorScreen> {
                         child: Align(
                           alignment: Alignment.topRight,
                           child: SizedBox(
-                            width: clipSize.width,
-                            height: clipSize.height,
-                            child: ClipRect(
-                              child: GestureDetector(
-                                onSecondaryTapDown: (details) =>
-                                    _showCanvasContextMenu(
-                                      details.globalPosition,
-                                      controller,
-                                      docWorldSize,
-                                    ),
-                                child: Listener(
-                                  key: _canvasKey,
-                                  behavior: HitTestBehavior.translucent,
-                                  onPointerDown: (event) => _onPointerDown(
-                                    event,
-                                    docWorldSize,
-                                    viewportSize,
-                                  ),
-                                  onPointerMove: (event) => _onPointerMove(
-                                    event,
-                                    docWorldSize,
-                                    viewportSize,
-                                  ),
-                                  onPointerUp: _onPointerUpOrCancel,
-                                  onPointerCancel: _onPointerUpOrCancel,
-                                  onPointerPanZoomStart: (event) =>
-                                      _onPointerPanZoomStart(
-                                        event,
-                                        docWorldSize,
-                                        viewportSize,
-                                      ),
-                                  onPointerPanZoomUpdate: (event) =>
-                                      _onPointerPanZoomUpdate(
-                                        event,
-                                        docWorldSize,
-                                        viewportSize,
-                                      ),
-                                  onPointerPanZoomEnd: _onPointerPanZoomEnd,
-                                  onPointerSignal: (event) => _onPointerSignal(
-                                    event,
-                                    docWorldSize,
-                                    viewportSize,
-                                  ),
-                                  child: Transform(
-                                    alignment: Alignment.topLeft,
-                                    transform: pageTransform,
-                                    child: SizedBox(
-                                      width: docWorldSize.width,
-                                      height: docWorldSize.height,
-                                      child: Stack(
-                                        children: [
-                                          for (
-                                            var i = 0;
-                                            i < controller.pages.length;
-                                            i++
-                                          )
-                                            Positioned(
-                                              left: 0,
-                                              top: i * _pageExtent,
-                                              width: pageWorldSize.width,
-                                              height: pageWorldSize.height,
-                                              child: IgnorePointer(
-                                                child: Stack(
-                                                  fit: StackFit.expand,
-                                                  children: [
-                                                    DecoratedBox(
-                                                      decoration: BoxDecoration(
-                                                        color: AppColors.paper,
-                                                        boxShadow: const [
-                                                          BoxShadow(
-                                                            color: AppColors
-                                                                .shadow,
-                                                            blurRadius: 14,
-                                                            offset: Offset(
-                                                              0,
-                                                              6,
+                            width: documentContentSize.width,
+                            height: documentContentSize.height,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                SizedBox(
+                                  width: clipSize.width,
+                                  height: clipSize.height,
+                                  child: ClipRect(
+                                    child: GestureDetector(
+                                      onSecondaryTapDown: (details) =>
+                                          _showCanvasContextMenu(
+                                            details.globalPosition,
+                                            controller,
+                                            docWorldSize,
+                                          ),
+                                      child: Listener(
+                                        key: _canvasKey,
+                                        behavior: HitTestBehavior.translucent,
+                                        onPointerDown: (event) =>
+                                            _onPointerDown(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            ),
+                                        onPointerMove: (event) =>
+                                            _onPointerMove(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            ),
+                                        onPointerUp: _onPointerUpOrCancel,
+                                        onPointerCancel: _onPointerUpOrCancel,
+                                        onPointerPanZoomStart: (event) =>
+                                            _onPointerPanZoomStart(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            ),
+                                        onPointerPanZoomUpdate: (event) =>
+                                            _onPointerPanZoomUpdate(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            ),
+                                        onPointerPanZoomEnd:
+                                            _onPointerPanZoomEnd,
+                                        onPointerSignal: (event) =>
+                                            _onPointerSignal(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            ),
+                                        child: Transform(
+                                          alignment: Alignment.topLeft,
+                                          transform: pageTransform,
+                                          child: SizedBox(
+                                            width: docWorldSize.width,
+                                            height: docWorldSize.height,
+                                            child: Stack(
+                                              children: [
+                                                for (
+                                                  var i =
+                                                      visiblePageRange.start;
+                                                  i < visiblePageRange.end;
+                                                  i++
+                                                )
+                                                  Positioned(
+                                                    left: 0,
+                                                    top: i * _pageExtent,
+                                                    width: pageWorldSize.width,
+                                                    height:
+                                                        pageWorldSize.height,
+                                                    child: IgnorePointer(
+                                                      child: Stack(
+                                                        fit: StackFit.expand,
+                                                        children: [
+                                                          DecoratedBox(
+                                                            decoration: BoxDecoration(
+                                                              color: AppColors
+                                                                  .paper,
+                                                              boxShadow: const [
+                                                                BoxShadow(
+                                                                  color: AppColors
+                                                                      .shadow,
+                                                                  blurRadius:
+                                                                      14,
+                                                                  offset:
+                                                                      Offset(
+                                                                        0,
+                                                                        6,
+                                                                      ),
+                                                                ),
+                                                              ],
                                                             ),
+                                                          ),
+                                                          Builder(
+                                                            builder: (context) {
+                                                              final visibility =
+                                                                  _pageBoundaryVisibilityInDocument(
+                                                                    visibleDocumentRect:
+                                                                        visibleDocumentRect,
+                                                                    pageWorldSize:
+                                                                        pageWorldSize,
+                                                                    pageIndex:
+                                                                        i,
+                                                                  );
+                                                              return CustomPaint(
+                                                                painter: _PageFramePainter(
+                                                                  showLeft:
+                                                                      visibility
+                                                                          .left,
+                                                                  showTop:
+                                                                      visibility
+                                                                          .top,
+                                                                  showRight:
+                                                                      visibility
+                                                                          .right,
+                                                                  showBottom:
+                                                                      visibility
+                                                                          .bottom,
+                                                                  highlightColor:
+                                                                      Theme.of(
+                                                                        context,
+                                                                      ).colorScheme.primary.withValues(
+                                                                        alpha:
+                                                                            0.75,
+                                                                      ),
+                                                                ),
+                                                              );
+                                                            },
                                                           ),
                                                         ],
                                                       ),
                                                     ),
-                                                    Builder(
-                                                      builder: (context) {
-                                                        final visibility =
-                                                            _pageBoundaryVisibilityInDocument(
-                                                              visibleDocumentRect:
-                                                                  visibleDocumentRect,
-                                                              pageWorldSize:
-                                                                  pageWorldSize,
-                                                              pageIndex: i,
-                                                            );
-                                                        return CustomPaint(
-                                                          painter: _PageFramePainter(
-                                                            showLeft:
-                                                                visibility.left,
-                                                            showTop:
-                                                                visibility.top,
-                                                            showRight:
-                                                                visibility
-                                                                    .right,
-                                                            showBottom:
-                                                                visibility
-                                                                    .bottom,
-                                                            highlightColor:
-                                                                Theme.of(
-                                                                      context,
-                                                                    )
-                                                                    .colorScheme
-                                                                    .primary
-                                                                    .withValues(
-                                                                      alpha:
-                                                                          0.75,
-                                                                    ),
-                                                          ),
-                                                        );
-                                                      },
-                                                    ),
-                                                  ],
+                                                  ),
+                                                DocumentPageOverlay(
+                                                  controller: controller,
+                                                  interactionEnabled:
+                                                      !_isViewportNavigating,
+                                                  worldOrigin: Offset.zero,
+                                                  pages: controller.pages,
+                                                  pageSize: pageWorldSize,
+                                                  pageGap: _pageGap,
+                                                  firstPageIndex:
+                                                      visiblePageRange.start,
+                                                  lastPageIndex:
+                                                      visiblePageRange.end,
+                                                  renderBackground: true,
+                                                  renderInactive: true,
+                                                  renderActive: false,
                                                 ),
-                                              ),
+                                                DocumentDrawingCanvas(
+                                                  allowMultiTouch: false,
+                                                  interactionEnabled:
+                                                      !_isViewportNavigating,
+                                                  worldOrigin: Offset.zero,
+                                                  pages: controller.pages,
+                                                  pageSize: pageWorldSize,
+                                                  pageGap: _pageGap,
+                                                  firstPageIndex:
+                                                      visiblePageRange.start,
+                                                  lastPageIndex:
+                                                      visiblePageRange.end,
+                                                ),
+                                                DocumentPageOverlay(
+                                                  controller: controller,
+                                                  interactionEnabled:
+                                                      !_isViewportNavigating,
+                                                  worldOrigin: Offset.zero,
+                                                  pages: controller.pages,
+                                                  pageSize: pageWorldSize,
+                                                  pageGap: _pageGap,
+                                                  firstPageIndex:
+                                                      visiblePageRange.start,
+                                                  lastPageIndex:
+                                                      visiblePageRange.end,
+                                                  renderBackground: false,
+                                                  renderInactive: false,
+                                                  renderActive: true,
+                                                ),
+                                              ],
                                             ),
-                                          DocumentPageOverlay(
-                                            controller: controller,
-                                            interactionEnabled:
-                                                !_isViewportNavigating,
-                                            worldOrigin: Offset.zero,
-                                            pages: controller.pages,
-                                            pageSize: pageWorldSize,
-                                            pageGap: _pageGap,
-                                            renderBackground: true,
-                                            renderInactive: true,
-                                            renderActive: false,
                                           ),
-                                          DocumentDrawingCanvas(
-                                            allowMultiTouch: false,
-                                            interactionEnabled:
-                                                !_isViewportNavigating,
-                                            worldOrigin: Offset.zero,
-                                            pages: controller.pages,
-                                            pageSize: pageWorldSize,
-                                            pageGap: _pageGap,
-                                          ),
-                                          DocumentPageOverlay(
-                                            controller: controller,
-                                            interactionEnabled:
-                                                !_isViewportNavigating,
-                                            worldOrigin: Offset.zero,
-                                            pages: controller.pages,
-                                            pageSize: pageWorldSize,
-                                            pageGap: _pageGap,
-                                            renderBackground: false,
-                                            renderInactive: false,
-                                            renderActive: true,
-                                          ),
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
+                                Transform(
+                                  alignment: Alignment.topLeft,
+                                  transform: pageTransform,
+                                  child: SizedBox(
+                                    width: docWorldSize.width,
+                                    height:
+                                        docWorldSize.height +
+                                        _addPageFooterHeight,
+                                    child: Stack(
+                                      children: [
+                                        Positioned(
+                                          top:
+                                              docWorldSize.height +
+                                              _addPageButtonGap,
+                                          left: 0,
+                                          width: docWorldSize.width,
+                                          child: Center(
+                                            child: FilledButton.icon(
+                                              onPressed: () =>
+                                                  _addPageBelow(controller),
+                                              icon: const Icon(Icons.add),
+                                              label: const Text('Add page'),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -1231,6 +1282,13 @@ class _BoundaryVisibility {
   int get hashCode {
     return Object.hash(left, top, right, bottom);
   }
+}
+
+class _PageRenderRange {
+  const _PageRenderRange(this.start, this.end);
+
+  final int start;
+  final int end;
 }
 
 class _PageFramePainter extends CustomPainter {

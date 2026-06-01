@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui';
-import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -91,6 +91,7 @@ class EditorController extends ChangeNotifier {
   final List<EditorAction> _undoActions = <EditorAction>[];
   final List<EditorAction> _redoActions = <EditorAction>[];
   Timer? _prefsSaveDebounce;
+  Timer? _notebookSaveDebounce;
 
   String? lastTextFontFamily;
   double lastTextFontSize = 18.0;
@@ -98,6 +99,8 @@ class EditorController extends ChangeNotifier {
 
   String? activeTextBlockId;
   quill.QuillController? activeTextController;
+  int? _activeTextEditPageIndex;
+  TextBlock? _activeTextEditBefore;
   String? activeImageBlockId;
   LassoSelection? lassoSelection;
   final ValueNotifier<Offset> lassoDragDelta = ValueNotifier(Offset.zero);
@@ -115,6 +118,17 @@ class EditorController extends ChangeNotifier {
   bool get canRedo => _redoActions.isNotEmpty;
   Rect get contentBounds => _computeContentBounds();
   Size get layoutPageSize => Size(_pageWidth, _pageHeight);
+
+  @override
+  void dispose() {
+    _commitActiveTextEdit();
+    _prefsSaveDebounce?.cancel();
+    if (_notebookSaveDebounce != null) {
+      unawaited(_save());
+    }
+    lassoDragDelta.dispose();
+    super.dispose();
+  }
 
   void updatePageLayout({
     required double pageWidth,
@@ -390,13 +404,20 @@ class EditorController extends ChangeNotifier {
   }
 
   void setActiveTextBlock(String? blockId, quill.QuillController? controller) {
+    if (blockId != activeTextBlockId) {
+      _commitActiveTextEdit();
+    }
     activeTextBlockId = blockId;
     activeTextController = controller;
     activeImageBlockId = null;
+    if (blockId != null) {
+      _beginTextEdit(blockId);
+    }
     notifyListeners();
   }
 
   void clearActiveTextBlock() {
+    _commitActiveTextEdit();
     activeTextBlockId = null;
     activeTextController = null;
     notifyListeners();
@@ -405,6 +426,7 @@ class EditorController extends ChangeNotifier {
   void setActiveImageBlock(String? blockId) {
     activeImageBlockId = blockId;
     if (blockId != null) {
+      _commitActiveTextEdit();
       activeTextBlockId = null;
       activeTextController = null;
     }
@@ -816,6 +838,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void undo() {
+    _commitActiveTextEdit();
     if (_undoActions.isEmpty) {
       return;
     }
@@ -827,6 +850,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void redo() {
+    _commitActiveTextEdit();
     if (_redoActions.isEmpty) {
       return;
     }
@@ -838,6 +862,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void addPage() {
+    _commitActiveTextEdit();
     final nextIndex = pages.length + 1;
     final page = _createPage(nextIndex);
     pages = [...pages, page];
@@ -873,6 +898,7 @@ class EditorController extends ChangeNotifier {
     if (currentPageIndex == index) {
       return;
     }
+    _commitActiveTextEdit();
     activeTextBlockId = null;
     activeTextController = null;
     activeImageBlockId = null;
@@ -948,8 +974,12 @@ class EditorController extends ChangeNotifier {
   }) {
     final normalizedText = plainText.trimRight();
     final after = before.copyWith(text: normalizedText, deltaJson: deltaJson);
-    _applyAction(UpdateTextAction(before: before, after: after));
-    _save();
+    if (before.text == after.text && before.deltaJson == after.deltaJson) {
+      return;
+    }
+    _beginTextEdit(before.id);
+    _replaceTextBlockOnCurrentPage(after, notify: false);
+    _scheduleSave();
   }
 
   void updateTextBlockPosition(String id, Offset position) {
@@ -968,6 +998,9 @@ class EditorController extends ChangeNotifier {
 
   void deleteTextBlock(String id) {
     final block = currentPage.textBlocks.firstWhere((item) => item.id == id);
+    if (activeTextBlockId == id) {
+      _discardActiveTextEdit();
+    }
     _applyAction(DeleteTextAction(block));
     clearActiveTextBlock();
     _save();
@@ -1910,6 +1943,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void _applyAction(EditorAction action) {
+    _commitActiveTextEdit();
     final updated = action.apply(currentPage);
     _undoActions.add(action);
     _redoActions.clear();
@@ -1934,7 +1968,75 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _replaceTextBlockOnCurrentPage(TextBlock block, {required bool notify}) {
+    final updated = currentPage.textBlocks
+        .map((item) => item.id == block.id ? block : item)
+        .toList();
+    final page = currentPage.copyWith(textBlocks: updated);
+    pages = [
+      for (var i = 0; i < pages.length; i++)
+        if (i == currentPageIndex) page else pages[i],
+    ];
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  void _beginTextEdit(String blockId) {
+    if (_activeTextEditBefore?.id == blockId) {
+      return;
+    }
+    final pageIndex = _pageIndexContainingTextBlock(blockId);
+    if (pageIndex == null) {
+      return;
+    }
+    final block = pages[pageIndex].textBlocks.firstWhere(
+      (item) => item.id == blockId,
+    );
+    _activeTextEditPageIndex = pageIndex;
+    _activeTextEditBefore = block;
+  }
+
+  void _commitActiveTextEdit() {
+    final pageIndex = _activeTextEditPageIndex;
+    final before = _activeTextEditBefore;
+    _discardActiveTextEdit();
+    if (pageIndex == null || before == null) {
+      return;
+    }
+    if (pageIndex < 0 || pageIndex >= pages.length) {
+      return;
+    }
+    final after = pages[pageIndex].textBlocks
+        .where((item) => item.id == before.id)
+        .firstOrNull;
+    if (after == null) {
+      return;
+    }
+    if (before.text == after.text && before.deltaJson == after.deltaJson) {
+      return;
+    }
+    _undoActions.add(UpdateTextAction(before: before, after: after));
+    _redoActions.clear();
+    _scheduleSave();
+  }
+
+  void _discardActiveTextEdit() {
+    _activeTextEditPageIndex = null;
+    _activeTextEditBefore = null;
+  }
+
+  void _scheduleSave() {
+    _notebookSaveDebounce?.cancel();
+    _notebookSaveDebounce = Timer(const Duration(milliseconds: 500), () {
+      _notebookSaveDebounce = null;
+      unawaited(_save());
+    });
+  }
+
   Future<void> _save() async {
+    _notebookSaveDebounce?.cancel();
+    _notebookSaveDebounce = null;
     final updated = notebook.copyWith(pages: pages, updatedAt: DateTime.now());
     await repository.saveNotebook(updated);
   }

@@ -24,27 +24,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
   static const double _wideBreakpoint = 1100;
   static const double _folderPaneMinWidth = 56;
   static const double _folderPaneMaxWidth = 420;
-  static const double _itemsPaneMinWidth = 170;
+  static const double _itemsPaneMinWidth = 56;
   static const double _itemsPaneMaxWidth = 520;
   static const double _resizeHandleWidth = 12;
 
   bool _showLeftNavigation = true;
   double _folderPaneWidth = 220;
   double _itemsPaneWidth = 320;
-
-  double _textScaleForPane({
-    required double width,
-    required double minWidth,
-    required double maxWidth,
-    double minScale = 0.72,
-    double maxScale = 1.0,
-  }) {
-    final normalized = ((width - minWidth) / (maxWidth - minWidth)).clamp(
-      0.0,
-      1.0,
-    );
-    return minScale + (maxScale - minScale) * normalized;
-  }
 
   @override
   void initState() {
@@ -110,13 +96,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   }
 
                   final folderIconOnly = folderWidth < 165;
-                  final itemsCompact = itemsWidth < 260;
-                  final itemsTextScale = _textScaleForPane(
-                    width: itemsWidth,
-                    minWidth: _itemsPaneMinWidth,
-                    maxWidth: 360,
-                    minScale: 0.72,
-                  );
+                  final itemsIconOnly = itemsWidth < 260;
+                  final itemsHeaderHeight = folderIconOnly ? 72.0 : 68.0;
                   final expandedLeftZoneWidth =
                       folderWidth +
                       _resizeHandleWidth +
@@ -162,8 +143,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                           controller: controller,
                                           onOpen: (item) =>
                                               controller.selectItem(item.uid),
-                                          compact: itemsCompact,
-                                          textScale: itemsTextScale,
+                                          onCreate: _createAndSelectItem,
+                                          headerHeight: itemsHeaderHeight,
+                                          iconOnly: itemsIconOnly,
                                         ),
                                       ),
                                       _PaneResizeHandle(
@@ -212,8 +194,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     Expanded(
                       child: _LibraryItemsPane(
                         controller: controller,
-                        compact: false,
-                        textScale: 1.0,
+                        iconOnly: false,
+                        headerHeight: 64,
                         onOpen: (item) {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -221,6 +203,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             ),
                           );
                         },
+                        onCreate: _createAndOpenItem,
                       ),
                     ),
                   ],
@@ -238,6 +221,38 @@ class _LibraryScreenState extends State<LibraryScreen> {
     setState(() {
       _showLeftNavigation = !_showLeftNavigation;
     });
+  }
+
+  Future<Notebook> _createItem(NotebookKind kind) {
+    final controller = context.read<LibraryController>();
+    return switch (kind) {
+      NotebookKind.notebook => controller.createNotebook(),
+      NotebookKind.board => controller.createBoard(),
+    };
+  }
+
+  Future<void> _createAndSelectItem(NotebookKind kind) async {
+    final controller = context.read<LibraryController>();
+    final item = await _createItem(kind);
+    if (!mounted) {
+      return;
+    }
+    await _promptRenameItem(controller, item);
+  }
+
+  Future<void> _createAndOpenItem(NotebookKind kind) async {
+    final controller = context.read<LibraryController>();
+    final item = await _createItem(kind);
+    if (!mounted) {
+      return;
+    }
+    await _promptRenameItem(controller, item);
+    if (!mounted) {
+      return;
+    }
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => _LibraryRoute(item: item)));
   }
 
   Future<void> _promptNewFolder(LibraryController controller) async {
@@ -304,6 +319,45 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     await controller.renameFolder(folder, result);
+  }
+
+  Future<void> _promptRenameItem(
+    LibraryController controller,
+    Notebook item,
+  ) async {
+    final textController = TextEditingController(text: item.title);
+    textController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: textController.text.length,
+    );
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Rename item'),
+          content: TextField(
+            controller: textController,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Item name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(textController.text),
+              child: const Text('Rename'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null) {
+      return;
+    }
+    await controller.renameItem(item.uid, result);
   }
 
   Future<void> _confirmDeleteFolder(
@@ -557,14 +611,16 @@ class _LibraryItemsPane extends StatelessWidget {
   const _LibraryItemsPane({
     required this.controller,
     required this.onOpen,
-    this.compact = false,
-    this.textScale = 1.0,
+    required this.onCreate,
+    required this.headerHeight,
+    this.iconOnly = false,
   });
 
   final LibraryController controller;
   final ValueChanged<Notebook> onOpen;
-  final bool compact;
-  final double textScale;
+  final Future<void> Function(NotebookKind kind) onCreate;
+  final double headerHeight;
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -595,12 +651,12 @@ class _LibraryItemsPane extends StatelessWidget {
                 runSpacing: 12,
                 children: [
                   ElevatedButton.icon(
-                    onPressed: controller.createNotebook,
+                    onPressed: () => onCreate(NotebookKind.notebook),
                     icon: const Icon(Icons.menu_book),
                     label: const Text('New notebook'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: controller.createBoard,
+                    onPressed: () => onCreate(NotebookKind.board),
                     icon: const Icon(Icons.dashboard_outlined),
                     label: const Text('New board'),
                   ),
@@ -635,12 +691,12 @@ class _LibraryItemsPane extends StatelessWidget {
                 runSpacing: 12,
                 children: [
                   ElevatedButton.icon(
-                    onPressed: controller.createNotebook,
+                    onPressed: () => onCreate(NotebookKind.notebook),
                     icon: const Icon(Icons.menu_book),
                     label: const Text('New notebook'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: controller.createBoard,
+                    onPressed: () => onCreate(NotebookKind.board),
                     icon: const Icon(Icons.dashboard_outlined),
                     label: const Text('New board'),
                   ),
@@ -652,56 +708,106 @@ class _LibraryItemsPane extends StatelessWidget {
       );
     }
 
+    if (iconOnly) {
+      return Column(
+        children: [
+          SizedBox(
+            height: headerHeight,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: PopupMenuButton<_CreateAction>(
+                  tooltip: 'Create',
+                  onSelected: (action) {
+                    if (action == _CreateAction.notebook) {
+                      onCreate(NotebookKind.notebook);
+                    } else {
+                      onCreate(NotebookKind.board);
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _CreateAction.notebook,
+                      child: Text('New notebook'),
+                    ),
+                    PopupMenuItem(
+                      value: _CreateAction.board,
+                      child: Text('New board'),
+                    ),
+                  ],
+                  child: const Icon(Icons.add),
+                ),
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView.separated(
+              itemCount: controller.visibleItems.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final item = controller.visibleItems[index];
+                return Tooltip(
+                  message: item.title,
+                  waitDuration: const Duration(milliseconds: 350),
+                  child: LibraryItemCard(
+                    item: item,
+                    selected: item.uid == controller.selectedItemId,
+                    iconOnly: true,
+                    onTap: () => onOpen(item),
+                    onRename: () => context
+                        .findAncestorStateOfType<_LibraryScreenState>()
+                        ?._promptRenameItem(controller, item),
+                    onDelete: () => controller.deleteItem(item.uid),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 120),
-                  curve: Curves.easeOutCubic,
-                  style:
-                      (Theme.of(context).textTheme.titleMedium ??
-                              const TextStyle())
-                          .copyWith(
-                            fontSize:
-                                (Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium?.fontSize ??
-                                    16) *
-                                textScale,
-                          ),
+        SizedBox(
+          height: headerHeight,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
                   child: Text(
                     controller.selectedFolder,
+                    style: Theme.of(context).textTheme.titleMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-              PopupMenuButton<_CreateAction>(
-                tooltip: 'Create',
-                onSelected: (action) {
-                  if (action == _CreateAction.notebook) {
-                    controller.createNotebook();
-                  } else {
-                    controller.createBoard();
-                  }
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: _CreateAction.notebook,
-                    child: Text('New notebook'),
-                  ),
-                  PopupMenuItem(
-                    value: _CreateAction.board,
-                    child: Text('New board'),
-                  ),
-                ],
-                child: const Icon(Icons.add),
-              ),
-            ],
+                PopupMenuButton<_CreateAction>(
+                  tooltip: 'Create',
+                  onSelected: (action) {
+                    if (action == _CreateAction.notebook) {
+                      onCreate(NotebookKind.notebook);
+                    } else {
+                      onCreate(NotebookKind.board);
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _CreateAction.notebook,
+                      child: Text('New notebook'),
+                    ),
+                    PopupMenuItem(
+                      value: _CreateAction.board,
+                      child: Text('New board'),
+                    ),
+                  ],
+                  child: const Icon(Icons.add),
+                ),
+              ],
+            ),
           ),
         ),
         const Divider(height: 1),
@@ -714,9 +820,11 @@ class _LibraryItemsPane extends StatelessWidget {
               return LibraryItemCard(
                 item: item,
                 selected: item.uid == controller.selectedItemId,
-                compact: compact,
-                textScale: textScale,
+                iconOnly: false,
                 onTap: () => onOpen(item),
+                onRename: () => context
+                    .findAncestorStateOfType<_LibraryScreenState>()
+                    ?._promptRenameItem(controller, item),
                 onDelete: () => controller.deleteItem(item.uid),
               );
             },

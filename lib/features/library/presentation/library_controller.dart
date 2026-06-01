@@ -132,6 +132,9 @@ class LibraryController extends ChangeNotifier {
     _folders.add(trimmed);
     selectedFolder = trimmed;
     selectedItemId = _firstItemInFolder(trimmed)?.uid;
+    _activeNotebook = selectedItemId == null
+        ? null
+        : _itemById(selectedItemId!);
     await _saveFolders();
     notifyListeners();
   }
@@ -169,6 +172,9 @@ class LibraryController extends ChangeNotifier {
         : _activeNotebook;
     if (!_selectedItemIsInFolder(selectedFolder)) {
       selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
+      _activeNotebook = selectedItemId == null
+          ? null
+          : _itemById(selectedItemId!);
     }
     await _saveFolders();
     notifyListeners();
@@ -198,29 +204,36 @@ class LibraryController extends ChangeNotifier {
     }
     if (!_selectedItemIsInFolder(selectedFolder)) {
       selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
+      _activeNotebook = selectedItemId == null
+          ? null
+          : _itemById(selectedItemId!);
     }
     await _saveFolders();
     notifyListeners();
   }
 
-  Future<void> createNotebook() async {
+  Future<Notebook> createNotebook() async {
     final notebook = await repository.createNotebook(
       folder: _targetFolderForNewItem(),
     );
     items = [notebook, ...items];
     selectedFolder = notebook.folder;
     selectedItemId = notebook.uid;
+    _activeNotebook = notebook;
     notifyListeners();
+    return notebook;
   }
 
-  Future<void> createBoard() async {
+  Future<Notebook> createBoard() async {
     final board = await repository.createBoard(
       folder: _targetFolderForNewItem(),
     );
     items = [board, ...items];
     selectedFolder = board.folder;
     selectedItemId = board.uid;
+    _activeNotebook = board;
     notifyListeners();
+    return board;
   }
 
   Future<void> deleteItem(String uid) async {
@@ -228,6 +241,37 @@ class LibraryController extends ChangeNotifier {
     items = items.where((item) => item.uid != uid).toList();
     if (selectedItemId == uid) {
       selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
+      _activeNotebook = selectedItemId == null
+          ? null
+          : _itemById(selectedItemId!);
+    } else if (_activeNotebook?.uid == uid) {
+      _activeNotebook = null;
+    }
+    notifyListeners();
+  }
+
+  Future<void> renameItem(String uid, String title) async {
+    final trimmed = title.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+
+    final existing = _itemById(uid);
+    if (existing == null || existing.title == trimmed) {
+      return;
+    }
+
+    final updated = existing.copyWith(
+      title: trimmed,
+      updatedAt: DateTime.now(),
+    );
+    await repository.saveNotebook(updated);
+    items = [
+      for (final item in items)
+        if (item.uid == uid) updated else item,
+    ];
+    if (_activeNotebook?.uid == uid) {
+      _activeNotebook = updated;
     }
     notifyListeners();
   }
@@ -247,6 +291,9 @@ class LibraryController extends ChangeNotifier {
   void selectFolder(String folder) {
     selectedFolder = folder;
     selectedItemId = _firstItemInFolder(folder)?.uid;
+    _activeNotebook = selectedItemId == null
+        ? null
+        : _itemById(selectedItemId!);
     notifyListeners();
   }
 
@@ -280,7 +327,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   Notebook? selectedItem() {
-    if (_activeNotebook != null) {
+    if (_activeNotebook != null && _activeNotebook!.uid == selectedItemId) {
       return _activeNotebook;
     }
     if (selectedItemId == null) {
