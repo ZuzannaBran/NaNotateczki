@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/gestures.dart'
@@ -16,6 +18,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../../data/export/notebook_export_service.dart';
 import '../../notebook/domain/drawing_tool.dart';
+import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/note_page.dart';
 import '../state/editor_controller.dart';
 import 'widgets/drawing_canvas.dart';
@@ -32,12 +35,12 @@ class EditorScreen extends StatefulWidget {
 
 class _EditorScreenState extends State<EditorScreen> {
   static const double _pageGap = 26;
-  static const double _leftMargin = 24;
+  static const double _leftMargin = 56;
   static const double _rightMargin = 56;
   static const double _topBottomPadding = 22;
   static const double _addPageButtonGap = 10;
   static const double _addPageFooterHeight = 56;
-  static const double _minPageScaleFactor = 1.0;
+  static const double _minPageScaleFactor = 0.25;
   static const double _maxPageScaleFloor = 1.8;
   static const double _postFitZoomFactor = 2.0;
   static const double _touchPanSensitivity = 0.55;
@@ -501,8 +504,9 @@ class _EditorScreenState extends State<EditorScreen> {
     late final double minX;
     late final double maxX;
     if (contentWidth <= viewportSize.width) {
-      minX = 0.0;
-      maxX = 0.0;
+      final centeredX = (viewportSize.width - contentWidth) / 2;
+      minX = centeredX;
+      maxX = centeredX;
     } else {
       minX = viewportSize.width - contentWidth;
       maxX = 0.0;
@@ -511,8 +515,9 @@ class _EditorScreenState extends State<EditorScreen> {
     late final double minY;
     late final double maxY;
     if (contentHeight <= viewportSize.height) {
-      minY = 0.0;
-      maxY = 0.0;
+      final centeredY = (viewportSize.height - contentHeight) / 2;
+      minY = centeredY;
+      maxY = centeredY;
     } else {
       minY = viewportSize.height - contentHeight;
       maxY = 0.0;
@@ -608,6 +613,20 @@ class _EditorScreenState extends State<EditorScreen> {
         top: false,
         right: false,
         bottom: false,
+      );
+    }
+
+    final pageFullyVisible =
+        visibleDocumentRect.left <= pageRect.left + edgeThreshold &&
+        visibleDocumentRect.top <= pageRect.top + edgeThreshold &&
+        visibleDocumentRect.right >= pageRect.right - edgeThreshold &&
+        visibleDocumentRect.bottom >= pageRect.bottom - edgeThreshold;
+    if (pageFullyVisible) {
+      return const _BoundaryVisibility(
+        left: true,
+        top: true,
+        right: true,
+        bottom: true,
       );
     }
 
@@ -734,6 +753,181 @@ class _EditorScreenState extends State<EditorScreen> {
     controller.deleteActiveElement();
   }
 
+  Future<void> _showIndexTabEditor(
+    EditorController controller,
+    int pageIndex,
+    String tabId,
+  ) async {
+    if (pageIndex < 0 || pageIndex >= controller.pages.length) {
+      return;
+    }
+    final page = controller.pages[pageIndex];
+    final tab = page.indexTabs.where((tab) => tab.id == tabId).firstOrNull;
+    if (tab == null) {
+      return;
+    }
+    final currentColor = tab.color;
+    var red = _toByte(currentColor.r).toDouble();
+    var green = _toByte(currentColor.g).toDouble();
+    var blue = _toByte(currentColor.b).toDouble();
+    var position = tab.position.clamp(0.0, 1.0).toDouble();
+
+    final result = await showDialog<_IndexTabEditResult>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final preview = Color.fromARGB(
+              255,
+              red.round(),
+              green.round(),
+              blue.round(),
+            );
+            return AlertDialog(
+              title: const Text('Edit tab'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 172,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 92,
+                          height: 160,
+                          decoration: BoxDecoration(
+                            color: AppColors.paper,
+                            border: Border.all(color: AppColors.divider),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: AppColors.shadow,
+                                blurRadius: 8,
+                                offset: Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Positioned(
+                                left: -28,
+                                top: 8 + position * 136,
+                                width: 56,
+                                height: 16,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: preview.withValues(alpha: 0.75),
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(2),
+                                      bottomLeft: Radius.circular(2),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: Slider(
+                            value: position,
+                            min: 0,
+                            max: 1,
+                            divisions: 20,
+                            onChanged: (value) =>
+                                setDialogState(() => position = value),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _indexTabChannelSlider(
+                    label: 'R',
+                    value: red,
+                    color: Colors.red,
+                    onChanged: (value) => setDialogState(() => red = value),
+                  ),
+                  _indexTabChannelSlider(
+                    label: 'G',
+                    value: green,
+                    color: Colors.green,
+                    onChanged: (value) => setDialogState(() => green = value),
+                  ),
+                  _indexTabChannelSlider(
+                    label: 'B',
+                    value: blue,
+                    color: Colors.blue,
+                    onChanged: (value) => setDialogState(() => blue = value),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(context).pop(_IndexTabEditResult.remove()),
+                  child: const Text('Remove'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(
+                    _IndexTabEditResult.save(
+                      color: preview,
+                      position: position,
+                    ),
+                  ),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null) {
+      return;
+    }
+    controller.setCurrentPage(pageIndex);
+    if (result.remove) {
+      controller.clearIndexTab(tabId);
+      return;
+    }
+    controller.updateIndexTab(
+      id: tabId,
+      color: result.color,
+      position: result.position,
+    );
+  }
+
+  Widget _indexTabChannelSlider({
+    required String label,
+    required double value,
+    required Color color,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Row(
+      children: [
+        SizedBox(width: 18, child: Text(label)),
+        Expanded(
+          child: Slider(
+            value: value,
+            min: 0,
+            max: 255,
+            activeColor: color,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
+  int _toByte(double component) {
+    return (component * 255.0).round().clamp(0, 255).toInt();
+  }
+
   Future<void> _showCanvasContextMenu(
     Offset globalPosition,
     EditorController controller,
@@ -836,7 +1030,10 @@ class _EditorScreenState extends State<EditorScreen> {
               final fitToWidthScale = (maxPageWidth / pageWidth)
                   .clamp(1.0, 4.0)
                   .toDouble();
-              final clipScale = math.min(_pageScale, fitToWidthScale);
+              final clipScale = math.max(
+                1.0,
+                math.min(_pageScale, fitToWidthScale),
+              );
               final clipSize = Size(
                 docWorldSize.width * clipScale,
                 docWorldSize.height * clipScale,
@@ -854,12 +1051,6 @@ class _EditorScreenState extends State<EditorScreen> {
                 docWorldSize: docWorldSize,
                 viewportSize: viewportSize,
               );
-              final minimapBoundaryVisibility =
-                  _pageBoundaryVisibilityInDocument(
-                    visibleDocumentRect: visibleDocumentRect,
-                    pageWorldSize: pageWorldSize,
-                    pageIndex: controller.currentPageIndex,
-                  );
               final visiblePageRange = _visiblePageRange(
                 visibleDocumentRect: visibleDocumentRect,
                 pageWorldSize: pageWorldSize,
@@ -1104,6 +1295,34 @@ class _EditorScreenState extends State<EditorScreen> {
                                 Transform(
                                   alignment: Alignment.topLeft,
                                   transform: pageTransform,
+                                  child: _IndexTabsOverlay(
+                                    pages: controller.pages,
+                                    pageSize: pageWorldSize,
+                                    pageGap: _pageGap,
+                                    firstPageIndex: visiblePageRange.start,
+                                    lastPageIndex: visiblePageRange.end,
+                                    onEditTab: (pageIndex, tabId) =>
+                                        _showIndexTabEditor(
+                                          controller,
+                                          pageIndex,
+                                          tabId,
+                                        ),
+                                    onDragStart: (pageIndex, tabId) =>
+                                        controller.beginIndexTabDrag(
+                                          pageIndex: pageIndex,
+                                          id: tabId,
+                                        ),
+                                    onDragUpdate: (tabId, position) =>
+                                        controller.updateIndexTabDrag(
+                                          id: tabId,
+                                          position: position,
+                                        ),
+                                    onDragEnd: controller.commitIndexTabDrag,
+                                  ),
+                                ),
+                                Transform(
+                                  alignment: Alignment.topLeft,
+                                  transform: pageTransform,
                                   child: SizedBox(
                                     width: docWorldSize.width,
                                     height:
@@ -1118,11 +1337,31 @@ class _EditorScreenState extends State<EditorScreen> {
                                           left: 0,
                                           width: docWorldSize.width,
                                           child: Center(
-                                            child: FilledButton.icon(
-                                              onPressed: () =>
-                                                  _addPageBelow(controller),
-                                              icon: const Icon(Icons.add),
-                                              label: const Text('Add page'),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                FilledButton.icon(
+                                                  onPressed: () =>
+                                                      _addPageBelow(controller),
+                                                  icon: const Icon(Icons.add),
+                                                  label: const Text('Add page'),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                OutlinedButton.icon(
+                                                  onPressed:
+                                                      controller.pages.length >
+                                                          1
+                                                      ? controller
+                                                            .deleteLastPage
+                                                      : null,
+                                                  icon: const Icon(
+                                                    Icons.delete_outline,
+                                                  ),
+                                                  label: const Text(
+                                                    'Delete page',
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ),
@@ -1153,7 +1392,6 @@ class _EditorScreenState extends State<EditorScreen> {
                         pageGap: _pageGap,
                         panelHeight: minimapPanelHeight,
                         visibleDocumentRect: visibleDocumentRect,
-                        boundaryVisibility: minimapBoundaryVisibility,
                       ),
                     ),
                   ],
@@ -1235,6 +1473,33 @@ class _EditorScreenState extends State<EditorScreen> {
 
 class _PasteFromClipboardIntent extends Intent {
   const _PasteFromClipboardIntent();
+}
+
+class _IndexTabEditResult {
+  const _IndexTabEditResult({
+    required this.color,
+    required this.position,
+    required this.remove,
+  });
+
+  final Color color;
+  final double position;
+  final bool remove;
+
+  factory _IndexTabEditResult.save({
+    required Color color,
+    required double position,
+  }) {
+    return _IndexTabEditResult(color: color, position: position, remove: false);
+  }
+
+  factory _IndexTabEditResult.remove() {
+    return const _IndexTabEditResult(
+      color: Colors.transparent,
+      position: 0,
+      remove: true,
+    );
+  }
 }
 
 class _CopyElementIntent extends Intent {
@@ -1366,6 +1631,116 @@ class _PageFramePainter extends CustomPainter {
   }
 }
 
+class _IndexTabsOverlay extends StatefulWidget {
+  const _IndexTabsOverlay({
+    required this.pages,
+    required this.pageSize,
+    required this.pageGap,
+    required this.firstPageIndex,
+    required this.lastPageIndex,
+    required this.onEditTab,
+    required this.onDragStart,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+  });
+
+  static const double _tabWidth = 92;
+  static const double _tabHeight = 24;
+  static const double _tabOverhang = _tabWidth / 2;
+
+  final List<NotePage> pages;
+  final Size pageSize;
+  final double pageGap;
+  final int firstPageIndex;
+  final int lastPageIndex;
+  final void Function(int pageIndex, String tabId) onEditTab;
+  final void Function(int pageIndex, String tabId) onDragStart;
+  final void Function(String tabId, double position) onDragUpdate;
+  final VoidCallback onDragEnd;
+
+  @override
+  State<_IndexTabsOverlay> createState() => _IndexTabsOverlayState();
+}
+
+class _IndexTabsOverlayState extends State<_IndexTabsOverlay> {
+  double? _dragStartPosition;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.pageSize.width,
+      height:
+          widget.pages.length * widget.pageSize.height +
+          math.max(0, widget.pages.length - 1) * widget.pageGap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (var i = widget.firstPageIndex; i < widget.lastPageIndex; i++)
+            for (final tab in widget.pages[i].indexTabs)
+              Positioned(
+                left: -_IndexTabsOverlay._tabOverhang,
+                top:
+                    i * (widget.pageSize.height + widget.pageGap) +
+                    _tabTop(tab.position),
+                width: _IndexTabsOverlay._tabWidth,
+                height: _IndexTabsOverlay._tabHeight,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onDoubleTap: () => widget.onEditTab(i, tab.id),
+                  onLongPressStart: (_) {
+                    _dragStartPosition = tab.position;
+                    widget.onDragStart(i, tab.id);
+                  },
+                  onLongPressMoveUpdate: (details) {
+                    final available = math.max(
+                      1.0,
+                      widget.pageSize.height - _IndexTabsOverlay._tabHeight,
+                    );
+                    final startPosition = _dragStartPosition ?? tab.position;
+                    final position =
+                        startPosition + details.offsetFromOrigin.dy / available;
+                    widget.onDragUpdate(tab.id, position);
+                  },
+                  onLongPressEnd: (_) {
+                    _dragStartPosition = null;
+                    widget.onDragEnd();
+                  },
+                  onLongPressCancel: () {
+                    _dragStartPosition = null;
+                    widget.onDragEnd();
+                  },
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: tab.color,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(2),
+                        bottomLeft: Radius.circular(2),
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: AppColors.shadow,
+                          blurRadius: 6,
+                          offset: Offset(-1, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  double _tabTop(double? position) {
+    final available = math.max(
+      0.0,
+      widget.pageSize.height - _IndexTabsOverlay._tabHeight,
+    );
+    return available * (position ?? 0).clamp(0.0, 1.0).toDouble();
+  }
+}
+
 class _ZoomPercentBadge extends StatelessWidget {
   const _ZoomPercentBadge({required this.zoomPercent});
 
@@ -1404,7 +1779,6 @@ class _ProjectMiniMapOverlay extends StatefulWidget {
     required this.pageGap,
     required this.panelHeight,
     required this.visibleDocumentRect,
-    required this.boundaryVisibility,
   });
 
   final List<NotePage> pages;
@@ -1413,20 +1787,24 @@ class _ProjectMiniMapOverlay extends StatefulWidget {
   final double pageGap;
   final double panelHeight;
   final Rect visibleDocumentRect;
-  final _BoundaryVisibility boundaryVisibility;
 
   @override
   State<_ProjectMiniMapOverlay> createState() => _ProjectMiniMapOverlayState();
 }
 
 class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
+  static const double _minimapWidth = 84.0;
+
   final ScrollController _minimapScrollController = ScrollController();
+  final Map<String, _MiniMapImageCacheEntry> _minimapImages = {};
+  final Set<String> _loadingMinimapImageIds = {};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncMinimapToViewport();
+      _precacheMinimapImages();
     });
   }
 
@@ -1435,6 +1813,7 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
     super.didUpdateWidget(oldWidget);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_minimapScrollController.hasClients) {
+        _precacheMinimapImages();
         return;
       }
       final max = _minimapScrollController.position.maxScrollExtent;
@@ -1442,28 +1821,126 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
         _minimapScrollController.jumpTo(max);
       }
       _syncMinimapToViewport();
+      _precacheMinimapImages();
     });
+  }
+
+  void _precacheMinimapImages() {
+    final activeIds = <String>{};
+    for (final page in widget.pages) {
+      for (final block in page.imageBlocks) {
+        activeIds.add(block.id);
+        final cacheKey = _minimapImageCacheKey(block);
+        final cached = _minimapImages[block.id];
+        if (cached != null && cached.cacheKey == cacheKey) {
+          continue;
+        }
+        if (_loadingMinimapImageIds.contains(block.id)) {
+          continue;
+        }
+        _loadMinimapImage(block, cacheKey);
+      }
+    }
+
+    final obsoleteIds = _minimapImages.keys
+        .where((id) => !activeIds.contains(id))
+        .toList();
+    for (final id in obsoleteIds) {
+      _minimapImages.remove(id)?.image.dispose();
+    }
+  }
+
+  Future<void> _loadMinimapImage(ImageBlock block, String cacheKey) async {
+    _loadingMinimapImageIds.add(block.id);
+    ui.Image? image;
+    try {
+      image = await _decodeMinimapImage(block);
+      if (!mounted) {
+        image?.dispose();
+        return;
+      }
+      final currentKey = _currentMinimapImageCacheKey(block.id);
+      if (image == null || currentKey != cacheKey) {
+        image?.dispose();
+        return;
+      }
+      _minimapImages.remove(block.id)?.image.dispose();
+      _minimapImages[block.id] = _MiniMapImageCacheEntry(
+        cacheKey: cacheKey,
+        image: image,
+      );
+      image = null;
+      setState(() {});
+    } catch (error) {
+      debugPrint('_ProjectMiniMapOverlay: failed to decode image: $error');
+    } finally {
+      image?.dispose();
+      _loadingMinimapImageIds.remove(block.id);
+    }
+  }
+
+  String? _currentMinimapImageCacheKey(String id) {
+    for (final page in widget.pages) {
+      for (final block in page.imageBlocks) {
+        if (block.id == id) {
+          return _minimapImageCacheKey(block);
+        }
+      }
+    }
+    return null;
+  }
+
+  String _minimapImageCacheKey(ImageBlock block) {
+    return [
+      block.id,
+      block.path,
+      block.bytes?.lengthInBytes ?? 0,
+      block.imageExt ?? '',
+      block.imageMime ?? '',
+    ].join('|');
+  }
+
+  Future<ui.Image?> _decodeMinimapImage(ImageBlock block) async {
+    Uint8List? bytes = block.bytes;
+    if ((bytes == null || bytes.isEmpty) && block.path.isNotEmpty) {
+      final file = File(block.path);
+      if (await file.exists()) {
+        bytes = await file.readAsBytes();
+      }
+    }
+    if (bytes == null || bytes.isEmpty) {
+      return null;
+    }
+
+    final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+    final descriptor = await ui.ImageDescriptor.encoded(buffer);
+    final codec = await descriptor.instantiateCodec();
+    final frame = await codec.getNextFrame();
+    buffer.dispose();
+    descriptor.dispose();
+    codec.dispose();
+    return frame.image;
   }
 
   void _syncMinimapToViewport() {
     if (!mounted || !_minimapScrollController.hasClients) {
       return;
     }
-    const minimapWidth = 84.0;
     final worldWidth = math.max(1.0, widget.pageWorldSize.width);
-    final mapScale = minimapWidth / worldWidth;
+    final mapScale = _minimapWidth / worldWidth;
+    final panelHeight = _visiblePanelHeight(mapScale);
 
     final indicatorTop = widget.visibleDocumentRect.top * mapScale;
     final indicatorBottom = widget.visibleDocumentRect.bottom * mapScale;
     final viewTop = _minimapScrollController.offset;
-    final viewBottom = viewTop + widget.panelHeight;
-    final margin = widget.panelHeight * 0.18;
+    final viewBottom = viewTop + panelHeight;
+    final margin = panelHeight * 0.18;
 
     double? target;
     if (indicatorTop < viewTop + margin) {
       target = indicatorTop - margin;
     } else if (indicatorBottom > viewBottom - margin) {
-      target = indicatorBottom - widget.panelHeight + margin;
+      target = indicatorBottom - panelHeight + margin;
     }
 
     if (target == null) {
@@ -1479,24 +1956,42 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
     _minimapScrollController.jumpTo(clamped);
   }
 
+  double _visiblePanelHeight(double mapScale) {
+    return math.min(widget.panelHeight, _contentHeight(mapScale));
+  }
+
+  double _contentHeight(double mapScale) {
+    return math.max(1.0, _documentWorldHeight() * mapScale);
+  }
+
+  double _documentWorldHeight() {
+    return math.max(
+      1.0,
+      (widget.pages.length * widget.pageWorldSize.height) +
+          (math.max(0, widget.pages.length - 1) * widget.pageGap),
+    );
+  }
+
   @override
   void dispose() {
     _minimapScrollController.dispose();
+    for (final cached in _minimapImages.values) {
+      cached.image.dispose();
+    }
+    _minimapImages.clear();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    const minimapWidth = 84.0;
+    const outerRadius = 10.0;
+    const minimapPadding = 6.0;
+    const innerRadius = outerRadius - minimapPadding;
     final worldWidth = math.max(1.0, widget.pageWorldSize.width);
-    final worldHeight = math.max(
-      1.0,
-      (widget.pages.length * widget.pageWorldSize.height) +
-          (math.max(0, widget.pages.length - 1) * widget.pageGap),
-    );
-    final mapScale = minimapWidth / worldWidth;
-    final contentHeight = math.max(widget.panelHeight, worldHeight * mapScale);
-    final canScroll = contentHeight > widget.panelHeight + 0.5;
+    final mapScale = _minimapWidth / worldWidth;
+    final contentHeight = _contentHeight(mapScale);
+    final panelHeight = _visiblePanelHeight(mapScale);
+    final canScroll = contentHeight > panelHeight + 0.5;
     final indicatorRectInContent = Rect.fromLTWH(
       widget.visibleDocumentRect.left * mapScale,
       widget.visibleDocumentRect.top * mapScale,
@@ -1507,7 +2002,7 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.toolbar.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(outerRadius),
         boxShadow: const [
           BoxShadow(
             color: AppColors.shadow,
@@ -1517,12 +2012,12 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(minimapPadding),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(innerRadius),
           child: SizedBox(
-            width: minimapWidth,
-            height: widget.panelHeight,
+            width: _minimapWidth,
+            height: panelHeight,
             child: Stack(
               children: [
                 SingleChildScrollView(
@@ -1532,14 +2027,17 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                       : const NeverScrollableScrollPhysics(),
                   child: RepaintBoundary(
                     child: CustomPaint(
-                      size: Size(minimapWidth, contentHeight),
+                      size: Size(_minimapWidth, contentHeight),
                       painter: _ProjectMiniMapPainter(
                         pages: widget.pages,
                         currentPageIndex: widget.currentPageIndex,
                         pageWorldSize: widget.pageWorldSize,
                         pageGap: widget.pageGap,
                         mapScale: mapScale,
-                        boundaryVisibility: widget.boundaryVisibility,
+                        cornerRadius: innerRadius,
+                        images: _minimapImages.map(
+                          (id, cached) => MapEntry(id, cached.image),
+                        ),
                       ),
                     ),
                   ),
@@ -1555,17 +2053,11 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                         final rect = indicatorRectInContent
                             .shift(Offset(0, -scrollOffset))
                             .intersect(
-                              Rect.fromLTWH(
-                                0,
-                                0,
-                                minimapWidth,
-                                widget.panelHeight,
-                              ),
+                              Rect.fromLTWH(0, 0, _minimapWidth, panelHeight),
                             );
                         return CustomPaint(
                           painter: _MiniMapViewportOverlayPainter(
                             indicatorRect: rect,
-                            boundaryVisibility: widget.boundaryVisibility,
                           ),
                         );
                       },
@@ -1588,7 +2080,8 @@ class _ProjectMiniMapPainter extends CustomPainter {
     required this.pageWorldSize,
     required this.pageGap,
     required this.mapScale,
-    required this.boundaryVisibility,
+    required this.cornerRadius,
+    required this.images,
   });
 
   final List<NotePage> pages;
@@ -1596,18 +2089,24 @@ class _ProjectMiniMapPainter extends CustomPainter {
   final Size pageWorldSize;
   final double pageGap;
   final double mapScale;
-  final _BoundaryVisibility boundaryVisibility;
+  final double cornerRadius;
+  final Map<String, ui.Image> images;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final panelRect = Offset.zero & size;
+    final panelRRect = RRect.fromRectAndRadius(
+      panelRect,
+      Radius.circular(cornerRadius),
+    );
     final background = Paint()..color = const Color(0xFFF8FAFD);
-    canvas.drawRect(Offset.zero & size, background);
+    canvas.drawRRect(panelRRect, background);
 
     final border = Paint()
       ..color = const Color(0xFFCFD7E4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
-    canvas.drawRect((Offset.zero & size).deflate(0.5), border);
+    canvas.drawRRect(panelRRect.deflate(0.5), border);
 
     if (pages.isEmpty) {
       return;
@@ -1635,36 +2134,16 @@ class _ProjectMiniMapPainter extends CustomPainter {
       canvas.drawRect(pageRect, pageFill);
       canvas.drawRect(pageRect.deflate(0.3), pageBorder);
 
-      if (isCurrentPage && boundaryVisibility.any) {
-        final highlightPaint = Paint()
-          ..color = const Color(0xFF0E8A97).withValues(alpha: 0.9)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.9;
-        final edgeRect = pageRect.deflate(0.3);
-        if (boundaryVisibility.left) {
-          canvas.drawLine(
-            edgeRect.topLeft,
-            edgeRect.bottomLeft,
-            highlightPaint,
-          );
-        }
-        if (boundaryVisibility.top) {
-          canvas.drawLine(edgeRect.topLeft, edgeRect.topRight, highlightPaint);
-        }
-        if (boundaryVisibility.right) {
-          canvas.drawLine(
-            edgeRect.topRight,
-            edgeRect.bottomRight,
-            highlightPaint,
-          );
-        }
-        if (boundaryVisibility.bottom) {
-          canvas.drawLine(
-            edgeRect.bottomLeft,
-            edgeRect.bottomRight,
-            highlightPaint,
-          );
-        }
+      for (final tab in page.indexTabs) {
+        final stripeHeight = (pageHeight * 0.035).clamp(2.0, 7.0).toDouble();
+        final stripeTop =
+            pageTop +
+            (pageHeight - stripeHeight) * tab.position.clamp(0.0, 1.0);
+        final stripePaint = Paint()..color = tab.color.withValues(alpha: 0.34);
+        canvas.drawRect(
+          Rect.fromLTWH(0, stripeTop, size.width, stripeHeight),
+          stripePaint,
+        );
       }
 
       if (pageGap > 0 && i < pages.length - 1) {
@@ -1689,14 +2168,28 @@ class _ProjectMiniMapPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.55;
       for (final block in page.imageBlocks) {
-        final topLeft = toMap(block.position);
-        final rect = Rect.fromLTWH(
-          topLeft.dx,
-          topLeft.dy,
-          block.width * scaleX,
-          block.height * scaleY,
-        );
-        canvas.drawRect(rect, imageFill);
+        final image = images[block.id];
+        final rect = _imageRect(block, pageTopWorld, scaleX, scaleY);
+        if (image == null) {
+          canvas.drawRect(rect, imageFill);
+        } else {
+          final crop = Rect.fromLTRB(
+            block.cropLeft.clamp(0.0, 1.0) * image.width,
+            block.cropTop.clamp(0.0, 1.0) * image.height,
+            block.cropRight.clamp(0.0, 1.0) * image.width,
+            block.cropBottom.clamp(0.0, 1.0) * image.height,
+          );
+          if (block.rotation == 0) {
+            canvas.drawImageRect(image, crop, rect, Paint());
+          } else {
+            canvas.save();
+            canvas.translate(rect.center.dx, rect.center.dy);
+            canvas.rotate(block.rotation);
+            canvas.translate(-rect.center.dx, -rect.center.dy);
+            canvas.drawImageRect(image, crop, rect, Paint());
+            canvas.restore();
+          }
+        }
         canvas.drawRect(rect, imageBorder);
       }
 
@@ -1756,18 +2249,41 @@ class _ProjectMiniMapPainter extends CustomPainter {
         oldDelegate.pageWorldSize != pageWorldSize ||
         oldDelegate.pageGap != pageGap ||
         oldDelegate.mapScale != mapScale ||
-        oldDelegate.boundaryVisibility != boundaryVisibility;
+        oldDelegate.cornerRadius != cornerRadius ||
+        oldDelegate.images != images;
+  }
+
+  Rect _imageRect(
+    ImageBlock block,
+    double pageTopWorld,
+    double scaleX,
+    double scaleY,
+  ) {
+    final visibleWidth =
+        block.width * (block.cropRight - block.cropLeft).clamp(0.08, 1.0);
+    final visibleHeight =
+        block.height * (block.cropBottom - block.cropTop).clamp(0.08, 1.0);
+    return Rect.fromLTWH(
+      (block.position.dx + block.width * block.cropLeft) * scaleX,
+      (pageTopWorld + block.position.dy + block.height * block.cropTop) *
+          scaleY,
+      visibleWidth * scaleX,
+      visibleHeight * scaleY,
+    );
   }
 }
 
+class _MiniMapImageCacheEntry {
+  const _MiniMapImageCacheEntry({required this.cacheKey, required this.image});
+
+  final String cacheKey;
+  final ui.Image image;
+}
+
 class _MiniMapViewportOverlayPainter extends CustomPainter {
-  _MiniMapViewportOverlayPainter({
-    required this.indicatorRect,
-    required this.boundaryVisibility,
-  });
+  _MiniMapViewportOverlayPainter({required this.indicatorRect});
 
   final Rect indicatorRect;
-  final _BoundaryVisibility boundaryVisibility;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1778,41 +2294,10 @@ class _MiniMapViewportOverlayPainter extends CustomPainter {
       ..color = Colors.black.withValues(alpha: 0.26)
       ..style = PaintingStyle.fill;
     canvas.drawRect(indicatorRect, fill);
-    if (boundaryVisibility.any) {
-      final border = Paint()
-        ..color = const Color(0xFF0E8A97).withValues(alpha: 0.92)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.9;
-      if (boundaryVisibility.left) {
-        canvas.drawLine(
-          indicatorRect.topLeft,
-          indicatorRect.bottomLeft,
-          border,
-        );
-      }
-      if (boundaryVisibility.top) {
-        canvas.drawLine(indicatorRect.topLeft, indicatorRect.topRight, border);
-      }
-      if (boundaryVisibility.right) {
-        canvas.drawLine(
-          indicatorRect.topRight,
-          indicatorRect.bottomRight,
-          border,
-        );
-      }
-      if (boundaryVisibility.bottom) {
-        canvas.drawLine(
-          indicatorRect.bottomLeft,
-          indicatorRect.bottomRight,
-          border,
-        );
-      }
-    }
   }
 
   @override
   bool shouldRepaint(covariant _MiniMapViewportOverlayPainter oldDelegate) {
-    return oldDelegate.indicatorRect != indicatorRect ||
-        oldDelegate.boundaryVisibility != boundaryVisibility;
+    return oldDelegate.indicatorRect != indicatorRect;
   }
 }

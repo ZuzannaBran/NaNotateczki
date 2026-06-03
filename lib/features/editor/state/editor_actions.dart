@@ -85,6 +85,19 @@ class RemoveInkStrokesAction extends EditorAction {
   }
 }
 
+class UpdateIndexTabAction extends EditorAction {
+  UpdateIndexTabAction({required this.before, required this.after});
+
+  final NotePage before;
+  final NotePage after;
+
+  @override
+  NotePage apply(NotePage page) => after;
+
+  @override
+  NotePage revert(NotePage page) => before;
+}
+
 class UpdateTextAction extends EditorAction {
   UpdateTextAction({required this.before, required this.after});
 

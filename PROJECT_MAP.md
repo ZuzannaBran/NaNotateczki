@@ -112,29 +112,29 @@ Entry point.
 
 ---
 
-### `lib/data/isar/entities/notebook_entity.dart` (74 linii)
+### `lib/data/isar/entities/notebook_entity.dart` (84 linii)
 Encje Isara (każda zmiana wymaga regeneracji `*.g.dart` i podbicia
 `kManualSchemaRevision` w `isar_service.dart`).
 - 5: `@collection NotebookEntity` — `id, uid, title, kindIndex, folder,
   createdAt, updatedAt, pages`.
-- 17: `@embedded NotePageEntity` — `uid, index, title, isBookmarked,
-  textBlocks, imageBlocks, inkStrokes`.
-- 28: `@embedded TextBlockEntity` — `text, deltaJson, fontSize, colorValue,
+- 18: `@embedded NotePageEntity` — `uid, index, title, isBookmarked,
+  legacy indexTabColorValue/indexTabPosition, indexTabs, textBlocks,
+  imageBlocks, inkStrokes`.
+- 32: `@embedded IndexTabEntity` — `uid, colorValue, position`.
+- 39: `@embedded TextBlockEntity` — `text, deltaJson, fontSize, colorValue,
   width, rotation, dx, dy`.
-- 41: `@embedded ImageBlockEntity` — `path, ocrText, bytes (List<int>?),
+- 52: `@embedded ImageBlockEntity` — `path, ocrText, bytes (List<int>?),
   imageExt, imageMime, width, height, rotation, dx, dy, crop{Left,Top,Right,Bottom}`.
-- 60: `@embedded InkStrokeEntity` — `colorValue, width, toolIndex, points`.
-- 69: `@embedded InkPointEntity` — `dx, dy, pressure`.
+- 71: `@embedded InkStrokeEntity` — `colorValue, width, toolIndex, points`.
+- 80: `@embedded InkPointEntity` — `dx, dy, pressure`.
 
-### `lib/data/isar/entities/notebook_entity.g.dart` (5574 linii)
+### `lib/data/isar/entities/notebook_entity.g.dart` (6061 linii)
 Wygenerowane przez `isar_generator` — **NIE edytuj ręcznie**. Po zmianach w
 `notebook_entity.dart` uruchom `dart run build_runner build --delete-conflicting-outputs`.
 
 ### `lib/data/isar/isar_service.dart` (142 linii)
-- 9: `const int kManualSchemaRevision = 2` — **podbij po zmianie encji**.
-  Aktualna rewizja `2` została bumpnięta razem z naprawą symetrii
-  `_toolFromIndex/_toolToIndex` w `notebook_repository.dart` — pierwsze
-  uruchomienie po pull'u wykona auto-wipe bazy.
+- 9: `const int kManualSchemaRevision = 5` — **podbij po zmianie encji**.
+  Aktualna rewizja `5` obejmuje listę wielu zakładek indeksujących na stronie.
 - 11: `class IsarOpenResult` — `service, wasReset, freshFile, resetReason`.
 - 25: `class IsarService(this.isar)`.
 - 34: `static Future<IsarOpenResult> open()` — odporne otwieranie: fingerprint
@@ -202,9 +202,11 @@ Folder-based sync (`notatek_cloud.json` we wskazanym folderze).
 - 6: `extension NotebookKindValue` — `indexValue`, `fromIndex(int) → NotebookKind`
   (safe fallback do `notebook`).
 
-### `lib/features/notebook/domain/note_page.dart` (39 linii)
-- 5: `class NotePage { id, title, textBlocks, imageBlocks, inkStrokes, isBookmarked }`
-  + `copyWith`.
+### `lib/features/notebook/domain/note_page.dart` (71 linii)
+- 7: `class NotePage { id, title, textBlocks, imageBlocks, inkStrokes,
+  isBookmarked, indexTabs }` + `copyWith`.
+- 46: `withoutIndexTab(tabId)` — kopia strony bez konkretnej zakładki indeksującej.
+- 53: `class IndexTab { id, color, position }` + `copyWith`.
 
 ### `lib/features/notebook/domain/drawing_tool.dart` (36 linii)
 - 1: `enum DrawingTool` — pen, highlighter, eraserBrush, eraserStroke,
@@ -226,7 +228,7 @@ Folder-based sync (`notatek_cloud.json` we wskazanym folderze).
   imageExt?, imageMime?, rotation, cropLeft/Top/Right/Bottom }` + `copyWith`
   (crop domyślnie 0/0/1/1).
 
-### `lib/features/notebook/data/notebook_repository.dart` (580 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (652 linii)
 Mostek domena ↔ Isar ↔ JSON.
 - 18: `class NotebookRepository(this.isar, {this.onChanged})` — callback po każdym zapisie.
 - 26: `lastFetchSkippedCorruptRows` — flaga dla backupu po fallbacku.
@@ -241,17 +243,19 @@ Mostek domena ↔ Isar ↔ JSON.
   bytes brak a plik istnieje, potem `writeTxn(put)`, woła `onChanged`.
 - 203: `deleteNotebook(uid)`.
 - 217: `encodeNotebooks(items)` / 221: `decodeNotebooks(items)` — JSON.
-- 228–278: mapowanie entity↔domain (`_fromEntity`, `_pageFromEntity`,
+- 228–312: mapowanie entity↔domain (`_fromEntity`, `_pageFromEntity`,
   `_toEntity`, `_pageToEntity`).
-- 280–374: konwersje per-blok (`_textFrom/ToEntity`, `_imageFrom/ToEntity`,
+- 314–406: konwersje per-blok (`_textFrom/ToEntity`, `_imageFrom/ToEntity`,
   `_strokeFrom/ToEntity`).
-- 376–544: JSON serializery (`_notebookTo/FromJson`, `_pageTo/FromJson`,
+- 408–616: JSON serializery (`_notebookTo/FromJson`, `_pageTo/FromJson`,
   `_textTo/FromJson`, `_imageTo/FromJson`, `_strokeTo/FromJson`).
-- 546: `_toolFromIndex(int)` — symetryczne, prosty mapping przez `DrawingTool.values`.
-- 554: `_toolToIndex(tool)` — `tool.index`. **Symetria wymagana** —
+- 286: `_indexTabsFromEntity(...)` — lista zakładek + migracja starego pojedynczego pola.
+- 473: `_indexTabToJson` / 481: `_indexTabsFromJson` — JSON wielu zakładek + migracja starego backupu.
+- 618: `_toolFromIndex(int)` — symetryczne, prosty mapping przez `DrawingTool.values`.
+- 626: `_toolToIndex(tool)` — `tool.index`. **Symetria wymagana** —
   zmieniasz jedną, zmieniaj drugą + bump `kManualSchemaRevision`.
-- 556: `_bytesFromEntity(List<int>?)`.
-- 563: `_bytesToBase64` / 570: `_bytesFromBase64`.
+- 628: `_bytesFromEntity(List<int>?)`.
+- 635: `_bytesToBase64` / 642: `_bytesFromBase64`.
 
 ---
 
@@ -347,28 +351,29 @@ Trójkolumnowy layout (folders | items | workspace) z resizable pane.
 ### `lib/features/notebook/presentation/notebook_screen.dart` (24 linie)
 - 8: `class NotebookScreen` — empty state albo bezpośrednio `EditorScreen()`.
 
-### `lib/features/editor/state/editor_actions.dart` (401 linii)
+### `lib/features/editor/state/editor_actions.dart` (414 linii)
 Wszystkie operacje undoowalne. Każda akcja: `apply(page)` + `revert(page)`.
 - 8: `abstract class EditorAction`.
 - 13: `class AddTextAction(block)`.
 - 31: `class AddImageAction(block)`.
 - 51: `class AddInkStrokeAction(stroke)`.
 - 71: `class RemoveInkStrokesAction({before, after})` — usuwa zbiór strokeów.
-- 88: `class UpdateTextAction({before, after})`.
-- 113: `class DeleteTextAction(block)`.
-- 133: `class MoveTextAction({id, from, to})` — `OffsetPosition`.
-- 163: `class MoveImageAction({id, from, to})`.
-- 193: `class UpdateImageOcrAction({id, ocrText, before})` — `before` to cała
+- 88: `class UpdateIndexTabAction({before, after})` — ustawia/cofa zakładkę indeksującą.
+- 101: `class UpdateTextAction({before, after})`.
+- 126: `class DeleteTextAction(block)`.
+- 146: `class MoveTextAction({id, from, to})` — `OffsetPosition`.
+- 176: `class MoveImageAction({id, from, to})`.
+- 206: `class UpdateImageOcrAction({id, ocrText, before})` — `before` to cała
   lista, żeby rollback miał wartość poprzednią.
-- 219: `class UpdateImageAction({before, after})` — pozycja/rozmiar/crop/rotation.
-- 244: `class DeleteImageAction(block)`.
-- 264: `class MoveSelectionAction` - transluje lasso.
-- 319: `class DeleteSelectionAction` - usuwa grupę z lasso.
-- 366: `class PasteSelectionAction` - duplikuje/wkleja lasso.
-- 390: `class OffsetPosition(dx, dy)` — wartościowy odpowiednik `Offset`
+- 232: `class UpdateImageAction({before, after})` — pozycja/rozmiar/crop/rotation.
+- 257: `class DeleteImageAction(block)`.
+- 277: `class MoveSelectionAction` - transluje lasso.
+- 332: `class DeleteSelectionAction` - usuwa grupę z lasso.
+- 379: `class PasteSelectionAction` - duplikuje/wkleja lasso.
+- 403: `class OffsetPosition(dx, dy)` — wartościowy odpowiednik `Offset`
   (`fromOffset`, `toOffset`).
 
-### `lib/features/editor/state/editor_controller.dart` (2075 linii)
+### `lib/features/editor/state/editor_controller.dart` (2212 linii)
 Mózg edytora. **Najczęściej modyfikowany plik aplikacji.** Trzyma stan stron,
 narzędzia, kolory, undo/redo, zoom/pan, schowek elementów.
 - 30: `class LassoSelection` - trzyma metadane zaznaczenia lasso
@@ -452,22 +457,29 @@ Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`
 #### Gesty / undo / redo / strony
 - 829: `handleTap(point)` — text vs image vs nic.
 - 840: `undo()` / 852: `redo()` — domykają aktywną edycję tekstu przed operacją.
-- 864: `addPage()` — nowy `NotePage`, czyści aktywne.
-- 875: `_createPage(index)`.
-- 886: `_ensurePageCount(working, count)`.
-- 894: `setCurrentPage(index)`.
-- 909: `toggleBookmark()`.
+- 867: `addPage()` — nowy `NotePage`, czyści aktywne.
+- 880: `deleteLastPage()` — usuwa ostatnią stronę, nie schodzi poniżej jednej strony.
+- 894: `_createPage(index)`.
+- 906: `_ensurePageCount(working, count)`.
+- 912: `setCurrentPage(index)`.
+- 927: `toggleBookmark()`.
+- 933: `addIndexTab({color, position})` — undoowalnie dopisuje nową zakładkę na bieżącej stronie.
+- 929: `updateIndexTab({id, color, position})` — undoowalnie edytuje konkretną zakładkę.
+- 952: `clearIndexTab(id)` — undoowalnie usuwa konkretną zakładkę indeksującą.
+- 966: `beginIndexTabDrag({pageIndex, id})` — start przeciągania zakładki, zapamiętuje stronę do jednej akcji undo.
+- 986: `updateIndexTabDrag({id, position})` — live przesunięcie zakładki góra/dół bez zapisu na każdy ruch.
+- 1011: `commitIndexTabDrag()` — kończy przeciąganie i zapisuje jedną akcję undo.
 
 #### Operacje tekstowe (current page)
-- 915: `addTextBlock(position)` — Quill Delta z lastText* defaultami.
-- 941: `addTextBlockFromText(position, text)` — z clipboarda/pliku.
-- 970: `updateTextBlockContent(before, {plainText, deltaJson})` — szybka ścieżka
+- 1038: `addTextBlock(position)` — Quill Delta z lastText* defaultami.
+- 1064: `addTextBlockFromText(position, text)` — z clipboarda/pliku.
+- 1093: `updateTextBlockContent(before, {plainText, deltaJson})` — szybka ścieżka
   wpisywania: aktualizuje `pages` bez `notifyListeners()` i debouncuje zapis.
-- 985: `updateTextBlockPosition`.
-- 992: `updateTextBlockWidth`.
-- 999: `deleteTextBlock`.
-- 1009: `commitTextMove(id, start, end)`.
-- 1023: `commitTextResize(before, after)`.
+- 1108: `updateTextBlockPosition`.
+- 1115: `updateTextBlockWidth`.
+- 1122: `deleteTextBlock`.
+- 1132: `commitTextMove(id, start, end)`.
+- 1146: `commitTextResize(before, after)`.
 
 #### Obrazy / clipboard / wklejanie
 - 1031: `addImageBlock(position)` — image picker (galeria).
@@ -518,23 +530,23 @@ Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`
 - 1871: `_runOcr(file)` — mlkit, Latin script.
 - 1887: `_isOcrSupported()` — Android/iOS only.
 - 1894: `_computeContentBounds()` — bbox stroke + text + image dla widoku.
-- 1945: `_applyAction(action)` — domyka aktywną edycję tekstu, push undo,
+- 2082: `_applyAction(action)` — domyka aktywną edycję tekstu, push undo,
   clear redo, apply, update page.
-- 1953: `_applyActionWithoutNotify(action)` — wariant dla commitowania lassa;
+- 2076: `_applyActionWithoutNotify(action)` — wariant dla commitowania lassa;
   zmienia `pages` i undo stack bez pośredniego `notifyListeners()`.
-- 1963: `_updatePage(page)`.
-- 1971: `_replaceTextBlockOnCurrentPage(block, {notify})` — live update tekstu
+- 2086: `_updatePage(page)`.
+- 2094: `_replaceTextBlockOnCurrentPage(block, {notify})` — live update tekstu
   bez przebudowy drzewa podczas szybkiego pisania.
-- 1985: `_beginTextEdit(blockId)` / 2000: `_commitActiveTextEdit()` /
-  2024: `_discardActiveTextEdit()` — grupowanie wielu znaków w jedną akcję undo.
-- 2029: `_scheduleSave()` — debounce zapisu notebooka po live-edit tekstu.
-- 2037: `_save()` — `repository.saveNotebook(notebook.copyWith(pages, updatedAt=now))`.
-- 2062–2075: sealed `_ElementClipboardItem` + `_TextElementClipboardItem`
+- 2108: `_beginTextEdit(blockId)` / 2123: `_commitActiveTextEdit()` /
+  2147: `_discardActiveTextEdit()` — grupowanie wielu znaków w jedną akcję undo.
+- 2152: `_scheduleSave()` — debounce zapisu notebooka po live-edit tekstu.
+- 2160: `_save()` — `repository.saveNotebook(notebook.copyWith(pages, updatedAt=now))`.
+- 2185–2198: sealed `_ElementClipboardItem` + `_TextElementClipboardItem`
   + `_ImageElementClipboardItem` + `_LassoElementClipboardItem`.
 
 ---
 
-### `lib/features/editor/presentation/editor_screen.dart` (1836 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2302 linii)
 Layout edytora notebooka (stronicowy). Listener gestów, transformacja zoom/pan
 strony, mini-mapa, podgląd skali, podgląd ramki strony.
 - 26: `class EditorScreen extends StatefulWidget`.
@@ -568,44 +580,56 @@ strony, mini-mapa, podgląd skali, podgląd ramki strony.
 - 426: `_onPointerPanZoomEnd(event)`.
 - 438: `_onPointerSignal(event, ...)` — `PointerScrollEvent` (myszka).
 - 462: `_applyPageTransform({scale, pan, ...})` — aktualizuje `_pageScale/_pagePan`.
-- 510: `_clampPagePan({pan, scale, docWorldSize, viewportSize})`.
+- 501: `_clampPagePan({pan, scale, docWorldSize, viewportSize})` — centruje
+  dokument w osi, w której po oddaleniu mieści się w viewportcie.
 - 544: `_stopViewportNavigation()`.
 - 554: `_midpoint(a, b)` / 558: `_distanceBetween` / 562: `_documentHeight`.
 - 569: `_visibleDocumentRect({docWorldSize, viewportSize})` — który fragment widać.
-- 650: `_visiblePageRange(...)` — wylicza okno renderowanych stron
+- 593: `_pageBoundaryVisibilityInDocument(...)` — liczy widoczne krawędzie strony;
+  przy pełnej widoczności strony zwraca wszystkie krawędzie.
+- 649: `_visiblePageRange(...)` — wylicza okno renderowanych stron
   jako strona viewportu + jedna powyżej i trzy poniżej, żeby długie notatniki
   nie budowały wszystkich stron naraz.
-- 659: `_insertPositionForViewport({...})` — gdzie wstawić blok dla insert toolbara.
-- 693: `_handleExport(controller, format)` — eksportuje aktualną notatkę do
+- 658: `_insertPositionForViewport({...})` — gdzie wstawić blok dla insert toolbara.
+- 692: `_handleExport(controller, format)` — eksportuje aktualną notatkę do
   PDF/PNG przez `NotebookExportService`, obsługuje anulowanie dialogu zapisu.
-- 751: `_handleDelete(controller)`.
-- 817: `build(context)` — Scaffold(AppBar=tytuł notebooka+bookmark) + Column
+- 750: `_handleDelete(controller)`.
+- 754: `_showIndexTabEditor(controller, pageIndex, tabId)` — dialog edycji istniejącej zakładki po dwukliku.
+- 903: `_indexTabChannelSlider(...)` — slider RGB w dialogu zakładki.
+- 991: `build(context)` — Scaffold(AppBar=tytuł notebooka+bookmark) + Column
   (EditorToolbar, TextEditToolbar gdy aktywny tekst, InsertToolbar gdy `_isInsertToolbarVisible`,
   LayoutBuilder z głównym canvas: SingleChildScrollView (bez drag-scrolla przy
   narzędziach ink) + Listener +
   Transform(`_pageScale/_pagePan`) + Stack[tylko widoczne strony
   (DecoratedBox+`_PageFramePainter`), `DocumentPageOverlay`(bg+inactive),
-  `DocumentDrawingCanvas`, `DocumentPageOverlay`(active)] + przycisk `Add page`
+  `DocumentDrawingCanvas`, `DocumentPageOverlay`(active), `_IndexTabsOverlay`]
+  + przyciski `Add page` / `Delete page`
   pozycjonowany w przestrzeni dokumentu tuż pod ostatnią stroną); pozycjonuje
   `_ZoomPercentBadge` + `_ProjectMiniMapOverlay`.
-- 1188–1225: skróty klawiszowe (Ctrl/Cmd+V/C/X, Delete) → CallbackActions
+- 1386–1422: skróty klawiszowe (Ctrl/Cmd+V/C/X, Delete) → CallbackActions
   (paste/copy/cut/delete) — **wyłączone gdy aktywny TextEditor**.
-- 1254: `class _PasteFromClipboardIntent`.
-- 1258: `_CopyElementIntent`.
-- 1262: `_CutElementIntent`.
-- 1266: `_DeleteElementIntent`.
-- 1270: `enum _CanvasContextAction { paste }`.
-- 1272: `class _BoundaryVisibility` — które krawędzie strony są widoczne.
-- 1305: `class _PageRenderRange` — półotwarty zakres stron renderowanych w
+- 1449: `class _PasteFromClipboardIntent`.
+- 1453: `class _IndexTabEditResult` — wynik dialogu edycji zakładki (`save/remove`).
+- 1480: `_CopyElementIntent`.
+- 1484: `_CutElementIntent`.
+- 1488: `_DeleteElementIntent`.
+- 1492: `enum _CanvasContextAction { paste }`.
+- 1494: `class _BoundaryVisibility` — które krawędzie strony są widoczne.
+- 1527: `class _PageRenderRange` — półotwarty zakres stron renderowanych w
   głównym edytorze.
-- 1312: `class _PageFramePainter extends CustomPainter` — rysuje pomarańczową
+- 1534: `class _PageFramePainter extends CustomPainter` — rysuje pomarańczową
   ramkę aktywnej strony.
-- 1387: `class _ZoomPercentBadge` — chip „150%".
-- 1417: `class _ProjectMiniMapOverlay extends StatefulWidget` (mini-mapa).
-- 1440: `_ProjectMiniMapOverlayState`.
-- 1466: `_syncMinimapToViewport()`.
-- 1602: `class _ProjectMiniMapPainter` — rysuje strony, content thumbnails.
-- 1781: `class _MiniMapViewportOverlayPainter` — rysuje prostokąt widoku.
+- 1609: `class _IndexTabsOverlay` — rysuje wiele kolorowych zakładek; dwuklik otwiera edycję, a długie przytrzymanie pozwala przesuwać zakładkę góra/dół.
+- 1719: `class _ZoomPercentBadge` — chip „150%".
+- 1749: `class _ProjectMiniMapOverlay extends StatefulWidget` (mini-mapa).
+- 1770: `_ProjectMiniMapOverlayState` — synchronizacja widoku + cache miniatur obrazów/PDF.
+- 1803: `_precacheMinimapImages()` — dekoduje asynchronicznie `ImageBlock.bytes/path` do `ui.Image`.
+- 1900: `_syncMinimapToViewport()`.
+- 1934: `_visiblePanelHeight(...)` / 1938: `_contentHeight(...)` — wysokość mini-mapy rośnie z liczbą stron do limitu panelu.
+- 2070: `class _ProjectMiniMapPainter` — rysuje strony, content thumbnails,
+  zdekodowane miniatury obrazów/PDF oraz paski zakładek, bez podświetlania krawędzi.
+- 2270: `class _MiniMapImageCacheEntry` — cache key + zdekodowany obraz mini-mapy.
+- 2277: `class _MiniMapViewportOverlayPainter` — rysuje wypełniony prostokąt widoku bez podświetlanych krawędzi.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (2256 linii)
 Dwie warianty canvasu rysowania. **Notebook używa `DocumentDrawingCanvas`,
@@ -719,21 +743,24 @@ Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
   widget odejmuje `worldOrigin` strony i śledzi `dragDeltaListenable`.
 - 1530: top-level `Offset _globalDeltaToLocalDelta(...)`.
 
-### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (524 linie)
+### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (646 linii)
 Główny pasek narzędzi nad canvasem (narzędzia, kolory, stroke width, undo/redo,
 export).
-- 8: `class EditorToolbar extends StatelessWidget`.
+- 9: `class EditorToolbar extends StatelessWidget`.
 - 20: `build` — lewy przewijany segment z narzędziami i stały prawy przycisk
   eksportu.
-- 113: `_exportButton()` — popup PDF/PNG wyrównany do prawej strony toolbara.
-- 139: `_actionButton({...})` — generyczny IconButton.
-- 156: `_toolButton({...})` — IconButton z aktywnym tłem gdy `tool == ...`.
-- 172: `_eraserSelector()` — popup z `eraserBrush`/`eraserStroke`.
-- 225: `_shapeSelector()` — popup z liniami/strzałkami/prostokątami/kołami.
-- 299: `_shapeLabel(tool)`.
-- 322: `_colorDot(...)` — kafelek koloru (quickColors + recentColors + picker).
-- 470: `_channelSlider({...})` — slider R/G/B w pickerze niestandardowym.
-- 519: `_toByte(component)`.
+- 116: `_exportButton()` — popup PDF/PNG wyrównany do prawej strony toolbara.
+- 142: `_indexTabButton(context)` — ikonka zakładki; wybór koloru i wysokości w dialogu, dodaje kolejną zakładkę.
+- 178: `_actionButton({...})` — generyczny IconButton.
+- 195: `_toolButton({...})` — IconButton z aktywnym tłem gdy `tool == ...`.
+- 213: `_eraserSelector()` — popup z `eraserBrush`/`eraserStroke`.
+- 266: `_shapeSelector()` — popup z liniami/strzałkami/prostokątami/kołami.
+- 340: `_shapeLabel(tool)`.
+- 363: `_colorDot(...)` — kafelek koloru (quickColors + recentColors + picker).
+- 399: `_pickColor(...)` — dialog wyboru koloru.
+- 506: `_pickIndexTabPosition(...)` — dialog wyboru wysokości zakładki.
+- 594: `_channelSlider({...})` — slider R/G/B w pickerze niestandardowym.
+- 643: `_toByte(component)`.
 
 ### `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (457 linii)
 Pasek formatowania tekstu (pokazywany gdy aktywny TextBlock).

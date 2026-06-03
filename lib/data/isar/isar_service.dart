@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'entities/notebook_entity.dart';
 
-const int kManualSchemaRevision = 3;
+const int kManualSchemaRevision = 5;
 
 class IsarOpenResult {
   IsarOpenResult({
@@ -86,6 +86,7 @@ class IsarService {
     final ids = <int>[
       NotebookEntitySchema.id,
       NotePageEntitySchema.id,
+      IndexTabEntitySchema.id,
       TextBlockEntitySchema.id,
       ImageBlockEntitySchema.id,
       InkStrokeEntitySchema.id,

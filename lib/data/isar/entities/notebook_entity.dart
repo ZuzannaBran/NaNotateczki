@@ -20,9 +20,19 @@ class NotePageEntity {
   late int index;
   late String title;
   late bool isBookmarked;
+  int? indexTabColorValue;
+  double? indexTabPosition;
+  late List<IndexTabEntity> indexTabs;
   late List<TextBlockEntity> textBlocks;
   late List<ImageBlockEntity> imageBlocks;
   late List<InkStrokeEntity> inkStrokes;
+}
+
+@embedded
+class IndexTabEntity {
+  late String uid;
+  late int colorValue;
+  late double position;
 }
 
 @embedded

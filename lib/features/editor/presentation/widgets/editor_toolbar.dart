@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/export/notebook_export_service.dart';
 import '../../../notebook/domain/drawing_tool.dart';
+import '../../../notebook/domain/notebook_kind.dart';
 import '../../state/editor_controller.dart';
 
 class EditorToolbar extends StatelessWidget {
@@ -66,6 +67,8 @@ class EditorToolbar extends StatelessWidget {
                         isActive: false,
                         onPressed: onInsertPressed,
                       ),
+                      if (controller.notebook.kind == NotebookKind.notebook)
+                        _indexTabButton(context),
                       const SizedBox(width: 12),
                       for (var i = 0; i < controller.quickColors.length; i++)
                         _colorDot(
@@ -133,6 +136,37 @@ class EditorToolbar extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _indexTabButton(BuildContext context) {
+    final hasTab = controller.currentPage.indexTabs.isNotEmpty;
+    return _actionButton(
+      icon: hasTab ? Icons.bookmark : Icons.bookmark_border,
+      label: 'Index tab',
+      isActive: hasTab,
+      onPressed: () async {
+        final color = await _pickColor(
+          context,
+          controller.inkColor,
+          controller.recentColors,
+        );
+        if (color == null) {
+          return;
+        }
+        if (!context.mounted) {
+          return;
+        }
+        final position = await _pickIndexTabPosition(
+          context,
+          0.12,
+          color: color,
+        );
+        if (position == null) {
+          return;
+        }
+        controller.addIndexTab(color: color, position: position);
+      },
     );
   }
 
@@ -459,6 +493,94 @@ class EditorToolbar extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(preview),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<double?> _pickIndexTabPosition(
+    BuildContext context,
+    double current, {
+    required Color color,
+  }) async {
+    var position = current.clamp(0.0, 1.0).toDouble();
+    return showDialog<double>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Choose tab height'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 180,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 92,
+                          height: 160,
+                          decoration: BoxDecoration(
+                            color: AppColors.paper,
+                            border: Border.all(color: AppColors.divider),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: AppColors.shadow,
+                                blurRadius: 8,
+                                offset: Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Positioned(
+                                left: -28,
+                                top: 8 + position * 136,
+                                width: 56,
+                                height: 16,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.75),
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(2),
+                                      bottomLeft: Radius.circular(2),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: Slider(
+                            value: position,
+                            min: 0,
+                            max: 1,
+                            divisions: 20,
+                            onChanged: (value) =>
+                                setState(() => position = value),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(position),
                   child: const Text('Save'),
                 ),
               ],

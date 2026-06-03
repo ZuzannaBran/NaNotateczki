@@ -93,6 +93,7 @@ class NotebookRepository {
           imageBlocks: <ImageBlock>[],
           inkStrokes: <InkStroke>[],
           isBookmarked: false,
+          indexTabs: <IndexTab>[],
         ),
       ],
     );
@@ -118,6 +119,7 @@ class NotebookRepository {
           imageBlocks: <ImageBlock>[],
           inkStrokes: <InkStroke>[],
           isBookmarked: false,
+          indexTabs: <IndexTab>[],
         ),
       ],
     );
@@ -245,6 +247,7 @@ class NotebookRepository {
       imageBlocks: entity.imageBlocks.map(_imageFromEntity).toList(),
       inkStrokes: entity.inkStrokes.map(_strokeFromEntity).toList(),
       isBookmarked: entity.isBookmarked,
+      indexTabs: _indexTabsFromEntity(entity),
     );
   }
 
@@ -272,9 +275,41 @@ class NotebookRepository {
       ..index = index
       ..title = page.title
       ..isBookmarked = page.isBookmarked
+      ..indexTabColorValue = page.indexTabs.firstOrNull?.color.toARGB32()
+      ..indexTabPosition = page.indexTabs.firstOrNull?.position
+      ..indexTabs = page.indexTabs.map(_indexTabToEntity).toList()
       ..textBlocks = page.textBlocks.map(_textToEntity).toList()
       ..imageBlocks = page.imageBlocks.map(_imageToEntity).toList()
       ..inkStrokes = page.inkStrokes.map(_strokeToEntity).toList();
+  }
+
+  List<IndexTab> _indexTabsFromEntity(NotePageEntity entity) {
+    final tabs = entity.indexTabs.map(_indexTabFromEntity).toList();
+    if (tabs.isNotEmpty || entity.indexTabColorValue == null) {
+      return tabs;
+    }
+    return [
+      IndexTab(
+        id: const Uuid().v4(),
+        color: Color(entity.indexTabColorValue!),
+        position: entity.indexTabPosition ?? 0.0,
+      ),
+    ];
+  }
+
+  IndexTab _indexTabFromEntity(IndexTabEntity entity) {
+    return IndexTab(
+      id: entity.uid,
+      color: Color(entity.colorValue),
+      position: entity.position,
+    );
+  }
+
+  IndexTabEntity _indexTabToEntity(IndexTab tab) {
+    return IndexTabEntity()
+      ..uid = tab.id
+      ..colorValue = tab.color.toARGB32()
+      ..position = tab.position;
   }
 
   TextBlock _textFromEntity(TextBlockEntity entity) {
@@ -405,6 +440,9 @@ class NotebookRepository {
       'id': page.id,
       'title': page.title,
       'isBookmarked': page.isBookmarked,
+      'indexTabColor': page.indexTabs.firstOrNull?.color.toARGB32(),
+      'indexTabPosition': page.indexTabs.firstOrNull?.position,
+      'indexTabs': page.indexTabs.map(_indexTabToJson).toList(),
       'textBlocks': page.textBlocks.map(_textToJson).toList(),
       'imageBlocks': page.imageBlocks.map(_imageToJson).toList(),
       'inkStrokes': page.inkStrokes.map(_strokeToJson).toList(),
@@ -428,6 +466,40 @@ class NotebookRepository {
           .map(_strokeFromJson)
           .toList(),
       isBookmarked: json['isBookmarked'] as bool? ?? false,
+      indexTabs: _indexTabsFromJson(json),
+    );
+  }
+
+  Map<String, dynamic> _indexTabToJson(IndexTab tab) {
+    return {
+      'id': tab.id,
+      'color': tab.color.toARGB32(),
+      'position': tab.position,
+    };
+  }
+
+  List<IndexTab> _indexTabsFromJson(Map<String, dynamic> json) {
+    final tabs = (json['indexTabs'] as List<dynamic>? ?? <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(_indexTabFromJson)
+        .toList();
+    if (tabs.isNotEmpty || json['indexTabColor'] == null) {
+      return tabs;
+    }
+    return [
+      IndexTab(
+        id: const Uuid().v4(),
+        color: Color(json['indexTabColor'] as int),
+        position: (json['indexTabPosition'] as num?)?.toDouble() ?? 0.0,
+      ),
+    ];
+  }
+
+  IndexTab _indexTabFromJson(Map<String, dynamic> json) {
+    return IndexTab(
+      id: (json['id'] as String?) ?? const Uuid().v4(),
+      color: Color(json['color'] as int),
+      position: (json['position'] as num).toDouble(),
     );
   }
 
