@@ -533,6 +533,33 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     if (event is! KeyDownEvent) {
       return null;
     }
+    final keyboard = HardwareKeyboard.instance;
+    final isControl = keyboard.isControlPressed || keyboard.isMetaPressed;
+    final isShift = keyboard.isShiftPressed;
+    if (isControl && event.logicalKey == LogicalKeyboardKey.keyB) {
+      _toggleInlineAttribute(quill.Attribute.bold);
+      return KeyEventResult.handled;
+    }
+    if (isControl && event.logicalKey == LogicalKeyboardKey.keyI) {
+      _toggleInlineAttribute(quill.Attribute.italic);
+      return KeyEventResult.handled;
+    }
+    if (isControl && event.logicalKey == LogicalKeyboardKey.keyU) {
+      _toggleInlineAttribute(quill.Attribute.underline);
+      return KeyEventResult.handled;
+    }
+    if (isControl && isShift && event.logicalKey == LogicalKeyboardKey.digit7) {
+      _toggleList('ordered');
+      return KeyEventResult.handled;
+    }
+    if (isControl && isShift && event.logicalKey == LogicalKeyboardKey.digit8) {
+      _toggleList('bullet');
+      return KeyEventResult.handled;
+    }
+    if (isControl && isShift && event.logicalKey == LogicalKeyboardKey.keyC) {
+      _toggleList('unchecked');
+      return KeyEventResult.handled;
+    }
     if (event.logicalKey == LogicalKeyboardKey.delete) {
       _editorController.deleteTextBlockOnPage(
         widget.pageIndex,
@@ -544,6 +571,35 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       return null;
     }
     return null;
+  }
+
+  void _toggleInlineAttribute(quill.Attribute attribute) {
+    final isActive = _quillController
+        .getSelectionStyle()
+        .attributes
+        .containsKey(attribute.key);
+    final resolved = isActive
+        ? quill.Attribute.fromKeyValue(attribute.key, null) ?? attribute
+        : attribute;
+    _quillController.formatSelection(resolved);
+  }
+
+  void _toggleList(String value) {
+    final current = _quillController
+        .getSelectionStyle()
+        .attributes['list']
+        ?.value
+        ?.toString();
+    final isActive =
+        current == value || (value == 'unchecked' && current == 'checked');
+    final attribute = quill.Attribute.fromKeyValue(
+      'list',
+      isActive ? null : value,
+    );
+    if (attribute == null) {
+      return;
+    }
+    _quillController.formatSelection(attribute);
   }
 
   void _initQuill() {

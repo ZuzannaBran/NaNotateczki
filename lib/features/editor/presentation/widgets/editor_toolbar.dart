@@ -216,25 +216,23 @@ class EditorToolbar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            icon: const Icon(Icons.cleaning_services),
+            icon: _EraserIcon(sparkles: activeTool == DrawingTool.eraserStroke),
             tooltip: activeTool == DrawingTool.eraserStroke
                 ? 'Erase stroke'
                 : 'Eraser brush',
             color: isSelected ? AppColors.inkBlack : null,
             onPressed: () => controller.setTool(activeTool),
           ),
-          PopupMenuButton<DrawingTool>(
+          _selectorMenuButton(
             tooltip: 'Eraser options',
             initialValue: activeTool,
-            icon: const Icon(Icons.arrow_drop_down),
-            onSelected: controller.setTool,
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: DrawingTool.eraserBrush,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cleaning_services),
+                    _EraserIcon(),
                     SizedBox(width: 8),
                     Text('Eraser brush'),
                   ],
@@ -245,7 +243,7 @@ class EditorToolbar extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.auto_fix_off),
+                    _EraserIcon(sparkles: true),
                     SizedBox(width: 8),
                     Text('Erase stroke'),
                   ],
@@ -274,11 +272,9 @@ class EditorToolbar extends StatelessWidget {
             color: isSelected ? AppColors.inkBlack : null,
             onPressed: () => controller.setTool(activeTool),
           ),
-          PopupMenuButton<DrawingTool>(
+          _selectorMenuButton(
             tooltip: 'Shape options',
             initialValue: activeTool,
-            icon: const Icon(Icons.arrow_drop_down),
-            onSelected: controller.setTool,
             itemBuilder: (context) => [
               _shapeItem(DrawingTool.line),
               _shapeItem(DrawingTool.arrow),
@@ -291,6 +287,24 @@ class EditorToolbar extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _selectorMenuButton({
+    required String tooltip,
+    required DrawingTool initialValue,
+    required PopupMenuItemBuilder<DrawingTool> itemBuilder,
+  }) {
+    return SizedBox(
+      width: 32,
+      child: PopupMenuButton<DrawingTool>(
+        tooltip: tooltip,
+        initialValue: initialValue,
+        icon: const Icon(Icons.arrow_drop_down),
+        padding: EdgeInsets.zero,
+        onSelected: controller.setTool,
+        itemBuilder: itemBuilder,
       ),
     );
   }
@@ -642,5 +656,82 @@ class EditorToolbar extends StatelessWidget {
 
   int _toByte(double component) {
     return (component * 255.0).round().clamp(0, 255).toInt();
+  }
+}
+
+class _EraserIcon extends StatelessWidget {
+  const _EraserIcon({this.sparkles = false});
+
+  final bool sparkles;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconTheme = IconTheme.of(context);
+    final size = iconTheme.size ?? 24;
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(
+        children: [
+          CustomPaint(
+            size: Size.square(size),
+            painter: _EraserIconPainter(color: iconTheme.color),
+          ),
+          if (sparkles)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Icon(
+                Icons.auto_awesome,
+                size: size * 0.42,
+                color: iconTheme.color,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EraserIconPainter extends CustomPainter {
+  const _EraserIconPainter({required this.color});
+
+  final Color? color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final lineColor = color ?? Colors.black87;
+    final outline = Paint()
+      ..color = lineColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
+    final body = Paint()
+      ..color = lineColor.withValues(alpha: 0.10)
+      ..style = PaintingStyle.fill;
+    final end = Paint()
+      ..color = lineColor.withValues(alpha: 0.30)
+      ..style = PaintingStyle.fill;
+
+    final w = size.width;
+    final h = size.height;
+    final eraser = Rect.fromLTWH(-w * 0.34, -h * 0.14, w * 0.68, h * 0.28);
+    final endCap = Rect.fromLTWH(-w * 0.34, -h * 0.14, w * 0.22, h * 0.28);
+
+    canvas.save();
+    canvas.translate(w * 0.48, h * 0.62);
+    canvas.rotate(-0.7853981633974483);
+    canvas.drawRect(eraser, body);
+    canvas.drawRect(endCap, end);
+    canvas.drawRect(eraser, outline);
+    canvas.drawLine(
+      Offset(-w * 0.12, -h * 0.14),
+      Offset(-w * 0.12, h * 0.14),
+      outline,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_EraserIconPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }

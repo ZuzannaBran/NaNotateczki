@@ -49,6 +49,11 @@ class TextEditToolbar extends StatelessWidget {
         final isUnderline = selectionStyle.attributes.containsKey(
           quill.Attribute.underline.key,
         );
+        final isStrike = selectionStyle.attributes.containsKey(
+          quill.Attribute.strikeThrough.key,
+        );
+        final currentList = selectionStyle.attributes['list']?.value
+            ?.toString();
         final currentFont = selectionStyle
             .attributes[quill.Attribute.font.key]
             ?.value
@@ -72,20 +77,30 @@ class TextEditToolbar extends StatelessWidget {
               children: [
                 _styleButton(
                   icon: Icons.format_bold,
+                  tooltip: 'Bold',
                   isActive: isBold,
                   onPressed: () => _applyFormat(quill.Attribute.bold, isBold),
                 ),
                 _styleButton(
                   icon: Icons.format_italic,
+                  tooltip: 'Italic',
                   isActive: isItalic,
                   onPressed: () =>
                       _applyFormat(quill.Attribute.italic, isItalic),
                 ),
                 _styleButton(
                   icon: Icons.format_underline,
+                  tooltip: 'Underline',
                   isActive: isUnderline,
                   onPressed: () =>
                       _applyFormat(quill.Attribute.underline, isUnderline),
+                ),
+                _styleButton(
+                  icon: Icons.strikethrough_s,
+                  tooltip: 'Strikethrough',
+                  isActive: isStrike,
+                  onPressed: () =>
+                      _applyFormat(quill.Attribute.strikeThrough, isStrike),
                 ),
                 const SizedBox(width: 8),
                 _fontDropdown(currentFont),
@@ -93,6 +108,32 @@ class TextEditToolbar extends StatelessWidget {
                 _sizeDropdown(currentSize),
                 const SizedBox(width: 8),
                 _colorPicker(context, currentColor),
+                const SizedBox(width: 8),
+                _listButton(
+                  icon: Icons.format_list_bulleted,
+                  tooltip: 'Bullet list',
+                  value: 'bullet',
+                  currentList: currentList,
+                ),
+                _listButton(
+                  icon: Icons.format_list_numbered,
+                  tooltip: 'Numbered list',
+                  value: 'ordered',
+                  currentList: currentList,
+                ),
+                _listButton(
+                  icon: Icons.check_box_outlined,
+                  tooltip: 'Checklist',
+                  value: 'unchecked',
+                  currentList: currentList,
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.format_clear),
+                  tooltip: 'Clear formatting',
+                  onPressed: _clearInlineFormatting,
+                  iconSize: 20,
+                ),
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.delete_outline),
@@ -113,14 +154,40 @@ class TextEditToolbar extends StatelessWidget {
 
   Widget _styleButton({
     required IconData icon,
+    required String tooltip,
     required bool isActive,
     required VoidCallback onPressed,
   }) {
     return IconButton(
       icon: Icon(icon),
-      tooltip: 'Text style',
+      tooltip: tooltip,
       color: isActive ? AppColors.inkBlack : null,
       onPressed: onPressed,
+      iconSize: 20,
+    );
+  }
+
+  Widget _listButton({
+    required IconData icon,
+    required String tooltip,
+    required String value,
+    required String? currentList,
+  }) {
+    final isActive =
+        currentList == value ||
+        (value == 'unchecked' && currentList == 'checked');
+    return IconButton(
+      icon: Icon(icon),
+      tooltip: tooltip,
+      color: isActive ? AppColors.inkBlack : null,
+      onPressed: () {
+        final nextValue = isActive ? null : value;
+        final attribute = quill.Attribute.fromKeyValue('list', nextValue);
+        if (attribute == null) {
+          return;
+        }
+        controller.formatSelection(attribute);
+      },
       iconSize: 20,
     );
   }
@@ -406,6 +473,34 @@ class TextEditToolbar extends StatelessWidget {
       quill.ChangeSource.local,
     );
     controller.formatSelection(resolved);
+    controller.updateSelection(selection, quill.ChangeSource.local);
+  }
+
+  void _clearInlineFormatting() {
+    final selection = controller.selection;
+    final length = selection.isCollapsed
+        ? controller.document.length - 1
+        : selection.extentOffset - selection.baseOffset;
+    final start = selection.isCollapsed
+        ? 0
+        : selection.baseOffset < selection.extentOffset
+        ? selection.baseOffset
+        : selection.extentOffset;
+    if (length <= 0) {
+      return;
+    }
+    for (final key in const ['bold', 'italic', 'underline', 'strike']) {
+      final attribute = quill.Attribute.fromKeyValue(key, null);
+      if (attribute != null) {
+        controller.formatText(start, length, attribute);
+      }
+    }
+    final color = quill.Attribute.fromKeyValue('color', null);
+    final size = quill.Attribute.fromKeyValue('size', null);
+    final font = quill.Attribute.fromKeyValue('font', null);
+    if (color != null) controller.formatText(start, length, color);
+    if (size != null) controller.formatText(start, length, size);
+    if (font != null) controller.formatText(start, length, font);
     controller.updateSelection(selection, quill.ChangeSource.local);
   }
 

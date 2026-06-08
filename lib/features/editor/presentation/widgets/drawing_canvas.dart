@@ -524,6 +524,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
             controller.tool,
             controller.inkStrokeWidth,
           ),
+          toolOverride: controller.tool,
         );
       }
       _resetCurrent();
@@ -566,6 +567,11 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         controller.addInkStrokeOnPage(
           pageIndex,
           List<InkPoint>.from(_currentPoints),
+          widthOverride: _effectiveStrokeWidth(
+            controller.tool,
+            controller.inkStrokeWidth,
+          ),
+          toolOverride: controller.tool,
         );
       }
     } else {
@@ -575,7 +581,14 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
           pageIndex,
         );
       } else {
-        controller.addInkStroke(List<InkPoint>.from(_currentPoints));
+        controller.addInkStroke(
+          List<InkPoint>.from(_currentPoints),
+          widthOverride: _effectiveStrokeWidth(
+            controller.tool,
+            controller.inkStrokeWidth,
+          ),
+          toolOverride: controller.tool,
+        );
       }
     }
     _resetCurrent();
@@ -1481,7 +1494,15 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         pageIndex,
       );
     } else {
-      controller.addInkStrokeOnPage(pageIndex, pageLocalPoints);
+      controller.addInkStrokeOnPage(
+        pageIndex,
+        pageLocalPoints,
+        widthOverride: _effectiveStrokeWidth(
+          controller.tool,
+          controller.inkStrokeWidth,
+        ),
+        toolOverride: controller.tool,
+      );
     }
     _resetCurrent();
   }

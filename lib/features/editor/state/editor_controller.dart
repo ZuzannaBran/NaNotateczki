@@ -1871,7 +1871,7 @@ class EditorController extends ChangeNotifier {
       tool: strokeTool,
     );
     _applyAction(AddInkStrokeAction(stroke));
-    _save();
+    _scheduleSave();
   }
 
   void eraseInkStrokesById(Set<String> ids) {
@@ -1884,7 +1884,7 @@ class EditorController extends ChangeNotifier {
       return;
     }
     _applyAction(RemoveInkStrokesAction(before: before, after: after));
-    _save();
+    _scheduleSave();
   }
 
   void commitImageMove(String id, Offset start, Offset end) {

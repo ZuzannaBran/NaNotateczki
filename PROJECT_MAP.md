@@ -31,7 +31,7 @@ NaNotateczki/                  ← główny pakiet Flutter (name: program)
 ├── lib/
 │   ├── main.dart              ← runApp(NotesApp())
 │   ├── app/                   ← root widget + DI (Provider)
-│   ├── core/                  ← motyw, metryki, reużywalne widgety
+│   ├── core/                  ← motyw, metryki, platform channels, widgety
 │   ├── data/                  ← Isar, backup, sync
 │   └── features/
 │       ├── library/           ← lista notebooków, foldery, search, sync
@@ -39,6 +39,7 @@ NaNotateczki/                  ← główny pakiet Flutter (name: program)
 │       ├── editor/            ← edytor stronicowy (notebook)
 │       └── board/             ← edytor canvas (board, jedna „strona")
 ├── test/widget_test.dart      ← smoke test: NotesApp pumpuje MaterialApp
+├── linux/runner/              ← GTK runner + natywny kanał przycisku rysika
 ├── pubspec.yaml               ← zależności (Isar, Quill, mlkit, pdfx…)
 └── AI_INSTRUCTIONS.md         ← skrót Effective Dart Style
 ```
@@ -49,26 +50,26 @@ Format pozycji: `LL: nazwa — krótki opis`. `LL` to numer linii startowej.
 
 ---
 
-### `lib/main.dart` (88 linii)
+### `lib/main.dart` (90 linii)
 Entry point.
-- 9: `_wrappedKeyDataHandler` — oryginalny handler Fluttera opakowany przez
+- 10: `_wrappedKeyDataHandler` — oryginalny handler Fluttera opakowany przez
   filtr niepoprawnych pakietów key data.
-- 10: `_wrappedPlatformErrorHandler` — poprzedni globalny handler błędów
+- 11: `_wrappedPlatformErrorHandler` — poprzedni globalny handler błędów
   platformy, zachowany dla błędów niezwiązanych z key data.
-- 14: `_invalidKeyDataFilter` — konsumuje pakiety key data z
+- 15: `_invalidKeyDataFilter` — konsumuje pakiety key data z
   `physical/logical == 0`, żeby nie dochodziły do asercji Fluttera na Linuksie.
-- 21: `void main()` — `WidgetsFlutterBinding.ensureInitialized()`, instaluje
-  filtr key data, odnawia go po `syncKeyboardState()` i przez krótki watchdog
-  startowy, potem `runApp(NotesApp())`.
-- 37: `_installInvalidKeyDataFilter()` — idempotentnie instaluje filtr i nie
+- 22: `void main()` — `WidgetsFlutterBinding.ensureInitialized()`, inicjalizuje
+  kanał stanu przycisku rysika, instaluje filtr key data, odnawia go po
+  `syncKeyboardState()` i przez krótki watchdog startowy, potem `runApp(NotesApp())`.
+- 39: `_installInvalidKeyDataFilter()` — idempotentnie instaluje filtr i nie
   owija ponownie własnego handlera.
-- 47: `_installInvalidKeyDataErrorFilter()` — instaluje wąski fallback dla
+- 49: `_installInvalidKeyDataErrorFilter()` — instaluje wąski fallback dla
   asercji `HardwareKeyboard`, jeśli Flutter zdąży nadpisać handler.
-- 57: `_invalidKeyDataErrorFilter(...)` — wycisza tylko asercję niepoprawnych
+- 59: `_invalidKeyDataErrorFilter(...)` — wycisza tylko asercję niepoprawnych
   key data, resztę przekazuje poprzedniemu handlerowi błędów.
-- 65: `_isInvalidKeyDataAssertion(...)` — rozpoznaje dokładną asercję
+- 67: `_isInvalidKeyDataAssertion(...)` — rozpoznaje dokładną asercję
   `data.physical != 0 && data.logical != 0` ze stosu `KeyEventManager`.
-- 73: `_startKeyDataFilterWatchdog()` — przez ok. godzinę po starcie odnawia
+- 75: `_startKeyDataFilterWatchdog()` — przez ok. godzinę po starcie odnawia
   filtr co 500 ms, bo Flutter potrafi nadpisać `onKeyData` po inicjalizacji
   tekstu na Linuksie.
 
@@ -109,6 +110,15 @@ Entry point.
 - 105: `_buildHandle({alignment, direction, cursor})` — `MouseRegion + GestureDetector` (onLongPress z opóźnieniem),
   liczy delta w lokalnej przestrzeni, animuje skalę uchwytu.
 - 172: `_globalToFrameLocal` — `RenderBox.globalToLocal`.
+
+### `linux/runner/my_application.cc` (148 linii)
+GTK runner dla desktopowego Linuksa.
+- 10: `struct _MyApplication` — trzyma argumenty Dart entrypoint.
+- 18: `first_frame_cb(...)` — pokazuje okno po pierwszej wyrenderowanej klatce.
+- 23: `my_application_activate(...)` — tworzy okno GTK, `FlView`,
+  rejestruje pluginy i focusuje widok Fluttera.
+- 112: `my_application_shutdown(...)` — cleanup pluginów.
+- 121: `my_application_dispose(...)` — zwalnia argumenty Dart entrypoint.
 
 ---
 
@@ -515,8 +525,10 @@ Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`
 
 #### Strokes / commits
 - 1717: `addInkStroke(points, {widthOverride, toolOverride})` — highlighter
-  ma `inkStrokeWidth * 8.0`.
-- 1740: `eraseInkStrokesById(ids)`.
+  ma `inkStrokeWidth * 8.0`; zapis do repo jest debounced, żeby szybkie
+  odrywanie rysika nie blokowało kolejnego stroke'a na Isar/backup.
+- 1740: `eraseInkStrokesById(ids)` — usuwa stroke'i undoowalnie i debouncuje
+  zapis.
 - 1753: `commitImageMove(id, start, end)`.
 - 1767: `commitImageResize(before, after)` — porównuje pos/size/crop/rotation.
 - 1781: `_moveImageBlockToPage(fromIdx, toIdx, id, position)`.
@@ -539,105 +551,117 @@ Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`
   bez przebudowy drzewa podczas szybkiego pisania.
 - 2108: `_beginTextEdit(blockId)` / 2123: `_commitActiveTextEdit()` /
   2147: `_discardActiveTextEdit()` — grupowanie wielu znaków w jedną akcję undo.
-- 2152: `_scheduleSave()` — debounce zapisu notebooka po live-edit tekstu.
+- 2152: `_scheduleSave()` — debounce zapisu notebooka po live-edit tekstu
+  i krótkich seriach stroke'ów.
 - 2160: `_save()` — `repository.saveNotebook(notebook.copyWith(pages, updatedAt=now))`.
 - 2185–2198: sealed `_ElementClipboardItem` + `_TextElementClipboardItem`
   + `_ImageElementClipboardItem` + `_LassoElementClipboardItem`.
 
 ---
 
-### `lib/features/editor/presentation/editor_screen.dart` (2302 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2389 linii)
 Layout edytora notebooka (stronicowy). Listener gestów, transformacja zoom/pan
-strony, mini-mapa, podgląd skali, podgląd ramki strony.
-- 26: `class EditorScreen extends StatefulWidget`.
-- 33: `_EditorScreenState` — stałe (34–46: `_pageGap=26`, paddings,
-  footer `Add page`, sensytywności pan/scroll, scale floors). A4 ratio czytane z
+strony, przesunięcie kolumny strony, mini-mapa, podgląd skali, podgląd ramki
+strony.
+- 29: `class EditorScreen extends StatefulWidget`.
+- 36: `_EditorScreenState` — stałe (37–51: `_pageGap=26`, paddings,
+  footer `Add page`, sensytywności pan/scroll, scale floors, granica kolumny
+  podglądu, tolerancja zatrzymania na krawędzi). A4 ratio czytane z
   `AppMetrics.a4HeightRatio`.
-- 48–67: pola stanu (ScrollController, GlobalKey canvas, `_pageExtent`,
+- 52–73: pola stanu (ScrollController, GlobalKey canvas, `_pageExtent`,
   `_isViewportNavigating`, aktywny rysik, pending touch navigation, gesty
-  multi-touch, `_pageScale=1`, `_pagePan`, `_pageMin/MaxScale`).
-- 69: `initState` — `_scrollController.addListener(_handleScroll)`.
-- 75: `dispose`.
-- 81: `_handleScroll()`.
-- 88: `_onPagesScroll(notification, controller)` — synchronizuje bieżącą stronę
+  multi-touch, `_pageScale=1`, `_pagePan`, `_pageMin/MaxScale`,
+  `_pageColumnOffset`, granice przesunięcia kolumny).
+- 74: `initState` — `_scrollController.addListener(_handleScroll)`.
+- 80: `dispose`.
+- 86: `_handleScroll()`.
+- 93: `_onPagesScroll(notification, controller)` — synchronizuje bieżącą stronę
   po zakończeniu scrolla; scroll nie tworzy stron automatycznie.
-- 103: `_syncCurrentPageToViewport(controller)`.
-- 126: `_addPageBelow(controller)` — dodaje stronę przez kontroler bez
+- 108: `_syncCurrentPageToViewport(controller)`.
+- 131: `_addPageBelow(controller)` — dodaje stronę przez kontroler bez
   automatycznego przewijania widoku.
-- 148: `_syncPageTransformBounds({docWorldSize, fitToWidthScale, viewportSize})`.
-- 185: `_isNavigationPointerKind(kind)` — touch/trackpad/mouse (NIE pen/stylus).
-- 190: `_isStylusPointerKind(kind)`.
-- 195: `_onPointerDown(event, docWorldSize, viewportSize)` — pending touch
+- 138: `_syncPageTransformBounds({docWorldSize, fitToWidthScale, viewportSize})`.
+- 175: `_syncPageColumnOffsetBounds({basePageLeft})` — clampuje poziome
+  przesunięcie kolumny strony do obszaru poza kolumną podglądu.
+- 196: `_applyPageColumnPan(deltaX)` — przesuwa kolumnę strony gestem dwoma
+  palcami w osi X, z clampem poza kolumną podglądu i tolerancją zatrzymania
+  na krawędziach.
+- 222: `_snapToPageColumnEdge(offset)` / 232: `_snapPageColumnToEdge(edge)` —
+  wygaszają ułamkowe drgania przy limicie przesunięcia.
+- 241: `_isNavigationPointerKind(kind)` — touch/trackpad/mouse (NIE pen/stylus).
+- 246: `_isStylusPointerKind(kind)`.
+- 251: `_onPointerDown(event, docWorldSize, viewportSize)` — pending touch
   navigation przy narzędziach rysowania; gdy rysik jest aktywny, dotyk dłoni
   nie wchodzi w nawigację viewportu.
-- 236: `_onPointerMove(...)` — multi-touch pinch/pan; gdy pierwszy dotyk
+- 292: `_onPointerMove(...)` — multi-touch pinch/pan; gdy pierwszy dotyk
   przesunie się przed drugim palcem, awansuje go z pending do aktywnych pointerów,
-  żeby gest dwoma palcami nadal wystartował bez przypadkowego stroke'a.
-- 308: `_onPointerUpOrCancel(event)`.
-- 333: `_startViewportNavigation(docWorldSize, viewportSize)`.
-- 359: `_onPointerPanZoomStart(event, ...)` — trackpad scroll wheel.
-- 384: `_onPointerPanZoomUpdate(...)`.
-- 426: `_onPointerPanZoomEnd(event)`.
-- 438: `_onPointerSignal(event, ...)` — `PointerScrollEvent` (myszka).
-- 462: `_applyPageTransform({scale, pan, ...})` — aktualizuje `_pageScale/_pagePan`.
-- 501: `_clampPagePan({pan, scale, docWorldSize, viewportSize})` — centruje
+  żeby gest dwoma palcami nadal wystartował bez przypadkowego stroke'a; poziomy
+  ruch dwóch palców przesuwa kolumnę strony.
+- 366: `_onPointerUpOrCancel(event)`.
+- 391: `_startViewportNavigation(docWorldSize, viewportSize)`.
+- 417: `_onPointerPanZoomStart(event, ...)` — trackpad scroll wheel.
+- 442: `_onPointerPanZoomUpdate(...)`.
+- 484: `_onPointerPanZoomEnd(event)`.
+- 496: `_onPointerSignal(event, ...)` — `PointerScrollEvent` (myszka).
+- 520: `_applyPageTransform({scale, pan, ...})` — aktualizuje `_pageScale/_pagePan`.
+- 568: `_clampPagePan({pan, scale, docWorldSize, viewportSize})` — centruje
   dokument w osi, w której po oddaleniu mieści się w viewportcie.
-- 544: `_stopViewportNavigation()`.
-- 554: `_midpoint(a, b)` / 558: `_distanceBetween` / 562: `_documentHeight`.
-- 569: `_visibleDocumentRect({docWorldSize, viewportSize})` — który fragment widać.
-- 593: `_pageBoundaryVisibilityInDocument(...)` — liczy widoczne krawędzie strony;
+- 604: `_stopViewportNavigation()`.
+- 614: `_midpoint(a, b)` / 618: `_distanceBetween` / 622: `_documentHeight`.
+- 629: `_visibleDocumentRect({docWorldSize, viewportSize})` — który fragment widać.
+- 668: `_pageBoundaryVisibilityInDocument(...)` — liczy widoczne krawędzie strony;
   przy pełnej widoczności strony zwraca wszystkie krawędzie.
-- 649: `_visiblePageRange(...)` — wylicza okno renderowanych stron
+- 724: `_visiblePageRange(...)` — wylicza okno renderowanych stron
   jako strona viewportu + jedna powyżej i trzy poniżej, żeby długie notatniki
   nie budowały wszystkich stron naraz.
-- 658: `_insertPositionForViewport({...})` — gdzie wstawić blok dla insert toolbara.
-- 692: `_handleExport(controller, format)` — eksportuje aktualną notatkę do
+- 733: `_insertPositionForViewport({...})` — gdzie wstawić blok dla insert toolbara.
+- 767: `_handleExport(controller, format)` — eksportuje aktualną notatkę do
   PDF/PNG przez `NotebookExportService`, obsługuje anulowanie dialogu zapisu.
-- 750: `_handleDelete(controller)`.
-- 754: `_showIndexTabEditor(controller, pageIndex, tabId)` — dialog edycji istniejącej zakładki po dwukliku.
-- 903: `_indexTabChannelSlider(...)` — slider RGB w dialogu zakładki.
-- 991: `build(context)` — Scaffold(AppBar=tytuł notebooka+bookmark) + Column
+- 825: `_handleDelete(controller)`.
+- 829: `_showIndexTabEditor(controller, pageIndex, tabId)` — dialog edycji istniejącej zakładki po dwukliku.
+- 978: `_indexTabChannelSlider(...)` — slider RGB w dialogu zakładki.
+- 1066: `build(context)` — Scaffold(AppBar=tytuł notebooka+bookmark) + Column
   (EditorToolbar, TextEditToolbar gdy aktywny tekst, InsertToolbar gdy `_isInsertToolbarVisible`,
   LayoutBuilder z głównym canvas: SingleChildScrollView (bez drag-scrolla przy
-  narzędziach ink) + Listener +
+  narzędziach ink) + poziome przesunięcie kolumny strony + Listener +
   Transform(`_pageScale/_pagePan`) + Stack[tylko widoczne strony
   (DecoratedBox+`_PageFramePainter`), `DocumentPageOverlay`(bg+inactive),
   `DocumentDrawingCanvas`, `DocumentPageOverlay`(active), `_IndexTabsOverlay`]
   + przyciski `Add page` / `Delete page`
   pozycjonowany w przestrzeni dokumentu tuż pod ostatnią stroną); pozycjonuje
   `_ZoomPercentBadge` + `_ProjectMiniMapOverlay`.
-- 1386–1422: skróty klawiszowe (Ctrl/Cmd+V/C/X, Delete) → CallbackActions
+- 1494–1540: skróty klawiszowe (Ctrl/Cmd+V/C/X, Delete) → CallbackActions
   (paste/copy/cut/delete) — **wyłączone gdy aktywny TextEditor**.
-- 1449: `class _PasteFromClipboardIntent`.
-- 1453: `class _IndexTabEditResult` — wynik dialogu edycji zakładki (`save/remove`).
-- 1480: `_CopyElementIntent`.
-- 1484: `_CutElementIntent`.
-- 1488: `_DeleteElementIntent`.
-- 1492: `enum _CanvasContextAction { paste }`.
-- 1494: `class _BoundaryVisibility` — które krawędzie strony są widoczne.
-- 1527: `class _PageRenderRange` — półotwarty zakres stron renderowanych w
+- 1560: `class _PasteFromClipboardIntent`.
+- 1564: `class _IndexTabEditResult` — wynik dialogu edycji zakładki (`save/remove`).
+- 1591: `_CopyElementIntent`.
+- 1595: `_CutElementIntent`.
+- 1599: `_DeleteElementIntent`.
+- 1603: `enum _CanvasContextAction { paste }`.
+- 1605: `class _BoundaryVisibility` — które krawędzie strony są widoczne.
+- 1638: `class _PageRenderRange` — półotwarty zakres stron renderowanych w
   głównym edytorze.
-- 1534: `class _PageFramePainter extends CustomPainter` — rysuje pomarańczową
+- 1645: `class _PageFramePainter extends CustomPainter` — rysuje pomarańczową
   ramkę aktywnej strony.
-- 1609: `class _IndexTabsOverlay` — rysuje wiele kolorowych zakładek; dwuklik otwiera edycję, a długie przytrzymanie pozwala przesuwać zakładkę góra/dół.
-- 1719: `class _ZoomPercentBadge` — chip „150%".
-- 1749: `class _ProjectMiniMapOverlay extends StatefulWidget` (mini-mapa).
-- 1770: `_ProjectMiniMapOverlayState` — synchronizacja widoku + cache miniatur obrazów/PDF.
-- 1803: `_precacheMinimapImages()` — dekoduje asynchronicznie `ImageBlock.bytes/path` do `ui.Image`.
-- 1900: `_syncMinimapToViewport()`.
-- 1934: `_visiblePanelHeight(...)` / 1938: `_contentHeight(...)` — wysokość mini-mapy rośnie z liczbą stron do limitu panelu.
-- 2070: `class _ProjectMiniMapPainter` — rysuje strony, content thumbnails,
+- 1720: `class _IndexTabsOverlay` — rysuje wiele kolorowych zakładek; dwuklik otwiera edycję, a długie przytrzymanie pozwala przesuwać zakładkę góra/dół.
+- 1830: `class _ZoomPercentBadge` — chip „150%".
+- 1860: `class _ProjectMiniMapOverlay extends StatefulWidget` (mini-mapa).
+- 1881: `_ProjectMiniMapOverlayState` — synchronizacja widoku + cache miniatur obrazów/PDF.
+- 1914: `_precacheMinimapImages()` — dekoduje asynchronicznie `ImageBlock.bytes/path` do `ui.Image`.
+- 2011: `_syncMinimapToViewport()`.
+- 2045: `_visiblePanelHeight(...)` / 2049: `_contentHeight(...)` — wysokość mini-mapy rośnie z liczbą stron do limitu panelu.
+- 2162: `class _ProjectMiniMapPainter` — rysuje strony, content thumbnails,
   zdekodowane miniatury obrazów/PDF oraz paski zakładek, bez podświetlania krawędzi.
-- 2270: `class _MiniMapImageCacheEntry` — cache key + zdekodowany obraz mini-mapy.
-- 2277: `class _MiniMapViewportOverlayPainter` — rysuje wypełniony prostokąt widoku bez podświetlanych krawędzi.
+- 2362: `class _MiniMapImageCacheEntry` — cache key + zdekodowany obraz mini-mapy.
+- 2369: `class _MiniMapViewportOverlayPainter` — rysuje wypełniony prostokąt widoku bez podświetlanych krawędzi.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (2256 linii)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (2395 linii)
 Dwie warianty canvasu rysowania. **Notebook używa `DocumentDrawingCanvas`,
 board używa `DrawingCanvas`.** Logika prawie zduplikowana — to świadoma decyzja
 (różne układy współrzędnych). Oba warianty opóźniają start stroke dla dotyku,
 odrzucają duży kontakt dłoni i dają pierwszeństwo aktywnemu rysikowi/myszy.
-- 14: `class DrawingCanvas extends StatefulWidget` — board, jedna strona/canvas.
-- 34: `class DocumentDrawingCanvas extends StatefulWidget` — notebook,
+- 17: `class DrawingCanvas extends StatefulWidget` — board, jedna strona/canvas.
+- 37: `class DocumentDrawingCanvas extends StatefulWidget` — notebook,
   N stron pionowo, params `{worldOrigin, pages, pageSize, pageGap,
   allowMultiTouch, interactionEnabled, firstPageIndex, lastPageIndex}`; painter
   renderuje tylko ten zakres, hit-test nadal liczy po pełnym dokumencie.
@@ -652,67 +676,67 @@ odrzucają duży kontakt dłoni i dają pierwszeństwo aktywnemu rysikowi/myszy.
 - 164: `_isDiscontinuousInkJump(...)` — wykrywa boczny, daleki skok względem
   ostatniego stabilnego kierunku kreski.
 
-#### `_DrawingCanvasState` (board) — 193–1072
-- 222: `build` — `Listener` z `_onPointerDown/Move/Up/Cancel` +
+#### `_DrawingCanvasState` (board) — 193–1085
+- 225: `build` — `Listener` z `_onPointerDown/Move/Up/Cancel` +
   `ValueListenableBuilder(controller.lassoDragDelta)` + dwa `CustomPaint` w
   `RepaintBoundary`: zapisane stroke'i i szybki overlay aktywnej kreski.
 - 309: `_onPointerDown(event, controller, viewportSize)` — wybiera aktywny pointer;
   dotyk startuje dopiero po progu ruchu, rysik/mysz od razu.
-- 392: `_onPointerMove` — dodaje punkty, ewentualnie eraser; aktywna kreska
-  używa `_notifyInkChanged()` zamiast pełnego `setState()` na każdy punkt.
+- 392: `_onPointerMove` — dodaje punkty, ewentualnie eraser;
+  aktywna kreska używa `_notifyInkChanged()` zamiast pełnego `setState()`.
 - 485: `_onPointerUp` — commit stroke przez `controller.addInkStroke`.
-- 584: `_onPointerCancel`.
-- 598: `_resetCurrent()`.
-- 630: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski.
-- 634: `_toWorld(local)`.
-- 638: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
-- 659: `_startSnapTimer(offset)` — po holdzie z czystym kształtem wywołuje `_snapToShape`.
-- 669: `_eraseAt(offset, page, controller)`.
-- 681: `_resolvedPage(controller)` / 685: `_resolvedPageIndex`.
-- 689: `_strokeHitTest(stroke, point, radius)`.
-- 708: `_distanceSquaredToSegment(p, a, b)`.
-- 721: `_snapToShape()` — wykrywa line/rect/ellipse.
-- 779: `_clearSnapHintSoon()`.
-- 792: `_isRoughlyStraight(start, end, points)`.
-- 816: `_isRoughlyRectangle(points)`.
-- 841: `_isRoughlyEllipse(points)`.
-- 910: `_findFarthestCorner(points, holdPoint)`.
-- 934: `_isInkTool(tool)`.
-- 938: `_isSnapTool(tool)` — pen/highlighter snapują, eraser/kształty nie.
-- 942: `_effectiveStrokeWidth(tool, baseWidth)`.
-- 974: `_squareCorner(start, end)` — wymuszony kwadrat/koło.
+- 597: `_onPointerCancel`.
+- 611: `_resetCurrent()`.
+- 643: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski.
+- 647: `_toWorld(local)`.
+- 651: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
+- 661: `_startSnapTimer(offset)` — po holdzie z czystym kształtem wywołuje `_snapToShape`.
+- 671: `_eraseAt(offset, page, controller)`.
+- 683: `_resolvedPage(controller)` / 687: `_resolvedPageIndex`.
+- 691: `_strokeHitTest(stroke, point, radius)`.
+- 710: `_distanceSquaredToSegment(p, a, b)`.
+- 723: `_snapToShape()` — wykrywa line/rect/ellipse.
+- 781: `_clearSnapHintSoon()`.
+- 794: `_isRoughlyStraight(start, end, points)`.
+- 818: `_isRoughlyRectangle(points)`.
+- 843: `_isRoughlyEllipse(points)`.
+- 912: `_findFarthestCorner(points, holdPoint)`.
+- 936: `_isInkTool(tool)`.
+- 940: `_isSnapTool(tool)` — pen/highlighter snapują, eraser/kształty nie.
+- 944: `_effectiveStrokeWidth(tool, baseWidth)`.
+- 976: `_squareCorner(start, end)` — wymuszony kwadrat/koło.
 
-#### `_DocumentDrawingCanvasState` (notebook) — 1074–2022
+#### `_DocumentDrawingCanvasState` (notebook) — 1087–2063
 Te same metody co wyżej, ale operują w przestrzeni dokumentu (offset per page).
-- 1111: `build` — też nasłuchuje `lassoDragDelta` przy repaint zaznaczonych stroke'ów.
-- 1192: `_onPointerDown` / 1297 Move / 1413 Up / 1489 Cancel; lasso w dokumencie
-  woła `selectWithLasso` zamiast zapisywać obrys jako stroke.
-- 1503: `_resetCurrent`.
-- 1537: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski.
-- 1541: `_toWorld(local)`.
-- 1566: `_pageOrigin(pageIndex)` / 1576: `_toPageLocal(world, pageIndex)` /
-  1584: `_toDocument(pageLocal, pageIndex)` / 1592: `_isInsidePage(pageLocal)`.
-- 1599: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
-- 1620: `_startSnapTimer`.
-- 1630: `_eraseAt(localOffset, pageIndex)`.
-- 1646: `_strokeHitTest` / 1665 `_distanceSquaredToSegment`.
-- 1691: `_snapToShape`.
-- 1633: `_clearSnapHintSoon`.
-- 1646: `_isRoughlyStraight` / 1670 `_isRoughlyRectangle` / 1695 `_isRoughlyEllipse`.
-- 1764: `_findFarthestCorner`.
-- 1788: `_isInkTool` / 1792 `_isSnapTool` / 1796 `_effectiveStrokeWidth`.
-- 1828: `_squareCorner`.
+- 1119: `build` — też nasłuchuje `lassoDragDelta` przy repaint zaznaczonych stroke'ów.
+- 1205: `_onPointerDown` / 1310 Move / 1426 Up / 1510 Cancel; lasso w dokumencie
+  woła `selectWithLasso`.
+- 1524: `_resetCurrent`.
+- 1558: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski.
+- 1562: `_toWorld(local)`.
+- 1587: `_pageOrigin(pageIndex)` / 1597: `_toPageLocal(world, pageIndex)` /
+  1605: `_toDocument(pageLocal, pageIndex)` / 1613: `_isInsidePage(pageLocal)`.
+- 1620: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
+- 1630: `_startSnapTimer`.
+- 1640: `_eraseAt(localOffset, pageIndex)`.
+- 1656: `_strokeHitTest` / 1675 `_distanceSquaredToSegment`.
+- 1701: `_snapToShape`.
+- 1759: `_clearSnapHintSoon`.
+- 2036: `_isRoughlyStraight` / 2060 `_isRoughlyRectangle` / 2085 `_isRoughlyEllipse`.
+- 2154: `_findFarthestCorner`.
+- 2178: `_isInkTool` / 2182 `_isSnapTool` / 2186 `_effectiveStrokeWidth`.
+- 2218: `_squareCorner`.
 
 #### Paintery
-- 1928: `class _InkPainter extends CustomPainter` (board) — rysuje zapisane
+- 2321: `class _InkPainter extends CustomPainter` (board) — rysuje zapisane
   stroke'i i lasso selection; nie odświeża się przy każdym punkcie aktywnej kreski.
-- 2019: `class _InkOverlayPainter extends CustomPainter` — lekka warstwa
+- 2412: `class _InkOverlayPainter extends CustomPainter` — lekka warstwa
   aktywnej kreski, snap hint i pozycji gumki, sterowana `ValueNotifier`.
-- 2138: `class _DocumentInkPainter extends CustomPainter` (notebook) —
+- 2531: `class _DocumentInkPainter extends CustomPainter` (notebook) —
   analogiczny painter zapisanych stroke'ów dla dokumentu; filtruje zakres po
   `firstPageIndex/lastPageIndex`, a zaznaczenie po `selectedPageIndex`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (1554 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (1610 linii)
 Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
 - 20: `class PageOverlay extends StatelessWidget` (board, single-page);
   aktywna warstwa przepuszcza gesty lasso mimo `tool.isInk`; przekazuje
@@ -723,11 +747,12 @@ Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
   bg+inactive PRZED canvasem, active PONAD).
 - 193: `class _TextBlockWidget extends StatefulWidget`.
 - 214: `_TextBlockWidgetState` — build/_initQuill/_isOnFrame/_dragHandle/
-  _startMove/_updateMove/_endMove + helpery do delty Quill; zaznaczenie lasso
+  _startMove/_updateMove/_endMove + helpery do delty Quill i skróty
+  `Ctrl/Cmd+B/I/U`, `Ctrl/Cmd+Shift+7/8/C`; zaznaczenie lasso
   daje niebieskie podświetlenie i przesuwa pozycję przez lokalny
   `ValueListenableBuilder`, bez rebuildowania Quilla.
-- 632: `class _ImageBlockWidget extends StatefulWidget`.
-- 653: `_ImageBlockWidgetState` — Listener (drag+pinch dwoma palcami=resize),
+- 696: `class _ImageBlockWidget extends StatefulWidget`.
+- 717: `_ImageBlockWidgetState` — Listener (drag+pinch dwoma palcami=resize),
   `ResizableFrame` z 8 uchwytami, prawy klik → menu kopiowania,
   `_imageChild` (`Image.memory(bytes)` lub `Image.file(path)` z
   `Transform.rotate` + crop `Rect.fromLTRB(cropLeft,cropTop,cropRight,cropBottom)`),
@@ -735,15 +760,15 @@ Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
   zaznaczenie lasso daje border/shadow i przesuwa tylko `Positioned` przez
   `ValueListenableBuilder`,
   `_cornerDelta`/`_clampSize`/`_cornerPosition`/`_cropOffsetX|Y`.
-- 1361: `enum _CropAnchorAxis { left, right, top, bottom }`.
-- 1363: `class _CropAnchor`.
-- 1370: `enum _ImageContextAction { copy }`.
-- 1374: `_LassoSelectionWidget` — niewidzialny hit target do dragowania całego
+- 1438: `_LassoSelectionWidget` — niewidzialny hit target do dragowania całego
   zaznaczenia + akcje copy/delete; nie rysuje prostokąta, bounds są dokumentowe,
   widget odejmuje `worldOrigin` strony i śledzi `dragDeltaListenable`.
-- 1530: top-level `Offset _globalDeltaToLocalDelta(...)`.
+- 1583: `enum _CropAnchorAxis { left, right, top, bottom }`.
+- 1585: `class _CropAnchor`.
+- 1592: `enum _ImageContextAction { copy }`.
+- 1594: top-level `Offset _globalDeltaToLocalDelta(...)`.
 
-### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (646 linii)
+### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (737 linii)
 Główny pasek narzędzi nad canvasem (narzędzia, kolory, stroke width, undo/redo,
 export).
 - 9: `class EditorToolbar extends StatelessWidget`.
@@ -753,29 +778,35 @@ export).
 - 142: `_indexTabButton(context)` — ikonka zakładki; wybór koloru i wysokości w dialogu, dodaje kolejną zakładkę.
 - 178: `_actionButton({...})` — generyczny IconButton.
 - 195: `_toolButton({...})` — IconButton z aktywnym tłem gdy `tool == ...`.
-- 213: `_eraserSelector()` — popup z `eraserBrush`/`eraserStroke`.
-- 266: `_shapeSelector()` — popup z liniami/strzałkami/prostokątami/kołami.
-- 340: `_shapeLabel(tool)`.
-- 363: `_colorDot(...)` — kafelek koloru (quickColors + recentColors + picker).
-- 399: `_pickColor(...)` — dialog wyboru koloru.
-- 506: `_pickIndexTabPosition(...)` — dialog wyboru wysokości zakładki.
-- 594: `_channelSlider({...})` — slider R/G/B w pickerze niestandardowym.
-- 643: `_toByte(component)`.
+- 208: `_eraserSelector()` — popup z `eraserBrush`/`eraserStroke`.
+- 259: `_shapeSelector()` — popup z liniami/strzałkami/prostokątami/kołami.
+- 294: `_selectorMenuButton({...})` — węższy przycisk strzałki dla selektorów.
+- 349: `_shapeLabel(tool)`.
+- 372: `_colorDot(...)` — kafelek koloru (quickColors + recentColors + picker).
+- 408: `_pickColor(...)` — dialog wyboru koloru.
+- 520: `_pickIndexTabPosition(...)` — dialog wyboru wysokości zakładki.
+- 608: `_channelSlider({...})` — slider R/G/B w pickerze niestandardowym.
+- 657: `_toByte(component)`.
+- 662: `class _EraserIcon` — klasyczna ikonka gumki z opcjonalnymi błyskotkami.
+- 695: `class _EraserIconPainter` — rysuje bazową sylwetkę gumki.
 
-### `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (457 linii)
+### `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (533 linie)
 Pasek formatowania tekstu (pokazywany gdy aktywny TextBlock).
 - 7: `class TextEditToolbar extends StatelessWidget` — bierze `quill.QuillController`
   + `EditorController` + `activeTextBlockId`.
-- 38: `build` — bold/italic/underline/strike, font, size, color picker.
-- 114: `_styleButton({...})`.
-- 128: `_fontDropdown(currentFont)`.
-- 154: `_sizeDropdown(currentSize)`.
-- 180: `_colorPicker(context, currentValue)` — popup z slidersami.
-- 216: `_toHex(color)`.
-- 349: `_channelSlider({...})`.
-- 373: `_toByte(component)`.
-- 402: `_applyFormat(attribute, isActive)` — toggle bold/italic/etc.
-- 433: `_storeLastTextStyle(...)` — zapamiętuje preferencje (Quill formatuje
+- 38: `build` — bold/italic/underline/strike, font, size, color picker,
+  bullet/ordered/checklist, clear formatting, delete.
+- 155: `_styleButton({...})`.
+- 170: `_listButton({...})`.
+- 195: `_fontDropdown(currentFont)`.
+- 221: `_sizeDropdown(currentSize)`.
+- 247: `_colorPicker(context, currentValue)` — popup z slidersami.
+- 283: `_toHex(color)`.
+- 416: `_channelSlider({...})`.
+- 440: `_toByte(component)`.
+- 458: `_applyFormat(attribute, isActive)` — toggle bold/italic/etc.
+- 479: `_clearInlineFormatting()` — usuwa inline style z zaznaczenia lub bloku.
+- 514: `_storeLastTextStyle(...)` — zapamiętuje preferencje (Quill formatuje
   natychmiast, controller też trzyma kopię w `lastText*`).
 
 ---
