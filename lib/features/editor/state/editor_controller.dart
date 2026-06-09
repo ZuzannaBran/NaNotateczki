@@ -62,6 +62,7 @@ class LassoSelection {
 class EditorController extends ChangeNotifier {
   static const double minViewScale = 0.25;
   static const double maxViewScale = 4.0;
+  static const Duration _inkSaveDebounceDelay = Duration(seconds: 2);
 
   EditorController({required this.repository, required this.notebook}) {
     pages = notebook.pages;
@@ -1109,14 +1110,32 @@ class EditorController extends ChangeNotifier {
     required String plainText,
     required String deltaJson,
   }) {
+    final diagnosticsStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
     final normalizedText = plainText.trimRight();
     final after = before.copyWith(text: normalizedText, deltaJson: deltaJson);
     if (before.text == after.text && before.deltaJson == after.deltaJson) {
+      if (kDebugMode) {
+        debugPrint(
+          'TextInputDiag controller content unchanged '
+          'block=${before.id} textLen=${normalizedText.length} '
+          'deltaLen=${deltaJson.length} elapsedUs='
+          '${diagnosticsStopwatch?.elapsedMicroseconds}',
+        );
+      }
       return;
     }
     _beginTextEdit(before.id);
     _replaceTextBlockOnCurrentPage(after, notify: false);
     _scheduleSave();
+    diagnosticsStopwatch?.stop();
+    if (kDebugMode) {
+      debugPrint(
+        'TextInputDiag controller content updated '
+        'block=${before.id} page=$currentPageIndex '
+        'textLen=${normalizedText.length} deltaLen=${deltaJson.length} '
+        'elapsedUs=${diagnosticsStopwatch?.elapsedMicroseconds}',
+      );
+    }
   }
 
   void updateTextBlockPosition(String id, Offset position) {
@@ -2123,8 +2142,12 @@ class EditorController extends ChangeNotifier {
     if (_activeTextEditBefore?.id == blockId) {
       return;
     }
+    final diagnosticsStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
     final pageIndex = _pageIndexContainingTextBlock(blockId);
     if (pageIndex == null) {
+      if (kDebugMode) {
+        debugPrint('TextInputDiag begin edit missing block=$blockId');
+      }
       return;
     }
     final block = pages[pageIndex].textBlocks.firstWhere(
@@ -2132,6 +2155,13 @@ class EditorController extends ChangeNotifier {
     );
     _activeTextEditPageIndex = pageIndex;
     _activeTextEditBefore = block;
+    diagnosticsStopwatch?.stop();
+    if (kDebugMode) {
+      debugPrint(
+        'TextInputDiag begin edit block=$blockId page=$pageIndex '
+        'elapsedUs=${diagnosticsStopwatch?.elapsedMicroseconds}',
+      );
+    }
   }
 
   void _commitActiveTextEdit() {
@@ -2165,8 +2195,17 @@ class EditorController extends ChangeNotifier {
 
   void _scheduleSave() {
     _notebookSaveDebounce?.cancel();
-    _notebookSaveDebounce = Timer(const Duration(milliseconds: 500), () {
+    if (kDebugMode) {
+      debugPrint(
+        'TextInputDiag save scheduled notebook=${notebook.uid} '
+        'delayMs=${_inkSaveDebounceDelay.inMilliseconds} pages=${pages.length}',
+      );
+    }
+    _notebookSaveDebounce = Timer(_inkSaveDebounceDelay, () {
       _notebookSaveDebounce = null;
+      if (kDebugMode) {
+        debugPrint('TextInputDiag save debounce fired ${notebook.uid}');
+      }
       unawaited(_save());
     });
   }
@@ -2174,8 +2213,35 @@ class EditorController extends ChangeNotifier {
   Future<void> _save() async {
     _notebookSaveDebounce?.cancel();
     _notebookSaveDebounce = null;
+    final diagnosticsStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
+    if (kDebugMode) {
+      final textBlocks = pages.fold<int>(
+        0,
+        (sum, page) => sum + page.textBlocks.length,
+      );
+      final imageBlocks = pages.fold<int>(
+        0,
+        (sum, page) => sum + page.imageBlocks.length,
+      );
+      final strokes = pages.fold<int>(
+        0,
+        (sum, page) => sum + page.inkStrokes.length,
+      );
+      debugPrint(
+        'TextInputDiag save begin notebook=${notebook.uid} '
+        'pages=${pages.length} textBlocks=$textBlocks '
+        'imageBlocks=$imageBlocks strokes=$strokes',
+      );
+    }
     final updated = notebook.copyWith(pages: pages, updatedAt: DateTime.now());
     await repository.saveNotebook(updated);
+    diagnosticsStopwatch?.stop();
+    if (kDebugMode) {
+      debugPrint(
+        'TextInputDiag save done notebook=${notebook.uid} '
+        'elapsedMs=${diagnosticsStopwatch?.elapsedMilliseconds}',
+      );
+    }
   }
 }
 

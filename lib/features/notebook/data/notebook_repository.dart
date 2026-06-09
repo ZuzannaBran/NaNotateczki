@@ -145,8 +145,29 @@ class NotebookRepository {
   }
 
   Future<void> saveNotebook(Notebook notebook) async {
+    final diagnosticsStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
+    if (kDebugMode) {
+      final textBlocks = notebook.pages.fold<int>(
+        0,
+        (sum, page) => sum + page.textBlocks.length,
+      );
+      final imageBlocks = notebook.pages.fold<int>(
+        0,
+        (sum, page) => sum + page.imageBlocks.length,
+      );
+      final strokes = notebook.pages.fold<int>(
+        0,
+        (sum, page) => sum + page.inkStrokes.length,
+      );
+      debugPrint(
+        'TextInputDiag repo save begin uid=${notebook.uid} '
+        'pages=${notebook.pages.length} textBlocks=$textBlocks '
+        'imageBlocks=$imageBlocks strokes=$strokes',
+      );
+    }
     final migratedPages = <NotePage>[];
     bool migrated = false;
+    final migrationStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
     for (final page in notebook.pages) {
       final migratedBlocks = <ImageBlock>[];
       bool pageMigrated = false;
@@ -186,11 +207,20 @@ class NotebookRepository {
         pageMigrated ? page.copyWith(imageBlocks: migratedBlocks) : page,
       );
     }
+    migrationStopwatch?.stop();
+    if (kDebugMode) {
+      debugPrint(
+        'TextInputDiag repo migration done uid=${notebook.uid} '
+        'migrated=$migrated elapsedMs='
+        '${migrationStopwatch?.elapsedMilliseconds}',
+      );
+    }
 
     final notebookToSave = migrated
         ? notebook.copyWith(pages: migratedPages)
         : notebook;
 
+    final transactionStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
     await isar.writeTxn(() async {
       final existing = await isar.notebookEntitys
           .filter()
@@ -199,7 +229,21 @@ class NotebookRepository {
       final entity = _toEntity(notebookToSave, existing?.id);
       await isar.notebookEntitys.put(entity);
     });
+    transactionStopwatch?.stop();
+    if (kDebugMode) {
+      debugPrint(
+        'TextInputDiag repo txn done uid=${notebook.uid} '
+        'elapsedMs=${transactionStopwatch?.elapsedMilliseconds}',
+      );
+    }
     onChanged?.call();
+    diagnosticsStopwatch?.stop();
+    if (kDebugMode) {
+      debugPrint(
+        'TextInputDiag repo save done uid=${notebook.uid} '
+        'elapsedMs=${diagnosticsStopwatch?.elapsedMilliseconds}',
+      );
+    }
   }
 
   Future<void> deleteNotebook(String uid) async {

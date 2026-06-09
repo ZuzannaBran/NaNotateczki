@@ -13,9 +13,9 @@ class LocalBackupService {
   final NotebookRepository repository;
 
   static const _dirName = 'local_backup';
+  static const _incrementalDirName = 'notebooks';
+  static const _manifest = 'manifest.json';
   static const _latest = 'notebooks_latest.json';
-  static const _prev1 = 'notebooks_prev1.json';
-  static const _prev2 = 'notebooks_prev2.json';
 
   Future<Directory> _backupDir() async {
     final docs = await getApplicationDocumentsDirectory();
@@ -31,29 +31,72 @@ class LocalBackupService {
     return File('${dir.path}/$name');
   }
 
+  Future<Directory> _notebooksDir() async {
+    final dir = Directory('${(await _backupDir()).path}/$_incrementalDirName');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  Future<File> _manifestFile() async {
+    final dir = await _backupDir();
+    return File('${dir.path}/$_manifest');
+  }
+
+  Future<File> _notebookFile(String uid) async {
+    final dir = await _notebooksDir();
+    return File('${dir.path}/${Uri.encodeComponent(uid)}.json');
+  }
+
   Future<void> snapshot(List<Notebook> items) async {
     try {
-      final latest = await _file(_latest);
-      final prev1 = await _file(_prev1);
-      final prev2 = await _file(_prev2);
+      final notebooksDir = await _notebooksDir();
+      final expectedFiles = <String>{};
+      var changed = 0;
+      for (final notebook in items) {
+        final encoded = repository.encodeNotebooks([notebook]).single;
+        final content = jsonEncode(encoded);
+        final file = await _notebookFile(notebook.uid);
+        expectedFiles.add(file.path);
+        if (await file.exists()) {
+          final previous = await file.readAsString();
+          if (previous == content) {
+            continue;
+          }
+        }
+        await file.writeAsString(content);
+        changed++;
+      }
 
-      if (await prev1.exists()) {
-        try {
-          await prev1.rename(prev2.path);
-        } catch (_) {
-          await prev1.delete();
+      var deleted = 0;
+      await for (final entity in notebooksDir.list()) {
+        if (entity is File &&
+            entity.path.endsWith('.json') &&
+            !expectedFiles.contains(entity.path)) {
+          await entity.delete();
+          deleted++;
         }
       }
-      if (await latest.exists()) {
-        try {
-          await latest.rename(prev1.path);
-        } catch (_) {
-          await latest.delete();
-        }
-      }
 
-      final payload = repository.encodeNotebooks(items);
-      await latest.writeAsString(jsonEncode(payload));
+      final manifestPayload = {
+        'version': 1,
+        'notebooks': [
+          for (final notebook in items)
+            {
+              'uid': notebook.uid,
+              'updatedAt': notebook.updatedAt.toIso8601String(),
+              'file': '${Uri.encodeComponent(notebook.uid)}.json',
+            },
+        ],
+      };
+      await (await _manifestFile()).writeAsString(jsonEncode(manifestPayload));
+      if (kDebugMode) {
+        debugPrint(
+          'LocalBackupDiag snapshot incremental notebooks=${items.length} '
+          'changed=$changed deleted=$deleted',
+        );
+      }
     } catch (e, st) {
       debugPrint('LocalBackupService.snapshot failed: $e\n$st');
     }
@@ -61,13 +104,58 @@ class LocalBackupService {
 
   Future<bool> hasLatest() async {
     try {
-      return await (await _file(_latest)).exists();
+      return await (await _manifestFile()).exists() ||
+          await (await _file(_latest)).exists();
     } catch (_) {
       return false;
     }
   }
 
   Future<List<Notebook>> readLatest() async {
+    final incremental = await _readIncrementalLatest();
+    if (incremental.isNotEmpty) {
+      return incremental;
+    }
+    return _readLegacyLatest();
+  }
+
+  Future<List<Notebook>> _readIncrementalLatest() async {
+    try {
+      final manifest = await _manifestFile();
+      if (!await manifest.exists()) {
+        return <Notebook>[];
+      }
+      final decoded = jsonDecode(await manifest.readAsString());
+      if (decoded is! Map<String, dynamic>) {
+        return <Notebook>[];
+      }
+      final notebookEntries = decoded['notebooks'];
+      if (notebookEntries is! List) {
+        return <Notebook>[];
+      }
+      final decodedNotebooks = <Object?>[];
+      for (final entry in notebookEntries) {
+        if (entry is! Map<String, dynamic>) {
+          continue;
+        }
+        final fileName = entry['file'];
+        if (fileName is! String || fileName.isEmpty) {
+          continue;
+        }
+        final file = File('${(await _notebooksDir()).path}/$fileName');
+        if (!await file.exists()) {
+          continue;
+        }
+        decodedNotebooks.add(jsonDecode(await file.readAsString()));
+      }
+      return repository.decodeNotebooks(decodedNotebooks);
+    } catch (e) {
+      debugPrint('LocalBackupService.readIncrementalLatest failed: $e');
+      return <Notebook>[];
+    }
+  }
+
+  Future<List<Notebook>> _readLegacyLatest() async {
     try {
       final file = await _file(_latest);
       if (!await file.exists()) {
@@ -80,7 +168,7 @@ class LocalBackupService {
       }
       return repository.decodeNotebooks(decoded);
     } catch (e) {
-      debugPrint('LocalBackupService.readLatest failed: $e');
+      debugPrint('LocalBackupService.readLegacyLatest failed: $e');
       return <Notebook>[];
     }
   }
