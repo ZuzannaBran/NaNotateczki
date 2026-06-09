@@ -53,7 +53,6 @@ class LocalBackupService {
     try {
       final notebooksDir = await _notebooksDir();
       final expectedFiles = <String>{};
-      var changed = 0;
       for (final notebook in items) {
         final encoded = repository.encodeNotebooks([notebook]).single;
         final content = jsonEncode(encoded);
@@ -66,16 +65,13 @@ class LocalBackupService {
           }
         }
         await file.writeAsString(content);
-        changed++;
       }
 
-      var deleted = 0;
       await for (final entity in notebooksDir.list()) {
         if (entity is File &&
             entity.path.endsWith('.json') &&
             !expectedFiles.contains(entity.path)) {
           await entity.delete();
-          deleted++;
         }
       }
 
@@ -91,12 +87,6 @@ class LocalBackupService {
         ],
       };
       await (await _manifestFile()).writeAsString(jsonEncode(manifestPayload));
-      if (kDebugMode) {
-        debugPrint(
-          'LocalBackupDiag snapshot incremental notebooks=${items.length} '
-          'changed=$changed deleted=$deleted',
-        );
-      }
     } catch (e, st) {
       debugPrint('LocalBackupService.snapshot failed: $e\n$st');
     }

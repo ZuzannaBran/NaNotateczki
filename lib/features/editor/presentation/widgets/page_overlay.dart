@@ -612,26 +612,11 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _lastDeltaJson = jsonEncode(doc.toDelta().toJson());
     _docSubscription?.cancel();
     _docSubscription = _quillController.document.changes.listen((event) {
-      final diagnosticsStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
       if (_isNormalizing) {
-        if (kDebugMode) {
-          debugPrint(
-            'TextInputDiag quill skip normalizing '
-            'block=${widget.block.id} page=${widget.pageIndex}',
-          );
-        }
         return;
       }
       final rawText = _quillController.document.toPlainText();
       final trailingNewlines = _countTrailingNewlines(rawText);
-      if (kDebugMode) {
-        debugPrint(
-          'TextInputDiag quill change '
-          'block=${widget.block.id} page=${widget.pageIndex} '
-          'source=${event.source} textLen=${rawText.length} '
-          'trailingNewlines=$trailingNewlines',
-        );
-      }
       if (trailingNewlines > 2) {
         final deleteCount = trailingNewlines - 2;
         final deleteStart = rawText.length - deleteCount;
@@ -652,20 +637,11 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       }
       final current = _editorController.findTextBlockById(widget.block.id);
       if (current == null) {
-        if (kDebugMode) {
-          debugPrint(
-            'TextInputDiag quill current missing '
-            'block=${widget.block.id} elapsedUs='
-            '${diagnosticsStopwatch?.elapsedMicroseconds}',
-          );
-        }
         return;
       }
-      final encodeStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
       final deltaJson = jsonEncode(
         _quillController.document.toDelta().toJson(),
       );
-      encodeStopwatch?.stop();
       _lastDeltaJson = deltaJson;
       final plain = _quillController.document.toPlainText();
       _editorController.updateTextBlockContentOnPage(
@@ -674,15 +650,6 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         plainText: plain,
         deltaJson: deltaJson,
       );
-      diagnosticsStopwatch?.stop();
-      if (kDebugMode) {
-        debugPrint(
-          'TextInputDiag quill done '
-          'block=${widget.block.id} deltaLen=${deltaJson.length} '
-          'encodeUs=${encodeStopwatch?.elapsedMicroseconds} '
-          'totalUs=${diagnosticsStopwatch?.elapsedMicroseconds}',
-        );
-      }
     });
   }
 

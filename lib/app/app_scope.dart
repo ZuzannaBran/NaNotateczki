@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -104,9 +103,6 @@ class _BackupScheduler with WidgetsBindingObserver {
   void schedule() {
     _dirty = true;
     _timer?.cancel();
-    if (kDebugMode) {
-      debugPrint('BackupDiag scheduled delayMs=${_idleDelay.inMilliseconds}');
-    }
     _timer = Timer(_idleDelay, () {
       unawaited(flush(reason: 'idle'));
     });
@@ -124,31 +120,14 @@ class _BackupScheduler with WidgetsBindingObserver {
     }
     _dirty = false;
     _isRunning = true;
-    final totalStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
-    final fetchStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
     try {
       final items = await repository.fetchNotebooks();
-      fetchStopwatch?.stop();
       if (repository.lastFetchSkippedCorruptRows) {
-        debugPrint('BackupDiag skipped reason=partial_isar_fetch');
         return;
       }
-      final snapshotStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
       await backupService.snapshot(items);
-      snapshotStopwatch?.stop();
-      totalStopwatch?.stop();
-      if (kDebugMode) {
-        debugPrint(
-          'BackupDiag done reason=$reason notebooks=${items.length} '
-          'fetchMs=${fetchStopwatch?.elapsedMilliseconds} '
-          'snapshotMs=${snapshotStopwatch?.elapsedMilliseconds} '
-          'totalMs=${totalStopwatch?.elapsedMilliseconds}',
-        );
-      }
     } catch (e) {
-      fetchStopwatch?.stop();
-      totalStopwatch?.stop();
-      debugPrint('BackupDiag failed reason=$reason error=$e');
+      debugPrint('BackupScheduler.flush failed: $e');
     } finally {
       _isRunning = false;
       if (_dirty) {
