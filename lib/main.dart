@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app/notes_app.dart';
+import 'core/input/stylus_button_state.dart';
 
 ui.KeyDataCallback? _wrappedKeyDataHandler;
 ui.ErrorCallback? _wrappedPlatformErrorHandler;
@@ -20,6 +21,7 @@ bool _invalidKeyDataFilter(ui.KeyData data) {
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  StylusButtonState.initialize();
   _installInvalidKeyDataFilter();
   _installInvalidKeyDataErrorFilter();
   unawaited(

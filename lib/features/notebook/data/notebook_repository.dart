@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/isar/entities/notebook_entity.dart';
@@ -151,34 +152,12 @@ class NotebookRepository {
       final migratedBlocks = <ImageBlock>[];
       bool pageMigrated = false;
       for (final block in page.imageBlocks) {
-        if (block.bytes == null && block.path.isNotEmpty) {
-          final file = File(block.path);
-          if (file.existsSync()) {
-            try {
-              final bytes = await file.readAsBytes();
-              final ext = block.path.split('.').last.toLowerCase();
-              String mime = 'image/jpeg';
-              if (ext == 'png') {
-                mime = 'image/png';
-              } else if (ext == 'gif') {
-                mime = 'image/gif';
-              } else if (ext == 'webp') {
-                mime = 'image/webp';
-              }
-
-              migratedBlocks.add(
-                block.copyWith(bytes: bytes, imageExt: ext, imageMime: mime),
-              );
-              pageMigrated = true;
-              migrated = true;
-              continue;
-            } catch (e) {
-              debugPrint(
-                'NotebookRepository.saveNotebook: image migration '
-                'failed for ${block.id}: $e',
-              );
-            }
-          }
+        final persistedBlock = await _persistInlineImageBytes(block);
+        if (persistedBlock != block) {
+          migratedBlocks.add(persistedBlock);
+          pageMigrated = true;
+          migrated = true;
+          continue;
         }
         migratedBlocks.add(block);
       }
@@ -200,6 +179,39 @@ class NotebookRepository {
       await isar.notebookEntitys.put(entity);
     });
     onChanged?.call();
+  }
+
+  Future<ImageBlock> _persistInlineImageBytes(ImageBlock block) async {
+    final bytes = block.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      return block;
+    }
+    if (block.path.isNotEmpty &&
+        File(block.path).existsSync() &&
+        !_isVolatileImagePath(block.path)) {
+      return block.copyWith(clearBytes: true);
+    }
+
+    final docs = await getApplicationDocumentsDirectory();
+    final imagesDir = Directory('${docs.path}/images');
+    if (!await imagesDir.exists()) {
+      await imagesDir.create(recursive: true);
+    }
+    final extension = (block.imageExt ?? block.path.split('.').last)
+        .toLowerCase();
+    final safeExtension = RegExp(r'^[a-z0-9]+$').hasMatch(extension)
+        ? extension
+        : 'png';
+    final file = File(
+      '${imagesDir.path}/restored_${block.id}_'
+      '${DateTime.now().millisecondsSinceEpoch}.$safeExtension',
+    );
+    await file.writeAsBytes(bytes, flush: true);
+    return block.copyWith(path: file.path, clearBytes: true);
+  }
+
+  bool _isVolatileImagePath(String path) {
+    return path.contains('/images_cache/') || path.contains('\\images_cache\\');
   }
 
   Future<void> deleteNotebook(String uid) async {
@@ -362,7 +374,7 @@ class NotebookRepository {
       ..uid = block.id
       ..path = block.path
       ..ocrText = block.ocrText
-      ..bytes = block.bytes?.toList()
+      ..bytes = block.path.isEmpty ? block.bytes?.toList() : null
       ..imageExt = block.imageExt
       ..imageMime = block.imageMime
       ..width = block.width
@@ -534,7 +546,7 @@ class NotebookRepository {
   }
 
   Map<String, dynamic> _imageToJson(ImageBlock block) {
-    final bytesBase64 = _bytesToBase64(block.bytes);
+    final bytesBase64 = _bytesToBase64(_imageBytesForJson(block));
     return {
       'id': block.id,
       'path': block.path,
@@ -574,6 +586,26 @@ class NotebookRepository {
       cropRight: (json['cropRight'] as num?)?.toDouble() ?? 1.0,
       cropBottom: (json['cropBottom'] as num?)?.toDouble() ?? 1.0,
     );
+  }
+
+  Uint8List? _imageBytesForJson(ImageBlock block) {
+    final bytes = block.bytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      return bytes;
+    }
+    if (block.path.isEmpty) {
+      return null;
+    }
+    final file = File(block.path);
+    if (!file.existsSync()) {
+      return null;
+    }
+    try {
+      return file.readAsBytesSync();
+    } catch (e) {
+      debugPrint('NotebookRepository._imageBytesForJson failed: $e');
+      return null;
+    }
   }
 
   Map<String, dynamic> _strokeToJson(InkStroke stroke) {

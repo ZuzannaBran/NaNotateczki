@@ -126,7 +126,10 @@ class EditorController extends ChangeNotifier {
   @override
   void dispose() {
     _commitActiveTextEdit();
-    _prefsSaveDebounce?.cancel();
+    if (_prefsSaveDebounce != null) {
+      _prefsSaveDebounce?.cancel();
+      unawaited(_saveEditorPrefs());
+    }
     if (_notebookSaveDebounce != null) {
       unawaited(_save());
     }
@@ -396,6 +399,7 @@ class EditorController extends ChangeNotifier {
     tool = newTool;
     if (newTool.isEraser) {
       lastEraserTool = newTool;
+      _schedulePrefsSave();
     }
     if (newTool.isShape) {
       lastShapeTool = newTool;
@@ -705,6 +709,7 @@ class EditorController extends ChangeNotifier {
 
   void setStrokeWidth(double value) {
     inkStrokeWidth = value;
+    _schedulePrefsSave();
     notifyListeners();
   }
 
@@ -740,6 +745,8 @@ class EditorController extends ChangeNotifier {
       final lastTextHex = decoded['lastTextColor']?.toString();
       final lastFont = decoded['lastTextFontFamily']?.toString();
       final lastSize = decoded['lastTextFontSize'];
+      final strokeWidth = decoded['inkStrokeWidth'];
+      final eraserToolIndex = decoded['lastEraserTool'];
       final quick = decoded['quickColors'];
       final recent = decoded['recentColors'];
 
@@ -757,6 +764,16 @@ class EditorController extends ChangeNotifier {
       final sizeParsed = lastSize is num ? lastSize.toDouble() : null;
       if (sizeParsed != null) {
         lastTextFontSize = sizeParsed;
+      }
+      final strokeWidthParsed = strokeWidth is num
+          ? strokeWidth.toDouble()
+          : null;
+      if (strokeWidthParsed != null && strokeWidthParsed > 0) {
+        inkStrokeWidth = strokeWidthParsed;
+      }
+      final eraserToolParsed = _eraserToolFromIndex(eraserToolIndex);
+      if (eraserToolParsed != null) {
+        lastEraserTool = eraserToolParsed;
       }
       if (quick is List) {
         final mapped = quick
@@ -803,6 +820,8 @@ class EditorController extends ChangeNotifier {
         'lastTextColor': _colorToHex(lastTextColor),
         'lastTextFontFamily': lastTextFontFamily,
         'lastTextFontSize': lastTextFontSize,
+        'inkStrokeWidth': inkStrokeWidth,
+        'lastEraserTool': lastEraserTool.index,
       };
       await file.writeAsString(jsonEncode(payload));
     } catch (e) {
@@ -813,6 +832,14 @@ class EditorController extends ChangeNotifier {
   Future<File> _prefsFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/editor_prefs.json');
+  }
+
+  DrawingTool? _eraserToolFromIndex(Object? value) {
+    if (value is! int || value < 0 || value >= DrawingTool.values.length) {
+      return null;
+    }
+    final parsed = DrawingTool.values[value];
+    return parsed.isEraser ? parsed : null;
   }
 
   Color? _colorFromHex(String? value) {
@@ -1171,8 +1198,7 @@ class EditorController extends ChangeNotifier {
     if (picked == null) {
       return null;
     }
-    final file = await _persistImage(picked);
-    return _addImageBlockFromFile(file, position);
+    return _addImageBlockFromFile(File(picked.path), position);
   }
 
   Future<String?> insertFromFilePicker(Offset position) async {
@@ -1524,7 +1550,6 @@ class EditorController extends ChangeNotifier {
       position: position,
       width: initialSize.width,
       height: initialSize.height,
-      bytes: bytes,
       imageExt: extension,
       imageMime: 'image/$extension',
     );
@@ -1558,7 +1583,6 @@ class EditorController extends ChangeNotifier {
     bool runOcr = true,
   }) async {
     final persisted = await _persistImageFile(file);
-    final bytes = await file.readAsBytes();
     final size = await _imageSize(persisted);
     final initialSize = _initialImageBlockSize(size);
     final extension = file.path.split('.').last.toLowerCase();
@@ -1577,7 +1601,6 @@ class EditorController extends ChangeNotifier {
       position: position,
       width: initialSize.width,
       height: initialSize.height,
-      bytes: bytes,
       imageExt: extension,
       imageMime: mime,
     );
@@ -1663,7 +1686,6 @@ class EditorController extends ChangeNotifier {
           height: notebook.kind == NotebookKind.notebook
               ? targetHeight
               : targetHeight.clamp(80, 520).toDouble(),
-          bytes: render.bytes,
           imageExt: 'png',
           imageMime: 'image/png',
         );
@@ -1760,7 +1782,6 @@ class EditorController extends ChangeNotifier {
         height: notebook.kind == NotebookKind.notebook
             ? targetHeight
             : targetHeight.clamp(80, 520).toDouble(),
-        bytes: await file.readAsBytes(),
         imageExt: 'png',
         imageMime: 'image/png',
       );
@@ -1837,7 +1858,7 @@ class EditorController extends ChangeNotifier {
         'restored_${block.id}_${DateTime.now().millisecondsSinceEpoch}.$extension';
     final file = await _persistImageBytes(block.bytes!, filename);
 
-    final updatedBlock = block.copyWith(path: file.path);
+    final updatedBlock = block.copyWith(path: file.path, clearBytes: true);
     final updated = currentPage.imageBlocks
         .map((item) => item.id == blockId ? updatedBlock : item)
         .toList();
@@ -1958,39 +1979,28 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
-  Future<File> _persistImage(XFile picked) async {
-    final dir = await getTemporaryDirectory();
-    final imagesDir = Directory('${dir.path}/images_cache');
-    if (!await imagesDir.exists()) {
-      await imagesDir.create(recursive: true);
-    }
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final extension = picked.path.split('.').last;
-    final target = File('${imagesDir.path}/img_$timestamp.$extension');
-    return File(picked.path).copy(target.path);
-  }
-
   Future<File> _persistImageFile(File source) async {
-    final dir = await getTemporaryDirectory();
-    final imagesDir = Directory('${dir.path}/images_cache');
-    if (!await imagesDir.exists()) {
-      await imagesDir.create(recursive: true);
-    }
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final extension = source.path.split('.').last;
+    final imagesDir = await _imagesDir();
     final target = File('${imagesDir.path}/img_$timestamp.$extension');
     return source.copy(target.path);
   }
 
   Future<File> _persistImageBytes(Uint8List bytes, String filename) async {
-    final dir = await getTemporaryDirectory();
-    final imagesDir = Directory('${dir.path}/images_cache');
-    if (!await imagesDir.exists()) {
-      await imagesDir.create(recursive: true);
-    }
+    final imagesDir = await _imagesDir();
     final target = File('${imagesDir.path}/$filename');
     await target.writeAsBytes(bytes, flush: true);
     return target;
+  }
+
+  Future<Directory> _imagesDir() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final imagesDir = Directory('${dir.path}/images');
+    if (!await imagesDir.exists()) {
+      await imagesDir.create(recursive: true);
+    }
+    return imagesDir;
   }
 
   String _colorToHex(Color color) {
