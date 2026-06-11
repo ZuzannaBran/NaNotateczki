@@ -2292,14 +2292,12 @@ class _ProjectMiniMapPainter extends CustomPainter {
         );
       }
 
+      canvas.saveLayer(pageRect, Paint());
       for (final stroke in page.inkStrokes) {
         if (stroke.points.isEmpty) {
           continue;
         }
         final paint = Paint()
-          ..color = stroke.tool.name == 'highlighter'
-              ? stroke.color.withValues(alpha: 0.24)
-              : stroke.color.withValues(alpha: 0.88)
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round
@@ -2307,6 +2305,15 @@ class _ProjectMiniMapPainter extends CustomPainter {
             0.38,
             1.45,
           );
+        if (stroke.tool == DrawingTool.eraserBrush) {
+          paint
+            ..color = Colors.transparent
+            ..blendMode = BlendMode.clear;
+        } else {
+          paint.color = stroke.tool == DrawingTool.highlighter
+              ? stroke.color.withValues(alpha: 0.24)
+              : stroke.color.withValues(alpha: 0.88);
+        }
 
         if (stroke.points.length == 1) {
           final point = toMap(stroke.points.first.toOffset());
@@ -2323,6 +2330,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
         }
         canvas.drawPath(path, paint);
       }
+      canvas.restore();
 
       canvas.restore();
     }

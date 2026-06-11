@@ -366,7 +366,12 @@ class NotebookExportService {
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke.width;
-    if (stroke.tool == DrawingTool.eraserBrush) {
+    if (stroke.tool == DrawingTool.eraserArea) {
+      paint
+        ..color = Colors.transparent
+        ..blendMode = BlendMode.clear
+        ..style = PaintingStyle.fill;
+    } else if (stroke.tool == DrawingTool.eraserBrush) {
       paint
         ..color = Colors.transparent
         ..blendMode = BlendMode.clear;
@@ -375,7 +380,11 @@ class NotebookExportService {
     }
 
     final path = _buildInkPath(stroke.points, stroke.tool, origin);
-    canvas.drawPath(path, paint);
+    if (stroke.tool == DrawingTool.eraserArea) {
+      canvas.drawPath(path..close(), paint);
+    } else {
+      canvas.drawPath(path, paint);
+    }
   }
 
   static Path _buildInkPath(

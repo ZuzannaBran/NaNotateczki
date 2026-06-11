@@ -216,10 +216,11 @@ class EditorToolbar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            icon: _EraserIcon(sparkles: activeTool == DrawingTool.eraserStroke),
-            tooltip: activeTool == DrawingTool.eraserStroke
-                ? 'Erase stroke'
-                : 'Eraser brush',
+            icon: _EraserIcon(
+              sparkles: activeTool == DrawingTool.eraserStroke,
+              area: activeTool == DrawingTool.eraserArea,
+            ),
+            tooltip: _eraserLabel(activeTool),
             color: isSelected ? AppColors.inkBlack : null,
             onPressed: () => controller.setTool(activeTool),
           ),
@@ -246,6 +247,17 @@ class EditorToolbar extends StatelessWidget {
                     _EraserIcon(sparkles: true),
                     SizedBox(width: 8),
                     Text('Erase stroke'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: DrawingTool.eraserArea,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _EraserIcon(area: true),
+                    SizedBox(width: 8),
+                    Text('Erase area'),
                   ],
                 ),
               ),
@@ -321,6 +333,14 @@ class EditorToolbar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _eraserLabel(DrawingTool tool) {
+    return switch (tool) {
+      DrawingTool.eraserStroke => 'Erase stroke',
+      DrawingTool.eraserArea => 'Erase area',
+      _ => 'Eraser brush',
+    };
   }
 
   IconData _shapeIcon(DrawingTool tool) {
@@ -660,9 +680,10 @@ class EditorToolbar extends StatelessWidget {
 }
 
 class _EraserIcon extends StatelessWidget {
-  const _EraserIcon({this.sparkles = false});
+  const _EraserIcon({this.sparkles = false, this.area = false});
 
   final bool sparkles;
+  final bool area;
 
   @override
   Widget build(BuildContext context) {
@@ -683,6 +704,16 @@ class _EraserIcon extends StatelessWidget {
               child: Icon(
                 Icons.auto_awesome,
                 size: size * 0.42,
+                color: iconTheme.color,
+              ),
+            ),
+          if (area)
+            Positioned(
+              right: size * 0.02,
+              top: size * 0.02,
+              child: Icon(
+                Icons.circle_outlined,
+                size: size * 0.44,
                 color: iconTheme.color,
               ),
             ),

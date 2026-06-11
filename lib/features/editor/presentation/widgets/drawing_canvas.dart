@@ -122,6 +122,20 @@ bool _samePoint(InkPoint a, InkPoint b) {
   return a.dx == b.dx && a.dy == b.dy;
 }
 
+List<InkPoint> _closedAreaPoints(List<InkPoint> points) {
+  if (points.length < 3 || _samePoint(points.first, points.last)) {
+    return List<InkPoint>.from(points);
+  }
+  return <InkPoint>[
+    ...points,
+    InkPoint(
+      dx: points.first.dx,
+      dy: points.first.dy,
+      pressure: points.first.pressure,
+    ),
+  ];
+}
+
 bool _shouldAcceptInkPoint(
   List<InkPoint> points,
   Offset offset,
@@ -439,6 +453,13 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       _notifyInkChanged();
       return;
     }
+    if (tool == DrawingTool.eraserArea) {
+      _currentPoints
+        ..clear()
+        ..add(InkPoint.fromOffset(offset, pressure));
+      _notifyInkChanged();
+      return;
+    }
     if (tool == DrawingTool.eraserBrush) {
       _eraserPosition = offset;
     }
@@ -499,6 +520,13 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       _addEraserTrailPoint(offset);
       _eraseAt(offset, page, controller);
       _notifyInkChanged();
+      return;
+    }
+    if (tool == DrawingTool.eraserArea) {
+      if (_shouldAddPoint(offset, tool)) {
+        _currentPoints.add(InkPoint.fromOffset(offset, event.pressure));
+        _notifyInkChanged();
+      }
       return;
     }
     if (tool.isShape) {
@@ -614,6 +642,33 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       _resetCurrent();
       return;
     }
+    if (tool == DrawingTool.eraserArea) {
+      if (_currentPoints.length >= 3) {
+        final points = _closedAreaPoints(_currentPoints);
+        if (widget.pageIndex != null) {
+          controller.addInkStrokeOnPage(
+            pageIndex,
+            points,
+            widthOverride: _effectiveStrokeWidth(
+              tool,
+              controller.inkStrokeWidth,
+            ),
+            toolOverride: tool,
+          );
+        } else {
+          controller.addInkStroke(
+            points,
+            widthOverride: _effectiveStrokeWidth(
+              tool,
+              controller.inkStrokeWidth,
+            ),
+            toolOverride: tool,
+          );
+        }
+      }
+      _resetCurrent();
+      return;
+    }
     if (_currentPoints.isEmpty) {
       return;
     }
@@ -708,6 +763,32 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
           controller.eraseInkStrokesByIdOnPage(pageIndex, _eraseStrokeIds);
         } else {
           controller.eraseInkStrokesById(_eraseStrokeIds);
+        }
+      }
+      return;
+    }
+    if (tool == DrawingTool.eraserArea) {
+      if (_currentPoints.length >= 3) {
+        final points = _closedAreaPoints(_currentPoints);
+        if (widget.pageIndex != null) {
+          controller.addInkStrokeOnPage(
+            pageIndex,
+            points,
+            widthOverride: _effectiveStrokeWidth(
+              tool,
+              controller.inkStrokeWidth,
+            ),
+            toolOverride: tool,
+          );
+        } else {
+          controller.addInkStroke(
+            points,
+            widthOverride: _effectiveStrokeWidth(
+              tool,
+              controller.inkStrokeWidth,
+            ),
+            toolOverride: tool,
+          );
         }
       }
       return;
@@ -1158,6 +1239,9 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     if (tool == DrawingTool.eraserBrush) {
       return baseWidth * _eraserBrushWidthScale;
     }
+    if (tool == DrawingTool.eraserArea) {
+      return max(1.5, baseWidth * 0.5);
+    }
     return baseWidth;
   }
 
@@ -1510,6 +1594,13 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       _notifyInkChanged();
       return;
     }
+    if (tool == DrawingTool.eraserArea) {
+      _currentPoints
+        ..clear()
+        ..add(InkPoint.fromOffset(docOffset, pressure));
+      _notifyInkChanged();
+      return;
+    }
     if (tool == DrawingTool.eraserBrush) {
       _eraserPosition = worldOffset;
     }
@@ -1596,6 +1687,13 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       _addEraserTrailPoint(worldOffset);
       _eraseAt(localOffset, pageIndex);
       _notifyInkChanged();
+      return;
+    }
+    if (tool == DrawingTool.eraserArea) {
+      if (_shouldAddPoint(docOffset, tool)) {
+        _currentPoints.add(InkPoint.fromOffset(docOffset, event.pressure));
+        _notifyInkChanged();
+      }
       return;
     }
     if (tool.isShape) {
@@ -1702,6 +1800,18 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       _resetCurrent();
       return;
     }
+    if (tool == DrawingTool.eraserArea) {
+      if (_currentPoints.length >= 3) {
+        controller.addInkStrokeOnPage(
+          pageIndex,
+          _toPageLocalPoints(_closedAreaPoints(_currentPoints), pageIndex),
+          widthOverride: _effectiveStrokeWidth(tool, controller.inkStrokeWidth),
+          toolOverride: tool,
+        );
+      }
+      _resetCurrent();
+      return;
+    }
     if (_currentPoints.isEmpty) {
       return;
     }
@@ -1789,6 +1899,17 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     if (tool == DrawingTool.eraserStroke) {
       if (_eraseStrokeIds.isNotEmpty) {
         controller.eraseInkStrokesByIdOnPage(pageIndex, _eraseStrokeIds);
+      }
+      return;
+    }
+    if (tool == DrawingTool.eraserArea) {
+      if (_currentPoints.length >= 3) {
+        controller.addInkStrokeOnPage(
+          pageIndex,
+          _toPageLocalPoints(_closedAreaPoints(_currentPoints), pageIndex),
+          widthOverride: _effectiveStrokeWidth(tool, controller.inkStrokeWidth),
+          toolOverride: tool,
+        );
       }
       return;
     }
@@ -2301,6 +2422,9 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     if (tool == DrawingTool.eraserBrush) {
       return baseWidth * _eraserBrushWidthScale;
     }
+    if (tool == DrawingTool.eraserArea) {
+      return max(1.5, baseWidth * 0.5);
+    }
     return baseWidth;
   }
 
@@ -2479,7 +2603,12 @@ class _InkPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
       ..strokeWidth = width;
-    if (tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserArea) {
+      paint
+        ..color = Colors.transparent
+        ..blendMode = BlendMode.clear
+        ..style = PaintingStyle.fill;
+    } else if (tool == DrawingTool.eraserBrush) {
       paint
         ..color = Colors.transparent
         ..blendMode = BlendMode.clear;
@@ -2499,7 +2628,11 @@ class _InkPainter extends CustomPainter {
         ..strokeWidth = width + 8.0;
       canvas.drawPath(path, highlightPaint);
     }
-    canvas.drawPath(path, paint);
+    if (tool == DrawingTool.eraserArea) {
+      canvas.drawPath(path..close(), paint);
+    } else {
+      canvas.drawPath(path, paint);
+    }
   }
 
   Color _toolColor(Color base, DrawingTool tool) {
@@ -2573,14 +2706,6 @@ class _InkOverlayPainter extends CustomPainter {
 
     if (currentTool == DrawingTool.eraserStroke && eraserTrail.isNotEmpty) {
       _drawEraserTrail(canvas, size, eraserTrail, eraserRadius ?? 12.0);
-    } else if (eraserPosition != null &&
-        currentTool == DrawingTool.eraserBrush) {
-      final radius = eraserRadius ?? 12.0;
-      final ringPaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.35)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2;
-      canvas.drawCircle(eraserPosition! - worldOrigin, radius, ringPaint);
     }
   }
 
@@ -2597,8 +2722,7 @@ class _InkOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = radius * 2
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * 0.25);
-    if (points.length == 1) {
-      canvas.drawCircle(points.first - worldOrigin, radius, paint);
+    if (points.length < 2) {
       return;
     }
 
@@ -2651,6 +2775,10 @@ class _InkOverlayPainter extends CustomPainter {
     if (points.isEmpty) {
       return;
     }
+    if (tool == DrawingTool.eraserArea && points.length < 3) {
+      _drawEraserAreaStart(canvas, points, width);
+      return;
+    }
     final paint = Paint()
       ..strokeCap = tool == DrawingTool.highlighter
           ? StrokeCap.square
@@ -2658,7 +2786,11 @@ class _InkOverlayPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
       ..strokeWidth = width;
-    if (tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserArea) {
+      paint
+        ..color = _canvasBackgroundColor.withValues(alpha: 0.32)
+        ..style = PaintingStyle.fill;
+    } else if (tool == DrawingTool.eraserBrush) {
       paint.color = _canvasBackgroundColor;
     } else {
       paint.color = _toolColor(color, tool);
@@ -2671,7 +2803,49 @@ class _InkOverlayPainter extends CustomPainter {
       worldOrigin,
       Offset.zero,
     );
-    canvas.drawPath(path, paint);
+    if (tool == DrawingTool.eraserArea) {
+      final closedPath = path..close();
+      canvas.drawPath(closedPath, paint);
+      final outlinePaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.35)
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = max(1.2, width);
+      canvas.drawPath(closedPath, outlinePaint);
+    } else {
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  void _drawEraserAreaStart(
+    Canvas canvas,
+    List<InkPoint> points,
+    double width,
+  ) {
+    final radius = max(5.0, width * 3.0);
+    final fillPaint = Paint()
+      ..color = _canvasBackgroundColor.withValues(alpha: 0.32)
+      ..style = PaintingStyle.fill;
+    final outlinePaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.35)
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = max(1.2, width);
+    final start = points.first.toOffset() - worldOrigin;
+    canvas.drawCircle(start, radius, fillPaint);
+    if (points.length == 1) {
+      canvas.drawCircle(start, radius, outlinePaint);
+      return;
+    }
+    final end = points.last.toOffset() - worldOrigin;
+    final path = Path()
+      ..moveTo(start.dx, start.dy)
+      ..lineTo(end.dx, end.dy);
+    canvas.drawPath(path, outlinePaint);
+    canvas.drawCircle(start, radius, outlinePaint);
+    canvas.drawCircle(end, radius, outlinePaint);
   }
 
   Color _toolColor(Color base, DrawingTool tool) {
@@ -2773,7 +2947,12 @@ class _DocumentInkPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
       ..strokeWidth = width;
-    if (tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserArea) {
+      paint
+        ..color = Colors.transparent
+        ..blendMode = BlendMode.clear
+        ..style = PaintingStyle.fill;
+    } else if (tool == DrawingTool.eraserBrush) {
       paint
         ..color = Colors.transparent
         ..blendMode = BlendMode.clear;
@@ -2793,7 +2972,11 @@ class _DocumentInkPainter extends CustomPainter {
         ..strokeWidth = width + 8.0;
       canvas.drawPath(path, highlightPaint);
     }
-    canvas.drawPath(path, paint);
+    if (tool == DrawingTool.eraserArea) {
+      canvas.drawPath(path..close(), paint);
+    } else {
+      canvas.drawPath(path, paint);
+    }
   }
 
   Color _toolColor(Color base, DrawingTool tool) {

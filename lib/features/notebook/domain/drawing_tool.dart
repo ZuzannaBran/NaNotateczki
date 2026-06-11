@@ -15,11 +15,14 @@ enum DrawingTool {
   blockArrow,
   edit,
   lasso,
+  eraserArea,
 }
 
 extension DrawingToolX on DrawingTool {
   bool get isEraser =>
-      this == DrawingTool.eraserBrush || this == DrawingTool.eraserStroke;
+      this == DrawingTool.eraserBrush ||
+      this == DrawingTool.eraserStroke ||
+      this == DrawingTool.eraserArea;
 
   bool get isShape =>
       this == DrawingTool.line ||
