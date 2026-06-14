@@ -9,6 +9,7 @@ class StylusButtonState {
   );
 
   static final ValueNotifier<bool> pressed = ValueNotifier<bool>(false);
+  static final ValueNotifier<int> eraserToggleRequests = ValueNotifier<int>(0);
   static bool _initialized = false;
 
   static bool get isPressed => pressed.value;
@@ -22,6 +23,10 @@ class StylusButtonState {
   }
 
   static Future<void> _handleMethodCall(MethodCall call) async {
+    if (call.method == 'toggleEraser') {
+      eraserToggleRequests.value++;
+      return;
+    }
     if (call.method != 'setPressed') {
       return;
     }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -17,7 +18,203 @@ const double _eraserBrushWidthScale = 2.0;
 const double _eraserStrokeMinRadius = 4.0;
 const double _eraserStrokeRadiusScale = 1.5;
 const double _eraserTrailMaxLength = 96.0;
+const double _scratchEraseRadiusScale = 4.0;
+const int _scratchEraseMinDirectionReversals = 3;
 const Color _canvasBackgroundColor = AppColors.paper;
+
+class _PartialEraseResult {
+  const _PartialEraseResult({required this.strokes, required this.changed});
+
+  final List<InkStroke> strokes;
+  final bool changed;
+}
+
+_PartialEraseResult _eraseStrokeParts({
+  required List<InkStroke> strokes,
+  required List<InkPoint> gesture,
+  required double radius,
+  required String Function() createId,
+}) {
+  final gestureOffsets = gesture.map((point) => point.toOffset()).toList();
+  final next = <InkStroke>[];
+  var changed = false;
+  for (final stroke in strokes) {
+    if (!_canScratchEraseStroke(stroke) || stroke.points.length < 2) {
+      next.add(stroke);
+      continue;
+    }
+    final parts = _splitStrokeAroundGesture(
+      stroke,
+      gestureOffsets,
+      radius,
+      createId,
+    );
+    if (parts == null) {
+      next.add(stroke);
+      continue;
+    }
+    changed = true;
+    next.addAll(parts);
+  }
+  return _PartialEraseResult(strokes: next, changed: changed);
+}
+
+List<InkStroke>? _splitStrokeAroundGesture(
+  InkStroke stroke,
+  List<Offset> gesture,
+  double radius,
+  String Function() createId,
+) {
+  final points = stroke.points;
+  final removed = List<bool>.filled(points.length, false);
+  for (var i = 0; i < points.length; i++) {
+    if (_distanceSquaredToPolyline(points[i].toOffset(), gesture) <=
+        radius * radius) {
+      removed[i] = true;
+    }
+  }
+  for (var i = 0; i < points.length - 1; i++) {
+    final a = points[i].toOffset();
+    final b = points[i + 1].toOffset();
+    if (_segmentDistanceSquaredToPolyline(a, b, gesture) <= radius * radius) {
+      removed[i] = true;
+      removed[i + 1] = true;
+    }
+  }
+  if (!removed.contains(true)) {
+    return null;
+  }
+
+  final parts = <InkStroke>[];
+  var run = <InkPoint>[];
+  void flushRun() {
+    if (run.length >= 2) {
+      parts.add(stroke.copyWith(id: createId(), points: List.of(run)));
+    }
+    run = <InkPoint>[];
+  }
+
+  for (var i = 0; i < points.length; i++) {
+    if (removed[i]) {
+      flushRun();
+    } else {
+      run.add(points[i]);
+    }
+  }
+  flushRun();
+  return parts;
+}
+
+bool _canScratchEraseStroke(InkStroke stroke) {
+  return stroke.tool != DrawingTool.eraserBrush &&
+      stroke.tool != DrawingTool.eraserStroke &&
+      stroke.tool != DrawingTool.eraserArea &&
+      stroke.tool != DrawingTool.lasso;
+}
+
+bool _isScratchEraseGesture(
+  List<InkPoint> points,
+  PointerDeviceKind pointerKind,
+) {
+  if (pointerKind != PointerDeviceKind.stylus &&
+      pointerKind != PointerDeviceKind.invertedStylus &&
+      pointerKind != PointerDeviceKind.mouse) {
+    return false;
+  }
+  return _directionReversalCount(points) >= _scratchEraseMinDirectionReversals;
+}
+
+int _directionReversalCount(List<InkPoint> points) {
+  var reversals = 0;
+  Offset? previousDirection;
+  for (var i = 1; i < points.length; i++) {
+    final delta = points[i].toOffset() - points[i - 1].toOffset();
+    if (delta.distanceSquared < 4.0) {
+      continue;
+    }
+    final direction = delta / delta.distance;
+    final previous = previousDirection;
+    if (previous != null) {
+      final dot = previous.dx * direction.dx + previous.dy * direction.dy;
+      if (dot < -0.25) {
+        reversals++;
+      }
+    }
+    previousDirection = direction;
+  }
+  return reversals;
+}
+
+double _distanceSquaredToPolyline(Offset point, List<Offset> polyline) {
+  if (polyline.isEmpty) {
+    return double.infinity;
+  }
+  if (polyline.length == 1) {
+    return (point - polyline.first).distanceSquared;
+  }
+  var best = double.infinity;
+  for (var i = 0; i < polyline.length - 1; i++) {
+    best = min(
+      best,
+      _distanceSquaredToSegment(point, polyline[i], polyline[i + 1]),
+    );
+  }
+  return best;
+}
+
+double _segmentDistanceSquaredToPolyline(
+  Offset a,
+  Offset b,
+  List<Offset> polyline,
+) {
+  if (polyline.length < 2) {
+    return min(
+      (a - polyline.first).distanceSquared,
+      (b - polyline.first).distanceSquared,
+    );
+  }
+  var best = double.infinity;
+  for (var i = 0; i < polyline.length - 1; i++) {
+    best = min(
+      best,
+      _distanceSquaredBetweenSegments(a, b, polyline[i], polyline[i + 1]),
+    );
+  }
+  return best;
+}
+
+double _distanceSquaredBetweenSegments(Offset a, Offset b, Offset c, Offset d) {
+  if (_segmentsIntersect(a, b, c, d)) {
+    return 0;
+  }
+  return min(
+    min(_distanceSquaredToSegment(a, c, d), _distanceSquaredToSegment(b, c, d)),
+    min(_distanceSquaredToSegment(c, a, b), _distanceSquaredToSegment(d, a, b)),
+  );
+}
+
+bool _segmentsIntersect(Offset a, Offset b, Offset c, Offset d) {
+  final abC = _cross(b - a, c - a);
+  final abD = _cross(b - a, d - a);
+  final cdA = _cross(d - c, a - c);
+  final cdB = _cross(d - c, b - c);
+  return abC.sign != abD.sign && cdA.sign != cdB.sign;
+}
+
+double _cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
+
+double _distanceSquaredToSegment(Offset p, Offset a, Offset b) {
+  final ab = b - a;
+  final ap = p - a;
+  final abLen2 = ab.dx * ab.dx + ab.dy * ab.dy;
+  if (abLen2 == 0) {
+    return (p - a).distanceSquared;
+  }
+  final t = (ap.dx * ab.dx + ap.dy * ab.dy) / abLen2;
+  final clamped = t.clamp(0.0, 1.0);
+  final closest = Offset(a.dx + ab.dx * clamped, a.dy + ab.dy * clamped);
+  return (p - closest).distanceSquared;
+}
 
 class DrawingCanvas extends StatefulWidget {
   const DrawingCanvas({
@@ -225,12 +422,20 @@ DrawingTool _toolForPointerEvent(
   return currentTool;
 }
 
+void _toggleEraserShortcut(EditorController controller) {
+  controller.setTool(
+    controller.tool.isEraser ? DrawingTool.pen : controller.lastEraserTool,
+  );
+}
+
 bool _hasStylusButton(PointerEvent event) {
   if (event.kind == PointerDeviceKind.stylus ||
       event.kind == PointerDeviceKind.invertedStylus) {
-    return event.buttons & ~kStylusContact != 0;
+    const stylusButtons = kPrimaryStylusButton | kSecondaryStylusButton;
+    return event.buttons & stylusButtons != 0;
   }
-  if (event.kind == PointerDeviceKind.mouse) {
+  if (defaultTargetPlatform == TargetPlatform.linux &&
+      event.kind == PointerDeviceKind.mouse) {
     const stylusButtonFallback = kSecondaryMouseButton | kMiddleMouseButton;
     return event.buttons & stylusButtonFallback != 0;
   }
@@ -281,9 +486,28 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   bool _suspendInk = false;
 
   @override
+  void initState() {
+    super.initState();
+    StylusButtonState.eraserToggleRequests.addListener(
+      _handleEraserToggleRequest,
+    );
+  }
+
+  @override
   void dispose() {
+    StylusButtonState.eraserToggleRequests.removeListener(
+      _handleEraserToggleRequest,
+    );
     _inkRepaint.dispose();
     super.dispose();
+  }
+
+  void _handleEraserToggleRequest() {
+    if (!mounted) {
+      return;
+    }
+    _resetCurrent();
+    _toggleEraserShortcut(context.read<EditorController>());
   }
 
   @override
@@ -683,6 +907,10 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         InkPoint(dx: point.dx + 0.5, dy: point.dy, pressure: point.pressure),
       );
     }
+    if (_tryCommitScratchErase(controller, pageIndex, tool)) {
+      _resetCurrent();
+      return;
+    }
     if (widget.pageIndex != null) {
       if (tool == DrawingTool.lasso) {
         controller.selectWithLasso(
@@ -805,6 +1033,9 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         InkPoint(dx: point.dx + 0.5, dy: point.dy, pressure: point.pressure),
       );
     }
+    if (_tryCommitScratchErase(controller, pageIndex, tool)) {
+      return;
+    }
     if (tool == DrawingTool.lasso) {
       controller.selectWithLasso(
         _currentPoints.map((p) => p.toOffset()).toList(),
@@ -834,6 +1065,35 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         toolOverride: tool,
       );
     }
+  }
+
+  bool _tryCommitScratchErase(
+    EditorController controller,
+    int pageIndex,
+    DrawingTool tool,
+  ) {
+    final pointerKind = _primaryPointerKind;
+    if (tool != DrawingTool.pen || pointerKind == null) {
+      return false;
+    }
+    final result = _eraseStrokeParts(
+      strokes: _resolvedPage(controller).inkStrokes,
+      gesture: _currentPoints,
+      radius: max(8.0, controller.inkStrokeWidth * _scratchEraseRadiusScale),
+      createId: controller.createInkStrokeId,
+    );
+    if (!result.changed) {
+      return false;
+    }
+    if (!_isScratchEraseGesture(_currentPoints, pointerKind)) {
+      return false;
+    }
+    if (widget.pageIndex != null) {
+      controller.replaceInkStrokesOnPage(pageIndex, result.strokes);
+    } else {
+      controller.replaceInkStrokes(result.strokes);
+    }
+    return true;
   }
 
   void _clearCurrentSegmentForToolSwitch() {
@@ -1401,9 +1661,28 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   bool _suspendInk = false;
 
   @override
+  void initState() {
+    super.initState();
+    StylusButtonState.eraserToggleRequests.addListener(
+      _handleEraserToggleRequest,
+    );
+  }
+
+  @override
   void dispose() {
+    StylusButtonState.eraserToggleRequests.removeListener(
+      _handleEraserToggleRequest,
+    );
     _inkRepaint.dispose();
     super.dispose();
+  }
+
+  void _handleEraserToggleRequest() {
+    if (!mounted) {
+      return;
+    }
+    _resetCurrent();
+    _toggleEraserShortcut(context.read<EditorController>());
   }
 
   @override
@@ -1826,6 +2105,10 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         InkPoint(dx: point.dx + 0.5, dy: point.dy, pressure: point.pressure),
       );
     }
+    if (_tryCommitScratchErase(controller, pageIndex, tool)) {
+      _resetCurrent();
+      return;
+    }
     final pageLocalPoints = _toPageLocalPoints(_currentPoints, pageIndex);
     if (tool == DrawingTool.lasso) {
       controller.selectWithLasso(
@@ -1926,6 +2209,9 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       );
     }
     final pageLocalPoints = _toPageLocalPoints(_currentPoints, pageIndex);
+    if (_tryCommitScratchErase(controller, pageIndex, tool)) {
+      return;
+    }
     if (tool == DrawingTool.lasso) {
       controller.selectWithLasso(
         pageLocalPoints.map((p) => p.toOffset()).toList(),
@@ -1952,6 +2238,31 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       widthOverride: _effectiveStrokeWidth(tool, controller.inkStrokeWidth),
       toolOverride: tool,
     );
+  }
+
+  bool _tryCommitScratchErase(
+    EditorController controller,
+    int pageIndex,
+    DrawingTool tool,
+  ) {
+    final pointerKind = _primaryPointerKind;
+    if (tool != DrawingTool.pen || pointerKind == null) {
+      return false;
+    }
+    final result = _eraseStrokeParts(
+      strokes: widget.pages[pageIndex].inkStrokes,
+      gesture: _toPageLocalPoints(_currentPoints, pageIndex),
+      radius: max(8.0, controller.inkStrokeWidth * _scratchEraseRadiusScale),
+      createId: controller.createInkStrokeId,
+    );
+    if (!result.changed) {
+      return false;
+    }
+    if (!_isScratchEraseGesture(_currentPoints, pointerKind)) {
+      return false;
+    }
+    controller.replaceInkStrokesOnPage(pageIndex, result.strokes);
+    return true;
   }
 
   void _clearCurrentSegmentForToolSwitch() {

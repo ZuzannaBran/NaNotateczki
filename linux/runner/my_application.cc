@@ -33,6 +33,14 @@ static gboolean is_tablet_like_source(GdkInputSource source) {
          source == GDK_SOURCE_TABLET_PAD;
 }
 
+static gboolean device_tool_is_eraser(GdkDeviceTool* tool) {
+  if (tool == nullptr) {
+    return FALSE;
+  }
+
+  return gdk_device_tool_get_tool_type(tool) == GDK_DEVICE_TOOL_TYPE_ERASER;
+}
+
 static gboolean device_name_suggests_stylus(GdkDevice* device) {
   const gchar* name = gdk_device_get_name(device);
   if (name == nullptr) {
@@ -45,7 +53,11 @@ static gboolean device_name_suggests_stylus(GdkDevice* device) {
       g_strrstr(lower_name, "pen") != nullptr ||
       g_strrstr(lower_name, "tablet") != nullptr ||
       g_strrstr(lower_name, "wacom") != nullptr ||
-      g_strrstr(lower_name, "dell") != nullptr;
+      g_strrstr(lower_name, "xppen") != nullptr ||
+      g_strrstr(lower_name, "xp-pen") != nullptr ||
+      g_strrstr(lower_name, "huion") != nullptr ||
+      g_strrstr(lower_name, "ugee") != nullptr ||
+      g_strrstr(lower_name, "gaomon") != nullptr;
   g_free(lower_name);
   return result;
 }
@@ -62,7 +74,11 @@ static void send_stylus_button_state(MyApplication* self, gboolean pressed,
 
 static gboolean is_stylus_button_event(GdkEventButton* event) {
   GdkEvent* base_event = reinterpret_cast<GdkEvent*>(event);
-  if (gdk_event_get_device_tool(base_event) != nullptr) {
+  GdkDeviceTool* tool = gdk_event_get_device_tool(base_event);
+  if (device_tool_is_eraser(tool)) {
+    return TRUE;
+  }
+  if (tool != nullptr) {
     return event->button != GDK_BUTTON_PRIMARY;
   }
 
@@ -72,6 +88,9 @@ static gboolean is_stylus_button_event(GdkEventButton* event) {
   }
 
   const GdkInputSource source = gdk_device_get_source(source_device);
+  if (source == GDK_SOURCE_ERASER) {
+    return TRUE;
+  }
   return is_tablet_like_source(source) && event->button != GDK_BUTTON_PRIMARY;
 }
 

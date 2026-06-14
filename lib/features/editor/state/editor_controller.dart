@@ -59,6 +59,13 @@ class LassoSelection {
       strokeIds.isEmpty && textBlockIds.isEmpty && imageBlockIds.isEmpty;
 }
 
+bool _sameInkStrokeIds(List<InkStroke> a, List<InkStroke> b) {
+  return listEquals(
+    a.map((stroke) => stroke.id).toList(),
+    b.map((stroke) => stroke.id).toList(),
+  );
+}
+
 class EditorController extends ChangeNotifier {
   static const double minViewScale = 0.25;
   static const double maxViewScale = 4.0;
@@ -357,6 +364,11 @@ class EditorController extends ChangeNotifier {
   void eraseInkStrokesByIdOnPage(int pageIndex, Set<String> ids) {
     _ensurePageSelected(pageIndex);
     eraseInkStrokesById(ids);
+  }
+
+  void replaceInkStrokesOnPage(int pageIndex, List<InkStroke> strokes) {
+    _ensurePageSelected(pageIndex);
+    replaceInkStrokes(strokes);
   }
 
   void commitImageMoveOnPage(
@@ -1908,6 +1920,17 @@ class EditorController extends ChangeNotifier {
     _applyAction(RemoveInkStrokesAction(before: before, after: after));
     _scheduleSave();
   }
+
+  void replaceInkStrokes(List<InkStroke> strokes) {
+    final before = List<InkStroke>.from(currentPage.inkStrokes);
+    if (_sameInkStrokeIds(before, strokes)) {
+      return;
+    }
+    _applyAction(RemoveInkStrokesAction(before: before, after: strokes));
+    _scheduleSave();
+  }
+
+  String createInkStrokeId() => _uuid.v4();
 
   void commitImageMove(String id, Offset start, Offset end) {
     if (start == end) {
