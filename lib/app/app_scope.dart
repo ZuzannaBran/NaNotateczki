@@ -77,6 +77,7 @@ class _AppScopeState extends State<AppScope> {
             ),
           ],
           child: MaterialApp(
+            debugShowCheckedModeBanner: false,
             title: 'Notatek',
             theme: AppTheme.light(),
             home: const LibraryScreen(),

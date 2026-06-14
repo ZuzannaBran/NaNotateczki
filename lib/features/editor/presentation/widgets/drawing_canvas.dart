@@ -509,10 +509,13 @@ DrawingTool _toolForPointerEvent(
   PointerEvent event,
   DrawingTool currentTool,
   DrawingTool eraserTool,
+  bool stylusButtonsEnabled,
 ) {
-  if (event.kind == PointerDeviceKind.invertedStylus ||
-      StylusButtonState.isPressed ||
-      _hasStylusButton(event)) {
+  if (event.kind == PointerDeviceKind.invertedStylus) {
+    return eraserTool;
+  }
+  if (stylusButtonsEnabled &&
+      (StylusButtonState.isPressed || _hasStylusButton(event))) {
     return eraserTool;
   }
   return currentTool;
@@ -603,7 +606,10 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       return;
     }
     _resetCurrent();
-    _toggleEraserShortcut(context.read<EditorController>());
+    final controller = context.read<EditorController>();
+    if (controller.stylusButtonsEnabled) {
+      _toggleEraserShortcut(controller);
+    }
   }
 
   @override
@@ -702,6 +708,10 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     EditorController controller,
     Size viewportSize,
   ) {
+    if (event.kind == PointerDeviceKind.touch &&
+        !controller.allowsFingerDrawing) {
+      return;
+    }
     if (_primaryPointer != null) {
       if (!_shouldDelayTouchStroke(_primaryPointerKind!)) {
         return;
@@ -725,6 +735,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       event,
       controller.tool,
       controller.lastEraserTool,
+      controller.stylusButtonsEnabled,
     );
     final page = _resolvedPage(controller);
     _activePointers.add(event.pointer);
@@ -1049,6 +1060,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       event,
       controller.tool,
       controller.lastEraserTool,
+      controller.stylusButtonsEnabled,
     );
     if (targetTool == currentTool) {
       return currentTool;
@@ -1787,7 +1799,10 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       return;
     }
     _resetCurrent();
-    _toggleEraserShortcut(context.read<EditorController>());
+    final controller = context.read<EditorController>();
+    if (controller.stylusButtonsEnabled) {
+      _toggleEraserShortcut(controller);
+    }
   }
 
   @override
@@ -1886,6 +1901,10 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     EditorController controller,
     Size viewportSize,
   ) {
+    if (event.kind == PointerDeviceKind.touch &&
+        !controller.allowsFingerDrawing) {
+      return;
+    }
     if (_primaryPointer != null) {
       if (!_shouldDelayTouchStroke(_primaryPointerKind!)) {
         return;
@@ -1909,6 +1928,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       event,
       controller.tool,
       controller.lastEraserTool,
+      controller.stylusButtonsEnabled,
     );
     _activePointers.add(event.pointer);
     if (_activePointers.length > 1) {
@@ -2244,6 +2264,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       event,
       controller.tool,
       controller.lastEraserTool,
+      controller.stylusButtonsEnabled,
     );
     if (targetTool == currentTool) {
       return currentTool;

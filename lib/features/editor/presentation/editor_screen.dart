@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -21,8 +22,11 @@ import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/note_page.dart';
 import '../state/editor_controller.dart';
+import 'editor_settings_screen.dart';
+import 'widgets/busy_overlay.dart';
 import 'widgets/drawing_canvas.dart';
 import 'widgets/editor_toolbar.dart';
+import 'widgets/page_background_paint.dart';
 import 'widgets/page_overlay.dart';
 import 'widgets/text_edit_toolbar.dart';
 
@@ -49,6 +53,7 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _inkNavigationTouchSlop = 8.0;
   static const double _previewColumnRight = 118.0;
   static const double _edgeStopTolerance = 0.5;
+  static const Duration _touchContextMenuDelay = Duration(seconds: 1);
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _canvasKey = GlobalKey();
@@ -59,6 +64,7 @@ class _EditorScreenState extends State<EditorScreen> {
   int? _activeInkPointer;
   int? _pendingNavigationPointer;
   Offset? _pendingNavigationPosition;
+  bool _isBusy = false;
   Offset _touchLastFocal = Offset.zero;
   double _touchLastDistance = 1.0;
   Offset _panZoomLastPan = Offset.zero;
@@ -72,6 +78,9 @@ class _EditorScreenState extends State<EditorScreen> {
   double _pageColumnMinOffset = 0.0;
   double _pageColumnMaxOffset = _rightMargin;
   Offset _insertPosition = const Offset(120, 120);
+  Timer? _touchContextMenuTimer;
+  int? _touchContextMenuPointer;
+  Offset? _touchContextMenuStart;
 
   @override
   void initState() {
@@ -83,6 +92,7 @@ class _EditorScreenState extends State<EditorScreen> {
   void dispose() {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
+    _cancelTouchContextMenu();
     super.dispose();
   }
 
@@ -269,6 +279,11 @@ class _EditorScreenState extends State<EditorScreen> {
       return;
     }
     if (controller.tool.isInk && event.kind == PointerDeviceKind.touch) {
+      if (!controller.allowsFingerDrawing) {
+        _activePointers[event.pointer] = event.localPosition;
+        _startViewportNavigation(docWorldSize, viewportSize);
+        return;
+      }
       if (_pendingNavigationPointer == null && _activePointers.isEmpty) {
         _pendingNavigationPointer = event.pointer;
         _pendingNavigationPosition = event.localPosition;
@@ -328,6 +343,23 @@ class _EditorScreenState extends State<EditorScreen> {
       return;
     }
     if (_activePointers.length < 2) {
+      final controller = context.read<EditorController>();
+      if (event.kind == PointerDeviceKind.touch &&
+          !controller.allowsFingerDrawing &&
+          _activePointers.length == 1) {
+        final panDelta = event.localPosition - _touchLastFocal;
+        _touchLastFocal = event.localPosition;
+        _touchLastDistance = 1.0;
+        _applyPageColumnPan(panDelta.dx * _touchPanSensitivity);
+        _applyPageTransform(
+          scaleDelta: 1.0,
+          panDelta: Offset(0, panDelta.dy) * _touchPanSensitivity,
+          focalPoint: event.localPosition,
+          docWorldSize: docWorldSize,
+          viewportSize: viewportSize,
+        );
+        return;
+      }
       _stopViewportNavigation();
       return;
     }
@@ -380,25 +412,39 @@ class _EditorScreenState extends State<EditorScreen> {
     if (_activePointers.length >= 2) {
       return;
     }
+    final controller = context.read<EditorController>();
+    if (_isViewportNavigating &&
+        !_panZoomSessionActive &&
+        _activePointers.length == 1 &&
+        !controller.allowsFingerDrawing) {
+      _touchLastFocal = _activePointers.values.first;
+      _touchLastDistance = 1.0;
+      return;
+    }
     if (_isViewportNavigating && !_panZoomSessionActive) {
       _stopViewportNavigation();
       if (mounted) {
-        _syncCurrentPageToViewport(context.read<EditorController>());
+        _syncCurrentPageToViewport(controller);
       }
     }
   }
 
   void _startViewportNavigation(Size docWorldSize, Size viewportSize) {
     final pointers = _activePointers.values.take(2).toList(growable: false);
-    if (pointers.length < 2) {
+    if (pointers.isEmpty) {
       return;
     }
-    context.read<EditorController>().startPinchToScaleActiveImage();
-    _touchLastFocal = _midpoint(pointers[0], pointers[1]);
-    _touchLastDistance = math.max(
-      0.001,
-      _distanceBetween(pointers[0], pointers[1]),
-    );
+    if (pointers.length >= 2) {
+      context.read<EditorController>().startPinchToScaleActiveImage();
+      _touchLastFocal = _midpoint(pointers[0], pointers[1]);
+      _touchLastDistance = math.max(
+        0.001,
+        _distanceBetween(pointers[0], pointers[1]),
+      );
+    } else {
+      _touchLastFocal = pointers[0];
+      _touchLastDistance = 1.0;
+    }
     final clampedPan = _clampPagePan(
       scale: _pageScale,
       pan: _pagePan,
@@ -733,10 +779,18 @@ class _EditorScreenState extends State<EditorScreen> {
   Offset _insertPositionForViewport({
     required Rect visibleDocumentRect,
     required Size pageWorldSize,
-    required int currentPageIndex,
+    required int pageCount,
   }) {
-    final pageTop =
-        currentPageIndex.toDouble() * (_pageExtent == 0 ? 1 : _pageExtent);
+    if (pageCount <= 0) {
+      return Offset(pageWorldSize.width * 0.5, pageWorldSize.height * 0.5);
+    }
+    final extent = _pageExtent == 0 ? pageWorldSize.height : _pageExtent;
+    final visibleCenterY = visibleDocumentRect.center.dy.clamp(
+      0.0,
+      math.max(0.0, (pageCount * extent) - _pageGap),
+    );
+    final pageIndex = (visibleCenterY / extent).floor().clamp(0, pageCount - 1);
+    final pageTop = pageIndex.toDouble() * (_pageExtent == 0 ? 1 : _pageExtent);
     final pageRect = Rect.fromLTWH(
       0,
       pageTop,
@@ -753,8 +807,23 @@ class _EditorScreenState extends State<EditorScreen> {
     return safeRect.center;
   }
 
+  Future<T> _withBusyOverlay<T>(Future<T> Function() action) async {
+    if (mounted) {
+      setState(() => _isBusy = true);
+    }
+    try {
+      return await action();
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      }
+    }
+  }
+
   Future<void> _handleInsertFile(EditorController controller) async {
-    final message = await controller.insertFromFilePicker(_insertPosition);
+    final message = await _withBusyOverlay(
+      () => controller.insertFromFilePicker(_insertPosition),
+    );
     if (message != null && mounted) {
       ScaffoldMessenger.of(
         context,
@@ -769,9 +838,8 @@ class _EditorScreenState extends State<EditorScreen> {
     NotebookExportFormat format,
   ) async {
     try {
-      final path = await NotebookExportService.exportController(
-        controller,
-        format,
+      final path = await _withBusyOverlay(
+        () => NotebookExportService.exportController(controller, format),
       );
       if (!mounted) {
         return;
@@ -793,6 +861,18 @@ class _EditorScreenState extends State<EditorScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
+  }
+
+  void _openSettings() {
+    final controller = context.read<EditorController>();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => ChangeNotifierProvider.value(
+          value: controller,
+          child: const EditorSettingsScreen(),
+        ),
+      ),
+    );
   }
 
   Future<void> _handlePaste(EditorController controller) async {
@@ -1004,7 +1084,8 @@ class _EditorScreenState extends State<EditorScreen> {
   Future<void> _showCanvasContextMenu(
     Offset globalPosition,
     EditorController controller,
-    Size docWorldSize,
+    Size pageWorldSize,
+    int pageCount,
   ) async {
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
@@ -1013,7 +1094,8 @@ class _EditorScreenState extends State<EditorScreen> {
     }
     final targetPosition = _contextMenuInsertPosition(
       globalPosition: globalPosition,
-      docWorldSize: docWorldSize,
+      pageWorldSize: pageWorldSize,
+      pageCount: pageCount,
     );
     if (targetPosition != null) {
       _insertPosition = targetPosition;
@@ -1046,7 +1128,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Offset? _contextMenuInsertPosition({
     required Offset globalPosition,
-    required Size docWorldSize,
+    required Size pageWorldSize,
+    required int pageCount,
   }) {
     final renderBox =
         _canvasKey.currentContext?.findRenderObject() as RenderBox?;
@@ -1056,10 +1139,65 @@ class _EditorScreenState extends State<EditorScreen> {
     final local = renderBox.globalToLocal(globalPosition);
     final scale = _pageScale <= 0 ? 1.0 : _pageScale;
     final world = (local - _pagePan) / scale;
+    if (pageCount <= 0) {
+      return Offset(
+        world.dx.clamp(0.0, pageWorldSize.width),
+        world.dy.clamp(0.0, pageWorldSize.height),
+      );
+    }
+    final extent = _pageExtent <= 0 ? pageWorldSize.height : _pageExtent;
+    final pageIndex = (world.dy / extent).floor().clamp(0, pageCount - 1);
+    final pageTop = pageIndex * extent;
     return Offset(
-      world.dx.clamp(0.0, docWorldSize.width),
-      world.dy.clamp(0.0, docWorldSize.height),
+      world.dx.clamp(0.0, pageWorldSize.width),
+      pageTop + (world.dy - pageTop).clamp(0.0, pageWorldSize.height),
     );
+  }
+
+  void _startTouchContextMenuTimer(
+    PointerDownEvent event,
+    EditorController controller,
+    Size pageWorldSize,
+    int pageCount,
+  ) {
+    _cancelTouchContextMenu();
+    if (event.kind != PointerDeviceKind.touch) {
+      return;
+    }
+    _touchContextMenuPointer = event.pointer;
+    _touchContextMenuStart = event.position;
+    _touchContextMenuTimer = Timer(_touchContextMenuDelay, () {
+      if (!mounted || _touchContextMenuPointer != event.pointer) {
+        return;
+      }
+      _showCanvasContextMenu(
+        event.position,
+        controller,
+        pageWorldSize,
+        pageCount,
+      );
+      _cancelTouchContextMenu();
+    });
+  }
+
+  void _updateTouchContextMenuTimer(PointerMoveEvent event) {
+    if (event.pointer != _touchContextMenuPointer) {
+      return;
+    }
+    final start = _touchContextMenuStart;
+    if (start == null) {
+      return;
+    }
+    if ((event.position - start).distance > _inkNavigationTouchSlop) {
+      _cancelTouchContextMenu();
+    }
+  }
+
+  void _cancelTouchContextMenu() {
+    _touchContextMenuTimer?.cancel();
+    _touchContextMenuTimer = null;
+    _touchContextMenuPointer = null;
+    _touchContextMenuStart = null;
   }
 
   @override
@@ -1137,7 +1275,7 @@ class _EditorScreenState extends State<EditorScreen> {
               final insertPosition = _insertPositionForViewport(
                 visibleDocumentRect: visibleDocumentRect,
                 pageWorldSize: pageWorldSize,
-                currentPageIndex: controller.currentPageIndex,
+                pageCount: controller.pages.length,
               );
               _insertPosition = insertPosition;
               final minimapPanelHeight = math.min(
@@ -1197,25 +1335,41 @@ class _EditorScreenState extends State<EditorScreen> {
                                             _showCanvasContextMenu(
                                               details.globalPosition,
                                               controller,
-                                              docWorldSize,
+                                              pageWorldSize,
+                                              controller.pages.length,
                                             ),
                                         child: Listener(
                                           key: _canvasKey,
                                           behavior: HitTestBehavior.translucent,
-                                          onPointerDown: (event) =>
-                                              _onPointerDown(
-                                                event,
-                                                docWorldSize,
-                                                viewportSize,
-                                              ),
-                                          onPointerMove: (event) =>
-                                              _onPointerMove(
-                                                event,
-                                                docWorldSize,
-                                                viewportSize,
-                                              ),
-                                          onPointerUp: _onPointerUpOrCancel,
-                                          onPointerCancel: _onPointerUpOrCancel,
+                                          onPointerDown: (event) {
+                                            _startTouchContextMenuTimer(
+                                              event,
+                                              controller,
+                                              pageWorldSize,
+                                              controller.pages.length,
+                                            );
+                                            _onPointerDown(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            );
+                                          },
+                                          onPointerMove: (event) {
+                                            _updateTouchContextMenuTimer(event);
+                                            _onPointerMove(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            );
+                                          },
+                                          onPointerUp: (event) {
+                                            _cancelTouchContextMenu();
+                                            _onPointerUpOrCancel(event);
+                                          },
+                                          onPointerCancel: (event) {
+                                            _cancelTouchContextMenu();
+                                            _onPointerUpOrCancel(event);
+                                          },
                                           onPointerPanZoomStart: (event) =>
                                               _onPointerPanZoomStart(
                                                 event,
@@ -1279,6 +1433,10 @@ class _EditorScreenState extends State<EditorScreen> {
                                                                   ),
                                                                 ],
                                                               ),
+                                                            ),
+                                                            PageBackgroundPaint(
+                                                              settings: controller
+                                                                  .currentBackgroundSettings,
                                                             ),
                                                             Builder(
                                                               builder: (context) {
@@ -1550,9 +1708,19 @@ class _EditorScreenState extends State<EditorScreen> {
             tooltip: 'Bookmark page',
             onPressed: controller.toggleBookmark,
           ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: _openSettings,
+          ),
         ],
       ),
-      body: content,
+      body: Stack(
+        children: [
+          Positioned.fill(child: content),
+          if (_isBusy) const Positioned.fill(child: BusyOverlay()),
+        ],
+      ),
     );
   }
 }
@@ -2242,8 +2410,10 @@ class _ProjectMiniMapPainter extends CustomPainter {
         );
       }
 
-      Offset toMap(Offset point) =>
+      Offset pagePointToMap(Offset point) =>
           Offset(point.dx * scaleX, (pageTopWorld + point.dy) * scaleY);
+      Offset documentPointToMap(Offset point) =>
+          Offset(point.dx * scaleX, point.dy * scaleY);
 
       canvas.save();
       canvas.clipRect(pageRect);
@@ -2255,7 +2425,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
         ..strokeWidth = 0.55;
       for (final block in page.imageBlocks) {
         final image = images[block.id];
-        final rect = _imageRect(block, pageTopWorld, scaleX, scaleY);
+        final rect = _imageRect(block, scaleX, scaleY);
         if (image == null) {
           canvas.drawRect(rect, imageFill);
         } else {
@@ -2281,7 +2451,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
 
       final textPaint = Paint()..color = const Color(0xFF95A2B4);
       for (final block in page.textBlocks) {
-        final topLeft = toMap(block.position + const Offset(0, 2));
+        final topLeft = documentPointToMap(block.position + const Offset(0, 2));
         final lineWidth = (block.width * scaleX * 0.8)
             .clamp(6.0, size.width * 0.84)
             .toDouble();
@@ -2316,16 +2486,16 @@ class _ProjectMiniMapPainter extends CustomPainter {
         }
 
         if (stroke.points.length == 1) {
-          final point = toMap(stroke.points.first.toOffset());
+          final point = pagePointToMap(stroke.points.first.toOffset());
           canvas.drawCircle(point, paint.strokeWidth / 2, paint);
           continue;
         }
 
         final path = Path();
-        final first = toMap(stroke.points.first.toOffset());
+        final first = pagePointToMap(stroke.points.first.toOffset());
         path.moveTo(first.dx, first.dy);
         for (var j = 1; j < stroke.points.length; j++) {
-          final point = toMap(stroke.points[j].toOffset());
+          final point = pagePointToMap(stroke.points[j].toOffset());
           path.lineTo(point.dx, point.dy);
         }
         canvas.drawPath(path, paint);
@@ -2347,20 +2517,14 @@ class _ProjectMiniMapPainter extends CustomPainter {
         oldDelegate.images != images;
   }
 
-  Rect _imageRect(
-    ImageBlock block,
-    double pageTopWorld,
-    double scaleX,
-    double scaleY,
-  ) {
+  Rect _imageRect(ImageBlock block, double scaleX, double scaleY) {
     final visibleWidth =
         block.width * (block.cropRight - block.cropLeft).clamp(0.08, 1.0);
     final visibleHeight =
         block.height * (block.cropBottom - block.cropTop).clamp(0.08, 1.0);
     return Rect.fromLTWH(
       (block.position.dx + block.width * block.cropLeft) * scaleX,
-      (pageTopWorld + block.position.dy + block.height * block.cropTop) *
-          scaleY,
+      (block.position.dy + block.height * block.cropTop) * scaleY,
       visibleWidth * scaleX,
       visibleHeight * scaleY,
     );

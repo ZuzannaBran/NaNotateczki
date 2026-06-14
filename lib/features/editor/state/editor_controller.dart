@@ -26,6 +26,8 @@ import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/text_block.dart';
 import 'editor_actions.dart';
+import 'input_mode.dart';
+import 'page_background.dart';
 
 class LassoSelection {
   LassoSelection({
@@ -87,6 +89,12 @@ class EditorController extends ChangeNotifier {
   DrawingTool tool = DrawingTool.pen;
   DrawingTool lastEraserTool = DrawingTool.eraserBrush;
   DrawingTool lastShapeTool = DrawingTool.line;
+  PointerInputMode pointerInputMode = PointerInputMode.off;
+  bool stylusButtonsEnabled = true;
+  PageBackgroundSettings defaultNotebookBackground =
+      const PageBackgroundSettings();
+  PageBackgroundSettings defaultBoardBackground =
+      const PageBackgroundSettings();
   Color inkColor = const Color(0xFF1E1E1E);
   double inkStrokeWidth = 2.5;
   final List<Color> quickColors = [
@@ -98,6 +106,8 @@ class EditorController extends ChangeNotifier {
 
   final List<EditorAction> _undoActions = <EditorAction>[];
   final List<EditorAction> _redoActions = <EditorAction>[];
+  final Map<String, PageBackgroundSettings> _localBackgrounds =
+      <String, PageBackgroundSettings>{};
   Timer? _prefsSaveDebounce;
   Timer? _notebookSaveDebounce;
 
@@ -127,8 +137,22 @@ class EditorController extends ChangeNotifier {
 
   bool get canUndo => _undoActions.isNotEmpty;
   bool get canRedo => _redoActions.isNotEmpty;
+  bool get allowsFingerDrawing => pointerInputMode.allowsFingerDrawing;
+  PageBackgroundSettings get currentBackgroundSettings {
+    return _localBackgrounds[notebook.uid] ??
+        defaultBackgroundSettingsForKind(notebook.kind);
+  }
+
   Rect get contentBounds => _computeContentBounds();
   Size get layoutPageSize => Size(_pageWidth, _pageHeight);
+  double get layoutPageGap => _pageGap;
+
+  PageBackgroundSettings defaultBackgroundSettingsForKind(NotebookKind kind) {
+    return switch (kind) {
+      NotebookKind.notebook => defaultNotebookBackground,
+      NotebookKind.board => defaultBoardBackground,
+    };
+  }
 
   @override
   void dispose() {
@@ -274,6 +298,10 @@ class EditorController extends ChangeNotifier {
       return;
     }
     setCurrentPage(pageIndex);
+  }
+
+  void _ensureInsertPageSelected(Offset position) {
+    _ensurePageSelected(_pageIndexForPosition(position));
   }
 
   Future<String?> handleTapOnPage(int pageIndex, Offset point) async {
@@ -728,6 +756,44 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPointerInputMode(PointerInputMode mode) {
+    if (pointerInputMode == mode) {
+      return;
+    }
+    pointerInputMode = mode;
+    _schedulePrefsSave();
+    notifyListeners();
+  }
+
+  void setStylusButtonsEnabled(bool enabled) {
+    if (stylusButtonsEnabled == enabled) {
+      return;
+    }
+    stylusButtonsEnabled = enabled;
+    _schedulePrefsSave();
+    notifyListeners();
+  }
+
+  void setDefaultBackgroundSettings(
+    NotebookKind kind,
+    PageBackgroundSettings settings,
+  ) {
+    switch (kind) {
+      case NotebookKind.notebook:
+        defaultNotebookBackground = settings;
+      case NotebookKind.board:
+        defaultBoardBackground = settings;
+    }
+    _schedulePrefsSave();
+    notifyListeners();
+  }
+
+  void setCurrentBackgroundSettings(PageBackgroundSettings settings) {
+    _localBackgrounds[notebook.uid] = settings;
+    _schedulePrefsSave();
+    notifyListeners();
+  }
+
   void setQuickColor(int index, Color newColor) {
     if (index < 0 || index >= quickColors.length) {
       return;
@@ -762,6 +828,10 @@ class EditorController extends ChangeNotifier {
       final lastSize = decoded['lastTextFontSize'];
       final strokeWidth = decoded['inkStrokeWidth'];
       final eraserToolIndex = decoded['lastEraserTool'];
+      final inputModeIndex = decoded['pointerInputMode'];
+      final stylusButtons = decoded['stylusButtonsEnabled'];
+      final backgroundDefaults = decoded['backgroundDefaults'];
+      final localBackgrounds = decoded['localBackgrounds'];
       final quick = decoded['quickColors'];
       final recent = decoded['recentColors'];
 
@@ -789,6 +859,32 @@ class EditorController extends ChangeNotifier {
       final eraserToolParsed = _eraserToolFromIndex(eraserToolIndex);
       if (eraserToolParsed != null) {
         lastEraserTool = eraserToolParsed;
+      }
+      pointerInputMode = pointerInputModeFromIndex(inputModeIndex);
+      if (stylusButtons is bool) {
+        stylusButtonsEnabled = stylusButtons;
+      }
+      if (backgroundDefaults is Map) {
+        defaultNotebookBackground = PageBackgroundSettings.fromJson(
+          backgroundDefaults[backgroundPrefsKeyForKind(NotebookKind.notebook)],
+        );
+        defaultBoardBackground = PageBackgroundSettings.fromJson(
+          backgroundDefaults[backgroundPrefsKeyForKind(NotebookKind.board)],
+        );
+      }
+      if (localBackgrounds is Map) {
+        _localBackgrounds
+          ..clear()
+          ..addEntries(
+            localBackgrounds.entries
+                .where((entry) => entry.key is String)
+                .map(
+                  (entry) => MapEntry(
+                    entry.key as String,
+                    PageBackgroundSettings.fromJson(entry.value),
+                  ),
+                ),
+          );
       }
       if (quick is List) {
         final mapped = quick
@@ -837,6 +933,17 @@ class EditorController extends ChangeNotifier {
         'lastTextFontSize': lastTextFontSize,
         'inkStrokeWidth': inkStrokeWidth,
         'lastEraserTool': lastEraserTool.index,
+        'pointerInputMode': pointerInputMode.index,
+        'stylusButtonsEnabled': stylusButtonsEnabled,
+        'backgroundDefaults': {
+          backgroundPrefsKeyForKind(NotebookKind.notebook):
+              defaultNotebookBackground.toJson(),
+          backgroundPrefsKeyForKind(NotebookKind.board): defaultBoardBackground
+              .toJson(),
+        },
+        'localBackgrounds': _localBackgrounds.map(
+          (key, value) => MapEntry(key, value.toJson()),
+        ),
       };
       await file.writeAsString(jsonEncode(payload));
     } catch (e) {
@@ -1213,6 +1320,7 @@ class EditorController extends ChangeNotifier {
     if (picked == null) {
       return null;
     }
+    _ensureInsertPageSelected(position);
     return _addImageBlockFromFile(File(picked.path), position);
   }
 
@@ -1239,6 +1347,7 @@ class EditorController extends ChangeNotifier {
       return 'Selected file is not accessible.';
     }
     try {
+      _ensureInsertPageSelected(position);
       return await _insertFile(File(path), position);
     } on PlatformNotSupportedException {
       return 'PDF rendering is not supported on this platform.';
@@ -1251,6 +1360,7 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<String?> insertFromClipboard(Offset position) async {
+    _ensureInsertPageSelected(position);
     final clipboard = SystemClipboard.instance;
     if (clipboard != null) {
       final reader = await clipboard.read();
@@ -1285,6 +1395,7 @@ class EditorController extends ChangeNotifier {
 
     switch (clipboardItem) {
       case _TextElementClipboardItem(:final block):
+        _ensureInsertPageSelected(position);
         final pasted = block.copyWith(id: _uuid.v4(), position: position);
         _applyAction(AddTextAction(pasted));
         setTool(DrawingTool.text);
@@ -1292,6 +1403,7 @@ class EditorController extends ChangeNotifier {
         _save();
         return null;
       case _ImageElementClipboardItem(:final block):
+        _ensureInsertPageSelected(position);
         final pasted = block.copyWith(id: _uuid.v4(), position: position);
         _applyAction(AddImageAction(pasted));
         _activateInsertedImage(pasted.id);
@@ -1654,7 +1766,7 @@ class EditorController extends ChangeNotifier {
       final localOffset = notebook.kind == NotebookKind.board
           ? position
           : Offset.zero;
-      final workingPages = List<NotePage>.from(pages);
+      final additions = <int, List<ImageBlock>>{};
       var pageOffset = 0.0;
       for (var pageIndex = 1; pageIndex <= document.pagesCount; pageIndex++) {
         final page = await document.getPage(pageIndex);
@@ -1683,7 +1795,6 @@ class EditorController extends ChangeNotifier {
         final targetIndex = notebook.kind == NotebookKind.board
             ? basePageIndex
             : basePageIndex + (pageIndex - 1);
-        _ensurePageCount(workingPages, targetIndex + 1);
         final targetOrigin = notebook.kind == NotebookKind.board
             ? Offset.zero
             : (pageExtent <= 0
@@ -1704,17 +1815,13 @@ class EditorController extends ChangeNotifier {
           imageExt: 'png',
           imageMime: 'image/png',
         );
-        final targetPage = workingPages[targetIndex];
-        workingPages[targetIndex] = targetPage.copyWith(
-          imageBlocks: [...targetPage.imageBlocks, block],
-        );
+        additions.putIfAbsent(targetIndex, () => <ImageBlock>[]).add(block);
         if (notebook.kind == NotebookKind.board) {
           pageOffset += block.height + 12;
         }
       }
       await document.close();
-      pages = workingPages;
-      notifyListeners();
+      _appendImageBlocksOnPages(additions);
       _save();
       return null;
     } on PlatformNotSupportedException {
@@ -1767,7 +1874,7 @@ class EditorController extends ChangeNotifier {
     final localOffset = notebook.kind == NotebookKind.board
         ? position
         : Offset.zero;
-    final workingPages = List<NotePage>.from(pages);
+    final additions = <int, List<ImageBlock>>{};
     var pageOffset = 0.0;
     for (var i = 0; i < files.length; i++) {
       final file = files[i];
@@ -1781,7 +1888,6 @@ class EditorController extends ChangeNotifier {
       final targetIndex = notebook.kind == NotebookKind.board
           ? basePageIndex
           : basePageIndex + i;
-      _ensurePageCount(workingPages, targetIndex + 1);
       final targetOrigin = notebook.kind == NotebookKind.board
           ? Offset.zero
           : (pageExtent <= 0 ? Offset.zero : _pageOriginForIndex(targetIndex));
@@ -1800,18 +1906,33 @@ class EditorController extends ChangeNotifier {
         imageExt: 'png',
         imageMime: 'image/png',
       );
-      final targetPage = workingPages[targetIndex];
-      workingPages[targetIndex] = targetPage.copyWith(
-        imageBlocks: [...targetPage.imageBlocks, block],
-      );
+      additions.putIfAbsent(targetIndex, () => <ImageBlock>[]).add(block);
       if (notebook.kind == NotebookKind.board) {
         pageOffset += block.height + 12;
       }
     }
-    pages = workingPages;
-    notifyListeners();
+    _appendImageBlocksOnPages(additions);
     _save();
     return null;
+  }
+
+  void _appendImageBlocksOnPages(Map<int, List<ImageBlock>> additions) {
+    if (additions.isEmpty) {
+      return;
+    }
+    final workingPages = List<NotePage>.from(pages);
+    final maxPageIndex = additions.keys.reduce((a, b) => a > b ? a : b);
+    _ensurePageCount(workingPages, maxPageIndex + 1);
+    pages = [
+      for (var i = 0; i < workingPages.length; i++)
+        if (additions[i] case final blocks?)
+          workingPages[i].copyWith(
+            imageBlocks: [...workingPages[i].imageBlocks, ...blocks],
+          )
+        else
+          workingPages[i],
+    ];
+    notifyListeners();
   }
 
   Future<String?> runOcrForImage(ImageBlock block) async {
@@ -1850,18 +1971,27 @@ class EditorController extends ChangeNotifier {
   }
 
   void updateImageBlockOcrText(String id, String text) {
-    final before = currentPage.imageBlocks.map((item) => item).toList();
-    final updated = currentPage.imageBlocks
+    final pageIndex = _pageIndexContainingImageBlock(id);
+    if (pageIndex == null) {
+      return;
+    }
+    _ensurePageSelected(pageIndex);
+    final before = pages[pageIndex].imageBlocks.map((item) => item).toList();
+    final updated = pages[pageIndex].imageBlocks
         .map((item) => item.id == id ? item.copyWith(ocrText: text) : item)
         .toList();
     _applyAction(UpdateImageOcrAction(id: id, ocrText: text, before: before));
-    _updatePage(currentPage.copyWith(imageBlocks: updated));
+    _updatePage(pages[pageIndex].copyWith(imageBlocks: updated));
     _save();
   }
 
   Future<void> restoreImageCache(int pageIndex, String blockId) async {
-    _ensurePageSelected(pageIndex);
-    final block = currentPage.imageBlocks
+    final currentBlockPageIndex = _pageIndexContainingImageBlock(blockId);
+    if (currentBlockPageIndex == null) {
+      return;
+    }
+    _ensurePageSelected(currentBlockPageIndex);
+    final block = pages[currentBlockPageIndex].imageBlocks
         .where((b) => b.id == blockId)
         .firstOrNull;
     if (block == null || block.bytes == null) return;
@@ -1874,10 +2004,10 @@ class EditorController extends ChangeNotifier {
     final file = await _persistImageBytes(block.bytes!, filename);
 
     final updatedBlock = block.copyWith(path: file.path, clearBytes: true);
-    final updated = currentPage.imageBlocks
+    final updated = pages[currentBlockPageIndex].imageBlocks
         .map((item) => item.id == blockId ? updatedBlock : item)
         .toList();
-    _updatePage(currentPage.copyWith(imageBlocks: updated));
+    _updatePage(pages[currentBlockPageIndex].copyWith(imageBlocks: updated));
     _save();
   }
 

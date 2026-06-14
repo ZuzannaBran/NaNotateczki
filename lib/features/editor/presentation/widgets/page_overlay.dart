@@ -829,7 +829,6 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
             width: visibleWidth,
             height: visibleHeight,
             decoration: BoxDecoration(
-              color: AppColors.toolbar,
               borderRadius: BorderRadius.zero,
               border: Border.all(
                 color: isSelected

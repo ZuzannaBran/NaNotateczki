@@ -12,6 +12,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../../core/theme/app_colors.dart';
 import '../../features/editor/state/editor_controller.dart';
+import '../../features/editor/state/page_background.dart';
 import '../../features/notebook/domain/drawing_tool.dart';
 import '../../features/notebook/domain/image_block.dart';
 import '../../features/notebook/domain/ink_stroke.dart';
@@ -48,20 +49,28 @@ class NotebookExportService {
         ? _fallbackPageSize
         : controller.layoutPageSize;
     final notebook = controller.notebook.copyWith(pages: controller.pages);
-    return exportNotebook(notebook, format, pageSize: pageSize);
+    return exportNotebook(
+      notebook,
+      format,
+      pageSize: pageSize,
+      pageGap: controller.layoutPageGap,
+      background: controller.currentBackgroundSettings,
+    );
   }
 
   static Future<String?> exportNotebook(
     Notebook notebook,
     NotebookExportFormat format, {
     required Size pageSize,
+    double pageGap = 0.0,
+    PageBackgroundSettings background = const PageBackgroundSettings(),
   }) async {
     final baseName = _fileNameBase(notebook.title);
     switch (format) {
       case NotebookExportFormat.pdf:
-        return _exportPdf(notebook, pageSize, baseName);
+        return _exportPdf(notebook, pageSize, pageGap, baseName, background);
       case NotebookExportFormat.png:
-        return _exportPng(notebook, pageSize, baseName);
+        return _exportPng(notebook, pageSize, pageGap, baseName, background);
     }
   }
 
@@ -77,10 +86,17 @@ class NotebookExportService {
   static Future<String?> _exportPdf(
     Notebook notebook,
     Size pageSize,
+    double pageGap,
     String baseName,
+    PageBackgroundSettings background,
   ) async {
     final pdf = pw.Document();
-    final pages = await _renderNotebook(notebook, pageSize);
+    final pages = await _renderNotebook(
+      notebook,
+      pageSize,
+      pageGap,
+      background,
+    );
     for (final page in pages) {
       pdf.addPage(
         pw.Page(
@@ -104,9 +120,16 @@ class NotebookExportService {
   static Future<String?> _exportPng(
     Notebook notebook,
     Size pageSize,
+    double pageGap,
     String baseName,
+    PageBackgroundSettings background,
   ) async {
-    final pages = await _renderNotebook(notebook, pageSize);
+    final pages = await _renderNotebook(
+      notebook,
+      pageSize,
+      pageGap,
+      background,
+    );
     if (pages.length == 1) {
       return _saveBytesAs(
         dialogTitle: 'Save PNG export',
@@ -185,6 +208,8 @@ class NotebookExportService {
   static Future<List<_RenderedPage>> _renderNotebook(
     Notebook notebook,
     Size pageSize,
+    double pageGap,
+    PageBackgroundSettings background,
   ) async {
     if (notebook.kind == NotebookKind.board) {
       final page = notebook.pages.isEmpty ? _emptyPage() : notebook.pages.first;
@@ -196,17 +221,30 @@ class NotebookExportService {
         page,
         safeBounds.size,
         origin: safeBounds.topLeft,
+        background: background,
       );
       return [_RenderedPage(bytes: bytes, size: safeBounds.size)];
     }
 
     final rendered = <_RenderedPage>[];
-    for (final page in notebook.pages) {
-      final bytes = await _renderPage(page, pageSize);
+    for (var i = 0; i < notebook.pages.length; i++) {
+      final page = notebook.pages[i];
+      final origin = Offset(0, i * (pageSize.height + pageGap));
+      final bytes = await _renderPage(
+        page,
+        pageSize,
+        origin: origin,
+        strokeOrigin: Offset.zero,
+        background: background,
+      );
       rendered.add(_RenderedPage(bytes: bytes, size: pageSize));
     }
     if (rendered.isEmpty) {
-      final bytes = await _renderPage(_emptyPage(), pageSize);
+      final bytes = await _renderPage(
+        _emptyPage(),
+        pageSize,
+        background: background,
+      );
       rendered.add(_RenderedPage(bytes: bytes, size: pageSize));
     }
     return rendered;
@@ -216,14 +254,16 @@ class NotebookExportService {
     NotePage page,
     Size size, {
     Offset origin = Offset.zero,
+    Offset? strokeOrigin,
+    required PageBackgroundSettings background,
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.scale(_pixelRatio);
-    canvas.drawRect(Offset.zero & size, Paint()..color = AppColors.paper);
+    _paintBackground(canvas, size, origin, background);
     await _paintImages(canvas, page.imageBlocks, origin);
     _paintTextBlocks(canvas, page.textBlocks, origin);
-    _paintStrokes(canvas, page.inkStrokes, origin, size);
+    _paintStrokes(canvas, page.inkStrokes, strokeOrigin ?? origin, size);
     final picture = recorder.endRecording();
     final image = await picture.toImage(
       math.max(1, (size.width * _pixelRatio).ceil()),
@@ -236,6 +276,41 @@ class NotebookExportService {
       throw StateError('Unable to encode export image.');
     }
     return data.buffer.asUint8List();
+  }
+
+  static void _paintBackground(
+    Canvas canvas,
+    Size size,
+    Offset origin,
+    PageBackgroundSettings settings,
+  ) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = AppColors.paper);
+    if (settings.style == PageBackgroundStyle.blank) {
+      return;
+    }
+
+    final spacing = settings.spacing.clamp(
+      PageBackgroundSettings.minSpacing,
+      PageBackgroundSettings.maxSpacing,
+    );
+    final paint = Paint()
+      ..color = const Color(0xFFD2D6DC)
+      ..strokeWidth = 1.0;
+
+    double firstLine(double offset) {
+      final remainder = offset % spacing;
+      return remainder == 0 ? 0 : spacing - remainder;
+    }
+
+    for (var y = firstLine(origin.dy); y < size.height; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    if (settings.style == PageBackgroundStyle.lines) {
+      return;
+    }
+    for (var x = firstLine(origin.dx); x < size.width; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
   }
 
   static Future<void> _paintImages(

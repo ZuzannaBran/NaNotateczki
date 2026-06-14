@@ -5,6 +5,8 @@ import '../../../../data/export/notebook_export_service.dart';
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/notebook_kind.dart';
 import '../../state/editor_controller.dart';
+import '../../state/page_background.dart';
+import 'page_background_paint.dart';
 
 class EditorToolbar extends StatelessWidget {
   const EditorToolbar({
@@ -69,6 +71,7 @@ class EditorToolbar extends StatelessWidget {
                       ),
                       if (controller.notebook.kind == NotebookKind.notebook)
                         _indexTabButton(context),
+                      _backgroundButton(context),
                       const SizedBox(width: 12),
                       for (var i = 0; i < controller.quickColors.length; i++)
                         _colorDot(
@@ -166,6 +169,98 @@ class EditorToolbar extends StatelessWidget {
           return;
         }
         controller.addIndexTab(color: color, position: position);
+      },
+    );
+  }
+
+  Widget _backgroundButton(BuildContext context) {
+    final settings = controller.currentBackgroundSettings;
+    final icon = switch (settings.style) {
+      PageBackgroundStyle.blank => Icons.crop_square,
+      PageBackgroundStyle.grid => Icons.grid_4x4,
+      PageBackgroundStyle.lines => Icons.density_medium,
+    };
+    return _actionButton(
+      icon: icon,
+      label: 'Background',
+      isActive: settings.style != PageBackgroundStyle.blank,
+      onPressed: () => _showBackgroundDialog(context),
+    );
+  }
+
+  Future<void> _showBackgroundDialog(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AnimatedBuilder(
+          animation: controller,
+          builder: (context, child) {
+            final settings = controller.currentBackgroundSettings;
+            return AlertDialog(
+              title: const Text('Background'),
+              content: SizedBox(
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SegmentedButton<PageBackgroundStyle>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: PageBackgroundStyle.blank,
+                          icon: Icon(Icons.crop_square),
+                          label: Text('Plain'),
+                        ),
+                        ButtonSegment(
+                          value: PageBackgroundStyle.grid,
+                          icon: Icon(Icons.grid_4x4),
+                          label: Text('Grid'),
+                        ),
+                        ButtonSegment(
+                          value: PageBackgroundStyle.lines,
+                          icon: Icon(Icons.density_medium),
+                          label: Text('Lines'),
+                        ),
+                      ],
+                      selected: {settings.style},
+                      onSelectionChanged: (selection) {
+                        controller.setCurrentBackgroundSettings(
+                          settings.copyWith(style: selection.single),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const SizedBox(width: 56, child: Text('Density')),
+                        Expanded(
+                          child: Slider(
+                            value: settings.spacing,
+                            min: PageBackgroundSettings.minSpacing,
+                            max: PageBackgroundSettings.maxSpacing,
+                            divisions: 12,
+                            onChanged: (value) {
+                              controller.setCurrentBackgroundSettings(
+                                settings.copyWith(spacing: value),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    PageBackgroundPreview(settings: settings),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
   }
@@ -689,31 +784,26 @@ class _EraserIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final iconTheme = IconTheme.of(context);
     final size = iconTheme.size ?? 24;
+    final backgroundColor = Theme.of(context).colorScheme.surface;
     return SizedBox.square(
       dimension: size,
       child: Stack(
         children: [
           CustomPaint(
             size: Size.square(size),
-            painter: _EraserIconPainter(color: iconTheme.color),
+            painter: _EraserIconPainter(
+              area: area,
+              backgroundColor: backgroundColor,
+              color: iconTheme.color,
+            ),
           ),
           if (sparkles)
             Positioned(
-              right: 0,
+              left: 0,
               top: 0,
               child: Icon(
                 Icons.auto_awesome,
                 size: size * 0.42,
-                color: iconTheme.color,
-              ),
-            ),
-          if (area)
-            Positioned(
-              right: size * 0.02,
-              top: size * 0.02,
-              child: Icon(
-                Icons.circle_outlined,
-                size: size * 0.44,
                 color: iconTheme.color,
               ),
             ),
@@ -724,8 +814,14 @@ class _EraserIcon extends StatelessWidget {
 }
 
 class _EraserIconPainter extends CustomPainter {
-  const _EraserIconPainter({required this.color});
+  const _EraserIconPainter({
+    required this.area,
+    required this.backgroundColor,
+    required this.color,
+  });
 
+  final bool area;
+  final Color backgroundColor;
   final Color? color;
 
   @override
@@ -735,17 +831,35 @@ class _EraserIconPainter extends CustomPainter {
       ..color = lineColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6;
+    final areaOutline = Paint()
+      ..color = lineColor.withValues(alpha: 0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
     final body = Paint()
-      ..color = lineColor.withValues(alpha: 0.10)
+      ..color = Color.alphaBlend(
+        lineColor.withValues(alpha: 0.10),
+        backgroundColor,
+      )
       ..style = PaintingStyle.fill;
     final end = Paint()
-      ..color = lineColor.withValues(alpha: 0.30)
+      ..color = Color.alphaBlend(
+        lineColor.withValues(alpha: 0.30),
+        backgroundColor,
+      )
       ..style = PaintingStyle.fill;
 
     final w = size.width;
     final h = size.height;
     final eraser = Rect.fromLTWH(-w * 0.34, -h * 0.14, w * 0.68, h * 0.28);
     final endCap = Rect.fromLTWH(-w * 0.34, -h * 0.14, w * 0.22, h * 0.28);
+
+    if (area) {
+      canvas.drawCircle(
+        Offset(w * 0.48, h * 0.62),
+        size.shortestSide * 0.29,
+        areaOutline,
+      );
+    }
 
     canvas.save();
     canvas.translate(w * 0.48, h * 0.62);
@@ -763,6 +877,8 @@ class _EraserIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_EraserIconPainter oldDelegate) {
-    return oldDelegate.color != color;
+    return oldDelegate.area != area ||
+        oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.color != color;
   }
 }

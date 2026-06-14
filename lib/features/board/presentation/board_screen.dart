@@ -14,12 +14,15 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/export/notebook_export_service.dart';
-import '../../notebook/domain/drawing_tool.dart';
+import '../../editor/presentation/editor_settings_screen.dart';
+import '../../editor/presentation/widgets/busy_overlay.dart';
 import '../../editor/presentation/widgets/drawing_canvas.dart';
 import '../../editor/presentation/widgets/editor_toolbar.dart';
+import '../../editor/presentation/widgets/page_background_paint.dart';
 import '../../editor/presentation/widgets/page_overlay.dart';
 import '../../editor/presentation/widgets/text_edit_toolbar.dart';
 import '../../editor/state/editor_controller.dart';
+import '../../notebook/domain/drawing_tool.dart';
 
 class BoardScreen extends StatefulWidget {
   const BoardScreen({super.key});
@@ -38,7 +41,9 @@ class _BoardScreenState extends State<BoardScreen> {
   final GlobalKey _boardKey = GlobalKey();
   bool _isViewportNavigating = false;
   bool _panZoomSessionActive = false;
+  bool _isBusy = false;
   final Map<int, Offset> _activePointers = <int, Offset>{};
+  int? _activeInkPointer;
   int? _pendingNavigationPointer;
   Offset? _pendingNavigationPosition;
   Offset _touchLastFocal = Offset.zero;
@@ -66,10 +71,26 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   void _onPointerDown(PointerDownEvent event, EditorController controller) {
+    if (controller.tool.isInk && _isStylusPointerKind(event.kind)) {
+      _activeInkPointer = event.pointer;
+      _pendingNavigationPointer = null;
+      _pendingNavigationPosition = null;
+      return;
+    }
+    if (controller.tool.isInk &&
+        event.kind == PointerDeviceKind.touch &&
+        _activeInkPointer != null) {
+      return;
+    }
     if (!_isNavigationPointerKind(event.kind)) {
       return;
     }
     if (controller.tool.isInk && event.kind == PointerDeviceKind.touch) {
+      if (!controller.allowsFingerDrawing) {
+        _activePointers[event.pointer] = event.localPosition;
+        _startViewportNavigation(controller);
+        return;
+      }
       if (_pendingNavigationPointer == null && _activePointers.isEmpty) {
         _pendingNavigationPointer = event.pointer;
         _pendingNavigationPosition = event.localPosition;
@@ -94,6 +115,12 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   void _onPointerMove(PointerMoveEvent event, EditorController controller) {
+    if (event.pointer == _activeInkPointer) {
+      return;
+    }
+    if (event.kind == PointerDeviceKind.touch && _activeInkPointer != null) {
+      return;
+    }
     if (!_isNavigationPointerKind(event.kind)) {
       return;
     }
@@ -118,6 +145,17 @@ class _BoardScreenState extends State<BoardScreen> {
       return;
     }
     if (_activePointers.length < 2) {
+      if (event.kind == PointerDeviceKind.touch &&
+          !controller.allowsFingerDrawing &&
+          _activePointers.length == 1) {
+        final panDelta = event.localPosition - _touchLastFocal;
+        _touchLastFocal = event.localPosition;
+        _touchLastDistance = 1.0;
+        if (panDelta != Offset.zero) {
+          controller.panBy(panDelta * _touchPanSensitivity);
+        }
+        return;
+      }
       _stopViewportNavigation(controller);
       return;
     }
@@ -148,6 +186,10 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   void _onPointerUpOrCancel(PointerEvent event, EditorController controller) {
+    if (event.pointer == _activeInkPointer) {
+      _activeInkPointer = null;
+      return;
+    }
     if (event.pointer == _pendingNavigationPointer) {
       _pendingNavigationPointer = null;
       _pendingNavigationPosition = null;
@@ -158,6 +200,17 @@ class _BoardScreenState extends State<BoardScreen> {
       return;
     }
     if (_activePointers.length >= 2) {
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+    if (_isViewportNavigating &&
+        !_panZoomSessionActive &&
+        _activePointers.length == 1 &&
+        !controller.allowsFingerDrawing) {
+      _touchLastFocal = _activePointers.values.first;
+      _touchLastDistance = 1.0;
       if (mounted) {
         setState(() {});
       }
@@ -174,15 +227,20 @@ class _BoardScreenState extends State<BoardScreen> {
 
   void _startViewportNavigation(EditorController controller) {
     final pointers = _activePointers.values.take(2).toList(growable: false);
-    if (pointers.length < 2) {
+    if (pointers.isEmpty) {
       return;
     }
-    controller.startPinchToScaleActiveImage();
-    _touchLastFocal = _midpoint(pointers[0], pointers[1]);
-    _touchLastDistance = math.max(
-      0.001,
-      _distanceBetween(pointers[0], pointers[1]),
-    );
+    if (pointers.length >= 2) {
+      controller.startPinchToScaleActiveImage();
+      _touchLastFocal = _midpoint(pointers[0], pointers[1]);
+      _touchLastDistance = math.max(
+        0.001,
+        _distanceBetween(pointers[0], pointers[1]),
+      );
+    } else {
+      _touchLastFocal = pointers[0];
+      _touchLastDistance = 1.0;
+    }
     if (!_isViewportNavigating) {
       setState(() {
         _isViewportNavigating = true;
@@ -322,6 +380,11 @@ class _BoardScreenState extends State<BoardScreen> {
         kind != PointerDeviceKind.invertedStylus;
   }
 
+  bool _isStylusPointerKind(PointerDeviceKind kind) {
+    return kind == PointerDeviceKind.stylus ||
+        kind == PointerDeviceKind.invertedStylus;
+  }
+
   Offset _boardInsertPosition(
     Rect boardRect,
     Size viewportSize,
@@ -336,7 +399,9 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   Future<void> _handleInsertFile(EditorController controller) async {
-    final message = await controller.insertFromFilePicker(_insertPosition);
+    final message = await _withBusyOverlay(
+      () => controller.insertFromFilePicker(_insertPosition),
+    );
     if (message != null && mounted) {
       ScaffoldMessenger.of(
         context,
@@ -351,9 +416,8 @@ class _BoardScreenState extends State<BoardScreen> {
     NotebookExportFormat format,
   ) async {
     try {
-      final path = await NotebookExportService.exportController(
-        controller,
-        format,
+      final path = await _withBusyOverlay(
+        () => NotebookExportService.exportController(controller, format),
       );
       if (!mounted) {
         return;
@@ -375,6 +439,31 @@ class _BoardScreenState extends State<BoardScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
+  }
+
+  Future<T> _withBusyOverlay<T>(Future<T> Function() action) async {
+    if (mounted) {
+      setState(() => _isBusy = true);
+    }
+    try {
+      return await action();
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      }
+    }
+  }
+
+  void _openSettings() {
+    final controller = context.read<EditorController>();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => ChangeNotifierProvider.value(
+          value: controller,
+          child: const EditorSettingsScreen(),
+        ),
+      ),
+    );
   }
 
   Future<void> _handlePaste(EditorController controller) async {
@@ -566,6 +655,12 @@ class _BoardScreenState extends State<BoardScreen> {
                                   height: boardRect.height,
                                   child: Stack(
                                     children: [
+                                      Positioned.fill(
+                                        child: PageBackgroundPaint(
+                                          settings: controller
+                                              .currentBackgroundSettings,
+                                        ),
+                                      ),
                                       PageOverlay(
                                         controller: controller,
                                         interactionEnabled:
@@ -680,8 +775,20 @@ class _BoardScreenState extends State<BoardScreen> {
       appBar: AppBar(
         titleSpacing: useWideTitleInset ? 44 : null,
         title: Text(controller.notebook.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: _openSettings,
+          ),
+        ],
       ),
-      body: content,
+      body: Stack(
+        children: [
+          Positioned.fill(child: content),
+          if (_isBusy) const Positioned.fill(child: BusyOverlay()),
+        ],
+      ),
     );
   }
 }
