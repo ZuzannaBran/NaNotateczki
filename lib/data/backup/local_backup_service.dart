@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/notebook.dart';
+import 'backup_eraser_flattening.dart';
 
 class LocalBackupService {
   LocalBackupService(this.repository);
@@ -54,7 +55,8 @@ class LocalBackupService {
       final notebooksDir = await _notebooksDir();
       final expectedFiles = <String>{};
       for (final notebook in items) {
-        final encoded = repository.encodeNotebooks([notebook]).single;
+        final backupNotebook = flattenErasersForBackup(notebook);
+        final encoded = repository.encodeNotebooks([backupNotebook]).single;
         final content = jsonEncode(encoded);
         final file = await _notebookFile(notebook.uid);
         expectedFiles.add(file.path);

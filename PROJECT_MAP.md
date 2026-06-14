@@ -204,20 +204,39 @@ Wygenerowane przez `isar_generator` — **NIE edytuj ręcznie**. Po zmianach w
 - 119: `_wipeDatabaseFiles` — kasuje `default.isar` + `.lock`.
 - 132: `_smokeTest` — `notebookEntitys.where().limit(1).findAll()`.
 
-### `lib/data/backup/local_backup_service.dart` (179 linii)
+### `lib/data/backup/local_backup_service.dart` (181 linii)
 Przyrostowy lokalny backup JSON w `local_backup/`: `manifest.json` +
 `notebooks/<uid>.json`; stary `notebooks_latest.json` nadal jest czytany jako
 fallback restore.
-- 10: `class LocalBackupService(this.repository)`.
-- 20: `_backupDir()` — tworzy katalog jeśli brak.
-- 29: `_file(name)`.
-- 34: `_notebooksDir()` / 42: `_manifestFile()` / 47: `_notebookFile(uid)`.
-- 52: `snapshot(items)` — zapisuje tylko zmienione pliki notebooków
-  i usuwa pliki notebooków spoza manifestu.
-- 95: `hasLatest()` — rozpoznaje nowy manifest albo legacy `notebooks_latest.json`.
-- 104: `readLatest()` — preferuje backup przyrostowy, fallback do legacy.
-- 112: `_readIncrementalLatest()` / 148: `_readLegacyLatest()`.
-- 166: `restoreFromLatest()` — zapisuje wszystkie notebooki do Isara, zwraca count.
+- 11: `class LocalBackupService(this.repository)`.
+- 21: `_backupDir()` — tworzy katalog jeśli brak.
+- 30: `_file(name)`.
+- 35: `_notebooksDir()` / 43: `_manifestFile()` / 48: `_notebookFile(uid)`.
+- 53: `snapshot(items)` — zapisuje tylko zmienione pliki notebooków
+  i usuwa pliki notebooków spoza manifestu; przed JSON-em spłaszcza
+  `eraserBrush`/`eraserArea` przez `flattenErasersForBackup`, żeby backup
+  nie zawierał stroke'ów gumki ani zamazanych fragmentów.
+- 97: `hasLatest()` — rozpoznaje nowy manifest albo legacy `notebooks_latest.json`.
+- 106: `readLatest()` — preferuje backup przyrostowy, fallback do legacy.
+- 114: `_readIncrementalLatest()` / 150: `_readLegacyLatest()`.
+- 168: `restoreFromLatest()` — zapisuje wszystkie notebooki do Isara, zwraca count.
+
+### `lib/data/backup/backup_eraser_flattening.dart` (272 linie)
+Sanityzacja lokalnego backupu: stosuje zapisane stroke'i gumki do wcześniejszych
+stroke'ów i wyrzuca same gumki z payloadu backupu.
+- 9: `flattenErasersForBackup(notebook)` — zwraca kopię notebooka z
+  przetworzonymi stronami.
+- 15: `_flattenPageErasers(page)` — idzie po stroke'ach w kolejności rysowania;
+  `eraserBrush`/`eraserArea` tną wcześniejsze stroke'i, `eraserStroke` nie jest
+  zapisywany.
+- 50: `_applyBrushEraser(...)` — rozcina stroke'i po kolizji z polyline gumki.
+- 74: `_applyAreaEraser(...)` — rozcina stroke'i po wejściu/przecięciu polygonu.
+- 97: `_splitStroke(...)` — wspólne dzielenie stroke'a na fragmenty z nowymi ID.
+- 150: `_distanceSquaredToPolyline(...)` / 167 `_segmentDistanceSquaredToPolyline(...)`
+  / 188 `_distanceSquaredToSegment(...)` / 200 `_segmentDistanceSquared(...)` —
+  helpery geometrii gumki-pędzla.
+- 212: `_pointInPolygon(...)` / 228 `_segmentIntersectsPolygon(...)` /
+  239 `_segmentsIntersect(...)` — helpery geometrii gumki-obszaru.
 
 ### `lib/data/export/notebook_export_service.dart` (579 linii)
 Eksport notebooków/boardów do wybranej przez użytkownika lokalizacji
@@ -442,7 +461,7 @@ Wszystkie operacje undoowalne. Każda akcja: `apply(page)` + `revert(page)`.
 - 403: `class OffsetPosition(dx, dy)` — wartościowy odpowiednik `Offset`
   (`fromOffset`, `toOffset`).
 
-### `lib/features/editor/state/editor_controller.dart` (2246 linii)
+### `lib/features/editor/state/editor_controller.dart` (2249 linii)
 Mózg edytora. **Najczęściej modyfikowany plik aplikacji.** Trzyma stan stron,
 narzędzia, kolory, undo/redo, zoom/pan, schowek elementów.
 - 30: `class LassoSelection` - trzyma metadane zaznaczenia lasso
@@ -504,11 +523,12 @@ Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`
 - 384: `finalizeImageMoveOnPage` — **decyduje czy stroke przechodzi
   na inną stronę** (`_moveImageBlockToPage`) czy zostaje (`commitImageMoveOnPage`).
 - 401: `commitImageResizeOnPage`.
-- 463: `selectWithLasso(points, pageIndex)` — Ray-Casting; stroke'y liczone w
-  koordynatach strony, tekst/obrazy w koordynatach dokumentu.
-- 563: `updateLassoMove(delta)` — zapisuje bieżące przesunięcie tylko w
+- 464: `selectWithLasso(points, pageIndex)` — Ray-Casting; stroke'y liczone w
+  koordynatach strony, tekst/obrazy w koordynatach dokumentu; stroke'i gumki
+  są ignorowane przez selekcję.
+- 567: `updateLassoMove(delta)` — zapisuje bieżące przesunięcie tylko w
   `lassoDragDelta`, bez przebudowy całego controllera.
-- 568: `commitLassoMove()` — zatwierdza `lassoDragDelta` jako
+- 572: `commitLassoMove()` — zatwierdza `lassoDragDelta` jako
   `MoveSelectionAction`, przesuwa bounds i dopiero wtedy robi notify/save.
 
 #### Narzędzia, kolory, prefs
@@ -593,37 +613,37 @@ Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`
 - 1881: `deleteImageBlock(id)`.
 
 #### Strokes / commits
-- 1888: `addInkStroke(points, {widthOverride, toolOverride})` — highlighter
+- 1891: `addInkStroke(points, {widthOverride, toolOverride})` — highlighter
   ma `inkStrokeWidth * 8.0`; zapis do repo jest debounced, żeby szybkie
   odrywanie rysika nie blokowało kolejnego stroke'a na Isar/backup.
-- 1911: `eraseInkStrokesById(ids)` — usuwa stroke'i undoowalnie i debouncuje
+- 1914: `eraseInkStrokesById(ids)` — usuwa stroke'i undoowalnie i debouncuje
   zapis.
-- 1924: `replaceInkStrokes(strokes)` — undoowalnie podmienia listę stroke'ów;
+- 1927: `replaceInkStrokes(strokes)` — undoowalnie podmienia listę stroke'ów;
   używane przez częściowe wycinanie zamazanego zakresu.
-- 1933: `createInkStrokeId()` — publiczny generator ID dla nowych fragmentów
+- 1936: `createInkStrokeId()` — publiczny generator ID dla nowych fragmentów
   stroke'ów po rozcięciu.
-- 1935: `commitImageMove(id, start, end)`.
-- 1949: `commitImageResize(before, after)` — porównuje pos/size/crop/rotation.
-- 1963: `_moveImageBlockToPage(fromIdx, toIdx, id, position)`.
+- 1938: `commitImageMove(id, start, end)`.
+- 1952: `commitImageResize(before, after)` — porównuje pos/size/crop/rotation.
+- 1966: `_moveImageBlockToPage(fromIdx, toIdx, id, position)`.
 
 #### Helpery
-- 2005: `_persistImageFile(file)`.
-- 2013: `_persistImageBytes(bytes, filename)`.
-- 2020: `_imagesDir()` — tworzy/trzyma obrazy w dokumentach aplikacji, nie w
+- 2008: `_persistImageFile(file)`.
+- 2016: `_persistImageBytes(bytes, filename)`.
+- 2023: `_imagesDir()` — tworzy/trzyma obrazy w dokumentach aplikacji, nie w
   katalogu tymczasowym.
-- 2029: `_colorToHex(color)`.
-- 2034: `_imageSize(file)` — `instantiateImageCodec`.
-- 2042: `_runOcr(file)` — mlkit, Latin script.
-- 2058: `_isOcrSupported()` — Android/iOS only.
-- 2065: `_computeContentBounds()` — bbox stroke + text + image dla widoku.
-- 2116: `_applyAction(action)` — domyka aktywną edycję tekstu, push undo,
+- 2032: `_colorToHex(color)`.
+- 2037: `_imageSize(file)` — `instantiateImageCodec`.
+- 2045: `_runOcr(file)` — mlkit, Latin script.
+- 2061: `_isOcrSupported()` — Android/iOS only.
+- 2068: `_computeContentBounds()` — bbox stroke + text + image dla widoku.
+- 2119: `_applyAction(action)` — domyka aktywną edycję tekstu, push undo,
   clear redo, apply, update page.
-- 2124: `_applyActionWithoutNotify(action)` — wariant dla commitowania lassa;
+- 2127: `_applyActionWithoutNotify(action)` — wariant dla commitowania lassa;
   zmienia `pages` i undo stack bez pośredniego `notifyListeners()`.
-- 2134: `_updatePage(page)`.
-- 2142: `_replaceTextBlockOnCurrentPage(block, {notify})` — live update tekstu
+- 2137: `_updatePage(page)`.
+- 2145: `_replaceTextBlockOnCurrentPage(block, {notify})` — live update tekstu
   bez przebudowy drzewa podczas szybkiego pisania.
-- 2156: `_beginTextEdit(blockId)` / 2171: `_commitActiveTextEdit()` /
+- 2159: `_beginTextEdit(blockId)` / 2174: `_commitActiveTextEdit()` /
   2195: `_discardActiveTextEdit()` — grupowanie wielu znaków w jedną akcję undo.
 - 2200: `_scheduleSave()` — debouncuje zapis notebooka
   przez `_inkSaveDebounceDelay` po live-edit tekstu i krótkich seriach stroke'ów.
@@ -730,129 +750,137 @@ strony.
 - 2362: `class _MiniMapImageCacheEntry` — cache key + zdekodowany obraz mini-mapy.
 - 2369: `class _MiniMapViewportOverlayPainter` — rysuje wypełniony prostokąt widoku bez podświetlanych krawędzi.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (3315 linii)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (3430 linii)
 Dwie warianty canvasu rysowania. **Notebook używa `DocumentDrawingCanvas`,
 board używa `DrawingCanvas`.** Logika prawie zduplikowana — to świadoma decyzja
 (różne układy współrzędnych). Oba warianty opóźniają start stroke dla dotyku,
 odrzucają duży kontakt dłoni i dają pierwszeństwo aktywnemu rysikowi/myszy.
-- 32: `_eraseStrokeParts(...)` / 115: `_isScratchEraseGesture(...)` —
-  wspólna logika częściowej gumki scratch-erase: szybki gest penem z `3+`
-  nawrotami lub samoprzecięciem rozcina istniejące stroke'i zamiast dopisywać
-  nowy stroke.
-- 219: `class DrawingCanvas extends StatefulWidget` — board, jedna strona/canvas.
-- 239: `class DocumentDrawingCanvas extends StatefulWidget` — notebook,
+- 36: `_eraseStrokeParts(...)` / 66: `_scratchEraseInkHitCount(...)` —
+  scratch-erase ma dwa promienie: mała tolerancja tylko do odpalenia gumki
+  oraz szeroki promień realnego usunięcia, żeby nie zostawiać kropek tuszu;
+  do odpalenia wymaga `3+` trafień istniejącego tuszu.
+- 159: `_isScratchEraseGesture(...)` — wymaga aktywnego pena, `3+` nawrotów
+  oraz minimalnego zagęszczenia ścieżki względem obszaru gestu.
+- 286: `_scratchEraseIntersectionRadius(strokeWidth)` — mała tolerancja
+  przecięcia wizualnej linii (`max(1, width * 0.5)`), nie pełny promień gumki.
+- 293: `_scratchEraseDeleteRadius(strokeWidth)` — realny promień usuwania
+  zamazanego zakresu (`max(8, width * 6)`).
+- 313: `class DrawingCanvas extends StatefulWidget` — board, jedna strona/canvas.
+- 333: `class DocumentDrawingCanvas extends StatefulWidget` — notebook,
   N stron pionowo, params `{worldOrigin, pages, pageSize, pageGap,
   allowMultiTouch, interactionEnabled, firstPageIndex, lastPageIndex}`; painter
   renderuje tylko ten zakres, hit-test nadal liczy po pełnym dokumencie.
-- 265: `_buildInkPath(...)` / 302: `_shouldSmoothStroke(...)` — wspólne,
+- 359: `_buildInkPath(...)` / 396: `_shouldSmoothStroke(...)` — wspólne,
   adaptacyjne wygładzanie szybkich stroke'ów pen/highlighter; kształty, lasso
   i gumka zostają odcinkami.
-- 336: `_shouldAcceptInkPoint(...)` —
+- 430: `_shouldAcceptInkPoint(...)` —
   wspólny filtr punktów pen/highlighter: odrzuca nagłe, boczne skoki kontaktu
   oddalone od dotychczasowego kierunku kreski.
-- 354: `_shouldRejectViewportEdgePoint(...)` / 372 `_isNearViewportEdge(...)` —
+- 448: `_shouldRejectViewportEdgePoint(...)` / 466 `_isNearViewportEdge(...)` —
   ignoruje nienaturalne skoki do samej krawędzi okna programu.
-- 383: `_isDiscontinuousInkJump(...)` — wykrywa boczny, daleki skok względem
+- 477: `_isDiscontinuousInkJump(...)` — wykrywa boczny, daleki skok względem
   ostatniego stabilnego kierunku kreski.
-- 412: `_toolForPointerEvent(...)` / 425 `_toggleEraserShortcut(...)` /
-  431 `_hasStylusButton(...)` — tymczasowo
+- 506: `_toolForPointerEvent(...)` / 519 `_toggleEraserShortcut(...)` /
+  525 `_hasStylusButton(...)` — tymczasowo
   używają ostatniej gumki dla natywnego stanu `StylusButtonState`,
   `invertedStylus`, standardowych przycisków stylusa Fluttera
   (`primary/secondary`) oraz linuksowego fallbacku `secondary/middle mouse`
   dla rysików raportowanych jako mysz; obsługują też przełączenie gumki z
   Apple Pencil double tap.
-- 445: `_eraserStrokeRadius(strokeWidth)` — wspólny promień hit-testu i śladu
+- 539: `_eraserStrokeRadius(strokeWidth)` — wspólny promień hit-testu i śladu
   widmo magicznej gumki (`max(4, width * 1.5)`).
-- 449: `_trimEraserTrail(trail)` — ogranicza długość widocznego śladu magicznej
+- 543: `_trimEraserTrail(trail)` — ogranicza długość widocznego śladu magicznej
   gumki do `_eraserTrailMaxLength`.
 
-#### `_DrawingCanvasState` (board) — 460–1630
-- 514: `build` — `MouseRegion` ustawia natywny kursor `basic` dla
+#### `_DrawingCanvasState` (board) — 554–1733
+- 608: `build` — `MouseRegion` ustawia natywny kursor `basic` dla
   pen/highlighter, `Listener` z `_onPointerDown/Move/Up/Cancel` +
   `ValueListenableBuilder(controller.lassoDragDelta)` + dwa `CustomPaint` w
   `RepaintBoundary`: zapisane stroke'i i szybki overlay aktywnej kreski.
-- 604: `_onPointerDown(event, controller, viewportSize)` — wybiera aktywny pointer;
+- 698: `_onPointerDown(event, controller, viewportSize)` — wybiera aktywny pointer;
   dotyk startuje dopiero po progu ruchu, rysik/mysz od razu; przycisk rysika
   ustawia gumkę tylko dla aktywnego stroke'a.
-- 704: `_onPointerMove` — dodaje punkty, ewentualnie eraser; wykrywa też zmianę
+- 798: `_onPointerMove` — dodaje punkty, ewentualnie eraser; wykrywa też zmianę
   `buttons` w trakcie ruchu i przełącza segment na gumkę/poprzednie narzędzie.
-- 813: `_onPointerUp` — commit stroke przez `controller.addInkStroke`; przed
+- 907: `_onPointerUp` — commit stroke przez `controller.addInkStroke`; przed
   commitem pen sprawdza, czy skupiony szybki gest ma wyciąć fragmenty stroke'ów.
-- 945: `_syncActiveToolWithPointerMove(...)` — domyka bieżący segment i zaczyna
+- 1039: `_syncActiveToolWithPointerMove(...)` — domyka bieżący segment i zaczyna
   nowy po wciśnięciu lub puszczeniu przycisku rysika w trakcie kontaktu.
-- 975: `_commitCurrentSegment(...)` / 1049: `_addCurrentStroke(...)` —
+- 1069: `_commitCurrentSegment(...)` / 1143: `_addCurrentStroke(...)` —
   wspólny commit używany przy normalnym `up` i przy przełączaniu narzędzia.
-- 1070: `_tryCommitScratchErase(...)` — wykrywa gest penem z `3+` nawrotami i
-  podmienia stroke'i przez `replaceInkStrokes*`, jeśli coś faktycznie przeciął.
-- 1099: `_clearCurrentSegmentForToolSwitch()` — czyści overlay bez kończenia
+- 1164: `_tryCommitScratchErase(...)` — najpierw sprawdza `3+` nawrotów
+  i zagęszczenie gestu, potem `3+` małe trafienia istniejącego tuszu, a dopiero
+  szerokim promieniem podmienia stroke'i przez `replaceInkStrokes*`.
+- 1202: `_clearCurrentSegmentForToolSwitch()` — czyści overlay bez kończenia
   aktywnego pointera.
-- 1119: `_onPointerCancel`.
-- 1133: `_resetCurrent()`.
-- 1167: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski.
-- 1171: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
-- 1179: `_activeTool(controller)` — zwraca override z przycisku rysika albo
+- 1222: `_onPointerCancel`.
+- 1236: `_resetCurrent()`.
+- 1270: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski.
+- 1274: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
+- 1282: `_activeTool(controller)` — zwraca override z przycisku rysika albo
   aktualne narzędzie controllera.
-- 1183: `_toWorld(local)`.
-- 1187: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
-- 1208: `_startSnapTimer(offset)` — po holdzie z czystym kształtem wywołuje `_snapToShape`.
-- 1218: `_eraseAt(offset, page, controller)`.
-- 1230: `_resolvedPage(controller)` / 1234: `_resolvedPageIndex`.
-- 1238: `_strokeHitTest(stroke, point, radius)`.
-- 1257: `_distanceSquaredToSegment(p, a, b)`.
-- 1270: `_snapToShape()` — wykrywa line/rect/ellipse.
-- 1328: `_clearSnapHintSoon()`.
-- 1341: `_isRoughlyStraight(start, end, points)`.
-- 1365: `_isRoughlyRectangle(points)`.
-- 1390: `_isRoughlyEllipse(points)`.
-- 1459: `_findFarthestCorner(points, holdPoint)`.
-- 1483: `_isInkTool(tool)`.
-- 1487: `_isSnapTool(tool)` — pen/highlighter snapują, eraser/kształty nie.
-- 1491: `_usesCustomInkCursor(tool)` — pen/highlighter używają natywnego kursora `basic`.
-- 1495: `_effectiveStrokeWidth(tool, baseWidth)` — highlighter ma mnożnik 8,
+- 1286: `_toWorld(local)`.
+- 1290: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
+- 1311: `_startSnapTimer(offset)` — po holdzie z czystym kształtem wywołuje `_snapToShape`.
+- 1321: `_eraseAt(offset, page, controller)`.
+- 1333: `_resolvedPage(controller)` / 1337: `_resolvedPageIndex`.
+- 1341: `_strokeHitTest(stroke, point, radius)`.
+- 1360: `_distanceSquaredToSegment(p, a, b)`.
+- 1373: `_snapToShape()` — wykrywa line/rect/ellipse.
+- 1431: `_clearSnapHintSoon()`.
+- 1444: `_isRoughlyStraight(start, end, points)`.
+- 1468: `_isRoughlyRectangle(points)`.
+- 1493: `_isRoughlyEllipse(points)`.
+- 1562: `_findFarthestCorner(points, holdPoint)`.
+- 1586: `_isInkTool(tool)`.
+- 1590: `_isSnapTool(tool)` — pen/highlighter snapują, eraser/kształty nie.
+- 1594: `_usesCustomInkCursor(tool)` — pen/highlighter używają natywnego kursora `basic`.
+- 1598: `_effectiveStrokeWidth(tool, baseWidth)` — highlighter ma mnożnik 8,
   zwykła gumka `_eraserBrushWidthScale`.
-- 1533: `_squareCorner(start, end)` — wymuszony kwadrat/koło.
+- 1636: `_squareCorner(start, end)` — wymuszony kwadrat/koło.
 
-#### `_DocumentDrawingCanvasState` (notebook) — 1633–2843
+#### `_DocumentDrawingCanvasState` (notebook) — 1736–2977
 Te same metody co wyżej, ale operują w przestrzeni dokumentu (offset per page).
-- 1689: `build` — też nasłuchuje `lassoDragDelta` przy repaint zaznaczonych stroke'ów.
-- 1779: `_onPointerDown` / 1900 Move / 2034 Up / 2289 Cancel; lasso w dokumencie
+- 1792: `build` — też nasłuchuje `lassoDragDelta` przy repaint zaznaczonych stroke'ów.
+- 1882: `_onPointerDown` / 2003 Move / 2137 Up / 2402 Cancel; lasso w dokumencie
   woła `selectWithLasso`, a przycisk rysika ustawia gumkę dla aktywnego stroke'a
   także gdy `buttons` zmienia się w trakcie ruchu.
-- 2129: `_syncActiveToolWithPointerMove(...)`.
-- 2169: `_commitCurrentSegment(...)` / 2230: `_addCurrentStroke(...)`.
-- 2243: `_tryCommitScratchErase(...)` — notebookowy wariant częściowego
+- 2232: `_syncActiveToolWithPointerMove(...)`.
+- 2272: `_commitCurrentSegment(...)` / 2333: `_addCurrentStroke(...)`.
+- 2346: `_tryCommitScratchErase(...)` — notebookowy wariant częściowego
   wycinania, konwertuje gest z dokumentu do koordynatów strony.
-- 2268: `_clearCurrentSegmentForToolSwitch()`.
-- 2303: `_resetCurrent`.
-- 2339: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski.
-- 2343: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
-- 2351: `_activeTool(controller)` — zwraca override z przycisku rysika albo
+- 2381: `_clearCurrentSegmentForToolSwitch()`.
+- 2416: `_resetCurrent`.
+- 2452: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski.
+- 2456: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
+- 2464: `_activeTool(controller)` — zwraca override z przycisku rysika albo
   aktualne narzędzie controllera.
-- 2355: `_toWorld(local)`.
-- 2378: `_pageOrigin(pageIndex)` / 2388: `_toPageLocal(world, pageIndex)` /
-  2396: `_toDocument(pageLocal, pageIndex)` / 2404: `_isInsidePage(pageLocal)`.
-- 2413: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
-- 2434: `_startSnapTimer`.
-- 2444: `_eraseAt(localOffset, pageIndex)`.
-- 2459: `_strokeHitTest` / 2478: `_distanceSquaredToSegment`.
-- 2504: `_snapToShape`.
-- 2562: `_clearSnapHintSoon`.
-- 2575: `_isRoughlyStraight` / 2599: `_isRoughlyRectangle` / 2624: `_isRoughlyEllipse`.
-- 2693: `_findFarthestCorner`.
-- 2717: `_isInkTool` / 2721: `_isSnapTool` /
-  2725: `_usesCustomInkCursor` / 2729: `_effectiveStrokeWidth`.
-- 2767: `_squareCorner`.
+- 2468: `_toWorld(local)`.
+- 2493: `_pageOrigin(pageIndex)` / 2503: `_toPageLocal(world, pageIndex)` /
+  2511: `_toDocument(pageLocal, pageIndex)` / 2519: `_isInsidePage(pageLocal)`.
+- 2526: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
+- 2547: `_startSnapTimer`.
+- 2557: `_eraseAt(localOffset, pageIndex)`.
+- 2572: `_strokeHitTest` / 2591: `_distanceSquaredToSegment`.
+- 2617: `_snapToShape`.
+- 2675: `_clearSnapHintSoon`.
+- 2688: `_isRoughlyStraight` / 2712: `_isRoughlyRectangle` / 2737: `_isRoughlyEllipse`.
+- 2806: `_findFarthestCorner`.
+- 2830: `_isInkTool` / 2834: `_isSnapTool` /
+  2838: `_usesCustomInkCursor` / 2842: `_effectiveStrokeWidth`.
+- 2880: `_squareCorner`.
 
 #### Paintery
-- 2867: `class _InkPainter extends CustomPainter` (board) — rysuje zapisane
+- 2980: `class _InkPainter extends CustomPainter` (board) — rysuje zapisane
   stroke'i i lasso selection; nie odświeża się przy każdym punkcie aktywnej kreski.
-- 2967: `class _InkOverlayPainter extends CustomPainter` — lekka warstwa
-  aktywnej kreski, snap hint, pozycji gumki-pędzla i śladu magicznej gumki,
+- 3081: `class _InkOverlayPainter extends CustomPainter` — lekka warstwa
+  aktywnej kreski, snap hint i śladu magicznej gumki,
   sterowana `ValueNotifier`; ślad magicznej gumki jest krótkim, rozmytym
   trailem bez rdzenia, z gradientową maską ogona do pełnej przezroczystości
-  (`_pointAlongTrail` na 3064), aktywny ślad zwykłej gumki ma kolor papieru,
+  (`_pointAlongTrail` na 3178), aktywny ślad zwykłej gumki ma kolor papieru,
+  ale pojedynczy punkt zwykłej gumki nie jest rysowany jako okrągły preview;
   zapisany stroke gumki nadal czyści przez `BlendMode.clear`.
-- 3186: `class _DocumentInkPainter extends CustomPainter` (notebook) —
+- 3301: `class _DocumentInkPainter extends CustomPainter` (notebook) —
   analogiczny painter zapisanych stroke'ów dla dokumentu; filtruje zakres po
   `firstPageIndex/lastPageIndex`, a zaznaczenie po `selectedPageIndex`.
 
@@ -958,6 +986,16 @@ swobodne rozmieszczanie + zoom/pan z trackpada/touch.
 - 707: `class _BoardZoomControls` — przyciski +/–/fit/reset zoom.
 
 ---
+
+### `test/backup_eraser_flattening_test.dart` (96 linii)
+Testy sanitizacji backupu gumki.
+- 11: `flattens brush erasers into stroke fragments` — sprawdza, że
+  `eraserBrush` znika z backupu, a oryginalny stroke zostaje tylko jako
+  niezamazany fragment.
+- 33: `flattens area erasers and removes eraser strokes from backup` —
+  sprawdza, że `eraserArea` usuwa zamazany stroke i nie trafia do payloadu.
+- 64: `_notebook(strokes)` — fixture jednego notebooka z jedną stroną.
+- 88: `_stroke(...)` — fixture stroke'a z listy `Offset`.
 
 ### `test/widget_test.dart` (20 linii)
 Smoke test: `NotesApp` pumpuje `MaterialApp` + jeden `CircularProgressIndicator`

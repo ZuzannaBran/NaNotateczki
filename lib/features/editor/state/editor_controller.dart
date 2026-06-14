@@ -505,7 +505,10 @@ class EditorController extends ChangeNotifier {
     }
 
     for (final s in page.inkStrokes) {
-      if (s.points.any((p) => isInsidePagePath(Offset(p.dx, p.dy)))) {
+      final isSelectedInk =
+          !s.tool.isEraser &&
+          s.points.any((p) => isInsidePagePath(Offset(p.dx, p.dy)));
+      if (isSelectedInk) {
         selectedStrokes.add(s.id);
       }
     }

@@ -18,8 +18,13 @@ const double _eraserBrushWidthScale = 2.0;
 const double _eraserStrokeMinRadius = 4.0;
 const double _eraserStrokeRadiusScale = 1.5;
 const double _eraserTrailMaxLength = 96.0;
-const double _scratchEraseRadiusScale = 4.0;
+const double _scratchEraseIntersectionMinRadius = 1.0;
+const double _scratchEraseIntersectionRadiusScale = 0.5;
+const double _scratchEraseDeleteMinRadius = 8.0;
+const double _scratchEraseDeleteRadiusScale = 6.0;
+const double _scratchEraseMinPathDensity = 4.0;
 const int _scratchEraseMinDirectionReversals = 3;
+const int _scratchEraseMinInkHits = 3;
 const Color _canvasBackgroundColor = AppColors.paper;
 
 class _PartialEraseResult {
@@ -57,6 +62,22 @@ _PartialEraseResult _eraseStrokeParts({
     next.addAll(parts);
   }
   return _PartialEraseResult(strokes: next, changed: changed);
+}
+
+int _scratchEraseInkHitCount({
+  required List<InkStroke> strokes,
+  required List<InkPoint> gesture,
+  required double radius,
+}) {
+  final gestureOffsets = gesture.map((point) => point.toOffset()).toList();
+  var hits = 0;
+  for (final stroke in strokes) {
+    if (!_canScratchEraseStroke(stroke) || stroke.points.length < 2) {
+      continue;
+    }
+    hits += _strokeGestureHitCount(stroke, gestureOffsets, radius);
+  }
+  return hits;
 }
 
 List<InkStroke>? _splitStrokeAroundGesture(
@@ -105,6 +126,29 @@ List<InkStroke>? _splitStrokeAroundGesture(
   return parts;
 }
 
+int _strokeGestureHitCount(
+  InkStroke stroke,
+  List<Offset> gesture,
+  double radius,
+) {
+  final points = stroke.points;
+  final r2 = radius * radius;
+  var hits = 0;
+  for (final point in points) {
+    if (_distanceSquaredToPolyline(point.toOffset(), gesture) <= r2) {
+      hits++;
+    }
+  }
+  for (var i = 0; i < points.length - 1; i++) {
+    final a = points[i].toOffset();
+    final b = points[i + 1].toOffset();
+    if (_segmentDistanceSquaredToPolyline(a, b, gesture) <= r2) {
+      hits++;
+    }
+  }
+  return hits;
+}
+
 bool _canScratchEraseStroke(InkStroke stroke) {
   return stroke.tool != DrawingTool.eraserBrush &&
       stroke.tool != DrawingTool.eraserStroke &&
@@ -121,7 +165,10 @@ bool _isScratchEraseGesture(
       pointerKind != PointerDeviceKind.mouse) {
     return false;
   }
-  return _directionReversalCount(points) >= _scratchEraseMinDirectionReversals;
+  if (_directionReversalCount(points) < _scratchEraseMinDirectionReversals) {
+    return false;
+  }
+  return _scratchErasePathDensity(points) >= _scratchEraseMinPathDensity;
 }
 
 int _directionReversalCount(List<InkPoint> points) {
@@ -143,6 +190,41 @@ int _directionReversalCount(List<InkPoint> points) {
     previousDirection = direction;
   }
   return reversals;
+}
+
+double _scratchErasePathDensity(List<InkPoint> points) {
+  if (points.length < 2) {
+    return 0;
+  }
+  final diagonal = _scratchEraseBoundsDiagonal(points);
+  if (diagonal == 0) {
+    return 0;
+  }
+  return _scratchErasePathLength(points) / diagonal;
+}
+
+double _scratchErasePathLength(List<InkPoint> points) {
+  var length = 0.0;
+  for (var i = 1; i < points.length; i++) {
+    length += (points[i].toOffset() - points[i - 1].toOffset()).distance;
+  }
+  return length;
+}
+
+double _scratchEraseBoundsDiagonal(List<InkPoint> points) {
+  final first = points.first.toOffset();
+  var minX = first.dx;
+  var maxX = first.dx;
+  var minY = first.dy;
+  var maxY = first.dy;
+  for (final point in points.skip(1)) {
+    final offset = point.toOffset();
+    minX = min(minX, offset.dx);
+    maxX = max(maxX, offset.dx);
+    minY = min(minY, offset.dy);
+    maxY = max(maxY, offset.dy);
+  }
+  return Offset(maxX - minX, maxY - minY).distance;
 }
 
 double _distanceSquaredToPolyline(Offset point, List<Offset> polyline) {
@@ -202,6 +284,20 @@ bool _segmentsIntersect(Offset a, Offset b, Offset c, Offset d) {
 }
 
 double _cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
+
+double _scratchEraseIntersectionRadius(double strokeWidth) {
+  return max(
+    _scratchEraseIntersectionMinRadius,
+    strokeWidth * _scratchEraseIntersectionRadiusScale,
+  );
+}
+
+double _scratchEraseDeleteRadius(double strokeWidth) {
+  return max(
+    _scratchEraseDeleteMinRadius,
+    strokeWidth * _scratchEraseDeleteRadiusScale,
+  );
+}
 
 double _distanceSquaredToSegment(Offset p, Offset a, Offset b) {
   final ab = b - a;
@@ -1076,16 +1172,25 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     if (tool != DrawingTool.pen || pointerKind == null) {
       return false;
     }
-    final result = _eraseStrokeParts(
-      strokes: _resolvedPage(controller).inkStrokes,
+    if (!_isScratchEraseGesture(_currentPoints, pointerKind)) {
+      return false;
+    }
+    final strokes = _resolvedPage(controller).inkStrokes;
+    final inkHits = _scratchEraseInkHitCount(
+      strokes: strokes,
       gesture: _currentPoints,
-      radius: max(8.0, controller.inkStrokeWidth * _scratchEraseRadiusScale),
+      radius: _scratchEraseIntersectionRadius(controller.inkStrokeWidth),
+    );
+    if (inkHits < _scratchEraseMinInkHits) {
+      return false;
+    }
+    final result = _eraseStrokeParts(
+      strokes: strokes,
+      gesture: _currentPoints,
+      radius: _scratchEraseDeleteRadius(controller.inkStrokeWidth),
       createId: controller.createInkStrokeId,
     );
     if (!result.changed) {
-      return false;
-    }
-    if (!_isScratchEraseGesture(_currentPoints, pointerKind)) {
       return false;
     }
     if (widget.pageIndex != null) {
@@ -1218,7 +1323,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   void _eraseAt(Offset offset, NotePage page, EditorController controller) {
     final radius = _eraserStrokeRadius(controller.inkStrokeWidth);
     for (final stroke in page.inkStrokes) {
-      if (_eraseStrokeIds.contains(stroke.id)) {
+      if (_eraseStrokeIds.contains(stroke.id) || stroke.tool.isEraser) {
         continue;
       }
       if (_strokeHitTest(stroke, offset, radius)) {
@@ -2249,16 +2354,26 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     if (tool != DrawingTool.pen || pointerKind == null) {
       return false;
     }
+    if (!_isScratchEraseGesture(_currentPoints, pointerKind)) {
+      return false;
+    }
+    final strokes = widget.pages[pageIndex].inkStrokes;
+    final gesture = _toPageLocalPoints(_currentPoints, pageIndex);
+    final inkHits = _scratchEraseInkHitCount(
+      strokes: strokes,
+      gesture: gesture,
+      radius: _scratchEraseIntersectionRadius(controller.inkStrokeWidth),
+    );
+    if (inkHits < _scratchEraseMinInkHits) {
+      return false;
+    }
     final result = _eraseStrokeParts(
-      strokes: widget.pages[pageIndex].inkStrokes,
-      gesture: _toPageLocalPoints(_currentPoints, pageIndex),
-      radius: max(8.0, controller.inkStrokeWidth * _scratchEraseRadiusScale),
+      strokes: strokes,
+      gesture: gesture,
+      radius: _scratchEraseDeleteRadius(controller.inkStrokeWidth),
       createId: controller.createInkStrokeId,
     );
     if (!result.changed) {
-      return false;
-    }
-    if (!_isScratchEraseGesture(_currentPoints, pointerKind)) {
       return false;
     }
     controller.replaceInkStrokesOnPage(pageIndex, result.strokes);
@@ -2447,7 +2562,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       context.read<EditorController>().inkStrokeWidth,
     );
     for (final stroke in page.inkStrokes) {
-      if (_eraseStrokeIds.contains(stroke.id)) {
+      if (_eraseStrokeIds.contains(stroke.id) || stroke.tool.isEraser) {
         continue;
       }
       if (_strokeHitTest(stroke, localOffset, radius)) {
@@ -2904,7 +3019,8 @@ class _InkPainter extends CustomPainter {
     bool isSelected = false,
     Offset delta = Offset.zero,
   }) {
-    if (points.isEmpty) {
+    if (points.isEmpty ||
+        (tool == DrawingTool.eraserBrush && points.length < 2)) {
       return;
     }
     final paint = Paint()
@@ -3083,7 +3199,8 @@ class _InkOverlayPainter extends CustomPainter {
     double width,
     DrawingTool tool,
   ) {
-    if (points.isEmpty) {
+    if (points.isEmpty ||
+        (tool == DrawingTool.eraserBrush && points.length < 2)) {
       return;
     }
     if (tool == DrawingTool.eraserArea && points.length < 3) {
