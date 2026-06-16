@@ -10,6 +10,7 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:provider/provider.dart';
 
+import '../../../../core/input/soft_keyboard.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/resizable_frame.dart';
 import '../../../notebook/domain/drawing_tool.dart';
@@ -17,6 +18,16 @@ import '../../../notebook/domain/image_block.dart';
 import '../../../notebook/domain/note_page.dart';
 import '../../../notebook/domain/text_block.dart';
 import '../../state/editor_controller.dart';
+
+const Color _lassoAccentColor = Color(0xFF2E5AAC);
+const double _lassoActionOutset = 56.0;
+const double _lassoActionBarMinWidth = 112.0;
+
+bool _allowsTextDoubleTapEdit(DrawingTool tool) {
+  return tool != DrawingTool.pen &&
+      tool != DrawingTool.highlighter &&
+      !tool.isEraser;
+}
 
 class PageOverlay extends StatelessWidget {
   const PageOverlay({
@@ -52,9 +63,12 @@ class PageOverlay extends StatelessWidget {
         ? controller.lassoSelection
         : null;
     final hasActiveLasso = renderActive && lassoSelection != null;
+    final allowsTextDoubleTap = _allowsTextDoubleTapEdit(tool);
 
     return IgnorePointer(
-      ignoring: (tool.isInk && !hasActiveLasso) || !interactionEnabled,
+      ignoring:
+          (tool.isInk && !allowsTextDoubleTap && !hasActiveLasso) ||
+          !interactionEnabled,
       child: Stack(
         children: [
           if (renderBackground)
@@ -101,7 +115,20 @@ class PageOverlay extends StatelessWidget {
                     : null,
                 isLassoSelected:
                     lassoSelection?.textBlockIds.contains(block.id) == true,
+                doubleTapOnly: false,
               ),
+          if (renderActive && tool.isInk && allowsTextDoubleTap)
+            for (final block in effectivePage.textBlocks)
+              if (block.id != activeTextId)
+                _TextBlockWidget(
+                  block: block,
+                  pageIndex: effectivePageIndex,
+                  worldOrigin: worldOrigin,
+                  interactionEnabled: interactionEnabled,
+                  lassoDragDelta: null,
+                  isLassoSelected: false,
+                  doubleTapOnly: true,
+                ),
           for (final block in effectivePage.imageBlocks)
             if ((block.id == activeImageId && renderActive) ||
                 (block.id != activeImageId && renderInactive))
@@ -198,6 +225,7 @@ class _TextBlockWidget extends StatefulWidget {
     required this.interactionEnabled,
     required this.lassoDragDelta,
     required this.isLassoSelected,
+    required this.doubleTapOnly,
   });
 
   final TextBlock block;
@@ -206,6 +234,7 @@ class _TextBlockWidget extends StatefulWidget {
   final bool interactionEnabled;
   final ValueListenable<Offset>? lassoDragDelta;
   final bool isLassoSelected;
+  final bool doubleTapOnly;
 
   @override
   State<_TextBlockWidget> createState() => _TextBlockWidgetState();
@@ -215,12 +244,30 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   Offset? _dragStart;
   Offset? _startPosition;
   bool _dragFromFrame = false;
-  static const double _handleLineLength = 12.0;
-  static const double _handleDotRadius = 4.0;
-  static const double _handleDotDiameter = _handleDotRadius * 2;
-  static const double _handleHitSize = 28.0;
-  bool _isHandleHovered = false;
-  bool _isHandleDragging = false;
+  Offset? _resizeStart;
+  double? _resizeGrabOffset;
+  double? _startWidth;
+  Offset? _fontScaleStart;
+  double? _startFontSize;
+  String? _startDeltaJson;
+  TextBlock? _transformBefore;
+  static const double _minTextWidth = 72.0;
+  static const double _maxTextWidth = 1200.0;
+  static const double _minTextFontSize = 8.0;
+  static const double _maxTextFontSize = 96.0;
+  static const double _cornerDotSize = 12.0;
+  static const double _cornerDotHitSize = 36.0;
+  static const double _edgeHandleHitWidth = 44.0;
+  static const double _edgeHandleWidth = 6.0;
+  static const double _edgeHandleHeight = 28.0;
+  static const double _actionButtonSize = 28.0;
+  static const double _actionGap = 8.0;
+  static const double _actionsTop = 42.0;
+  static const Color _textFrameColor = Color(0xFF8E8E8E);
+  bool _isMoveHovered = false;
+  bool _isMoveDragging = false;
+  bool _isResizeHovered = false;
+  bool _isResizeDragging = false;
   late quill.QuillController _quillController;
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
@@ -271,6 +318,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     final canEdit =
         controller.tool == DrawingTool.text && widget.interactionEnabled;
     final canTransform = !controller.tool.isInk && widget.interactionEnabled;
+    final canDoubleTapEdit =
+        _allowsTextDoubleTapEdit(controller.tool) && widget.interactionEnabled;
     _quillController.readOnly = !(isActive && canEdit);
 
     if (isActive &&
@@ -280,127 +329,157 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         if (mounted) {
           controller.setActiveTextBlock(widget.block.id, _quillController);
           _focusNode.requestFocus();
+          requestSoftKeyboardForFocus(context, _focusNode);
         }
       });
     }
 
     final child = IgnorePointer(
-      ignoring: !canTransform,
-      child: Builder(
-        builder: (context) {
-          return GestureDetector(
-            onTapDown: canTransform
-                ? (_) {
-                    if (controller.currentPageIndex != widget.pageIndex) {
-                      controller.setCurrentPage(widget.pageIndex);
+      ignoring: !(canTransform || canDoubleTapEdit),
+      child: Opacity(
+        opacity: widget.doubleTapOnly ? 0.0 : 1.0,
+        child: Builder(
+          builder: (context) {
+            return GestureDetector(
+              onDoubleTap: canDoubleTapEdit
+                  ? () => _activateTextEditing(controller)
+                  : null,
+              onTapDown: canTransform
+                  ? (_) {
+                      if (controller.currentPageIndex != widget.pageIndex) {
+                        controller.setCurrentPage(widget.pageIndex);
+                      }
+                      controller.markTextTap();
+                      controller.setActiveTextBlock(
+                        widget.block.id,
+                        canEdit ? _quillController : null,
+                      );
+                      if (canEdit) {
+                        _focusNode.requestFocus();
+                        requestSoftKeyboardForFocus(context, _focusNode);
+                      }
                     }
-                    controller.markTextTap();
-                    controller.setActiveTextBlock(
-                      widget.block.id,
-                      canEdit ? _quillController : null,
-                    );
-                    if (canEdit) {
-                      _focusNode.requestFocus();
+                  : null,
+              onPanStart: canTransform
+                  ? (details) {
+                      final box = context.findRenderObject() as RenderBox?;
+                      final size = box?.size ?? Size.zero;
+                      final local = details.localPosition;
+                      _dragFromFrame = !isActive || _isOnFrame(local, size);
+                      if (!_dragFromFrame) {
+                        return;
+                      }
+                      _startMove(details.globalPosition);
                     }
-                  }
-                : null,
-            onPanStart: canTransform
-                ? (details) {
-                    final box = context.findRenderObject() as RenderBox?;
-                    final size = box?.size ?? Size.zero;
-                    final local = details.localPosition;
-                    _dragFromFrame = !isActive || _isOnFrame(local, size);
-                    if (!_dragFromFrame) {
-                      return;
+                  : null,
+              onPanUpdate: canTransform
+                  ? (details) {
+                      if (!_dragFromFrame) {
+                        return;
+                      }
+                      _updateMove(details.globalPosition, controller);
                     }
-                    _startMove(details.globalPosition);
-                  }
-                : null,
-            onPanUpdate: canTransform
-                ? (details) {
-                    if (!_dragFromFrame) {
-                      return;
+                  : null,
+              onPanEnd: canTransform
+                  ? (_) {
+                      if (!_dragFromFrame) {
+                        return;
+                      }
+                      _endMove(controller);
                     }
-                    _updateMove(details.globalPosition, controller);
-                  }
-                : null,
-            onPanEnd: canTransform
-                ? (_) {
-                    if (!_dragFromFrame) {
-                      return;
-                    }
-                    _endMove(controller);
-                  }
-                : null,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Stack(
+                  : null,
+              child: SizedBox(
+                width: widget.block.width + _edgeHandleHitWidth / 2,
+                child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 4,
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: isActive && canTransform
+                            ? _actionsTop + _actionButtonSize
+                            : 0,
                       ),
-                      constraints: BoxConstraints(maxWidth: widget.block.width),
-                      decoration: BoxDecoration(
-                        color: AppColors.paper.withValues(
-                          alpha: isActive
-                              ? 0.85
-                              : widget.isLassoSelected
-                              ? 0.18
-                              : 0.0,
+                      child: Container(
+                        width: widget.block.width,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
                         ),
-                        borderRadius: BorderRadius.zero,
-                        border: Border.all(
-                          color: isActive
-                              ? AppColors.inkBlack
-                              : widget.isLassoSelected
-                              ? Colors.blue.withValues(alpha: 0.55)
-                              : Colors.transparent,
-                          width: 1.2,
+                        decoration: BoxDecoration(
+                          color: AppColors.paper.withValues(
+                            alpha: isActive
+                                ? 0.92
+                                : widget.isLassoSelected
+                                ? 0.18
+                                : 0.0,
+                          ),
+                          borderRadius: BorderRadius.zero,
+                          border: Border.all(
+                            color: isActive
+                                ? _textFrameColor
+                                : widget.isLassoSelected
+                                ? _lassoAccentColor.withValues(alpha: 0.55)
+                                : Colors.transparent,
+                            width: isActive ? 1.6 : 1.2,
+                          ),
+                          boxShadow: widget.isLassoSelected
+                              ? [
+                                  BoxShadow(
+                                    color: _lassoAccentColor.withValues(
+                                      alpha: 0.18,
+                                    ),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
                         ),
-                        boxShadow: widget.isLassoSelected
-                            ? [
-                                BoxShadow(
-                                  color: Colors.blue.withValues(alpha: 0.18),
-                                  blurRadius: 8,
-                                  spreadRadius: 1,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: quill.QuillEditor(
-                        controller: _quillController,
-                        focusNode: _focusNode,
-                        scrollController: _scrollController,
-                        config: quill.QuillEditorConfig(
-                          scrollable: false,
-                          padding: EdgeInsets.zero,
-                          autoFocus: false,
-                          expands: false,
-                          // ignore: experimental_member_use
-                          onKeyPressed: (event, node) =>
-                              _handleKeyPressed(event),
+                        child: quill.QuillEditor(
+                          controller: _quillController,
+                          focusNode: _focusNode,
+                          scrollController: _scrollController,
+                          config: quill.QuillEditorConfig(
+                            scrollable: false,
+                            padding: EdgeInsets.zero,
+                            autoFocus: false,
+                            expands: false,
+                            // ignore: experimental_member_use
+                            onKeyPressed: (event, node) =>
+                                _handleKeyPressed(event),
+                          ),
                         ),
                       ),
                     ),
+                    if (isActive && canTransform) ...[
+                      Positioned(
+                        left: -_cornerDotHitSize / 2,
+                        top: -_cornerDotHitSize / 2,
+                        child: _cornerDot(controller),
+                      ),
+                      Positioned(
+                        top: 0,
+                        right: -_edgeHandleHitWidth / 2,
+                        bottom: _actionsTop + _actionButtonSize,
+                        child: _widthHandle(controller),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        left:
+                            (widget.block.width -
+                                (_actionButtonSize * 2 + _actionGap)) /
+                            2,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [_moveHandle(controller)],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                if (isActive && canTransform)
-                  SizedBox(
-                    width: _handleLineLength + _handleDotDiameter,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: _dragHandle(controller),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
 
@@ -428,66 +507,317 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   }
 
   bool _isOnFrame(Offset local, Size size) {
-    const frameHit = 8.0;
+    const frameHit = 10.0;
     final left = local.dx <= frameHit;
-    final right = local.dx >= size.width - (_handleLineLength + _handleHitSize);
+    final right = local.dx >= size.width - frameHit;
     final top = local.dy <= frameHit;
     final bottom = local.dy >= size.height - frameHit;
     return left || right || top || bottom;
   }
 
-  Widget _dragHandle(EditorController controller) {
-    final handleColor = (_isHandleDragging || _isHandleHovered)
-        ? AppColors.inkBlack
-        : Colors.grey.shade500;
+  void _activateTextEditing(EditorController controller) {
+    if (controller.currentPageIndex != widget.pageIndex) {
+      controller.setCurrentPage(widget.pageIndex);
+    }
+    controller.markTextTap();
+    if (controller.tool != DrawingTool.text) {
+      controller.setTool(DrawingTool.text);
+    }
+    controller.setActiveTextBlock(widget.block.id, _quillController);
+    _focusNode.requestFocus();
+    requestSoftKeyboardForFocus(context, _focusNode);
+  }
+
+  Widget _cornerDot(EditorController controller) {
     return GestureDetector(
-      behavior: HitTestBehavior.translucent,
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (details) {
+        _startFontScale(details.globalPosition);
+      },
+      onPanUpdate: (details) {
+        _updateFontScale(details.globalPosition, controller);
+      },
+      onPanEnd: (_) => _endTransform(controller),
+      onPanCancel: () {
+        _fontScaleStart = null;
+        _startFontSize = null;
+        _startDeltaJson = null;
+        _startWidth = null;
+        _transformBefore = null;
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeUpLeftDownRight,
+        child: SizedBox.square(
+          dimension: _cornerDotHitSize,
+          child: Center(
+            child: Container(
+              width: _cornerDotSize,
+              height: _cornerDotSize,
+              decoration: BoxDecoration(
+                color: AppColors.paper,
+                border: Border.all(color: _textFrameColor, width: 1.2),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _moveHandle(EditorController controller) {
+    return _roundActionButton(
+      icon: Icons.open_with,
+      tooltip: 'Move',
+      isActive: _isMoveDragging || _isMoveHovered,
+      onEnter: () => setState(() => _isMoveHovered = true),
+      onExit: () => setState(() => _isMoveHovered = false),
       onPanStart: (details) {
         _dragFromFrame = true;
-        setState(() => _isHandleDragging = true);
+        setState(() => _isMoveDragging = true);
         _startMove(details.globalPosition);
       },
       onPanUpdate: (details) {
         _updateMove(details.globalPosition, controller);
       },
       onPanEnd: (_) {
-        setState(() => _isHandleDragging = false);
+        setState(() => _isMoveDragging = false);
         _endMove(controller);
       },
       onPanCancel: () {
-        setState(() => _isHandleDragging = false);
+        setState(() => _isMoveDragging = false);
+        _dragStart = null;
+        _startPosition = null;
+        _dragFromFrame = false;
       },
+    );
+  }
+
+  Widget _roundActionButton({
+    required IconData icon,
+    required String tooltip,
+    required bool isActive,
+    required VoidCallback onEnter,
+    required VoidCallback onExit,
+    required GestureDragStartCallback onPanStart,
+    required GestureDragUpdateCallback onPanUpdate,
+    required GestureDragEndCallback onPanEnd,
+    required VoidCallback onPanCancel,
+  }) {
+    final handleColor = isActive ? AppColors.inkBlack : Colors.grey.shade600;
+    return Tooltip(
+      message: tooltip,
       child: MouseRegion(
-        onEnter: (_) => setState(() => _isHandleHovered = true),
-        onExit: (_) => setState(() => _isHandleHovered = false),
-        child: SizedBox(
-          width: _handleLineLength + _handleHitSize,
-          height: _handleHitSize,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: _handleLineLength,
-                  height: 1.2,
-                  color: handleColor,
-                ),
-                Container(
-                  width: _handleDotRadius * 2,
-                  height: _handleDotRadius * 2,
-                  decoration: BoxDecoration(
-                    color: Colors.transparent,
-                    border: Border.all(color: handleColor, width: 1.2),
-                    shape: BoxShape.circle,
-                  ),
+        onEnter: (_) => onEnter(),
+        onExit: (_) => onExit(),
+        cursor: SystemMouseCursors.move,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: onPanStart,
+          onPanUpdate: onPanUpdate,
+          onPanEnd: onPanEnd,
+          onPanCancel: onPanCancel,
+          child: Container(
+            width: _actionButtonSize,
+            height: _actionButtonSize,
+            decoration: BoxDecoration(
+              color: AppColors.paper.withValues(alpha: 0.96),
+              border: Border.all(color: Colors.grey.shade300),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 5,
+                  offset: const Offset(0, 1),
                 ),
               ],
+            ),
+            child: Icon(icon, size: 15, color: handleColor),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _widthHandle(EditorController controller) {
+    final handleColor = (_isResizeDragging || _isResizeHovered)
+        ? AppColors.inkBlack
+        : _textFrameColor;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (details) {
+        setState(() => _isResizeDragging = true);
+        _startResize(details.globalPosition, details.localPosition.dx);
+      },
+      onPanUpdate: (details) {
+        _updateResize(details.globalPosition, controller);
+      },
+      onPanEnd: (_) {
+        setState(() => _isResizeDragging = false);
+        _endTransform(controller);
+      },
+      onPanCancel: () {
+        setState(() => _isResizeDragging = false);
+        _resizeStart = null;
+        _resizeGrabOffset = null;
+        _startWidth = null;
+        _transformBefore = null;
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeLeftRight,
+        onEnter: (_) => setState(() => _isResizeHovered = true),
+        onExit: (_) => setState(() => _isResizeHovered = false),
+        child: SizedBox(
+          width: _edgeHandleHitWidth,
+          child: Center(
+            child: Container(
+              width: _edgeHandleWidth,
+              height: _edgeHandleHeight,
+              decoration: BoxDecoration(
+                color: AppColors.paper,
+                border: Border.all(color: handleColor, width: 1.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _startResize(Offset globalPosition, double handleLocalDx) {
+    _resizeStart = globalPosition;
+    _resizeGrabOffset = handleLocalDx - _edgeHandleHitWidth / 2;
+    _startWidth = widget.block.width;
+    _transformBefore = widget.block;
+  }
+
+  void _updateResize(Offset globalPosition, EditorController controller) {
+    if (_resizeStart == null || _startWidth == null) {
+      return;
+    }
+    final local = _globalToTextLocal(globalPosition);
+    final grabOffset = _resizeGrabOffset ?? 0.0;
+    final nextWidth = (local.dx - grabOffset).clamp(
+      _minTextWidth,
+      _maxTextWidth,
+    );
+    controller.updateTextBlockOnPage(
+      widget.pageIndex,
+      widget.block.copyWith(width: nextWidth),
+    );
+  }
+
+  void _startFontScale(Offset globalPosition) {
+    _fontScaleStart = globalPosition;
+    _startWidth = widget.block.width;
+    _startFontSize = widget.block.fontSize;
+    _startDeltaJson = widget.block.deltaJson;
+    _transformBefore = widget.block;
+  }
+
+  void _updateFontScale(Offset globalPosition, EditorController controller) {
+    if (_fontScaleStart == null ||
+        _startWidth == null ||
+        _startFontSize == null) {
+      return;
+    }
+    final delta = _globalDeltaToLocalDelta(
+      context,
+      start: _fontScaleStart!,
+      end: globalPosition,
+    );
+    final deltaSize = -(delta.dx + delta.dy) / 6;
+    final nextFontSize = (_startFontSize! + deltaSize).clamp(
+      _minTextFontSize,
+      _maxTextFontSize,
+    );
+    final scale = _startFontSize == 0 ? 1.0 : nextFontSize / _startFontSize!;
+    final nextWidth = (_startWidth! * scale).clamp(
+      _minTextWidth,
+      _maxTextWidth,
+    );
+    controller.updateTextBlockOnPage(
+      widget.pageIndex,
+      widget.block.copyWith(
+        fontSize: nextFontSize,
+        width: nextWidth,
+        deltaJson: _scaledDeltaJson(
+          _startDeltaJson,
+          scale: scale,
+          fallbackSize: _startFontSize!,
+        ),
+      ),
+    );
+  }
+
+  String? _scaledDeltaJson(
+    String? deltaJson, {
+    required double scale,
+    required double fallbackSize,
+  }) {
+    if (deltaJson == null || deltaJson.trim().isEmpty) {
+      return deltaJson;
+    }
+    try {
+      final decoded = jsonDecode(deltaJson);
+      if (decoded is! List) {
+        return deltaJson;
+      }
+      final scaled = decoded.map((op) {
+        if (op is! Map) {
+          return op;
+        }
+        final next = Map<String, dynamic>.from(op);
+        final insert = next['insert'];
+        if (insert is! String || insert.isEmpty) {
+          return next;
+        }
+        final rawAttributes = next['attributes'];
+        final attributes = rawAttributes is Map
+            ? Map<String, dynamic>.from(rawAttributes)
+            : <String, dynamic>{};
+        final currentSize =
+            double.tryParse(attributes['size']?.toString() ?? '') ??
+            fallbackSize;
+        final nextSize = (currentSize * scale).clamp(
+          _minTextFontSize,
+          _maxTextFontSize,
+        );
+        attributes['size'] = nextSize.round().toString();
+        next['attributes'] = attributes;
+        return next;
+      }).toList();
+      return jsonEncode(scaled);
+    } catch (e) {
+      debugPrint('_TextBlockWidget: failed to scale Quill delta: $e');
+      return deltaJson;
+    }
+  }
+
+  void _endTransform(EditorController controller) {
+    final before = _transformBefore;
+    if (before != null) {
+      final current = controller.findTextBlockById(widget.block.id);
+      if (current != null) {
+        controller.commitTextUpdateOnPage(widget.pageIndex, before, current);
+      }
+    }
+    _resizeStart = null;
+    _resizeGrabOffset = null;
+    _startWidth = null;
+    _fontScaleStart = null;
+    _startFontSize = null;
+    _startDeltaJson = null;
+    _transformBefore = null;
+  }
+
+  Offset _globalToTextLocal(Offset globalPosition) {
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox) {
+      return globalPosition;
+    }
+    return renderObject.globalToLocal(globalPosition);
   }
 
   void _startMove(Offset globalPosition) {
@@ -834,14 +1164,14 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                 color: isSelected
                     ? AppColors.inkBlack
                     : widget.isLassoSelected
-                    ? Colors.blue.withValues(alpha: 0.8)
+                    ? _lassoAccentColor.withValues(alpha: 0.8)
                     : AppColors.divider,
                 width: widget.isLassoSelected ? 2.0 : 1.0,
               ),
               boxShadow: widget.isLassoSelected
                   ? [
                       BoxShadow(
-                        color: Colors.blue.withValues(alpha: 0.22),
+                        color: _lassoAccentColor.withValues(alpha: 0.22),
                         blurRadius: 10,
                         spreadRadius: 1,
                       ),
@@ -1325,15 +1655,22 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     EditorController controller,
   ) async {
     final textController = TextEditingController(text: widget.block.ocrText);
+    final focusNode = FocusNode();
     final updated = await showDialog<String>(
       context: context,
       builder: (context) {
+        requestSoftKeyboardForFocus(context, focusNode);
         var isRunning = false;
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
               title: const Text('OCR text'),
-              content: TextField(controller: textController, maxLines: 5),
+              content: TextField(
+                controller: textController,
+                focusNode: focusNode,
+                autofocus: true,
+                maxLines: 5,
+              ),
               actions: [
                 TextButton(
                   onPressed: isRunning
@@ -1371,7 +1708,7 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
           },
         );
       },
-    );
+    ).whenComplete(focusNode.dispose);
 
     if (updated == null || updated == widget.block.ocrText) {
       return;
@@ -1459,59 +1796,74 @@ class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
   @override
   Widget build(BuildContext context) {
     final controller = context.read<EditorController>();
+    final colorScheme = Theme.of(context).colorScheme;
 
-    final child = GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onPanStart: widget.interactionEnabled
-          ? (details) {
-              _dragStartPos = details.globalPosition;
-            }
-          : null,
-      onPanUpdate: widget.interactionEnabled
-          ? (details) {
-              if (_dragStartPos == null) return;
-              final start = _dragStartPos!;
-              final current = details.globalPosition;
-              final localDelta = _globalDeltaToLocalDelta(
-                context,
-                start: start,
-                end: current,
-              );
+    final child = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          left: _lassoActionOutset,
+          top: _lassoActionOutset,
+          width: widget.selection.bounds.width,
+          height: widget.selection.bounds.height,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onPanStart: widget.interactionEnabled
+                ? (details) {
+                    _dragStartPos = details.globalPosition;
+                  }
+                : null,
+            onPanUpdate: widget.interactionEnabled
+                ? (details) {
+                    if (_dragStartPos == null) return;
+                    final start = _dragStartPos!;
+                    final current = details.globalPosition;
+                    final localDelta = _globalDeltaToLocalDelta(
+                      context,
+                      start: start,
+                      end: current,
+                    );
 
-              _dragStartPos = current;
-              controller.updateLassoMove(
-                controller.lassoDragDelta.value + localDelta,
-              );
-            }
-          : null,
-      onPanEnd: widget.interactionEnabled
-          ? (_) {
-              _dragStartPos = null;
-              controller.commitLassoMove();
-            }
-          : null,
-      onPanCancel: widget.interactionEnabled
-          ? () {
-              _dragStartPos = null;
-              controller.commitLassoMove();
-            }
-          : null,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          if (widget.interactionEnabled)
-            Positioned(
-              top: -20,
-              right: -20,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Material(
-                    type: MaterialType.circle,
-                    color: AppColors.paper,
-                    elevation: 2,
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
+                    _dragStartPos = current;
+                    controller.updateLassoMove(
+                      controller.lassoDragDelta.value + localDelta,
+                    );
+                  }
+                : null,
+            onPanEnd: widget.interactionEnabled
+                ? (_) {
+                    _dragStartPos = null;
+                    controller.commitLassoMove();
+                  }
+                : null,
+            onPanCancel: widget.interactionEnabled
+                ? () {
+                    _dragStartPos = null;
+                    controller.commitLassoMove();
+                  }
+                : null,
+          ),
+        ),
+        if (widget.interactionEnabled)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: Material(
+              color: AppColors.paper,
+              elevation: 2,
+              borderRadius: BorderRadius.circular(8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.divider),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _LassoActionButton(
+                      icon: Icons.copy,
+                      tooltip: 'Copy selection',
+                      color: AppColors.inkBlack,
                       onTap: () async {
                         final message = await controller
                             .copyActiveElementToClipboard();
@@ -1527,44 +1879,38 @@ class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
                           controller.clearLassoSelection();
                         }
                       },
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Icon(Icons.copy, size: 18, color: Colors.blue),
+                    ),
+                    SizedBox(
+                      height: 32,
+                      child: VerticalDivider(
+                        width: 1,
+                        color: AppColors.divider,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Material(
-                    type: MaterialType.circle,
-                    color: AppColors.paper,
-                    elevation: 2,
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
+                    _LassoActionButton(
+                      icon: Icons.delete_outline,
+                      tooltip: 'Delete selection',
+                      color: colorScheme.error,
                       onTap: controller.deleteLassoSelection,
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: Colors.red,
-                        ),
-                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
 
     Widget positioned(Offset dragDelta, Widget child) {
       final rect = widget.selection.bounds.shift(dragDelta);
+      final width = rect.width + _lassoActionOutset;
       return Positioned(
-        left: rect.left - widget.worldOrigin.dx,
-        top: rect.top - widget.worldOrigin.dy,
-        width: rect.width,
-        height: rect.height,
+        left: rect.left - widget.worldOrigin.dx - _lassoActionOutset,
+        top: rect.top - widget.worldOrigin.dy - _lassoActionOutset,
+        width: width < _lassoActionBarMinWidth
+            ? _lassoActionBarMinWidth
+            : width,
+        height: rect.height + _lassoActionOutset,
         child: child,
       );
     }
@@ -1575,6 +1921,36 @@ class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
       builder: (context, dragDelta, child) {
         return positioned(dragDelta, child!);
       },
+    );
+  }
+}
+
+class _LassoActionButton extends StatelessWidget {
+  const _LassoActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkResponse(
+        containedInkWell: true,
+        radius: 24,
+        onTap: onTap,
+        child: SizedBox.square(
+          dimension: 48,
+          child: Icon(icon, size: 22, color: color),
+        ),
+      ),
     );
   }
 }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/error/app_error_log.dart';
+import '../../../core/input/app_preferences_controller.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../state/editor_controller.dart';
 import '../state/input_mode.dart';
@@ -13,6 +16,7 @@ class EditorSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
+    final preferences = context.watch<AppPreferencesController>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -39,6 +43,30 @@ class EditorSettingsScreen extends StatelessWidget {
                       horizontal: 16,
                     ),
                     children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                        ),
+                        title: const Text('Device mode'),
+                        subtitle: Text(preferences.deviceInputMode.description),
+                        trailing: SegmentedButton<DeviceInputMode>(
+                          showSelectedIcon: false,
+                          segments: const [
+                            ButtonSegment(
+                              value: DeviceInputMode.computer,
+                              label: Text('Computer'),
+                            ),
+                            ButtonSegment(
+                              value: DeviceInputMode.tablet,
+                              label: Text('Tablet'),
+                            ),
+                          ],
+                          selected: {preferences.deviceInputMode},
+                          onSelectionChanged: (selection) {
+                            preferences.setDeviceInputMode(selection.single);
+                          },
+                        ),
+                      ),
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -85,6 +113,44 @@ class EditorSettingsScreen extends StatelessWidget {
                           },
                         ),
                       ),
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                        ),
+                        title: const Text('Scribble eraser'),
+                        subtitle: const Text(
+                          'Erase ink by scribbling over it with the pen.',
+                        ),
+                        trailing: SegmentedButton<bool>(
+                          showSelectedIcon: false,
+                          segments: const [
+                            ButtonSegment(value: false, label: Text('Off')),
+                            ButtonSegment(value: true, label: Text('On')),
+                          ],
+                          selected: {controller.scratchEraseEnabled},
+                          onSelectionChanged: (selection) {
+                            controller.setScratchEraseEnabled(selection.single);
+                          },
+                        ),
+                      ),
+                      AnimatedBuilder(
+                        animation: AppErrorLog.instance,
+                        builder: (context, _) {
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
+                            title: const Text('Errors'),
+                            subtitle: Text(
+                              AppErrorLog.instance.isEmpty
+                                  ? 'No errors recorded.'
+                                  : '${AppErrorLog.instance.length} recorded.',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => _showErrorsDialog(context),
+                          );
+                        },
+                      ),
                     ],
                   ),
                   ListView(
@@ -127,6 +193,88 @@ class EditorSettingsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _showErrorsDialog(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder: (context) {
+      return AnimatedBuilder(
+        animation: AppErrorLog.instance,
+        builder: (context, _) {
+          final logText = AppErrorLog.instance.toClipboardText();
+          return AlertDialog(
+            title: const Text('Errors'),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      AppErrorLog.instance.isEmpty
+                          ? 'No errors recorded.'
+                          : '${AppErrorLog.instance.length} errors recorded.',
+                    ),
+                    const SizedBox(height: 12),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: const Text('Preview'),
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          constraints: const BoxConstraints(maxHeight: 280),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).dividerColor,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: SingleChildScrollView(
+                            child: SelectableText(
+                              logText,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: AppErrorLog.instance.isEmpty
+                    ? null
+                    : AppErrorLog.instance.clear,
+                child: const Text('Clear'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: logText));
+                  if (!context.mounted) {
+                    return;
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Errors copied.')),
+                  );
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Copy'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }
 
 class _BackgroundSection extends StatelessWidget {

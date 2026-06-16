@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app/notes_app.dart';
+import 'core/error/app_error_log.dart';
 import 'core/input/stylus_button_state.dart';
 
 ui.KeyDataCallback? _wrappedKeyDataHandler;
 ui.ErrorCallback? _wrappedPlatformErrorHandler;
 Timer? _keyDataFilterWatchdog;
 int _keyDataFilterWatchdogTicks = 0;
+void Function(FlutterErrorDetails details)? _wrappedFlutterErrorHandler;
 
 bool _invalidKeyDataFilter(ui.KeyData data) {
   if (data.physical == 0 || data.logical == 0) {
@@ -20,7 +22,14 @@ bool _invalidKeyDataFilter(ui.KeyData data) {
 }
 
 void main() {
+  runZonedGuarded(_runApp, (error, stackTrace) {
+    AppErrorLog.instance.record(error, stackTrace, source: 'Dart zone');
+  });
+}
+
+void _runApp() {
   WidgetsFlutterBinding.ensureInitialized();
+  _installFlutterErrorLogger();
   StylusButtonState.initialize();
   _installInvalidKeyDataFilter();
   _installInvalidKeyDataErrorFilter();
@@ -34,6 +43,20 @@ void main() {
     _installInvalidKeyDataFilter();
   });
   runApp(const NotesApp());
+}
+
+void _installFlutterErrorLogger() {
+  final currentHandler = FlutterError.onError;
+  if (currentHandler == _flutterErrorLogger) {
+    return;
+  }
+  _wrappedFlutterErrorHandler = currentHandler;
+  FlutterError.onError = _flutterErrorLogger;
+}
+
+void _flutterErrorLogger(FlutterErrorDetails details) {
+  AppErrorLog.instance.recordFlutterError(details);
+  _wrappedFlutterErrorHandler?.call(details);
 }
 
 void _installInvalidKeyDataFilter() {
@@ -61,6 +84,7 @@ bool _invalidKeyDataErrorFilter(Object error, StackTrace stackTrace) {
     _installInvalidKeyDataFilter();
     return true;
   }
+  AppErrorLog.instance.record(error, stackTrace, source: 'Platform dispatcher');
   return _wrappedPlatformErrorHandler?.call(error, stackTrace) ?? false;
 }
 

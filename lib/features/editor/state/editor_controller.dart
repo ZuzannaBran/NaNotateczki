@@ -91,6 +91,7 @@ class EditorController extends ChangeNotifier {
   DrawingTool lastShapeTool = DrawingTool.line;
   PointerInputMode pointerInputMode = PointerInputMode.off;
   bool stylusButtonsEnabled = true;
+  bool scratchEraseEnabled = true;
   PageBackgroundSettings defaultNotebookBackground =
       const PageBackgroundSettings();
   PageBackgroundSettings defaultBoardBackground =
@@ -108,6 +109,8 @@ class EditorController extends ChangeNotifier {
   final List<EditorAction> _redoActions = <EditorAction>[];
   final Map<String, PageBackgroundSettings> _localBackgrounds =
       <String, PageBackgroundSettings>{};
+  final Set<NotebookKind> _dirtyBackgroundDefaultKinds = <NotebookKind>{};
+  final Set<String> _dirtyLocalBackgroundIds = <String>{};
   Timer? _prefsSaveDebounce;
   Timer? _notebookSaveDebounce;
 
@@ -328,6 +331,11 @@ class EditorController extends ChangeNotifier {
     updateTextBlockPosition(id, position);
   }
 
+  void updateTextBlockOnPage(int pageIndex, TextBlock block) {
+    _ensurePageSelected(pageIndex);
+    _replaceTextBlockOnCurrentPage(block, notify: true);
+  }
+
   void deleteTextBlockOnPage(int pageIndex, String id) {
     _ensurePageSelected(pageIndex);
     deleteTextBlock(id);
@@ -341,6 +349,15 @@ class EditorController extends ChangeNotifier {
   ) {
     _ensurePageSelected(pageIndex);
     commitTextMove(id, start, end);
+  }
+
+  void commitTextUpdateOnPage(
+    int pageIndex,
+    TextBlock before,
+    TextBlock after,
+  ) {
+    _ensurePageSelected(pageIndex);
+    commitTextUpdate(before, after);
   }
 
   Future<String?> runOcrForImageOnPage(int pageIndex, ImageBlock block) async {
@@ -774,6 +791,15 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setScratchEraseEnabled(bool enabled) {
+    if (scratchEraseEnabled == enabled) {
+      return;
+    }
+    scratchEraseEnabled = enabled;
+    _schedulePrefsSave();
+    notifyListeners();
+  }
+
   void setDefaultBackgroundSettings(
     NotebookKind kind,
     PageBackgroundSettings settings,
@@ -784,12 +810,14 @@ class EditorController extends ChangeNotifier {
       case NotebookKind.board:
         defaultBoardBackground = settings;
     }
+    _dirtyBackgroundDefaultKinds.add(kind);
     _schedulePrefsSave();
     notifyListeners();
   }
 
   void setCurrentBackgroundSettings(PageBackgroundSettings settings) {
     _localBackgrounds[notebook.uid] = settings;
+    _dirtyLocalBackgroundIds.add(notebook.uid);
     _schedulePrefsSave();
     notifyListeners();
   }
@@ -830,6 +858,7 @@ class EditorController extends ChangeNotifier {
       final eraserToolIndex = decoded['lastEraserTool'];
       final inputModeIndex = decoded['pointerInputMode'];
       final stylusButtons = decoded['stylusButtonsEnabled'];
+      final scratchErase = decoded['scratchEraseEnabled'];
       final backgroundDefaults = decoded['backgroundDefaults'];
       final localBackgrounds = decoded['localBackgrounds'];
       final quick = decoded['quickColors'];
@@ -864,27 +893,37 @@ class EditorController extends ChangeNotifier {
       if (stylusButtons is bool) {
         stylusButtonsEnabled = stylusButtons;
       }
+      if (scratchErase is bool) {
+        scratchEraseEnabled = scratchErase;
+      }
       if (backgroundDefaults is Map) {
-        defaultNotebookBackground = PageBackgroundSettings.fromJson(
-          backgroundDefaults[backgroundPrefsKeyForKind(NotebookKind.notebook)],
-        );
-        defaultBoardBackground = PageBackgroundSettings.fromJson(
-          backgroundDefaults[backgroundPrefsKeyForKind(NotebookKind.board)],
-        );
+        if (!_dirtyBackgroundDefaultKinds.contains(NotebookKind.notebook)) {
+          defaultNotebookBackground = PageBackgroundSettings.fromJson(
+            backgroundDefaults[backgroundPrefsKeyForKind(
+              NotebookKind.notebook,
+            )],
+          );
+        }
+        if (!_dirtyBackgroundDefaultKinds.contains(NotebookKind.board)) {
+          defaultBoardBackground = PageBackgroundSettings.fromJson(
+            backgroundDefaults[backgroundPrefsKeyForKind(NotebookKind.board)],
+          );
+        }
       }
       if (localBackgrounds is Map) {
-        _localBackgrounds
-          ..clear()
-          ..addEntries(
-            localBackgrounds.entries
-                .where((entry) => entry.key is String)
-                .map(
-                  (entry) => MapEntry(
-                    entry.key as String,
-                    PageBackgroundSettings.fromJson(entry.value),
-                  ),
-                ),
-          );
+        if (_dirtyLocalBackgroundIds.isEmpty) {
+          _localBackgrounds.clear();
+        }
+        for (final entry in localBackgrounds.entries) {
+          if (entry.key is! String) {
+            continue;
+          }
+          final key = entry.key as String;
+          if (_dirtyLocalBackgroundIds.contains(key)) {
+            continue;
+          }
+          _localBackgrounds[key] = PageBackgroundSettings.fromJson(entry.value);
+        }
       }
       if (quick is List) {
         final mapped = quick
@@ -924,6 +963,11 @@ class EditorController extends ChangeNotifier {
   Future<void> _saveEditorPrefs() async {
     try {
       final file = await _prefsFile();
+      final existing = await _readEditorPrefs(file);
+      final dirtyBackgroundDefaultKinds = Set<NotebookKind>.of(
+        _dirtyBackgroundDefaultKinds,
+      );
+      final dirtyLocalBackgroundIds = Set<String>.of(_dirtyLocalBackgroundIds);
       final payload = <String, dynamic>{
         'inkColor': _colorToHex(inkColor),
         'quickColors': quickColors.map(_colorToHex).toList(),
@@ -935,20 +979,84 @@ class EditorController extends ChangeNotifier {
         'lastEraserTool': lastEraserTool.index,
         'pointerInputMode': pointerInputMode.index,
         'stylusButtonsEnabled': stylusButtonsEnabled,
-        'backgroundDefaults': {
-          backgroundPrefsKeyForKind(NotebookKind.notebook):
-              defaultNotebookBackground.toJson(),
-          backgroundPrefsKeyForKind(NotebookKind.board): defaultBoardBackground
-              .toJson(),
-        },
-        'localBackgrounds': _localBackgrounds.map(
-          (key, value) => MapEntry(key, value.toJson()),
+        'scratchEraseEnabled': scratchEraseEnabled,
+        'backgroundDefaults': _mergedBackgroundDefaults(
+          existing['backgroundDefaults'],
+          dirtyBackgroundDefaultKinds,
+        ),
+        'localBackgrounds': _mergedLocalBackgrounds(
+          existing['localBackgrounds'],
+          dirtyLocalBackgroundIds,
         ),
       };
       await file.writeAsString(jsonEncode(payload));
+      _dirtyBackgroundDefaultKinds.removeAll(dirtyBackgroundDefaultKinds);
+      _dirtyLocalBackgroundIds.removeAll(dirtyLocalBackgroundIds);
     } catch (e) {
       debugPrint('EditorController._saveEditorPrefs failed: $e');
     }
+  }
+
+  Future<Map<String, dynamic>> _readEditorPrefs(File file) async {
+    try {
+      if (!await file.exists()) {
+        return <String, dynamic>{};
+      }
+      final decoded = jsonDecode(await file.readAsString());
+      return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    } catch (e) {
+      debugPrint('EditorController._readEditorPrefs failed: $e');
+      return <String, dynamic>{};
+    }
+  }
+
+  Map<String, dynamic> _mergedBackgroundDefaults(
+    Object? existingValue,
+    Set<NotebookKind> dirtyKinds,
+  ) {
+    final merged = <String, dynamic>{};
+    if (existingValue is Map) {
+      for (final entry in existingValue.entries) {
+        if (entry.key is String) {
+          merged[entry.key as String] = entry.value;
+        }
+      }
+    }
+
+    for (final kind in NotebookKind.values) {
+      final key = backgroundPrefsKeyForKind(kind);
+      if (dirtyKinds.contains(kind) || !merged.containsKey(key)) {
+        merged[key] = defaultBackgroundSettingsForKind(kind).toJson();
+      }
+    }
+    return merged;
+  }
+
+  Map<String, dynamic> _mergedLocalBackgrounds(
+    Object? existingValue,
+    Set<String> dirtyIds,
+  ) {
+    final merged = <String, dynamic>{};
+    if (existingValue is Map) {
+      for (final entry in existingValue.entries) {
+        if (entry.key is String) {
+          merged[entry.key as String] = entry.value;
+        }
+      }
+    }
+
+    if (merged.isEmpty && dirtyIds.isEmpty) {
+      return _localBackgrounds.map(
+        (key, value) => MapEntry(key, value.toJson()),
+      );
+    }
+    for (final id in dirtyIds) {
+      final settings = _localBackgrounds[id];
+      if (settings != null) {
+        merged[id] = settings.toJson();
+      }
+    }
+    return merged;
   }
 
   Future<File> _prefsFile() async {
@@ -1309,6 +1417,20 @@ class EditorController extends ChangeNotifier {
 
   void commitTextResize(TextBlock before, TextBlock after) {
     if (before.width == after.width) {
+      return;
+    }
+    _applyAction(UpdateTextAction(before: before, after: after));
+    _save();
+  }
+
+  void commitTextUpdate(TextBlock before, TextBlock after) {
+    if (before.text == after.text &&
+        before.deltaJson == after.deltaJson &&
+        before.position == after.position &&
+        before.fontSize == after.fontSize &&
+        before.color == after.color &&
+        before.width == after.width &&
+        before.rotation == after.rotation) {
       return;
     }
     _applyAction(UpdateTextAction(before: before, after: after));

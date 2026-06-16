@@ -659,6 +659,7 @@ class _BoardScreenState extends State<BoardScreen> {
                                         child: PageBackgroundPaint(
                                           settings: controller
                                               .currentBackgroundSettings,
+                                          origin: boardRect.topLeft,
                                         ),
                                       ),
                                       PageOverlay(

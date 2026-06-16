@@ -8,10 +8,12 @@ class PageBackgroundPaint extends StatelessWidget {
     required this.settings,
     super.key,
     this.borderRadius = BorderRadius.zero,
+    this.origin = Offset.zero,
   });
 
   final PageBackgroundSettings settings;
   final BorderRadius borderRadius;
+  final Offset origin;
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +25,7 @@ class PageBackgroundPaint extends StatelessWidget {
           lineColor: Theme.of(
             context,
           ).colorScheme.outlineVariant.withValues(alpha: 0.55),
+          origin: origin,
         ),
         child: const SizedBox.expand(),
       ),
@@ -62,10 +65,12 @@ class _PageBackgroundPainter extends CustomPainter {
   const _PageBackgroundPainter({
     required this.settings,
     required this.lineColor,
+    required this.origin,
   });
 
   final PageBackgroundSettings settings;
   final Color lineColor;
+  final Offset origin;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -83,21 +88,36 @@ class _PageBackgroundPainter extends CustomPainter {
       ..color = lineColor
       ..strokeWidth = 1.0;
 
-    for (var y = spacing; y < size.height; y += spacing) {
+    for (
+      var y = _firstLineOffset(origin.dy, spacing);
+      y < size.height;
+      y += spacing
+    ) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
     if (settings.style == PageBackgroundStyle.lines) {
       return;
     }
-    for (var x = spacing; x < size.width; x += spacing) {
+    for (
+      var x = _firstLineOffset(origin.dx, spacing);
+      x < size.width;
+      x += spacing
+    ) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
+  }
+
+  double _firstLineOffset(double originValue, double spacing) {
+    final remainder = originValue.remainder(spacing);
+    final normalized = remainder < 0 ? remainder + spacing : remainder;
+    return normalized == 0 ? spacing : spacing - normalized;
   }
 
   @override
   bool shouldRepaint(covariant _PageBackgroundPainter oldDelegate) {
     return settings.style != oldDelegate.settings.style ||
         settings.spacing != oldDelegate.settings.spacing ||
-        lineColor != oldDelegate.lineColor;
+        lineColor != oldDelegate.lineColor ||
+        origin != oldDelegate.origin;
   }
 }

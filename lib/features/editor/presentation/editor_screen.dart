@@ -773,7 +773,27 @@ class _EditorScreenState extends State<EditorScreen> {
     required int pageCount,
     required int currentPageIndex,
   }) {
-    return _PageRenderRange(0, math.max(0, pageCount));
+    if (pageCount <= 0) {
+      return const _PageRenderRange(0, 0);
+    }
+
+    final extent = pageWorldSize.height + _pageGap;
+    if (extent <= 0) {
+      return _PageRenderRange(0, pageCount);
+    }
+
+    final firstVisible = (visibleDocumentRect.top / extent)
+        .floor()
+        .clamp(0, pageCount - 1)
+        .toInt();
+    final lastVisible = (visibleDocumentRect.bottom / extent)
+        .floor()
+        .clamp(firstVisible, pageCount - 1)
+        .toInt();
+    final start = math.max(0, firstVisible - 1);
+    final end = math.min(pageCount, lastVisible + 4);
+
+    return _PageRenderRange(start, end);
   }
 
   Offset _insertPositionForViewport({
@@ -2048,6 +2068,7 @@ class _ProjectMiniMapOverlay extends StatefulWidget {
 
 class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
   static const double _minimapWidth = 84.0;
+  static const int _minimapImageDecodeWidth = 128;
 
   final ScrollController _minimapScrollController = ScrollController();
   final Map<String, _MiniMapImageCacheEntry> _minimapImages = {};
@@ -2080,8 +2101,10 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
   }
 
   void _precacheMinimapImages() {
+    final pageRange = _minimapImagePageRange();
     final activeIds = <String>{};
-    for (final page in widget.pages) {
+    for (var i = pageRange.start; i < pageRange.end; i++) {
+      final page = widget.pages[i];
       for (final block in page.imageBlocks) {
         activeIds.add(block.id);
         final cacheKey = _minimapImageCacheKey(block);
@@ -2113,6 +2136,10 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
         image?.dispose();
         return;
       }
+      if (!_shouldCacheMinimapImage(block.id)) {
+        image?.dispose();
+        return;
+      }
       final currentKey = _currentMinimapImageCacheKey(block.id);
       if (image == null || currentKey != cacheKey) {
         image?.dispose();
@@ -2134,7 +2161,9 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
   }
 
   String? _currentMinimapImageCacheKey(String id) {
-    for (final page in widget.pages) {
+    final pageRange = _minimapImagePageRange();
+    for (var i = pageRange.start; i < pageRange.end; i++) {
+      final page = widget.pages[i];
       for (final block in page.imageBlocks) {
         if (block.id == id) {
           return _minimapImageCacheKey(block);
@@ -2142,6 +2171,34 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
       }
     }
     return null;
+  }
+
+  bool _shouldCacheMinimapImage(String id) {
+    return _currentMinimapImageCacheKey(id) != null;
+  }
+
+  _PageRenderRange _minimapImagePageRange() {
+    if (widget.pages.isEmpty) {
+      return const _PageRenderRange(0, 0);
+    }
+
+    final extent = widget.pageWorldSize.height + widget.pageGap;
+    if (extent <= 0) {
+      return _PageRenderRange(0, widget.pages.length);
+    }
+
+    final firstVisible = (widget.visibleDocumentRect.top / extent)
+        .floor()
+        .clamp(0, widget.pages.length - 1)
+        .toInt();
+    final lastVisible = (widget.visibleDocumentRect.bottom / extent)
+        .floor()
+        .clamp(firstVisible, widget.pages.length - 1)
+        .toInt();
+    final start = math.max(0, firstVisible - 2);
+    final end = math.min(widget.pages.length, lastVisible + 5);
+
+    return _PageRenderRange(start, end);
   }
 
   String _minimapImageCacheKey(ImageBlock block) {
@@ -2168,7 +2225,9 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
 
     final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
     final descriptor = await ui.ImageDescriptor.encoded(buffer);
-    final codec = await descriptor.instantiateCodec();
+    final codec = await descriptor.instantiateCodec(
+      targetWidth: _minimapImageDecodeWidth,
+    );
     final frame = await codec.getNextFrame();
     buffer.dispose();
     descriptor.dispose();
@@ -2475,7 +2534,12 @@ class _ProjectMiniMapPainter extends CustomPainter {
             0.38,
             1.45,
           );
-        if (stroke.tool == DrawingTool.eraserBrush) {
+        if (stroke.tool == DrawingTool.eraserArea) {
+          paint
+            ..color = Colors.transparent
+            ..blendMode = BlendMode.clear
+            ..style = PaintingStyle.fill;
+        } else if (stroke.tool == DrawingTool.eraserBrush) {
           paint
             ..color = Colors.transparent
             ..blendMode = BlendMode.clear;
@@ -2498,7 +2562,11 @@ class _ProjectMiniMapPainter extends CustomPainter {
           final point = pagePointToMap(stroke.points[j].toOffset());
           path.lineTo(point.dx, point.dy);
         }
-        canvas.drawPath(path, paint);
+        if (stroke.tool == DrawingTool.eraserArea) {
+          canvas.drawPath(path..close(), paint);
+        } else {
+          canvas.drawPath(path, paint);
+        }
       }
       canvas.restore();
 

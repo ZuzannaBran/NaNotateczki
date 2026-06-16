@@ -26,6 +26,7 @@ const double _scratchEraseMinPathDensity = 4.0;
 const int _scratchEraseMinDirectionReversals = 3;
 const int _scratchEraseMinInkHits = 3;
 const Color _canvasBackgroundColor = AppColors.paper;
+const Color _lassoAccentColor = Color(0xFF2E5AAC);
 
 class _PartialEraseResult {
   const _PartialEraseResult({required this.strokes, required this.changed});
@@ -1181,7 +1182,9 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     DrawingTool tool,
   ) {
     final pointerKind = _primaryPointerKind;
-    if (tool != DrawingTool.pen || pointerKind == null) {
+    if (!controller.scratchEraseEnabled ||
+        tool != DrawingTool.pen ||
+        pointerKind == null) {
       return false;
     }
     if (!_isScratchEraseGesture(_currentPoints, pointerKind)) {
@@ -2372,7 +2375,9 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     DrawingTool tool,
   ) {
     final pointerKind = _primaryPointerKind;
-    if (tool != DrawingTool.pen || pointerKind == null) {
+    if (!controller.scratchEraseEnabled ||
+        tool != DrawingTool.pen ||
+        pointerKind == null) {
       return false;
     }
     if (!_isScratchEraseGesture(_currentPoints, pointerKind)) {
@@ -3067,7 +3072,7 @@ class _InkPainter extends CustomPainter {
     final path = _buildInkPath(points, tool, Offset.zero, worldOrigin, delta);
     if (isSelected) {
       final highlightPaint = Paint()
-        ..color = Colors.blue.withValues(alpha: 0.24)
+        ..color = _lassoAccentColor.withValues(alpha: 0.22)
         ..strokeCap = tool == DrawingTool.highlighter
             ? StrokeCap.square
             : StrokeCap.round
@@ -3085,7 +3090,7 @@ class _InkPainter extends CustomPainter {
 
   Color _toolColor(Color base, DrawingTool tool) {
     if (tool == DrawingTool.lasso) {
-      return const Color(0x882196F3); // Semi-transparent blue for lasso
+      return _lassoAccentColor.withValues(alpha: 0.38);
     }
     if (tool == DrawingTool.highlighter) {
       return base.withValues(alpha: 0.5);
@@ -3299,7 +3304,7 @@ class _InkOverlayPainter extends CustomPainter {
 
   Color _toolColor(Color base, DrawingTool tool) {
     if (tool == DrawingTool.lasso) {
-      return const Color(0x882196F3); // Semi-transparent blue for lasso
+      return _lassoAccentColor.withValues(alpha: 0.38);
     }
     if (tool == DrawingTool.highlighter) {
       return base.withValues(alpha: 0.5);
@@ -3346,11 +3351,15 @@ class _DocumentInkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.saveLayer(Offset.zero & size, Paint());
     final start = firstPageIndex.clamp(0, pages.length).toInt();
     final end = (lastPageIndex ?? pages.length)
         .clamp(start, pages.length)
         .toInt();
+    if (start >= end) {
+      return;
+    }
+
+    canvas.saveLayer(_renderLayerBounds(start, end), Paint());
     for (var i = start; i < end; i++) {
       final origin = _pageOrigin(i);
       for (final stroke in pages[i].inkStrokes) {
@@ -3369,6 +3378,19 @@ class _DocumentInkPainter extends CustomPainter {
       }
     }
     canvas.restore();
+  }
+
+  Rect _renderLayerBounds(int start, int end) {
+    const overflowMargin = 128.0;
+    final stride = pageSize.height + pageGap;
+    final top = start * stride;
+    final bottom = ((end - 1) * stride) + pageSize.height;
+    return Rect.fromLTRB(
+      -overflowMargin - worldOrigin.dx,
+      top - overflowMargin - worldOrigin.dy,
+      pageSize.width + overflowMargin - worldOrigin.dx,
+      bottom + overflowMargin - worldOrigin.dy,
+    );
   }
 
   Offset _pageOrigin(int index) {
@@ -3412,7 +3434,7 @@ class _DocumentInkPainter extends CustomPainter {
     final path = _buildInkPath(points, tool, origin, worldOrigin, delta);
     if (isSelected) {
       final highlightPaint = Paint()
-        ..color = Colors.blue.withValues(alpha: 0.24)
+        ..color = _lassoAccentColor.withValues(alpha: 0.22)
         ..strokeCap = tool == DrawingTool.highlighter
             ? StrokeCap.square
             : StrokeCap.round
@@ -3430,7 +3452,7 @@ class _DocumentInkPainter extends CustomPainter {
 
   Color _toolColor(Color base, DrawingTool tool) {
     if (tool == DrawingTool.lasso) {
-      return const Color(0x882196F3); // Semi-transparent blue for lasso
+      return _lassoAccentColor.withValues(alpha: 0.38);
     }
     if (tool == DrawingTool.highlighter) {
       return base.withValues(alpha: 0.5);

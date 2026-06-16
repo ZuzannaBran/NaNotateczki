@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/input/soft_keyboard.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/state/editor_controller.dart';
@@ -257,13 +258,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Future<void> _promptNewFolder(LibraryController controller) async {
     final textController = TextEditingController();
+    final focusNode = FocusNode();
     final result = await showDialog<String>(
       context: context,
       builder: (context) {
+        requestSoftKeyboardForFocus(context, focusNode);
         return AlertDialog(
           title: const Text('New folder'),
           content: TextField(
             controller: textController,
+            focusNode: focusNode,
+            autofocus: true,
             decoration: const InputDecoration(hintText: 'Folder name'),
           ),
           actions: [
@@ -278,7 +283,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ],
         );
       },
-    );
+    ).whenComplete(focusNode.dispose);
 
     if (result == null) {
       return;
@@ -291,13 +296,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
     String folder,
   ) async {
     final textController = TextEditingController(text: folder);
+    final focusNode = FocusNode();
     final result = await showDialog<String>(
       context: context,
       builder: (context) {
+        requestSoftKeyboardForFocus(context, focusNode);
         return AlertDialog(
           title: const Text('Rename folder'),
           content: TextField(
             controller: textController,
+            focusNode: focusNode,
             autofocus: true,
             decoration: const InputDecoration(hintText: 'Folder name'),
           ),
@@ -313,7 +321,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ],
         );
       },
-    );
+    ).whenComplete(focusNode.dispose);
 
     if (result == null) {
       return;
@@ -326,6 +334,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     Notebook item,
   ) async {
     final textController = TextEditingController(text: item.title);
+    final focusNode = FocusNode();
     textController.selection = TextSelection(
       baseOffset: 0,
       extentOffset: textController.text.length,
@@ -333,10 +342,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) {
+        requestSoftKeyboardForFocus(context, focusNode);
         return AlertDialog(
           title: const Text('Rename item'),
           content: TextField(
             controller: textController,
+            focusNode: focusNode,
             autofocus: true,
             decoration: const InputDecoration(hintText: 'Item name'),
           ),
@@ -352,7 +363,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ],
         );
       },
-    );
+    ).whenComplete(focusNode.dispose);
 
     if (result == null) {
       return;
