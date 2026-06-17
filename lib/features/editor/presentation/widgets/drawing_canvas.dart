@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/input/stylus_button_state.dart';
@@ -42,10 +43,15 @@ _PartialEraseResult _eraseStrokeParts({
   required String Function() createId,
 }) {
   final gestureOffsets = gesture.map((point) => point.toOffset()).toList();
+  final gestureBounds = _offsetBounds(gestureOffsets, radius);
   final next = <InkStroke>[];
   var changed = false;
   for (final stroke in strokes) {
     if (!_canScratchEraseStroke(stroke) || stroke.points.length < 2) {
+      next.add(stroke);
+      continue;
+    }
+    if (!_strokeBounds(stroke, radius).overlaps(gestureBounds)) {
       next.add(stroke);
       continue;
     }
@@ -71,14 +77,50 @@ int _scratchEraseInkHitCount({
   required double radius,
 }) {
   final gestureOffsets = gesture.map((point) => point.toOffset()).toList();
+  final gestureBounds = _offsetBounds(gestureOffsets, radius);
   var hits = 0;
   for (final stroke in strokes) {
     if (!_canScratchEraseStroke(stroke) || stroke.points.length < 2) {
       continue;
     }
+    if (!_strokeBounds(stroke, radius).overlaps(gestureBounds)) {
+      continue;
+    }
     hits += _strokeGestureHitCount(stroke, gestureOffsets, radius);
   }
   return hits;
+}
+
+Rect _offsetBounds(List<Offset> points, double inflateBy) {
+  if (points.isEmpty) {
+    return Rect.zero.inflate(inflateBy);
+  }
+  var left = points.first.dx;
+  var top = points.first.dy;
+  var right = left;
+  var bottom = top;
+  for (final point in points.skip(1)) {
+    left = min(left, point.dx);
+    top = min(top, point.dy);
+    right = max(right, point.dx);
+    bottom = max(bottom, point.dy);
+  }
+  return Rect.fromLTRB(left, top, right, bottom).inflate(inflateBy + 1.0);
+}
+
+Rect _strokeBounds(InkStroke stroke, double inflateBy) {
+  var left = stroke.points.first.dx;
+  var top = stroke.points.first.dy;
+  var right = left;
+  var bottom = top;
+  for (final point in stroke.points.skip(1)) {
+    left = min(left, point.dx);
+    top = min(top, point.dy);
+    right = max(right, point.dx);
+    bottom = max(bottom, point.dy);
+  }
+  final strokeInflate = inflateBy + (stroke.width / 2) + 1.0;
+  return Rect.fromLTRB(left, top, right, bottom).inflate(strokeInflate);
 }
 
 List<InkStroke>? _splitStrokeAroundGesture(
@@ -564,6 +606,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   final List<InkPoint> _currentPoints = <InkPoint>[];
   final List<Offset> _eraserTrail = <Offset>[];
   final ValueNotifier<int> _inkRepaint = ValueNotifier<int>(0);
+  bool _inkRepaintScheduled = false;
   final Set<String> _eraseStrokeIds = <String>{};
   final Set<int> _activePointers = <int>{};
   int? _primaryPointer;
@@ -584,7 +627,6 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   Offset? _ellipseFixedCorner;
   Offset? _shapeStart;
   bool _suspendInk = false;
-
   @override
   void initState() {
     super.initState();
@@ -1191,10 +1233,14 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       return false;
     }
     final strokes = _resolvedPage(controller).inkStrokes;
+    final intersectionRadius = _scratchEraseIntersectionRadius(
+      controller.inkStrokeWidth,
+    );
+    final deleteRadius = _scratchEraseDeleteRadius(controller.inkStrokeWidth);
     final inkHits = _scratchEraseInkHitCount(
       strokes: strokes,
       gesture: _currentPoints,
-      radius: _scratchEraseIntersectionRadius(controller.inkStrokeWidth),
+      radius: intersectionRadius,
     );
     if (inkHits < _scratchEraseMinInkHits) {
       return false;
@@ -1202,7 +1248,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     final result = _eraseStrokeParts(
       strokes: strokes,
       gesture: _currentPoints,
-      radius: _scratchEraseDeleteRadius(controller.inkStrokeWidth),
+      radius: deleteRadius,
       createId: controller.createInkStrokeId,
     );
     if (!result.changed) {
@@ -1285,7 +1331,16 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   }
 
   void _notifyInkChanged() {
-    _inkRepaint.value++;
+    if (!_inkRepaintScheduled) {
+      _inkRepaintScheduled = true;
+      SchedulerBinding.instance.scheduleFrameCallback((_) {
+        _inkRepaintScheduled = false;
+        if (mounted) {
+          _inkRepaint.value++;
+        }
+      });
+      SchedulerBinding.instance.ensureVisualUpdate();
+    }
   }
 
   void _addEraserTrailPoint(Offset offset) {
@@ -1757,6 +1812,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   final List<InkPoint> _currentPoints = <InkPoint>[];
   final List<Offset> _eraserTrail = <Offset>[];
   final ValueNotifier<int> _inkRepaint = ValueNotifier<int>(0);
+  bool _inkRepaintScheduled = false;
   final Set<String> _eraseStrokeIds = <String>{};
   final Set<int> _activePointers = <int>{};
   int? _primaryPointer;
@@ -1779,7 +1835,6 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   Offset? _shapeStart;
   int? _activePageIndex;
   bool _suspendInk = false;
-
   @override
   void initState() {
     super.initState();
@@ -1885,6 +1940,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
                           eraserPosition: _eraserPosition,
                           eraserRadius: eraserRadius,
                           eraserTrail: _eraserTrail,
+                          clipRect: _activePageClipRect(),
                         ),
                         size: Size.infinite,
                       ),
@@ -2385,10 +2441,14 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     }
     final strokes = widget.pages[pageIndex].inkStrokes;
     final gesture = _toPageLocalPoints(_currentPoints, pageIndex);
+    final intersectionRadius = _scratchEraseIntersectionRadius(
+      controller.inkStrokeWidth,
+    );
+    final deleteRadius = _scratchEraseDeleteRadius(controller.inkStrokeWidth);
     final inkHits = _scratchEraseInkHitCount(
       strokes: strokes,
       gesture: gesture,
-      radius: _scratchEraseIntersectionRadius(controller.inkStrokeWidth),
+      radius: intersectionRadius,
     );
     if (inkHits < _scratchEraseMinInkHits) {
       return false;
@@ -2396,7 +2456,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     final result = _eraseStrokeParts(
       strokes: strokes,
       gesture: gesture,
-      radius: _scratchEraseDeleteRadius(controller.inkStrokeWidth),
+      radius: deleteRadius,
       createId: controller.createInkStrokeId,
     );
     if (!result.changed) {
@@ -2478,7 +2538,16 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   }
 
   void _notifyInkChanged() {
-    _inkRepaint.value++;
+    if (!_inkRepaintScheduled) {
+      _inkRepaintScheduled = true;
+      SchedulerBinding.instance.scheduleFrameCallback((_) {
+        _inkRepaintScheduled = false;
+        if (mounted) {
+          _inkRepaint.value++;
+        }
+      });
+      SchedulerBinding.instance.ensureVisualUpdate();
+    }
   }
 
   void _addEraserTrailPoint(Offset offset) {
@@ -2495,6 +2564,19 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
 
   Offset _toWorld(Offset localPosition) {
     return localPosition + widget.worldOrigin;
+  }
+
+  Rect? _activePageClipRect() {
+    final pageIndex = _activePageIndex;
+    if (pageIndex == null) {
+      return null;
+    }
+    return Rect.fromLTWH(
+      0,
+      pageIndex * (widget.pageSize.height + widget.pageGap),
+      widget.pageSize.width,
+      widget.pageSize.height,
+    );
   }
 
   int? _pageIndexAt(Offset worldOffset) {
@@ -3119,6 +3201,7 @@ class _InkOverlayPainter extends CustomPainter {
     this.eraserPosition,
     this.eraserRadius,
     this.eraserTrail = const <Offset>[],
+    this.clipRect,
   }) : super(repaint: repaint);
 
   final List<InkPoint> currentPoints;
@@ -3131,9 +3214,15 @@ class _InkOverlayPainter extends CustomPainter {
   final Offset? eraserPosition;
   final double? eraserRadius;
   final List<Offset> eraserTrail;
+  final Rect? clipRect;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final clip = clipRect;
+    if (clip != null) {
+      canvas.save();
+      canvas.clipRect(clip.shift(-worldOrigin));
+    }
     if (currentPoints.isNotEmpty) {
       _drawStroke(
         canvas,
@@ -3159,6 +3248,9 @@ class _InkOverlayPainter extends CustomPainter {
 
     if (currentTool == DrawingTool.eraserStroke && eraserTrail.isNotEmpty) {
       _drawEraserTrail(canvas, size, eraserTrail, eraserRadius ?? 12.0);
+    }
+    if (clip != null) {
+      canvas.restore();
     }
   }
 
@@ -3322,7 +3414,8 @@ class _InkOverlayPainter extends CustomPainter {
         oldDelegate.snapHintEnd != snapHintEnd ||
         oldDelegate.eraserPosition != eraserPosition ||
         oldDelegate.eraserRadius != eraserRadius ||
-        oldDelegate.eraserTrail != eraserTrail;
+        oldDelegate.eraserTrail != eraserTrail ||
+        oldDelegate.clipRect != clipRect;
   }
 }
 
@@ -3362,6 +3455,8 @@ class _DocumentInkPainter extends CustomPainter {
     canvas.saveLayer(_renderLayerBounds(start, end), Paint());
     for (var i = start; i < end; i++) {
       final origin = _pageOrigin(i);
+      canvas.save();
+      canvas.clipRect(_pageClipRect(origin));
       for (final stroke in pages[i].inkStrokes) {
         final isSelected =
             selectedPageIndex == i && selectedStrokeIds.contains(stroke.id);
@@ -3376,6 +3471,7 @@ class _DocumentInkPainter extends CustomPainter {
           delta: isSelected ? selectionDelta : Offset.zero,
         );
       }
+      canvas.restore();
     }
     canvas.restore();
   }
@@ -3396,6 +3492,15 @@ class _DocumentInkPainter extends CustomPainter {
   Offset _pageOrigin(int index) {
     final stride = pageSize.height + pageGap;
     return Offset(0, index * stride);
+  }
+
+  Rect _pageClipRect(Offset origin) {
+    return Rect.fromLTWH(
+      -worldOrigin.dx,
+      origin.dy - worldOrigin.dy,
+      pageSize.width,
+      pageSize.height,
+    );
   }
 
   void _drawStroke(

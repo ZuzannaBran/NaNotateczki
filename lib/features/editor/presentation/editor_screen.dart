@@ -52,6 +52,7 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _scrollPanSensitivity = 0.38;
   static const double _inkNavigationTouchSlop = 8.0;
   static const double _previewColumnRight = 118.0;
+  static const double _minUsableCanvasWidth = 640.0;
   static const double _edgeStopTolerance = 0.5;
   static const Duration _touchContextMenuDelay = Duration(seconds: 1);
 
@@ -1241,6 +1242,20 @@ class _EditorScreenState extends State<EditorScreen> {
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
+              if (constraints.maxWidth < _minUsableCanvasWidth) {
+                return const ColoredBox(
+                  color: AppColors.paper,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Widen the window to edit this notebook.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                );
+              }
               final maxPageWidth = math.max(
                 260.0,
                 constraints.maxWidth - (_leftMargin + _rightMargin),
