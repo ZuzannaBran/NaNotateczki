@@ -22,13 +22,19 @@ bool _invalidKeyDataFilter(ui.KeyData data) {
 }
 
 void main() {
-  runZonedGuarded(_runApp, (error, stackTrace) {
-    AppErrorLog.instance.record(error, stackTrace, source: 'Dart zone');
-  });
+  runZonedGuarded(
+    () async {
+      await _runApp();
+    },
+    (error, stackTrace) {
+      AppErrorLog.instance.record(error, stackTrace, source: 'Dart zone');
+    },
+  );
 }
 
-void _runApp() {
+Future<void> _runApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppErrorLog.instance.load();
   _installFlutterErrorLogger();
   StylusButtonState.initialize();
   _installInvalidKeyDataFilter();

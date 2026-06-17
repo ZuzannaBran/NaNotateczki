@@ -181,8 +181,7 @@ class TextEditToolbar extends StatelessWidget {
       tooltip: tooltip,
       color: isActive ? AppColors.inkBlack : null,
       onPressed: () {
-        final nextValue = isActive ? null : value;
-        final attribute = quill.Attribute.fromKeyValue('list', nextValue);
+        final attribute = _listAttribute(value, unset: isActive);
         if (attribute == null) {
           return;
         }
@@ -529,5 +528,18 @@ class TextEditToolbar extends StatelessWidget {
         editorController.setLastTextColor(color);
       }
     }
+  }
+
+  quill.Attribute? _listAttribute(String value, {required bool unset}) {
+    final attribute = switch (value) {
+      'bullet' => quill.Attribute.ul,
+      'ordered' => quill.Attribute.ol,
+      'unchecked' => quill.Attribute.unchecked,
+      _ => null,
+    };
+    if (attribute == null) {
+      return null;
+    }
+    return unset ? quill.Attribute.clone(attribute, null) : attribute;
   }
 }

@@ -50,11 +50,11 @@ Format pozycji: `LL: nazwa — krótki opis`. `LL` to numer linii startowej.
 
 ---
 
-### `lib/main.dart` (122 linie)
+### `lib/main.dart` (120 linii)
 Entry point.
-- 10: `_wrappedKeyDataHandler` — oryginalny handler Fluttera opakowany przez
+- 11: `_wrappedKeyDataHandler` — oryginalny handler Fluttera opakowany przez
   filtr niepoprawnych pakietów key data.
-- 11: `_wrappedPlatformErrorHandler` — poprzedni globalny handler błędów
+- 12: `_wrappedPlatformErrorHandler` — poprzedni globalny handler błędów
   platformy, zachowany dla błędów niezwiązanych z key data.
 - 15: `_wrappedFlutterErrorHandler` — poprzedni handler FlutterError, zachowany
   po dodaniu logowania błędów aplikacji.
@@ -62,24 +62,25 @@ Entry point.
   `physical/logical == 0`, żeby nie dochodziły do asercji Fluttera na Linuksie.
 - 24: `void main()` — uruchamia aplikację w `runZonedGuarded` i zapisuje
   nieobsłużone błędy Dart zone do `AppErrorLog`.
-- 30: `_runApp()` — `WidgetsFlutterBinding.ensureInitialized()`, instaluje
-  logowanie `FlutterError`, inicjalizuje kanał stanu przycisku rysika, instaluje
-  filtr key data, odnawia go po `syncKeyboardState()` i przez krótki watchdog
-  startowy, potem `runApp(NotesApp())`.
-- 48: `_installFlutterErrorLogger()` — opakowuje `FlutterError.onError`
+- 35: `_runApp()` — `WidgetsFlutterBinding.ensureInitialized()`, ładuje
+  utrwalony `AppErrorLog`, instaluje logowanie `FlutterError`, inicjalizuje
+  kanał stanu przycisku rysika, instaluje filtr key data, odnawia go po
+  `syncKeyboardState()` i przez krótki watchdog startowy, potem
+  `runApp(NotesApp())`.
+- 54: `_installFlutterErrorLogger()` — opakowuje `FlutterError.onError`
   i zachowuje poprzedni handler.
-- 57: `_flutterErrorLogger(details)` — zapisuje błędy frameworka do
+- 63: `_flutterErrorLogger(details)` — zapisuje błędy frameworka do
   `AppErrorLog`, potem przekazuje je poprzedniemu handlerowi.
-- 62: `_installInvalidKeyDataFilter()` — idempotentnie instaluje filtr i nie
+- 68: `_installInvalidKeyDataFilter()` — idempotentnie instaluje filtr i nie
   owija ponownie własnego handlera.
-- 72: `_installInvalidKeyDataErrorFilter()` — instaluje wąski fallback dla
+- 78: `_installInvalidKeyDataErrorFilter()` — instaluje wąski fallback dla
   asercji `HardwareKeyboard`, jeśli Flutter zdąży nadpisać handler.
-- 82: `_invalidKeyDataErrorFilter(...)` — wycisza tylko asercję niepoprawnych
+- 88: `_invalidKeyDataErrorFilter(...)` — wycisza tylko asercję niepoprawnych
   key data, resztę zapisuje do `AppErrorLog` i przekazuje poprzedniemu handlerowi
   błędów.
-- 91: `_isInvalidKeyDataAssertion(...)` — rozpoznaje dokładną asercję
+- 97: `_isInvalidKeyDataAssertion(...)` — rozpoznaje dokładną asercję
   `data.physical != 0 && data.logical != 0` ze stosu `KeyEventManager`.
-- 99: `_startKeyDataFilterWatchdog()` — przez ok. godzinę po starcie odnawia
+- 105: `_startKeyDataFilterWatchdog()` — przez ok. godzinę po starcie odnawia
   filtr co 500 ms, bo Flutter potrafi nadpisać `onKeyData` po inicjalizacji
   tekstu na Linuksie.
 
@@ -142,17 +143,23 @@ Globalne preferencje aplikacji niezależne od konkretnego edytora.
   `DeviceInputMode.tablet`, focusuje pole i wysyła do Fluttera `TextInput.show`
   jako prośbę o systemową klawiaturę ekranową.
 
-### `lib/core/error/app_error_log.dart` (85 linii)
-Lokalny bufor ostatnich błędów aplikacji do kopiowania z ustawień.
-- 3: `class AppErrorLog extends ChangeNotifier` — singleton trzymający do 80
-  ostatnich błędów, powiadamia UI po zmianach.
-- 18: `record(error, stackTrace, {source})` — dodaje wpis z datą, źródłem,
-  treścią błędu i opcjonalnym stack trace.
-- 34: `recordFlutterError(details)` — adapter dla `FlutterErrorDetails`.
-- 42: `clear()` — czyści bufor.
-- 50: `toClipboardText()` — formatuje zawartość bufora do skopiowania.
-- 58: `class AppErrorLogEntry` — immutable wpis błędu.
-- 71: `format()` — tekstowy format jednego wpisu.
+### `lib/core/error/app_error_log.dart` (166 linii)
+Lokalny bufor ostatnich błędów aplikacji do kopiowania z ustawień, utrwalany w
+`app_error_log.json`.
+- 8: `class AppErrorLog extends ChangeNotifier` — singleton trzymający do 80
+  błędów z ostatnich 3 dni, powiadamia UI po zmianach.
+- 25: `load()` — wczytuje zapisany JSON błędów, odrzuca niepoprawne wpisy i
+  przycina historię.
+- 46: `record(error, stackTrace, {source})` — dodaje wpis z datą, źródłem,
+  treścią błędu i opcjonalnym stack trace, potem zapisuje plik.
+- 61: `recordFlutterError(details)` — adapter dla `FlutterErrorDetails`.
+- 69: `clear()` — czyści bufor i zapisany plik.
+- 78: `toClipboardText()` — formatuje zawartość bufora do skopiowania.
+- 85: `_prune()` — zostawia wpisy z ostatnich 3 dni i maksymalnie 80 rekordów.
+- 94: `_save()` — zapisuje aktualny bufor do `app_error_log.json`.
+- 111: `class AppErrorLogEntry` — immutable wpis błędu z JSON
+  `fromJson/toJson`.
+- 156: `format()` — tekstowy format jednego wpisu.
 
 ### `lib/core/widgets/empty_state.dart` (30 linii)
 - 3: `class EmptyState` — wycentrowane `title + message`, max width 360.
@@ -1013,12 +1020,12 @@ Te same metody co wyżej, ale operują w przestrzeni dokumentu (offset per page)
   `firstPageIndex/lastPageIndex`, zawęża `saveLayer` do renderowanego zakresu,
   a zaznaczenie po `selectedPageIndex`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (1985 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (1995 linii)
 Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
-- 26: `class PageOverlay extends StatelessWidget` (board, single-page);
+- 32: `class PageOverlay extends StatelessWidget` (board, single-page);
   aktywna warstwa przepuszcza gesty lasso mimo `tool.isInk`; przekazuje
   `lassoDragDelta` tylko do elementów zaznaczonych lasso.
-- 139: `class DocumentPageOverlay extends StatelessWidget` (notebook, N stron).
+- 161: `class DocumentPageOverlay extends StatelessWidget` (notebook, N stron).
   Params `firstPageIndex/lastPageIndex` oraz
   `renderBackground/renderInactive/renderActive` (dwie warstwy w EditorScreen:
   bg+inactive PRZED canvasem, active PONAD).
@@ -1027,13 +1034,13 @@ Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
   tekstu w stylu Canva: punkt w lewym górnym rogu skaluje okno przez
   rozmiar czcionki i deltę Quill, prawy pusty prostokątny uchwyt zmienia
   szerokość z zawijaniem tekstu, przycisk przesuwania, dwuklik w dozwolonych
-  trybach przełącza blok w edycję; helpery do delty Quill i skróty `Ctrl/Cmd+B/I/U`,
-  `Ctrl/Cmd+Shift+7/8/C`;
+  trybach przełącza blok w edycję; helpery do delty Quill, poprawne mapowanie
+  atrybutów list Quilla i skróty `Ctrl/Cmd+B/I/U`, `Ctrl/Cmd+Shift+7/8/C`;
   zaznaczenie lasso daje podświetlenie akcentem z palety aplikacji, w trybie
   tablet prosi system o klawiaturę ekranową i przesuwa pozycję przez lokalny
   `ValueListenableBuilder`, bez rebuildowania Quilla.
-- 1026: `class _ImageBlockWidget extends StatefulWidget`.
-- 1047: `_ImageBlockWidgetState` — Listener (drag+pinch dwoma palcami=resize),
+- 1036: `class _ImageBlockWidget extends StatefulWidget`.
+- 1057: `_ImageBlockWidgetState` — Listener (drag+pinch dwoma palcami=resize),
   `ResizableFrame` z 8 uchwytami, prawy klik → menu kopiowania,
   `_imageChild` (`Image.memory(bytes)` lub `Image.file(path)` z
   `Transform.rotate` + crop `Rect.fromLTRB(cropLeft,cropTop,cropRight,cropBottom)`),
@@ -1041,42 +1048,43 @@ Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
   zaznaczenie lasso daje border/shadow i przesuwa tylko `Positioned` przez
   `ValueListenableBuilder`,
   `_cornerDelta`/`_clampSize`/`_cornerPosition`/`_cropOffsetX|Y`.
-- 1332: `_editOcr(...)` — dialog edycji tekstu OCR; w trybie tablet prosi
+- 1663: `_editOcr(...)` — dialog edycji tekstu OCR; w trybie tablet prosi
   system o klawiaturę ekranową.
-- 1453: `_LassoSelectionWidget` — niewidzialny hit target do dragowania całego
+- 1784: `_LassoSelectionWidget` — niewidzialny hit target do dragowania całego
   zaznaczenia + pasek akcji copy/delete w powiększonym, klikalnym obszarze;
   nie rysuje prostokąta, bounds są dokumentowe, widget odejmuje `worldOrigin`
   strony i śledzi `dragDeltaListenable`.
-- 1607: `_LassoActionButton` — wspólny 48×48 przycisk akcji lassa.
-- 1637: `enum _CropAnchorAxis { left, right, top, bottom }`.
-- 1639: `class _CropAnchor`.
-- 1646: `enum _ImageContextAction { copy }`.
-- 1648: top-level `Offset _globalDeltaToLocalDelta(...)`.
+- 1938: `_LassoActionButton` — wspólny 48×48 przycisk akcji lassa.
+- 1968: `enum _CropAnchorAxis { left, right, top, bottom }`.
+- 1970: `class _CropAnchor`.
+- 1977: `enum _ImageContextAction { copy }`.
+- 1979: top-level `Offset _globalDeltaToLocalDelta(...)`.
 
-### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (884 linii)
+### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (905 linii)
 Główny pasek narzędzi nad canvasem (narzędzia, kolory, stroke width, undo/redo,
 export).
 - 11: `class EditorToolbar extends StatelessWidget`.
-- 23: `build` — lewy przewijany segment z narzędziami, lokalnym przyciskiem tła
+- 24: `build` — lewy przewijany segment z narzędziami, lokalnym przyciskiem tła
   i stały prawy przycisk
   eksportu.
 - 119: `_exportButton()` — popup PDF/PNG wyrównany do prawej strony toolbara.
 - 145: `_indexTabButton(context)` — ikonka zakładki; wybór koloru i wysokości w dialogu, dodaje kolejną zakładkę.
 - 176: `_backgroundButton(context)` — lokalne ustawienia tła bieżącego notebooka/boarda.
 - 191: `_showBackgroundDialog(context)` — dialog `Plain/Grid/Lines`, slider zagęszczenia i podgląd.
-- 270: `_actionButton({...})` — generyczny IconButton.
-- 282: `_toolButton({...})` — IconButton z aktywnym tłem gdy `tool == ...`.
-- 300: `_eraserSelector()` — popup z `eraserBrush`/`eraserStroke`/`eraserArea`.
-- 363: `_shapeSelector()` — popup z liniami/strzałkami/prostokątami/kołami.
-- 398: `_selectorMenuButton({...})` — węższy przycisk strzałki dla selektorów.
-- 461: `_shapeLabel(tool)`.
-- 484: `_colorDot(...)` — kafelek koloru (quickColors + recentColors + picker).
-- 520: `_pickColor(...)` — dialog wyboru koloru.
-- 632: `_pickIndexTabPosition(...)` — dialog wyboru wysokości zakładki.
-- 720: `_channelSlider({...})` — slider R/G/B w pickerze niestandardowym.
-- 769: `_toByte(component)`.
-- 774: `class _EraserIcon` — klasyczna ikonka gumki z opcjonalnymi błyskotkami/kółkiem obszaru.
-- 813: `class _EraserIconPainter` — rysuje bazową sylwetkę gumki i znacznik gumki zakresowej.
+- 268: `_actionButton({...})` — generyczny IconButton.
+- 286: `_toolButton({...})` — IconButton z aktywnym tłem gdy `tool == ...`.
+- 305: `_toolHighlightStyle(selected)` — wspólny kwadratowy hover i aktywne tło dla przycisków toolbara.
+- 322: `_eraserSelector()` — popup z `eraserBrush`/`eraserStroke`/`eraserArea`.
+- 386: `_shapeSelector()` — popup z liniami/strzałkami/prostokątami/kołami.
+- 422: `_selectorMenuButton({...})` — węższy przycisk strzałki dla selektorów.
+- 485: `_shapeLabel(tool)`.
+- 508: `_colorDot(...)` — kafelek koloru (quickColors + recentColors + picker).
+- 544: `_pickColor(...)` — dialog wyboru koloru.
+- 656: `_pickIndexTabPosition(...)` — dialog wyboru wysokości zakładki.
+- 744: `_channelSlider({...})` — slider R/G/B w pickerze niestandardowym.
+- 793: `_toByte(component)`.
+- 798: `class _EraserIcon` — klasyczna ikonka gumki z opcjonalnymi błyskotkami/kółkiem obszaru.
+- 837: `class _EraserIconPainter` — rysuje bazową sylwetkę gumki i znacznik gumki zakresowej.
 
 ### `lib/features/editor/presentation/widgets/page_background_paint.dart` (123 linie)
 Render tła strony/canvasu i preview w ustawieniach.
@@ -1088,7 +1096,7 @@ Render tła strony/canvasu i preview w ustawieniach.
 - 64: `class _PageBackgroundPainter extends CustomPainter` — rysuje papier,
   poziome linie oraz pionowe linie dla kratki, wyrównane do `origin`.
 
-### `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (533 linie)
+### `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (545 linii)
 Pasek formatowania tekstu (pokazywany gdy aktywny TextBlock).
 - 7: `class TextEditToolbar extends StatelessWidget` — bierze `quill.QuillController`
   + `EditorController` + `activeTextBlockId`.
@@ -1106,6 +1114,8 @@ Pasek formatowania tekstu (pokazywany gdy aktywny TextBlock).
 - 479: `_clearInlineFormatting()` — usuwa inline style z zaznaczenia lub bloku.
 - 514: `_storeLastTextStyle(...)` — zapamiętuje preferencje (Quill formatuje
   natychmiast, controller też trzyma kopię w `lastText*`).
+- 533: `_listAttribute(value, unset)` — mapuje bullet/ordered/checklist na
+  natywne atrybuty Quilla i usuwa listę przez `Attribute.clone(..., null)`.
 
 ---
 

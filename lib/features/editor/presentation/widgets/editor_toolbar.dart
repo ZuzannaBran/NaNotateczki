@@ -183,7 +183,7 @@ class EditorToolbar extends StatelessWidget {
     return _actionButton(
       icon: icon,
       label: 'Background',
-      isActive: settings.style != PageBackgroundStyle.blank,
+      isActive: false,
       onPressed: () => _showBackgroundDialog(context),
     );
   }
@@ -277,6 +277,7 @@ class EditorToolbar extends StatelessWidget {
         icon: Icon(icon),
         tooltip: label,
         color: isActive ? AppColors.inkBlack : null,
+        style: _toolHighlightStyle(isActive),
         onPressed: onPressed,
       ),
     );
@@ -295,7 +296,25 @@ class EditorToolbar extends StatelessWidget {
         icon: Icon(icon),
         tooltip: label,
         color: selected ? AppColors.inkBlack : null,
+        style: _toolHighlightStyle(selected),
         onPressed: onPressed ?? () => controller.setTool(tool),
+      ),
+    );
+  }
+
+  ButtonStyle _toolHighlightStyle(bool selected) {
+    return ButtonStyle(
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (selected) {
+          return AppColors.inkBlack.withValues(alpha: 0.10);
+        }
+        return null;
+      }),
+      overlayColor: WidgetStateProperty.all(
+        AppColors.inkBlack.withValues(alpha: 0.08),
+      ),
+      shape: WidgetStateProperty.all(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
       ),
     );
   }
@@ -317,6 +336,7 @@ class EditorToolbar extends StatelessWidget {
             ),
             tooltip: _eraserLabel(activeTool),
             color: isSelected ? AppColors.inkBlack : null,
+            style: _toolHighlightStyle(isSelected),
             onPressed: () => controller.setTool(activeTool),
           ),
           _selectorMenuButton(
@@ -377,6 +397,7 @@ class EditorToolbar extends StatelessWidget {
             icon: Icon(_shapeIcon(activeTool)),
             tooltip: _shapeLabel(activeTool),
             color: isSelected ? AppColors.inkBlack : null,
+            style: _toolHighlightStyle(isSelected),
             onPressed: () => controller.setTool(activeTool),
           ),
           _selectorMenuButton(
@@ -492,7 +513,8 @@ class EditorToolbar extends StatelessWidget {
     required ValueChanged<Color> onEdit,
   }) {
     return GestureDetector(
-      onTap: () async {
+      onTap: onSelect,
+      onDoubleTap: () async {
         final updated = await _pickColor(
           context,
           color,
@@ -503,7 +525,6 @@ class EditorToolbar extends StatelessWidget {
         }
         onEdit(updated);
       },
-      onLongPress: onSelect,
       child: Container(
         margin: const EdgeInsets.only(right: 6),
         width: 24,

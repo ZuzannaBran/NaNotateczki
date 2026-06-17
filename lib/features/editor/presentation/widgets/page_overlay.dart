@@ -458,7 +458,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                       ),
                       Positioned(
                         top: 0,
-                        right: -_edgeHandleHitWidth / 2,
+                        right: 0,
                         bottom: _actionsTop + _actionButtonSize,
                         child: _widthHandle(controller),
                       ),
@@ -922,14 +922,24 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         ?.toString();
     final isActive =
         current == value || (value == 'unchecked' && current == 'checked');
-    final attribute = quill.Attribute.fromKeyValue(
-      'list',
-      isActive ? null : value,
-    );
+    final attribute = _listAttribute(value, unset: isActive);
     if (attribute == null) {
       return;
     }
     _quillController.formatSelection(attribute);
+  }
+
+  quill.Attribute? _listAttribute(String value, {required bool unset}) {
+    final attribute = switch (value) {
+      'bullet' => quill.Attribute.ul,
+      'ordered' => quill.Attribute.ol,
+      'unchecked' => quill.Attribute.unchecked,
+      _ => null,
+    };
+    if (attribute == null) {
+      return null;
+    }
+    return unset ? quill.Attribute.clone(attribute, null) : attribute;
   }
 
   void _initQuill() {
