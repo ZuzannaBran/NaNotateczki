@@ -16,7 +16,7 @@ analogię, do Codeksa/innych agentów (zob. [.codex/](../.codex/) i
 Mapa zawiera dla każdego pliku w `lib/`:
 - jednozdaniowy opis odpowiedzialności pliku,
 - listę klas/funkcji z numerami linii,
-- ostrzeżenia o nieoczywistych zachowaniach (Isar schema, OCR, undo/redo,
+- ostrzeżenia o nieoczywistych zachowaniach (Drift schema, OCR, undo/redo,
   symetria `_toolFromIndex/_toolToIndex` itd.).
 
 Procedura przy każdym zadaniu:
@@ -54,11 +54,10 @@ Jeżeli tworzysz nowy plik w `lib/`, dopisz dla niego sekcję w PROJECT_MAP.md
 ## 3. Pre-flight checklist (przed napisaniem `Edit`/`Write`)
 
 - [ ] Otworzyłem PROJECT_MAP.md i wiem, w którym pliku/zakresie pracuję.
-- [ ] Wiem czy zmiana wymaga regen Isara
-      (dotyka `lib/data/isar/entities/notebook_entity.dart`?).
-      Jeżeli tak → po zmianie uruchom
-      `dart run build_runner build --delete-conflicting-outputs` i podbij
-      `kManualSchemaRevision` w `lib/data/isar/isar_service.dart:9`.
+- [ ] Wiem czy zmiana wymaga regen Drifta
+      (dotyka `lib/data/drift/notes_database.dart`?).
+      Jeżeli tak → po zmianie uruchom `dart run build_runner build` i
+      świadomie podbij `schemaVersion`, jeśli trzeba zachować istniejące dane.
 - [ ] Wiem czy zmiana powinna być undoowalna (mutuje stan strony w edytorze?).
       Jeżeli tak → dodaj `EditorAction` i wywołuj `_applyAction`, NIE mutuj
       stron bezpośrednio.
@@ -91,7 +90,7 @@ flutter run                                              # default device
 flutter test                                             # smoke test
 dart analyze                                             # lint
 dart format lib test                                     # formatowanie
-dart run build_runner build --delete-conflicting-outputs # po edycji encji Isara
+dart run build_runner build                              # po edycji schematu Drifta
 ```
 
 Linux dependencies (instaluj user → nie próbuj `apt` z agenta):
@@ -100,8 +99,9 @@ Linux dependencies (instaluj user → nie próbuj `apt` z agenta):
 
 ## 6. Czego NIE robić
 
-- **Nie czytaj automatycznie** `*_entity.g.dart` (5574 linie kodu generowanego
-  przez `isar_generator`). Jeśli musisz coś tam zweryfikować → użyj `grep`.
+- **Nie czytaj automatycznie** `notes_database.g.dart` (ponad 6000 linii kodu
+  generowanego przez `drift_dev`). Jeśli musisz coś tam zweryfikować → użyj
+  `grep`.
 - **Nie konsoliduj** `DrawingCanvas` z `DocumentDrawingCanvas` (ani
   `PageOverlay` z `DocumentPageOverlay`) bez wyraźnej zgody użytkownika —
   to świadome dublowanie ze względu na różne układy współrzędnych
@@ -111,7 +111,7 @@ Linux dependencies (instaluj user → nie próbuj `apt` z agenta):
 - **Nie dodawaj** komentarzy w stylu „// added for issue #XYZ" ani opisów
   „what" zamiast „why". Reguła główna: domyślnie zero komentarzy.
 - **Nie commituj** bez wyraźnej prośby użytkownika.
-- **Nie modyfikuj** `lib/data/isar/entities/notebook_entity.g.dart` ręcznie.
+- **Nie modyfikuj** `lib/data/drift/notes_database.g.dart` ręcznie.
 
 ## 7. Jak komunikować się z użytkownikiem
 

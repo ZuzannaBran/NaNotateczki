@@ -13,7 +13,8 @@ czytać cały kod. **Zawsze najpierw zajrzyj tutaj, potem czytaj konkretny zakre
 ## 1. Stack i konwencje
 
 - Flutter 3.x + Dart `^3.11.1` (Material 3).
-- Lokalna baza: **Isar 3** (`isar`, `isar_flutter_libs`, kodogen w `*_entity.g.dart`).
+- Lokalna baza: **Drift + SQLite** (`drift`, `sqlite3_flutter_libs`,
+  `drift_dev`; kodogen w `notes_database.g.dart`).
 - State management: **Provider + ChangeNotifier** (brak Bloc/Riverpod).
 - Rich text: **flutter_quill** w blokach tekstowych.
 - Inne kluczowe paczki: `pdfx`, `image_picker`, `file_picker`,
@@ -32,15 +33,16 @@ NaNotateczki/                  ← główny pakiet Flutter (name: program)
 │   ├── main.dart              ← runApp(NotesApp())
 │   ├── app/                   ← root widget + DI (Provider)
 │   ├── core/                  ← motyw, metryki, platform channels, widgety
-│   ├── data/                  ← Isar, backup, sync
+│   ├── data/                  ← Drift/SQLite, backup, sync
 │   └── features/
 │       ├── library/           ← lista notebooków, foldery, search, sync
 │       ├── notebook/          ← modele domeny + repository + ekran "pusty"
 │       ├── editor/            ← edytor stronicowy (notebook)
 │       └── board/             ← edytor canvas (board, jedna „strona")
 ├── test/widget_test.dart      ← smoke test: NotesApp pumpuje MaterialApp
+├── web/                       ← Flutter web + assety Drift WASM
 ├── linux/runner/              ← GTK runner + natywny kanał przycisku rysika
-├── pubspec.yaml               ← zależności (Isar, Quill, mlkit, pdfx…)
+├── pubspec.yaml               ← zależności (Drift, Quill, mlkit, pdfx…)
 └── AI_INSTRUCTIONS.md         ← skrót Effective Dart Style
 ```
 
@@ -50,7 +52,7 @@ Format pozycji: `LL: nazwa — krótki opis`. `LL` to numer linii startowej.
 
 ---
 
-### `lib/main.dart` (120 linii)
+### `lib/main.dart` (122 linie)
 Entry point.
 - 11: `_wrappedKeyDataHandler` — oryginalny handler Fluttera opakowany przez
   filtr niepoprawnych pakietów key data.
@@ -62,11 +64,11 @@ Entry point.
   `physical/logical == 0`, żeby nie dochodziły do asercji Fluttera na Linuksie.
 - 24: `void main()` — uruchamia aplikację w `runZonedGuarded` i zapisuje
   nieobsłużone błędy Dart zone do `AppErrorLog`.
-- 35: `_runApp()` — `WidgetsFlutterBinding.ensureInitialized()`, ładuje
-  utrwalony `AppErrorLog`, instaluje logowanie `FlutterError`, inicjalizuje
-  kanał stanu przycisku rysika, instaluje filtr key data, odnawia go po
-  `syncKeyboardState()` i przez krótki watchdog startowy, potem
-  `runApp(NotesApp())`.
+- 36: `_runApp()` — `WidgetsFlutterBinding.ensureInitialized()`, ładuje
+  utrwalony `AppErrorLog` i `OptimizationLog`, instaluje logowanie
+  `FlutterError`, inicjalizuje kanał stanu przycisku rysika, instaluje filtr
+  key data, odnawia go po `syncKeyboardState()` i przez krótki watchdog
+  startowy, potem `runApp(NotesApp())`.
 - 54: `_installFlutterErrorLogger()` — opakowuje `FlutterError.onError`
   i zachowuje poprzedni handler.
 - 63: `_flutterErrorLogger(details)` — zapisuje błędy frameworka do
@@ -87,26 +89,29 @@ Entry point.
 ### `lib/app/notes_app.dart` (12 linii)
 - 5: `class NotesApp extends StatelessWidget` — owija aplikację w `AppScope`.
 
-### `lib/app/app_scope.dart` (228 linii) — DI + bootstrap
+### `lib/app/app_scope.dart` (318 linii) — DI + bootstrap
 - 16: `class AppScope` — root scope aplikacji, tworzy `_AppScopeState`.
-- 23: `_AppScopeState` — trzyma pojedynczy `_openFuture`, repozytorium,
+- 26: `_AppScopeState` — trzyma pojedynczy `_openFuture`, repozytorium,
   backup service, sync service, scheduler backupu i flagę jednorazowego
-  zapisania błędu startu.
-- 42–58: jeśli bootstrap zwróci błąd, zapisuje go do `AppErrorLog` i pokazuje
-  `_StartupErrorScreen` z kopiowaniem błędów.
-- 61–65: spinner podczas otwierania Isara.
-- 69–85: tworzy/cache'uje `NotebookRepository`, `LocalBackupService`,
+  zapisania błędu startu; w `initState()` uruchamia też `FrameTimingTracker`.
+- 51–65: jeśli bootstrap zwróci błąd, zapisuje go do `AppErrorLog` i przekazuje
+  oryginalny wyjątek do `_StartupErrorScreen`.
+- 68–71: spinner podczas otwierania SQLite/Drift.
+- 77–91: tworzy/cache'uje `NotebookRepository`, `LocalBackupService`,
   `CloudSyncService` i `_BackupScheduler`; `repository.onChanged` tylko
   planuje backup, nie robi snapshotu natychmiast.
-- 85–113: `MultiProvider` z `AppPreferencesController`,
+- 93–117: `MultiProvider` z `AppPreferencesController`,
   `NotebookRepository`, `LocalBackupService`, `LibraryController`
-  (`wasReset`/`freshFile`/`resetReason` z Isara) →
+  (`wasReset`/`freshFile`/`resetReason` z `NotesDatabase.open`) →
   `MaterialApp(home: LibraryScreen)`, bez debug bannera.
-- 115: `_StartupErrorScreen` — awaryjny ekran startu z przyciskiem
-  `Copy errors`, dostępny nawet gdy ustawienia aplikacji nie zdążą się otworzyć.
-- 166: `_BackupScheduler` — osobny idle debounce backupu (`8s`), blokada przed
-  nakładaniem snapshotów oraz flush przy lifecycle
-  `inactive/paused/detached`.
+- 121: `_StartupErrorScreen` — pokazuje etap awarii otwierania bazy, liczbę
+  prób, przyczynę systemową i informację o zachowaniu pliku; udostępnia też
+  `Copy errors`, nawet gdy ustawienia aplikacji nie zdążą się otworzyć.
+- 197: `_BackupScheduler` — osobny idle debounce backupu (`8s`), blokada przed
+  nakładaniem snapshotów oraz flush przy lifecycle `inactive/paused/detached`;
+  loguje `[backup]` z czasem fetch/snapshot/total, szczegółowym raportem
+  `LocalBackupService.snapshot` oraz zagregowanym `build/raster/total`
+  z `FrameTimingTracker` dla okresu backupu.
 
 ### `lib/core/theme/app_colors.dart` (18 linii)
 - 3: `class AppColors` — stałe: `paper`, `toolbar`, `inkBlack`, `shadow`,
@@ -161,18 +166,56 @@ Lokalny bufor ostatnich błędów aplikacji do kopiowania z ustawień, utrwalany
   `fromJson/toJson`.
 - 156: `format()` — tekstowy format jednego wpisu.
 
+### `lib/core/diagnostics/optimization_log.dart` (340 linii)
+Lokalny bufor przefiltrowanych zdarzeń wydajnościowych do kopiowania z ustawień,
+utrwalany w `optimization_log.json`.
+- 9: `class OptimizationLog extends ChangeNotifier` — singleton trzymający do
+  80 podejrzanych wpisów z ostatnich 3 dni, sortowanych po score i czasie.
+- 23: `load()` — wczytuje zapisany JSON i przycina historię.
+- 42: `recordInkStroke(...)` — filtruje logi stroke'ów z canvasu; zapisuje
+  tylko wolne/podejrzane przypadki (`slow move`, `slow frame`, dużo move przy
+  małej liczbie punktów, itp.).
+- 93: `recordBackup(...)` — filtruje kosztowne backupy i błędy/skipy backupu.
+- 145: `toClipboardText()` — formatuje posortowaną listę podejrzanych wpisów.
+- 157: `_inkScore(...)` / 190: `_backupScore(...)` — heurystyki filtra i score.
+- 228: `_record(entry)` / 235: `_prune()` / 251: `_save()`.
+- 267: `class OptimizationLogEntry` — wpis `category/label/score/reasons/details`
+  z JSON `fromJson/toJson`.
+- 326: `format()` — tekstowy format jednego wpisu.
+
+### `lib/core/diagnostics/frame_timing_tracker.dart` (132 linie)
+Globalny agregat `FrameTiming` do korelacji logów `[ink]` i `[backup]`
+z prawdziwym kosztem build/raster.
+- 3: `class FrameTimingTracker` — singleton instalujący
+  `SchedulerBinding.addTimingsCallback`, trzymający bufor ostatnich klatek
+  i wystawiający `captureCursor()/summarySince(cursor)`.
+- 89: `class FrameTimingSummary` — gotowy do logowania agregat
+  `frames/build/raster/total` z avg/max i licznikami klatek >16.7 ms / >33 ms.
+
+### `lib/core/diagnostics/board_scene_perf_tracker.dart` (153 linie)
+Debug-only agregat build/paint warstw boarda, żeby korelować `[ink] board`
+z kosztami `BoardScreen`.
+- 3: `class BoardScenePerfTracker` — singleton z `captureCursor()`,
+  `recordBuild()` i `recordPaint(layer, us)`, trzymający ring-buffer
+  ostatnich próbek sceny boarda.
+- 80: `class BoardScenePerfSummary` — agregat `sceneBuild`, `scenePaint`,
+  `background`, `inactiveOverlay`, `canvasHost`, `activeOverlay` do jednej
+  linii logu.
+
 ### `lib/core/widgets/empty_state.dart` (30 linii)
 - 3: `class EmptyState` — wycentrowane `title + message`, max width 360.
 
-### `lib/core/widgets/resizable_frame.dart` (179 linii)
+### `lib/core/widgets/resizable_frame.dart` (200 linii)
 - 5: `enum ResizeDirection` (8 kierunków: topLeft…bottomRight).
 - 16: `class ResizableFrame extends StatefulWidget` — owija dziecko,
   pokazuje 8 uchwytów gdy `isSelected`.
 - 40: `_ResizableFrameState` — z `_activeHandle` do podświetlania.
 - 45: `build` — gdy nie wybrany, zwraca samo dziecko; inaczej `Stack` z 8 `_buildHandle`.
-- 105: `_buildHandle({alignment, direction, cursor})` — `MouseRegion + GestureDetector` (onLongPress z opóźnieniem),
+- 106: `_buildHandle({alignment, direction, cursor})` — `MouseRegion + GestureDetector` (onLongPress z opóźnieniem),
   liczy delta w lokalnej przestrzeni, animuje skalę uchwytu.
-- 172: `_globalToFrameLocal` — `RenderBox.globalToLocal`.
+- 162: `_endResize` — kończy resize idempotentnie; cancel odkłada na kolejną
+  klatkę, żeby nie wołać `setState` podczas zablokowanej finalizacji drzewa.
+- 193: `_globalToFrameLocal` — `RenderBox.globalToLocal`.
 
 ### `linux/runner/my_application.cc` (299 linii)
 GTK runner dla desktopowego Linuksa.
@@ -218,56 +261,87 @@ iOS scene delegate.
 
 ---
 
-### `lib/data/isar/entities/notebook_entity.dart` (84 linii)
-Encje Isara (każda zmiana wymaga regeneracji `*.g.dart` i podbicia
-`kManualSchemaRevision` w `isar_service.dart`).
-- 5: `@collection NotebookEntity` — `id, uid, title, kindIndex, folder,
-  createdAt, updatedAt, pages`.
-- 18: `@embedded NotePageEntity` — `uid, index, title, isBookmarked,
-  legacy indexTabColorValue/indexTabPosition, indexTabs, textBlocks,
-  imageBlocks, inkStrokes`.
-- 32: `@embedded IndexTabEntity` — `uid, colorValue, position`.
-- 39: `@embedded TextBlockEntity` — `text, deltaJson, fontSize, colorValue,
-  width, rotation, dx, dy`.
-- 52: `@embedded ImageBlockEntity` — `path, ocrText, bytes (List<int>?),
-  imageExt, imageMime, width, height, rotation, dx, dy, crop{Left,Top,Right,Bottom}`.
-- 71: `@embedded InkStrokeEntity` — `colorValue, width, toolIndex, points`.
-- 80: `@embedded InkPointEntity` — `dx, dy, pressure`.
+### `lib/data/drift/notes_database.dart` (236 linii)
+Schemat Drift/SQLite i otwieranie lokalnej bazy `notes.sqlite`.
+- 12: `class NotebookRows extends Table` — notebook/board: `uid`, tytuł,
+  rodzaj, folder, daty.
+- 24: `class PageRows extends Table` — strony z `notebookUid`, kolejnością,
+  tytułem, bookmarkiem i legacy polami pojedynczej zakładki.
+- 37: `class IndexTabRows extends Table` — wiele zakładek strony.
+- 47: `class TextBlockRows extends Table` — bloki tekstu; kolumna DB `text`
+  jest w kodzie nazwana `plainText`, żeby nie kolidować z helperem Drifta.
+- 64: `class ImageBlockRows extends Table` — bloki obrazów, crop/rotation,
+  opcjonalne legacy bytes tylko gdy brak trwałego `path`.
+- 87: `class InkStrokeRows extends Table` — stroke; punkty trzymane jako
+  `pointsJson` per stroke, nie jako osobne rekordy per punkt.
+- 100: `class DatabaseOpenResult` — `database`, `wasReset`, `freshFile`,
+  `resetReason`.
+- 111: `DatabaseOpenStage` / 113: `DatabaseOpenException` — rozróżnia awarię
+  tworzenia połączenia od walidacji/migracji i zachowuje pierwotną przyczynę.
+- 147: `class NotesDatabase extends _$NotesDatabase`.
+- 154: `open()` — otwiera `notes.sqlite` przez conditional connection; przy
+  błędzie wykonuje do 3 prób, loguje etap każdej próby, a po ich wyczerpaniu
+  rzuca `DatabaseOpenException` bez usuwania pliku bazy.
+- 227: `schemaVersion => 1`.
+- 230: `migration` — `createAll()` i `PRAGMA foreign_keys = ON`.
 
-### `lib/data/isar/entities/notebook_entity.g.dart` (6061 linii)
-Wygenerowane przez `isar_generator` — **NIE edytuj ręcznie**. Po zmianach w
-`notebook_entity.dart` uruchom `dart run build_runner build --delete-conflicting-outputs`.
+### `lib/data/drift/notes_database_connection.dart` (2 linie)
+Conditional export: IO implementation domyślnie, web implementation przy
+`dart.library.js_interop`.
 
-### `lib/data/isar/isar_service.dart` (142 linii)
-- 9: `const int kManualSchemaRevision = 5` — **podbij po zmianie encji**.
-  Aktualna rewizja `5` obejmuje listę wielu zakładek indeksujących na stronie.
-- 11: `class IsarOpenResult` — `service, wasReset, freshFile, resetReason`.
-- 25: `class IsarService(this.isar)`.
-- 34: `static Future<IsarOpenResult> open()` — odporne otwieranie: fingerprint
-  schematu, wipe+retry na schema mismatch / open failure / smoke test failure.
-- 83: `Future<void> close()`.
-- 85: `_computeSchemaFingerprint()` — `vN:id1,id2,…`.
-- 97: `_readStoredFingerprint(dir)` — `schema_version.txt`.
-- 110: `_writeFingerprint`.
-- 119: `_wipeDatabaseFiles` — kasuje `default.isar` + `.lock`.
-- 132: `_smokeTest` — `notebookEntitys.where().limit(1).findAll()`.
+### `lib/data/drift/notes_database_connection_io.dart` (21 linii)
+Natywne połączenie Drift.
+- 7: `class NotesDatabaseConnection` — `QueryExecutor` + `freshFile`.
+- 14: `openNotesDatabaseConnection(name)` — `NativeDatabase.createInBackground`
+  w katalogu dokumentów aplikacji.
 
-### `lib/data/backup/local_backup_service.dart` (181 linii)
+### `lib/data/drift/notes_database_connection_web.dart` (21 linii)
+Webowe połączenie Drift WASM.
+- 4: `class NotesDatabaseConnection` — `QueryExecutor` + `freshFile`.
+- 11: `openNotesDatabaseConnection(name)` — `WasmDatabase.open`, używa
+  `web/sqlite3.wasm` i `web/drift_worker.dart.js`.
+
+### `lib/data/drift/notes_database.g.dart` (6075 linii)
+Wygenerowane przez `drift_dev` — **NIE edytuj ręcznie**. Po zmianach w
+`notes_database.dart` uruchom `dart run build_runner build`.
+
+### `web/drift_worker.dart` (5 linii)
+Źródło workera Drifta dla webowego SQLite WASM.
+- 3: `main()` — `WasmDatabase.workerMainForOpen()`.
+
+### `web/drift_worker.dart.js`
+Skompilowany worker używany przez `notes_database_connection_web.dart`; odtwarzaj
+po zmianie `web/drift_worker.dart` komendą
+`dart compile js -O4 -o web/drift_worker.dart.js web/drift_worker.dart`.
+
+### `web/sqlite3.wasm`
+Binary SQLite WASM wymagany przez `WasmDatabase.open`.
+
+### `lib/data/backup/local_backup_service.dart` (410 linii)
 Przyrostowy lokalny backup JSON w `local_backup/`: `manifest.json` +
 `notebooks/<uid>.json`; stary `notebooks_latest.json` nadal jest czytany jako
-fallback restore.
-- 11: `class LocalBackupService(this.repository)`.
-- 21: `_backupDir()` — tworzy katalog jeśli brak.
-- 30: `_file(name)`.
-- 35: `_notebooksDir()` / 43: `_manifestFile()` / 48: `_notebookFile(uid)`.
-- 53: `snapshot(items)` — zapisuje tylko zmienione pliki notebooków
-  i usuwa pliki notebooków spoza manifestu; przed JSON-em spłaszcza
-  `eraserBrush`/`eraserArea` przez `flattenErasersForBackup`, żeby backup
-  nie zawierał stroke'ów gumki ani zamazanych fragmentów.
-- 97: `hasLatest()` — rozpoznaje nowy manifest albo legacy `notebooks_latest.json`.
-- 106: `readLatest()` — preferuje backup przyrostowy, fallback do legacy.
-- 114: `_readIncrementalLatest()` / 150: `_readLegacyLatest()`.
-- 168: `restoreFromLatest()` — zapisuje wszystkie notebooki do Isara, zwraca count.
+fallback restore. Stare snapshoty usuniętych notebooków trafiają do
+`local_backup/trash/` zamiast znikać bez śladu.
+- 12: `class LocalBackupService(this.repository)`.
+- 23: `_backupDir()` — tworzy katalog jeśli brak.
+- 32: `_file(name)`.
+- 37: `_notebooksDir()` / 45: `_manifestFile()` / 50: `_notebookFile(uid)` /
+  55: `_trashDir()`.
+- 63: `snapshot(items)` — zwraca `BackupSnapshotReport`; poza samym zapisem
+  mierzy per-notebook `flatten/encode/json/compare/write`, liczbę stron,
+  stroke'ów, punktów i rozmiar JSON-a, a w raporcie globalnym zbiera też
+  `manifestMs`, `staleListMs` i najwolniejszy notebook.
+- 186: `hasLatest()` — rozpoznaje nowy manifest albo legacy `notebooks_latest.json`.
+- 195: `readLatest()` — preferuje backup przyrostowy, fallback do legacy.
+- 203: `_readIncrementalLatest()` / 244: `_readLegacyLatest()` — logują błędy
+  odczytu backupu do `AppErrorLog`.
+- 267: `restoreFromLatest()` — zapisuje wszystkie notebooki do repozytorium,
+  zwraca count.
+- 286: `_moveStaleNotebookBackupToTrash(file)` — archiwizuje osierocony plik
+  backupu zamiast go usuwać.
+- 324: `class BackupSnapshotReport` — agregat całego snapshotu do logu
+  `[backup]`, z liczbą notebooków/stron/stroke'ów/punktów i `slowest{...}`.
+- 375: `class NotebookBackupReport` — per-notebook rozbicie kosztu backupu.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (272 linie)
 Sanityzacja lokalnego backupu: stosuje zapisane stroke'i gumki do wcześniejszych
@@ -313,17 +387,18 @@ Eksport notebooków/boardów do wybranej przez użytkownika lokalizacji
   z tym samym adaptacyjnym wygładzaniem pen/highlighter co canvas.
 - 540: `_pageContentBounds(page)` — obszar eksportu boarda.
 
-### `lib/data/sync/cloud_sync_service.dart` (125 linii)
+### `lib/data/sync/cloud_sync_service.dart` (127 linii)
 Folder-based sync (`notatek_cloud.json` we wskazanym folderze).
-- 9: `class CloudSyncResult` — `totalNotebooks, uploaded, downloaded`.
-- 21: `class CloudSyncService(this.repository)`.
-- 29: `getCloudPath()` — czyta `cloud_sync.json`.
-- 44: `setCloudPath(path)`.
-- 49: `sync(local)` — merguje chmurę i lokalne po `updatedAt`, zapisuje obie strony.
-- 77: `_readCloudNotebooks`.
-- 89: `_mergeNotebooks` — last-write-wins po `updatedAt`.
-- 107: `_countNewer`.
-- 121: `_configFile`.
+- 10: `class CloudSyncResult` — `totalNotebooks, uploaded, downloaded`.
+- 22: `class CloudSyncService(this.repository)`.
+- 30: `getCloudPath()` — czyta `cloud_sync.json`.
+- 45: `setCloudPath(path)`.
+- 50: `sync(local)` — merguje chmurę i lokalne po `updatedAt`, zapisuje obie strony.
+- 78: `_readCloudNotebooks`.
+- 91: `mergeNotebooks` — last-write-wins po `updatedAt`; przy remisie zachowuje
+  wersję lokalną, żeby równy timestamp nie wyczyścił nowszego stanu użytkownika.
+- 109: `_countNewer`.
+- 123: `_configFile`.
 
 ---
 
@@ -362,123 +437,154 @@ Folder-based sync (`notatek_cloud.json` we wskazanym folderze).
   imageExt?, imageMime?, rotation, cropLeft/Top/Right/Bottom }` + `copyWith`
   (crop domyślnie 0/0/1/1, `clearBytes` usuwa legacy/fallback bytes).
 
-### `lib/features/notebook/data/notebook_repository.dart` (684 linii)
-Mostek domena ↔ Isar ↔ JSON.
-- 19: `class NotebookRepository(this.isar, {this.onChanged})` — callback po każdym zapisie.
-- 27: `lastFetchSkippedCorruptRows` — flaga dla backupu po fallbacku.
-- 29: `fetchNotebooks()` — sortowane po `updatedAtDesc`, z fallbackiem.
-- 43: `_fetchNotebooksDefensively()` — id-by-id, loguje skipy i usuwa
-  nieodczytywalne rekordy.
-- 71: `_deleteCorruptRows(ids)` — kasuje uszkodzone rekordy po Isar id.
-- 80: `createNotebook({title, folder})` — `NotebookKind.notebook`, 1 strona „Page 1".
-- 106: `createBoard({title, folder})` — `NotebookKind.board`, jedna strona „Canvas".
-- 132: `getNotebook(uid)`.
-- 148: `saveNotebook(notebook)` — migruje stare obrazy inline do trwałego
-  katalogu `images/`, czyści `bytes` przy trwałym `path`, potem
-  `writeTxn(put)`, woła `onChanged`.
-- 184: `_persistInlineImageBytes(block)` — przenosi obrazy z `bytes` bez
-  trwałej ścieżki poza rekord Isara do katalogu dokumentów aplikacji i usuwa
-  bytes z modelu po utrwaleniu pliku.
-- 217: `deleteNotebook(uid)`.
-- 231: `encodeNotebooks(items)` / 235: `decodeNotebooks(items)` — JSON.
-- 242–295: mapowanie entity↔domain (`_fromEntity`, `_pageFromEntity`,
-  `_toEntity`, `_pageToEntity`).
-- 327–420: konwersje per-blok (`_textFrom/ToEntity`, `_imageFrom/ToEntity`,
-  `_strokeFrom/ToEntity`).
-- 423–648: JSON serializery (`_notebookTo/FromJson`, `_pageTo/FromJson`,
-  `_textTo/FromJson`, `_imageTo/FromJson`, `_strokeTo/FromJson`).
-- 298: `_indexTabsFromEntity(...)` — lista zakładek + migracja starego pojedynczego pola.
-- 485: `_indexTabToJson` / 493: `_indexTabsFromJson` — JSON wielu zakładek + migracja starego backupu.
-- 591: `_imageBytesForJson(block)` — do backupu/sync czyta bytes z pamięci
-  albo z pliku pod `path`, bez wkładania ich do Isara.
-- 650: `_toolFromIndex(int)` — symetryczne, prosty mapping przez `DrawingTool.values`.
-- 658: `_toolToIndex(tool)` — `tool.index`. **Symetria wymagana** —
-  zmieniasz jedną, zmieniaj drugą + bump `kManualSchemaRevision`.
-- 660: `_bytesFromEntity(List<int>?)`.
-- 667: `_bytesToBase64` / 674: `_bytesFromBase64`.
+### `lib/features/notebook/data/notebook_repository.dart` (1076 linii)
+Mostek domena ↔ Drift/SQLite ↔ JSON.
+- 21: `class NotebookRepository` — repo z callbackiem po zapisie i opcjonalnym
+  testowym handlerem błędów odczytu.
+- 39: `lastFetchSkippedCorruptRows` / 40: `lastCorruptNotebookCount` /
+  42: `lastCorruptNotebookIds` — stan ostatniego defensywnego fetchu po `uid`.
+- 44: `fetchNotebooks()` — składa notebooki z tabel dzieci; częściowo
+  uszkodzony dokument pozostaje na liście i jest oznaczany do recovery, a błąd
+  głównego zapytania jest zgłaszany zamiast udawać pustą bazę.
+- 86: `saveRecoveredCopy(...)` — zapisuje kopię odzyskaną z nowym `uid` i
+  dopiskiem do tytułu, żeby nie nadpisać uszkodzonego oryginału.
+- 100: `archiveNotebookBeforeDelete(...)` — odkłada ręcznie usuwany notebook
+  do `deleted_notebooks/<ts>_<uid>.json`.
+- 132: `createNotebook({title, folder})` — `NotebookKind.notebook`, 1 strona „Page 1".
+- 158: `createBoard({title, folder})` — `NotebookKind.board`, jedna strona „Canvas".
+- 184: `getNotebook(uid)` — zwraca także częściowo czytelny dokument i oznacza
+  jego UID jako uszkodzony.
+- 211: `saveNotebook(notebook)` — odrzuca snapshot bez stron i szereguje zapisy
+  per UID w kolejności wywołań; `_saveNotebookNow` (233) odrzuca częściowo
+  odczytany dokument, migruje stare obrazy inline, atomowo odrzuca snapshot
+  starszy od najnowszej wersji i zastępuje dzieci w transakcji.
+- 282: `updateNotebookMetadata(uid, {title, folder})` — aktualizuje wyłącznie
+  nagłówek z monotonicznym `updatedAt`, bez zastępowania zawartości notatki.
+- 326: `_persistInlineImages(notebook)` / 349 `_persistInlineImageBytes(block)` —
+  przenosi obrazy z `bytes` bez trwałej ścieżki do katalogu dokumentów aplikacji
+  i czyści `bytes` po utrwaleniu pliku.
+- 382: `deleteNotebook(uid)` — przed delete próbuje zarchiwizować aktualną
+  wersję notebooka do pliku odzyskiwania, potem kasuje dzieci i nagłówek.
+- 397: `encodeNotebooks(items)` / 401: `decodeNotebooks(items)` — JSON.
+- 408: `_readNotebook(row)` / 448: `_readPage(row)` — defensywnie składa
+  dokument; błąd pojedynczej tabeli, strony lub dziecka nie ukrywa całego UID.
+- 522: `_readRowsSafely` / 536: `_convertRowsSafely` / 554: `_recordReadError`
+  — wspólne granice błędów odczytu i konwersji rekordów dzieci.
+- 577: `_insertPage(notebookUid, page, pageIndex)` — zapisuje stronę i jej
+  dzieci w kolejności z modelu.
+- 619: `_deleteNotebookChildren(notebookUid)` — usuwa dzieci stron przed
+  zastąpieniem snapshotu notebooka.
+- 647–766: konwersje Drift row/companion ↔ domena per blok.
+- 768: `_pointsToJson(points)` / 782: `_pointsFromJson(value)` — punkty stroke'a
+  jako JSON per stroke.
+- 799–1024: JSON serializery backup/sync (`_notebookTo/FromJson`,
+  `_pageTo/FromJson`, `_textTo/FromJson`, `_imageTo/FromJson`,
+  `_strokeTo/FromJson`).
+- 1025: `_toolFromIndex(int)` / 1033: `_toolToIndex(tool)` — symetryczne,
+  prosty mapping przez `DrawingTool.values`.
+- 1035: `_bytesFromEntity(Uint8List?)`.
+- 1042: `_bytesToBase64` / 1049: `_bytesFromBase64`.
+- 1061: `_NotebookReadResult` / 1071: `_PageReadResult` — wynik modelu razem
+  z flagą pominiętych uszkodzonych rekordów.
 
 ---
 
-### `lib/features/library/presentation/library_controller.dart` (449 linii)
+### `lib/features/library/presentation/library_controller.dart` (599 linii)
 ChangeNotifier — stan ekranu Biblioteki.
-- 12: `class LibraryController extends ChangeNotifier` — repo, cloud, backup,
-  flagi `wasReset/freshFile/resetReason`.
-- 28–44: pola: `autoRestoreCount, isLoading, isSyncing, isLoadingSelectedItem,
-  items, selectedItemId, selectedFolder='', searchQuery, cloudPath,
-  lastSyncedAt, lastSyncResult, _folders, _activeNotebook`,
-  `_defaultFolderName`, `_foldersFileName`.
-- 46: `shouldShowResetBanner` getter.
-- 49: `dismissResetBanner()`.
-- 54: `initialize()` — `_loadFolders` → `loadItems` → `_loadCloudPath`.
-- 60: `loadItems()` — pobiera, auto-restore z backupu jeśli pusto a był reset,
-  ustawia wybrany folder/item.
-- 86: `syncNow()`.
-- 96: `setCloudPath(path)`.
-- 102: `visibleItems` getter — filtr folderem + searchem.
-- 115: `folderNames` getter — `_folders ∪ items.folder`, sortowane
+- 13: `class LibraryController extends ChangeNotifier` — repo, cloud, backup,
+  flagi `wasReset/freshFile/resetReason` oraz stan recovery uszkodzonych dokumentów.
+- 29–47: pola: `autoRestoreCount, isLoading, isSyncing,
+  isLoadingSelectedItem, isRecoveringCorruptDocuments, items, selectedItemId,
+  selectedFolder='', searchQuery, cloudPath, lastSyncedAt, lastSyncResult, loadError,
+  _folders, _activeNotebook, _corruptRecoveryDismissed, corruptDocumentCount,
+  recoverableCorruptDocuments`.
+- 51: `shouldShowResetBanner` getter.
+- 54: `hasCorruptDocuments`; 56: `shouldPromptCorruptRecovery`;
+  61: `shouldShowCorruptionBanner`.
+- 66: `dismissResetBanner()` / 71: `dismissCorruptRecoveryPrompt()`.
+- 77: `initialize()` — `_loadFolders` → `loadItems` → `_loadCloudPath`.
+- 83: `loadItems()` — podmienia listę dopiero po udanym odczycie; przy błędzie
+  zachowuje dotychczasowe elementy, ustawia `loadError` i loguje incydent;
+  obsługuje też recovery po świeżej bazie.
+- 139: `restoreCorruptDocumentsFromBackup()` — zapisuje każdą odzyskaną notatkę
+  jako oddzielną kopię `Recovered`, bez nadpisywania oryginału.
+- 192: `syncNow()` — resetuje `isSyncing` także po wyjątku.
+- 205: `setCloudPath(path)`.
+- 211: `visibleItems` getter — filtr folderem + searchem.
+- 224: `folderNames` getter — `_folders ∪ items.folder`, sortowane
   alfabetycznie bez względu na wielkość liter.
-- 127: `createFolder(name)`.
-- 142: `renameFolder(oldName, newName)` — zapisuje nową nazwę w folderach i
-  notebookach przypisanych do folderu.
-- 183: `deleteFolder(name)` — usuwa folder i wszystkie notebooki w nim.
-- 215: `createNotebook()` / 227: `createBoard()` — używają wybranego folderu
+- 236: `createFolder(name)`.
+- 251: `renameFolder(oldName, newName)` — aktualizuje wyłącznie metadane
+  notebooków przypisanych do folderu, bez przepisywania ich stron.
+- 294: `deleteFolder(name)` — usuwa folder i wszystkie notebooki w nim.
+- 326: `createNotebook()` / 338: `createBoard()` — używają wybranego folderu
   albo fallbacku `Notes`, zaznaczają i zwracają utworzony element.
-- 239: `deleteItem(uid)`.
-- 253: `renameItem(uid, title)` — zmienia tytuł notebooka/tablicy i zapisuje repo.
-- 279: `selectItem(uid)` — async load z repo, ustawia `_activeNotebook`.
-- 291: `selectFolder(folder)`.
-- 300: `setSearchQuery(value)`.
-- 305: `exportBackup()` — pisze `notatek_backup_<ts>.json` w docs dir.
-- 315: `importBackup(path)` — dekoduje + `saveNotebook` per item + reload.
-- 329: `selectedItem()` — wybiera active pasujący do id albo item po id.
-- 339: `_itemById(uid)`.
-- 349: `_firstItemInFolder(folder)`.
-- 357: `_selectedItemIsInFolder(folder)`.
-- 365: `_targetFolderForNewItem()`.
-- 376: `_loadCloudPath`.
-- 381: `_loadFolders` / 405: `_saveFolders` (`library_folders.json`).
-- 415: `_foldersFile`.
-- 420: `_compareFolderNames(a, b)`.
-- 428: `_matches(notebook, query)` — title/page title/textBlock/ocrText.
+- 350: `deleteItem(uid)`.
+- 364: `renameItem(uid, title)` — aktualizuje tylko tytuł nagłówka bez
+  przepisywania stron notebooka/tablicy.
+- 392: `selectItem(uid)` — async load z repo, ustawia `_activeNotebook`.
+- 404: `selectFolder(folder)`.
+- 413: `setSearchQuery(value)`.
+- 418: `exportBackup()` — pisze `notatek_backup_<ts>.json` w docs dir.
+- 428: `importBackup(path)` — dekoduje + `saveNotebook` per item + reload.
+- 442: `selectedItem()` — wybiera active pasujący do id albo item po id.
+- 452: `_itemById(uid)`.
+- 462: `_firstItemInFolder(folder)`.
+- 470: `_selectedItemIsInFolder(folder)`.
+- 478: `_targetFolderForNewItem()`.
+- 489: `_loadCloudPath`.
+- 494: `_loadFolders` / 518: `_saveFolders` (`library_folders.json`).
+- 528: `_foldersFile`.
+- 533: `_compareFolderNames(a, b)`.
+- 541: `_matches(notebook, query)` — title/page title/textBlock/ocrText.
+- 563: `_refreshCorruptRecoveryState()` — wylicza brakujące względem backupu
+  kandydaty do odzyskania, uwzględniając także nadal widoczne UID z częściowo
+  uszkodzonymi dziećmi; gdy kandydatów brak, zapisuje incydent do `AppErrorLog`.
 
-### `lib/features/library/presentation/library_screen.dart` (961 linii)
+### `lib/features/library/presentation/library_screen.dart` (1082 linie)
 Trójkolumnowy layout (folders | items | workspace) z resizable pane.
-- 16: `class LibraryScreen extends StatefulWidget`.
-- 23: `_LibraryScreenState` — stałe layoutu (24–29: `_wideBreakpoint=1100`,
-  pane min/max widths, `_resizeHandleWidth=12`).
-- 31–33: `_showLeftNavigation`, `_folderPaneWidth=220`, `_itemsPaneWidth=320`.
-- 36: `initState` — post-frame `controller.initialize()`.
-- 44: `build` — Scaffold + banner resetu + LayoutBuilder.
-- 66–181: wide layout (≥1100): folder pane, resize handle, items pane,
+- 17: `class LibraryScreen extends StatefulWidget`.
+- 24: `_LibraryScreenState` — stałe layoutu (25–30: `_wideBreakpoint=1100`,
+  pane min/max widths, `_resizeHandleWidth=12`) + flaga
+  `_isShowingCorruptRecoveryDialog`.
+- 38: `initState` — post-frame `controller.initialize()`.
+- 46: `build` — Scaffold + bannery resetu, korupcji i błędu odczytu z retry +
+  LayoutBuilder;
+  wywołuje `_maybeShowCorruptRecoveryDialog(controller)` przy starcie.
+- 122–234: wide layout (≥1100): folder pane, resize handle, items pane,
   resize handle, workspace + `_LeftZoneToggleTab`.
-- 184–209: wąski layout: `_FolderChipBar` na górze + lista items na pełnej szerokości.
-- 219: `_toggleLeftNavigation`.
-- 226: `_createItem(kind)` — tworzy notebook/tablicę i zwraca nowy element.
-- 234: `_createAndSelectItem(kind)` — desktopowe tworzenie z natychmiastowym
+- 237–266: wąski layout: `_FolderChipBar` na górze + lista items na pełnej
+  szerokości.
+- 271: `_toggleLeftNavigation`.
+- 278: `_createItem(kind)` — tworzy notebook/tablicę i zwraca nowy element.
+- 286: `_createAndSelectItem(kind)` — desktopowe tworzenie z natychmiastowym
   dialogiem nazwy, bez push trasy.
-- 243: `_createAndOpenItem(kind)` — tworzy element, pokazuje dialog nazwy
+- 295: `_createAndOpenItem(kind)` — tworzy element, pokazuje dialog nazwy
   i otwiera go na wąskim widoku.
-- 259: `_promptNewFolder(controller)` — dialog tworzenia folderu; w trybie
+- 310: `_promptNewFolder(controller)` — dialog tworzenia folderu; w trybie
   tablet prosi system o klawiaturę ekranową.
-- 294: `_promptRenameFolder(controller, folder)` — dialog zmiany nazwy folderu;
+- 345: `_promptRenameFolder(controller, folder)` — dialog zmiany nazwy folderu;
   w trybie tablet prosi system o klawiaturę ekranową.
-- 332: `_promptRenameItem(controller, item)` — dialog zmiany nazwy
+- 383: `_promptRenameItem(controller, item)` — dialog zmiany nazwy
   notebooka/tablicy; w trybie tablet prosi system o klawiaturę ekranową.
-- 374: `_confirmDeleteFolder(controller, folder)` — potwierdzenie usunięcia
+- 425: `_confirmDeleteFolder(controller, folder)` — potwierdzenie usunięcia
   folderu razem z zawartością.
-- 407: `enum _FolderAction { rename, delete }`.
-- 409: `class _FolderListPane` — lista folderów (iconOnly gdy pane < 165px),
-  separatory jak w liście notatek, 426–497 iconOnly, 500–537 normalny z menu
+- 457: `_maybeShowCorruptRecoveryDialog(controller)` — modalne pytanie
+  `Yes/No` o odzyskanie kopii z lokalnego backupu; przy odzysku zapisuje
+  osobne kopie i pokazuje `SnackBar`.
+- 528: `enum _FolderAction { rename, delete }`.
+- 530: `class _FolderListPane` — lista folderów (iconOnly gdy pane < 165px),
+  separatory jak w liście notatek, 533–604 iconOnly, 607–644 normalny z menu
   akcji folderu.
-- 552: `class _FolderChipBar` — chipy folderów (mobile) z menu akcji folderu.
-- 621: `class _LibraryItemsPane` — lista notebooków (empty states 653, 693;
-  722–773 iconOnly, 774–844 normalny widok z `LibraryItemCard`).
-- 849: `class _LibraryWorkspace` — wybiera `BoardScreen` lub `NotebookScreen`
+- 673: `class _FolderChipBar` — chipy folderów (mobile) z menu akcji folderu.
+- 742: `class _LibraryItemsPane` — lista notebooków i empty state.
+- 970: `class _LibraryWorkspace` — wybiera `BoardScreen` lub `NotebookScreen`
   na podstawie `item.kind`, owija w `ChangeNotifierProvider<EditorController>`.
-- 877: `class _LibraryRoute` — wąski layout (push'owane), `FutureBuilder` do `getNotebook`.
-- 903: `enum _CreateAction { notebook, board }`.
-- 905: `class _PaneResizeHandle` — pasek do przeciągania szerokości pane.
-- 927: `class _LeftZoneToggleTab` — strzałka chevron do collapsowania nawigacji.
+- 998: `class _LibraryRoute` — wąski layout (push'owane), `FutureBuilder` do
+  `getNotebook`.
+- 1024: `enum _CreateAction { notebook, board }`.
+- 1026: `class _PaneResizeHandle` — pasek do przeciągania szerokości pane.
+- 1048: `class _LeftZoneToggleTab` — strzałka chevron do collapsowania nawigacji.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 - 6: `enum _ItemAction { rename, delete }` — akcje menu kontekstowego elementu biblioteki.
@@ -718,7 +824,7 @@ Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`
 #### Strokes / commits
 - 2143: `addInkStroke(points, {widthOverride, toolOverride})` — highlighter
   ma `inkStrokeWidth * 8.0`; zapis do repo jest debounced, żeby szybkie
-  odrywanie rysika nie blokowało kolejnego stroke'a na Isar/backup.
+  odrywanie rysika nie blokowało kolejnego stroke'a na SQLite/backup.
 - 2123: `eraseInkStrokesById(ids)` — usuwa stroke'i undoowalnie i debouncuje
   zapis.
 - 2136: `replaceInkStrokes(strokes)` — undoowalnie podmienia listę stroke'ów;
@@ -757,20 +863,24 @@ Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`
 
 ---
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (343 linie)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (448 linii)
 Panel ustawień edytora.
 - 12: `class EditorSettingsScreen extends StatelessWidget` — ekran ustawień
   z górnym `TabBar` (`System`, `Visual`, `Widgets`); zakładka systemowa zawiera
   `Device mode` (`Computer`/`Tablet`) oraz trzy `SegmentedButton` `Off/On`:
   rozróżnianie rysika/palca, obsługa przycisków rysika oraz gumka bazgrołem,
-  plus pozycję `Errors` z kopiowaniem ukrytego domyślnie podglądu błędów;
+  plus pozycje `Errors` i `Optimization`; `Optimization` pokazuje wyłącznie
+  wpisy po heurystycznym filtrze, a terminal nadal ma pełny raw log;
   zakładka Visual zawiera globalne domyślne tło osobno dla notebooków i boardów.
-- 198: `_showErrorsDialog(context)` — dialog `Errors` z `Copy`, `Clear`,
+- 214: `_showErrorsDialog(context)` — dialog `Errors` z `Copy`, `Clear`,
   `Close` i zwijanym podglądem zawartości logu.
-- 280: `class _BackgroundSection` — kontrolki stylu tła `Plain/Grid/Lines`,
+- 299: `_showOptimizationDialog(context)` — dialog `Optimization` z
+  `Copy`, `Clear`, `Close`, opisem że to tylko filtered entries, oraz
+  zwijanym podglądem wpisów z `OptimizationLog`.
+- 392: `class _BackgroundSection` — kontrolki stylu tła `Plain/Grid/Lines`,
   slider zagęszczenia i podgląd.
 
-### `lib/features/editor/presentation/editor_screen.dart` (2644 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2656 linii)
 Layout edytora notebooka (stronicowy). Listener gestów, transformacja zoom/pan
 strony, przesunięcie kolumny strony, mini-mapa, podgląd skali, podgląd ramki
 strony.
@@ -779,10 +889,11 @@ strony.
   footer `Add page`, sensytywności pan/scroll, scale floors, granica kolumny
   podglądu, minimalna użyteczna szerokość canvasu, tolerancja zatrzymania na
   krawędzi). A4 ratio czytane z `AppMetrics.a4HeightRatio`.
-- 56–84: pola stanu (ScrollController, GlobalKey canvas, `_pageExtent`,
+- 56–85: pola stanu (ScrollController, GlobalKey canvas, `_pageExtent`,
   `_isViewportNavigating`, aktywny rysik, pending touch navigation, gesty
   multi-touch, `_pageScale=1`, `_pagePan`, `_pageMin/MaxScale`,
-  `_pageColumnOffset`, granice przesunięcia kolumny).
+  `_pageColumnOffset`, granice przesunięcia kolumny, throttling logu zbyt
+  wąskiego okna).
 - 87: `initState` — `_scrollController.addListener(_handleScroll)`.
 - 93: `dispose`.
 - 100: `_handleScroll()`.
@@ -840,7 +951,9 @@ strony.
 - 1079: `_indexTabChannelSlider(...)` — slider RGB w dialogu zakładki.
 - 1105: `_showCanvasContextMenu(...)` / 1150: `_contextMenuInsertPosition(...)` — menu `Paste` z prawego kliku, przycina punkt wstawiania do obszaru strony.
 - 1178: `_startTouchContextMenuTimer(...)` — po 1 s przytrzymania palcem na canvie pokazuje menu `Paste` pod kursorem.
-- 1225: `build(context)` — Scaffold(AppBar=tytuł notebooka+bookmark+settings) + Column
+- 1225: `_logNarrowCanvas(width)` — debug-only, throttlowany log `[layout]`
+  gdy panel edytora jest za wąski do bezpiecznego renderowania.
+- 1241: `build(context)` — Scaffold(AppBar=tytuł notebooka+settings) + Column
   (EditorToolbar, TextEditToolbar gdy aktywny tekst, InsertToolbar gdy `_isInsertToolbarVisible`,
   LayoutBuilder z komunikatem przy zbyt wąskim oknie albo głównym canvas:
   SingleChildScrollView (bez drag-scrolla przy narzędziach ink) + poziome
@@ -854,178 +967,208 @@ strony.
   `_ZoomPercentBadge` + `_ProjectMiniMapOverlay` + `BusyOverlay`.
 - 1694–1727: skróty klawiszowe (Ctrl/Cmd+V/C/X, Delete) → CallbackActions
   (paste/copy/cut/delete) — **wyłączone gdy aktywny TextEditor**.
-- 1763: `class _PasteFromClipboardIntent`.
-- 1767: `class _IndexTabEditResult` — wynik dialogu edycji zakładki (`save/remove`).
-- 1794: `_CopyElementIntent`.
-- 1798: `_CutElementIntent`.
-- 1802: `_DeleteElementIntent`.
-- 1806: `enum _CanvasContextAction { paste }`.
-- 1808: `class _BoundaryVisibility` — które krawędzie strony są widoczne.
-- 1841: `class _PageRenderRange` — półotwarty zakres stron renderowanych w
+- 1758: `class _PasteFromClipboardIntent`.
+- 1762: `class _IndexTabEditResult` — wynik dialogu edycji zakładki (`save/remove`).
+- 1789: `_CopyElementIntent`.
+- 1793: `_CutElementIntent`.
+- 1797: `_DeleteElementIntent`.
+- 1801: `enum _CanvasContextAction { paste }`.
+- 1803: `class _BoundaryVisibility` — które krawędzie strony są widoczne.
+- 1836: `class _PageRenderRange` — półotwarty zakres stron renderowanych w
   głównym edytorze.
-- 1848: `class _PageFramePainter extends CustomPainter` — rysuje pomarańczową
+- 1843: `class _PageFramePainter extends CustomPainter` — rysuje pomarańczową
   ramkę aktywnej strony.
-- 1923: `class _IndexTabsOverlay` — rysuje wiele kolorowych zakładek; dwuklik otwiera edycję, a długie przytrzymanie pozwala przesuwać zakładkę góra/dół.
-- 2033: `class _ZoomPercentBadge` — chip „150%".
-- 2063: `class _ProjectMiniMapOverlay extends StatefulWidget` (mini-mapa).
-- 2084: `_ProjectMiniMapOverlayState` — synchronizacja widoku + cache miniatur obrazów/PDF.
+- 1918: `class _IndexTabsOverlay` — rysuje wiele kolorowych zakładek; dwuklik otwiera edycję, a długie przytrzymanie pozwala przesuwać zakładkę góra/dół.
+- 2028: `class _ZoomPercentBadge` — chip „150%".
+- 2058: `class _ProjectMiniMapOverlay extends StatefulWidget` (mini-mapa).
+- 2079: `_ProjectMiniMapOverlayState` — synchronizacja widoku + cache miniatur obrazów/PDF.
 - 2118: `_precacheMinimapImages()` — dekoduje asynchronicznie obrazy tylko dla stron blisko widoku.
 - 2195: `_minimapImagePageRange()` — zakres stron, dla których minimapa trzyma zdekodowane obrazy.
 - 2253: `_syncMinimapToViewport()`.
 - 2287: `_visiblePanelHeight(...)` / 2291: `_contentHeight(...)` — wysokość mini-mapy rośnie z liczbą stron do limitu panelu.
 - 2404: `class _ProjectMiniMapPainter` — rysuje strony, content thumbnails,
   zdekodowane miniatury obrazów/PDF oraz paski zakładek, bez podświetlania krawędzi.
-- 2617: `class _MiniMapImageCacheEntry` — cache key + zdekodowany obraz mini-mapy.
-- 2624: `class _MiniMapViewportOverlayPainter` — rysuje wypełniony prostokąt widoku bez podświetlanych krawędzi.
+- 2612: `class _MiniMapImageCacheEntry` — cache key + zdekodowany obraz mini-mapy.
+- 2619: `class _MiniMapViewportOverlayPainter` — rysuje wypełniony prostokąt widoku bez podświetlanych krawędzi.
 
 ### `lib/features/editor/presentation/widgets/busy_overlay.dart` (38 linii)
 Centralny overlay ładowania dla długich operacji importu/eksportu w edytorach.
 - 3: `class BusyOverlay extends StatelessWidget` — półprzezroczysta blokująca warstwa z centralnym `CircularProgressIndicator`.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (3580 linii)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (3859 linii)
 Dwie warianty canvasu rysowania. **Notebook używa `DocumentDrawingCanvas`,
 board używa `DrawingCanvas`.** Logika prawie zduplikowana — to świadoma decyzja
 (różne układy współrzędnych). Oba warianty opóźniają start stroke dla dotyku,
 odrzucają duży kontakt dłoni, dają pierwszeństwo aktywnemu rysikowi/myszy
 i przy aktywnym `PointerInputMode` blokują rozpoczynanie kreski palcem.
-- 39: `_eraseStrokeParts(...)` / 74: `_scratchEraseInkHitCount(...)` —
+- 36: `_debugInkLog(message)` — debug-only, bardzo skondensowane logi
+  `[ink]` końca stroke'a i `[scratch]` bazgrołowej gumki.
+- 43: `class _InkPerfLog` — debug-only agregat per stroke: czas obsługi
+  `PointerMove`, liczba wywołań repaintu overlayu, czas do zaplanowanej klatki
+  oraz dodatkowo `canvasBuildUs*`, `savedPaintUs*`, `overlayPaintUs*`.
+- 269: `class _CanvasProjectStats` — zwięzły opis wielkości renderowanego
+  kontekstu (`pages/renderPages/savedStrokes/savedPts`) dopisywany do logów
+  `[ink]`.
+- 299: `_eraseStrokeParts(...)` / 329: `_scratchEraseInkHitCount(...)` —
   scratch-erase ma dwa promienie: mała tolerancja tylko do odpalenia gumki
   oraz szeroki promień realnego usunięcia, żeby nie zostawiać kropek tuszu;
-  do odpalenia wymaga `3+` trafień istniejącego tuszu; przed dokładną geometrią
-  używa bounding-box prefilteru `_offsetBounds/_strokeBounds`.
-- 202: `_isScratchEraseGesture(...)` — wymaga aktywnego pena, `3+` nawrotów
+  do odpalenia wymaga `3+` trafień istniejącego tuszu; geometria sprawdza
+  bezpośrednio punkty/segmenty bez bounding-box prefilteru.
+- 421: `_isScratchEraseGesture(...)` — wymaga aktywnego pena, `3+` nawrotów
   oraz minimalnego zagęszczenia ścieżki względem obszaru gestu.
-- 331: `_scratchEraseIntersectionRadius(strokeWidth)` — mała tolerancja
+- 550: `_scratchEraseIntersectionRadius(strokeWidth)` — mała tolerancja
   przecięcia wizualnej linii (`max(1, width * 0.5)`), nie pełny promień gumki.
-- 338: `_scratchEraseDeleteRadius(strokeWidth)` — realny promień usuwania
-  zamazanego zakresu (`max(8, width * 6)`).
-- 358: `class DrawingCanvas extends StatefulWidget` — board, jedna strona/canvas.
-- 378: `class DocumentDrawingCanvas extends StatefulWidget` — notebook,
+- 557: `_scratchEraseDeleteRadius(strokeWidth)` — realny promień usuwania
+  zamazanego zakresu (`max(8, width * 6)`), zgodny ze starszym zachowaniem.
+- 577: `class DrawingCanvas extends StatefulWidget` — board, jedna strona/canvas.
+- 597: `class DocumentDrawingCanvas extends StatefulWidget` — notebook,
   N stron pionowo, params `{worldOrigin, pages, pageSize, pageGap,
   allowMultiTouch, interactionEnabled, firstPageIndex, lastPageIndex}`; painter
   renderuje tylko ten zakres, hit-test nadal liczy po pełnym dokumencie.
-- 404: `_buildInkPath(...)` / 441: `_shouldSmoothStroke(...)` — wspólne,
+- 623: `_buildInkPath(...)` / 660: `_shouldSmoothStroke(...)` — wspólne,
   adaptacyjne wygładzanie szybkich stroke'ów pen/highlighter; kształty, lasso
   i gumka zostają odcinkami.
-- 475: `_shouldAcceptInkPoint(...)` —
+- 694: `_shouldAcceptInkPoint(...)` —
   wspólny filtr punktów pen/highlighter: odrzuca nagłe, boczne skoki kontaktu
   oddalone od dotychczasowego kierunku kreski.
-- 493: `_shouldRejectViewportEdgePoint(...)` / 511 `_isNearViewportEdge(...)` —
+- 712: `_shouldRejectViewportEdgePoint(...)` / 730 `_isNearViewportEdge(...)` —
   ignoruje nienaturalne skoki do samej krawędzi okna programu.
-- 522: `_isDiscontinuousInkJump(...)` — wykrywa boczny, daleki skok względem
+- 741: `_isDiscontinuousInkJump(...)` — wykrywa boczny, daleki skok względem
   ostatniego stabilnego kierunku kreski.
-- 551: `_toolForPointerEvent(...)` / 567 `_toggleEraserShortcut(...)` /
-  573 `_hasStylusButton(...)` — tymczasowo używają ostatniej gumki dla
+- 770: `_toolForPointerEvent(...)` / 786 `_toggleEraserShortcut(...)` /
+  792 `_hasStylusButton(...)` — tymczasowo używają ostatniej gumki dla
   `invertedStylus` oraz, gdy `stylusButtonsEnabled == true`, dla natywnego
   stanu `StylusButtonState`, standardowych przycisków stylusa Fluttera
   (`primary/secondary`) i linuksowego fallbacku `secondary/middle mouse`;
   obsługują też przełączenie gumki z Apple Pencil double tap.
-- 587: `_eraserStrokeRadius(strokeWidth)` — wspólny promień hit-testu i śladu
+- 806: `_eraserStrokeRadius(strokeWidth)` — wspólny promień hit-testu i śladu
   widmo magicznej gumki (`max(4, width * 1.5)`).
-- 591: `_trimEraserTrail(trail)` — ogranicza długość widocznego śladu magicznej
+- 810: `_trimEraserTrail(trail)` — ogranicza długość widocznego śladu magicznej
   gumki do `_eraserTrailMaxLength`.
 
-#### `_DrawingCanvasState` (board) — 602–1807
-- 659: `build` — `MouseRegion` ustawia natywny kursor `basic` dla
+#### `_DrawingCanvasState` (board) — 821–2121
+- 825–848: `_strokeStartedAt/_strokeMoveEvents/_frameTimingCursor` +
+  `_inkPerf` — stan do jednej linii `[ink]` po zakończeniu stroke'a, razem z
+  agregatem opóźnień i korelacją z `FrameTimingTracker`.
+- 884: `build` — `MouseRegion` ustawia natywny kursor `basic` dla
   pen/highlighter, `Listener` z `_onPointerDown/Move/Up/Cancel` +
   `ValueListenableBuilder(controller.lassoDragDelta)` + dwa `CustomPaint` w
   `RepaintBoundary`: zapisane stroke'i i szybki overlay aktywnej kreski.
-- 749: `_onPointerDown(event, controller, viewportSize)` — wybiera aktywny pointer;
+  Painter zapisanych stroke'ów używa `saveLayer` jak starsza wersja; mierzy też
+  `canvasBuildUs*` dla tej gałęzi.
+- 984: `_onPointerDown(event, controller, viewportSize)` — wybiera aktywny pointer;
   dotyk startuje dopiero po progu ruchu w trybie `Off`; pozostałe tryby
   blokują pisanie palcem; rysik/mysz startują od razu; przycisk rysika ustawia
-  gumkę tylko dla aktywnego stroke'a.
-- 854: `_onPointerMove` — dodaje punkty, ewentualnie eraser; wykrywa też zmianę
-  `buttons` w trakcie ruchu i przełącza segment na gumkę/poprzednie narzędzie.
-- 963: `_onPointerUp` — commit stroke przez `controller.addInkStroke`; przed
+  gumkę tylko dla aktywnego stroke'a; start stroke'a łapie też kursor
+  `FrameTimingTracker`.
+- 1094: `_onPointerMove` — dodaje punkty, ewentualnie eraser; mierzy czas obsługi
+  eventu; wykrywa też zmianę `buttons` w trakcie ruchu i przełącza segment na
+  gumkę/poprzednie narzędzie.
+- 1209: `_onPointerUp` — commit stroke przez `controller.addInkStroke`; przed
   commitem pen sprawdza, czy skupiony szybki gest ma wyciąć fragmenty stroke'ów.
-- 1095: `_syncActiveToolWithPointerMove(...)` — domyka bieżący segment i zaczyna
+- 1342: `_syncActiveToolWithPointerMove(...)` — domyka bieżący segment i zaczyna
   nowy po wciśnięciu lub puszczeniu przycisku rysika w trakcie kontaktu.
-- 1126: `_commitCurrentSegment(...)` / 1200: `_addCurrentStroke(...)` —
+- 1373: `_commitCurrentSegment(...)` / 1454: `_addCurrentStroke(...)` —
   wspólny commit używany przy normalnym `up` i przy przełączaniu narzędzia.
-- 1221: `_tryCommitScratchErase(...)` — jeśli `scratchEraseEnabled`, najpierw
+- 1468: `_tryCommitScratchErase(...)` — jeśli `scratchEraseEnabled`, najpierw
   sprawdza `3+` nawrotów i zagęszczenie gestu, potem `3+` małe trafienia
   istniejącego tuszu, a dopiero szerokim promieniem podmienia stroke'i przez
-  `replaceInkStrokes*`.
-- 1265: `_clearCurrentSegmentForToolSwitch()` — czyści overlay bez kończenia
+  `replaceInkStrokes*`; loguje jedną linię `[scratch]` tylko przy rozpoznanym
+  geście bazgrołowej gumki.
+- 1524: `_clearCurrentSegmentForToolSwitch()` — czyści overlay bez kończenia
   aktywnego pointera.
-- 1285: `_onPointerCancel`.
-- 1299: `_resetCurrent()`.
-- 1333: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski,
-  koalescowany do jednej zaplanowanej klatki.
-- 1346: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
-- 1354: `_activeTool(controller)` — zwraca override z przycisku rysika albo
+- 1544: `_onPointerCancel`.
+- 1558: `_resetCurrent()`.
+- 1596: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski,
+  koalescowany do jednej zaplanowanej klatki; aktualizuje metryki `_inkPerf`.
+- 1611: `_logStrokeUp(...)` — jedna linia `[ink]` po zakończeniu stroke'a
+  boarda z metrykami wielkości projektu i `FrameTimingSummary`
+  (`build/raster/total` dla klatek, które wydarzyły się w trakcie stroke'a),
+  plus zapis podejrzanych przypadków do `OptimizationLog`; zawiera też
+  rozbicie `canvasBuildUs*`, `savedPaintUs*`, `overlayPaintUs*` oraz
+  `BoardScenePerfSummary` z `BoardScreen`.
+- 1664: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
+- 1672: `_activeTool(controller)` — zwraca override z przycisku rysika albo
   aktualne narzędzie controllera.
-- 1358: `_toWorld(local)`.
-- 1362: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
-- 1383: `_startSnapTimer(offset)` — po holdzie z czystym kształtem wywołuje `_snapToShape`.
-- 1393: `_eraseAt(offset, page, controller)`.
-- 1405: `_resolvedPage(controller)` / 1409: `_resolvedPageIndex`.
-- 1413: `_strokeHitTest(stroke, point, radius)`.
-- 1432: `_distanceSquaredToSegment(p, a, b)`.
-- 1445: `_snapToShape()` — wykrywa line/rect/ellipse.
-- 1503: `_clearSnapHintSoon()`.
-- 1516: `_isRoughlyStraight(start, end, points)`.
-- 1540: `_isRoughlyRectangle(points)`.
-- 1565: `_isRoughlyEllipse(points)`.
-- 1634: `_findFarthestCorner(points, holdPoint)`.
-- 1658: `_isInkTool(tool)`.
-- 1662: `_isSnapTool(tool)` — pen/highlighter snapują, eraser/kształty nie.
-- 1666: `_usesCustomInkCursor(tool)` — pen/highlighter używają natywnego kursora `basic`.
-- 1670: `_effectiveStrokeWidth(tool, baseWidth)` — highlighter ma mnożnik 8,
+- 1676: `_toWorld(local)`.
+- 1680: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
+- 1699: `_startSnapTimer(offset)` — po holdzie z czystym kształtem wywołuje `_snapToShape`.
+- 1709: `_eraseAt(offset, page, controller)`.
+- 1721: `_resolvedPage(controller)` / 1725: `_resolvedPageIndex`.
+- 1729: `_strokeHitTest(stroke, point, radius)`.
+- 1748: `_distanceSquaredToSegment(p, a, b)`.
+- 1761: `_snapToShape()` — wykrywa line/rect/ellipse.
+- 1819: `_clearSnapHintSoon()`.
+- 1832: `_isRoughlyStraight(start, end, points)`.
+- 1856: `_isRoughlyRectangle(points)`.
+- 1881: `_isRoughlyEllipse(points)`.
+- 1950: `_findFarthestCorner(points, holdPoint)`.
+- 1974: `_isInkTool(tool)`.
+- 1978: `_isSnapTool(tool)` — pen/highlighter snapują, eraser/kształty nie.
+- 1982: `_usesCustomInkCursor(tool)` — pen/highlighter używają natywnego kursora `basic`.
+- 1986: `_effectiveStrokeWidth(tool, baseWidth)` — highlighter ma mnożnik 8,
   zwykła gumka `_eraserBrushWidthScale`.
-- 1708: `_squareCorner(start, end)` — wymuszony kwadrat/koło.
+- 2024: `_squareCorner(start, end)` — wymuszony kwadrat/koło.
 
-#### `_DocumentDrawingCanvasState` (notebook) — 1808–3089
+#### `_DocumentDrawingCanvasState` (notebook) — 2124–3509
 Te same metody co wyżej, ale operują w przestrzeni dokumentu (offset per page).
-- 1867: `build` — też nasłuchuje `lassoDragDelta` przy repaint zaznaczonych stroke'ów;
-  aktywny overlay tuszu jest klipowany do aktualnej strony.
-- 1958: `_onPointerDown` / 2084 Move / 2218 Up / 2490 Cancel; lasso w dokumencie
+- 2128–2152: `_strokeStartedAt/_strokeMoveEvents/_frameTimingCursor` +
+  `_inkPerf` — stan do jednej linii `[ink]` po zakończeniu stroke'a, razem z
+  agregatem opóźnień i korelacją z `FrameTimingTracker`.
+- 2188: `build` — też nasłuchuje `lassoDragDelta` przy repaint zaznaczonych
+  stroke'ów; aktywny overlay tuszu nie jest dodatkowo klipowany; mierzy też
+  `canvasBuildUs*` dla notebookowego canvasa.
+- 2288: `_onPointerDown` / 2418 Move / 2563 Up / 2848 Cancel; lasso w dokumencie
   woła `selectWithLasso`, aktywny `PointerInputMode` blokuje pisanie palcem,
-  a przycisk rysika ustawia gumkę dla aktywnego stroke'a także gdy `buttons`
-  zmienia się w trakcie ruchu.
-- 2313: `_syncActiveToolWithPointerMove(...)`.
-- 2354: `_commitCurrentSegment(...)` / 2415: `_addCurrentStroke(...)`.
-- 2428: `_tryCommitScratchErase(...)` — jeśli `scratchEraseEnabled`,
+  `Move` mierzy czas obsługi eventu, a przycisk rysika ustawia gumkę dla
+  aktywnego stroke'a także gdy `buttons` zmienia się w trakcie ruchu.
+- 2659: `_syncActiveToolWithPointerMove(...)`.
+- 2700: `_commitCurrentSegment(...)` / 2760: `_addCurrentStroke(...)`.
+- 2774: `_tryCommitScratchErase(...)` — jeśli `scratchEraseEnabled`,
   notebookowy wariant częściowego wycinania konwertuje gest z dokumentu do
-  koordynatów strony.
-- 2469: `_clearCurrentSegmentForToolSwitch()`.
-- 2504: `_resetCurrent`.
-- 2540: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski,
-  koalescowany do jednej zaplanowanej klatki.
-- 2553: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
-- 2561: `_activeTool(controller)` — zwraca override z przycisku rysika albo
+  koordynatów strony; loguje jedną linię `[scratch]` tylko przy rozpoznanym
+  geście bazgrołowej gumki.
+- 2827: `_clearCurrentSegmentForToolSwitch()`.
+- 2862: `_resetCurrent`.
+- 2901: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski,
+  koalescowany do jednej zaplanowanej klatki; aktualizuje metryki `_inkPerf`.
+- 2916: `_logStrokeUp(...)` — jedna linia `[ink]` po zakończeniu stroke'a
+  notebooka z rozmiarem renderowanego zakresu stron i `FrameTimingSummary`,
+  plus zapis podejrzanych przypadków do `OptimizationLog`; zawiera też
+  rozbicie `canvasBuildUs*`, `savedPaintUs*`, `overlayPaintUs*`.
+- 2967: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
+- 2975: `_activeTool(controller)` — zwraca override z przycisku rysika albo
   aktualne narzędzie controllera.
-- 2565: `_toWorld(local)`.
-- 2569: `_activePageClipRect()` — clip aktywnego overlayu tuszu do strony.
-- 2603: `_pageOrigin(pageIndex)` / 2613: `_toPageLocal(world, pageIndex)` /
-  2621: `_toDocument(pageLocal, pageIndex)` / 2629: `_isInsidePage(pageLocal)`.
-- 2636: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
-- 2657: `_startSnapTimer`.
-- 2667: `_eraseAt(localOffset, pageIndex)`.
-- 2682: `_strokeHitTest` / 2701: `_distanceSquaredToSegment`.
-- 2727: `_snapToShape`.
-- 2785: `_clearSnapHintSoon`.
-- 2798: `_isRoughlyStraight` / 2822: `_isRoughlyRectangle` / 2847: `_isRoughlyEllipse`.
-- 2916: `_findFarthestCorner`.
-- 2940: `_isInkTool` / 2944: `_isSnapTool` /
-  2948: `_usesCustomInkCursor` / 2952: `_effectiveStrokeWidth`.
-- 2990: `_squareCorner`.
+- 2979: `_toWorld(local)`.
+- 3024: `_pageOrigin(pageIndex)` / 3034: `_toPageLocal(world, pageIndex)` /
+  3042: `_toDocument(pageLocal, pageIndex)` / 3050: `_isInsidePage(pageLocal)`.
+- 3057: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
+- 3078: `_startSnapTimer`.
+- 3088: `_eraseAt(localOffset, pageIndex)`.
+- 3103: `_strokeHitTest` / 3122: `_distanceSquaredToSegment`.
+- 3148: `_snapToShape`.
+- 3206: `_clearSnapHintSoon`.
+- 3219: `_isRoughlyStraight` / 3243: `_isRoughlyRectangle` / 3268: `_isRoughlyEllipse`.
+- 3337: `_findFarthestCorner`.
+- 3361: `_isInkTool` / 3365: `_isSnapTool` /
+  3369: `_usesCustomInkCursor` / 3373: `_effectiveStrokeWidth`.
+- 3411: `_squareCorner`.
 
 #### Paintery
-- 3090: `class _InkPainter extends CustomPainter` (board) — rysuje zapisane
-  stroke'i i lasso selection; nie odświeża się przy każdym punkcie aktywnej kreski.
-- 3191: `class _InkOverlayPainter extends CustomPainter` — lekka warstwa
+- 3511: `class _InkPainter extends CustomPainter` (board) — rysuje zapisane
+  stroke'i i lasso selection w pełnym `saveLayer`; loguje `savedPaintUs*`;
+  nie odświeża się przy każdym punkcie aktywnej kreski.
+- 3557: `class _InkOverlayPainter extends CustomPainter` — lekka warstwa
   aktywnej kreski, snap hint i śladu magicznej gumki,
-  sterowana `ValueNotifier`; może klipować aktywny notebookowy stroke do
-  aktualnej strony; ślad magicznej gumki jest krótkim, rozmytym trailem bez
+  sterowana `ValueNotifier`; ślad magicznej gumki jest krótkim, rozmytym trailem bez
   rdzenia, z gradientową maską ogona do pełnej przezroczystości, aktywny ślad
   zwykłej gumki ma kolor papieru, ale pojedynczy punkt zwykłej gumki nie jest
   rysowany jako okrągły preview; zapisany stroke gumki nadal czyści przez
   `BlendMode.clear`.
-- 3422: `class _DocumentInkPainter extends CustomPainter` (notebook) —
+- 3781: `class _DocumentInkPainter extends CustomPainter` (notebook) —
   analogiczny painter zapisanych stroke'ów dla dokumentu; filtruje zakres po
-  `firstPageIndex/lastPageIndex`, zawęża `saveLayer` do renderowanego zakresu,
-  klipuje stroke'i do prostokąta strony, a zaznaczenie po `selectedPageIndex`.
+  `firstPageIndex/lastPageIndex`, używa pełnego `saveLayer`, zaznaczenie po
+  `selectedPageIndex`, loguje `savedPaintUs*`.
 
 ### `lib/features/editor/presentation/widgets/page_overlay.dart` (1995 linii)
 Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
@@ -1126,7 +1269,7 @@ Pasek formatowania tekstu (pokazywany gdy aktywny TextBlock).
 
 ---
 
-### `lib/features/board/presentation/board_screen.dart` (878 linii)
+### `lib/features/board/presentation/board_screen.dart` (939 linii)
 Edytor canvas (kind=board): jedna „strona" o nieograniczonych granicach,
 swobodne rozmieszczanie + zoom/pan z trackpada/touch.
 - 27: `class BoardScreen extends StatefulWidget`.
@@ -1154,13 +1297,47 @@ swobodne rozmieszczanie + zoom/pan z trackpada/touch.
 - 553: `build` — Scaffold(AppBar tytuł boarda+settings) + Column(EditorToolbar,
   TextEditToolbar opcjonalnie, Stack(Transform pan/zoom
   z `PageBackgroundPaint(origin: boardRect.topLeft)`, DrawingCanvas i
-  PageOverlay, `_BoardZoomControls` pozycjonowane) + `BusyOverlay`.
-- 796: `enum _BoardContextAction { paste }`.
-- 798: `_PasteFromClipboardIntent` / 802 Copy / 806 Cut / 810 Delete (te same
+  PageOverlay, `_BoardZoomControls` pozycjonowane) + `BusyOverlay`; w
+  `LayoutBuilder` mierzy też `sceneBuildUs*` i owija warstwy boarda w
+  `_BoardPaintProbe`, żeby logować `scene/background/overlay/canvasHost`.
+- 820: `class _BoardPaintProbe` / 837 `_RenderBoardPaintProbe` — cienki
+  `RenderProxyBox` mierzący czas `paint()` wybranej warstwy boarda i
+  zapisujący próbkę do `BoardScenePerfTracker`.
+- 858: `enum _BoardContextAction { paste }`.
+- 860: `_PasteFromClipboardIntent` / 864 Copy / 868 Cut / 872 Delete (te same
   intent klasy co w editor_screen ale lokalne).
-- 814: `class _BoardZoomControls` — przyciski +/–/fit/reset zoom.
+- 876: `class _BoardZoomControls` — przyciski +/–/fit/reset zoom.
 
 ---
+
+### `test/notebook_repository_test.dart` (236 linii)
+- 11: `saveNotebook updates existing notebook without breaking foreign keys` —
+  smoke test zapisu pełnego snapshotu notebooka.
+- 31: `database open retries transient failures without resetting data` —
+  sprawdza trzy próby otwarcia i brak flagi resetu po sukcesie.
+- 59: `database open fails closed after retries` — sprawdza, że trwały błąd
+  jest zwracany z etapem, liczbą prób i przyczyną bez destrukcyjnego fallbacku.
+- 94: `older snapshot cannot replace newer notebook data` — sprawdza, że
+  starszy snapshot nie usuwa nowszych stron ani metadanych.
+- 128: `later equal-timestamp snapshot wins in save order` — kolejka per UID
+  zachowuje kolejność równoległych zapisów o równym czasie.
+- 145: `empty snapshot cannot erase notebook pages` — walidacja blokuje zapis
+  dokumentu bez stron.
+- 160: `top-level fetch failure is reported instead of returning empty` — błąd
+  odczytu nie jest przedstawiany jako pusta baza.
+- 172: `metadata update preserves pages and blocks an older snapshot` —
+  sprawdza zapis samego nagłówka i późniejsze odrzucenie starego modelu.
+- 194: `corrupt stroke does not hide its notebook or page` — sprawdza
+  częściowy odczyt, oznaczenie UID, blokadę zapisu i zachowanie wadliwego
+  rekordu w SQLite.
+
+### `test/cloud_sync_service_test.dart` (24 linie)
+- 11: `local snapshot wins when sync timestamps are equal` — remis czasu nie
+  pozwala chmurze zastąpić lokalnego snapshotu.
+
+### `test/library_controller_test.dart` (33 linie)
+- 13: `load failure preserves previously visible notebooks` — błąd głównego
+  odczytu pozostawia poprzednią listę i kończy stan ładowania.
 
 ### `test/backup_eraser_flattening_test.dart` (96 linii)
 Testy sanitizacji backupu gumki.
@@ -1174,21 +1351,20 @@ Testy sanitizacji backupu gumki.
 
 ### `test/widget_test.dart` (20 linii)
 Smoke test: `NotesApp` pumpuje `MaterialApp` + jeden `CircularProgressIndicator`
-(bo `IsarService.open()` jeszcze biegnie).
+(bo `NotesDatabase.open()` jeszcze biegnie).
 
 ## 4. Kluczowe konwencje, na które agent musi uważać
 
-- **Schemat Isar**: każda zmiana w `notebook_entity.dart` wymaga regeneracji
-  `*.g.dart` (`dart run build_runner build --delete-conflicting-outputs`)
-  i podbicia `kManualSchemaRevision` w
-  [isar_service.dart:9](lib/data/isar/isar_service.dart#L9). Brak podbicia →
-  aplikacja zrobi auto-wipe i pokaże banner reset.
-- **`_toolFromIndex`/`_toolToIndex`** (repo, [linie 650 i 658](lib/features/notebook/data/notebook_repository.dart#L650))
+- **Schemat Drift**: każda zmiana tabel w
+  [notes_database.dart](lib/data/drift/notes_database.dart) wymaga regeneracji
+  `notes_database.g.dart` (`dart run build_runner build`) i świadomego
+  podbicia `schemaVersion` + migracji, jeśli trzeba zachować istniejące dane.
+- **`_toolFromIndex`/`_toolToIndex`** (repo, [linie 1005 i 1013](lib/features/notebook/data/notebook_repository.dart#L1005))
   są obecnie **symetryczne** (`tool.index` ↔ `DrawingTool.values[index]`).
   Wcześniejsza wersja była dziurawa (gubiła square/circle/triangle/ellipse/
-  text/image/edit przy roundtripie) — schema bumpnięty z 1 do 2, żeby wymusić
-  auto-wipe. Zmieniasz kolejność `DrawingTool.values`? Albo dodajesz/wycinasz
-  wartość pośrodku? Bump `kManualSchemaRevision` ponownie.
+  text/image/edit przy roundtripie). Zmieniasz kolejność `DrawingTool.values`?
+  Albo dodajesz/wycinasz wartość pośrodku? Zaplanuj migrację zapisanych
+  `toolIndex`.
 - **Save flow**: mutacje w `EditorController` debouncują `_save()` → repo →
   `onChanged` → `_BackupScheduler` → `LocalBackupService.snapshot` po idle.
   Backup jest przyrostowy per notebook (`manifest.json` + `notebooks/<uid>.json`).
@@ -1207,10 +1383,10 @@ Smoke test: `NotesApp` pumpuje `MaterialApp` + jeden `CircularProgressIndicator`
   są wyłączone gdy aktywny jest TextEditor
   ([editor_screen.dart:1037](lib/features/editor/presentation/editor_screen.dart#L1037)).
 - **Migracja obrazów w `saveNotebook`**
-  ([notebook_repository.dart:148](lib/features/notebook/data/notebook_repository.dart#L148))
+  ([notebook_repository.dart:194](lib/features/notebook/data/notebook_repository.dart#L194))
   przenosi stare inline `bytes` z nietrwałą/pustą ścieżką do katalogu
   dokumentów aplikacji i czyści `bytes` po utrwaleniu pliku. `bytes` nie są
-  zapisywane do Isara, jeśli blok ma trwały `path`, żeby duże obrazy nie
+  zapisywane do SQLite, jeśli blok ma trwały `path`, żeby duże obrazy nie
   spowalniały zapisu i odczytu notebooka.
 
 ## 5. Skrypty / przydatne komendy
@@ -1220,7 +1396,8 @@ flutter pub get
 flutter run                                # uruchomienie aplikacji
 dart format lib test                       # formatowanie
 dart analyze                               # analiza statyczna
-dart run build_runner build --delete-conflicting-outputs   # regen Isar
+dart run build_runner build                # regen Drift
+dart compile js -O4 -o web/drift_worker.dart.js web/drift_worker.dart
 flutter test                               # smoke test
 ```
 

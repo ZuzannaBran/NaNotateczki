@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../core/diagnostics/frame_timing_tracker.dart';
+import '../core/diagnostics/optimization_log.dart';
 import '../core/error/app_error_log.dart';
 import '../core/input/app_preferences_controller.dart';
 import '../core/theme/app_theme.dart';
 import '../data/backup/local_backup_service.dart';
-import '../data/isar/isar_service.dart';
+import '../data/drift/notes_database.dart';
 import '../data/sync/cloud_sync_service.dart';
 import '../features/library/presentation/library_controller.dart';
 import '../features/library/presentation/library_screen.dart';
@@ -22,12 +24,18 @@ class AppScope extends StatefulWidget {
 }
 
 class _AppScopeState extends State<AppScope> {
-  late final Future<IsarOpenResult> _openFuture = IsarService.open();
+  late final Future<DatabaseOpenResult> _openFuture = NotesDatabase.open();
   NotebookRepository? _repository;
   LocalBackupService? _backupService;
   CloudSyncService? _cloudSync;
   _BackupScheduler? _backupScheduler;
   bool _openErrorRecorded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    FrameTimingTracker.instance.initialize();
+  }
 
   @override
   void dispose() {
@@ -37,7 +45,7 @@ class _AppScopeState extends State<AppScope> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<IsarOpenResult>(
+    return FutureBuilder<DatabaseOpenResult>(
       future: _openFuture,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -53,7 +61,7 @@ class _AppScopeState extends State<AppScope> {
             debugShowCheckedModeBanner: false,
             title: 'Notatek',
             theme: AppTheme.light(),
-            home: const _StartupErrorScreen(),
+            home: _StartupErrorScreen(error: snapshot.error!),
           );
         }
 
@@ -64,12 +72,10 @@ class _AppScopeState extends State<AppScope> {
         }
 
         final result = snapshot.data!;
-        final isarService = result.service;
-
         final repository =
             _repository ??
             NotebookRepository(
-              isarService.isar,
+              result.database,
               onChanged: () => _backupScheduler?.schedule(),
             );
         _repository = repository;
@@ -113,48 +119,73 @@ class _AppScopeState extends State<AppScope> {
 }
 
 class _StartupErrorScreen extends StatelessWidget {
-  const _StartupErrorScreen();
+  const _StartupErrorScreen({required this.error});
+
+  final Object error;
 
   @override
   Widget build(BuildContext context) {
+    final databaseError = error is DatabaseOpenException
+        ? error as DatabaseOpenException
+        : null;
     return Scaffold(
       appBar: AppBar(title: const Text('Startup error')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'The app could not finish startup.',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Copy the error details and send them with your test report.',
-                ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: () async {
-                    await Clipboard.setData(
-                      ClipboardData(
-                        text: AppErrorLog.instance.toClipboardText(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      databaseError == null
+                          ? 'The app could not finish startup.'
+                          : 'The notes database could not be opened.',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    if (databaseError != null) ...[
+                      Text('Failed stage: ${databaseError.stageLabel}.'),
+                      const SizedBox(height: 6),
+                      Text('Attempts: ${databaseError.attempts}.'),
+                      const SizedBox(height: 6),
+                      SelectableText('System error: ${databaseError.cause}'),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'The database file was left untouched. No automatic '
+                        'reset was performed.',
                       ),
-                    );
-                    if (!context.mounted) {
-                      return;
-                    }
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Errors copied.')),
-                    );
-                  },
-                  icon: const Icon(Icons.copy),
-                  label: const Text('Copy errors'),
+                    ] else
+                      SelectableText('System error: $error'),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Copy the full error details and send them with your '
+                      'test report.',
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(
+                          ClipboardData(
+                            text: AppErrorLog.instance.toClipboardText(),
+                          ),
+                        );
+                        if (!context.mounted) {
+                          return;
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Errors copied.')),
+                        );
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copy errors'),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -196,14 +227,73 @@ class _BackupScheduler with WidgetsBindingObserver {
     }
     _dirty = false;
     _isRunning = true;
+    final frameCursor = FrameTimingTracker.instance.captureCursor();
+    final totalStopwatch = Stopwatch()..start();
+    var fetchMs = 0;
+    BackupSnapshotReport? snapshotReport;
+    var itemCount = 0;
     try {
+      final fetchStopwatch = Stopwatch()..start();
       final items = await repository.fetchNotebooks();
+      fetchStopwatch.stop();
+      fetchMs = fetchStopwatch.elapsedMilliseconds;
+      itemCount = items.length;
       if (repository.lastFetchSkippedCorruptRows) {
+        final frameSummary = FrameTimingTracker.instance.summarySince(
+          frameCursor,
+        );
+        debugPrint(
+          '[backup] reason=$reason skipped=corruptRows items=$itemCount '
+          'fetchMs=$fetchMs totalMs=${totalStopwatch.elapsedMilliseconds} '
+          '${frameSummary.toLogString()}',
+        );
+        OptimizationLog.instance.recordBackup(
+          reason: reason,
+          items: itemCount,
+          fetchMs: fetchMs,
+          snapshotMs: 0,
+          totalMs: totalStopwatch.elapsedMilliseconds,
+          status: 'corruptRows',
+        );
         return;
       }
-      await backupService.snapshot(items);
+      snapshotReport = await backupService.snapshot(items);
+      final frameSummary = FrameTimingTracker.instance.summarySince(
+        frameCursor,
+      );
+      debugPrint(
+        '[backup] reason=$reason items=$itemCount fetchMs=$fetchMs '
+        'snapshotMs=${snapshotReport.totalMs} '
+        'totalMs=${totalStopwatch.elapsedMilliseconds} '
+        '${snapshotReport.toLogString()} ${frameSummary.toLogString()}',
+      );
+      OptimizationLog.instance.recordBackup(
+        reason: reason,
+        items: itemCount,
+        fetchMs: fetchMs,
+        snapshotMs: snapshotReport.totalMs,
+        totalMs: totalStopwatch.elapsedMilliseconds,
+        status: 'ok',
+      );
     } catch (e) {
-      debugPrint('BackupScheduler.flush failed: $e');
+      final frameSummary = FrameTimingTracker.instance.summarySince(
+        frameCursor,
+      );
+      debugPrint(
+        '[backup] reason=$reason failed=1 items=$itemCount '
+        'fetchMs=$fetchMs snapshotMs=${snapshotReport?.totalMs ?? 0} '
+        'totalMs=${totalStopwatch.elapsedMilliseconds} '
+        '${frameSummary.toLogString()} error=$e',
+      );
+      OptimizationLog.instance.recordBackup(
+        reason: reason,
+        items: itemCount,
+        fetchMs: fetchMs,
+        snapshotMs: snapshotReport?.totalMs ?? 0,
+        totalMs: totalStopwatch.elapsedMilliseconds,
+        status: 'failed',
+        error: e.toString(),
+      );
     } finally {
       _isRunning = false;
       if (_dirty) {

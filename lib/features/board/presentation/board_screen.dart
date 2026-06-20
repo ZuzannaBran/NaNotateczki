@@ -9,9 +9,11 @@ import 'package:flutter/gestures.dart'
         PointerScrollEvent,
         PointerSignalEvent;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/diagnostics/board_scene_perf_tracker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/export/notebook_export_service.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
@@ -585,6 +587,7 @@ class _BoardScreenState extends State<BoardScreen> {
               borderRadius: BorderRadius.circular(16),
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  final buildStopwatch = Stopwatch()..start();
                   final viewportSize = Size(
                     constraints.maxWidth,
                     constraints.maxHeight,
@@ -616,7 +619,7 @@ class _BoardScreenState extends State<BoardScreen> {
                     viewportSize.height / 2,
                   );
 
-                  return Listener(
+                  final child = Listener(
                     key: _boardKey,
                     behavior: HitTestBehavior.translucent,
                     onPointerDown: (event) => _onPointerDown(event, controller),
@@ -642,51 +645,66 @@ class _BoardScreenState extends State<BoardScreen> {
                       child: Stack(
                         children: [
                           Positioned.fill(
-                            child: OverflowBox(
-                              alignment: Alignment.topLeft,
-                              minWidth: 0,
-                              minHeight: 0,
-                              maxWidth: double.infinity,
-                              maxHeight: double.infinity,
-                              child: Transform(
-                                transform: transform,
-                                child: SizedBox(
-                                  width: boardRect.width,
-                                  height: boardRect.height,
-                                  child: Stack(
-                                    children: [
-                                      Positioned.fill(
-                                        child: PageBackgroundPaint(
-                                          settings: controller
-                                              .currentBackgroundSettings,
-                                          origin: boardRect.topLeft,
+                            child: _BoardPaintProbe(
+                              layerName: 'scenePaint',
+                              child: OverflowBox(
+                                alignment: Alignment.topLeft,
+                                minWidth: 0,
+                                minHeight: 0,
+                                maxWidth: double.infinity,
+                                maxHeight: double.infinity,
+                                child: Transform(
+                                  transform: transform,
+                                  child: SizedBox(
+                                    width: boardRect.width,
+                                    height: boardRect.height,
+                                    child: Stack(
+                                      children: [
+                                        Positioned.fill(
+                                          child: _BoardPaintProbe(
+                                            layerName: 'backgroundPaint',
+                                            child: PageBackgroundPaint(
+                                              settings: controller
+                                                  .currentBackgroundSettings,
+                                              origin: boardRect.topLeft,
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                      PageOverlay(
-                                        controller: controller,
-                                        interactionEnabled:
-                                            !_isViewportNavigating,
-                                        worldOrigin: boardRect.topLeft,
-                                        renderBackground: true,
-                                        renderInactive: true,
-                                        renderActive: false,
-                                      ),
-                                      DrawingCanvas(
-                                        allowMultiTouch: false,
-                                        interactionEnabled:
-                                            !_isViewportNavigating,
-                                        worldOrigin: boardRect.topLeft,
-                                      ),
-                                      PageOverlay(
-                                        controller: controller,
-                                        interactionEnabled:
-                                            !_isViewportNavigating,
-                                        worldOrigin: boardRect.topLeft,
-                                        renderBackground: false,
-                                        renderInactive: false,
-                                        renderActive: true,
-                                      ),
-                                    ],
+                                        _BoardPaintProbe(
+                                          layerName: 'inactiveOverlayPaint',
+                                          child: PageOverlay(
+                                            controller: controller,
+                                            interactionEnabled:
+                                                !_isViewportNavigating,
+                                            worldOrigin: boardRect.topLeft,
+                                            renderBackground: true,
+                                            renderInactive: true,
+                                            renderActive: false,
+                                          ),
+                                        ),
+                                        _BoardPaintProbe(
+                                          layerName: 'canvasHostPaint',
+                                          child: DrawingCanvas(
+                                            allowMultiTouch: false,
+                                            interactionEnabled:
+                                                !_isViewportNavigating,
+                                            worldOrigin: boardRect.topLeft,
+                                          ),
+                                        ),
+                                        _BoardPaintProbe(
+                                          layerName: 'activeOverlayPaint',
+                                          child: PageOverlay(
+                                            controller: controller,
+                                            interactionEnabled:
+                                                !_isViewportNavigating,
+                                            worldOrigin: boardRect.topLeft,
+                                            renderBackground: false,
+                                            renderInactive: false,
+                                            renderActive: true,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -713,6 +731,11 @@ class _BoardScreenState extends State<BoardScreen> {
                       ),
                     ),
                   );
+                  buildStopwatch.stop();
+                  BoardScenePerfTracker.instance.recordBuild(
+                    buildStopwatch.elapsedMicroseconds,
+                  );
+                  return child;
                 },
               ),
             ),
@@ -790,6 +813,44 @@ class _BoardScreenState extends State<BoardScreen> {
           if (_isBusy) const Positioned.fill(child: BusyOverlay()),
         ],
       ),
+    );
+  }
+}
+
+class _BoardPaintProbe extends SingleChildRenderObjectWidget {
+  const _BoardPaintProbe({required this.layerName, required super.child});
+
+  final String layerName;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return _RenderBoardPaintProbe(layerName);
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, RenderObject renderObject) {
+    final paintProbe = renderObject as _RenderBoardPaintProbe;
+    paintProbe.layerName = layerName;
+  }
+}
+
+class _RenderBoardPaintProbe extends RenderProxyBox {
+  _RenderBoardPaintProbe(this._layerName);
+
+  String _layerName;
+
+  set layerName(String value) {
+    _layerName = value;
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final stopwatch = Stopwatch()..start();
+    super.paint(context, offset);
+    stopwatch.stop();
+    BoardScenePerfTracker.instance.recordPaint(
+      _layerName,
+      stopwatch.elapsedMicroseconds,
     );
   }
 }

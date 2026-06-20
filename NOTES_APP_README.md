@@ -19,7 +19,7 @@ organization, and export, with local persistence and optional folder sync.
 ## Structure (feature-first)
 - lib/app: app scope, DI, routing.
 - lib/core: theme, shared widgets.
-- lib/data: Isar storage, sync services.
+- lib/data: Drift/SQLite storage, sync services.
 - lib/features:
 	- library: notebooks list, search, sync actions.
 	- notebook: domain models, repository, notebook screen.

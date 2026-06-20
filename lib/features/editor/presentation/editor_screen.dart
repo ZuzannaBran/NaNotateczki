@@ -82,6 +82,7 @@ class _EditorScreenState extends State<EditorScreen> {
   Timer? _touchContextMenuTimer;
   int? _touchContextMenuPointer;
   Offset? _touchContextMenuStart;
+  DateTime? _lastNarrowCanvasLogAt;
 
   @override
   void initState() {
@@ -1221,6 +1222,21 @@ class _EditorScreenState extends State<EditorScreen> {
     _touchContextMenuStart = null;
   }
 
+  void _logNarrowCanvas(double width) {
+    assert(() {
+      final now = DateTime.now();
+      final last = _lastNarrowCanvasLogAt;
+      if (last == null || now.difference(last) > const Duration(seconds: 2)) {
+        _lastNarrowCanvasLogAt = now;
+        debugPrint(
+          '[layout] nb narrow w=${width.toStringAsFixed(0)} '
+          'min=${_minUsableCanvasWidth.toStringAsFixed(0)}',
+        );
+      }
+      return true;
+    }());
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
@@ -1243,6 +1259,7 @@ class _EditorScreenState extends State<EditorScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               if (constraints.maxWidth < _minUsableCanvasWidth) {
+                _logNarrowCanvas(constraints.maxWidth);
                 return const ColoredBox(
                   color: AppColors.paper,
                   child: Center(
@@ -1738,11 +1755,6 @@ class _EditorScreenState extends State<EditorScreen> {
         titleSpacing: useWideTitleInset ? 44 : null,
         title: Text(controller.notebook.title),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bookmark_outline),
-            tooltip: 'Bookmark page',
-            onPressed: controller.toggleBookmark,
-          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',

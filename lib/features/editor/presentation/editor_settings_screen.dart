@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/diagnostics/optimization_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../core/input/app_preferences_controller.dart';
 import '../../notebook/domain/notebook_kind.dart';
@@ -151,6 +152,24 @@ class EditorSettingsScreen extends StatelessWidget {
                           );
                         },
                       ),
+                      AnimatedBuilder(
+                        animation: OptimizationLog.instance,
+                        builder: (context, _) {
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
+                            title: const Text('Optimization'),
+                            subtitle: Text(
+                              OptimizationLog.instance.isEmpty
+                                  ? 'No suspicious events recorded.'
+                                  : '${OptimizationLog.instance.length} recorded.',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => _showOptimizationDialog(context),
+                          );
+                        },
+                      ),
                     ],
                   ),
                   ListView(
@@ -264,6 +283,92 @@ Future<void> _showErrorsDialog(BuildContext context) {
                   }
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Errors copied.')),
+                  );
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Copy'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+Future<void> _showOptimizationDialog(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder: (context) {
+      return AnimatedBuilder(
+        animation: OptimizationLog.instance,
+        builder: (context, _) {
+          final logText = OptimizationLog.instance.toClipboardText();
+          return AlertDialog(
+            title: const Text('Optimization'),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      OptimizationLog.instance.isEmpty
+                          ? 'No suspicious optimization events recorded.'
+                          : '${OptimizationLog.instance.length} suspicious events recorded.',
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Filtered entries only. Terminal output still keeps all raw diagnostic logs.',
+                    ),
+                    const SizedBox(height: 12),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: const Text('Preview'),
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          constraints: const BoxConstraints(maxHeight: 280),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).dividerColor,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: SingleChildScrollView(
+                            child: SelectableText(
+                              logText,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: OptimizationLog.instance.isEmpty
+                    ? null
+                    : OptimizationLog.instance.clear,
+                child: const Text('Clear'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: logText));
+                  if (!context.mounted) {
+                    return;
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Optimization log copied.')),
                   );
                 },
                 icon: const Icon(Icons.copy),

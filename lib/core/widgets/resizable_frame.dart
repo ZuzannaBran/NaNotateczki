@@ -40,6 +40,7 @@ class ResizableFrame extends StatefulWidget {
 class _ResizableFrameState extends State<ResizableFrame> {
   Offset? _lastResizeGlobalPosition;
   ResizeDirection? _activeHandle;
+  bool _resizeEndScheduled = false;
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +117,7 @@ class _ResizableFrameState extends State<ResizableFrame> {
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onLongPressStart: (details) {
+              _resizeEndScheduled = false;
               setState(() => _activeHandle = direction);
               _lastResizeGlobalPosition = details.globalPosition;
               widget.onResizeStart?.call(direction);
@@ -129,21 +131,9 @@ class _ResizableFrameState extends State<ResizableFrame> {
               _lastResizeGlobalPosition = details.globalPosition;
               widget.onResizeUpdate?.call(direction, delta);
             },
-            onLongPressEnd: (_) {
-              setState(() => _activeHandle = null);
-              _lastResizeGlobalPosition = null;
-              widget.onResizeEnd?.call(direction);
-            },
-            onLongPressUp: () {
-              setState(() => _activeHandle = null);
-              _lastResizeGlobalPosition = null;
-              widget.onResizeEnd?.call(direction);
-            },
-            onLongPressCancel: () {
-              setState(() => _activeHandle = null);
-              _lastResizeGlobalPosition = null;
-              widget.onResizeEnd?.call(direction);
-            },
+            onLongPressEnd: (_) => _endResize(direction),
+            onLongPressUp: () => _endResize(direction),
+            onLongPressCancel: () => _endResize(direction, defer: true),
             child: SizedBox(
               width: widget.handleHitSize,
               height: widget.handleHitSize,
@@ -167,6 +157,37 @@ class _ResizableFrameState extends State<ResizableFrame> {
         ),
       ),
     );
+  }
+
+  void _endResize(ResizeDirection direction, {bool defer = false}) {
+    if (_activeHandle != direction && _lastResizeGlobalPosition == null) {
+      return;
+    }
+    if (_resizeEndScheduled) {
+      return;
+    }
+    _resizeEndScheduled = true;
+    _activeHandle = null;
+    _lastResizeGlobalPosition = null;
+
+    void notifyEnd() {
+      _resizeEndScheduled = false;
+      widget.onResizeEnd?.call(direction);
+    }
+
+    if (defer) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {});
+        notifyEnd();
+      });
+      return;
+    }
+
+    setState(() {});
+    notifyEnd();
   }
 
   Offset _globalToFrameLocal(Offset globalPosition) {

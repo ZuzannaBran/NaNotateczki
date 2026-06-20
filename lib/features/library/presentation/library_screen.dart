@@ -32,6 +32,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   bool _showLeftNavigation = true;
   double _folderPaneWidth = 220;
   double _itemsPaneWidth = 320;
+  bool _isShowingCorruptRecoveryDialog = false;
 
   @override
   void initState() {
@@ -45,6 +46,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<LibraryController>();
     final selectedItem = controller.selectedItem();
+    _maybeShowCorruptRecoveryDialog(controller);
 
     return Scaffold(
       body: Column(
@@ -61,6 +63,55 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 TextButton(
                   onPressed: controller.dismissResetBanner,
                   child: const Text('OK'),
+                ),
+              ],
+            ),
+          if (controller.shouldShowCorruptionBanner)
+            MaterialBanner(
+              backgroundColor: Colors.red.shade50,
+              content: Text(
+                controller.recoverableCorruptDocuments.isNotEmpty
+                    ? 'Some documents could not be loaded. You can restore recovered copies from the local backup.'
+                    : 'Some documents could not be loaded. No matching local backup copy was found.',
+              ),
+              actions: [
+                if (controller.recoverableCorruptDocuments.isNotEmpty)
+                  TextButton(
+                    onPressed: () async {
+                      final restored = await controller
+                          .restoreCorruptDocumentsFromBackup();
+                      if (!context.mounted) {
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            restored > 0
+                                ? 'Recovered $restored document copies from the local backup.'
+                                : 'No document copies were recovered.',
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Recover'),
+                  ),
+                TextButton(
+                  onPressed: controller.dismissCorruptRecoveryPrompt,
+                  child: const Text('Dismiss'),
+                ),
+              ],
+            ),
+          if (controller.loadError != null)
+            MaterialBanner(
+              backgroundColor: Colors.red.shade50,
+              content: const Text(
+                'The library could not be loaded. Existing documents were '
+                'left unchanged.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: controller.isLoading ? null : controller.loadItems,
+                  child: const Text('Retry'),
                 ),
               ],
             ),
@@ -401,6 +452,76 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     await controller.deleteFolder(folder);
+  }
+
+  void _maybeShowCorruptRecoveryDialog(LibraryController controller) {
+    if (!controller.shouldPromptCorruptRecovery ||
+        _isShowingCorruptRecoveryDialog) {
+      return;
+    }
+    _isShowingCorruptRecoveryDialog = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final names = controller.recoverableCorruptDocuments
+          .take(4)
+          .map((item) => item.title.trim().isEmpty ? 'Untitled' : item.title)
+          .toList();
+      final sample = names.join(', ');
+      final extraCount =
+          controller.recoverableCorruptDocuments.length - names.length;
+      final details = sample.isEmpty
+          ? '${controller.corruptDocumentCount} unreadable documents were detected.'
+          : extraCount > 0
+          ? '$sample and $extraCount more.'
+          : sample;
+
+      final shouldRecover = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Damaged documents detected'),
+            content: Text(
+              'Some documents could not be opened. '
+              'Recoverable copies were found in the local backup: $details\n\n'
+              'Recovered copies will be added as separate documents so the '
+              'original damaged data is not overwritten.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('No'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Yes'),
+              ),
+            ],
+          );
+        },
+      );
+
+      _isShowingCorruptRecoveryDialog = false;
+      if (!mounted) {
+        return;
+      }
+      if (shouldRecover == true) {
+        final restored = await controller.restoreCorruptDocumentsFromBackup();
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              restored > 0
+                  ? 'Recovered $restored document copies from the local backup.'
+                  : 'No document copies were recovered.',
+            ),
+          ),
+        );
+        return;
+      }
+      controller.dismissCorruptRecoveryPrompt();
+    });
   }
 }
 

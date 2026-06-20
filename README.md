@@ -6,7 +6,7 @@ Możesz prowadzić klasyczne zeszyty z wieloma stronami, szkicować na swobodnej
 tablicy, wklejać obrazy i tekst, porządkować materiały w folderach, a gotowe
 notatki eksportować do PDF albo PNG.
 
-Projekt jest aplikacją Flutterową z lokalnym zapisem danych w Isarze. Nie
+Projekt jest aplikacją Flutterową z lokalnym zapisem danych w Drift/SQLite. Nie
 wymaga konta ani zewnętrznego backendu: notatki są przechowywane lokalnie,
 backup działa jako pliki JSON, a synchronizacja folderowa zapisuje jeden plik
 w wybranym katalogu.
@@ -97,7 +97,7 @@ w wybranym katalogu.
 
 - Undo/redo dla operacji na tekstach, obrazach, kreskach, zakładkach i lasso.
 - Automatyczny zapis notatki po zmianach.
-- Lokalna baza Isar.
+- Lokalna baza Drift/SQLite.
 - Rotowany lokalny backup JSON: najnowszy snapshot oraz dwie poprzednie kopie.
 - Eksport i import backupu biblioteki jako JSON.
 - Odporne otwieranie bazy z wykrywaniem problemów schematu.
@@ -121,7 +121,7 @@ w wybranym katalogu.
 - Flutter 3.x i Dart `^3.11.1`.
 - Material 3.
 - Provider + ChangeNotifier do stanu aplikacji.
-- Isar 3 jako lokalna baza danych.
+- Drift + SQLite jako lokalna baza danych.
 - `flutter_quill` do edycji tekstu rich text.
 - `pdf`, `pdfx`, `file_picker`, `image_picker`, `super_clipboard`.
 - `google_mlkit_text_recognition` dla OCR na Androidzie i iOS.
@@ -134,7 +134,7 @@ NaNotateczki/
 │   ├── main.dart              # start aplikacji
 │   ├── app/                   # root widget, Provider i bootstrap
 │   ├── core/                  # motyw, metryki i wspólne widgety
-│   ├── data/                  # Isar, backup, eksport, synchronizacja
+│   ├── data/                  # Drift/SQLite, backup, eksport, synchronizacja
 │   └── features/
 │       ├── library/           # biblioteka, foldery, search, sync
 │       ├── notebook/          # modele domenowe i repository
@@ -172,10 +172,10 @@ dart analyze
 flutter test
 ```
 
-Po zmianach w encjach Isara trzeba dodatkowo uruchomić:
+Po zmianach w schemacie Drifta trzeba dodatkowo uruchomić:
 
 ```bash
-dart run build_runner build --delete-conflicting-outputs
+dart run build_runner build
 ```
 
 ## Ważne ograniczenia
@@ -192,9 +192,9 @@ dart run build_runner build --delete-conflicting-outputs
 ## Dla osób rozwijających projekt
 
 - Przed zmianami w `lib/` przeczytaj `PROJECT_MAP.md`.
-- Nie edytuj ręcznie wygenerowanego `notebook_entity.g.dart`.
-- Zmiany schematu Isara wymagają regeneracji plików i podbicia ręcznej rewizji
-  schematu.
+- Nie edytuj ręcznie wygenerowanego `notes_database.g.dart`.
+- Zmiany schematu Drifta wymagają regeneracji plików i świadomej migracji
+  `schemaVersion`, jeśli trzeba zachować istniejące dane.
 - Mutacje w edytorze, które użytkownik powinien móc cofnąć, powinny przechodzić
   przez akcje undo/redo w `EditorAction`.
 - `DrawingCanvas` i `DocumentDrawingCanvas` są podobne, ale obsługują inne

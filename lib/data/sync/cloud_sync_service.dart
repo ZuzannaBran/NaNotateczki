@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../features/notebook/data/notebook_repository.dart';
@@ -58,7 +59,7 @@ class CloudSyncService {
 
     final cloudFile = File('${cloudDir.path}/$_cloudFileName');
     final cloudNotebooks = await _readCloudNotebooks(cloudFile);
-    final merged = _mergeNotebooks(local, cloudNotebooks);
+    final merged = mergeNotebooks(local, cloudNotebooks);
 
     for (final notebook in merged) {
       await repository.saveNotebook(notebook);
@@ -86,7 +87,8 @@ class CloudSyncService {
     return repository.decodeNotebooks(data);
   }
 
-  List<Notebook> _mergeNotebooks(List<Notebook> local, List<Notebook> cloud) {
+  @visibleForTesting
+  List<Notebook> mergeNotebooks(List<Notebook> local, List<Notebook> cloud) {
     final Map<String, Notebook> merged = {
       for (final notebook in cloud) notebook.uid: notebook,
     };
@@ -96,9 +98,9 @@ class CloudSyncService {
         merged[notebook.uid] = notebook;
         continue;
       }
-      merged[notebook.uid] = notebook.updatedAt.isAfter(existing.updatedAt)
-          ? notebook
-          : existing;
+      merged[notebook.uid] = notebook.updatedAt.isBefore(existing.updatedAt)
+          ? existing
+          : notebook;
     }
     return merged.values.toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));

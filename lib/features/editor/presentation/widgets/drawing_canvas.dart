@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/diagnostics/board_scene_perf_tracker.dart';
+import '../../../../core/diagnostics/frame_timing_tracker.dart';
+import '../../../../core/diagnostics/optimization_log.dart';
 import '../../../../core/input/stylus_button_state.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../notebook/domain/drawing_tool.dart';
@@ -28,6 +31,263 @@ const int _scratchEraseMinDirectionReversals = 3;
 const int _scratchEraseMinInkHits = 3;
 const Color _canvasBackgroundColor = AppColors.paper;
 const Color _lassoAccentColor = Color(0xFF2E5AAC);
+const Set<String> _emptyStrokeIdSet = <String>{};
+
+void _debugInkLog(String message) {
+  assert(() {
+    debugPrint(message);
+    return true;
+  }());
+}
+
+class _InkPerfLog {
+  int _moveSamples = 0;
+  int _moveTotalUs = 0;
+  int _moveMaxUs = 0;
+  int _notifyCalls = 0;
+  int _scheduledFrames = 0;
+  int _frameTotalUs = 0;
+  int _frameMaxUs = 0;
+  int _buildSamples = 0;
+  int _buildTotalUs = 0;
+  int _buildMaxUs = 0;
+  int _savedPaintSamples = 0;
+  int _savedPaintTotalUs = 0;
+  int _savedPaintMaxUs = 0;
+  int _overlayPaintSamples = 0;
+  int _overlayPaintTotalUs = 0;
+  int _overlayPaintMaxUs = 0;
+
+  void reset() {
+    _moveSamples = 0;
+    _moveTotalUs = 0;
+    _moveMaxUs = 0;
+    _notifyCalls = 0;
+    _scheduledFrames = 0;
+    _frameTotalUs = 0;
+    _frameMaxUs = 0;
+    _buildSamples = 0;
+    _buildTotalUs = 0;
+    _buildMaxUs = 0;
+    _savedPaintSamples = 0;
+    _savedPaintTotalUs = 0;
+    _savedPaintMaxUs = 0;
+    _overlayPaintSamples = 0;
+    _overlayPaintTotalUs = 0;
+    _overlayPaintMaxUs = 0;
+  }
+
+  Stopwatch? _startStopwatch() {
+    if (!kDebugMode) {
+      return null;
+    }
+    return Stopwatch()..start();
+  }
+
+  Stopwatch? startMove() => _startStopwatch();
+
+  Stopwatch? startBuild() => _startStopwatch();
+
+  Stopwatch? startPaint() => _startStopwatch();
+
+  void recordMove(Stopwatch? stopwatch) {
+    if (stopwatch == null) {
+      return;
+    }
+    stopwatch.stop();
+    final elapsed = stopwatch.elapsedMicroseconds;
+    _moveSamples++;
+    _moveTotalUs += elapsed;
+    _moveMaxUs = max(_moveMaxUs, elapsed);
+  }
+
+  void recordBuild(Stopwatch? stopwatch) {
+    _recordTimedSample(
+      stopwatch,
+      onElapsed: (elapsed) {
+        _buildSamples++;
+        _buildTotalUs += elapsed;
+        _buildMaxUs = max(_buildMaxUs, elapsed);
+      },
+    );
+  }
+
+  void recordSavedPaint(Stopwatch? stopwatch) {
+    _recordTimedSample(
+      stopwatch,
+      onElapsed: (elapsed) {
+        _savedPaintSamples++;
+        _savedPaintTotalUs += elapsed;
+        _savedPaintMaxUs = max(_savedPaintMaxUs, elapsed);
+      },
+    );
+  }
+
+  void recordOverlayPaint(Stopwatch? stopwatch) {
+    _recordTimedSample(
+      stopwatch,
+      onElapsed: (elapsed) {
+        _overlayPaintSamples++;
+        _overlayPaintTotalUs += elapsed;
+        _overlayPaintMaxUs = max(_overlayPaintMaxUs, elapsed);
+      },
+    );
+  }
+
+  DateTime? recordNotify({required bool scheduled}) {
+    if (!kDebugMode) {
+      return null;
+    }
+    _notifyCalls++;
+    if (!scheduled) {
+      return null;
+    }
+    _scheduledFrames++;
+    return DateTime.now();
+  }
+
+  void recordFrame(DateTime? scheduledAt) {
+    if (scheduledAt == null) {
+      return;
+    }
+    final elapsed = DateTime.now().difference(scheduledAt).inMicroseconds;
+    _frameTotalUs += elapsed;
+    _frameMaxUs = max(_frameMaxUs, elapsed);
+  }
+
+  String summary() {
+    final moveAvgUs = _moveSamples == 0 ? 0 : _moveTotalUs ~/ _moveSamples;
+    final frameAvgUs = _scheduledFrames == 0
+        ? 0
+        : _frameTotalUs ~/ _scheduledFrames;
+    final buildAvgUs = _buildSamples == 0 ? 0 : _buildTotalUs ~/ _buildSamples;
+    final savedPaintAvgUs = _savedPaintSamples == 0
+        ? 0
+        : _savedPaintTotalUs ~/ _savedPaintSamples;
+    final overlayPaintAvgUs = _overlayPaintSamples == 0
+        ? 0
+        : _overlayPaintTotalUs ~/ _overlayPaintSamples;
+    return 'moveUsAvg=$moveAvgUs moveUsMax=$_moveMaxUs '
+        'notify=$_notifyCalls frames=$_scheduledFrames '
+        'frameUsAvg=$frameAvgUs frameUsMax=$_frameMaxUs '
+        'canvasBuildUsAvg=$buildAvgUs canvasBuildUsMax=$_buildMaxUs '
+        'savedPaintUsAvg=$savedPaintAvgUs savedPaintUsMax=$_savedPaintMaxUs '
+        'overlayPaintUsAvg=$overlayPaintAvgUs '
+        'overlayPaintUsMax=$_overlayPaintMaxUs';
+  }
+
+  int get moveAvgUs => _moveSamples == 0 ? 0 : _moveTotalUs ~/ _moveSamples;
+
+  int get moveMaxUs => _moveMaxUs;
+
+  int get notifyCalls => _notifyCalls;
+
+  int get scheduledFrames => _scheduledFrames;
+
+  int get frameAvgUs =>
+      _scheduledFrames == 0 ? 0 : _frameTotalUs ~/ _scheduledFrames;
+
+  int get frameMaxUs => _frameMaxUs;
+
+  void _recordTimedSample(
+    Stopwatch? stopwatch, {
+    required void Function(int elapsed) onElapsed,
+  }) {
+    if (stopwatch == null) {
+      return;
+    }
+    stopwatch.stop();
+    onElapsed(stopwatch.elapsedMicroseconds);
+  }
+}
+
+void _drawSavedStroke(
+  Canvas canvas,
+  List<InkPoint> points,
+  Color color,
+  double width,
+  DrawingTool tool,
+  Offset origin,
+  Offset worldOrigin, {
+  bool isSelected = false,
+  Offset delta = Offset.zero,
+}) {
+  if (points.isEmpty ||
+      (tool == DrawingTool.eraserBrush && points.length < 2)) {
+    return;
+  }
+
+  final paint = Paint()
+    ..strokeCap = tool == DrawingTool.highlighter
+        ? StrokeCap.square
+        : StrokeCap.round
+    ..strokeJoin = StrokeJoin.round
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = width;
+  if (tool == DrawingTool.eraserArea) {
+    paint
+      ..color = Colors.transparent
+      ..blendMode = BlendMode.clear
+      ..style = PaintingStyle.fill;
+  } else if (tool == DrawingTool.eraserBrush) {
+    paint
+      ..color = Colors.transparent
+      ..blendMode = BlendMode.clear;
+  } else {
+    paint.color = _savedStrokeColor(color, tool);
+  }
+
+  final path = _buildInkPath(points, tool, origin, worldOrigin, delta);
+  if (isSelected) {
+    final highlightPaint = Paint()
+      ..color = _lassoAccentColor.withValues(alpha: 0.22)
+      ..strokeCap = tool == DrawingTool.highlighter
+          ? StrokeCap.square
+          : StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width + 8.0;
+    canvas.drawPath(path, highlightPaint);
+  }
+  if (tool == DrawingTool.eraserArea) {
+    canvas.drawPath(path..close(), paint);
+  } else {
+    canvas.drawPath(path, paint);
+  }
+}
+
+Color _savedStrokeColor(Color base, DrawingTool tool) {
+  if (tool == DrawingTool.lasso) {
+    return _lassoAccentColor.withValues(alpha: 0.38);
+  }
+  if (tool == DrawingTool.highlighter) {
+    return base.withValues(alpha: 0.5);
+  }
+  return base;
+}
+
+class _CanvasProjectStats {
+  const _CanvasProjectStats({
+    required this.pages,
+    required this.renderPages,
+    required this.savedStrokes,
+    required this.savedPoints,
+  });
+
+  final int pages;
+  final int renderPages;
+  final int savedStrokes;
+  final int savedPoints;
+
+  String toLogString() {
+    return 'projPages=$pages renderPages=$renderPages '
+        'savedStrokes=$savedStrokes savedPts=$savedPoints';
+  }
+}
+
+int _strokePointCount(List<InkStroke> strokes) {
+  return strokes.fold<int>(0, (sum, stroke) => sum + stroke.points.length);
+}
 
 class _PartialEraseResult {
   const _PartialEraseResult({required this.strokes, required this.changed});
@@ -43,15 +303,10 @@ _PartialEraseResult _eraseStrokeParts({
   required String Function() createId,
 }) {
   final gestureOffsets = gesture.map((point) => point.toOffset()).toList();
-  final gestureBounds = _offsetBounds(gestureOffsets, radius);
   final next = <InkStroke>[];
   var changed = false;
   for (final stroke in strokes) {
     if (!_canScratchEraseStroke(stroke) || stroke.points.length < 2) {
-      next.add(stroke);
-      continue;
-    }
-    if (!_strokeBounds(stroke, radius).overlaps(gestureBounds)) {
       next.add(stroke);
       continue;
     }
@@ -77,50 +332,14 @@ int _scratchEraseInkHitCount({
   required double radius,
 }) {
   final gestureOffsets = gesture.map((point) => point.toOffset()).toList();
-  final gestureBounds = _offsetBounds(gestureOffsets, radius);
   var hits = 0;
   for (final stroke in strokes) {
     if (!_canScratchEraseStroke(stroke) || stroke.points.length < 2) {
       continue;
     }
-    if (!_strokeBounds(stroke, radius).overlaps(gestureBounds)) {
-      continue;
-    }
     hits += _strokeGestureHitCount(stroke, gestureOffsets, radius);
   }
   return hits;
-}
-
-Rect _offsetBounds(List<Offset> points, double inflateBy) {
-  if (points.isEmpty) {
-    return Rect.zero.inflate(inflateBy);
-  }
-  var left = points.first.dx;
-  var top = points.first.dy;
-  var right = left;
-  var bottom = top;
-  for (final point in points.skip(1)) {
-    left = min(left, point.dx);
-    top = min(top, point.dy);
-    right = max(right, point.dx);
-    bottom = max(bottom, point.dy);
-  }
-  return Rect.fromLTRB(left, top, right, bottom).inflate(inflateBy + 1.0);
-}
-
-Rect _strokeBounds(InkStroke stroke, double inflateBy) {
-  var left = stroke.points.first.dx;
-  var top = stroke.points.first.dy;
-  var right = left;
-  var bottom = top;
-  for (final point in stroke.points.skip(1)) {
-    left = min(left, point.dx);
-    top = min(top, point.dy);
-    right = max(right, point.dx);
-    bottom = max(bottom, point.dy);
-  }
-  final strokeInflate = inflateBy + (stroke.width / 2) + 1.0;
-  return Rect.fromLTRB(left, top, right, bottom).inflate(strokeInflate);
 }
 
 List<InkStroke>? _splitStrokeAroundGesture(
@@ -606,6 +825,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   final List<InkPoint> _currentPoints = <InkPoint>[];
   final List<Offset> _eraserTrail = <Offset>[];
   final ValueNotifier<int> _inkRepaint = ValueNotifier<int>(0);
+  final _InkPerfLog _inkPerf = _InkPerfLog();
   bool _inkRepaintScheduled = false;
   final Set<String> _eraseStrokeIds = <String>{};
   final Set<int> _activePointers = <int>{};
@@ -627,6 +847,11 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   Offset? _ellipseFixedCorner;
   Offset? _shapeStart;
   bool _suspendInk = false;
+  DateTime? _strokeStartedAt;
+  int _strokeMoveEvents = 0;
+  int? _frameTimingCursor;
+  int? _boardSceneCursor;
+
   @override
   void initState() {
     super.initState();
@@ -672,6 +897,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final buildStopwatch = _inkPerf.startBuild();
         final activeTool = _activeTool(controller);
         final lassoSelection =
             controller.lassoSelection?.pageIndex ==
@@ -685,7 +911,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         final eraserRadius = activeTool == DrawingTool.eraserBrush
             ? currentWidth / 2
             : _eraserStrokeRadius(controller.inkStrokeWidth);
-        return IgnorePointer(
+        final child = IgnorePointer(
           ignoring: !isInkTool || !widget.interactionEnabled || _suspendInk,
           child: MouseRegion(
             cursor: _usesCustomInkCursor(controller.tool)
@@ -701,47 +927,56 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
               onPointerCancel: (event) => _onPointerCancel(event),
               child: ValueListenableBuilder<Offset>(
                 valueListenable: controller.lassoDragDelta,
-                builder: (context, lassoDelta, _) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    RepaintBoundary(
-                      child: CustomPaint(
-                        painter: _InkPainter(
-                          strokes: page.inkStrokes,
-                          worldOrigin: widget.worldOrigin,
-                          selectedStrokeIds:
-                              lassoSelection?.strokeIds.toSet() ?? {},
-                          selectionDelta: lassoSelection == null
-                              ? Offset.zero
-                              : lassoDelta,
+                builder: (context, lassoDelta, _) {
+                  final selectedStrokeIds = lassoSelection == null
+                      ? _emptyStrokeIdSet
+                      : Set<String>.of(lassoSelection.strokeIds);
+                  final selectionDelta = lassoSelection == null
+                      ? Offset.zero
+                      : lassoDelta;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          painter: _InkPainter(
+                            perfLog: _inkPerf,
+                            strokes: page.inkStrokes,
+                            worldOrigin: widget.worldOrigin,
+                            selectedStrokeIds: selectedStrokeIds,
+                            selectionDelta: selectionDelta,
+                          ),
+                          size: Size.infinite,
                         ),
-                        size: Size.infinite,
                       ),
-                    ),
-                    RepaintBoundary(
-                      child: CustomPaint(
-                        painter: _InkOverlayPainter(
-                          repaint: _inkRepaint,
-                          currentPoints: _currentPoints,
-                          currentColor: controller.inkColor,
-                          currentWidth: currentWidth,
-                          currentTool: activeTool,
-                          worldOrigin: widget.worldOrigin,
-                          snapHintStart: _snapHintStart,
-                          snapHintEnd: _snapHintEnd,
-                          eraserPosition: _eraserPosition,
-                          eraserRadius: eraserRadius,
-                          eraserTrail: _eraserTrail,
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          painter: _InkOverlayPainter(
+                            perfLog: _inkPerf,
+                            repaint: _inkRepaint,
+                            currentPoints: _currentPoints,
+                            currentColor: controller.inkColor,
+                            currentWidth: currentWidth,
+                            currentTool: activeTool,
+                            worldOrigin: widget.worldOrigin,
+                            snapHintStart: _snapHintStart,
+                            snapHintEnd: _snapHintEnd,
+                            eraserPosition: _eraserPosition,
+                            eraserRadius: eraserRadius,
+                            eraserTrail: _eraserTrail,
+                          ),
+                          size: Size.infinite,
                         ),
-                        size: Size.infinite,
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
         );
+        _inkPerf.recordBuild(buildStopwatch);
+        return child;
       },
     );
   }
@@ -795,6 +1030,11 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     _primaryPointerKind = event.kind;
     _activeToolOverride = inputTool == controller.tool ? null : inputTool;
     _activePointerAllowsTapStroke = _canCommitTapStroke(event.kind);
+    _strokeStartedAt = DateTime.now();
+    _strokeMoveEvents = 0;
+    _frameTimingCursor = FrameTimingTracker.instance.captureCursor();
+    _boardSceneCursor = BoardScenePerfTracker.instance.captureCursor();
+    _inkPerf.reset();
     if (_shouldDelayTouchStroke(event.kind)) {
       _pendingTouchStart = offset;
       return;
@@ -856,108 +1096,114 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     EditorController controller,
     Size viewportSize,
   ) {
-    final page = _resolvedPage(controller);
     if (event.pointer != _primaryPointer) {
       return;
     }
-    if (_suspendInk || _activePointers.length > 1) {
-      return;
-    }
-    var tool = _activeTool(controller);
-    final offset = _toWorld(event.localPosition);
-    if (_shouldRejectViewportEdgePoint(
-      _currentPoints,
-      offset,
-      event.localPosition,
-      viewportSize,
-      tool,
-    )) {
-      return;
-    }
-    final pendingStart = _pendingTouchStart;
-    if (pendingStart != null) {
-      if ((offset - pendingStart).distance < _touchStrokeStartSlop) {
+    final moveStopwatch = _inkPerf.startMove();
+    try {
+      final page = _resolvedPage(controller);
+      _strokeMoveEvents++;
+      if (_suspendInk || _activePointers.length > 1) {
         return;
       }
-      _pendingTouchStart = null;
-      _beginStrokeAt(pendingStart, controller, page, tool, event.pressure);
-    }
-    tool = _syncActiveToolWithPointerMove(
-      event,
-      controller,
-      page,
-      offset,
-      tool,
-    );
-    if (tool == DrawingTool.eraserStroke) {
-      _eraserPosition = offset;
-      _addEraserTrailPoint(offset);
-      _eraseAt(offset, page, controller);
-      _notifyInkChanged();
-      return;
-    }
-    if (tool == DrawingTool.eraserArea) {
-      if (_shouldAddPoint(offset, tool)) {
-        _currentPoints.add(InkPoint.fromOffset(offset, event.pressure));
-        _notifyInkChanged();
-      }
-      return;
-    }
-    if (tool.isShape) {
-      if (_shapeStart == null) {
+      var tool = _activeTool(controller);
+      final offset = _toWorld(event.localPosition);
+      if (_shouldRejectViewportEdgePoint(
+        _currentPoints,
+        offset,
+        event.localPosition,
+        viewportSize,
+        tool,
+      )) {
         return;
       }
-      _currentPoints
-        ..clear()
-        ..addAll(_buildShapePoints(tool, _shapeStart!, offset));
-      _notifyInkChanged();
-      return;
-    }
-    if (_currentPoints.isEmpty) {
-      return;
-    }
-    if (_isSnapTool(tool)) {
-      _startSnapTimer(offset);
-    }
-    if (tool == DrawingTool.eraserBrush) {
-      _eraserPosition = offset;
-      _notifyInkChanged();
-    }
-    if (_snappedStraight) {
-      if (_currentPoints.length >= 2) {
-        _currentPoints[_currentPoints.length - 1] = InkPoint.fromOffset(
-          offset,
-          event.pressure,
-        );
-        _notifyInkChanged();
+      final pendingStart = _pendingTouchStart;
+      if (pendingStart != null) {
+        if ((offset - pendingStart).distance < _touchStrokeStartSlop) {
+          return;
+        }
+        _pendingTouchStart = null;
+        _beginStrokeAt(pendingStart, controller, page, tool, event.pressure);
       }
-      return;
-    }
-    if (_snappedRect) {
-      if (_currentPoints.length == 5) {
-        // Update rectangle using fixed far corner and moving hold point
-        final fixed = _rectFixedCorner ?? _currentPoints.first.toOffset();
-        final points = _buildRectanglePoints(fixed, offset, event.pressure);
+      tool = _syncActiveToolWithPointerMove(
+        event,
+        controller,
+        page,
+        offset,
+        tool,
+      );
+      if (tool == DrawingTool.eraserStroke) {
+        _eraserPosition = offset;
+        _addEraserTrailPoint(offset);
+        _eraseAt(offset, page, controller);
+        _notifyInkChanged();
+        return;
+      }
+      if (tool == DrawingTool.eraserArea) {
+        if (_shouldAddPoint(offset, tool)) {
+          _currentPoints.add(InkPoint.fromOffset(offset, event.pressure));
+          _notifyInkChanged();
+        }
+        return;
+      }
+      if (tool.isShape) {
+        if (_shapeStart == null) {
+          return;
+        }
         _currentPoints
           ..clear()
-          ..addAll(points);
+          ..addAll(_buildShapePoints(tool, _shapeStart!, offset));
+        _notifyInkChanged();
+        return;
+      }
+      if (_currentPoints.isEmpty) {
+        return;
+      }
+      if (_isSnapTool(tool)) {
+        _startSnapTimer(offset);
+      }
+      if (tool == DrawingTool.eraserBrush) {
+        _eraserPosition = offset;
         _notifyInkChanged();
       }
-      return;
-    }
-    if (_snappedEllipse) {
-      final fixed = _ellipseFixedCorner ?? _currentPoints.first.toOffset();
-      _currentPoints
-        ..clear()
-        ..addAll(_buildEllipsePoints(fixed, offset, event.pressure));
+      if (_snappedStraight) {
+        if (_currentPoints.length >= 2) {
+          _currentPoints[_currentPoints.length - 1] = InkPoint.fromOffset(
+            offset,
+            event.pressure,
+          );
+          _notifyInkChanged();
+        }
+        return;
+      }
+      if (_snappedRect) {
+        if (_currentPoints.length == 5) {
+          // Update rectangle using fixed far corner and moving hold point
+          final fixed = _rectFixedCorner ?? _currentPoints.first.toOffset();
+          final points = _buildRectanglePoints(fixed, offset, event.pressure);
+          _currentPoints
+            ..clear()
+            ..addAll(points);
+          _notifyInkChanged();
+        }
+        return;
+      }
+      if (_snappedEllipse) {
+        final fixed = _ellipseFixedCorner ?? _currentPoints.first.toOffset();
+        _currentPoints
+          ..clear()
+          ..addAll(_buildEllipsePoints(fixed, offset, event.pressure));
+        _notifyInkChanged();
+        return;
+      }
+      if (!_shouldAddPoint(offset, tool)) {
+        return;
+      }
+      _currentPoints.add(InkPoint.fromOffset(offset, event.pressure));
       _notifyInkChanged();
-      return;
+    } finally {
+      _inkPerf.recordMove(moveStopwatch);
     }
-    if (!_shouldAddPoint(offset, tool)) {
-      return;
-    }
-    _currentPoints.add(InkPoint.fromOffset(offset, event.pressure));
-    _notifyInkChanged();
   }
 
   void _onPointerUp(PointerUpEvent event, EditorController controller) {
@@ -981,6 +1227,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       return;
     }
     var tool = _activeTool(controller);
+    _logStrokeUp(controller, pageIndex, tool);
     if (tool.isShape) {
       if (_currentPoints.isEmpty) {
         _resetCurrent();
@@ -1243,6 +1490,10 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       radius: intersectionRadius,
     );
     if (inkHits < _scratchEraseMinInkHits) {
+      _debugInkLog(
+        '[scratch] board p=$pageIndex hits=$inkHits changed=0 '
+        'before=${strokes.length}',
+      );
       return false;
     }
     final result = _eraseStrokeParts(
@@ -1252,8 +1503,16 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       createId: controller.createInkStrokeId,
     );
     if (!result.changed) {
+      _debugInkLog(
+        '[scratch] board p=$pageIndex hits=$inkHits changed=0 '
+        'before=${strokes.length}',
+      );
       return false;
     }
+    _debugInkLog(
+      '[scratch] board p=$pageIndex hits=$inkHits changed=1 '
+      'before=${strokes.length} after=${result.strokes.length}',
+    );
     if (widget.pageIndex != null) {
       controller.replaceInkStrokesOnPage(pageIndex, result.strokes);
     } else {
@@ -1314,6 +1573,10 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     _primaryPointer = null;
     _primaryPointerKind = null;
     _activeToolOverride = null;
+    _strokeStartedAt = null;
+    _strokeMoveEvents = 0;
+    _frameTimingCursor = null;
+    _boardSceneCursor = null;
     _pendingTouchStart = null;
     _activePointerAllowsTapStroke = false;
     if (_currentPoints.isEmpty) {
@@ -1331,16 +1594,69 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   }
 
   void _notifyInkChanged() {
+    final scheduledAt = _inkPerf.recordNotify(scheduled: !_inkRepaintScheduled);
     if (!_inkRepaintScheduled) {
       _inkRepaintScheduled = true;
       SchedulerBinding.instance.scheduleFrameCallback((_) {
         _inkRepaintScheduled = false;
+        _inkPerf.recordFrame(scheduledAt);
         if (mounted) {
           _inkRepaint.value++;
         }
       });
       SchedulerBinding.instance.ensureVisualUpdate();
     }
+  }
+
+  void _logStrokeUp(
+    EditorController controller,
+    int pageIndex,
+    DrawingTool tool,
+  ) {
+    final page = _resolvedPage(controller);
+    final startedAt = _strokeStartedAt;
+    final durationMs = startedAt == null
+        ? 0
+        : DateTime.now().difference(startedAt).inMilliseconds;
+    final frameSummary = FrameTimingTracker.instance.summarySince(
+      _frameTimingCursor ?? FrameTimingTracker.instance.captureCursor(),
+    );
+    final boardSceneSummary = BoardScenePerfTracker.instance.summarySince(
+      _boardSceneCursor ?? BoardScenePerfTracker.instance.captureCursor(),
+    );
+    final projectStats = _projectStats(controller);
+    _debugInkLog(
+      '[ink] board up p=$pageIndex tool=${tool.name} '
+      'pts=${_currentPoints.length} moves=$_strokeMoveEvents '
+      'ms=$durationMs existing=${page.inkStrokes.length} '
+      '${projectStats.toLogString()} ${_inkPerf.summary()} '
+      '${boardSceneSummary.toLogString()} ${frameSummary.toLogString()}',
+    );
+    OptimizationLog.instance.recordInkStroke(
+      surface: 'board',
+      pageIndex: pageIndex,
+      tool: tool.name,
+      points: _currentPoints.length,
+      moves: _strokeMoveEvents,
+      durationMs: durationMs,
+      existingStrokes: page.inkStrokes.length,
+      moveUsAvg: _inkPerf.moveAvgUs,
+      moveUsMax: _inkPerf.moveMaxUs,
+      notifyCalls: _inkPerf.notifyCalls,
+      frames: _inkPerf.scheduledFrames,
+      frameUsAvg: _inkPerf.frameAvgUs,
+      frameUsMax: _inkPerf.frameMaxUs,
+    );
+  }
+
+  _CanvasProjectStats _projectStats(EditorController controller) {
+    final page = _resolvedPage(controller);
+    return _CanvasProjectStats(
+      pages: 1,
+      renderPages: 1,
+      savedStrokes: page.inkStrokes.length,
+      savedPoints: _strokePointCount(page.inkStrokes),
+    );
   }
 
   void _addEraserTrailPoint(Offset offset) {
@@ -1812,6 +2128,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   final List<InkPoint> _currentPoints = <InkPoint>[];
   final List<Offset> _eraserTrail = <Offset>[];
   final ValueNotifier<int> _inkRepaint = ValueNotifier<int>(0);
+  final _InkPerfLog _inkPerf = _InkPerfLog();
   bool _inkRepaintScheduled = false;
   final Set<String> _eraseStrokeIds = <String>{};
   final Set<int> _activePointers = <int>{};
@@ -1835,6 +2152,10 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   Offset? _shapeStart;
   int? _activePageIndex;
   bool _suspendInk = false;
+  DateTime? _strokeStartedAt;
+  int _strokeMoveEvents = 0;
+  int? _frameTimingCursor;
+
   @override
   void initState() {
     super.initState();
@@ -1879,6 +2200,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final buildStopwatch = _inkPerf.startBuild();
         final activeTool = _activeTool(controller);
         final lassoSelection = controller.lassoSelection;
         final currentWidth = _effectiveStrokeWidth(
@@ -1888,7 +2210,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         final eraserRadius = activeTool == DrawingTool.eraserBrush
             ? currentWidth / 2
             : _eraserStrokeRadius(controller.inkStrokeWidth);
-        return IgnorePointer(
+        final child = IgnorePointer(
           ignoring: !isInkTool || !widget.interactionEnabled || _suspendInk,
           child: MouseRegion(
             cursor: _usesCustomInkCursor(controller.tool)
@@ -1904,53 +2226,61 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
               onPointerCancel: (event) => _onPointerCancel(event),
               child: ValueListenableBuilder<Offset>(
                 valueListenable: controller.lassoDragDelta,
-                builder: (context, lassoDelta, _) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    RepaintBoundary(
-                      child: CustomPaint(
-                        painter: _DocumentInkPainter(
-                          pages: widget.pages,
-                          pageSize: widget.pageSize,
-                          pageGap: widget.pageGap,
-                          worldOrigin: widget.worldOrigin,
-                          firstPageIndex: widget.firstPageIndex,
-                          lastPageIndex: widget.lastPageIndex,
-                          selectedPageIndex: lassoSelection?.pageIndex,
-                          selectedStrokeIds:
-                              lassoSelection?.strokeIds.toSet() ?? {},
-                          selectionDelta: lassoSelection == null
-                              ? Offset.zero
-                              : lassoDelta,
+                builder: (context, lassoDelta, _) {
+                  final selectedStrokeIds = lassoSelection == null
+                      ? _emptyStrokeIdSet
+                      : Set<String>.of(lassoSelection.strokeIds);
+                  final selectionDelta = lassoSelection == null
+                      ? Offset.zero
+                      : lassoDelta;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          painter: _DocumentInkPainter(
+                            perfLog: _inkPerf,
+                            pages: widget.pages,
+                            pageSize: widget.pageSize,
+                            pageGap: widget.pageGap,
+                            worldOrigin: widget.worldOrigin,
+                            firstPageIndex: widget.firstPageIndex,
+                            lastPageIndex: widget.lastPageIndex,
+                            selectedPageIndex: lassoSelection?.pageIndex,
+                            selectedStrokeIds: selectedStrokeIds,
+                            selectionDelta: selectionDelta,
+                          ),
+                          size: Size.infinite,
                         ),
-                        size: Size.infinite,
                       ),
-                    ),
-                    RepaintBoundary(
-                      child: CustomPaint(
-                        painter: _InkOverlayPainter(
-                          repaint: _inkRepaint,
-                          currentPoints: _currentPoints,
-                          currentColor: controller.inkColor,
-                          currentWidth: currentWidth,
-                          currentTool: activeTool,
-                          worldOrigin: widget.worldOrigin,
-                          snapHintStart: _snapHintStart,
-                          snapHintEnd: _snapHintEnd,
-                          eraserPosition: _eraserPosition,
-                          eraserRadius: eraserRadius,
-                          eraserTrail: _eraserTrail,
-                          clipRect: _activePageClipRect(),
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          painter: _InkOverlayPainter(
+                            perfLog: _inkPerf,
+                            repaint: _inkRepaint,
+                            currentPoints: _currentPoints,
+                            currentColor: controller.inkColor,
+                            currentWidth: currentWidth,
+                            currentTool: activeTool,
+                            worldOrigin: widget.worldOrigin,
+                            snapHintStart: _snapHintStart,
+                            snapHintEnd: _snapHintEnd,
+                            eraserPosition: _eraserPosition,
+                            eraserRadius: eraserRadius,
+                            eraserTrail: _eraserTrail,
+                          ),
+                          size: Size.infinite,
                         ),
-                        size: Size.infinite,
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
         );
+        _inkPerf.recordBuild(buildStopwatch);
+        return child;
       },
     );
   }
@@ -2014,6 +2344,10 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     _primaryPointerKind = event.kind;
     _activeToolOverride = inputTool == controller.tool ? null : inputTool;
     _activePointerAllowsTapStroke = _canCommitTapStroke(event.kind);
+    _strokeStartedAt = DateTime.now();
+    _strokeMoveEvents = 0;
+    _frameTimingCursor = FrameTimingTracker.instance.captureCursor();
+    _inkPerf.reset();
     if (_shouldDelayTouchStroke(event.kind)) {
       _pendingTouchStart = docOffset;
       _pendingTouchPageIndex = pageIndex;
@@ -2089,130 +2423,141 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     if (event.pointer != _primaryPointer) {
       return;
     }
-    if (_suspendInk || _activePointers.length > 1) {
-      return;
-    }
-    final pageIndex = _activePageIndex;
-    if (pageIndex == null) {
-      return;
-    }
-    var tool = _activeTool(controller);
-    final worldOffset = _toWorld(event.localPosition);
-    final localOffset = _toPageLocal(worldOffset, pageIndex);
-    if (!_isInsidePage(localOffset)) {
-      if (tool == DrawingTool.eraserStroke || tool == DrawingTool.eraserBrush) {
+    final moveStopwatch = _inkPerf.startMove();
+    try {
+      _strokeMoveEvents++;
+      if (_suspendInk || _activePointers.length > 1) {
+        return;
+      }
+      final pageIndex = _activePageIndex;
+      if (pageIndex == null) {
+        return;
+      }
+      var tool = _activeTool(controller);
+      final worldOffset = _toWorld(event.localPosition);
+      final localOffset = _toPageLocal(worldOffset, pageIndex);
+      if (!_isInsidePage(localOffset)) {
+        if (tool == DrawingTool.eraserStroke ||
+            tool == DrawingTool.eraserBrush) {
+          _eraserPosition = worldOffset;
+          _notifyInkChanged();
+        }
+        return;
+      }
+      final docOffset = _toDocument(localOffset, pageIndex);
+      if (_shouldRejectViewportEdgePoint(
+        _currentPoints,
+        docOffset,
+        event.localPosition,
+        viewportSize,
+        tool,
+      )) {
+        return;
+      }
+      final pendingStart = _pendingTouchStart;
+      final pendingPageIndex = _pendingTouchPageIndex;
+      if (pendingStart != null) {
+        if (pendingPageIndex != pageIndex ||
+            (docOffset - pendingStart).distance < _touchStrokeStartSlop) {
+          return;
+        }
+        _pendingTouchStart = null;
+        _pendingTouchPageIndex = null;
+        final pendingLocal = _toPageLocalFromDocument(pendingStart, pageIndex);
+        _beginStrokeAt(
+          pendingStart,
+          _toWorldFromDocument(pendingStart),
+          pendingLocal,
+          pageIndex,
+          controller,
+          tool,
+          event.pressure,
+        );
+      }
+      tool = _syncActiveToolWithPointerMove(
+        event,
+        controller,
+        pageIndex,
+        docOffset,
+        worldOffset,
+        localOffset,
+        tool,
+      );
+      if (tool == DrawingTool.eraserStroke) {
+        _eraserPosition = worldOffset;
+        _addEraserTrailPoint(worldOffset);
+        _eraseAt(localOffset, pageIndex);
+        _notifyInkChanged();
+        return;
+      }
+      if (tool == DrawingTool.eraserArea) {
+        if (_shouldAddPoint(docOffset, tool)) {
+          _currentPoints.add(InkPoint.fromOffset(docOffset, event.pressure));
+          _notifyInkChanged();
+        }
+        return;
+      }
+      if (tool.isShape) {
+        if (_shapeStart == null) {
+          return;
+        }
+        _currentPoints
+          ..clear()
+          ..addAll(_buildShapePoints(tool, _shapeStart!, docOffset));
+        _notifyInkChanged();
+        return;
+      }
+      if (_currentPoints.isEmpty) {
+        return;
+      }
+      if (_isSnapTool(tool)) {
+        _startSnapTimer(docOffset);
+      }
+      if (tool == DrawingTool.eraserBrush) {
         _eraserPosition = worldOffset;
         _notifyInkChanged();
       }
-      return;
-    }
-    final docOffset = _toDocument(localOffset, pageIndex);
-    if (_shouldRejectViewportEdgePoint(
-      _currentPoints,
-      docOffset,
-      event.localPosition,
-      viewportSize,
-      tool,
-    )) {
-      return;
-    }
-    final pendingStart = _pendingTouchStart;
-    final pendingPageIndex = _pendingTouchPageIndex;
-    if (pendingStart != null) {
-      if (pendingPageIndex != pageIndex ||
-          (docOffset - pendingStart).distance < _touchStrokeStartSlop) {
+      if (_snappedStraight) {
+        if (_currentPoints.length >= 2) {
+          _currentPoints[_currentPoints.length - 1] = InkPoint.fromOffset(
+            docOffset,
+            event.pressure,
+          );
+          _notifyInkChanged();
+        }
         return;
       }
-      _pendingTouchStart = null;
-      _pendingTouchPageIndex = null;
-      final pendingLocal = _toPageLocalFromDocument(pendingStart, pageIndex);
-      _beginStrokeAt(
-        pendingStart,
-        _toWorldFromDocument(pendingStart),
-        pendingLocal,
-        pageIndex,
-        controller,
-        tool,
-        event.pressure,
-      );
-    }
-    tool = _syncActiveToolWithPointerMove(
-      event,
-      controller,
-      pageIndex,
-      docOffset,
-      worldOffset,
-      localOffset,
-      tool,
-    );
-    if (tool == DrawingTool.eraserStroke) {
-      _eraserPosition = worldOffset;
-      _addEraserTrailPoint(worldOffset);
-      _eraseAt(localOffset, pageIndex);
-      _notifyInkChanged();
-      return;
-    }
-    if (tool == DrawingTool.eraserArea) {
-      if (_shouldAddPoint(docOffset, tool)) {
-        _currentPoints.add(InkPoint.fromOffset(docOffset, event.pressure));
-        _notifyInkChanged();
-      }
-      return;
-    }
-    if (tool.isShape) {
-      if (_shapeStart == null) {
+      if (_snappedRect) {
+        if (_currentPoints.length == 5) {
+          final fixed = _rectFixedCorner ?? _currentPoints.first.toOffset();
+          final points = _buildRectanglePoints(
+            fixed,
+            docOffset,
+            event.pressure,
+          );
+          _currentPoints
+            ..clear()
+            ..addAll(points);
+          _notifyInkChanged();
+        }
         return;
       }
-      _currentPoints
-        ..clear()
-        ..addAll(_buildShapePoints(tool, _shapeStart!, docOffset));
-      _notifyInkChanged();
-      return;
-    }
-    if (_currentPoints.isEmpty) {
-      return;
-    }
-    if (_isSnapTool(tool)) {
-      _startSnapTimer(docOffset);
-    }
-    if (tool == DrawingTool.eraserBrush) {
-      _eraserPosition = worldOffset;
-      _notifyInkChanged();
-    }
-    if (_snappedStraight) {
-      if (_currentPoints.length >= 2) {
-        _currentPoints[_currentPoints.length - 1] = InkPoint.fromOffset(
-          docOffset,
-          event.pressure,
-        );
-        _notifyInkChanged();
-      }
-      return;
-    }
-    if (_snappedRect) {
-      if (_currentPoints.length == 5) {
-        final fixed = _rectFixedCorner ?? _currentPoints.first.toOffset();
-        final points = _buildRectanglePoints(fixed, docOffset, event.pressure);
+      if (_snappedEllipse) {
+        final fixed = _ellipseFixedCorner ?? _currentPoints.first.toOffset();
         _currentPoints
           ..clear()
-          ..addAll(points);
+          ..addAll(_buildEllipsePoints(fixed, docOffset, event.pressure));
         _notifyInkChanged();
+        return;
       }
-      return;
-    }
-    if (_snappedEllipse) {
-      final fixed = _ellipseFixedCorner ?? _currentPoints.first.toOffset();
-      _currentPoints
-        ..clear()
-        ..addAll(_buildEllipsePoints(fixed, docOffset, event.pressure));
+      if (!_shouldAddPoint(docOffset, tool)) {
+        return;
+      }
+      _currentPoints.add(InkPoint.fromOffset(docOffset, event.pressure));
       _notifyInkChanged();
-      return;
+    } finally {
+      _inkPerf.recordMove(moveStopwatch);
     }
-    if (!_shouldAddPoint(docOffset, tool)) {
-      return;
-    }
-    _currentPoints.add(InkPoint.fromOffset(docOffset, event.pressure));
-    _notifyInkChanged();
   }
 
   void _onPointerUp(PointerUpEvent event, EditorController controller) {
@@ -2240,6 +2585,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       return;
     }
     final tool = _activeTool(controller);
+    _logStrokeUp(pageIndex, tool);
     if (tool.isShape) {
       if (_currentPoints.isEmpty) {
         _resetCurrent();
@@ -2451,6 +2797,10 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       radius: intersectionRadius,
     );
     if (inkHits < _scratchEraseMinInkHits) {
+      _debugInkLog(
+        '[scratch] nb p=$pageIndex hits=$inkHits changed=0 '
+        'before=${strokes.length}',
+      );
       return false;
     }
     final result = _eraseStrokeParts(
@@ -2460,8 +2810,16 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       createId: controller.createInkStrokeId,
     );
     if (!result.changed) {
+      _debugInkLog(
+        '[scratch] nb p=$pageIndex hits=$inkHits changed=0 '
+        'before=${strokes.length}',
+      );
       return false;
     }
+    _debugInkLog(
+      '[scratch] nb p=$pageIndex hits=$inkHits changed=1 '
+      'before=${strokes.length} after=${result.strokes.length}',
+    );
     controller.replaceInkStrokesOnPage(pageIndex, result.strokes);
     return true;
   }
@@ -2520,6 +2878,9 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     _primaryPointer = null;
     _primaryPointerKind = null;
     _activeToolOverride = null;
+    _strokeStartedAt = null;
+    _strokeMoveEvents = 0;
+    _frameTimingCursor = null;
     _pendingTouchStart = null;
     _pendingTouchPageIndex = null;
     _activePointerAllowsTapStroke = false;
@@ -2538,16 +2899,89 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   }
 
   void _notifyInkChanged() {
+    final scheduledAt = _inkPerf.recordNotify(scheduled: !_inkRepaintScheduled);
     if (!_inkRepaintScheduled) {
       _inkRepaintScheduled = true;
       SchedulerBinding.instance.scheduleFrameCallback((_) {
         _inkRepaintScheduled = false;
+        _inkPerf.recordFrame(scheduledAt);
         if (mounted) {
           _inkRepaint.value++;
         }
       });
       SchedulerBinding.instance.ensureVisualUpdate();
     }
+  }
+
+  void _logStrokeUp(int pageIndex, DrawingTool tool) {
+    final startedAt = _strokeStartedAt;
+    final durationMs = startedAt == null
+        ? 0
+        : DateTime.now().difference(startedAt).inMilliseconds;
+    final frameSummary = FrameTimingTracker.instance.summarySince(
+      _frameTimingCursor ?? FrameTimingTracker.instance.captureCursor(),
+    );
+    final projectStats = _projectStats();
+    _debugInkLog(
+      '[ink] nb up p=$pageIndex tool=${tool.name} '
+      'pts=${_currentPoints.length} moves=$_strokeMoveEvents '
+      'ms=$durationMs existing=${widget.pages[pageIndex].inkStrokes.length} '
+      '${projectStats.toLogString()} ${_inkPerf.summary()} '
+      '${frameSummary.toLogString()}',
+    );
+    OptimizationLog.instance.recordInkStroke(
+      surface: 'notebook',
+      pageIndex: pageIndex,
+      tool: tool.name,
+      points: _currentPoints.length,
+      moves: _strokeMoveEvents,
+      durationMs: durationMs,
+      existingStrokes: widget.pages[pageIndex].inkStrokes.length,
+      moveUsAvg: _inkPerf.moveAvgUs,
+      moveUsMax: _inkPerf.moveMaxUs,
+      notifyCalls: _inkPerf.notifyCalls,
+      frames: _inkPerf.scheduledFrames,
+      frameUsAvg: _inkPerf.frameAvgUs,
+      frameUsMax: _inkPerf.frameMaxUs,
+    );
+  }
+
+  _CanvasProjectStats _projectStats() {
+    if (widget.pages.isEmpty) {
+      return const _CanvasProjectStats(
+        pages: 0,
+        renderPages: 0,
+        savedStrokes: 0,
+        savedPoints: 0,
+      );
+    }
+    final safeFirstPageIndex = widget.firstPageIndex.clamp(
+      0,
+      widget.pages.length - 1,
+    );
+    final requestedLastPageIndex = widget.lastPageIndex ?? safeFirstPageIndex;
+    final safeLastPageIndex = requestedLastPageIndex.clamp(
+      safeFirstPageIndex,
+      widget.pages.length - 1,
+    );
+    final renderPages = safeLastPageIndex >= safeFirstPageIndex
+        ? safeLastPageIndex - safeFirstPageIndex + 1
+        : 0;
+    final visiblePages = widget.pages.sublist(
+      safeFirstPageIndex,
+      safeLastPageIndex + 1,
+    );
+    return _CanvasProjectStats(
+      pages: widget.pages.length,
+      renderPages: renderPages,
+      savedStrokes: visiblePages.fold<int>(
+        0,
+        (sum, page) => sum + page.inkStrokes.length,
+      ),
+      savedPoints: visiblePages.fold<int>(0, (sum, page) {
+        return sum + _strokePointCount(page.inkStrokes);
+      }),
+    );
   }
 
   void _addEraserTrailPoint(Offset offset) {
@@ -2564,19 +2998,6 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
 
   Offset _toWorld(Offset localPosition) {
     return localPosition + widget.worldOrigin;
-  }
-
-  Rect? _activePageClipRect() {
-    final pageIndex = _activePageIndex;
-    if (pageIndex == null) {
-      return null;
-    }
-    return Rect.fromLTWH(
-      0,
-      pageIndex * (widget.pageSize.height + widget.pageGap),
-      widget.pageSize.width,
-      widget.pageSize.height,
-    );
   }
 
   int? _pageIndexAt(Offset worldOffset) {
@@ -3089,12 +3510,14 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
 
 class _InkPainter extends CustomPainter {
   _InkPainter({
+    required this.perfLog,
     required this.strokes,
     required this.worldOrigin,
     required this.selectedStrokeIds,
     required this.selectionDelta,
   });
 
+  final _InkPerfLog perfLog;
   final List<InkStroke> strokes;
   final Offset worldOrigin;
   final Set<String> selectedStrokeIds;
@@ -3102,94 +3525,38 @@ class _InkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paintStopwatch = perfLog.startPaint();
     canvas.saveLayer(Offset.zero & size, Paint());
     for (final stroke in strokes) {
       final isSelected = selectedStrokeIds.contains(stroke.id);
-      _drawStroke(
+      _drawSavedStroke(
         canvas,
         stroke.points,
         stroke.color,
         stroke.width,
         stroke.tool,
+        Offset.zero,
+        worldOrigin,
         isSelected: isSelected,
         delta: isSelected ? selectionDelta : Offset.zero,
       );
     }
     canvas.restore();
-  }
-
-  void _drawStroke(
-    Canvas canvas,
-    List<InkPoint> points,
-    Color color,
-    double width,
-    DrawingTool tool, {
-    bool isSelected = false,
-    Offset delta = Offset.zero,
-  }) {
-    if (points.isEmpty ||
-        (tool == DrawingTool.eraserBrush && points.length < 2)) {
-      return;
-    }
-    final paint = Paint()
-      ..strokeCap = tool == DrawingTool.highlighter
-          ? StrokeCap.square
-          : StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = width;
-    if (tool == DrawingTool.eraserArea) {
-      paint
-        ..color = Colors.transparent
-        ..blendMode = BlendMode.clear
-        ..style = PaintingStyle.fill;
-    } else if (tool == DrawingTool.eraserBrush) {
-      paint
-        ..color = Colors.transparent
-        ..blendMode = BlendMode.clear;
-    } else {
-      paint.color = _toolColor(color, tool);
-    }
-
-    final path = _buildInkPath(points, tool, Offset.zero, worldOrigin, delta);
-    if (isSelected) {
-      final highlightPaint = Paint()
-        ..color = _lassoAccentColor.withValues(alpha: 0.22)
-        ..strokeCap = tool == DrawingTool.highlighter
-            ? StrokeCap.square
-            : StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = width + 8.0;
-      canvas.drawPath(path, highlightPaint);
-    }
-    if (tool == DrawingTool.eraserArea) {
-      canvas.drawPath(path..close(), paint);
-    } else {
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  Color _toolColor(Color base, DrawingTool tool) {
-    if (tool == DrawingTool.lasso) {
-      return _lassoAccentColor.withValues(alpha: 0.38);
-    }
-    if (tool == DrawingTool.highlighter) {
-      return base.withValues(alpha: 0.5);
-    }
-    return base;
+    perfLog.recordSavedPaint(paintStopwatch);
   }
 
   @override
   bool shouldRepaint(covariant _InkPainter oldDelegate) {
     return oldDelegate.strokes != strokes ||
-        oldDelegate.selectedStrokeIds != selectedStrokeIds ||
-        oldDelegate.selectionDelta != selectionDelta;
+        !setEquals(oldDelegate.selectedStrokeIds, selectedStrokeIds) ||
+        oldDelegate.selectionDelta != selectionDelta ||
+        oldDelegate.worldOrigin != worldOrigin;
   }
 }
 
 class _InkOverlayPainter extends CustomPainter {
   _InkOverlayPainter({
+    required this.perfLog,
     required Listenable repaint,
     required this.currentPoints,
     required this.currentColor,
@@ -3201,9 +3568,9 @@ class _InkOverlayPainter extends CustomPainter {
     this.eraserPosition,
     this.eraserRadius,
     this.eraserTrail = const <Offset>[],
-    this.clipRect,
   }) : super(repaint: repaint);
 
+  final _InkPerfLog perfLog;
   final List<InkPoint> currentPoints;
   final Color currentColor;
   final double currentWidth;
@@ -3214,15 +3581,10 @@ class _InkOverlayPainter extends CustomPainter {
   final Offset? eraserPosition;
   final double? eraserRadius;
   final List<Offset> eraserTrail;
-  final Rect? clipRect;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final clip = clipRect;
-    if (clip != null) {
-      canvas.save();
-      canvas.clipRect(clip.shift(-worldOrigin));
-    }
+    final paintStopwatch = perfLog.startPaint();
     if (currentPoints.isNotEmpty) {
       _drawStroke(
         canvas,
@@ -3249,9 +3611,7 @@ class _InkOverlayPainter extends CustomPainter {
     if (currentTool == DrawingTool.eraserStroke && eraserTrail.isNotEmpty) {
       _drawEraserTrail(canvas, size, eraserTrail, eraserRadius ?? 12.0);
     }
-    if (clip != null) {
-      canvas.restore();
-    }
+    perfLog.recordOverlayPaint(paintStopwatch);
   }
 
   void _drawEraserTrail(
@@ -3414,13 +3774,13 @@ class _InkOverlayPainter extends CustomPainter {
         oldDelegate.snapHintEnd != snapHintEnd ||
         oldDelegate.eraserPosition != eraserPosition ||
         oldDelegate.eraserRadius != eraserRadius ||
-        oldDelegate.eraserTrail != eraserTrail ||
-        oldDelegate.clipRect != clipRect;
+        oldDelegate.eraserTrail != eraserTrail;
   }
 }
 
 class _DocumentInkPainter extends CustomPainter {
   _DocumentInkPainter({
+    required this.perfLog,
     required this.pages,
     required this.pageSize,
     required this.pageGap,
@@ -3432,6 +3792,7 @@ class _DocumentInkPainter extends CustomPainter {
     required this.selectionDelta,
   });
 
+  final _InkPerfLog perfLog;
   final List<NotePage> pages;
   final Size pageSize;
   final double pageGap;
@@ -3444,125 +3805,43 @@ class _DocumentInkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paintStopwatch = perfLog.startPaint();
+    canvas.saveLayer(Offset.zero & size, Paint());
     final start = firstPageIndex.clamp(0, pages.length).toInt();
     final end = (lastPageIndex ?? pages.length)
         .clamp(start, pages.length)
         .toInt();
     if (start >= end) {
+      canvas.restore();
+      perfLog.recordSavedPaint(paintStopwatch);
       return;
     }
 
-    canvas.saveLayer(_renderLayerBounds(start, end), Paint());
     for (var i = start; i < end; i++) {
       final origin = _pageOrigin(i);
-      canvas.save();
-      canvas.clipRect(_pageClipRect(origin));
       for (final stroke in pages[i].inkStrokes) {
         final isSelected =
             selectedPageIndex == i && selectedStrokeIds.contains(stroke.id);
-        _drawStroke(
+        _drawSavedStroke(
           canvas,
           stroke.points,
           stroke.color,
           stroke.width,
           stroke.tool,
           origin,
+          worldOrigin,
           isSelected: isSelected,
           delta: isSelected ? selectionDelta : Offset.zero,
         );
       }
-      canvas.restore();
     }
     canvas.restore();
-  }
-
-  Rect _renderLayerBounds(int start, int end) {
-    const overflowMargin = 128.0;
-    final stride = pageSize.height + pageGap;
-    final top = start * stride;
-    final bottom = ((end - 1) * stride) + pageSize.height;
-    return Rect.fromLTRB(
-      -overflowMargin - worldOrigin.dx,
-      top - overflowMargin - worldOrigin.dy,
-      pageSize.width + overflowMargin - worldOrigin.dx,
-      bottom + overflowMargin - worldOrigin.dy,
-    );
+    perfLog.recordSavedPaint(paintStopwatch);
   }
 
   Offset _pageOrigin(int index) {
     final stride = pageSize.height + pageGap;
     return Offset(0, index * stride);
-  }
-
-  Rect _pageClipRect(Offset origin) {
-    return Rect.fromLTWH(
-      -worldOrigin.dx,
-      origin.dy - worldOrigin.dy,
-      pageSize.width,
-      pageSize.height,
-    );
-  }
-
-  void _drawStroke(
-    Canvas canvas,
-    List<InkPoint> points,
-    Color color,
-    double width,
-    DrawingTool tool,
-    Offset origin, {
-    bool isSelected = false,
-    Offset delta = Offset.zero,
-  }) {
-    if (points.isEmpty) {
-      return;
-    }
-    final paint = Paint()
-      ..strokeCap = tool == DrawingTool.highlighter
-          ? StrokeCap.square
-          : StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = width;
-    if (tool == DrawingTool.eraserArea) {
-      paint
-        ..color = Colors.transparent
-        ..blendMode = BlendMode.clear
-        ..style = PaintingStyle.fill;
-    } else if (tool == DrawingTool.eraserBrush) {
-      paint
-        ..color = Colors.transparent
-        ..blendMode = BlendMode.clear;
-    } else {
-      paint.color = _toolColor(color, tool);
-    }
-
-    final path = _buildInkPath(points, tool, origin, worldOrigin, delta);
-    if (isSelected) {
-      final highlightPaint = Paint()
-        ..color = _lassoAccentColor.withValues(alpha: 0.22)
-        ..strokeCap = tool == DrawingTool.highlighter
-            ? StrokeCap.square
-            : StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = width + 8.0;
-      canvas.drawPath(path, highlightPaint);
-    }
-    if (tool == DrawingTool.eraserArea) {
-      canvas.drawPath(path..close(), paint);
-    } else {
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  Color _toolColor(Color base, DrawingTool tool) {
-    if (tool == DrawingTool.lasso) {
-      return _lassoAccentColor.withValues(alpha: 0.38);
-    }
-    if (tool == DrawingTool.highlighter) {
-      return base.withValues(alpha: 0.5);
-    }
-    return base;
   }
 
   @override
@@ -3573,7 +3852,7 @@ class _DocumentInkPainter extends CustomPainter {
         oldDelegate.firstPageIndex != firstPageIndex ||
         oldDelegate.lastPageIndex != lastPageIndex ||
         oldDelegate.selectedPageIndex != selectedPageIndex ||
-        oldDelegate.selectedStrokeIds != selectedStrokeIds ||
+        !setEquals(oldDelegate.selectedStrokeIds, selectedStrokeIds) ||
         oldDelegate.selectionDelta != selectionDelta ||
         oldDelegate.worldOrigin != worldOrigin;
   }

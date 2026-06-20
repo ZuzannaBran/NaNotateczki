@@ -1,13 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
-import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../data/isar/entities/notebook_entity.dart';
+import '../../../core/error/app_error_log.dart';
+import '../../../data/drift/notes_database.dart';
 import '../domain/drawing_tool.dart';
 import '../domain/image_block.dart';
 import '../domain/ink_stroke.dart';
@@ -17,63 +19,113 @@ import '../domain/note_page.dart';
 import '../domain/text_block.dart';
 
 class NotebookRepository {
-  NotebookRepository(this.isar, {this.onChanged});
+  NotebookRepository(
+    this.database, {
+    this.onChanged,
+    void Function(Object error, StackTrace stackTrace, String source)?
+    readErrorHandler,
+  }) : _readErrorHandler = readErrorHandler;
 
-  final Isar isar;
+  final NotesDatabase database;
   final void Function()? onChanged;
+  final void Function(Object error, StackTrace stackTrace, String source)?
+  _readErrorHandler;
   final Uuid _uuid = const Uuid();
   bool _lastFetchSkippedCorruptRows = false;
+  final List<String> _lastCorruptNotebookIds = <String>[];
+  final Map<String, DateTime> _latestPersistedUpdates = <String, DateTime>{};
+  final Map<String, Future<void>> _saveTails = <String, Future<void>>{};
 
   bool get lastFetchSkippedCorruptRows => _lastFetchSkippedCorruptRows;
+  int get lastCorruptNotebookCount => _lastCorruptNotebookIds.length;
+  List<String> get lastCorruptNotebookIds =>
+      List.unmodifiable(_lastCorruptNotebookIds);
 
   Future<List<Notebook>> fetchNotebooks() async {
     try {
-      final entities = await isar.notebookEntitys
-          .where()
-          .sortByUpdatedAtDesc()
-          .findAll();
-      _lastFetchSkippedCorruptRows = false;
-      return entities.map(_fromEntity).toList();
-    } catch (e, st) {
-      debugPrint('fetchNotebooks failed, falling back to defensive: $e\n$st');
-      return _fetchNotebooksDefensively();
-    }
-  }
-
-  Future<List<Notebook>> _fetchNotebooksDefensively() async {
-    final List<Notebook> results = <Notebook>[];
-    final corruptIds = <int>[];
-    try {
-      final ids = await isar.notebookEntitys.where().idProperty().findAll();
-      for (final id in ids) {
+      final rows =
+          await (database.select(database.notebookRows)..orderBy([
+                (row) => OrderingTerm(
+                  expression: row.updatedAt,
+                  mode: OrderingMode.desc,
+                ),
+              ]))
+              .get();
+      final notebooks = <Notebook>[];
+      final corruptIds = <String>[];
+      for (final row in rows) {
         try {
-          final entity = await isar.notebookEntitys.get(id);
-          if (entity != null) {
-            results.add(_fromEntity(entity));
+          final result = await _readNotebook(row);
+          notebooks.add(result.notebook);
+          if (result.hadCorruptRows) {
+            corruptIds.add(row.uid);
           }
-        } catch (e) {
-          corruptIds.add(id);
-          debugPrint('Skipped corrupt notebook id=$id: $e');
+        } catch (e, st) {
+          corruptIds.add(row.uid);
+          debugPrint('Skipped corrupt notebook uid=${row.uid}: $e');
+          _recordReadError(
+            e,
+            st,
+            'NotebookRepository.fetchNotebooks(${row.uid})',
+          );
         }
       }
-    } catch (e) {
-      debugPrint('Defensive fetch failed at idProperty stage: $e');
+      _lastFetchSkippedCorruptRows = corruptIds.isNotEmpty;
+      _lastCorruptNotebookIds
+        ..clear()
+        ..addAll(corruptIds);
+      return notebooks;
+    } catch (e, st) {
+      debugPrint('fetchNotebooks failed: $e\n$st');
+      _recordReadError(e, st, 'NotebookRepository.fetchNotebooks');
+      _lastFetchSkippedCorruptRows = true;
+      rethrow;
     }
-    _lastFetchSkippedCorruptRows = corruptIds.isNotEmpty;
-    if (corruptIds.isNotEmpty) {
-      debugPrint('Defensive fetch: skipped ${corruptIds.length} corrupt rows');
-      await _deleteCorruptRows(corruptIds);
-    }
-    results.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return results;
   }
 
-  Future<void> _deleteCorruptRows(List<int> ids) async {
+  Future<Notebook> saveRecoveredCopy(
+    Notebook notebook, {
+    String reason = 'Recovered copy',
+  }) async {
+    final recovered = notebook.copyWith(
+      uid: _uuid.v4(),
+      title: _buildRecoveredTitle(notebook.title, reason),
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await saveNotebook(recovered);
+    return recovered;
+  }
+
+  Future<void> archiveNotebookBeforeDelete(
+    Notebook notebook, {
+    String reason = 'deleted',
+  }) async {
     try {
-      await isar.writeTxn(() => isar.notebookEntitys.deleteAll(ids));
-      debugPrint('Deleted ${ids.length} corrupt notebook rows');
-    } catch (e) {
-      debugPrint('Failed to delete corrupt notebook rows $ids: $e');
+      final docs = await getApplicationDocumentsDirectory();
+      final archiveDir = Directory('${docs.path}/deleted_notebooks');
+      if (!await archiveDir.exists()) {
+        await archiveDir.create(recursive: true);
+      }
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final file = File(
+        '${archiveDir.path}/${timestamp}_${Uri.encodeComponent(notebook.uid)}.json',
+      );
+      final payload = encodeNotebooks([notebook]).single;
+      await file.writeAsString(
+        jsonEncode({
+          'reason': reason,
+          'archivedAt': DateTime.now().toIso8601String(),
+          'notebook': payload,
+        }),
+      );
+    } catch (e, st) {
+      debugPrint('Failed to archive notebook ${notebook.uid}: $e\n$st');
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'NotebookRepository.archiveNotebookBeforeDelete',
+      );
     }
   }
 
@@ -131,26 +183,152 @@ class NotebookRepository {
 
   Future<Notebook?> getNotebook(String uid) async {
     try {
-      final entity = await isar.notebookEntitys
-          .filter()
-          .uidEqualTo(uid)
-          .findFirst();
-      if (entity == null) {
+      final row = await (database.select(
+        database.notebookRows,
+      )..where((item) => item.uid.equals(uid))).getSingleOrNull();
+      if (row == null) {
         return null;
       }
-      return _fromEntity(entity);
-    } catch (e) {
+      final result = await _readNotebook(row);
+      if (result.hadCorruptRows) {
+        _lastFetchSkippedCorruptRows = true;
+        if (!_lastCorruptNotebookIds.contains(uid)) {
+          _lastCorruptNotebookIds.add(uid);
+        }
+      }
+      return result.notebook;
+    } catch (e, st) {
       debugPrint('getNotebook failed for uid=$uid: $e');
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'NotebookRepository.getNotebook($uid)',
+      );
       return null;
     }
   }
 
-  Future<void> saveNotebook(Notebook notebook) async {
+  Future<bool> saveNotebook(Notebook notebook) async {
+    if (notebook.pages.isEmpty) {
+      throw ArgumentError.value(
+        notebook.uid,
+        'notebook.uid',
+        'Cannot save a notebook without pages.',
+      );
+    }
+    final previous = _saveTails[notebook.uid] ?? Future<void>.value();
+    final completion = Completer<void>();
+    _saveTails[notebook.uid] = completion.future;
+    try {
+      await previous;
+      return await _saveNotebookNow(notebook);
+    } finally {
+      completion.complete();
+      if (identical(_saveTails[notebook.uid], completion.future)) {
+        _saveTails.remove(notebook.uid);
+      }
+    }
+  }
+
+  Future<bool> _saveNotebookNow(Notebook notebook) async {
+    if (_lastCorruptNotebookIds.contains(notebook.uid)) {
+      debugPrint(
+        'NotebookRepository.saveNotebook rejected partially read notebook '
+        'uid=${notebook.uid}',
+      );
+      return false;
+    }
+    final notebookToSave = await _persistInlineImages(notebook);
+
+    final saved = await database.transaction(() async {
+      final existing = await (database.select(
+        database.notebookRows,
+      )..where((row) => row.uid.equals(notebookToSave.uid))).getSingleOrNull();
+      final persistedAt = existing?.updatedAt;
+      final trackedAt = _latestPersistedUpdates[notebookToSave.uid];
+      final latestAt =
+          trackedAt != null &&
+              (persistedAt == null || trackedAt.isAfter(persistedAt))
+          ? trackedAt
+          : persistedAt;
+      if (latestAt != null && latestAt.isAfter(notebookToSave.updatedAt)) {
+        return false;
+      }
+      await database
+          .into(database.notebookRows)
+          .insertOnConflictUpdate(
+            NotebookRowsCompanion.insert(
+              uid: notebookToSave.uid,
+              title: notebookToSave.title,
+              kindIndex: notebookToSave.kind.indexValue,
+              folder: notebookToSave.folder,
+              createdAt: notebookToSave.createdAt,
+              updatedAt: notebookToSave.updatedAt,
+            ),
+          );
+      await _deleteNotebookChildren(notebookToSave.uid);
+      for (final entry in notebookToSave.pages.asMap().entries) {
+        await _insertPage(notebookToSave.uid, entry.value, entry.key);
+      }
+      return true;
+    });
+    if (saved) {
+      _latestPersistedUpdates[notebookToSave.uid] = notebookToSave.updatedAt;
+      onChanged?.call();
+    }
+    return saved;
+  }
+
+  Future<Notebook?> updateNotebookMetadata(
+    String uid, {
+    String? title,
+    String? folder,
+  }) async {
+    DateTime? preciseUpdatedAt;
+    final updated = await database.transaction(() async {
+      final existing = await (database.select(
+        database.notebookRows,
+      )..where((row) => row.uid.equals(uid))).getSingleOrNull();
+      if (existing == null) {
+        return null;
+      }
+      final trackedAt = _latestPersistedUpdates[uid];
+      final latestAt =
+          trackedAt != null && trackedAt.isAfter(existing.updatedAt)
+          ? trackedAt
+          : existing.updatedAt;
+      final now = DateTime.now();
+      final updatedAt = now.isAfter(latestAt)
+          ? now
+          : latestAt.add(const Duration(microseconds: 1));
+      await (database.update(
+        database.notebookRows,
+      )..where((row) => row.uid.equals(uid))).write(
+        NotebookRowsCompanion(
+          title: title == null ? const Value.absent() : Value(title),
+          folder: folder == null ? const Value.absent() : Value(folder),
+          updatedAt: Value(updatedAt),
+        ),
+      );
+      final row = await (database.select(
+        database.notebookRows,
+      )..where((item) => item.uid.equals(uid))).getSingle();
+      preciseUpdatedAt = updatedAt;
+      return (await _readNotebook(row)).notebook;
+    });
+    if (updated != null) {
+      _latestPersistedUpdates[uid] = preciseUpdatedAt!;
+      onChanged?.call();
+    }
+    return updated;
+  }
+
+  Future<Notebook> _persistInlineImages(Notebook notebook) async {
     final migratedPages = <NotePage>[];
-    bool migrated = false;
+    var migrated = false;
     for (final page in notebook.pages) {
       final migratedBlocks = <ImageBlock>[];
-      bool pageMigrated = false;
+      var pageMigrated = false;
       for (final block in page.imageBlocks) {
         final persistedBlock = await _persistInlineImageBytes(block);
         if (persistedBlock != block) {
@@ -165,20 +343,7 @@ class NotebookRepository {
         pageMigrated ? page.copyWith(imageBlocks: migratedBlocks) : page,
       );
     }
-
-    final notebookToSave = migrated
-        ? notebook.copyWith(pages: migratedPages)
-        : notebook;
-
-    await isar.writeTxn(() async {
-      final existing = await isar.notebookEntitys
-          .filter()
-          .uidEqualTo(notebookToSave.uid)
-          .findFirst();
-      final entity = _toEntity(notebookToSave, existing?.id);
-      await isar.notebookEntitys.put(entity);
-    });
-    onChanged?.call();
+    return migrated ? notebook.copyWith(pages: migratedPages) : notebook;
   }
 
   Future<ImageBlock> _persistInlineImageBytes(ImageBlock block) async {
@@ -215,16 +380,17 @@ class NotebookRepository {
   }
 
   Future<void> deleteNotebook(String uid) async {
-    await isar.writeTxn(() async {
-      final existing = await isar.notebookEntitys
-          .filter()
-          .uidEqualTo(uid)
-          .findFirst();
-      if (existing == null) {
-        return;
-      }
-      await isar.notebookEntitys.delete(existing.id);
+    final notebook = await getNotebook(uid);
+    if (notebook != null) {
+      await archiveNotebookBeforeDelete(notebook);
+    }
+    await database.transaction(() async {
+      await _deleteNotebookChildren(uid);
+      await (database.delete(
+        database.notebookRows,
+      )..where((item) => item.uid.equals(uid))).go();
     });
+    _latestPersistedUpdates.remove(uid);
     onChanged?.call();
   }
 
@@ -239,185 +405,395 @@ class NotebookRepository {
         .toList();
   }
 
-  Notebook _fromEntity(NotebookEntity entity) {
-    return Notebook(
-      uid: entity.uid,
-      title: entity.title,
-      kind: NotebookKindValue.fromIndex(entity.kindIndex),
-      folder: entity.folder,
-      createdAt: entity.createdAt,
-      updatedAt: entity.updatedAt,
-      pages: entity.pages.map(_pageFromEntity).toList(),
+  Future<_NotebookReadResult> _readNotebook(NotebookRow row) async {
+    var hadCorruptRows = false;
+    final pageRows = await _readRowsSafely(
+      read: () =>
+          (database.select(database.pageRows)
+                ..where((item) => item.notebookUid.equals(row.uid))
+                ..orderBy([(item) => OrderingTerm.asc(item.pageIndex)]))
+              .get(),
+      source: 'NotebookRepository._readNotebook(${row.uid}, pages)',
+      onError: () => hadCorruptRows = true,
+    );
+    final pages = <NotePage>[];
+    for (final pageRow in pageRows) {
+      try {
+        final result = await _readPage(pageRow);
+        pages.add(result.page);
+        hadCorruptRows = hadCorruptRows || result.hadCorruptRows;
+      } catch (error, stackTrace) {
+        hadCorruptRows = true;
+        _recordReadError(
+          error,
+          stackTrace,
+          'NotebookRepository._readNotebook(${row.uid}, page=${pageRow.uid})',
+        );
+      }
+    }
+    return _NotebookReadResult(
+      notebook: Notebook(
+        uid: row.uid,
+        title: row.title,
+        kind: NotebookKindValue.fromIndex(row.kindIndex),
+        folder: row.folder,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        pages: pages,
+      ),
+      hadCorruptRows: hadCorruptRows,
     );
   }
 
-  NotePage _pageFromEntity(NotePageEntity entity) {
-    return NotePage(
-      id: entity.uid,
-      title: entity.title,
-      textBlocks: entity.textBlocks.map(_textFromEntity).toList(),
-      imageBlocks: entity.imageBlocks.map(_imageFromEntity).toList(),
-      inkStrokes: entity.inkStrokes.map(_strokeFromEntity).toList(),
-      isBookmarked: entity.isBookmarked,
-      indexTabs: _indexTabsFromEntity(entity),
+  Future<_PageReadResult> _readPage(PageRow row) async {
+    var hadCorruptRows = false;
+    void markCorrupt() => hadCorruptRows = true;
+    final tabs = await _readRowsSafely(
+      read: () => (database.select(
+        database.indexTabRows,
+      )..where((item) => item.pageUid.equals(row.uid))).get(),
+      source: 'NotebookRepository._readPage(${row.uid}, tabs)',
+      onError: markCorrupt,
+    );
+    final textBlocks = await _readRowsSafely(
+      read: () =>
+          (database.select(database.textBlockRows)
+                ..where((item) => item.pageUid.equals(row.uid))
+                ..orderBy([(item) => OrderingTerm.asc(item.sortIndex)]))
+              .get(),
+      source: 'NotebookRepository._readPage(${row.uid}, text)',
+      onError: markCorrupt,
+    );
+    final imageBlocks = await _readRowsSafely(
+      read: () =>
+          (database.select(database.imageBlockRows)
+                ..where((item) => item.pageUid.equals(row.uid))
+                ..orderBy([(item) => OrderingTerm.asc(item.sortIndex)]))
+              .get(),
+      source: 'NotebookRepository._readPage(${row.uid}, images)',
+      onError: markCorrupt,
+    );
+    final strokes = await _readRowsSafely(
+      read: () =>
+          (database.select(database.inkStrokeRows)
+                ..where((item) => item.pageUid.equals(row.uid))
+                ..orderBy([(item) => OrderingTerm.asc(item.sortIndex)]))
+              .get(),
+      source: 'NotebookRepository._readPage(${row.uid}, strokes)',
+      onError: markCorrupt,
+    );
+    return _PageReadResult(
+      page: NotePage(
+        id: row.uid,
+        title: row.title,
+        textBlocks: _convertRowsSafely(
+          textBlocks,
+          _textFromRow,
+          'NotebookRepository._readPage(${row.uid}, text row)',
+          markCorrupt,
+        ),
+        imageBlocks: _convertRowsSafely(
+          imageBlocks,
+          _imageFromRow,
+          'NotebookRepository._readPage(${row.uid}, image row)',
+          markCorrupt,
+        ),
+        inkStrokes: _convertRowsSafely(
+          strokes,
+          _strokeFromRow,
+          'NotebookRepository._readPage(${row.uid}, stroke row)',
+          markCorrupt,
+        ),
+        isBookmarked: row.isBookmarked,
+        indexTabs: _indexTabsFromRows(
+          row,
+          _convertRowsSafely(
+            tabs,
+            _indexTabFromRow,
+            'NotebookRepository._readPage(${row.uid}, tab row)',
+            markCorrupt,
+          ),
+        ),
+      ),
+      hadCorruptRows: hadCorruptRows,
     );
   }
 
-  NotebookEntity _toEntity(Notebook notebook, int? existingId) {
-    final entity = NotebookEntity()
-      ..id = existingId ?? Isar.autoIncrement
-      ..uid = notebook.uid
-      ..title = notebook.title
-      ..kindIndex = notebook.kind.indexValue
-      ..folder = notebook.folder
-      ..createdAt = notebook.createdAt
-      ..updatedAt = notebook.updatedAt
-      ..pages = notebook.pages
-          .asMap()
-          .entries
-          .map((entry) => _pageToEntity(entry.value, entry.key))
-          .toList();
-
-    return entity;
+  Future<List<T>> _readRowsSafely<T>({
+    required Future<List<T>> Function() read,
+    required String source,
+    required void Function() onError,
+  }) async {
+    try {
+      return await read();
+    } catch (error, stackTrace) {
+      onError();
+      _recordReadError(error, stackTrace, source);
+      return <T>[];
+    }
   }
 
-  NotePageEntity _pageToEntity(NotePage page, int index) {
-    return NotePageEntity()
-      ..uid = page.id
-      ..index = index
-      ..title = page.title
-      ..isBookmarked = page.isBookmarked
-      ..indexTabColorValue = page.indexTabs.firstOrNull?.color.toARGB32()
-      ..indexTabPosition = page.indexTabs.firstOrNull?.position
-      ..indexTabs = page.indexTabs.map(_indexTabToEntity).toList()
-      ..textBlocks = page.textBlocks.map(_textToEntity).toList()
-      ..imageBlocks = page.imageBlocks.map(_imageToEntity).toList()
-      ..inkStrokes = page.inkStrokes.map(_strokeToEntity).toList();
+  List<R> _convertRowsSafely<T, R>(
+    List<T> rows,
+    R Function(T row) convert,
+    String source,
+    void Function() onError,
+  ) {
+    final converted = <R>[];
+    for (final row in rows) {
+      try {
+        converted.add(convert(row));
+      } catch (error, stackTrace) {
+        onError();
+        _recordReadError(error, stackTrace, source);
+      }
+    }
+    return converted;
   }
 
-  List<IndexTab> _indexTabsFromEntity(NotePageEntity entity) {
-    final tabs = entity.indexTabs.map(_indexTabFromEntity).toList();
-    if (tabs.isNotEmpty || entity.indexTabColorValue == null) {
+  void _recordReadError(Object error, StackTrace stackTrace, String source) {
+    debugPrint('$source: $error');
+    final handler = _readErrorHandler;
+    if (handler != null) {
+      handler(error, stackTrace, source);
+      return;
+    }
+    AppErrorLog.instance.record(error, stackTrace, source: source);
+  }
+
+  List<IndexTab> _indexTabsFromRows(PageRow page, List<IndexTab> tabs) {
+    if (tabs.isNotEmpty || page.legacyIndexTabColorValue == null) {
       return tabs;
     }
     return [
       IndexTab(
-        id: const Uuid().v4(),
-        color: Color(entity.indexTabColorValue!),
-        position: entity.indexTabPosition ?? 0.0,
+        id: _uuid.v4(),
+        color: Color(page.legacyIndexTabColorValue!),
+        position: page.legacyIndexTabPosition ?? 0.0,
       ),
     ];
   }
 
-  IndexTab _indexTabFromEntity(IndexTabEntity entity) {
+  Future<void> _insertPage(
+    String notebookUid,
+    NotePage page,
+    int pageIndex,
+  ) async {
+    await database
+        .into(database.pageRows)
+        .insert(
+          PageRowsCompanion.insert(
+            uid: page.id,
+            notebookUid: notebookUid,
+            pageIndex: pageIndex,
+            title: page.title,
+            isBookmarked: page.isBookmarked,
+            legacyIndexTabColorValue: Value(
+              page.indexTabs.firstOrNull?.color.toARGB32(),
+            ),
+            legacyIndexTabPosition: Value(page.indexTabs.firstOrNull?.position),
+          ),
+        );
+    for (final tab in page.indexTabs) {
+      await database
+          .into(database.indexTabRows)
+          .insert(_indexTabToCompanion(page.id, tab));
+    }
+    for (final entry in page.textBlocks.asMap().entries) {
+      await database
+          .into(database.textBlockRows)
+          .insert(_textToCompanion(page.id, entry.value, entry.key));
+    }
+    for (final entry in page.imageBlocks.asMap().entries) {
+      await database
+          .into(database.imageBlockRows)
+          .insert(_imageToCompanion(page.id, entry.value, entry.key));
+    }
+    for (final entry in page.inkStrokes.asMap().entries) {
+      await database
+          .into(database.inkStrokeRows)
+          .insert(_strokeToCompanion(page.id, entry.value, entry.key));
+    }
+  }
+
+  Future<void> _deleteNotebookChildren(String notebookUid) async {
+    final pages = await (database.select(
+      database.pageRows,
+    )..where((item) => item.notebookUid.equals(notebookUid))).get();
+    for (final page in pages) {
+      await (database.delete(
+        database.indexTabRows,
+      )..where((item) => item.pageUid.equals(page.uid))).go();
+      await (database.delete(
+        database.textBlockRows,
+      )..where((item) => item.pageUid.equals(page.uid))).go();
+      await (database.delete(
+        database.imageBlockRows,
+      )..where((item) => item.pageUid.equals(page.uid))).go();
+      await (database.delete(
+        database.inkStrokeRows,
+      )..where((item) => item.pageUid.equals(page.uid))).go();
+    }
+    await (database.delete(
+      database.pageRows,
+    )..where((item) => item.notebookUid.equals(notebookUid))).go();
+  }
+
+  String _buildRecoveredTitle(String title, String reason) {
+    final trimmedTitle = title.trim().isEmpty ? 'Untitled' : title.trim();
+    return '$trimmedTitle ($reason)';
+  }
+
+  IndexTab _indexTabFromRow(IndexTabRow row) {
     return IndexTab(
-      id: entity.uid,
-      color: Color(entity.colorValue),
-      position: entity.position,
+      id: row.uid,
+      color: Color(row.colorValue),
+      position: row.position,
     );
   }
 
-  IndexTabEntity _indexTabToEntity(IndexTab tab) {
-    return IndexTabEntity()
-      ..uid = tab.id
-      ..colorValue = tab.color.toARGB32()
-      ..position = tab.position;
+  IndexTabRowsCompanion _indexTabToCompanion(String pageUid, IndexTab tab) {
+    return IndexTabRowsCompanion.insert(
+      uid: tab.id,
+      pageUid: pageUid,
+      colorValue: tab.color.toARGB32(),
+      position: tab.position,
+    );
   }
 
-  TextBlock _textFromEntity(TextBlockEntity entity) {
+  TextBlock _textFromRow(TextBlockRow row) {
     return TextBlock(
-      id: entity.uid,
-      text: entity.text,
-      deltaJson: entity.deltaJson,
-      position: Offset(entity.dx, entity.dy),
-      fontSize: entity.fontSize,
-      color: Color(entity.colorValue),
-      width: entity.width,
-      rotation: entity.rotation,
+      id: row.uid,
+      text: row.plainText,
+      deltaJson: row.deltaJson,
+      position: Offset(row.dx, row.dy),
+      fontSize: row.fontSize,
+      color: Color(row.colorValue),
+      width: row.width,
+      rotation: row.rotation,
     );
   }
 
-  TextBlockEntity _textToEntity(TextBlock block) {
-    return TextBlockEntity()
-      ..uid = block.id
-      ..text = block.text
-      ..deltaJson = block.deltaJson
-      ..fontSize = block.fontSize
-      ..colorValue = block.color.toARGB32()
-      ..width = block.width
-      ..rotation = block.rotation
-      ..dx = block.position.dx
-      ..dy = block.position.dy;
+  TextBlockRowsCompanion _textToCompanion(
+    String pageUid,
+    TextBlock block,
+    int sortIndex,
+  ) {
+    return TextBlockRowsCompanion.insert(
+      uid: block.id,
+      pageUid: pageUid,
+      plainText: block.text,
+      deltaJson: Value(block.deltaJson),
+      fontSize: block.fontSize,
+      colorValue: block.color.toARGB32(),
+      width: block.width,
+      rotation: block.rotation,
+      dx: block.position.dx,
+      dy: block.position.dy,
+      sortIndex: sortIndex,
+    );
   }
 
-  ImageBlock _imageFromEntity(ImageBlockEntity entity) {
+  ImageBlock _imageFromRow(ImageBlockRow row) {
     return ImageBlock(
-      id: entity.uid,
-      path: entity.path,
-      ocrText: entity.ocrText,
-      position: Offset(entity.dx, entity.dy),
-      width: entity.width,
-      height: entity.height,
-      bytes: _bytesFromEntity(entity.bytes),
-      imageExt: entity.imageExt,
-      imageMime: entity.imageMime,
-      rotation: entity.rotation,
-      cropLeft: entity.cropLeft,
-      cropTop: entity.cropTop,
-      cropRight: entity.cropRight,
-      cropBottom: entity.cropBottom,
+      id: row.uid,
+      path: row.path,
+      ocrText: row.ocrText,
+      position: Offset(row.dx, row.dy),
+      width: row.width,
+      height: row.height,
+      bytes: _bytesFromEntity(row.bytes),
+      imageExt: row.imageExt,
+      imageMime: row.imageMime,
+      rotation: row.rotation,
+      cropLeft: row.cropLeft,
+      cropTop: row.cropTop,
+      cropRight: row.cropRight,
+      cropBottom: row.cropBottom,
     );
   }
 
-  ImageBlockEntity _imageToEntity(ImageBlock block) {
-    return ImageBlockEntity()
-      ..uid = block.id
-      ..path = block.path
-      ..ocrText = block.ocrText
-      ..bytes = block.path.isEmpty ? block.bytes?.toList() : null
-      ..imageExt = block.imageExt
-      ..imageMime = block.imageMime
-      ..width = block.width
-      ..height = block.height
-      ..rotation = block.rotation
-      ..dx = block.position.dx
-      ..dy = block.position.dy
-      ..cropLeft = block.cropLeft
-      ..cropTop = block.cropTop
-      ..cropRight = block.cropRight
-      ..cropBottom = block.cropBottom;
+  ImageBlockRowsCompanion _imageToCompanion(
+    String pageUid,
+    ImageBlock block,
+    int sortIndex,
+  ) {
+    return ImageBlockRowsCompanion.insert(
+      uid: block.id,
+      pageUid: pageUid,
+      path: block.path,
+      ocrText: block.ocrText,
+      bytes: Value(block.path.isEmpty ? block.bytes : null),
+      imageExt: Value(block.imageExt),
+      imageMime: Value(block.imageMime),
+      width: block.width,
+      height: block.height,
+      rotation: block.rotation,
+      dx: block.position.dx,
+      dy: block.position.dy,
+      cropLeft: block.cropLeft,
+      cropTop: block.cropTop,
+      cropRight: block.cropRight,
+      cropBottom: block.cropBottom,
+      sortIndex: sortIndex,
+    );
   }
 
-  InkStroke _strokeFromEntity(InkStrokeEntity entity) {
-    final tool = _toolFromIndex(entity.toolIndex);
+  InkStroke _strokeFromRow(InkStrokeRow row) {
     return InkStroke(
-      id: entity.uid,
-      points: entity.points
+      id: row.uid,
+      points: _pointsFromJson(row.pointsJson),
+      color: Color(row.colorValue),
+      width: row.width,
+      tool: _toolFromIndex(row.toolIndex),
+    );
+  }
+
+  InkStrokeRowsCompanion _strokeToCompanion(
+    String pageUid,
+    InkStroke stroke,
+    int sortIndex,
+  ) {
+    return InkStrokeRowsCompanion.insert(
+      uid: stroke.id,
+      pageUid: pageUid,
+      colorValue: stroke.color.toARGB32(),
+      width: stroke.width,
+      toolIndex: _toolToIndex(stroke.tool),
+      pointsJson: _pointsToJson(stroke.points),
+      sortIndex: sortIndex,
+    );
+  }
+
+  String _pointsToJson(List<InkPoint> points) {
+    return jsonEncode(
+      points
           .map(
-            (item) =>
-                InkPoint(dx: item.dx, dy: item.dy, pressure: item.pressure),
+            (point) => {
+              'dx': point.dx,
+              'dy': point.dy,
+              'pressure': point.pressure,
+            },
           )
           .toList(),
-      color: Color(entity.colorValue),
-      width: entity.width,
-      tool: tool,
     );
   }
 
-  InkStrokeEntity _strokeToEntity(InkStroke stroke) {
-    return InkStrokeEntity()
-      ..uid = stroke.id
-      ..colorValue = stroke.color.toARGB32()
-      ..width = stroke.width
-      ..toolIndex = _toolToIndex(stroke.tool)
-      ..points = stroke.points
-          .map(
-            (point) => InkPointEntity()
-              ..dx = point.dx
-              ..dy = point.dy
-              ..pressure = point.pressure,
-          )
-          .toList();
+  List<InkPoint> _pointsFromJson(String value) {
+    final decoded = jsonDecode(value);
+    if (decoded is! List<dynamic>) {
+      return <InkPoint>[];
+    }
+    return decoded
+        .whereType<Map<String, dynamic>>()
+        .map(
+          (point) => InkPoint(
+            dx: (point['dx'] as num).toDouble(),
+            dy: (point['dy'] as num).toDouble(),
+            pressure: (point['pressure'] as num?)?.toDouble() ?? 0.5,
+          ),
+        )
+        .toList();
   }
 
   Map<String, dynamic> _notebookToJson(Notebook notebook) {
@@ -500,7 +876,7 @@ class NotebookRepository {
     }
     return [
       IndexTab(
-        id: const Uuid().v4(),
+        id: _uuid.v4(),
         color: Color(json['indexTabColor'] as int),
         position: (json['indexTabPosition'] as num?)?.toDouble() ?? 0.0,
       ),
@@ -509,7 +885,7 @@ class NotebookRepository {
 
   IndexTab _indexTabFromJson(Map<String, dynamic> json) {
     return IndexTab(
-      id: (json['id'] as String?) ?? const Uuid().v4(),
+      id: (json['id'] as String?) ?? _uuid.v4(),
       color: Color(json['color'] as int),
       position: (json['position'] as num).toDouble(),
     );
@@ -628,12 +1004,11 @@ class NotebookRepository {
 
   InkStroke _strokeFromJson(Map<String, dynamic> json) {
     final toolIndex = (json['tool'] as num?)?.toInt() ?? 0;
-    final tool = _toolFromIndex(toolIndex);
     return InkStroke(
       id: json['id'] as String,
       color: Color(json['color'] as int),
       width: (json['width'] as num).toDouble(),
-      tool: tool,
+      tool: _toolFromIndex(toolIndex),
       points: (json['points'] as List<dynamic>? ?? <dynamic>[])
           .whereType<Map<String, dynamic>>()
           .map(
@@ -657,7 +1032,7 @@ class NotebookRepository {
 
   int _toolToIndex(DrawingTool tool) => tool.index;
 
-  Uint8List? _bytesFromEntity(List<int>? bytes) {
+  Uint8List? _bytesFromEntity(Uint8List? bytes) {
     if (bytes == null || bytes.isEmpty) {
       return null;
     }
@@ -681,4 +1056,21 @@ class NotebookRepository {
       return null;
     }
   }
+}
+
+class _NotebookReadResult {
+  const _NotebookReadResult({
+    required this.notebook,
+    required this.hadCorruptRows,
+  });
+
+  final Notebook notebook;
+  final bool hadCorruptRows;
+}
+
+class _PageReadResult {
+  const _PageReadResult({required this.page, required this.hadCorruptRows});
+
+  final NotePage page;
+  final bool hadCorruptRows;
 }

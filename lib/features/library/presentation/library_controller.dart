@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/error/app_error_log.dart';
 import '../../../data/backup/local_backup_service.dart';
 import '../../../data/sync/cloud_sync_service.dart';
 import '../../notebook/data/notebook_repository.dart';
@@ -30,6 +31,7 @@ class LibraryController extends ChangeNotifier {
   bool isLoading = false;
   bool isSyncing = false;
   bool isLoadingSelectedItem = false;
+  bool isRecoveringCorruptDocuments = false;
   List<Notebook> items = <Notebook>[];
   String? selectedItemId;
   String selectedFolder = '';
@@ -37,8 +39,12 @@ class LibraryController extends ChangeNotifier {
   String? cloudPath;
   DateTime? lastSyncedAt;
   CloudSyncResult? lastSyncResult;
+  Object? loadError;
   final Set<String> _folders = <String>{};
   Notebook? _activeNotebook;
+  bool _corruptRecoveryDismissed = false;
+  int corruptDocumentCount = 0;
+  List<Notebook> recoverableCorruptDocuments = <Notebook>[];
 
   static const String _defaultFolderName = 'Notes';
   static const String _foldersFileName = 'library_folders.json';
@@ -46,8 +52,25 @@ class LibraryController extends ChangeNotifier {
   bool get shouldShowResetBanner =>
       (wasReset || (freshFile && autoRestoreCount > 0)) && !_bannerDismissed;
 
+  bool get hasCorruptDocuments => corruptDocumentCount > 0;
+
+  bool get shouldPromptCorruptRecovery =>
+      hasCorruptDocuments &&
+      recoverableCorruptDocuments.isNotEmpty &&
+      !_corruptRecoveryDismissed;
+
+  bool get shouldShowCorruptionBanner =>
+      hasCorruptDocuments &&
+      !_corruptRecoveryDismissed &&
+      !shouldPromptCorruptRecovery;
+
   void dismissResetBanner() {
     _bannerDismissed = true;
+    notifyListeners();
+  }
+
+  void dismissCorruptRecoveryPrompt() {
+    _corruptRecoveryDismissed = true;
     notifyListeners();
   }
 
@@ -60,37 +83,123 @@ class LibraryController extends ChangeNotifier {
   Future<void> loadItems() async {
     isLoading = true;
     notifyListeners();
-    items = await repository.fetchNotebooks();
+    try {
+      final loadedItems = await repository.fetchNotebooks();
+      items = loadedItems;
+      loadError = null;
+      await _refreshCorruptRecoveryState();
 
-    if (items.isEmpty && (wasReset || freshFile) && await backup.hasLatest()) {
-      autoRestoreCount = await backup.restoreFromLatest();
-      if (autoRestoreCount > 0) {
-        items = await repository.fetchNotebooks();
+      if (items.isEmpty &&
+          (wasReset || freshFile) &&
+          await backup.hasLatest()) {
+        autoRestoreCount = await backup.restoreFromLatest();
+        if (autoRestoreCount > 0) {
+          items = await repository.fetchNotebooks();
+          await _refreshCorruptRecoveryState();
+        } else {
+          AppErrorLog.instance.record(
+            'Database restore was attempted after startup reset, but no '
+            'documents were restored from the local backup.',
+            null,
+            source: 'LibraryController.loadItems(reset_restore_empty)',
+          );
+        }
+      } else if (items.isEmpty && (wasReset || freshFile)) {
+        AppErrorLog.instance.record(
+          'Database reset/fresh start detected, but no local backup snapshot '
+          'was available for restore.',
+          null,
+          source: 'LibraryController.loadItems(reset_without_backup)',
+        );
       }
+
+      if (items.isNotEmpty) {
+        final folders = folderNames;
+        if (folders.isNotEmpty) {
+          selectedFolder = folders.first;
+        }
+        selectedItemId ??= _firstItemInFolder(selectedFolder)?.uid;
+        if (_activeNotebook == null && selectedItemId != null) {
+          _activeNotebook = _itemById(selectedItemId!);
+        }
+      }
+    } catch (error, stackTrace) {
+      loadError = error;
+      AppErrorLog.instance.record(
+        error,
+        stackTrace,
+        source: 'LibraryController.loadItems',
+      );
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<int> restoreCorruptDocumentsFromBackup() async {
+    if (recoverableCorruptDocuments.isEmpty) {
+      _corruptRecoveryDismissed = true;
+      AppErrorLog.instance.record(
+        'Corrupt documents were detected, but no recoverable local backup '
+        'copies were found.',
+        null,
+        source:
+            'LibraryController.restoreCorruptDocumentsFromBackup(no_candidates)',
+      );
+      notifyListeners();
+      return 0;
     }
 
-    if (items.isNotEmpty) {
-      final folders = folderNames;
-      if (folders.isNotEmpty) {
-        selectedFolder = folders.first;
-      }
-      selectedItemId ??= _firstItemInFolder(selectedFolder)?.uid;
-      if (_activeNotebook == null && selectedItemId != null) {
-        _activeNotebook = _itemById(selectedItemId!);
-      }
-    }
-    isLoading = false;
+    isRecoveringCorruptDocuments = true;
     notifyListeners();
+
+    var restored = 0;
+    try {
+      for (final notebook in recoverableCorruptDocuments) {
+        await repository.saveRecoveredCopy(notebook, reason: 'Recovered');
+        restored++;
+      }
+      _corruptRecoveryDismissed = true;
+      items = await repository.fetchNotebooks();
+      await _refreshCorruptRecoveryState();
+      if (items.isNotEmpty) {
+        selectedFolder = folderNames.isEmpty ? '' : folderNames.first;
+        selectedItemId ??= _firstItemInFolder(selectedFolder)?.uid;
+        _activeNotebook = selectedItemId == null
+            ? null
+            : _itemById(selectedItemId!);
+      }
+    } catch (e, st) {
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LibraryController.restoreCorruptDocumentsFromBackup',
+      );
+    } finally {
+      if (restored == 0) {
+        AppErrorLog.instance.record(
+          'Corrupt document recovery finished without restoring any copies.',
+          null,
+          source: 'LibraryController.restoreCorruptDocumentsFromBackup(empty)',
+        );
+      }
+      isRecoveringCorruptDocuments = false;
+      notifyListeners();
+    }
+    return restored;
   }
 
   Future<void> syncNow() async {
     isSyncing = true;
     notifyListeners();
-    lastSyncResult = await cloudSyncService.sync(items);
-    lastSyncedAt = DateTime.now();
-    isSyncing = false;
-    await loadItems();
-    notifyListeners();
+    try {
+      lastSyncResult = await cloudSyncService.sync(items);
+      lastSyncedAt = DateTime.now();
+      await loadItems();
+    } finally {
+      isSyncing = false;
+      notifyListeners();
+    }
   }
 
   Future<void> setCloudPath(String path) async {
@@ -158,18 +267,20 @@ class LibraryController extends ChangeNotifier {
         continue;
       }
 
-      final updated = item.copyWith(folder: trimmedNewName);
-      await repository.saveNotebook(updated);
-      updatedItems.add(updated);
+      final updated = await repository.updateNotebookMetadata(
+        item.uid,
+        folder: trimmedNewName,
+      );
+      updatedItems.add(updated ?? item);
     }
 
     items = updatedItems;
     if (selectedFolder == trimmedOldName) {
       selectedFolder = trimmedNewName;
     }
-    _activeNotebook = _activeNotebook?.folder == trimmedOldName
-        ? _activeNotebook!.copyWith(folder: trimmedNewName)
-        : _activeNotebook;
+    if (_activeNotebook?.folder == trimmedOldName) {
+      _activeNotebook = _itemById(_activeNotebook!.uid);
+    }
     if (!_selectedItemIsInFolder(selectedFolder)) {
       selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
       _activeNotebook = selectedItemId == null
@@ -261,11 +372,13 @@ class LibraryController extends ChangeNotifier {
       return;
     }
 
-    final updated = existing.copyWith(
+    final updated = await repository.updateNotebookMetadata(
+      uid,
       title: trimmed,
-      updatedAt: DateTime.now(),
     );
-    await repository.saveNotebook(updated);
+    if (updated == null) {
+      return;
+    }
     items = [
       for (final item in items)
         if (item.uid == uid) updated else item,
@@ -445,5 +558,42 @@ class LibraryController extends ChangeNotifier {
       }
     }
     return false;
+  }
+
+  Future<void> _refreshCorruptRecoveryState() async {
+    corruptDocumentCount = repository.lastCorruptNotebookCount;
+    recoverableCorruptDocuments = <Notebook>[];
+    if (!repository.lastFetchSkippedCorruptRows) {
+      return;
+    }
+
+    final backupNotebooks = await backup.readLatest();
+    final existingUids = items.map((item) => item.uid).toSet();
+    final corruptUids = repository.lastCorruptNotebookIds.toSet();
+    recoverableCorruptDocuments =
+        backupNotebooks
+            .where(
+              (item) =>
+                  !existingUids.contains(item.uid) ||
+                  corruptUids.contains(item.uid),
+            )
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    AppErrorLog.instance.record(
+      'Detected $corruptDocumentCount unreadable notebook rows. '
+      'Backup candidates: ${recoverableCorruptDocuments.length}.',
+      null,
+      source: 'LibraryController._refreshCorruptRecoveryState',
+    );
+    if (recoverableCorruptDocuments.isEmpty) {
+      AppErrorLog.instance.record(
+        'Unreadable notebook rows were detected, but the local backup did not '
+        'contain any missing document candidates to restore.',
+        null,
+        source:
+            'LibraryController._refreshCorruptRecoveryState(no_backup_match)',
+      );
+    }
   }
 }

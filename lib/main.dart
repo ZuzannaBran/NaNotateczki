@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app/notes_app.dart';
+import 'core/diagnostics/optimization_log.dart';
 import 'core/error/app_error_log.dart';
 import 'core/input/stylus_button_state.dart';
 
@@ -35,6 +36,7 @@ void main() {
 Future<void> _runApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppErrorLog.instance.load();
+  await OptimizationLog.instance.load();
   _installFlutterErrorLogger();
   StylusButtonState.initialize();
   _installInvalidKeyDataFilter();
