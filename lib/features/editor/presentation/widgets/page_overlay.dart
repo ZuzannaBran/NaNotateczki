@@ -1247,14 +1247,16 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     required double visibleHeight,
     required _CropAnchor anchor,
   }) {
+    final bytes = widget.block.bytes;
     final path = widget.block.path;
-    if (path.isEmpty) {
+    if ((bytes == null || bytes.isEmpty) && path.isEmpty) {
       return const Center(
         child: Icon(Icons.image_outlined, color: AppColors.inkBlack),
       );
     }
-    final file = File(path);
-    if (!file.existsSync()) {
+    final file = path.isEmpty ? null : File(path);
+    if ((bytes == null || bytes.isEmpty) &&
+        (file == null || !file.existsSync())) {
       return const Center(
         child: Icon(Icons.broken_image_outlined, color: AppColors.inkBlack),
       );
@@ -1285,7 +1287,9 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
           child: SizedBox(
             width: fullWidth,
             height: fullHeight,
-            child: Image.file(file, fit: BoxFit.cover),
+            child: bytes != null && bytes.isNotEmpty
+                ? Image.memory(bytes, fit: BoxFit.cover)
+                : Image.file(file!, fit: BoxFit.cover),
           ),
         ),
       ),
@@ -1293,7 +1297,15 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   }
 
   Future<void> _loadImageSize() async {
+    final inlineBytes = widget.block.bytes;
     final path = widget.block.path;
+    if (inlineBytes != null && inlineBytes.isNotEmpty) {
+      if (_loadedImageSizePath == widget.block.id) {
+        return;
+      }
+      await _decodeImageSize(inlineBytes, widget.block.id);
+      return;
+    }
     if (path.isEmpty || path == _loadedImageSizePath) {
       if (path.isEmpty && widget.block.bytes != null) {
         if (!mounted) return;
@@ -1316,7 +1328,14 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
       return;
     }
     try {
-      final bytes = await file.readAsBytes();
+      await _decodeImageSize(await file.readAsBytes(), path);
+    } catch (e) {
+      debugPrint('_ImageBlockWidget: failed to load image bounds: $e');
+    }
+  }
+
+  Future<void> _decodeImageSize(Uint8List bytes, String cacheKey) async {
+    try {
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       final size = Size(
@@ -1325,11 +1344,11 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
       );
       frame.image.dispose();
       codec.dispose();
-      if (!mounted || widget.block.path != path) {
+      if (!mounted) {
         return;
       }
       setState(() {
-        _loadedImageSizePath = path;
+        _loadedImageSizePath = cacheKey;
         _loadedImageSize = size;
       });
       _normalizeBlockToImageBounds();
@@ -1675,35 +1694,50 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
           builder: (context, setState) {
             return AlertDialog(
               title: const Text('OCR text'),
-              content: TextField(
-                controller: textController,
-                focusNode: focusNode,
-                autofocus: true,
-                maxLines: 5,
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!controller.supportsOcr) ...[
+                    const Text(
+                      'Automatic OCR is available only in the Android and '
+                      'iOS apps. You can still enter or edit the text here.',
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextField(
+                    controller: textController,
+                    focusNode: focusNode,
+                    autofocus: true,
+                    maxLines: 5,
+                  ),
+                ],
               ),
               actions: [
-                TextButton(
-                  onPressed: isRunning
-                      ? null
-                      : () async {
-                          setState(() => isRunning = true);
-                          final message = await controller.runOcrForImageOnPage(
-                            widget.pageIndex,
-                            widget.block,
-                          );
-                          if (message != null && context.mounted) {
-                            ScaffoldMessenger.of(
-                              context,
-                            ).showSnackBar(SnackBar(content: Text(message)));
-                          }
-                          final updatedBlock = controller.findImageBlockById(
-                            widget.block.id,
-                          );
-                          textController.text = updatedBlock?.ocrText ?? '';
-                          setState(() => isRunning = false);
-                        },
-                  child: const Text('Run OCR'),
-                ),
+                if (controller.supportsOcr)
+                  TextButton(
+                    onPressed: isRunning
+                        ? null
+                        : () async {
+                            setState(() => isRunning = true);
+                            final message = await controller
+                                .runOcrForImageOnPage(
+                                  widget.pageIndex,
+                                  widget.block,
+                                );
+                            if (message != null && context.mounted) {
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(SnackBar(content: Text(message)));
+                            }
+                            final updatedBlock = controller.findImageBlockById(
+                              widget.block.id,
+                            );
+                            textController.text = updatedBlock?.ocrText ?? '';
+                            setState(() => isRunning = false);
+                          },
+                    child: const Text('Run OCR'),
+                  ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Cancel'),

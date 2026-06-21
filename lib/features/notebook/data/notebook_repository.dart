@@ -101,6 +101,9 @@ class NotebookRepository {
     Notebook notebook, {
     String reason = 'deleted',
   }) async {
+    if (kIsWeb) {
+      return;
+    }
     try {
       final docs = await getApplicationDocumentsDirectory();
       final archiveDir = Directory('${docs.path}/deleted_notebooks');
@@ -350,6 +353,9 @@ class NotebookRepository {
     final bytes = block.bytes;
     if (bytes == null || bytes.isEmpty) {
       return block;
+    }
+    if (kIsWeb) {
+      return block.copyWith(path: '');
     }
     if (block.path.isNotEmpty &&
         File(block.path).existsSync() &&
@@ -970,6 +976,9 @@ class NotebookRepository {
       return bytes;
     }
     if (block.path.isEmpty) {
+      return null;
+    }
+    if (kIsWeb) {
       return null;
     }
     final file = File(block.path);

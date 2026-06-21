@@ -689,6 +689,8 @@ class _BoardScreenState extends State<BoardScreen> {
                                             interactionEnabled:
                                                 !_isViewportNavigating,
                                             worldOrigin: boardRect.topLeft,
+                                            effectiveScale:
+                                                controller.viewScale,
                                           ),
                                         ),
                                         _BoardPaintProbe(

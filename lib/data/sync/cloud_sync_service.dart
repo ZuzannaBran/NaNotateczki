@@ -28,6 +28,9 @@ class CloudSyncService {
   static const String _cloudFileName = 'notatek_cloud.json';
 
   Future<String?> getCloudPath() async {
+    if (kIsWeb) {
+      return null;
+    }
     final file = await _configFile();
     if (!await file.exists()) {
       return null;
@@ -43,11 +46,17 @@ class CloudSyncService {
   }
 
   Future<void> setCloudPath(String path) async {
+    if (kIsWeb) {
+      throw UnsupportedError('Folder sync is not available in a web browser.');
+    }
     final file = await _configFile();
     await file.writeAsString(jsonEncode({'path': path}));
   }
 
   Future<CloudSyncResult> sync(List<Notebook> local) async {
+    if (kIsWeb) {
+      throw UnsupportedError('Folder sync is not available in a web browser.');
+    }
     final path = await getCloudPath();
     if (path == null || path.isEmpty) {
       throw Exception('Cloud folder not configured.');

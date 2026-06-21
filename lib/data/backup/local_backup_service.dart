@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/error/app_error_log.dart';
+import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/notebook.dart';
 import 'backup_eraser_flattening.dart';
@@ -19,6 +20,7 @@ class LocalBackupService {
   static const _trashDirName = 'trash';
   static const _manifest = 'manifest.json';
   static const _latest = 'notebooks_latest.json';
+  static const _webBackupKey = 'local_backup_web.json';
 
   Future<Directory> _backupDir() async {
     final docs = await getApplicationDocumentsDirectory();
@@ -62,6 +64,9 @@ class LocalBackupService {
 
   Future<BackupSnapshotReport> snapshot(List<Notebook> items) async {
     try {
+      if (kIsWeb) {
+        return _snapshotForWeb(items);
+      }
       final totalStopwatch = Stopwatch()..start();
       final notebooksDir = await _notebooksDir();
       final expectedFiles = <String>{};
@@ -185,6 +190,9 @@ class LocalBackupService {
 
   Future<bool> hasLatest() async {
     try {
+      if (kIsWeb) {
+        return await readStoredText(_webBackupKey) != null;
+      }
       return await (await _manifestFile()).exists() ||
           await (await _file(_latest)).exists();
     } catch (_) {
@@ -193,6 +201,16 @@ class LocalBackupService {
   }
 
   Future<List<Notebook>> readLatest() async {
+    if (kIsWeb) {
+      final content = await readStoredText(_webBackupKey);
+      if (content == null) {
+        return <Notebook>[];
+      }
+      final decoded = jsonDecode(content);
+      return decoded is List
+          ? repository.decodeNotebooks(decoded)
+          : <Notebook>[];
+    }
     final incremental = await _readIncrementalLatest();
     if (incremental.isNotEmpty) {
       return incremental;
@@ -281,6 +299,34 @@ class LocalBackupService {
       }
     }
     return restored;
+  }
+
+  Future<BackupSnapshotReport> _snapshotForWeb(List<Notebook> items) async {
+    final stopwatch = Stopwatch()..start();
+    final encoded = repository.encodeNotebooks(
+      items.map(flattenErasersForBackup).toList(),
+    );
+    final content = jsonEncode(encoded);
+    await writeStoredText(_webBackupKey, content);
+    stopwatch.stop();
+    return BackupSnapshotReport(
+      notebookCount: items.length,
+      pageCount: items.fold(0, (sum, notebook) => sum + notebook.pages.length),
+      strokeCount: items.fold(
+        0,
+        (sum, notebook) => sum + _strokeCount(notebook),
+      ),
+      pointCount: items.fold(0, (sum, notebook) => sum + _pointCount(notebook)),
+      jsonBytes: utf8.encode(content).length,
+      changedCount: items.length,
+      unchangedCount: 0,
+      readCompareMs: 0,
+      staleListMs: 0,
+      staleMoved: 0,
+      manifestMs: 0,
+      totalMs: stopwatch.elapsedMilliseconds,
+      notebookReports: const [],
+    );
   }
 
   Future<void> _moveStaleNotebookBackupToTrash(File file) async {

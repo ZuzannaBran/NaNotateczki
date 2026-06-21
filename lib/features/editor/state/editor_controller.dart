@@ -20,11 +20,13 @@ import 'package:super_clipboard/super_clipboard.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
+import '../../notebook/domain/ink_spatial_index.dart';
 import '../../notebook/domain/ink_stroke.dart';
 import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/text_block.dart';
+import '../../../core/storage/text_storage.dart';
 import 'editor_actions.dart';
 import 'input_mode.dart';
 import 'page_background.dart';
@@ -107,6 +109,10 @@ class EditorController extends ChangeNotifier {
 
   final List<EditorAction> _undoActions = <EditorAction>[];
   final List<EditorAction> _redoActions = <EditorAction>[];
+  final Map<String, ValueNotifier<int>> _inkPageRevisions =
+      <String, ValueNotifier<int>>{};
+  final ValueNotifier<int> inkRevision = ValueNotifier<int>(0);
+  final ValueNotifier<int> historyRevision = ValueNotifier<int>(0);
   final Map<String, PageBackgroundSettings> _localBackgrounds =
       <String, PageBackgroundSettings>{};
   final Set<NotebookKind> _dirtyBackgroundDefaultKinds = <NotebookKind>{};
@@ -150,6 +156,19 @@ class EditorController extends ChangeNotifier {
   Size get layoutPageSize => Size(_pageWidth, _pageHeight);
   double get layoutPageGap => _pageGap;
 
+  ValueListenable<int> inkRevisionForPage(String pageId) {
+    return _inkPageRevisions.putIfAbsent(pageId, () => ValueNotifier<int>(0));
+  }
+
+  NotePage? pageById(String pageId) {
+    for (final page in pages) {
+      if (page.id == pageId) {
+        return page;
+      }
+    }
+    return null;
+  }
+
   PageBackgroundSettings defaultBackgroundSettingsForKind(NotebookKind kind) {
     return switch (kind) {
       NotebookKind.notebook => defaultNotebookBackground,
@@ -168,6 +187,11 @@ class EditorController extends ChangeNotifier {
       unawaited(_save());
     }
     lassoDragDelta.dispose();
+    inkRevision.dispose();
+    historyRevision.dispose();
+    for (final revision in _inkPageRevisions.values) {
+      revision.dispose();
+    }
     super.dispose();
   }
 
@@ -392,14 +416,14 @@ class EditorController extends ChangeNotifier {
     deleteImageBlock(id);
   }
 
-  void addInkStrokeOnPage(
+  String? addInkStrokeOnPage(
     int pageIndex,
     List<InkPoint> points, {
     double? widthOverride,
     DrawingTool? toolOverride,
   }) {
     _ensurePageSelected(pageIndex);
-    addInkStroke(
+    return addInkStroke(
       points,
       widthOverride: widthOverride,
       toolOverride: toolOverride,
@@ -549,7 +573,21 @@ class EditorController extends ChangeNotifier {
       return pointsToTest.any(isInsideDocumentPath);
     }
 
-    for (final s in page.inkStrokes) {
+    var lassoMinX = points.first.dx;
+    var lassoMinY = points.first.dy;
+    var lassoMaxX = lassoMinX;
+    var lassoMaxY = lassoMinY;
+    for (var index = 1; index < points.length; index++) {
+      final point = points[index];
+      lassoMinX = math.min(lassoMinX, point.dx);
+      lassoMinY = math.min(lassoMinY, point.dy);
+      lassoMaxX = math.max(lassoMaxX, point.dx);
+      lassoMaxY = math.max(lassoMaxY, point.dy);
+    }
+    final inkCandidates = inkSpatialIndexFor(
+      page.inkStrokes,
+    ).query(Rect.fromLTRB(lassoMinX, lassoMinY, lassoMaxX, lassoMaxY));
+    for (final s in inkCandidates) {
       final isSelectedInk =
           !s.tool.isEraser &&
           s.points.any((p) => isInsidePagePath(Offset(p.dx, p.dy)));
@@ -841,11 +879,10 @@ class EditorController extends ChangeNotifier {
 
   Future<void> _loadEditorPrefs() async {
     try {
-      final file = await _prefsFile();
-      if (!await file.exists()) {
+      final raw = await readStoredText('editor_prefs.json');
+      if (raw == null) {
         return;
       }
-      final raw = await file.readAsString();
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) {
         return;
@@ -962,8 +999,7 @@ class EditorController extends ChangeNotifier {
 
   Future<void> _saveEditorPrefs() async {
     try {
-      final file = await _prefsFile();
-      final existing = await _readEditorPrefs(file);
+      final existing = await _readEditorPrefs();
       final dirtyBackgroundDefaultKinds = Set<NotebookKind>.of(
         _dirtyBackgroundDefaultKinds,
       );
@@ -989,7 +1025,7 @@ class EditorController extends ChangeNotifier {
           dirtyLocalBackgroundIds,
         ),
       };
-      await file.writeAsString(jsonEncode(payload));
+      await writeStoredText('editor_prefs.json', jsonEncode(payload));
       _dirtyBackgroundDefaultKinds.removeAll(dirtyBackgroundDefaultKinds);
       _dirtyLocalBackgroundIds.removeAll(dirtyLocalBackgroundIds);
     } catch (e) {
@@ -997,12 +1033,13 @@ class EditorController extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> _readEditorPrefs(File file) async {
+  Future<Map<String, dynamic>> _readEditorPrefs() async {
     try {
-      if (!await file.exists()) {
+      final content = await readStoredText('editor_prefs.json');
+      if (content == null) {
         return <String, dynamic>{};
       }
-      final decoded = jsonDecode(await file.readAsString());
+      final decoded = jsonDecode(content);
       return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
     } catch (e) {
       debugPrint('EditorController._readEditorPrefs failed: $e');
@@ -1059,11 +1096,6 @@ class EditorController extends ChangeNotifier {
     return merged;
   }
 
-  Future<File> _prefsFile() async {
-    final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/editor_prefs.json');
-  }
-
   DrawingTool? _eraserToolFromIndex(Object? value) {
     if (value is! int || value < 0 || value >= DrawingTool.values.length) {
       return null;
@@ -1106,6 +1138,7 @@ class EditorController extends ChangeNotifier {
     final action = _undoActions.removeLast();
     final updated = action.revert(currentPage);
     _redoActions.add(action);
+    _notifyHistoryChanged();
     _updatePage(updated);
     _save();
   }
@@ -1118,6 +1151,7 @@ class EditorController extends ChangeNotifier {
     final action = _redoActions.removeLast();
     final updated = action.apply(currentPage);
     _undoActions.add(action);
+    _notifyHistoryChanged();
     _updatePage(updated);
     _save();
   }
@@ -1443,6 +1477,14 @@ class EditorController extends ChangeNotifier {
       return null;
     }
     _ensureInsertPageSelected(position);
+    if (kIsWeb) {
+      final extension = picked.name.split('.').last.toLowerCase();
+      return _addImageBlockFromBytes(
+        await picked.readAsBytes(),
+        position,
+        extension,
+      );
+    }
     return _addImageBlockFromFile(File(picked.path), position);
   }
 
@@ -1453,10 +1495,11 @@ class EditorController extends ChangeNotifier {
         allowMultiple: false,
         type: FileType.custom,
         allowedExtensions: ['png', 'jpg', 'jpeg', 'pdf', 'txt'],
+        withData: kIsWeb,
       );
     } catch (e) {
       debugPrint('EditorController.insertFromFilePicker: picker failed: $e');
-      if (Platform.isLinux) {
+      if (defaultTargetPlatform == TargetPlatform.linux) {
         return 'Missing "zenity". Install it: sudo apt-get install zenity.';
       }
       return 'File picker failed to open.';
@@ -1464,7 +1507,27 @@ class EditorController extends ChangeNotifier {
     if (result == null) {
       return null;
     }
-    final path = result.files.single.path;
+    final pickedFile = result.files.single;
+    if (kIsWeb) {
+      final bytes = pickedFile.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        return 'Selected file is not accessible.';
+      }
+      final extension = pickedFile.extension?.toLowerCase();
+      _ensureInsertPageSelected(position);
+      if (extension == 'png' || extension == 'jpg' || extension == 'jpeg') {
+        return _addImageBlockFromBytes(bytes, position, extension!);
+      }
+      if (extension == 'txt') {
+        addTextBlockFromText(position, utf8.decode(bytes));
+        return null;
+      }
+      if (extension == 'pdf') {
+        return _addPdfBytesAsImages(bytes, position);
+      }
+      return 'Unsupported file type.';
+    }
+    final path = pickedFile.path;
     if (path == null || path.isEmpty) {
       return 'Selected file is not accessible.';
     }
@@ -1788,6 +1851,26 @@ class EditorController extends ChangeNotifier {
     Offset position,
     String extension,
   ) async {
+    if (kIsWeb) {
+      final size = await _imageSizeFromBytes(bytes);
+      final initialSize = _initialImageBlockSize(size);
+      final normalizedExtension = extension == 'jpeg' ? 'jpg' : extension;
+      final block = ImageBlock(
+        id: _uuid.v4(),
+        path: '',
+        ocrText: '',
+        position: position,
+        width: initialSize.width,
+        height: initialSize.height,
+        bytes: bytes,
+        imageExt: normalizedExtension,
+        imageMime: 'image/$normalizedExtension',
+      );
+      _applyAction(AddImageAction(block));
+      _activateInsertedImage(block.id);
+      _save();
+      return null;
+    }
     final filename = 'clip_${DateTime.now().millisecondsSinceEpoch}.$extension';
     final file = await _persistImageBytes(bytes, filename);
     final size = await _imageSize(file);
@@ -1883,6 +1966,41 @@ class EditorController extends ChangeNotifier {
     }
     try {
       final document = await PdfDocument.openFile(pdfFile.path);
+      return await _addPdfDocumentAsImages(document, position);
+    } on PlatformNotSupportedException {
+      return 'PDF rendering is not supported on this platform.';
+    } on MissingPluginException {
+      return 'PDF renderer plugin is missing for this platform.';
+    } catch (e) {
+      debugPrint('EditorController._addPdfAsImages failed: $e');
+      return 'Failed to render PDF.';
+    }
+  }
+
+  Future<String?> _addPdfBytesAsImages(Uint8List bytes, Offset position) async {
+    try {
+      final document = await PdfDocument.openData(bytes);
+      return await _addPdfDocumentAsImages(
+        document,
+        position,
+        storeInline: true,
+      );
+    } on PlatformNotSupportedException {
+      return 'PDF rendering is not supported by this browser.';
+    } on MissingPluginException {
+      return 'PDF renderer is unavailable in this browser.';
+    } catch (e) {
+      debugPrint('EditorController._addPdfBytesAsImages failed: $e');
+      return 'Failed to render PDF.';
+    }
+  }
+
+  Future<String?> _addPdfDocumentAsImages(
+    PdfDocument document,
+    Offset position, {
+    bool storeInline = false,
+  }) async {
+    try {
       final pageExtent = _pageExtent;
       final basePageIndex = _pageIndexForPosition(position);
       final localOffset = notebook.kind == NotebookKind.board
@@ -1901,10 +2019,12 @@ class EditorController extends ChangeNotifier {
         if (render == null) {
           continue;
         }
-        final file = await _persistImageBytes(
-          render.bytes,
-          'pdf_${DateTime.now().millisecondsSinceEpoch}_$pageIndex.png',
-        );
+        final file = storeInline
+            ? null
+            : await _persistImageBytes(
+                render.bytes,
+                'pdf_${DateTime.now().millisecondsSinceEpoch}_$pageIndex.png',
+              );
         final renderWidth = (render.width ?? page.width).toDouble();
         final renderHeight = (render.height ?? page.height).toDouble();
         final size = Size(renderWidth, renderHeight);
@@ -1927,7 +2047,7 @@ class EditorController extends ChangeNotifier {
             : targetOrigin + localOffset;
         final block = ImageBlock(
           id: _uuid.v4(),
-          path: file.path,
+          path: file?.path ?? '',
           ocrText: '',
           position: targetPosition,
           width: targetWidth,
@@ -1936,23 +2056,18 @@ class EditorController extends ChangeNotifier {
               : targetHeight.clamp(80, 520).toDouble(),
           imageExt: 'png',
           imageMime: 'image/png',
+          bytes: storeInline ? render.bytes : null,
         );
         additions.putIfAbsent(targetIndex, () => <ImageBlock>[]).add(block);
         if (notebook.kind == NotebookKind.board) {
           pageOffset += block.height + 12;
         }
       }
-      await document.close();
       _appendImageBlocksOnPages(additions);
       _save();
       return null;
-    } on PlatformNotSupportedException {
-      return 'PDF rendering is not supported on this platform.';
-    } on MissingPluginException {
-      return 'PDF renderer plugin is missing for this platform.';
-    } catch (e) {
-      debugPrint('EditorController._addPdfAsImages failed: $e');
-      return 'Failed to render PDF.';
+    } finally {
+      await document.close();
     }
   }
 
@@ -2058,6 +2173,9 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<String?> runOcrForImage(ImageBlock block) async {
+    if (!supportsOcr) {
+      return 'OCR is available only in the Android and iOS apps.';
+    }
     final file = File(block.path);
     if (!await file.exists()) {
       return 'Image file not found.';
@@ -2140,13 +2258,13 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
-  void addInkStroke(
+  String? addInkStroke(
     List<InkPoint> points, {
     double? widthOverride,
     DrawingTool? toolOverride,
   }) {
     if (points.isEmpty) {
-      return;
+      return null;
     }
     final strokeTool = toolOverride ?? tool;
     final baseWidth = strokeTool == DrawingTool.highlighter
@@ -2159,8 +2277,9 @@ class EditorController extends ChangeNotifier {
       width: widthOverride ?? baseWidth,
       tool: strokeTool,
     );
-    _applyAction(AddInkStrokeAction(stroke));
+    _applyInkAction(AddInkStrokeAction(stroke));
     _scheduleSave();
+    return stroke.id;
   }
 
   void eraseInkStrokesById(Set<String> ids) {
@@ -2172,7 +2291,7 @@ class EditorController extends ChangeNotifier {
     if (after.length == before.length) {
       return;
     }
-    _applyAction(RemoveInkStrokesAction(before: before, after: after));
+    _applyInkAction(RemoveInkStrokesAction(before: before, after: after));
     _scheduleSave();
   }
 
@@ -2181,7 +2300,7 @@ class EditorController extends ChangeNotifier {
     if (_sameInkStrokeIds(before, strokes)) {
       return;
     }
-    _applyAction(RemoveInkStrokesAction(before: before, after: strokes));
+    _applyInkAction(RemoveInkStrokesAction(before: before, after: strokes));
     _scheduleSave();
   }
 
@@ -2287,7 +2406,10 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<Size> _imageSize(File file) async {
-    final bytes = await file.readAsBytes();
+    return _imageSizeFromBytes(await file.readAsBytes());
+  }
+
+  Future<Size> _imageSizeFromBytes(Uint8List bytes) async {
     final codec = await instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     final image = frame.image;
@@ -2316,6 +2438,8 @@ class EditorController extends ChangeNotifier {
     }
     return Platform.isAndroid || Platform.isIOS;
   }
+
+  bool get supportsOcr => _isOcrSupported();
 
   Rect _computeContentBounds() {
     Rect? bounds;
@@ -2373,13 +2497,40 @@ class EditorController extends ChangeNotifier {
     final updated = action.apply(currentPage);
     _undoActions.add(action);
     _redoActions.clear();
+    _notifyHistoryChanged();
     _updatePage(updated);
+  }
+
+  void _applyInkAction(EditorAction action) {
+    _commitActiveTextEdit();
+    final updated = action.apply(currentPage);
+    _undoActions.add(action);
+    _redoActions.clear();
+    _notifyHistoryChanged();
+    pages = [
+      for (var i = 0; i < pages.length; i++)
+        if (i == currentPageIndex) updated else pages[i],
+    ];
+    final pageRevision = _inkPageRevisions.putIfAbsent(
+      updated.id,
+      () => ValueNotifier<int>(0),
+    );
+    pageRevision.value++;
+    inkRevision.value++;
+    if (notebook.kind == NotebookKind.board) {
+      notifyListeners();
+    }
+  }
+
+  void _notifyHistoryChanged() {
+    historyRevision.value++;
   }
 
   void _applyActionWithoutNotify(EditorAction action) {
     final updated = action.apply(currentPage);
     _undoActions.add(action);
     _redoActions.clear();
+    _notifyHistoryChanged();
     pages = [
       for (var i = 0; i < pages.length; i++)
         if (i == currentPageIndex) updated else pages[i],

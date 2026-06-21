@@ -1546,6 +1546,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                                   ),
                                                   DocumentDrawingCanvas(
                                                     allowMultiTouch: false,
+                                                    effectiveScale: _pageScale,
                                                     interactionEnabled:
                                                         !_isViewportNavigating,
                                                     worldOrigin: Offset.zero,
@@ -1682,6 +1683,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       top: 10,
                       left: 10,
                       child: _ProjectMiniMapOverlay(
+                        controller: controller,
                         pages: controller.pages,
                         currentPageIndex: controller.currentPageIndex,
                         pageWorldSize: pageWorldSize,
@@ -2074,6 +2076,7 @@ class _ZoomPercentBadge extends StatelessWidget {
 
 class _ProjectMiniMapOverlay extends StatefulWidget {
   const _ProjectMiniMapOverlay({
+    required this.controller,
     required this.pages,
     required this.currentPageIndex,
     required this.pageWorldSize,
@@ -2082,6 +2085,7 @@ class _ProjectMiniMapOverlay extends StatefulWidget {
     required this.visibleDocumentRect,
   });
 
+  final EditorController controller;
   final List<NotePage> pages;
   final int currentPageIndex;
   final Size pageWorldSize;
@@ -2366,17 +2370,20 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                       ? const ClampingScrollPhysics()
                       : const NeverScrollableScrollPhysics(),
                   child: RepaintBoundary(
-                    child: CustomPaint(
-                      size: Size(_minimapWidth, contentHeight),
-                      painter: _ProjectMiniMapPainter(
-                        pages: widget.pages,
-                        currentPageIndex: widget.currentPageIndex,
-                        pageWorldSize: widget.pageWorldSize,
-                        pageGap: widget.pageGap,
-                        mapScale: mapScale,
-                        cornerRadius: innerRadius,
-                        images: _minimapImages.map(
-                          (id, cached) => MapEntry(id, cached.image),
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: widget.controller.inkRevision,
+                      builder: (context, _, _) => CustomPaint(
+                        size: Size(_minimapWidth, contentHeight),
+                        painter: _ProjectMiniMapPainter(
+                          pages: widget.controller.pages,
+                          currentPageIndex: widget.currentPageIndex,
+                          pageWorldSize: widget.pageWorldSize,
+                          pageGap: widget.pageGap,
+                          mapScale: mapScale,
+                          cornerRadius: innerRadius,
+                          images: _minimapImages.map(
+                            (id, cached) => MapEntry(id, cached.image),
+                          ),
                         ),
                       ),
                     ),

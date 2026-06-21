@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
+
+import '../storage/text_storage.dart';
 
 class OptimizationLog extends ChangeNotifier {
   OptimizationLog._();
@@ -25,11 +25,11 @@ class OptimizationLog extends ChangeNotifier {
 
   Future<void> load() async {
     try {
-      final file = await _logFile();
-      if (!await file.exists()) {
+      final content = await readStoredText(_fileName);
+      if (content == null) {
         return;
       }
-      final decoded = jsonDecode(await file.readAsString());
+      final decoded = jsonDecode(content);
       if (decoded is! List<dynamic>) {
         return;
       }
@@ -58,6 +58,8 @@ class OptimizationLog extends ChangeNotifier {
     required int frames,
     required int frameUsAvg,
     required int frameUsMax,
+    required int inputToPaintUsAvg,
+    required int inputToPaintUsMax,
   }) {
     final reasons = <String>[];
     final score = _inkScore(
@@ -70,6 +72,8 @@ class OptimizationLog extends ChangeNotifier {
       frames: frames,
       frameUsAvg: frameUsAvg,
       frameUsMax: frameUsMax,
+      inputToPaintUsAvg: inputToPaintUsAvg,
+      inputToPaintUsMax: inputToPaintUsMax,
       reasons: reasons,
     );
     if (reasons.isEmpty) {
@@ -96,6 +100,8 @@ class OptimizationLog extends ChangeNotifier {
           'frames': frames,
           'frameUsAvg': frameUsAvg,
           'frameUsMax': frameUsMax,
+          'inputToPaintUsAvg': inputToPaintUsAvg,
+          'inputToPaintUsMax': inputToPaintUsMax,
         },
       ),
     );
@@ -177,6 +183,8 @@ class OptimizationLog extends ChangeNotifier {
     required int frames,
     required int frameUsAvg,
     required int frameUsMax,
+    required int inputToPaintUsAvg,
+    required int inputToPaintUsMax,
     required List<String> reasons,
   }) {
     var score = 0;
@@ -187,6 +195,10 @@ class OptimizationLog extends ChangeNotifier {
     if (frameUsMax >= 20000 || frameUsAvg >= 10000) {
       reasons.add('slow frame scheduling');
       score = max(score, frameUsMax ~/ 1000);
+    }
+    if (inputToPaintUsMax >= 20000 || inputToPaintUsAvg >= 10000) {
+      reasons.add('slow input-to-paint');
+      score = max(score, inputToPaintUsMax ~/ 1000);
     }
     if (moves >= 120 && points <= max(3, moves ~/ 20)) {
       reasons.add('many moves accepted as few points');
@@ -249,18 +261,13 @@ class OptimizationLog extends ChangeNotifier {
 
   Future<void> _save() async {
     try {
-      final file = await _logFile();
-      await file.writeAsString(
+      await writeStoredText(
+        _fileName,
         jsonEncode(_entries.map((entry) => entry.toJson()).toList()),
       );
     } catch (e) {
       debugPrint('OptimizationLog._save failed: $e');
     }
-  }
-
-  Future<File> _logFile() async {
-    final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/$_fileName');
   }
 }
 

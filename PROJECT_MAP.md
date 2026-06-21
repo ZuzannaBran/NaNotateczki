@@ -135,22 +135,36 @@ Platform-channel state dla natywnego przycisku rysika.
 - 25: `_handleMethodCall(call)` — obsługuje `setPressed({pressed, button})`
   oraz `toggleEraser`.
 
-### `lib/core/input/app_preferences_controller.dart` (88 linii)
+### `lib/core/input/app_preferences_controller.dart` (84 linie)
 Globalne preferencje aplikacji niezależne od konkretnego edytora.
 - 7: `enum DeviceInputMode { computer, tablet }` — ręczny tryb urządzenia dla
   zachowania pól tekstowych.
 - 9: `extension DeviceInputModeX` — etykiety i opisy UI dla ustawienia.
 - 26: `class AppPreferencesController` — `ChangeNotifier`, ładuje/zapisuje
-  `app_prefs.json`; domyślnie Android/iOS = tablet, desktop = computer.
+  `app_prefs.json` przez wspólny storage; domyślnie Android/iOS = tablet,
+  desktop/web = computer.
+
+### `lib/core/storage/text_storage.dart` (2 linie)
+Conditional export magazynu małych plików tekstowych: IO domyślnie,
+`localStorage` przy `dart.library.js_interop`.
+
+### `lib/core/storage/text_storage_io.dart` (21 linii)
+- 5: `readStoredText(key)` — czyta plik z katalogu dokumentów aplikacji.
+- 13: `writeStoredText(key, value)` — zapisuje plik tekstowy w katalogu
+  dokumentów aplikacji.
+
+### `lib/core/storage/text_storage_web.dart` (9 linii)
+- 3: `readStoredText(key)` / 7: `writeStoredText(key, value)` — webowy storage
+  oparty o `window.localStorage`.
 
 ### `lib/core/input/soft_keyboard.dart` (22 linie)
 - 7: `requestSoftKeyboardForFocus(context, focusNode)` — jeśli globalny
   `DeviceInputMode.tablet`, focusuje pole i wysyła do Fluttera `TextInput.show`
   jako prośbę o systemową klawiaturę ekranową.
 
-### `lib/core/error/app_error_log.dart` (166 linii)
+### `lib/core/error/app_error_log.dart` (161 linii)
 Lokalny bufor ostatnich błędów aplikacji do kopiowania z ustawień, utrwalany w
-`app_error_log.json`.
+`app_error_log.json` natywnie albo `localStorage` w web.
 - 8: `class AppErrorLog extends ChangeNotifier` — singleton trzymający do 80
   błędów z ostatnich 3 dni, powiadamia UI po zmianach.
 - 25: `load()` — wczytuje zapisany JSON błędów, odrzuca niepoprawne wpisy i
@@ -162,26 +176,26 @@ Lokalny bufor ostatnich błędów aplikacji do kopiowania z ustawień, utrwalany
 - 78: `toClipboardText()` — formatuje zawartość bufora do skopiowania.
 - 85: `_prune()` — zostawia wpisy z ostatnich 3 dni i maksymalnie 80 rekordów.
 - 94: `_save()` — zapisuje aktualny bufor do `app_error_log.json`.
-- 111: `class AppErrorLogEntry` — immutable wpis błędu z JSON
+- 106: `class AppErrorLogEntry` — immutable wpis błędu z JSON
   `fromJson/toJson`.
-- 156: `format()` — tekstowy format jednego wpisu.
+- 151: `format()` — tekstowy format jednego wpisu.
 
-### `lib/core/diagnostics/optimization_log.dart` (340 linii)
+### `lib/core/diagnostics/optimization_log.dart` (347 linii)
 Lokalny bufor przefiltrowanych zdarzeń wydajnościowych do kopiowania z ustawień,
-utrwalany w `optimization_log.json`.
+utrwalany w `optimization_log.json` natywnie albo `localStorage` w web.
 - 9: `class OptimizationLog extends ChangeNotifier` — singleton trzymający do
   80 podejrzanych wpisów z ostatnich 3 dni, sortowanych po score i czasie.
-- 23: `load()` — wczytuje zapisany JSON i przycina historię.
-- 42: `recordInkStroke(...)` — filtruje logi stroke'ów z canvasu; zapisuje
+- 26: `load()` — wczytuje zapisany JSON i przycina historię.
+- 47: `recordInkStroke(...)` — filtruje logi stroke'ów z canvasu; zapisuje
   tylko wolne/podejrzane przypadki (`slow move`, `slow frame`, dużo move przy
-  małej liczbie punktów, itp.).
-- 93: `recordBackup(...)` — filtruje kosztowne backupy i błędy/skipy backupu.
-- 145: `toClipboardText()` — formatuje posortowaną listę podejrzanych wpisów.
-- 157: `_inkScore(...)` / 190: `_backupScore(...)` — heurystyki filtra i score.
-- 228: `_record(entry)` / 235: `_prune()` / 251: `_save()`.
-- 267: `class OptimizationLogEntry` — wpis `category/label/score/reasons/details`
+  małej liczbie punktów, wolny `input-to-paint`, itp.).
+- 110: `recordBackup(...)` — filtruje kosztowne backupy i błędy/skipy backupu.
+- 161: `toClipboardText()` — formatuje posortowaną listę podejrzanych wpisów.
+- 176: `_inkScore(...)` / 218: `_backupScore(...)` — heurystyki filtra i score.
+- 240: `_record(entry)` / 247: `_prune()` / 262: `_save()`.
+- 274: `class OptimizationLogEntry` — wpis `category/label/score/reasons/details`
   z JSON `fromJson/toJson`.
-- 326: `format()` — tekstowy format jednego wpisu.
+- 334: `format()` — tekstowy format jednego wpisu.
 
 ### `lib/core/diagnostics/frame_timing_tracker.dart` (132 linie)
 Globalny agregat `FrameTiming` do korelacji logów `[ink]` i `[backup]`
@@ -295,11 +309,11 @@ Natywne połączenie Drift.
 - 14: `openNotesDatabaseConnection(name)` — `NativeDatabase.createInBackground`
   w katalogu dokumentów aplikacji.
 
-### `lib/data/drift/notes_database_connection_web.dart` (21 linii)
-Webowe połączenie Drift WASM.
-- 4: `class NotesDatabaseConnection` — `QueryExecutor` + `freshFile`.
-- 11: `openNotesDatabaseConnection(name)` — `WasmDatabase.open`, używa
-  `web/sqlite3.wasm` i `web/drift_worker.dart.js`.
+### `lib/data/drift/notes_database_connection_web.dart` (28 linii)
+Webowe połączenie Drift WASM z trwałym IndexedDB bez zależności od workera.
+- 6: `class NotesDatabaseConnection` — `QueryExecutor` + `freshFile`.
+- 13: `openNotesDatabaseConnection(name)` — ładuje `web/sqlite3.wasm`,
+  rejestruje `IndexedDbFileSystem` i otwiera `WasmDatabase`.
 
 ### `lib/data/drift/notes_database.g.dart` (6075 linii)
 Wygenerowane przez `drift_dev` — **NIE edytuj ręcznie**. Po zmianach w
@@ -317,31 +331,35 @@ po zmianie `web/drift_worker.dart` komendą
 ### `web/sqlite3.wasm`
 Binary SQLite WASM wymagany przez `WasmDatabase.open`.
 
-### `lib/data/backup/local_backup_service.dart` (410 linii)
+### `lib/data/backup/local_backup_service.dart` (456 linii)
 Przyrostowy lokalny backup JSON w `local_backup/`: `manifest.json` +
 `notebooks/<uid>.json`; stary `notebooks_latest.json` nadal jest czytany jako
 fallback restore. Stare snapshoty usuniętych notebooków trafiają do
-`local_backup/trash/` zamiast znikać bez śladu.
-- 12: `class LocalBackupService(this.repository)`.
+`local_backup/trash/` zamiast znikać bez śladu. W web pojedynczy snapshot JSON
+jest zapisywany w `localStorage`.
+- 13: `class LocalBackupService(this.repository)`.
 - 23: `_backupDir()` — tworzy katalog jeśli brak.
 - 32: `_file(name)`.
 - 37: `_notebooksDir()` / 45: `_manifestFile()` / 50: `_notebookFile(uid)` /
   55: `_trashDir()`.
-- 63: `snapshot(items)` — zwraca `BackupSnapshotReport`; poza samym zapisem
+- 65: `snapshot(items)` — zwraca `BackupSnapshotReport`; poza samym zapisem
   mierzy per-notebook `flatten/encode/json/compare/write`, liczbę stron,
   stroke'ów, punktów i rozmiar JSON-a, a w raporcie globalnym zbiera też
   `manifestMs`, `staleListMs` i najwolniejszy notebook.
-- 186: `hasLatest()` — rozpoznaje nowy manifest albo legacy `notebooks_latest.json`.
-- 195: `readLatest()` — preferuje backup przyrostowy, fallback do legacy.
-- 203: `_readIncrementalLatest()` / 244: `_readLegacyLatest()` — logują błędy
+- 191: `hasLatest()` — rozpoznaje webowy snapshot, nowy manifest albo legacy.
+- 203: `readLatest()` — web czyta `localStorage`, natywnie preferuje backup
+  przyrostowy i używa legacy jako fallbacku.
+- 221: `_readIncrementalLatest()` / 262: `_readLegacyLatest()` — logują błędy
   odczytu backupu do `AppErrorLog`.
-- 267: `restoreFromLatest()` — zapisuje wszystkie notebooki do repozytorium,
+- 285: `restoreFromLatest()` — zapisuje wszystkie notebooki do repozytorium,
   zwraca count.
-- 286: `_moveStaleNotebookBackupToTrash(file)` — archiwizuje osierocony plik
+- 304: `_snapshotForWeb(items)` — zapisuje spłaszczony pełny snapshot JSON do
+  `localStorage`.
+- 332: `_moveStaleNotebookBackupToTrash(file)` — archiwizuje osierocony plik
   backupu zamiast go usuwać.
-- 324: `class BackupSnapshotReport` — agregat całego snapshotu do logu
+- 370: `class BackupSnapshotReport` — agregat całego snapshotu do logu
   `[backup]`, z liczbą notebooków/stron/stroke'ów/punktów i `slowest{...}`.
-- 375: `class NotebookBackupReport` — per-notebook rozbicie kosztu backupu.
+- 421: `class NotebookBackupReport` — per-notebook rozbicie kosztu backupu.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (272 linie)
 Sanityzacja lokalnego backupu: stosuje zapisane stroke'i gumki do wcześniejszych
@@ -360,7 +378,7 @@ stroke'ów i wyrzuca same gumki z payloadu backupu.
 - 212: `_pointInPolygon(...)` / 228 `_segmentIntersectsPolygon(...)` /
   239 `_segmentsIntersect(...)` — helpery geometrii gumki-obszaru.
 
-### `lib/data/export/notebook_export_service.dart` (663 linie)
+### `lib/data/export/notebook_export_service.dart` (683 linie)
 Eksport notebooków/boardów do wybranej przez użytkownika lokalizacji
 (`Documents/exports` jako domyślny katalog dialogu na desktopie).
 - 22: `enum NotebookExportFormat { pdf, png }`.
@@ -372,33 +390,34 @@ Eksport notebooków/boardów do wybranej przez użytkownika lokalizacji
 - 86: `_exportPdf(...)` — renderuje strony jako obrazy i zapisuje jeden PDF przez
   systemowy dialog zapisu.
 - 120: `_exportPng(...)` — board/jedna strona jako plik przez dialog zapisu,
-  notebook wielostronicowy jako folder `page_XX.png` w wybranym katalogu.
-- 163: `_saveBytesAs(...)` — `FilePicker.saveFile`, dopisanie rozszerzenia na
-  desktopie, przekazanie bytes na Android/iOS.
-- 208: `_renderNotebook(...)` — dla notebooka przekazuje origin strony
+  notebook wielostronicowy natywnie jako folder `page_XX.png`, a w web jako
+  seria pobranych plików.
+- 179: `_saveBytesAs(...)` — `FilePicker.saveFile`, dopisanie rozszerzenia na
+  desktopie, przekazanie bytes na Android/iOS/web.
+- 228: `_renderNotebook(...)` — dla notebooka przekazuje origin strony
   tekstom/obrazom, a kreski zostawia w lokalnym układzie strony.
-- 253: `_renderPage(...)` — `dart:ui` canvas, tło papieru z opcjonalną
+- 273: `_renderPage(...)` — `dart:ui` canvas, tło papieru z opcjonalną
   kratką/liniami, obrazy, tekst, strokes; obsługuje osobny `strokeOrigin`.
-- 281: `_paintBackground(...)` — rysuje papier i wzór tła z alignmentem do
+- 301: `_paintBackground(...)` — rysuje papier i wzór tła z alignmentem do
   przestrzeni boarda.
-- 316: `_paintImages(...)`.
-- 347: `_paintTextBlocks(...)` / 361: `_textSpans(block)` — prosty render delty Quill.
-- 420: `_paintStrokes(...)` / 465: `_buildInkPath(...)` — render stroke'ów
+- 336: `_paintImages(...)`.
+- 367: `_paintTextBlocks(...)` / 381: `_textSpans(block)` — prosty render delty Quill.
+- 440: `_paintStrokes(...)` / 485: `_buildInkPath(...)` — render stroke'ów
   z tym samym adaptacyjnym wygładzaniem pen/highlighter co canvas.
-- 540: `_pageContentBounds(page)` — obszar eksportu boarda.
+- 560: `_pageContentBounds(page)` — obszar eksportu boarda.
 
-### `lib/data/sync/cloud_sync_service.dart` (127 linii)
+### `lib/data/sync/cloud_sync_service.dart` (136 linii)
 Folder-based sync (`notatek_cloud.json` we wskazanym folderze).
 - 10: `class CloudSyncResult` — `totalNotebooks, uploaded, downloaded`.
 - 22: `class CloudSyncService(this.repository)`.
-- 30: `getCloudPath()` — czyta `cloud_sync.json`.
-- 45: `setCloudPath(path)`.
-- 50: `sync(local)` — merguje chmurę i lokalne po `updatedAt`, zapisuje obie strony.
-- 78: `_readCloudNotebooks`.
-- 91: `mergeNotebooks` — last-write-wins po `updatedAt`; przy remisie zachowuje
+- 30: `getCloudPath()` — czyta `cloud_sync.json`; w web zwraca brak ścieżki.
+- 48: `setCloudPath(path)` / 56: `sync(local)` — w web zgłaszają jawny
+  `UnsupportedError`, bo przeglądarka nie udostępnia trwałej ścieżki folderu.
+- 87: `_readCloudNotebooks`.
+- 100: `mergeNotebooks` — last-write-wins po `updatedAt`; przy remisie zachowuje
   wersję lokalną, żeby równy timestamp nie wyczyścił nowszego stanu użytkownika.
-- 109: `_countNewer`.
-- 123: `_configFile`.
+- 118: `_countNewer`.
+- 132: `_configFile`.
 
 ---
 
@@ -428,6 +447,16 @@ Folder-based sync (`notatek_cloud.json` we wskazanym folderze).
 - 5: `class InkStroke { id, points, color, width, tool }` + `copyWith`.
 - 37: `class InkPoint { dx, dy, pressure }` + `fromOffset` + `toOffset`.
 
+### `lib/features/notebook/domain/ink_spatial_index.dart` (125 linii)
+Cache'owany względem listy stroke'ów indeks przestrzenny o siatce 128 px,
+używany przez gumkę, scratch erase i wstępne filtrowanie lassa.
+- 13: `inkSpatialIndexFor(strokes)` — zwraca indeks z `Expando`, więc nowa lista
+  stroke'ów automatycznie dostaje nowy indeks.
+- 23: `class InkSpatialIndex` — buduje komórki bez zmiany kolejności stroke'ów;
+  bardzo długie stroke'i trzyma w osobnej liście overflow.
+- 50: `query(bounds)` / 76: `queryPoint(point, radius)` — zwracają wyłącznie
+  kandydatów; dokładny hit-test nadal wykonuje kod wywołujący.
+
 ### `lib/features/notebook/domain/text_block.dart` (45 linii)
 - 3: `class TextBlock { id, text, deltaJson?, position, fontSize, color,
   width, rotation }` + `copyWith`.
@@ -437,7 +466,7 @@ Folder-based sync (`notatek_cloud.json` we wskazanym folderze).
   imageExt?, imageMime?, rotation, cropLeft/Top/Right/Bottom }` + `copyWith`
   (crop domyślnie 0/0/1/1, `clearBytes` usuwa legacy/fallback bytes).
 
-### `lib/features/notebook/data/notebook_repository.dart` (1076 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (1085 linii)
 Mostek domena ↔ Drift/SQLite ↔ JSON.
 - 21: `class NotebookRepository` — repo z callbackiem po zapisie i opcjonalnym
   testowym handlerem błędów odczytu.
@@ -448,11 +477,12 @@ Mostek domena ↔ Drift/SQLite ↔ JSON.
   głównego zapytania jest zgłaszany zamiast udawać pustą bazę.
 - 86: `saveRecoveredCopy(...)` — zapisuje kopię odzyskaną z nowym `uid` i
   dopiskiem do tytułu, żeby nie nadpisać uszkodzonego oryginału.
-- 100: `archiveNotebookBeforeDelete(...)` — odkłada ręcznie usuwany notebook
-  do `deleted_notebooks/<ts>_<uid>.json`.
-- 132: `createNotebook({title, folder})` — `NotebookKind.notebook`, 1 strona „Page 1".
-- 158: `createBoard({title, folder})` — `NotebookKind.board`, jedna strona „Canvas".
-- 184: `getNotebook(uid)` — zwraca także częściowo czytelny dokument i oznacza
+- 100: `archiveNotebookBeforeDelete(...)` — natywnie odkłada ręcznie usuwany
+  notebook do `deleted_notebooks/<ts>_<uid>.json`; w web pomija plikowe
+  archiwum.
+- 135: `createNotebook({title, folder})` — `NotebookKind.notebook`, 1 strona „Page 1".
+- 161: `createBoard({title, folder})` — `NotebookKind.board`, jedna strona „Canvas".
+- 187: `getNotebook(uid)` — zwraca także częściowo czytelny dokument i oznacza
   jego UID jako uszkodzony.
 - 211: `saveNotebook(notebook)` — odrzuca snapshot bez stron i szereguje zapisy
   per UID w kolejności wywołań; `_saveNotebookNow` (233) odrzuca częściowo
@@ -460,10 +490,10 @@ Mostek domena ↔ Drift/SQLite ↔ JSON.
   starszy od najnowszej wersji i zastępuje dzieci w transakcji.
 - 282: `updateNotebookMetadata(uid, {title, folder})` — aktualizuje wyłącznie
   nagłówek z monotonicznym `updatedAt`, bez zastępowania zawartości notatki.
-- 326: `_persistInlineImages(notebook)` / 349 `_persistInlineImageBytes(block)` —
+- 329: `_persistInlineImages(notebook)` / 352 `_persistInlineImageBytes(block)` —
   przenosi obrazy z `bytes` bez trwałej ścieżki do katalogu dokumentów aplikacji
-  i czyści `bytes` po utrwaleniu pliku.
-- 382: `deleteNotebook(uid)` — przed delete próbuje zarchiwizować aktualną
+  i czyści `bytes` po utrwaleniu pliku; w web zachowuje bajty inline w SQLite.
+- 388: `deleteNotebook(uid)` — przed delete próbuje zarchiwizować aktualną
   wersję notebooka do pliku odzyskiwania, potem kasuje dzieci i nagłówek.
 - 397: `encodeNotebooks(items)` / 401: `decodeNotebooks(items)` — JSON.
 - 408: `_readNotebook(row)` / 448: `_readPage(row)` — defensywnie składa
@@ -480,7 +510,7 @@ Mostek domena ↔ Drift/SQLite ↔ JSON.
 - 799–1024: JSON serializery backup/sync (`_notebookTo/FromJson`,
   `_pageTo/FromJson`, `_textTo/FromJson`, `_imageTo/FromJson`,
   `_strokeTo/FromJson`).
-- 1025: `_toolFromIndex(int)` / 1033: `_toolToIndex(tool)` — symetryczne,
+- 1034: `_toolFromIndex(int)` / 1042: `_toolToIndex(tool)` — symetryczne,
   prosty mapping przez `DrawingTool.values`.
 - 1035: `_bytesFromEntity(Uint8List?)`.
 - 1042: `_bytesToBase64` / 1049: `_bytesFromBase64`.
@@ -489,7 +519,7 @@ Mostek domena ↔ Drift/SQLite ↔ JSON.
 
 ---
 
-### `lib/features/library/presentation/library_controller.dart` (599 linii)
+### `lib/features/library/presentation/library_controller.dart` (593 linie)
 ChangeNotifier — stan ekranu Biblioteki.
 - 13: `class LibraryController extends ChangeNotifier` — repo, cloud, backup,
   flagi `wasReset/freshFile/resetReason` oraz stan recovery uszkodzonych dokumentów.
@@ -533,8 +563,8 @@ ChangeNotifier — stan ekranu Biblioteki.
 - 470: `_selectedItemIsInFolder(folder)`.
 - 478: `_targetFolderForNewItem()`.
 - 489: `_loadCloudPath`.
-- 494: `_loadFolders` / 518: `_saveFolders` (`library_folders.json`).
-- 528: `_foldersFile`.
+- 495: `_loadFolders` / 518: `_saveFolders` (`library_folders.json`) przez
+  wspólny storage plikowy/webowy.
 - 533: `_compareFolderNames(a, b)`.
 - 541: `_matches(notebook, query)` — title/page title/textBlock/ocrText.
 - 563: `_refreshCorruptRecoveryState()` — wylicza brakujące względem backupu
@@ -642,17 +672,17 @@ Model preferencji tła strony/canvasu.
 - 64: `backgroundPrefsKeyForKind(kind)` — klucze `notebook`/`board` dla
   `editor_prefs.json`.
 
-### `lib/features/editor/state/editor_controller.dart` (2501 linii)
+### `lib/features/editor/state/editor_controller.dart` (2652 linie)
 Mózg edytora. **Najczęściej modyfikowany plik aplikacji.** Trzyma stan stron,
 narzędzia, kolory, undo/redo, zoom/pan, schowek elementów.
-- 32: `class LassoSelection` - trzyma metadane zaznaczenia lasso
+- 33: `class LassoSelection` - trzyma metadane zaznaczenia lasso
   (bounds dokumentowe, ID elementów, delty).
-- 64: `_sameInkStrokeIds(a, b)` — szybkie porównanie list stroke'ów po ID.
-- 71: `class EditorController extends ChangeNotifier`.
-- 72–74: `minViewScale=0.25`, `maxViewScale=4.0`,
+- 65: `_sameInkStrokeIds(a, b)` — szybkie porównanie list stroke'ów po ID.
+- 72: `class EditorController extends ChangeNotifier`.
+- 73–75: `minViewScale=0.25`, `maxViewScale=4.0`,
   `_inkSaveDebounceDelay=2s`.
-- 76: konstruktor — `pages = notebook.pages`, ładuje prefs.
-- 82–137: pola — `repository, notebook, _uuid, _imagePicker, pages,
+- 77: konstruktor — `pages = notebook.pages`, ładuje prefs.
+- 83–142: pola — `repository, notebook, _uuid, _imagePicker, pages,
   currentPageIndex, tool, lastEraserTool, lastShapeTool, `pointerInputMode`,
   `stylusButtonsEnabled`, `scratchEraseEnabled`, domyślne tła notebook/board,
   inkColor, inkStrokeWidth, quickColors (3 sloty), recentColors (12),
@@ -663,202 +693,218 @@ narzędzia, kolory, undo/redo, zoom/pan, schowek elementów.
   lassoSelection,
   `lassoDragDelta` (`ValueNotifier<Offset>` do płynnego dragowania lassa bez
   pełnego `notifyListeners()` na każdy ruch), _elementClipboard,
-  _suppressBackgroundTap, viewScale, viewPan,
+  _suppressBackgroundTap, viewScale, viewPan, `inkRevision`,
+  `historyRevision`, rewizje ink per `pageId`,
   _pageWidth/_pageHeight/_pageGap`.
-- 138–157: gettery `currentPage`, `canUndo`, `canRedo`,
+- 144–175: gettery `currentPage`, `canUndo`, `canRedo`,
   `allowsFingerDrawing`, `currentBackgroundSettings`, `contentBounds`,
   `layoutPageSize`, `layoutPageGap`, `defaultBackgroundSettingsForKind`.
-- 160: `dispose()` — domyka aktywną edycję tekstu, flushuje pending prefs/save
+- 158: `inkRevisionForPage(pageId)` / 162: `pageById(pageId)` — lokalne
+  źródło repaintu statycznego ink bez globalnej przebudowy notebooka.
+- 179: `dispose()` — domyka aktywną edycję tekstu, flushuje pending prefs/save
   i sprząta listenery.
 
 #### Layout/wiewport
-- 147: `updatePageLayout({pageWidth, pageHeight, pageGap})`.
-- 162: `setViewTransform({pan?, scale?})`.
-- 176: `panBy(delta)`.
-- 183: `zoomBy(factor, focalPoint)`.
-- 196: `viewportToWorld(offset)` / 201: `worldToViewport(offset)`.
+- 197: `updatePageLayout({pageWidth, pageHeight, pageGap})`.
+- 212: `setViewTransform({pan?, scale?})`.
+- 226: `panBy(delta)`.
+- 233: `zoomBy(factor, focalPoint)`.
+- 246: `viewportToWorld(offset)` / 251: `worldToViewport(offset)`.
 
 #### Strony
-- 205: `pageAt(index)`.
-- 209: `_pageExtent` getter (height + gap).
-- 211: `_pageOriginForIndex(index)`.
-- 218: `_pageIndexForPosition(offset)` — który page index zawiera punkt Y.
+- 255: `pageAt(index)`.
+- 259: `_pageExtent` getter (height + gap).
+- 261: `_pageOriginForIndex(index)`.
+- 268: `_pageIndexForPosition(offset)` — który page index zawiera punkt Y.
 
 #### Lookupy / aktywne elementy
-- 229: `findTextBlockById(id)`.
-- 240: `findImageBlockById(id)`.
-- 251: `_pageIndexContainingTextBlock(id)`.
-- 260: `_pageIndexContainingImageBlock(id)`.
-- 269: `_ensurePageSelected(pageIndex)`.
+- 279: `findTextBlockById(id)`.
+- 290: `findImageBlockById(id)`.
+- 301: `_pageIndexContainingTextBlock(id)`.
+- 310: `_pageIndexContainingImageBlock(id)`.
+- 319: `_ensurePageSelected(pageIndex)`.
 
 #### Per-page entry points (board/notebook → mapują na current page)
 Tylko te `*OnPage`, które są realnie wołane z `page_overlay`/`drawing_canvas`.
-- 279: `handleTapOnPage(pageIndex, point)`.
-- 315: `updateTextBlockContentOnPage(...)` / 325 position /
-  334 cały blok / 339 delete / 344 commitMove / 354 commit update.
-- 364: `runOcrForImageOnPage`.
-- 369: `updateImageBlockPositionOnPage` / 378 cały blok /
-  386 OCR text / 391 delete.
-- 396: `addInkStrokeOnPage(pageIndex, points, {widthOverride, toolOverride})`.
-- 410: `eraseInkStrokesByIdOnPage(pageIndex, ids)`.
-- 415: `replaceInkStrokesOnPage(pageIndex, strokes)` — undoowalna podmiana
+- 333: `handleTapOnPage(pageIndex, point)`.
+- 338: `updateTextBlockContentOnPage(...)` / 348 position /
+  357 cały blok / 362 delete / 367 commitMove / 377 commit update.
+- 386: `runOcrForImageOnPage`.
+- 391: `updateImageBlockPositionOnPage` / 400 cały blok /
+  408 OCR text / 413 delete.
+- 418: `addInkStrokeOnPage(pageIndex, points, {widthOverride, toolOverride})`.
+- 432: `eraseInkStrokesByIdOnPage(pageIndex, ids)`.
+- 437: `replaceInkStrokesOnPage(pageIndex, strokes)` — undoowalna podmiana
   stroke'ów strony, używana przez częściową gumkę scratch-erase.
-- 420: `commitImageMoveOnPage`.
-- 430: `finalizeImageMoveOnPage` — **decyduje czy stroke przechodzi
+- 442: `commitImageMoveOnPage`.
+- 452: `finalizeImageMoveOnPage` — **decyduje czy stroke przechodzi
   na inną stronę** (`_moveImageBlockToPage`) czy zostaje (`commitImageMoveOnPage`).
-- 447: `commitImageResizeOnPage`.
-- 489: `selectWithLasso(points, pageIndex)` — Ray-Casting; stroke'y liczone w
+- 469: `commitImageResizeOnPage`.
+- 532: `selectWithLasso(points, pageIndex)` — indeks przestrzenny + Ray-Casting;
+  stroke'y liczone w
   koordynatach strony, tekst/obrazy w koordynatach dokumentu; stroke'i gumki
   są ignorowane przez selekcję.
-- 567: `updateLassoMove(delta)` — zapisuje bieżące przesunięcie tylko w
+- 649: `updateLassoMove(delta)` — zapisuje bieżące przesunięcie tylko w
   `lassoDragDelta`, bez przebudowy całego controllera.
-- 572: `commitLassoMove()` — zatwierdza `lassoDragDelta` jako
+- 654: `commitLassoMove()` — zatwierdza `lassoDragDelta` jako
   `MoveSelectionAction`, przesuwa bounds i dopiero wtedy robi notify/save.
 
 #### Narzędzia, kolory, prefs
-- 466: `setTool(newTool)` — aktualizuje `lastEraserTool` i `lastShapeTool`;
+- 478: `setTool(newTool)` — aktualizuje `lastEraserTool` i `lastShapeTool`;
   wybór trybu gumki trafia do `editor_prefs.json`.
-- 471: `setActiveTextBlock(id, controller)` / 484 clear; domyka poprzednią
+- 494: `setActiveTextBlock(id, controller)` / 507 clear; domyka poprzednią
   sesję tekstową jako jedną akcję undo.
-- 468: `setActiveImageBlock(id)` / 482 clear.
-- 688: `markTextTap()` / 692: `consumeBackgroundTapSuppression()`.
-- 706: `setColor(color)`.
-- 713: `setLastTextFontFamily` / 718 size / 723 color.
-- 756: `setStrokeWidth(value)` — zapisuje trwały rozmiar narzędzi/gumki
+- 514: `setActiveImageBlock(id)` / 706 clear.
+- 774: `markTextTap()` / 778: `consumeBackgroundTapSuppression()`.
+- 784: `setColor(color)`.
+- 791: `setLastTextFontFamily` / 796 size / 801 color.
+- 807: `setStrokeWidth(value)` — zapisuje trwały rozmiar narzędzi/gumki
   w `editor_prefs.json`.
-- 762: `setPointerInputMode(mode)` — zapisuje tryb rozróżniania rysika/palca.
-- 771: `setStylusButtonsEnabled(enabled)` — zapisuje obsługę przycisków rysika.
-- 780: `setScratchEraseEnabled(enabled)` — zapisuje automatyczną gumkę
+- 813: `setPointerInputMode(mode)` — zapisuje tryb rozróżniania rysika/palca.
+- 822: `setStylusButtonsEnabled(enabled)` — zapisuje obsługę przycisków rysika.
+- 831: `setScratchEraseEnabled(enabled)` — zapisuje automatyczną gumkę
   bazgrołem.
-- 789: `setDefaultBackgroundSettings(kind, settings)` — zapisuje globalne
+- 840: `setDefaultBackgroundSettings(kind, settings)` — zapisuje globalne
   domyślne tło osobno dla notebooków i boardów; oznacza zmieniony typ do
   scalania zapisu preferencji.
-- 804: `setCurrentBackgroundSettings(settings)` — zapisuje lokalne tło
+- 855: `setCurrentBackgroundSettings(settings)` — zapisuje lokalne tło
   bieżącego notebooka/boarda po `uid`; oznacza zmieniony `uid` do scalania
   zapisu preferencji.
-- 811: `setQuickColor(index, color)`.
-- 820: `_addRecentColor(color)` (cap 12, dedup po ARGB).
-- 828: `_loadEditorPrefs()` (`editor_prefs.json`: kolory, tekst,
+- 862: `setQuickColor(index, color)`.
+- 871: `_addRecentColor(color)` (cap 12, dedup po ARGB).
+- 880: `_loadEditorPrefs()` (`editor_prefs.json`: kolory, tekst,
   `inkStrokeWidth`, `lastEraserTool`, `pointerInputMode`,
   `stylusButtonsEnabled`, `scratchEraseEnabled`, domyślne i lokalne tła; nie
   nadpisuje lokalnie zmienionych teł, jeśli load kończy się po zmianie UI).
-- 942: `_schedulePrefsSave()` (debounce 250 ms).
-- 949: `_saveEditorPrefs()` — zapisuje preferencje, scalając tła z aktualnym
+- 993: `_schedulePrefsSave()` (debounce 250 ms).
+- 1000: `_saveEditorPrefs()` — zapisuje preferencje, scalając tła z aktualnym
   plikiem zamiast nadpisywać je snapshotem z jednej instancji kontrolera.
-- 985: `_readEditorPrefs(file)` — defensywny odczyt istniejącego JSON-a
+- 1036: `_readEditorPrefs()` — defensywny odczyt istniejącego JSON-a
   preferencji do scalania.
-- 998: `_mergedBackgroundDefaults(...)` — scala globalne tła per
+- 1050: `_mergedBackgroundDefaults(...)` — scala globalne tła per
   `NotebookKind`, aktualizując tylko dirty typy albo brakujące klucze.
-- 1020: `_mergedLocalBackgrounds(...)` — scala lokalne tła per `uid`,
+- 1072: `_mergedLocalBackgrounds(...)` — scala lokalne tła per `uid`,
   aktualizując tylko dirty notatniki/tablice.
-- 1048: `_prefsFile()`.
-- 1053: `_eraserToolFromIndex(value)` — waliduje, że zapisany indeks to tryb gumki.
-- 1061: `_colorFromHex(value)`.
+- 1093: `_eraserToolFromIndex(value)` — waliduje, że zapisany indeks to tryb gumki.
+- 1101: `_colorFromHex(value)`.
 
 #### Gesty / undo / redo / strony
-- 1076: `handleTap(point)` — text vs image vs nic.
-- 1087: `undo()` / 1099: `redo()` — domykają aktywną edycję tekstu przed operacją.
-- 1111: `addPage()` — nowy `NotePage`, czyści aktywne.
-- 1124: `deleteLastPage()` — usuwa ostatnią stronę, nie schodzi poniżej jednej strony.
-- 1138: `_createPage(index)`.
-- 1150: `_ensurePageCount(working, count)`.
-- 1156: `setCurrentPage(index)`.
-- 1171: `toggleBookmark()`.
-- 1177: `addIndexTab({color, position})` — undoowalnie dopisuje nową zakładkę na bieżącej stronie.
-- 1190: `updateIndexTab({id, color, position})` — undoowalnie edytuje konkretną zakładkę.
-- 1213: `clearIndexTab(id)` — undoowalnie usuwa konkretną zakładkę indeksującą.
-- 1209: `beginIndexTabDrag({pageIndex, id})` — start przeciągania zakładki, zapamiętuje stronę do jednej akcji undo.
-- 1229: `updateIndexTabDrag({id, position})` — live przesunięcie zakładki góra/dół bez zapisu na każdy ruch.
-- 1266: `commitIndexTabDrag()` — kończy przeciąganie i zapisuje jedną akcję undo.
+- 1127: `handleTap(point)` — text vs image vs nic.
+- 1138: `undo()` / 1151: `redo()` — domykają aktywną edycję tekstu przed operacją.
+- 1164: `addPage()` — nowy `NotePage`, czyści aktywne.
+- 1177: `deleteLastPage()` — usuwa ostatnią stronę, nie schodzi poniżej jednej strony.
+- 1191: `_createPage(index)`.
+- 1203: `_ensurePageCount(working, count)`.
+- 1209: `setCurrentPage(index)`.
+- 1224: `toggleBookmark()`.
+- 1230: `addIndexTab({color, position})` — undoowalnie dopisuje nową zakładkę na bieżącej stronie.
+- 1243: `updateIndexTab({id, color, position})` — undoowalnie edytuje konkretną zakładkę.
+- 1266: `clearIndexTab(id)` — undoowalnie usuwa konkretną zakładkę indeksującą.
+- 1277: `beginIndexTabDrag({pageIndex, id})` — start przeciągania zakładki, zapamiętuje stronę do jednej akcji undo.
+- 1297: `updateIndexTabDrag({id, position})` — live przesunięcie zakładki góra/dół bez zapisu na każdy ruch.
+- 1322: `commitIndexTabDrag()` — kończy przeciąganie i zapisuje jedną akcję undo.
 
 #### Operacje tekstowe (current page)
-- 1310: `addTextBlock(position)` — Quill Delta z lastText* defaultami.
-- 1337: `addTextBlockFromText(position, text)` — z clipboarda/pliku.
-- 1365: `updateTextBlockContent(before, {plainText, deltaJson})` — szybka ścieżka
+- 1349: `addTextBlock(position)` — Quill Delta z lastText* defaultami.
+- 1375: `addTextBlockFromText(position, text)` — z clipboarda/pliku.
+- 1404: `updateTextBlockContent(before, {plainText, deltaJson})` — szybka ścieżka
   wpisywania: aktualizuje `pages` bez
   `notifyListeners()` i debouncuje zapis.
-- 1380: `updateTextBlockPosition`.
-- 1387: `updateTextBlockWidth`.
-- 1394: `deleteTextBlock`.
-- 1404: `commitTextMove(id, start, end)`.
-- 1418: `commitTextResize(before, after)`.
-- 1426: `commitTextUpdate(before, after)` — undoowalne zatwierdzenie zmiany
+- 1419: `updateTextBlockPosition`.
+- 1426: `updateTextBlockWidth`.
+- 1433: `deleteTextBlock`.
+- 1443: `commitTextMove(id, start, end)`.
+- 1457: `commitTextResize(before, after)`.
+- 1465: `commitTextUpdate(before, after)` — undoowalne zatwierdzenie zmiany
   szerokości/rotacji/pozycji całego bloku tekstu.
 
 #### Obrazy / clipboard / wklejanie
-- 1440: `addImageBlock(position)` — image picker (galeria), jedna kopia pliku do katalogu obrazów.
-- 1449: `insertFromFilePicker(position)` — png/jpg/jpeg/pdf/txt; Linux hint o zenity.
-- 1484: `insertFromClipboard(position)` — image lub tekst z `super_clipboard`,
+- 1474: `addImageBlock(position)` — image picker; natywnie kopiuje plik do
+  katalogu obrazów, w web zapisuje bajty inline.
+- 1491: `insertFromFilePicker(position)` — png/jpg/jpeg/pdf/txt; web przyjmuje
+  pliki jako bajty, w tym PDF renderowany przez `PdfDocument.openData`.
+- 1544: `insertFromClipboard(position)` — image lub tekst z `super_clipboard`,
   fallback `Clipboard.getData(text/plain)`; przed wstawieniem wybiera stronę z pozycji dokumentowej.
-- 1512: `pasteElementOrClipboard(position)` — wkleja zapamiętany
+- 1551: `pasteElementOrClipboard(position)` — wkleja zapamiętany
   `_elementClipboard` (Text/Image/Lasso) albo wpada do `insertFromClipboard`;
   tekst/obrazy trafiają na stronę wynikającą z pozycji dokumentowej.
-- 1594: `copyActiveElementToClipboard()` — lasso→wewnętrzny clipboard,
+- 1633: `copyActiveElementToClipboard()` — lasso→wewnętrzny clipboard,
   text→clipboard text+`_elementClipboard`, image→PNG/JPEG.
-- 1646: `cutActiveElementToClipboard()` — copy + `deleteActiveElement`.
-- 1655: `deleteActiveElement()` — kasuje aktywny tekst lub obraz na właściwej stronie.
-- 1680: `copyActiveImageToClipboard()` — wykrywa jpg/jpeg → `Formats.jpeg`, inaczej `png`.
-- 1709: `_tryInsertImageFromClipboard(reader, position)` — PNG first, potem JPEG.
-- 1683: `_readTextFromClipboard(reader)`.
-- 1691: `_readClipboardImageBytes(reader, format)`.
-- 1715: `_readStreamBytes(stream)`.
-- 1723: `_initialImageBlockSize(sourceSize)` — clampuje do strony (notebook
+- 1685: `cutActiveElementToClipboard()` — copy + `deleteActiveElement`.
+- 1694: `deleteActiveElement()` — kasuje aktywny tekst lub obraz na właściwej stronie.
+- 1719: `copyActiveImageToClipboard()` — wykrywa jpg/jpeg → `Formats.jpeg`, inaczej `png`.
+- 1748: `_tryInsertImageFromClipboard(reader, position)` — PNG first, potem JPEG.
+- 1765: `_readTextFromClipboard(reader)`.
+- 1773: `_readClipboardImageBytes(reader, format)`.
+- 1797: `_readStreamBytes(stream)`.
+- 1805: `_initialImageBlockSize(sourceSize)` — clampuje do strony (notebook
   używa `_pageWidth/_pageHeight`, board ma stałe 360x520).
-- 1743: `_addImageBlockFromBytes(bytes, position, extension)` — zapisuje bajty do pliku, blok trzyma tylko `path`.
-- 1768: `_insertFile(file, position)` — branchuje po rozszerzeniu (png/jpg/pdf/txt).
-- 1786: `_addImageBlockFromFile(file, position, {runOcr=true})` — kopiuje plik,
+- 1846: `_addImageBlockFromBytes(bytes, position, extension)` — natywnie
+  zapisuje bajty do pliku, w web trzyma je inline w bloku i SQLite.
+- 1891: `_insertFile(file, position)` — branchuje po rozszerzeniu (png/jpg/pdf/txt).
+- 1868: `_addImageBlockFromFile(file, position, {runOcr=true})` — kopiuje plik,
   blok trzyma tylko `path`, OCR jeżeli wspierane.
-- 1829: `_activateInsertedImage(id)` — switch na tool `edit`, set active image.
-- 1837: `_addPdfAsImages(pdfFile, position)` — używa `pdfx` (non-Linux),
+- 1911: `_activateInsertedImage(id)` — switch na tool `edit`, set active image.
+- 1963: `_addPdfAsImages(pdfFile, position)` — używa `pdfx` (non-Linux),
   renderuje każdą stronę, zapisuje PNG do trwałego katalogu obrazów, bez `bytes`
   w bloku; na końcu dopisuje nowe obrazy do aktualnych stron zamiast nadpisywać
   `pages` snapshotem sprzed importu.
-- 1916: `_addPdfAsImagesWithPoppler(pdfFile, position)` — Linux fallback,
+- 1980: `_addPdfBytesAsImages(bytes, position)` / 1998:
+  `_addPdfDocumentAsImages(...)` — webowy import PDF z bajtów; wyrenderowane
+  strony przechowuje jako obrazy inline w SQLite.
+- 2074: `_addPdfAsImagesWithPoppler(pdfFile, position)` — Linux fallback,
   uruchamia `pdftoppm` (`poppler-utils`), zapisuje PNG do trwałego katalogu obrazów.
-- 1998: `_appendImageBlocksOnPages(additions)` — scala obrazy z importu PDF z aktualnym stanem stron, zachowując istniejące `imageBlocks`.
-- 2017: `runOcrForImage(block)`.
-- 2030: `updateImageBlockPosition` / 2037 size / 2053 OCR text.
-- 2067: `restoreImageCache(pageIndex, blockId)` — odtwarza plik z legacy `bytes`, potem czyści `bytes`.
-- 2093: `deleteImageBlock(id)`.
+- 2156: `_appendImageBlocksOnPages(additions)` — scala obrazy z importu PDF z aktualnym stanem stron, zachowując istniejące `imageBlocks`.
+- 2175: `runOcrForImage(block)` — przed dostępem do pliku zwraca jawny
+  komunikat o ograniczeniu Android/iOS; 2442: `supportsOcr` dla UI.
+- 2112: `updateImageBlockPosition` / 2119 size / 2134 OCR text.
+- 2149: `restoreImageCache(pageIndex, blockId)` — odtwarza plik z legacy `bytes`, potem czyści `bytes`.
+- 2175: `deleteImageBlock(id)`.
 
 #### Strokes / commits
-- 2143: `addInkStroke(points, {widthOverride, toolOverride})` — highlighter
+- 2182: `addInkStroke(points, {widthOverride, toolOverride})` — zwraca ID
+  zapisanego stroke'a do atomowego handoffu overlay → warstwa statyczna;
+  highlighter
   ma `inkStrokeWidth * 8.0`; zapis do repo jest debounced, żeby szybkie
   odrywanie rysika nie blokowało kolejnego stroke'a na SQLite/backup.
-- 2123: `eraseInkStrokesById(ids)` — usuwa stroke'i undoowalnie i debouncuje
+- 2206: `eraseInkStrokesById(ids)` — usuwa stroke'i undoowalnie i debouncuje
   zapis.
-- 2136: `replaceInkStrokes(strokes)` — undoowalnie podmienia listę stroke'ów;
+- 2219: `replaceInkStrokes(strokes)` — undoowalnie podmienia listę stroke'ów;
   używane przez częściowe wycinanie zamazanego zakresu.
-- 2145: `createInkStrokeId()` — publiczny generator ID dla nowych fragmentów
+- 2228: `createInkStrokeId()` — publiczny generator ID dla nowych fragmentów
   stroke'ów po rozcięciu.
-- 2190: `commitImageMove(id, start, end)`.
-- 2204: `commitImageResize(before, after)` — porównuje pos/size/crop/rotation.
-- 2218: `_moveImageBlockToPage(fromIdx, toIdx, id, position)`.
+- 2230: `commitImageMove(id, start, end)`.
+- 2244: `commitImageResize(before, after)` — porównuje pos/size/crop/rotation.
+- 2258: `_moveImageBlockToPage(fromIdx, toIdx, id, position)`.
 
 #### Helpery
-- 2260: `_persistImageFile(file)`.
-- 2225: `_persistImageBytes(bytes, filename)`.
-- 2232: `_imagesDir()` — tworzy/trzyma obrazy w dokumentach aplikacji, nie w
+- 2379: `_persistImageFile(file)`.
+- 2387: `_persistImageBytes(bytes, filename)`.
+- 2394: `_imagesDir()` — tworzy/trzyma obrazy w dokumentach aplikacji, nie w
   katalogu tymczasowym.
-- 2241: `_colorToHex(color)`.
-- 2246: `_imageSize(file)` — `instantiateImageCodec`.
-- 2254: `_runOcr(file)` — mlkit, Latin script.
-- 2270: `_isOcrSupported()` — Android/iOS only.
-- 2277: `_computeContentBounds()` — bbox stroke + text + image dla widoku.
-- 2371: `_applyAction(action)` — domyka aktywną edycję tekstu, push undo,
+- 2403: `_colorToHex(color)`.
+- 2408: `_imageSize(file)` / 2412: `_imageSizeFromBytes(bytes)` —
+  `instantiateImageCodec`.
+- 2419: `_runOcr(file)` — mlkit, Latin script.
+- 2435: `_isOcrSupported()` — Android/iOS only.
+- 2360: `_computeContentBounds()` — bbox stroke + text + image dla widoku.
+- 2411: `_applyAction(action)` — domyka aktywną edycję tekstu, push undo,
   clear redo, apply, update page.
-- 2336: `_applyActionWithoutNotify(action)` — wariant dla commitowania lassa;
+- 2420: `_applyInkAction(action)` — aktualizuje tylko stronę ink, jej rewizję,
+  globalną rewizję minimapy i historię; pełne `notifyListeners()` zachowuje
+  wyłącznie dla boarda, którego bounds zależą od stroke'ów.
+- 2445: `_applyActionWithoutNotify(action)` — wariant dla commitowania lassa;
   zmienia `pages` i undo stack bez pośredniego `notifyListeners()`.
-- 2346: `_updatePage(page)`.
-- 2397: `_replaceTextBlockOnCurrentPage(block, {notify})` — live update tekstu
+- 2456: `_updatePage(page)`.
+- 2464: `_replaceTextBlockOnCurrentPage(block, {notify})` — live update tekstu
   bez przebudowy drzewa podczas szybkiego pisania.
-- 2368: `_beginTextEdit(blockId)` / 2383: `_commitActiveTextEdit()` /
-  2407: `_discardActiveTextEdit()` — grupowanie wielu znaków w jedną akcję undo.
-- 2412: `_scheduleSave()` — debouncuje zapis notebooka
+- 2478: `_beginTextEdit(blockId)` / 2493: `_commitActiveTextEdit()` /
+  2517: `_discardActiveTextEdit()` — grupowanie wielu znaków w jedną akcję undo.
+- 2606: `_scheduleSave()` — debouncuje zapis notebooka
   przez `_inkSaveDebounceDelay` po live-edit tekstu i krótkich seriach stroke'ów.
-- 2420: `_save()` — wywołuje
+- 2614: `_save()` — wywołuje
   `repository.saveNotebook(notebook.copyWith(pages, updatedAt=now))`.
-- 2428–2452: sealed `_ElementClipboardItem` + `_TextElementClipboardItem`
+- 2622–2652: sealed `_ElementClipboardItem` + `_TextElementClipboardItem`
   + `_ImageElementClipboardItem` + `_LassoElementClipboardItem`.
 
 ---
@@ -880,7 +926,7 @@ Panel ustawień edytora.
 - 392: `class _BackgroundSection` — kontrolki stylu tła `Plain/Grid/Lines`,
   slider zagęszczenia i podgląd.
 
-### `lib/features/editor/presentation/editor_screen.dart` (2656 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2663 linie)
 Layout edytora notebooka (stronicowy). Listener gestów, transformacja zoom/pan
 strony, przesunięcie kolumny strony, mini-mapa, podgląd skali, podgląd ramki
 strony.
@@ -980,197 +1026,219 @@ strony.
   ramkę aktywnej strony.
 - 1918: `class _IndexTabsOverlay` — rysuje wiele kolorowych zakładek; dwuklik otwiera edycję, a długie przytrzymanie pozwala przesuwać zakładkę góra/dół.
 - 2028: `class _ZoomPercentBadge` — chip „150%".
-- 2058: `class _ProjectMiniMapOverlay extends StatefulWidget` (mini-mapa).
-- 2079: `_ProjectMiniMapOverlayState` — synchronizacja widoku + cache miniatur obrazów/PDF.
-- 2118: `_precacheMinimapImages()` — dekoduje asynchronicznie obrazy tylko dla stron blisko widoku.
-- 2195: `_minimapImagePageRange()` — zakres stron, dla których minimapa trzyma zdekodowane obrazy.
-- 2253: `_syncMinimapToViewport()`.
-- 2287: `_visiblePanelHeight(...)` / 2291: `_contentHeight(...)` — wysokość mini-mapy rośnie z liczbą stron do limitu panelu.
-- 2404: `class _ProjectMiniMapPainter` — rysuje strony, content thumbnails,
+- 2077: `class _ProjectMiniMapOverlay extends StatefulWidget` (mini-mapa),
+  nasłuchuje `controller.inkRevision`, aby stroke odświeżał miniaturę bez
+  globalnego rebuilda edytora.
+- 2100: `_ProjectMiniMapOverlayState` — synchronizacja widoku + cache miniatur obrazów/PDF.
+- 2134: `_precacheMinimapImages()` — dekoduje asynchronicznie obrazy tylko dla stron blisko widoku.
+- 2211: `_minimapImagePageRange()` — zakres stron, dla których minimapa trzyma zdekodowane obrazy.
+- 2269: `_syncMinimapToViewport()`.
+- 2303: `_visiblePanelHeight(...)` / 2307: `_contentHeight(...)` — wysokość mini-mapy rośnie z liczbą stron do limitu panelu.
+- 2423: `class _ProjectMiniMapPainter` — rysuje strony, content thumbnails,
   zdekodowane miniatury obrazów/PDF oraz paski zakładek, bez podświetlania krawędzi.
-- 2612: `class _MiniMapImageCacheEntry` — cache key + zdekodowany obraz mini-mapy.
-- 2619: `class _MiniMapViewportOverlayPainter` — rysuje wypełniony prostokąt widoku bez podświetlanych krawędzi.
+- 2636: `class _MiniMapImageCacheEntry` — cache key + zdekodowany obraz mini-mapy.
+- 2643: `class _MiniMapViewportOverlayPainter` — rysuje wypełniony prostokąt widoku bez podświetlanych krawędzi.
 
 ### `lib/features/editor/presentation/widgets/busy_overlay.dart` (38 linii)
 Centralny overlay ładowania dla długich operacji importu/eksportu w edytorach.
 - 3: `class BusyOverlay extends StatelessWidget` — półprzezroczysta blokująca warstwa z centralnym `CircularProgressIndicator`.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (3859 linii)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4233 linie)
 Dwie warianty canvasu rysowania. **Notebook używa `DocumentDrawingCanvas`,
 board używa `DrawingCanvas`.** Logika prawie zduplikowana — to świadoma decyzja
 (różne układy współrzędnych). Oba warianty opóźniają start stroke dla dotyku,
 odrzucają duży kontakt dłoni, dają pierwszeństwo aktywnemu rysikowi/myszy
 i przy aktywnym `PointerInputMode` blokują rozpoczynanie kreski palcem.
-- 36: `_debugInkLog(message)` — debug-only, bardzo skondensowane logi
+- 37: `_debugInkLog(message)` — debug-only, bardzo skondensowane logi
   `[ink]` końca stroke'a i `[scratch]` bazgrołowej gumki.
-- 43: `class _InkPerfLog` — debug-only agregat per stroke: czas obsługi
+- 44: `class _InkPerfLog` — debug-only agregat per stroke: czas obsługi
   `PointerMove`, liczba wywołań repaintu overlayu, czas do zaplanowanej klatki
-  oraz dodatkowo `canvasBuildUs*`, `savedPaintUs*`, `overlayPaintUs*`.
-- 269: `class _CanvasProjectStats` — zwięzły opis wielkości renderowanego
+  oraz dodatkowo `canvasBuildUs*`, `staticPaintUs*`, `activePaintUs*` i
+  rzeczywiste opóźnienie `inputToPaintUs*` do zakończenia paintu overlayu.
+- 254: `_CachedInkGeometry` / 308: `_geometryForStroke` — cache `Path`, bounds
+  i segmentów hit-testu per niezmienny `InkStroke`.
+- 274: `_StaticInkLod` / 354: `_staticInkLodForScale` /
+  364: `_pathForStrokeLod` — trzy progowe poziomy detalu; uproszczone ścieżki
+  pióra/highlightera są liczone raz i cache'owane, aktywny stroke i gumki
+  pozostają pełnej jakości.
+- 425: `_savedInkLayerBounds(...)` — ogranicza bufor `saveLayer` do sumy
+  wizualnych bounds stroke'ów zamiast pełnego canvasu.
+- 458: `_cachedStrokeHitTest(...)` / 477: `_drawSavedStroke(...)` — wspólna
+  geometria hit-testu i renderowania zapisanych stroke'ów.
+- 548: `class _CanvasProjectStats` — zwięzły opis wielkości renderowanego
   kontekstu (`pages/renderPages/savedStrokes/savedPts`) dopisywany do logów
   `[ink]`.
-- 299: `_eraseStrokeParts(...)` / 329: `_scratchEraseInkHitCount(...)` —
+- 578: `_eraseStrokeParts(...)` / 614: `_scratchEraseInkHitCount(...)` —
   scratch-erase ma dwa promienie: mała tolerancja tylko do odpalenia gumki
   oraz szeroki promień realnego usunięcia, żeby nie zostawiać kropek tuszu;
-  do odpalenia wymaga `3+` trafień istniejącego tuszu; geometria sprawdza
-  bezpośrednio punkty/segmenty bez bounding-box prefilteru.
-- 421: `_isScratchEraseGesture(...)` — wymaga aktywnego pena, `3+` nawrotów
+  do odpalenia wymaga `3+` trafień istniejącego tuszu; indeks przestrzenny
+  odrzuca dalekie stroke'i przed dokładnym testem punktów/segmentów.
+- 724: `_isScratchEraseGesture(...)` — wymaga aktywnego pena, `3+` nawrotów
   oraz minimalnego zagęszczenia ścieżki względem obszaru gestu.
-- 550: `_scratchEraseIntersectionRadius(strokeWidth)` — mała tolerancja
+- 853: `_scratchEraseIntersectionRadius(strokeWidth)` — mała tolerancja
   przecięcia wizualnej linii (`max(1, width * 0.5)`), nie pełny promień gumki.
-- 557: `_scratchEraseDeleteRadius(strokeWidth)` — realny promień usuwania
+- 860: `_scratchEraseDeleteRadius(strokeWidth)` — realny promień usuwania
   zamazanego zakresu (`max(8, width * 6)`), zgodny ze starszym zachowaniem.
-- 577: `class DrawingCanvas extends StatefulWidget` — board, jedna strona/canvas.
-- 597: `class DocumentDrawingCanvas extends StatefulWidget` — notebook,
+- 880: `class DrawingCanvas extends StatefulWidget` — board, jedna strona/canvas.
+- 902: `class DocumentDrawingCanvas extends StatefulWidget` — notebook,
   N stron pionowo, params `{worldOrigin, pages, pageSize, pageGap,
-  allowMultiTouch, interactionEnabled, firstPageIndex, lastPageIndex}`; painter
-  renderuje tylko ten zakres, hit-test nadal liczy po pełnym dokumencie.
-- 623: `_buildInkPath(...)` / 660: `_shouldSmoothStroke(...)` — wspólne,
+  allowMultiTouch, interactionEnabled, firstPageIndex, lastPageIndex,
+  effectiveScale}`; statyczny ink renderuje tylko wskazany zakres stron jako
+  osobne `RepaintBoundary`, hit-test nadal liczy po pełnym dokumencie.
+- 930: `_buildInkPath(...)` / 967: `_shouldSmoothStroke(...)` — wspólne,
   adaptacyjne wygładzanie szybkich stroke'ów pen/highlighter; kształty, lasso
   i gumka zostają odcinkami.
-- 694: `_shouldAcceptInkPoint(...)` —
+- 1001: `_shouldAcceptInkPoint(...)` —
   wspólny filtr punktów pen/highlighter: odrzuca nagłe, boczne skoki kontaktu
   oddalone od dotychczasowego kierunku kreski.
-- 712: `_shouldRejectViewportEdgePoint(...)` / 730 `_isNearViewportEdge(...)` —
+- 1019: `_shouldRejectViewportEdgePoint(...)` / 1037 `_isNearViewportEdge(...)` —
   ignoruje nienaturalne skoki do samej krawędzi okna programu.
-- 741: `_isDiscontinuousInkJump(...)` — wykrywa boczny, daleki skok względem
+- 1048: `_isDiscontinuousInkJump(...)` — wykrywa boczny, daleki skok względem
   ostatniego stabilnego kierunku kreski.
-- 770: `_toolForPointerEvent(...)` / 786 `_toggleEraserShortcut(...)` /
-  792 `_hasStylusButton(...)` — tymczasowo używają ostatniej gumki dla
+- 1077: `_toolForPointerEvent(...)` / 1093 `_toggleEraserShortcut(...)` /
+  1099 `_hasStylusButton(...)` — tymczasowo używają ostatniej gumki dla
   `invertedStylus` oraz, gdy `stylusButtonsEnabled == true`, dla natywnego
   stanu `StylusButtonState`, standardowych przycisków stylusa Fluttera
   (`primary/secondary`) i linuksowego fallbacku `secondary/middle mouse`;
   obsługują też przełączenie gumki z Apple Pencil double tap.
-- 806: `_eraserStrokeRadius(strokeWidth)` — wspólny promień hit-testu i śladu
+- 1113: `_eraserStrokeRadius(strokeWidth)` — wspólny promień hit-testu i śladu
   widmo magicznej gumki (`max(4, width * 1.5)`).
-- 810: `_trimEraserTrail(trail)` — ogranicza długość widocznego śladu magicznej
+- 1117: `_trimEraserTrail(trail)` — ogranicza długość widocznego śladu magicznej
   gumki do `_eraserTrailMaxLength`.
 
-#### `_DrawingCanvasState` (board) — 821–2121
-- 825–848: `_strokeStartedAt/_strokeMoveEvents/_frameTimingCursor` +
+#### `_DrawingCanvasState` (board) — 1128–2397
+- 1132–1192: stan pointera, handoffu zapisanych stroke'ów i metryk `_inkPerf`.
   `_inkPerf` — stan do jednej linii `[ink]` po zakończeniu stroke'a, razem z
   agregatem opóźnień i korelacją z `FrameTimingTracker`.
-- 884: `build` — `MouseRegion` ustawia natywny kursor `basic` dla
+- 1194: `build` — `MouseRegion` ustawia natywny kursor `basic` dla
   pen/highlighter, `Listener` z `_onPointerDown/Move/Up/Cancel` +
   `ValueListenableBuilder(controller.lassoDragDelta)` + dwa `CustomPaint` w
   `RepaintBoundary`: zapisane stroke'i i szybki overlay aktywnej kreski.
-  Painter zapisanych stroke'ów używa `saveLayer` jak starsza wersja; mierzy też
-  `canvasBuildUs*` dla tej gałęzi.
-- 984: `_onPointerDown(event, controller, viewportSize)` — wybiera aktywny pointer;
+  Painter zapisanych stroke'ów używa ograniczonego `saveLayer`, cache geometrii
+  i progowego LOD; mierzy też `canvasBuildUs*` dla tej gałęzi.
+- 1300: `_onPointerDown(event, controller, viewportSize)` — wybiera aktywny pointer;
   dotyk startuje dopiero po progu ruchu w trybie `Off`; pozostałe tryby
   blokują pisanie palcem; rysik/mysz startują od razu; przycisk rysika ustawia
   gumkę tylko dla aktywnego stroke'a; start stroke'a łapie też kursor
   `FrameTimingTracker`.
-- 1094: `_onPointerMove` — dodaje punkty, ewentualnie eraser; mierzy czas obsługi
+- 1411: `_onPointerMove` — dodaje punkty, ewentualnie eraser; mierzy czas obsługi
   eventu; wykrywa też zmianę `buttons` w trakcie ruchu i przełącza segment na
   gumkę/poprzednie narzędzie.
-- 1209: `_onPointerUp` — commit stroke przez `controller.addInkStroke`; przed
+- 1527: `_onPointerUp` — commit stroke przez `controller.addInkStroke`; przed
   commitem pen sprawdza, czy skupiony szybki gest ma wyciąć fragmenty stroke'ów.
-- 1342: `_syncActiveToolWithPointerMove(...)` — domyka bieżący segment i zaczyna
+- 1608: `_syncActiveToolWithPointerMove(...)` — domyka bieżący segment i zaczyna
   nowy po wciśnięciu lub puszczeniu przycisku rysika w trakcie kontaktu.
-- 1373: `_commitCurrentSegment(...)` / 1454: `_addCurrentStroke(...)` —
+- 1639: `_commitCurrentSegment(...)` / 1694: `_addCurrentStroke(...)` —
   wspólny commit używany przy normalnym `up` i przy przełączaniu narzędzia.
-- 1468: `_tryCommitScratchErase(...)` — jeśli `scratchEraseEnabled`, najpierw
+- 1728: `_retainCommittedStroke(...)` / 1749: `_handleStaticInkPainted(...)` —
+  gotowy stroke pozostaje w szybkim overlayu do chwili potwierdzonego paintu
+  właściwej rewizji warstwy statycznej.
+- 1766: `_tryCommitScratchErase(...)` — jeśli `scratchEraseEnabled`, najpierw
   sprawdza `3+` nawrotów i zagęszczenie gestu, potem `3+` małe trafienia
   istniejącego tuszu, a dopiero szerokim promieniem podmienia stroke'i przez
   `replaceInkStrokes*`; loguje jedną linię `[scratch]` tylko przy rozpoznanym
   geście bazgrołowej gumki.
-- 1524: `_clearCurrentSegmentForToolSwitch()` — czyści overlay bez kończenia
+- 1822: `_clearCurrentSegmentForToolSwitch()` — czyści overlay bez kończenia
   aktywnego pointera.
-- 1544: `_onPointerCancel`.
-- 1558: `_resetCurrent()`.
-- 1596: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski,
+- 1842: `_onPointerCancel`.
+- 1856: `_resetCurrent()`.
+- 1894: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski,
   koalescowany do jednej zaplanowanej klatki; aktualizuje metryki `_inkPerf`.
-- 1611: `_logStrokeUp(...)` — jedna linia `[ink]` po zakończeniu stroke'a
+- 1909: `_logStrokeUp(...)` — jedna linia `[ink]` po zakończeniu stroke'a
   boarda z metrykami wielkości projektu i `FrameTimingSummary`
   (`build/raster/total` dla klatek, które wydarzyły się w trakcie stroke'a),
   plus zapis podejrzanych przypadków do `OptimizationLog`; zawiera też
-  rozbicie `canvasBuildUs*`, `savedPaintUs*`, `overlayPaintUs*` oraz
+  rozbicie `canvasBuildUs*`, `staticPaintUs*`, `activePaintUs*`,
+  `inputToPaintUs*` oraz
   `BoardScenePerfSummary` z `BoardScreen`.
-- 1664: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
-- 1672: `_activeTool(controller)` — zwraca override z przycisku rysika albo
+- 1962: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
+- 1970: `_activeTool(controller)` — zwraca override z przycisku rysika albo
   aktualne narzędzie controllera.
-- 1676: `_toWorld(local)`.
-- 1680: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
-- 1699: `_startSnapTimer(offset)` — po holdzie z czystym kształtem wywołuje `_snapToShape`.
-- 1709: `_eraseAt(offset, page, controller)`.
-- 1721: `_resolvedPage(controller)` / 1725: `_resolvedPageIndex`.
-- 1729: `_strokeHitTest(stroke, point, radius)`.
-- 1748: `_distanceSquaredToSegment(p, a, b)`.
-- 1761: `_snapToShape()` — wykrywa line/rect/ellipse.
-- 1819: `_clearSnapHintSoon()`.
-- 1832: `_isRoughlyStraight(start, end, points)`.
-- 1856: `_isRoughlyRectangle(points)`.
-- 1881: `_isRoughlyEllipse(points)`.
-- 1950: `_findFarthestCorner(points, holdPoint)`.
-- 1974: `_isInkTool(tool)`.
-- 1978: `_isSnapTool(tool)` — pen/highlighter snapują, eraser/kształty nie.
-- 1982: `_usesCustomInkCursor(tool)` — pen/highlighter używają natywnego kursora `basic`.
-- 1986: `_effectiveStrokeWidth(tool, baseWidth)` — highlighter ma mnożnik 8,
+- 1974: `_toWorld(local)`.
+- 1978: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
+- 1999: `_startSnapTimer(offset)` — po holdzie z czystym kształtem wywołuje `_snapToShape`.
+- 2009: `_eraseAt(offset, page, controller)` — kandydaci z indeksu przestrzennego.
+- 2024: `_resolvedPage(controller)` / 2028: `_resolvedPageIndex`.
+- 2032: `_strokeHitTest(stroke, point, radius)`.
+- 2036: `_snapToShape()` — wykrywa line/rect/ellipse.
+- 2094: `_clearSnapHintSoon()`.
+- 2107: `_isRoughlyStraight(start, end, points)`.
+- 2131: `_isRoughlyRectangle(points)`.
+- 2156: `_isRoughlyEllipse(points)`.
+- 2225: `_findFarthestCorner(points, holdPoint)`.
+- 2249: `_isInkTool(tool)`.
+- 2253: `_isSnapTool(tool)` — pen/highlighter snapują, eraser/kształty nie.
+- 2257: `_usesCustomInkCursor(tool)` — pen/highlighter używają natywnego kursora `basic`.
+- 2261: `_effectiveStrokeWidth(tool, baseWidth)` — highlighter ma mnożnik 8,
   zwykła gumka `_eraserBrushWidthScale`.
-- 2024: `_squareCorner(start, end)` — wymuszony kwadrat/koło.
+- 2299: `_squareCorner(start, end)` — wymuszony kwadrat/koło.
 
-#### `_DocumentDrawingCanvasState` (notebook) — 2124–3509
+#### `_DocumentDrawingCanvasState` (notebook) — 2399–3832
 Te same metody co wyżej, ale operują w przestrzeni dokumentu (offset per page).
-- 2128–2152: `_strokeStartedAt/_strokeMoveEvents/_frameTimingCursor` +
+- 2403–2464: stan pointera, handoffu zapisanych stroke'ów i metryk
   `_inkPerf` — stan do jednej linii `[ink]` po zakończeniu stroke'a, razem z
   agregatem opóźnień i korelacją z `FrameTimingTracker`.
-- 2188: `build` — też nasłuchuje `lassoDragDelta` przy repaint zaznaczonych
+- 2466: `build` — też nasłuchuje `lassoDragDelta` przy repaint zaznaczonych
   stroke'ów; aktywny overlay tuszu nie jest dodatkowo klipowany; mierzy też
   `canvasBuildUs*` dla notebookowego canvasa.
-- 2288: `_onPointerDown` / 2418 Move / 2563 Up / 2848 Cancel; lasso w dokumencie
+- 2560: `_buildSavedInkPages(...)` — osobny stabilny `RepaintBoundary` i
+  rewizja ink dla każdej renderowanej strony.
+- 2599: `_onPointerDown` / 2730 Move / 2876 Up; lasso w dokumencie
   woła `selectWithLasso`, aktywny `PointerInputMode` blokuje pisanie palcem,
   `Move` mierzy czas obsługi eventu, a przycisk rysika ustawia gumkę dla
   aktywnego stroke'a także gdy `buttons` zmienia się w trakcie ruchu.
-- 2659: `_syncActiveToolWithPointerMove(...)`.
-- 2700: `_commitCurrentSegment(...)` / 2760: `_addCurrentStroke(...)`.
-- 2774: `_tryCommitScratchErase(...)` — jeśli `scratchEraseEnabled`,
+- 2962: `_syncActiveToolWithPointerMove(...)`.
+- 3003: `_commitCurrentSegment(...)` / 3059: `_addCurrentStroke(...)`.
+- 3084: `_retainCommittedStroke(...)` / 3105: `_handleStaticInkPainted(...)` —
+  notebookowy handoff overlay → statyczna strona.
+- 3122: `_tryCommitScratchErase(...)` — jeśli `scratchEraseEnabled`,
   notebookowy wariant częściowego wycinania konwertuje gest z dokumentu do
   koordynatów strony; loguje jedną linię `[scratch]` tylko przy rozpoznanym
   geście bazgrołowej gumki.
-- 2827: `_clearCurrentSegmentForToolSwitch()`.
-- 2862: `_resetCurrent`.
-- 2901: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski,
+- 3175: `_clearCurrentSegmentForToolSwitch()`.
+- 3210: `_resetCurrent`.
+- 3249: `_notifyInkChanged()` — lekki repaint overlayu aktywnej kreski,
   koalescowany do jednej zaplanowanej klatki; aktualizuje metryki `_inkPerf`.
-- 2916: `_logStrokeUp(...)` — jedna linia `[ink]` po zakończeniu stroke'a
+- 3264: `_logStrokeUp(...)` — jedna linia `[ink]` po zakończeniu stroke'a
   notebooka z rozmiarem renderowanego zakresu stron i `FrameTimingSummary`,
   plus zapis podejrzanych przypadków do `OptimizationLog`; zawiera też
-  rozbicie `canvasBuildUs*`, `savedPaintUs*`, `overlayPaintUs*`.
-- 2967: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
-- 2975: `_activeTool(controller)` — zwraca override z przycisku rysika albo
+  rozbicie `canvasBuildUs*`, `staticPaintUs*`, `activePaintUs*` i
+  `inputToPaintUs*`.
+- 3335: `_addEraserTrailPoint(offset)` — zbiera i przycina punkty śladu widmo magicznej gumki.
+- 3343: `_activeTool(controller)` — zwraca override z przycisku rysika albo
   aktualne narzędzie controllera.
-- 2979: `_toWorld(local)`.
-- 3024: `_pageOrigin(pageIndex)` / 3034: `_toPageLocal(world, pageIndex)` /
-  3042: `_toDocument(pageLocal, pageIndex)` / 3050: `_isInsidePage(pageLocal)`.
-- 3057: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
-- 3078: `_startSnapTimer`.
-- 3088: `_eraseAt(localOffset, pageIndex)`.
-- 3103: `_strokeHitTest` / 3122: `_distanceSquaredToSegment`.
-- 3148: `_snapToShape`.
-- 3206: `_clearSnapHintSoon`.
-- 3219: `_isRoughlyStraight` / 3243: `_isRoughlyRectangle` / 3268: `_isRoughlyEllipse`.
-- 3337: `_findFarthestCorner`.
-- 3361: `_isInkTool` / 3365: `_isSnapTool` /
-  3369: `_usesCustomInkCursor` / 3373: `_effectiveStrokeWidth`.
-- 3411: `_squareCorner`.
+- 3347: `_toWorld(local)`.
+- 3372: `_pageOrigin(pageIndex)` / 3382: `_toPageLocal(world, pageIndex)` /
+  3390: `_toDocument(pageLocal, pageIndex)` / 3398: `_isInsidePage(pageLocal)`.
+- 3405: `_shouldAddPoint(offset, tool)` — min odległość + filtr skoków kontaktu.
+- 3426: `_startSnapTimer`.
+- 3436: `_eraseAt(localOffset, pageIndex)` — kandydaci z indeksu przestrzennego.
+- 3454: `_strokeHitTest` / 3471: `_snapToShape`.
+- 3529: `_clearSnapHintSoon`.
+- 3542: `_isRoughlyStraight` / 3566: `_isRoughlyRectangle` / 3591: `_isRoughlyEllipse`.
+- 3660: `_findFarthestCorner`.
+- 3684: `_isInkTool` / 3688: `_isSnapTool` /
+  3692: `_usesCustomInkCursor` / 3696: `_effectiveStrokeWidth`.
+- 3734: `_squareCorner`.
 
 #### Paintery
-- 3511: `class _InkPainter extends CustomPainter` (board) — rysuje zapisane
-  stroke'i i lasso selection w pełnym `saveLayer`; loguje `savedPaintUs*`;
-  nie odświeża się przy każdym punkcie aktywnej kreski.
-- 3557: `class _InkOverlayPainter extends CustomPainter` — lekka warstwa
+- 3834: `class _InkPainter extends CustomPainter` (board) — rysuje zapisane
+  stroke'i i lasso selection w `saveLayer` ograniczonym do bounds ink; korzysta
+  z cache geometrii i LOD, loguje `staticPaintUs*`; nie odświeża się przy
+  każdym punkcie aktywnej kreski.
+- 3892: `class _InkOverlayPainter extends CustomPainter` — lekka warstwa
   aktywnej kreski, snap hint i śladu magicznej gumki,
   sterowana `ValueNotifier`; ślad magicznej gumki jest krótkim, rozmytym trailem bez
-  rdzenia, z gradientową maską ogona do pełnej przezroczystości, aktywny ślad
+  rdzenia, z gradientową maską ogona do pełnej przezroczystości i warstwą
+  ograniczoną do bounds traila; aktywny ślad
   zwykłej gumki ma kolor papieru, ale pojedynczy punkt zwykłej gumki nie jest
   rysowany jako okrągły preview; zapisany stroke gumki nadal czyści przez
-  `BlendMode.clear`.
-- 3781: `class _DocumentInkPainter extends CustomPainter` (notebook) —
-  analogiczny painter zapisanych stroke'ów dla dokumentu; filtruje zakres po
-  `firstPageIndex/lastPageIndex`, używa pełnego `saveLayer`, zaznaczenie po
-  `selectedPageIndex`, loguje `savedPaintUs*`.
+  `BlendMode.clear`; rysuje też stroke'i oczekujące na handoff.
+- 4134: `_InkPageLayer` / 4180: `_PageInkPainter` — statyczny ink notebooka
+  per strona i per rewizja, z osobnym `RepaintBoundary`, ograniczonym
+  `saveLayer`, cache geometrii i LOD.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (1995 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2029 linii)
 Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
 - 32: `class PageOverlay extends StatelessWidget` (board, single-page);
   aktywna warstwa przepuszcza gesty lasso mimo `tool.isInk`; przekazuje
@@ -1195,46 +1263,48 @@ Warstwa interaktywna nad rysunkiem (tekst + obrazy, drag/resize/crop).
   `_imageChild` (`Image.memory(bytes)` lub `Image.file(path)` z
   `Transform.rotate` + crop `Rect.fromLTRB(cropLeft,cropTop,cropRight,cropBottom)`),
   `_normalizeBlockToImageBounds`, `_startResize`/`_updateResize`/`_endResize`;
+  obrazy webowe z pustą ścieżką renderuje i mierzy bezpośrednio z `bytes`;
   zaznaczenie lasso daje border/shadow i przesuwa tylko `Positioned` przez
   `ValueListenableBuilder`,
   `_cornerDelta`/`_clampSize`/`_cornerPosition`/`_cropOffsetX|Y`.
-- 1663: `_editOcr(...)` — dialog edycji tekstu OCR; w trybie tablet prosi
-  system o klawiaturę ekranową.
-- 1784: `_LassoSelectionWidget` — niewidzialny hit target do dragowania całego
+- 1682: `_editOcr(...)` — dialog edycji tekstu OCR; na platformach bez ML Kit
+  pokazuje komunikat i pozostawia ręczną edycję, a przycisk `Run OCR` ukrywa;
+  w trybie tablet prosi system o klawiaturę ekranową.
+- 1818: `_LassoSelectionWidget` — niewidzialny hit target do dragowania całego
   zaznaczenia + pasek akcji copy/delete w powiększonym, klikalnym obszarze;
   nie rysuje prostokąta, bounds są dokumentowe, widget odejmuje `worldOrigin`
   strony i śledzi `dragDeltaListenable`.
-- 1938: `_LassoActionButton` — wspólny 48×48 przycisk akcji lassa.
-- 1968: `enum _CropAnchorAxis { left, right, top, bottom }`.
-- 1970: `class _CropAnchor`.
-- 1977: `enum _ImageContextAction { copy }`.
-- 1979: top-level `Offset _globalDeltaToLocalDelta(...)`.
+- 1972: `_LassoActionButton` — wspólny 48×48 przycisk akcji lassa.
+- 2002: `enum _CropAnchorAxis { left, right, top, bottom }`.
+- 2004: `class _CropAnchor`.
+- 2011: `enum _ImageContextAction { copy }`.
+- 2013: top-level `Offset _globalDeltaToLocalDelta(...)`.
 
-### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (905 linii)
+### `lib/features/editor/presentation/widgets/editor_toolbar.dart` (917 linii)
 Główny pasek narzędzi nad canvasem (narzędzia, kolory, stroke width, undo/redo,
 export).
 - 11: `class EditorToolbar extends StatelessWidget`.
 - 24: `build` — lewy przewijany segment z narzędziami, lokalnym przyciskiem tła
   i stały prawy przycisk
   eksportu.
-- 119: `_exportButton()` — popup PDF/PNG wyrównany do prawej strony toolbara.
-- 145: `_indexTabButton(context)` — ikonka zakładki; wybór koloru i wysokości w dialogu, dodaje kolejną zakładkę.
-- 176: `_backgroundButton(context)` — lokalne ustawienia tła bieżącego notebooka/boarda.
-- 191: `_showBackgroundDialog(context)` — dialog `Plain/Grid/Lines`, slider zagęszczenia i podgląd.
-- 268: `_actionButton({...})` — generyczny IconButton.
-- 286: `_toolButton({...})` — IconButton z aktywnym tłem gdy `tool == ...`.
-- 305: `_toolHighlightStyle(selected)` — wspólny kwadratowy hover i aktywne tło dla przycisków toolbara.
-- 322: `_eraserSelector()` — popup z `eraserBrush`/`eraserStroke`/`eraserArea`.
-- 386: `_shapeSelector()` — popup z liniami/strzałkami/prostokątami/kołami.
-- 422: `_selectorMenuButton({...})` — węższy przycisk strzałki dla selektorów.
+- 131: `_exportButton()` — popup PDF/PNG wyrównany do prawej strony toolbara.
+- 157: `_indexTabButton(context)` — ikonka zakładki; wybór koloru i wysokości w dialogu, dodaje kolejną zakładkę.
+- 188: `_backgroundButton(context)` — lokalne ustawienia tła bieżącego notebooka/boarda.
+- 203: `_showBackgroundDialog(context)` — dialog `Plain/Grid/Lines`, slider zagęszczenia i podgląd.
+- 280: `_actionButton({...})` — generyczny IconButton.
+- 298: `_toolButton({...})` — IconButton z aktywnym tłem gdy `tool == ...`.
+- 317: `_toolHighlightStyle(selected)` — wspólny kwadratowy hover i aktywne tło dla przycisków toolbara.
+- 334: `_eraserSelector()` — popup z `eraserBrush`/`eraserStroke`/`eraserArea`.
+- 398: `_shapeSelector()` — popup z liniami/strzałkami/prostokątami/kołami.
+- 434: `_selectorMenuButton({...})` — węższy przycisk strzałki dla selektorów.
 - 485: `_shapeLabel(tool)`.
-- 508: `_colorDot(...)` — kafelek koloru (quickColors + recentColors + picker).
-- 544: `_pickColor(...)` — dialog wyboru koloru.
-- 656: `_pickIndexTabPosition(...)` — dialog wyboru wysokości zakładki.
-- 744: `_channelSlider({...})` — slider R/G/B w pickerze niestandardowym.
-- 793: `_toByte(component)`.
-- 798: `class _EraserIcon` — klasyczna ikonka gumki z opcjonalnymi błyskotkami/kółkiem obszaru.
-- 837: `class _EraserIconPainter` — rysuje bazową sylwetkę gumki i znacznik gumki zakresowej.
+- 520: `_colorDot(...)` — kafelek koloru (quickColors + recentColors + picker).
+- 556: `_pickColor(...)` — dialog wyboru koloru.
+- 668: `_pickIndexTabPosition(...)` — dialog wyboru wysokości zakładki.
+- 756: `_channelSlider({...})` — slider R/G/B w pickerze niestandardowym.
+- 805: `_toByte(component)`.
+- 810: `class _EraserIcon` — klasyczna ikonka gumki z opcjonalnymi błyskotkami/kółkiem obszaru.
+- 849: `class _EraserIconPainter` — rysuje bazową sylwetkę gumki i znacznik gumki zakresowej.
 
 ### `lib/features/editor/presentation/widgets/page_background_paint.dart` (123 linie)
 Render tła strony/canvasu i preview w ustawieniach.
@@ -1269,7 +1339,7 @@ Pasek formatowania tekstu (pokazywany gdy aktywny TextBlock).
 
 ---
 
-### `lib/features/board/presentation/board_screen.dart` (939 linii)
+### `lib/features/board/presentation/board_screen.dart` (941 linii)
 Edytor canvas (kind=board): jedna „strona" o nieograniczonych granicach,
 swobodne rozmieszczanie + zoom/pan z trackpada/touch.
 - 27: `class BoardScreen extends StatefulWidget`.
@@ -1300,13 +1370,13 @@ swobodne rozmieszczanie + zoom/pan z trackpada/touch.
   PageOverlay, `_BoardZoomControls` pozycjonowane) + `BusyOverlay`; w
   `LayoutBuilder` mierzy też `sceneBuildUs*` i owija warstwy boarda w
   `_BoardPaintProbe`, żeby logować `scene/background/overlay/canvasHost`.
-- 820: `class _BoardPaintProbe` / 837 `_RenderBoardPaintProbe` — cienki
+- 822: `class _BoardPaintProbe` / 839 `_RenderBoardPaintProbe` — cienki
   `RenderProxyBox` mierzący czas `paint()` wybranej warstwy boarda i
   zapisujący próbkę do `BoardScenePerfTracker`.
-- 858: `enum _BoardContextAction { paste }`.
-- 860: `_PasteFromClipboardIntent` / 864 Copy / 868 Cut / 872 Delete (te same
+- 860: `enum _BoardContextAction { paste }`.
+- 862: `_PasteFromClipboardIntent` / 866 Copy / 870 Cut / 874 Delete (te same
   intent klasy co w editor_screen ale lokalne).
-- 876: `class _BoardZoomControls` — przyciski +/–/fit/reset zoom.
+- 878: `class _BoardZoomControls` — przyciski +/–/fit/reset zoom.
 
 ---
 
@@ -1349,6 +1419,28 @@ Testy sanitizacji backupu gumki.
 - 64: `_notebook(strokes)` — fixture jednego notebooka z jedną stroną.
 - 88: `_stroke(...)` — fixture stroke'a z listy `Offset`.
 
+### `test/ink_render_benchmark_test.dart` (211 linii)
+- 24: `ink render benchmark` — deterministyczny benchmark prawdziwego
+  `DocumentDrawingCanvas`; po rozgrzewce renderuje fixture'y 100/1000/5000
+  stroke'ów na pełnym/średnim/niskim LOD, wykonuje syntetyczny gest rysika
+  i wypisuje porównywalne linie
+  `INK_BENCHMARK` z `staticPaintUs*`, `activePaintUs*`, `inputToPaintUs*`
+  oraz pozostałymi metrykami `[ink]`; czasy nie mają progów zależnych od
+  maszyny, test pilnuje kompletności logu i rozmiaru renderowanego zakresu.
+- 144: `_notebookFor(scenario)` / 172: `_strokeFor(...)` — deterministyczne
+  generatory stron, stroke'ów i punktów benchmarku.
+- 193: `_BenchmarkScenario` — opis rozmiaru fixture'a, efektywnego zoomu
+  i liczba renderowanych
+  stron.
+
+### `test/ink_spatial_index_test.dart` (49 linii)
+- 10: zachowuje kolejność bliskich kandydatów i odrzuca odległe stroke'i.
+- 24: bardzo długi stroke trafia do overflow zamiast tysięcy komórek siatki.
+
+### `test/resizable_frame_test.dart` (33 linie)
+- 8: demontaż widgetu podczas aktywnego resize nie wywołuje `setState` po
+  `dispose`.
+
 ### `test/widget_test.dart` (20 linii)
 Smoke test: `NotesApp` pumpuje `MaterialApp` + jeden `CircularProgressIndicator`
 (bo `NotesDatabase.open()` jeszcze biegnie).
@@ -1359,7 +1451,7 @@ Smoke test: `NotesApp` pumpuje `MaterialApp` + jeden `CircularProgressIndicator`
   [notes_database.dart](lib/data/drift/notes_database.dart) wymaga regeneracji
   `notes_database.g.dart` (`dart run build_runner build`) i świadomego
   podbicia `schemaVersion` + migracji, jeśli trzeba zachować istniejące dane.
-- **`_toolFromIndex`/`_toolToIndex`** (repo, [linie 1005 i 1013](lib/features/notebook/data/notebook_repository.dart#L1005))
+- **`_toolFromIndex`/`_toolToIndex`** (repo, [linie 1034 i 1042](lib/features/notebook/data/notebook_repository.dart#L1034))
   są obecnie **symetryczne** (`tool.index` ↔ `DrawingTool.values[index]`).
   Wcześniejsza wersja była dziurawa (gubiła square/circle/triangle/ellipse/
   text/image/edit przy roundtripie). Zmieniasz kolejność `DrawingTool.values`?
@@ -1369,7 +1461,7 @@ Smoke test: `NotesApp` pumpuje `MaterialApp` + jeden `CircularProgressIndicator`
   `onChanged` → `_BackupScheduler` → `LocalBackupService.snapshot` po idle.
   Backup jest przyrostowy per notebook (`manifest.json` + `notebooks/<uid>.json`).
 - **OCR** działa wyłącznie na Android/iOS
-  ([editor_controller.dart:1775](lib/features/editor/state/editor_controller.dart#L1775)).
+  ([editor_controller.dart:2435](lib/features/editor/state/editor_controller.dart#L2435)).
   Na desktopie kod zwraca komunikat, nie wyrzuca wyjątku.
 - **PDF na Linuxie** używa `pdftoppm` (poppler-utils), reszta — `pdfx`.
 - **DrawingCanvas vs DocumentDrawingCanvas**: NIE konsoliduj bez planu —
@@ -1383,7 +1475,7 @@ Smoke test: `NotesApp` pumpuje `MaterialApp` + jeden `CircularProgressIndicator`
   są wyłączone gdy aktywny jest TextEditor
   ([editor_screen.dart:1037](lib/features/editor/presentation/editor_screen.dart#L1037)).
 - **Migracja obrazów w `saveNotebook`**
-  ([notebook_repository.dart:194](lib/features/notebook/data/notebook_repository.dart#L194))
+  ([notebook_repository.dart:329](lib/features/notebook/data/notebook_repository.dart#L329))
   przenosi stare inline `bytes` z nietrwałą/pustą ścieżką do katalogu
   dokumentów aplikacji i czyści `bytes` po utrwaleniu pliku. `bytes` nie są
   zapisywane do SQLite, jeśli blok ma trwały `path`, żeby duże obrazy nie

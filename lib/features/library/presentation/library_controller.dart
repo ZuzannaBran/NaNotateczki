@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/error/app_error_log.dart';
+import '../../../core/storage/text_storage.dart';
 import '../../../data/backup/local_backup_service.dart';
 import '../../../data/sync/cloud_sync_service.dart';
 import '../../notebook/data/notebook_repository.dart';
@@ -493,11 +494,10 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> _loadFolders() async {
     try {
-      final file = await _foldersFile();
-      if (!await file.exists()) {
+      final content = await readStoredText(_foldersFileName);
+      if (content == null) {
         return;
       }
-      final content = await file.readAsString();
       final decoded = jsonDecode(content);
       if (decoded is! List) {
         return;
@@ -517,17 +517,11 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> _saveFolders() async {
     try {
-      final file = await _foldersFile();
       final payload = _folders.toList()..sort(_compareFolderNames);
-      await file.writeAsString(jsonEncode(payload));
+      await writeStoredText(_foldersFileName, jsonEncode(payload));
     } catch (e) {
       debugPrint('LibraryController._saveFolders failed: $e');
     }
-  }
-
-  Future<File> _foldersFile() async {
-    final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/$_foldersFileName');
   }
 
   int _compareFolderNames(String a, String b) {

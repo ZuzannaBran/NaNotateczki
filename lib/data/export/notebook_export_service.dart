@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -139,6 +139,22 @@ class NotebookExportService {
       );
     }
 
+    if (kIsWeb) {
+      for (var i = 0; i < pages.length; i++) {
+        final number = (i + 1).toString().padLeft(2, '0');
+        final result = await _saveBytesAs(
+          dialogTitle: 'Save PNG page ${i + 1}',
+          fileName: '${baseName}_page_$number.png',
+          extension: 'png',
+          bytes: pages[i].bytes,
+        );
+        if (result == null) {
+          return null;
+        }
+      }
+      return '${pages.length} PNG files downloaded';
+    }
+
     final initialDirectory = await _initialExportDirectory();
     final selectedDirectory = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'Choose folder for PNG export',
@@ -188,9 +204,13 @@ class NotebookExportService {
     return file.path;
   }
 
-  static bool get _pickerWritesBytes => Platform.isAndroid || Platform.isIOS;
+  static bool get _pickerWritesBytes =>
+      kIsWeb || Platform.isAndroid || Platform.isIOS;
 
   static Future<String?> _initialExportDirectory() async {
+    if (kIsWeb) {
+      return null;
+    }
     if (Platform.isAndroid || Platform.isIOS) {
       return null;
     }

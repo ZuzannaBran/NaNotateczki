@@ -93,15 +93,27 @@ class EditorToolbar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      IconButton(
-                        icon: const Icon(Icons.undo),
-                        onPressed: controller.canUndo ? controller.undo : null,
-                        tooltip: 'Undo',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.redo),
-                        onPressed: controller.canRedo ? controller.redo : null,
-                        tooltip: 'Redo',
+                      ValueListenableBuilder<int>(
+                        valueListenable: controller.historyRevision,
+                        builder: (context, _, _) => Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.undo),
+                              onPressed: controller.canUndo
+                                  ? controller.undo
+                                  : null,
+                              tooltip: 'Undo',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.redo),
+                              onPressed: controller.canRedo
+                                  ? controller.redo
+                                  : null,
+                              tooltip: 'Redo',
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
