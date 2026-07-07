@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +54,18 @@ void main() {
     expect(strokes, hasLength(1));
     expect(strokes.single.id, 'left');
     expect(strokes.single.tool, DrawingTool.pen);
+  });
+
+  test('flattening can run outside the UI isolate', () async {
+    final notebook = _notebook([
+      _stroke('line', DrawingTool.pen, const [Offset(0, 0), Offset(10, 0)]),
+    ]);
+
+    final flattened = await Isolate.run(
+      () => flattenErasersForBackup(notebook),
+    );
+
+    expect(flattened.pages.single.inkStrokes.single.id, 'line');
   });
 }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import '../core/diagnostics/frame_timing_tracker.dart';
 import '../core/diagnostics/optimization_log.dart';
 import '../core/error/app_error_log.dart';
 import '../core/input/app_preferences_controller.dart';
+import '../core/input/ink_activity_tracker.dart';
 import '../core/theme/app_theme.dart';
 import '../data/backup/local_backup_service.dart';
 import '../data/drift/notes_database.dart';
@@ -111,9 +113,74 @@ class _AppScopeState extends State<AppScope> {
             title: 'Notatek',
             theme: AppTheme.light(),
             home: const LibraryScreen(),
+            builder: (context, child) => _BackupStatusOverlay(
+              snapshotInProgress: backupService.snapshotInProgress,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+class _BackupStatusOverlay extends StatelessWidget {
+  const _BackupStatusOverlay({
+    required this.snapshotInProgress,
+    required this.child,
+  });
+
+  final ValueListenable<bool> snapshotInProgress;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        child,
+        ValueListenableBuilder<bool>(
+          valueListenable: snapshotInProgress,
+          builder: (context, isSaving, _) {
+            if (!isSaving) {
+              return const SizedBox.shrink();
+            }
+            return Positioned(
+              left: 16,
+              right: 16,
+              bottom: 24,
+              child: SafeArea(
+                child: IgnorePointer(
+                  child: Center(
+                    child: Card(
+                      elevation: 6,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Saving local backup...',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -221,6 +288,12 @@ class _BackupScheduler with WidgetsBindingObserver {
     if (!_dirty) {
       return;
     }
+    if (InkActivityTracker.instance.isBusy) {
+      _timer = Timer(InkActivityTracker.idleDelay, () {
+        unawaited(flush(reason: reason));
+      });
+      return;
+    }
     if (_isRunning) {
       _dirty = true;
       return;
@@ -234,7 +307,8 @@ class _BackupScheduler with WidgetsBindingObserver {
     var itemCount = 0;
     try {
       final fetchStopwatch = Stopwatch()..start();
-      final items = await repository.fetchNotebooks();
+      final items =
+          repository.cachedNotebooks ?? await repository.fetchNotebooks();
       fetchStopwatch.stop();
       fetchMs = fetchStopwatch.elapsedMilliseconds;
       itemCount = items.length;
@@ -257,7 +331,10 @@ class _BackupScheduler with WidgetsBindingObserver {
         );
         return;
       }
-      snapshotReport = await backupService.snapshot(items);
+      snapshotReport = await backupService.snapshot(
+        items,
+        shouldInterrupt: () => InkActivityTracker.instance.isBusy,
+      );
       final frameSummary = FrameTimingTracker.instance.summarySince(
         frameCursor,
       );
@@ -275,6 +352,9 @@ class _BackupScheduler with WidgetsBindingObserver {
         totalMs: totalStopwatch.elapsedMilliseconds,
         status: 'ok',
       );
+    } on BackupSnapshotInterrupted {
+      _dirty = true;
+      debugPrint('[backup] reason=$reason interrupted=ink');
     } catch (e) {
       final frameSummary = FrameTimingTracker.instance.summarySince(
         frameCursor,

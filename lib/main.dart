@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app/notes_app.dart';
+import 'core/diagnostics/data_integrity_log.dart';
 import 'core/diagnostics/optimization_log.dart';
 import 'core/error/app_error_log.dart';
 import 'core/input/stylus_button_state.dart';
@@ -19,7 +20,14 @@ bool _invalidKeyDataFilter(ui.KeyData data) {
   if (data.physical == 0 || data.logical == 0) {
     return true;
   }
-  return _wrappedKeyDataHandler?.call(data) ?? false;
+  try {
+    return _wrappedKeyDataHandler?.call(data) ?? false;
+  } on AssertionError catch (error, stackTrace) {
+    if (_isRawKeyDataTransitAssertion(error, stackTrace)) {
+      return true;
+    }
+    rethrow;
+  }
 }
 
 void main() {
@@ -36,6 +44,7 @@ void main() {
 Future<void> _runApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppErrorLog.instance.load();
+  await DataIntegrityLog.instance.load();
   await OptimizationLog.instance.load();
   _installFlutterErrorLogger();
   StylusButtonState.initialize();
@@ -63,6 +72,9 @@ void _installFlutterErrorLogger() {
 }
 
 void _flutterErrorLogger(FlutterErrorDetails details) {
+  if (_isDuplicatePointerAddedAssertion(details)) {
+    return;
+  }
   AppErrorLog.instance.recordFlutterError(details);
   _wrappedFlutterErrorHandler?.call(details);
 }
@@ -99,9 +111,32 @@ bool _invalidKeyDataErrorFilter(Object error, StackTrace stackTrace) {
 bool _isInvalidKeyDataAssertion(Object error, StackTrace stackTrace) {
   final message = error.toString();
   final stack = stackTrace.toString();
-  return message.contains('hardware_keyboard.dart') &&
-      message.contains('data.physical != 0 && data.logical != 0') &&
-      stack.contains('KeyEventManager.handleKeyData');
+  if (!message.contains('hardware_keyboard.dart') ||
+      !stack.contains('KeyEventManager.handleKeyData')) {
+    return false;
+  }
+  return message.contains('data.physical != 0 && data.logical != 0') ||
+      message.contains(
+        'Should never encounter KeyData when transitMode is rawKeyData',
+      );
+}
+
+bool _isRawKeyDataTransitAssertion(Object error, StackTrace stackTrace) {
+  return error.toString().contains(
+        'Should never encounter KeyData when transitMode is rawKeyData',
+      ) &&
+      stackTrace.toString().contains('KeyEventManager.handleKeyData');
+}
+
+bool _isDuplicatePointerAddedAssertion(FlutterErrorDetails details) {
+  final message = details.exceptionAsString();
+  final stack = details.stack?.toString() ?? '';
+  return message.contains('mouse_tracker.dart') &&
+      message.contains(
+        '(event is PointerAddedEvent) == '
+        '(lastEvent is PointerRemovedEvent)',
+      ) &&
+      stack.contains('MouseTracker._shouldMarkStateDirty');
 }
 
 void _startKeyDataFilterWatchdog() {

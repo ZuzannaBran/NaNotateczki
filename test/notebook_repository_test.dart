@@ -1,9 +1,15 @@
+import 'dart:ui';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:program/core/diagnostics/data_integrity_log.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/drift/notes_database_connection.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/drawing_tool.dart';
+import 'package:program/features/notebook/domain/ink_stroke.dart';
+import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 
 void main() {
@@ -26,6 +32,107 @@ void main() {
       expect(saved?.pages, hasLength(1));
     },
   );
+
+  test(
+    'saveNotebookPages updates one page and refreshes backup cache',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final notebook = await repository.createNotebook();
+      final secondPage = NotePage(
+        id: 'second-page',
+        title: 'Second page',
+        textBlocks: const [],
+        imageBlocks: const [],
+        inkStrokes: const [],
+        isBookmarked: false,
+        indexTabs: const [],
+      );
+      final twoPages = notebook.copyWith(
+        pages: [...notebook.pages, secondPage],
+        updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      );
+      await repository.saveNotebook(twoPages);
+      await repository.fetchNotebooks();
+
+      final changedPage = twoPages.pages.first.copyWith(title: 'Changed page');
+      final changed = twoPages.copyWith(
+        pages: [changedPage, secondPage],
+        updatedAt: twoPages.updatedAt.add(const Duration(seconds: 1)),
+      );
+
+      expect(
+        await repository.saveNotebookPages(changed, {changedPage.id}),
+        isTrue,
+      );
+      final saved = await repository.getNotebook(notebook.uid);
+      expect(saved?.pages.map((page) => page.title), [
+        'Changed page',
+        'Second page',
+      ]);
+      expect(
+        repository.cachedNotebooks?.single.pages.first.title,
+        'Changed page',
+      );
+    },
+  );
+
+  test('saveNotebookPages rolls back when replacing a page fails', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final duplicateStroke = InkStroke(
+      id: 'duplicate-stroke',
+      points: const [InkPoint(dx: 1, dy: 1, pressure: 0.5)],
+      color: const Color(0xFF000000),
+      width: 2,
+      tool: DrawingTool.pen,
+    );
+    final brokenPage = notebook.pages.single.copyWith(
+      title: 'Must roll back',
+      inkStrokes: [duplicateStroke, duplicateStroke],
+    );
+    final broken = notebook.copyWith(
+      pages: [brokenPage],
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+    );
+
+    await expectLater(
+      repository.saveNotebookPages(broken, {brokenPage.id}),
+      throwsA(anything),
+    );
+
+    final saved = await repository.getNotebook(notebook.uid);
+    expect(saved?.pages.single.title, 'Page 1');
+    expect(saved?.pages.single.inkStrokes, isEmpty);
+  });
+
+  test('local page save advances a future persisted timestamp', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final future = notebook.copyWith(
+      updatedAt: notebook.updatedAt.add(const Duration(days: 1)),
+    );
+    expect(await repository.saveNotebook(future), isTrue);
+
+    final changedPage = future.pages.single.copyWith(title: 'Clock safe');
+    final clockWentBack = future.copyWith(
+      pages: [changedPage],
+      updatedAt: notebook.updatedAt,
+    );
+    expect(
+      await repository.saveNotebookPages(clockWentBack, {changedPage.id}),
+      isTrue,
+    );
+
+    final saved = await repository.getNotebook(notebook.uid);
+    expect(saved?.pages.single.title, 'Clock safe');
+    expect(saved!.updatedAt.isAfter(future.updatedAt), isTrue);
+  });
 
   test(
     'database open retries transient failures without resetting data',
@@ -155,6 +262,159 @@ void main() {
 
     final saved = await repository.getNotebook(notebook.uid);
     expect(saved?.pages, hasLength(1));
+  });
+
+  test('suspicious full save records before and attempted evidence', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final incidents = <DataIntegrityIncident>[];
+    final beforeSnapshots = <Notebook>[];
+    final attemptedSnapshots = <Notebook>[];
+    final repository = NotebookRepository(
+      database,
+      dataIntegrityIncidentHandler: (incident, before, attempted) async {
+        incidents.add(incident);
+        beforeSnapshots.add(before);
+        attemptedSnapshots.add(attempted);
+      },
+    );
+    final notebook = await repository.createNotebook();
+    final stroke = InkStroke(
+      id: 'important-stroke',
+      points: const [InkPoint(dx: 10, dy: 20, pressure: 0.7)],
+      color: const Color(0xFF000000),
+      width: 2,
+      tool: DrawingTool.pen,
+    );
+    final withContent = notebook.copyWith(
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        notebook.pages.single.copyWith(inkStrokes: [stroke]),
+      ],
+    );
+    expect(await repository.saveNotebook(withContent), isTrue);
+
+    final emptied = withContent.copyWith(
+      updatedAt: withContent.updatedAt.add(const Duration(seconds: 1)),
+      pages: [withContent.pages.single.copyWith(inkStrokes: const [])],
+    );
+    expect(await repository.saveNotebook(emptied), isTrue);
+
+    expect(incidents, hasLength(1));
+    expect(incidents.single.operation, 'saveNotebook');
+    expect(incidents.single.notebookUid, notebook.uid);
+    expect(incidents.single.reasons, contains('all_content_removed'));
+    expect(incidents.single.before['inkStrokes'], 1);
+    expect(incidents.single.attempted['inkStrokes'], 0);
+    expect(incidents.single.stackTrace, contains('saveNotebook'));
+    expect(beforeSnapshots.single.pages.single.inkStrokes, hasLength(1));
+    expect(attemptedSnapshots.single.pages.single.inkStrokes, isEmpty);
+  });
+
+  test('suspicious page save identifies the affected page', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final incidents = <DataIntegrityIncident>[];
+    final repository = NotebookRepository(
+      database,
+      dataIntegrityIncidentHandler: (incident, _, _) async {
+        incidents.add(incident);
+      },
+    );
+    final notebook = await repository.createNotebook();
+    final stroke = InkStroke(
+      id: 'page-stroke',
+      points: const [InkPoint(dx: 1, dy: 2, pressure: 0.5)],
+      color: const Color(0xFF000000),
+      width: 2,
+      tool: DrawingTool.pen,
+    );
+    final pageWithContent = notebook.pages.single.copyWith(
+      inkStrokes: [stroke],
+    );
+    final withContent = notebook.copyWith(
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      pages: [pageWithContent],
+    );
+    expect(await repository.saveNotebook(withContent), isTrue);
+
+    final emptiedPage = pageWithContent.copyWith(inkStrokes: const []);
+    final emptied = withContent.copyWith(
+      updatedAt: withContent.updatedAt.add(const Duration(seconds: 1)),
+      pages: [emptiedPage],
+    );
+    expect(
+      await repository.saveNotebookPages(emptied, {emptiedPage.id}),
+      isTrue,
+    );
+
+    expect(incidents, hasLength(1));
+    expect(incidents.single.operation, 'saveNotebookPages');
+    expect(incidents.single.affectedPageIds, [emptiedPage.id]);
+    expect(
+      incidents.single.reasons,
+      contains('page:${emptiedPage.id}:all_content_removed'),
+    );
+  });
+
+  test(
+    'ordinary content update does not create an integrity incident',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final incidents = <DataIntegrityIncident>[];
+      final repository = NotebookRepository(
+        database,
+        dataIntegrityIncidentHandler: (incident, _, _) async {
+          incidents.add(incident);
+        },
+      );
+      final notebook = await repository.createNotebook();
+      final changed = notebook.copyWith(
+        title: 'Ordinary rename',
+        updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      );
+
+      expect(await repository.saveNotebook(changed), isTrue);
+      expect(incidents, isEmpty);
+    },
+  );
+
+  test('failed evidence recording prevents a suspicious overwrite', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(
+      database,
+      dataIntegrityIncidentHandler: (_, _, _) async {
+        throw StateError('evidence storage unavailable');
+      },
+    );
+    final notebook = await repository.createNotebook();
+    final stroke = InkStroke(
+      id: 'protected-stroke',
+      points: const [InkPoint(dx: 4, dy: 5, pressure: 0.8)],
+      color: const Color(0xFF000000),
+      width: 2,
+      tool: DrawingTool.pen,
+    );
+    final withContent = notebook.copyWith(
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        notebook.pages.single.copyWith(inkStrokes: [stroke]),
+      ],
+    );
+    expect(await repository.saveNotebook(withContent), isTrue);
+    final emptied = withContent.copyWith(
+      updatedAt: withContent.updatedAt.add(const Duration(seconds: 1)),
+      pages: [withContent.pages.single.copyWith(inkStrokes: const [])],
+    );
+
+    await expectLater(
+      repository.saveNotebook(emptied),
+      throwsA(isA<StateError>()),
+    );
+    final persisted = await repository.getNotebook(notebook.uid);
+    expect(persisted?.pages.single.inkStrokes, hasLength(1));
   });
 
   test(

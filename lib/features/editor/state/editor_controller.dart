@@ -26,6 +26,7 @@ import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/text_block.dart';
+import '../../../core/input/ink_activity_tracker.dart';
 import '../../../core/storage/text_storage.dart';
 import 'editor_actions.dart';
 import 'input_mode.dart';
@@ -119,6 +120,9 @@ class EditorController extends ChangeNotifier {
   final Set<String> _dirtyLocalBackgroundIds = <String>{};
   Timer? _prefsSaveDebounce;
   Timer? _notebookSaveDebounce;
+  final Set<String> _dirtyPageIds = <String>{};
+  bool _fullSavePending = false;
+  bool _isDisposed = false;
 
   String? lastTextFontFamily;
   double lastTextFontSize = 18.0;
@@ -183,9 +187,12 @@ class EditorController extends ChangeNotifier {
       _prefsSaveDebounce?.cancel();
       unawaited(_saveEditorPrefs());
     }
-    if (_notebookSaveDebounce != null) {
+    if (_notebookSaveDebounce != null ||
+        _fullSavePending ||
+        _dirtyPageIds.isNotEmpty) {
       unawaited(_save());
     }
+    _isDisposed = true;
     lassoDragDelta.dispose();
     inkRevision.dispose();
     historyRevision.dispose();
@@ -2595,7 +2602,7 @@ class EditorController extends ChangeNotifier {
     }
     _undoActions.add(UpdateTextAction(before: before, after: after));
     _redoActions.clear();
-    _scheduleSave();
+    _scheduleSave(pageId: pages[pageIndex].id);
   }
 
   void _discardActiveTextEdit() {
@@ -2603,19 +2610,72 @@ class EditorController extends ChangeNotifier {
     _activeTextEditBefore = null;
   }
 
-  void _scheduleSave() {
+  void _scheduleSave({String? pageId}) {
+    final dirtyPageId = pageId ?? currentPage.id;
+    _dirtyPageIds.add(dirtyPageId);
+    _armSaveTimer();
+  }
+
+  void _armSaveTimer() {
+    if (_isDisposed) {
+      return;
+    }
     _notebookSaveDebounce?.cancel();
     _notebookSaveDebounce = Timer(_inkSaveDebounceDelay, () {
       _notebookSaveDebounce = null;
-      unawaited(_save());
+      if (InkActivityTracker.instance.isBusy) {
+        _armSaveTimer();
+        return;
+      }
+      unawaited(_fullSavePending ? _save() : _saveDirtyPages());
     });
+  }
+
+  Future<void> _saveDirtyPages() async {
+    if (_dirtyPageIds.isEmpty) {
+      return;
+    }
+    final pageIds = Set<String>.of(_dirtyPageIds);
+    _dirtyPageIds.removeAll(pageIds);
+    final updated = notebook.copyWith(pages: pages, updatedAt: DateTime.now());
+    try {
+      final saved = await repository.saveNotebookPages(updated, pageIds);
+      if (!saved) {
+        _dirtyPageIds.addAll(pageIds);
+        _armSaveTimer();
+      }
+    } catch (error, stackTrace) {
+      _dirtyPageIds.addAll(pageIds);
+      debugPrint(
+        'EditorController._saveDirtyPages failed: $error\n$stackTrace',
+      );
+      _armSaveTimer();
+    }
   }
 
   Future<void> _save() async {
     _notebookSaveDebounce?.cancel();
     _notebookSaveDebounce = null;
-    final updated = notebook.copyWith(pages: pages, updatedAt: DateTime.now());
-    await repository.saveNotebook(updated);
+    _fullSavePending = true;
+    final savedPages = pages;
+    final updated = notebook.copyWith(
+      pages: savedPages,
+      updatedAt: DateTime.now(),
+    );
+    try {
+      final saved = await repository.saveNotebook(
+        updated,
+        preserveMetadata: true,
+      );
+      if (saved && identical(pages, savedPages)) {
+        _fullSavePending = false;
+        _dirtyPageIds.clear();
+        return;
+      }
+    } catch (error, stackTrace) {
+      debugPrint('EditorController._save failed: $error\n$stackTrace');
+    }
+    _armSaveTimer();
   }
 }
 

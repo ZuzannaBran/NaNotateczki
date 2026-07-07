@@ -122,6 +122,10 @@ void main() {
       expect(result, contains('activePaintUsAvg='));
       expect(result, contains('inputToPaintUsAvg='));
       expect(result, contains('inputToPaintUsMax='));
+      expect(
+        _metric(result, 'frameUsAvg'),
+        lessThanOrEqualTo(_metric(result, 'frameUsMax')),
+      );
       if (scenario.name != 'warmup') {
         debugPrint(
           'INK_BENCHMARK scenario=${scenario.name} '
@@ -139,6 +143,11 @@ void main() {
     }
     debugPrint = previousDebugPrint;
   });
+}
+
+int _metric(String log, String name) {
+  final match = RegExp('$name=(\\d+)').firstMatch(log);
+  return int.parse(match!.group(1)!);
 }
 
 Notebook _notebookFor(_BenchmarkScenario scenario) {

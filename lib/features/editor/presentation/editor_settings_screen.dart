@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/diagnostics/data_integrity_log.dart';
 import '../../../core/diagnostics/optimization_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../core/input/app_preferences_controller.dart';
@@ -153,6 +154,24 @@ class EditorSettingsScreen extends StatelessWidget {
                         },
                       ),
                       AnimatedBuilder(
+                        animation: DataIntegrityLog.instance,
+                        builder: (context, _) {
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
+                            title: const Text('Data integrity'),
+                            subtitle: Text(
+                              DataIntegrityLog.instance.isEmpty
+                                  ? 'No suspicious saves recorded.'
+                                  : '${DataIntegrityLog.instance.length} recorded.',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => _showDataIntegrityDialog(context),
+                          );
+                        },
+                      ),
+                      AnimatedBuilder(
                         animation: OptimizationLog.instance,
                         builder: (context, _) {
                           return ListTile(
@@ -283,6 +302,93 @@ Future<void> _showErrorsDialog(BuildContext context) {
                   }
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Errors copied.')),
+                  );
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Copy'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+Future<void> _showDataIntegrityDialog(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder: (context) {
+      return AnimatedBuilder(
+        animation: DataIntegrityLog.instance,
+        builder: (context, _) {
+          final logText = DataIntegrityLog.instance.toClipboardText();
+          return AlertDialog(
+            title: const Text('Data integrity'),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      DataIntegrityLog.instance.isEmpty
+                          ? 'No suspicious saves recorded.'
+                          : '${DataIntegrityLog.instance.length} suspicious saves recorded.',
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Each entry identifies the write path, reasons, content '
+                      'counts before and after, evidence archive, and stack trace.',
+                    ),
+                    const SizedBox(height: 12),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: const Text('Evidence'),
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          constraints: const BoxConstraints(maxHeight: 280),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).dividerColor,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: SingleChildScrollView(
+                            child: SelectableText(
+                              logText,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: DataIntegrityLog.instance.isEmpty
+                    ? null
+                    : DataIntegrityLog.instance.clear,
+                child: const Text('Clear'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: logText));
+                  if (!context.mounted) {
+                    return;
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Evidence copied.')),
                   );
                 },
                 icon: const Icon(Icons.copy),

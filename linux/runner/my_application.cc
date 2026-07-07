@@ -144,7 +144,9 @@ static gboolean stylus_key_event_cb(GtkWidget* widget, GdkEventKey* event,
   }
 
   send_stylus_button_state(self, pressed, event->hardware_keycode, "key");
-  return FALSE;
+  // Keep tablet-pad keys out of Flutter's keyboard state machine. Some Linux
+  // drivers emit releases without a matching keyboard press.
+  return TRUE;
 }
 
 // Implements GApplication::activate.

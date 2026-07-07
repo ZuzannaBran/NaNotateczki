@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,9 +13,17 @@ import '../../features/notebook/domain/notebook.dart';
 import 'backup_eraser_flattening.dart';
 
 class LocalBackupService {
-  LocalBackupService(this.repository);
+  LocalBackupService(
+    this.repository, {
+    Future<Directory> Function()? documentsDirectory,
+  }) : _documentsDirectory =
+           documentsDirectory ?? getApplicationDocumentsDirectory;
 
   final NotebookRepository repository;
+  final Future<Directory> Function() _documentsDirectory;
+  final ValueNotifier<bool> _snapshotInProgress = ValueNotifier(false);
+
+  ValueListenable<bool> get snapshotInProgress => _snapshotInProgress;
 
   static const _dirName = 'local_backup';
   static const _incrementalDirName = 'notebooks';
@@ -23,7 +33,7 @@ class LocalBackupService {
   static const _webBackupKey = 'local_backup_web.json';
 
   Future<Directory> _backupDir() async {
-    final docs = await getApplicationDocumentsDirectory();
+    final docs = await _documentsDirectory();
     final dir = Directory('${docs.path}/$_dirName');
     if (!await dir.exists()) {
       await dir.create(recursive: true);
@@ -62,13 +72,18 @@ class LocalBackupService {
     return dir;
   }
 
-  Future<BackupSnapshotReport> snapshot(List<Notebook> items) async {
+  Future<BackupSnapshotReport> snapshot(
+    List<Notebook> items, {
+    bool Function()? shouldInterrupt,
+  }) async {
+    _snapshotInProgress.value = true;
     try {
       if (kIsWeb) {
         return _snapshotForWeb(items);
       }
       final totalStopwatch = Stopwatch()..start();
       final notebooksDir = await _notebooksDir();
+      final previousUpdates = await _readManifestUpdates();
       final expectedFiles = <String>{};
       final notebookReports = <NotebookBackupReport>[];
       var readCompareMs = 0;
@@ -76,18 +91,38 @@ class LocalBackupService {
       var manifestMs = 0;
       var staleMoved = 0;
       for (final notebook in items) {
+        _throwIfInterrupted(shouldInterrupt);
         final notebookStopwatch = Stopwatch()..start();
-        final flattenStopwatch = Stopwatch()..start();
-        final backupNotebook = flattenErasersForBackup(notebook);
-        flattenStopwatch.stop();
-        final encodeStopwatch = Stopwatch()..start();
-        final encoded = repository.encodeNotebooks([backupNotebook]).single;
-        encodeStopwatch.stop();
-        final jsonStopwatch = Stopwatch()..start();
-        final content = jsonEncode(encoded);
-        jsonStopwatch.stop();
         final file = await _notebookFile(notebook.uid);
         expectedFiles.add(file.path);
+        if (previousUpdates[notebook.uid] == notebook.updatedAt &&
+            await file.exists()) {
+          notebookStopwatch.stop();
+          notebookReports.add(
+            NotebookBackupReport(
+              uid: notebook.uid,
+              pages: notebook.pages.length,
+              strokes: _strokeCount(notebook),
+              points: _pointCount(notebook),
+              jsonBytes: await file.length(),
+              flattenMs: 0,
+              encodeMs: 0,
+              jsonMs: 0,
+              compareMs: 0,
+              writeMs: 0,
+              totalMs: notebookStopwatch.elapsedMilliseconds,
+              changed: false,
+            ),
+          );
+          continue;
+        }
+        final workerResult = await _runBackupWorker<_BackupWorkerResult>(
+          _BackupWorkerOperation.snapshot,
+          notebook,
+          shouldInterrupt,
+        );
+        final content = workerResult.content;
+        _throwIfInterrupted(shouldInterrupt);
         var compareMs = 0;
         var writeMs = 0;
         var changed = true;
@@ -95,6 +130,7 @@ class LocalBackupService {
           final compareStopwatch = Stopwatch()..start();
           final previous = await file.readAsString();
           compareStopwatch.stop();
+          _throwIfInterrupted(shouldInterrupt);
           compareMs = compareStopwatch.elapsedMilliseconds;
           readCompareMs += compareMs;
           if (previous == content) {
@@ -115,9 +151,9 @@ class LocalBackupService {
             strokes: _strokeCount(notebook),
             points: _pointCount(notebook),
             jsonBytes: utf8.encode(content).length,
-            flattenMs: flattenStopwatch.elapsedMilliseconds,
-            encodeMs: encodeStopwatch.elapsedMilliseconds,
-            jsonMs: jsonStopwatch.elapsedMilliseconds,
+            flattenMs: workerResult.flattenMs,
+            encodeMs: workerResult.encodeMs,
+            jsonMs: workerResult.jsonMs,
             compareMs: compareMs,
             writeMs: writeMs,
             totalMs: notebookStopwatch.elapsedMilliseconds,
@@ -126,6 +162,7 @@ class LocalBackupService {
         );
       }
 
+      _throwIfInterrupted(shouldInterrupt);
       final staleStopwatch = Stopwatch()..start();
       await for (final entity in notebooksDir.list()) {
         if (entity is File &&
@@ -181,10 +218,14 @@ class LocalBackupService {
         totalMs: totalStopwatch.elapsedMilliseconds,
         notebookReports: notebookReports,
       );
+    } on BackupSnapshotInterrupted {
+      rethrow;
     } catch (e, st) {
       debugPrint('LocalBackupService.snapshot failed: $e\n$st');
       AppErrorLog.instance.record(e, st, source: 'LocalBackupService.snapshot');
       rethrow;
+    } finally {
+      _snapshotInProgress.value = false;
     }
   }
 
@@ -197,6 +238,43 @@ class LocalBackupService {
           await (await _file(_latest)).exists();
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<Map<String, DateTime>> _readManifestUpdates() async {
+    final file = await _manifestFile();
+    if (!await file.exists()) {
+      return const <String, DateTime>{};
+    }
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map<String, dynamic>) {
+        return const <String, DateTime>{};
+      }
+      final entries = decoded['notebooks'];
+      if (entries is! List<dynamic>) {
+        return const <String, DateTime>{};
+      }
+      final updates = <String, DateTime>{};
+      for (final entry in entries.whereType<Map<String, dynamic>>()) {
+        final uid = entry['uid'];
+        final updatedAt = entry['updatedAt'];
+        if (uid is String && updatedAt is String) {
+          final parsed = DateTime.tryParse(updatedAt);
+          if (parsed != null) {
+            updates[uid] = parsed;
+          }
+        }
+      }
+      return updates;
+    } catch (_) {
+      return const <String, DateTime>{};
+    }
+  }
+
+  void _throwIfInterrupted(bool Function()? shouldInterrupt) {
+    if (shouldInterrupt?.call() ?? false) {
+      throw const BackupSnapshotInterrupted();
     }
   }
 
@@ -365,6 +443,105 @@ class LocalBackupService {
           );
     });
   }
+}
+
+enum _BackupWorkerOperation { snapshot }
+
+class _BackupWorkerResult {
+  const _BackupWorkerResult({
+    required this.content,
+    required this.flattenMs,
+    required this.encodeMs,
+    required this.jsonMs,
+  });
+
+  final String content;
+  final int flattenMs;
+  final int encodeMs;
+  final int jsonMs;
+}
+
+Future<T> _runBackupWorker<T>(
+  _BackupWorkerOperation operation,
+  Object message,
+  bool Function()? shouldInterrupt,
+) async {
+  if (shouldInterrupt?.call() ?? false) {
+    throw const BackupSnapshotInterrupted();
+  }
+  final resultPort = ReceivePort();
+  final completer = Completer<T>();
+  Isolate? isolate;
+  Timer? interruptTimer;
+  final subscription = resultPort.listen((message) {
+    if (completer.isCompleted) {
+      return;
+    }
+    final response = message as List<Object?>;
+    if (response[0] as bool) {
+      completer.complete(response[1] as T);
+      return;
+    }
+    completer.completeError(
+      RemoteError(response[1] as String, response[2] as String),
+    );
+  });
+  try {
+    isolate = await Isolate.spawn(_backupWorkerEntryPoint, <Object?>[
+      resultPort.sendPort,
+      operation.index,
+      message,
+    ]);
+    interruptTimer = Timer.periodic(const Duration(milliseconds: 8), (_) {
+      if (!completer.isCompleted && (shouldInterrupt?.call() ?? false)) {
+        isolate?.kill(priority: Isolate.immediate);
+        completer.completeError(const BackupSnapshotInterrupted());
+      }
+    });
+    return await completer.future;
+  } finally {
+    interruptTimer?.cancel();
+    isolate?.kill(priority: Isolate.immediate);
+    await subscription.cancel();
+    resultPort.close();
+  }
+}
+
+void _backupWorkerEntryPoint(List<Object?> request) {
+  final sendPort = request[0] as SendPort;
+  try {
+    final operation = _BackupWorkerOperation.values[request[1] as int];
+    final result = switch (operation) {
+      _BackupWorkerOperation.snapshot => _createBackupPayload(
+        request[2] as Notebook,
+      ),
+    };
+    sendPort.send(<Object?>[true, result]);
+  } catch (error, stackTrace) {
+    sendPort.send(<Object?>[false, error.toString(), stackTrace.toString()]);
+  }
+}
+
+_BackupWorkerResult _createBackupPayload(Notebook notebook) {
+  final flattenStopwatch = Stopwatch()..start();
+  final backupNotebook = flattenErasersForBackup(notebook);
+  flattenStopwatch.stop();
+  final encodeStopwatch = Stopwatch()..start();
+  final encoded = NotebookRepository.encodeNotebook(backupNotebook);
+  encodeStopwatch.stop();
+  final jsonStopwatch = Stopwatch()..start();
+  final content = jsonEncode(encoded);
+  jsonStopwatch.stop();
+  return _BackupWorkerResult(
+    content: content,
+    flattenMs: flattenStopwatch.elapsedMilliseconds,
+    encodeMs: encodeStopwatch.elapsedMilliseconds,
+    jsonMs: jsonStopwatch.elapsedMilliseconds,
+  );
+}
+
+class BackupSnapshotInterrupted implements Exception {
+  const BackupSnapshotInterrupted();
 }
 
 class BackupSnapshotReport {

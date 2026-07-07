@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/diagnostics/data_integrity_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../data/drift/notes_database.dart';
 import '../domain/drawing_tool.dart';
@@ -18,28 +19,43 @@ import '../domain/notebook_kind.dart';
 import '../domain/note_page.dart';
 import '../domain/text_block.dart';
 
+typedef DataIntegrityIncidentHandler =
+    Future<void> Function(
+      DataIntegrityIncident incident,
+      Notebook before,
+      Notebook attempted,
+    );
+
 class NotebookRepository {
   NotebookRepository(
     this.database, {
     this.onChanged,
     void Function(Object error, StackTrace stackTrace, String source)?
     readErrorHandler,
-  }) : _readErrorHandler = readErrorHandler;
+    DataIntegrityIncidentHandler? dataIntegrityIncidentHandler,
+  }) : _readErrorHandler = readErrorHandler,
+       _dataIntegrityIncidentHandler = dataIntegrityIncidentHandler;
 
   final NotesDatabase database;
   final void Function()? onChanged;
   final void Function(Object error, StackTrace stackTrace, String source)?
   _readErrorHandler;
+  final DataIntegrityIncidentHandler? _dataIntegrityIncidentHandler;
   final Uuid _uuid = const Uuid();
   bool _lastFetchSkippedCorruptRows = false;
   final List<String> _lastCorruptNotebookIds = <String>[];
   final Map<String, DateTime> _latestPersistedUpdates = <String, DateTime>{};
   final Map<String, Future<void>> _saveTails = <String, Future<void>>{};
+  final Map<String, Notebook> _notebookCache = <String, Notebook>{};
+  bool _isNotebookCacheComplete = false;
 
   bool get lastFetchSkippedCorruptRows => _lastFetchSkippedCorruptRows;
   int get lastCorruptNotebookCount => _lastCorruptNotebookIds.length;
   List<String> get lastCorruptNotebookIds =>
       List.unmodifiable(_lastCorruptNotebookIds);
+  List<Notebook>? get cachedNotebooks => _isNotebookCacheComplete
+      ? List<Notebook>.unmodifiable(_notebookCache.values)
+      : null;
 
   Future<List<Notebook>> fetchNotebooks() async {
     try {
@@ -74,6 +90,14 @@ class NotebookRepository {
       _lastCorruptNotebookIds
         ..clear()
         ..addAll(corruptIds);
+      if (corruptIds.isEmpty) {
+        _notebookCache
+          ..clear()
+          ..addEntries(notebooks.map((item) => MapEntry(item.uid, item)));
+        _isNotebookCacheComplete = true;
+      } else {
+        _isNotebookCacheComplete = false;
+      }
       return notebooks;
     } catch (e, st) {
       debugPrint('fetchNotebooks failed: $e\n$st');
@@ -211,7 +235,10 @@ class NotebookRepository {
     }
   }
 
-  Future<bool> saveNotebook(Notebook notebook) async {
+  Future<bool> saveNotebook(
+    Notebook notebook, {
+    bool preserveMetadata = false,
+  }) async {
     if (notebook.pages.isEmpty) {
       throw ArgumentError.value(
         notebook.uid,
@@ -220,11 +247,16 @@ class NotebookRepository {
       );
     }
     final previous = _saveTails[notebook.uid] ?? Future<void>.value();
+    final requestStackTrace = StackTrace.current;
     final completion = Completer<void>();
     _saveTails[notebook.uid] = completion.future;
     try {
       await previous;
-      return await _saveNotebookNow(notebook);
+      return await _saveNotebookNow(
+        notebook,
+        requestStackTrace,
+        preserveMetadata: preserveMetadata,
+      );
     } finally {
       completion.complete();
       if (identical(_saveTails[notebook.uid], completion.future)) {
@@ -233,7 +265,111 @@ class NotebookRepository {
     }
   }
 
-  Future<bool> _saveNotebookNow(Notebook notebook) async {
+  Future<bool> saveNotebookPages(Notebook notebook, Set<String> pageIds) async {
+    if (pageIds.isEmpty) {
+      return true;
+    }
+    if (notebook.pages.isEmpty) {
+      throw ArgumentError.value(
+        notebook.uid,
+        'notebook.uid',
+        'Cannot save a notebook without pages.',
+      );
+    }
+    final previous = _saveTails[notebook.uid] ?? Future<void>.value();
+    final requestStackTrace = StackTrace.current;
+    final completion = Completer<void>();
+    _saveTails[notebook.uid] = completion.future;
+    try {
+      await previous;
+      return await _saveNotebookPagesNow(notebook, pageIds, requestStackTrace);
+    } finally {
+      completion.complete();
+      if (identical(_saveTails[notebook.uid], completion.future)) {
+        _saveTails.remove(notebook.uid);
+      }
+    }
+  }
+
+  Future<bool> _saveNotebookPagesNow(
+    Notebook notebook,
+    Set<String> pageIds,
+    StackTrace requestStackTrace,
+  ) async {
+    if (_lastCorruptNotebookIds.contains(notebook.uid)) {
+      return false;
+    }
+    final pagesById = <String, MapEntry<int, NotePage>>{
+      for (final entry in notebook.pages.asMap().entries)
+        if (pageIds.contains(entry.value.id)) entry.value.id: entry,
+    };
+    if (pagesById.length != pageIds.length) {
+      return false;
+    }
+    final existingRow = await (database.select(
+      database.notebookRows,
+    )..where((row) => row.uid.equals(notebook.uid))).getSingleOrNull();
+    if (existingRow == null) {
+      return false;
+    }
+    final existingResult = await _readNotebook(existingRow);
+    if (existingResult.hadCorruptRows) {
+      _markNotebookCorrupt(notebook.uid);
+      return false;
+    }
+    final attempted = _mergeSavedPages(
+      existingResult.notebook,
+      notebook,
+      pageIds,
+    );
+    await _protectSuspiciousOverwrite(
+      before: existingResult.notebook,
+      attempted: attempted,
+      operation: 'saveNotebookPages',
+      affectedPageIds: pageIds,
+      requestStackTrace: requestStackTrace,
+    );
+    DateTime? persistedAt;
+    final saved = await database.transaction(() async {
+      final existing = await (database.select(
+        database.notebookRows,
+      )..where((row) => row.uid.equals(notebook.uid))).getSingleOrNull();
+      if (existing == null) {
+        return false;
+      }
+      final trackedAt = _latestPersistedUpdates[notebook.uid];
+      final latestAt =
+          trackedAt != null && trackedAt.isAfter(existing.updatedAt)
+          ? trackedAt
+          : existing.updatedAt;
+      final updatedAt = notebook.updatedAt.isAfter(latestAt)
+          ? notebook.updatedAt
+          : latestAt.add(const Duration(seconds: 1));
+      persistedAt = updatedAt;
+      await (database.update(database.notebookRows)
+            ..where((row) => row.uid.equals(notebook.uid)))
+          .write(NotebookRowsCompanion(updatedAt: Value(updatedAt)));
+      for (final entry in pagesById.values) {
+        await _deletePageChildren(entry.value.id);
+        await _insertPage(notebook.uid, entry.value, entry.key);
+      }
+      return true;
+    });
+    if (saved) {
+      final savedAt = persistedAt!;
+      final persistedNotebook = notebook.copyWith(updatedAt: savedAt);
+      _latestPersistedUpdates[notebook.uid] = savedAt;
+      _notebookCache[notebook.uid] = persistedNotebook;
+      onChanged?.call();
+    }
+    return saved;
+  }
+
+  Future<bool> _saveNotebookNow(
+    Notebook notebook,
+    StackTrace requestStackTrace, {
+    bool preserveMetadata = false,
+  }) async {
     if (_lastCorruptNotebookIds.contains(notebook.uid)) {
       debugPrint(
         'NotebookRepository.saveNotebook rejected partially read notebook '
@@ -241,32 +377,80 @@ class NotebookRepository {
       );
       return false;
     }
-    final notebookToSave = await _persistInlineImages(notebook);
-
-    final saved = await database.transaction(() async {
-      final existing = await (database.select(
-        database.notebookRows,
-      )..where((row) => row.uid.equals(notebookToSave.uid))).getSingleOrNull();
-      final persistedAt = existing?.updatedAt;
-      final trackedAt = _latestPersistedUpdates[notebookToSave.uid];
+    final existingRow = await (database.select(
+      database.notebookRows,
+    )..where((row) => row.uid.equals(notebook.uid))).getSingleOrNull();
+    // The live editor owns page content, so its saves are authoritative and are
+    // stamped only monotonically below. External callers (sync/import) must not
+    // let an older snapshot clobber newer data.
+    if (!preserveMetadata) {
+      final persistedAt = existingRow?.updatedAt;
+      final trackedAt = _latestPersistedUpdates[notebook.uid];
       final latestAt =
           trackedAt != null &&
               (persistedAt == null || trackedAt.isAfter(persistedAt))
           ? trackedAt
           : persistedAt;
-      if (latestAt != null && latestAt.isAfter(notebookToSave.updatedAt)) {
+      if (latestAt != null && latestAt.isAfter(notebook.updatedAt)) {
         return false;
+      }
+    }
+    if (existingRow != null) {
+      final existingResult = await _readNotebook(existingRow);
+      if (existingResult.hadCorruptRows) {
+        _markNotebookCorrupt(notebook.uid);
+        return false;
+      }
+      await _protectSuspiciousOverwrite(
+        before: existingResult.notebook,
+        attempted: notebook,
+        operation: 'saveNotebook',
+        affectedPageIds: notebook.pages.map((page) => page.id).toSet(),
+        requestStackTrace: requestStackTrace,
+      );
+    }
+    final notebookToSave = await _persistInlineImages(notebook);
+
+    DateTime? persistedAt;
+    var effectiveTitle = notebookToSave.title;
+    var effectiveFolder = notebookToSave.folder;
+    final saved = await database.transaction(() async {
+      final existing = await (database.select(
+        database.notebookRows,
+      )..where((row) => row.uid.equals(notebookToSave.uid))).getSingleOrNull();
+      final existingAt = existing?.updatedAt;
+      final trackedAt = _latestPersistedUpdates[notebookToSave.uid];
+      final latestAt =
+          trackedAt != null &&
+              (existingAt == null || trackedAt.isAfter(existingAt))
+          ? trackedAt
+          : existingAt;
+      if (!preserveMetadata &&
+          latestAt != null &&
+          latestAt.isAfter(notebookToSave.updatedAt)) {
+        return false;
+      }
+      final updatedAt =
+          preserveMetadata &&
+              latestAt != null &&
+              !notebookToSave.updatedAt.isAfter(latestAt)
+          ? latestAt.add(const Duration(seconds: 1))
+          : notebookToSave.updatedAt;
+      persistedAt = updatedAt;
+      if (preserveMetadata && existing != null) {
+        effectiveTitle = existing.title;
+        effectiveFolder = existing.folder;
       }
       await database
           .into(database.notebookRows)
           .insertOnConflictUpdate(
             NotebookRowsCompanion.insert(
               uid: notebookToSave.uid,
-              title: notebookToSave.title,
+              title: effectiveTitle,
               kindIndex: notebookToSave.kind.indexValue,
-              folder: notebookToSave.folder,
+              folder: effectiveFolder,
               createdAt: notebookToSave.createdAt,
-              updatedAt: notebookToSave.updatedAt,
+              updatedAt: updatedAt,
             ),
           );
       await _deleteNotebookChildren(notebookToSave.uid);
@@ -276,7 +460,14 @@ class NotebookRepository {
       return true;
     });
     if (saved) {
-      _latestPersistedUpdates[notebookToSave.uid] = notebookToSave.updatedAt;
+      final savedAt = persistedAt!;
+      final persisted = notebookToSave.copyWith(
+        title: effectiveTitle,
+        folder: effectiveFolder,
+        updatedAt: savedAt,
+      );
+      _latestPersistedUpdates[notebookToSave.uid] = savedAt;
+      _notebookCache[notebookToSave.uid] = persisted;
       onChanged?.call();
     }
     return saved;
@@ -303,7 +494,7 @@ class NotebookRepository {
       final now = DateTime.now();
       final updatedAt = now.isAfter(latestAt)
           ? now
-          : latestAt.add(const Duration(microseconds: 1));
+          : latestAt.add(const Duration(seconds: 1));
       await (database.update(
         database.notebookRows,
       )..where((row) => row.uid.equals(uid))).write(
@@ -321,6 +512,7 @@ class NotebookRepository {
     });
     if (updated != null) {
       _latestPersistedUpdates[uid] = preciseUpdatedAt!;
+      _notebookCache[uid] = updated;
       onChanged?.call();
     }
     return updated;
@@ -385,6 +577,166 @@ class NotebookRepository {
     return path.contains('/images_cache/') || path.contains('\\images_cache\\');
   }
 
+  Notebook _mergeSavedPages(
+    Notebook before,
+    Notebook incoming,
+    Set<String> pageIds,
+  ) {
+    final incomingById = {
+      for (final page in incoming.pages)
+        if (pageIds.contains(page.id)) page.id: page,
+    };
+    return before.copyWith(
+      updatedAt: incoming.updatedAt,
+      pages: [for (final page in before.pages) incomingById[page.id] ?? page],
+    );
+  }
+
+  Future<void> _protectSuspiciousOverwrite({
+    required Notebook before,
+    required Notebook attempted,
+    required String operation,
+    required Set<String> affectedPageIds,
+    required StackTrace requestStackTrace,
+  }) async {
+    final beforeSummary = _NotebookContentSummary.fromNotebook(before);
+    final attemptedSummary = _NotebookContentSummary.fromNotebook(attempted);
+    final reasons = _suspiciousReductionReasons(
+      beforeSummary,
+      attemptedSummary,
+    );
+    final beforePages = {for (final page in before.pages) page.id: page};
+    final attemptedPages = {for (final page in attempted.pages) page.id: page};
+    for (final pageId in affectedPageIds) {
+      final beforePage = beforePages[pageId];
+      final attemptedPage = attemptedPages[pageId];
+      if (beforePage == null || attemptedPage == null) {
+        continue;
+      }
+      final pageReasons = _suspiciousReductionReasons(
+        _NotebookContentSummary.fromPages([beforePage]),
+        _NotebookContentSummary.fromPages([attemptedPage]),
+      );
+      reasons.addAll(pageReasons.map((reason) => 'page:$pageId:$reason'));
+    }
+    if (reasons.isEmpty) {
+      return;
+    }
+
+    final incident = DataIntegrityIncident(
+      id: _uuid.v4(),
+      occurredAt: DateTime.now(),
+      operation: operation,
+      notebookUid: before.uid,
+      notebookTitle: before.title,
+      reasons: reasons,
+      affectedPageIds: affectedPageIds.toList()..sort(),
+      before: beforeSummary.toJson(),
+      attempted: attemptedSummary.toJson(),
+      stackTrace: requestStackTrace.toString(),
+    );
+    final handler = _dataIntegrityIncidentHandler;
+    if (handler != null) {
+      await handler(incident, before, attempted);
+      return;
+    }
+    await _recordDataIntegrityIncident(incident, before, attempted);
+  }
+
+  Future<void> _recordDataIntegrityIncident(
+    DataIntegrityIncident incident,
+    Notebook before,
+    Notebook attempted,
+  ) async {
+    String? archivePath;
+    if (!kIsWeb) {
+      try {
+        archivePath = await _archiveDataIntegrityIncident(
+          incident,
+          before,
+          attempted,
+        );
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'NotebookRepository.dataIntegrityArchive(${incident.id})',
+        );
+        throw DataIntegrityProtectionException(
+          'Suspicious save blocked because its evidence archive failed. '
+          'incidentId=${incident.id}, notebookUid=${incident.notebookUid}',
+        );
+      }
+    }
+
+    final recorded = incident.copyWith(archivePath: archivePath);
+    try {
+      await DataIntegrityLog.instance.record(recorded);
+    } catch (e, st) {
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'NotebookRepository.dataIntegrityLog(${incident.id})',
+      );
+      if (archivePath == null) {
+        throw DataIntegrityProtectionException(
+          'Suspicious save blocked because no evidence could be persisted. '
+          'incidentId=${incident.id}, notebookUid=${incident.notebookUid}',
+        );
+      }
+    }
+    AppErrorLog.instance.record(
+      DataIntegrityProtectionException(
+        'Suspicious content reduction quarantined before write. '
+        'incidentId=${incident.id}, notebookUid=${incident.notebookUid}, '
+        'reasons=${incident.reasons.join(',')}, '
+        'archivePath=${archivePath ?? 'data_integrity_log.json'}',
+      ),
+      StackTrace.fromString(incident.stackTrace),
+      source: 'NotebookRepository.${incident.operation}.dataIntegrity',
+    );
+    debugPrint('[data-integrity] ${recorded.format()}');
+  }
+
+  Future<String> _archiveDataIntegrityIncident(
+    DataIntegrityIncident incident,
+    Notebook before,
+    Notebook attempted,
+  ) async {
+    final docs = await getApplicationDocumentsDirectory();
+    final archiveDir = Directory('${docs.path}/data_integrity_incidents');
+    if (!await archiveDir.exists()) {
+      await archiveDir.create(recursive: true);
+    }
+    final timestamp = incident.occurredAt.toIso8601String().replaceAll(
+      ':',
+      '-',
+    );
+    final file = File(
+      '${archiveDir.path}/${timestamp}_${incident.id}_'
+      '${Uri.encodeComponent(incident.notebookUid)}.json',
+    );
+    final recorded = incident.copyWith(archivePath: file.path);
+    await file.writeAsString(
+      jsonEncode({
+        'version': 1,
+        'incident': recorded.toJson(),
+        'before': encodeNotebook(before),
+        'attempted': encodeNotebook(attempted),
+      }),
+      flush: true,
+    );
+    return file.path;
+  }
+
+  void _markNotebookCorrupt(String uid) {
+    _lastFetchSkippedCorruptRows = true;
+    if (!_lastCorruptNotebookIds.contains(uid)) {
+      _lastCorruptNotebookIds.add(uid);
+    }
+    _isNotebookCacheComplete = false;
+  }
+
   Future<void> deleteNotebook(String uid) async {
     final notebook = await getNotebook(uid);
     if (notebook != null) {
@@ -397,12 +749,16 @@ class NotebookRepository {
       )..where((item) => item.uid.equals(uid))).go();
     });
     _latestPersistedUpdates.remove(uid);
+    _notebookCache.remove(uid);
     onChanged?.call();
   }
 
   List<Map<String, dynamic>> encodeNotebooks(List<Notebook> items) {
-    return items.map(_notebookToJson).toList();
+    return items.map(encodeNotebook).toList();
   }
+
+  static Map<String, dynamic> encodeNotebook(Notebook notebook) =>
+      _notebookToJson(notebook);
 
   List<Notebook> decodeNotebooks(List<dynamic> items) {
     return items
@@ -587,7 +943,7 @@ class NotebookRepository {
   ) async {
     await database
         .into(database.pageRows)
-        .insert(
+        .insertOnConflictUpdate(
           PageRowsCompanion.insert(
             uid: page.id,
             notebookUid: notebookUid,
@@ -627,22 +983,26 @@ class NotebookRepository {
       database.pageRows,
     )..where((item) => item.notebookUid.equals(notebookUid))).get();
     for (final page in pages) {
-      await (database.delete(
-        database.indexTabRows,
-      )..where((item) => item.pageUid.equals(page.uid))).go();
-      await (database.delete(
-        database.textBlockRows,
-      )..where((item) => item.pageUid.equals(page.uid))).go();
-      await (database.delete(
-        database.imageBlockRows,
-      )..where((item) => item.pageUid.equals(page.uid))).go();
-      await (database.delete(
-        database.inkStrokeRows,
-      )..where((item) => item.pageUid.equals(page.uid))).go();
+      await _deletePageChildren(page.uid);
     }
     await (database.delete(
       database.pageRows,
     )..where((item) => item.notebookUid.equals(notebookUid))).go();
+  }
+
+  Future<void> _deletePageChildren(String pageUid) async {
+    await (database.delete(
+      database.indexTabRows,
+    )..where((item) => item.pageUid.equals(pageUid))).go();
+    await (database.delete(
+      database.textBlockRows,
+    )..where((item) => item.pageUid.equals(pageUid))).go();
+    await (database.delete(
+      database.imageBlockRows,
+    )..where((item) => item.pageUid.equals(pageUid))).go();
+    await (database.delete(
+      database.inkStrokeRows,
+    )..where((item) => item.pageUid.equals(pageUid))).go();
   }
 
   String _buildRecoveredTitle(String title, String reason) {
@@ -802,7 +1162,7 @@ class NotebookRepository {
         .toList();
   }
 
-  Map<String, dynamic> _notebookToJson(Notebook notebook) {
+  static Map<String, dynamic> _notebookToJson(Notebook notebook) {
     return {
       'uid': notebook.uid,
       'title': notebook.title,
@@ -829,7 +1189,7 @@ class NotebookRepository {
     );
   }
 
-  Map<String, dynamic> _pageToJson(NotePage page) {
+  static Map<String, dynamic> _pageToJson(NotePage page) {
     return {
       'id': page.id,
       'title': page.title,
@@ -864,7 +1224,7 @@ class NotebookRepository {
     );
   }
 
-  Map<String, dynamic> _indexTabToJson(IndexTab tab) {
+  static Map<String, dynamic> _indexTabToJson(IndexTab tab) {
     return {
       'id': tab.id,
       'color': tab.color.toARGB32(),
@@ -897,7 +1257,7 @@ class NotebookRepository {
     );
   }
 
-  Map<String, dynamic> _textToJson(TextBlock block) {
+  static Map<String, dynamic> _textToJson(TextBlock block) {
     return {
       'id': block.id,
       'text': block.text,
@@ -927,7 +1287,7 @@ class NotebookRepository {
     );
   }
 
-  Map<String, dynamic> _imageToJson(ImageBlock block) {
+  static Map<String, dynamic> _imageToJson(ImageBlock block) {
     final bytesBase64 = _bytesToBase64(_imageBytesForJson(block));
     return {
       'id': block.id,
@@ -970,7 +1330,7 @@ class NotebookRepository {
     );
   }
 
-  Uint8List? _imageBytesForJson(ImageBlock block) {
+  static Uint8List? _imageBytesForJson(ImageBlock block) {
     final bytes = block.bytes;
     if (bytes != null && bytes.isNotEmpty) {
       return bytes;
@@ -993,7 +1353,7 @@ class NotebookRepository {
     }
   }
 
-  Map<String, dynamic> _strokeToJson(InkStroke stroke) {
+  static Map<String, dynamic> _strokeToJson(InkStroke stroke) {
     return {
       'id': stroke.id,
       'color': stroke.color.toARGB32(),
@@ -1039,7 +1399,7 @@ class NotebookRepository {
     return values[index];
   }
 
-  int _toolToIndex(DrawingTool tool) => tool.index;
+  static int _toolToIndex(DrawingTool tool) => tool.index;
 
   Uint8List? _bytesFromEntity(Uint8List? bytes) {
     if (bytes == null || bytes.isEmpty) {
@@ -1048,7 +1408,7 @@ class NotebookRepository {
     return Uint8List.fromList(bytes);
   }
 
-  String? _bytesToBase64(Uint8List? bytes) {
+  static String? _bytesToBase64(Uint8List? bytes) {
     if (bytes == null || bytes.isEmpty) {
       return null;
     }
@@ -1082,4 +1442,107 @@ class _PageReadResult {
 
   final NotePage page;
   final bool hadCorruptRows;
+}
+
+class DataIntegrityProtectionException implements Exception {
+  const DataIntegrityProtectionException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'DataIntegrityProtectionException: $message';
+}
+
+class _NotebookContentSummary {
+  const _NotebookContentSummary({
+    required this.pages,
+    required this.textBlocks,
+    required this.textCharacters,
+    required this.imageBlocks,
+    required this.inkStrokes,
+    required this.inkPoints,
+    required this.indexTabs,
+  });
+
+  factory _NotebookContentSummary.fromNotebook(Notebook notebook) {
+    return _NotebookContentSummary.fromPages(notebook.pages);
+  }
+
+  factory _NotebookContentSummary.fromPages(List<NotePage> pages) {
+    var textBlocks = 0;
+    var textCharacters = 0;
+    var imageBlocks = 0;
+    var inkStrokes = 0;
+    var inkPoints = 0;
+    var indexTabs = 0;
+    for (final page in pages) {
+      textBlocks += page.textBlocks.length;
+      textCharacters += page.textBlocks.fold<int>(
+        0,
+        (sum, block) => sum + block.text.length,
+      );
+      imageBlocks += page.imageBlocks.length;
+      inkStrokes += page.inkStrokes.length;
+      inkPoints += page.inkStrokes.fold<int>(
+        0,
+        (sum, stroke) => sum + stroke.points.length,
+      );
+      indexTabs += page.indexTabs.length;
+    }
+    return _NotebookContentSummary(
+      pages: pages.length,
+      textBlocks: textBlocks,
+      textCharacters: textCharacters,
+      imageBlocks: imageBlocks,
+      inkStrokes: inkStrokes,
+      inkPoints: inkPoints,
+      indexTabs: indexTabs,
+    );
+  }
+
+  final int pages;
+  final int textBlocks;
+  final int textCharacters;
+  final int imageBlocks;
+  final int inkStrokes;
+  final int inkPoints;
+  final int indexTabs;
+
+  int get contentItems => textBlocks + imageBlocks + inkStrokes;
+
+  int get contentScore =>
+      textCharacters + imageBlocks * 100 + inkStrokes * 10 + inkPoints;
+
+  Map<String, int> toJson() {
+    return {
+      'pages': pages,
+      'textBlocks': textBlocks,
+      'textCharacters': textCharacters,
+      'imageBlocks': imageBlocks,
+      'inkStrokes': inkStrokes,
+      'inkPoints': inkPoints,
+      'indexTabs': indexTabs,
+      'contentItems': contentItems,
+      'contentScore': contentScore,
+    };
+  }
+}
+
+List<String> _suspiciousReductionReasons(
+  _NotebookContentSummary before,
+  _NotebookContentSummary attempted,
+) {
+  final reasons = <String>[];
+  if (before.contentItems > 0 && attempted.contentItems == 0) {
+    reasons.add('all_content_removed');
+  }
+  if (before.pages > attempted.pages &&
+      before.contentItems > attempted.contentItems) {
+    reasons.add('pages_and_content_removed');
+  }
+  if (before.contentScore >= 100 &&
+      attempted.contentScore * 10 <= before.contentScore) {
+    reasons.add('content_score_dropped_at_least_90_percent');
+  }
+  return reasons;
 }

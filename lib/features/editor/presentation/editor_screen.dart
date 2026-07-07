@@ -793,7 +793,7 @@ class _EditorScreenState extends State<EditorScreen> {
         .clamp(firstVisible, pageCount - 1)
         .toInt();
     final start = math.max(0, firstVisible - 1);
-    final end = math.min(pageCount, lastVisible + 4);
+    final end = math.min(pageCount, lastVisible + 2);
 
     return _PageRenderRange(start, end);
   }
@@ -2164,16 +2164,13 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
     try {
       image = await _decodeMinimapImage(block);
       if (!mounted) {
-        image?.dispose();
         return;
       }
       if (!_shouldCacheMinimapImage(block.id)) {
-        image?.dispose();
         return;
       }
       final currentKey = _currentMinimapImageCacheKey(block.id);
       if (image == null || currentKey != cacheKey) {
-        image?.dispose();
         return;
       }
       _minimapImages.remove(block.id)?.image.dispose();
@@ -2336,6 +2333,7 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
     final contentHeight = _contentHeight(mapScale);
     final panelHeight = _visiblePanelHeight(mapScale);
     final canScroll = contentHeight > panelHeight + 0.5;
+    final backgroundSettings = widget.controller.currentBackgroundSettings;
     final indicatorRectInContent = Rect.fromLTWH(
       widget.visibleDocumentRect.left * mapScale,
       widget.visibleDocumentRect.top * mapScale,
@@ -2381,6 +2379,11 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                           pageGap: widget.pageGap,
                           mapScale: mapScale,
                           cornerRadius: innerRadius,
+                          showBackgroundLines:
+                              backgroundSettings.style.index > 0,
+                          showBackgroundColumns:
+                              backgroundSettings.style.index == 1,
+                          backgroundSpacing: backgroundSettings.spacing,
                           images: _minimapImages.map(
                             (id, cached) => MapEntry(id, cached.image),
                           ),
@@ -2428,6 +2431,9 @@ class _ProjectMiniMapPainter extends CustomPainter {
     required this.pageGap,
     required this.mapScale,
     required this.cornerRadius,
+    required this.showBackgroundLines,
+    required this.showBackgroundColumns,
+    required this.backgroundSpacing,
     required this.images,
   });
 
@@ -2437,6 +2443,9 @@ class _ProjectMiniMapPainter extends CustomPainter {
   final double pageGap;
   final double mapScale;
   final double cornerRadius;
+  final bool showBackgroundLines;
+  final bool showBackgroundColumns;
+  final double backgroundSpacing;
   final Map<String, ui.Image> images;
 
   @override
@@ -2480,6 +2489,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
         ..strokeWidth = isCurrentPage ? 0.7 : 0.6;
       canvas.drawRect(pageRect, pageFill);
       canvas.drawRect(pageRect.deflate(0.3), pageBorder);
+      _paintPageBackground(canvas, pageRect, scaleX, scaleY);
 
       for (final tab in page.indexTabs) {
         final stripeHeight = (pageHeight * 0.035).clamp(2.0, 7.0).toDouble();
@@ -2616,7 +2626,43 @@ class _ProjectMiniMapPainter extends CustomPainter {
         oldDelegate.pageGap != pageGap ||
         oldDelegate.mapScale != mapScale ||
         oldDelegate.cornerRadius != cornerRadius ||
+        oldDelegate.showBackgroundLines != showBackgroundLines ||
+        oldDelegate.showBackgroundColumns != showBackgroundColumns ||
+        oldDelegate.backgroundSpacing != backgroundSpacing ||
         oldDelegate.images != images;
+  }
+
+  void _paintPageBackground(
+    Canvas canvas,
+    Rect pageRect,
+    double scaleX,
+    double scaleY,
+  ) {
+    if (!showBackgroundLines) {
+      return;
+    }
+    final spacing = backgroundSpacing.clamp(16.0, 64.0);
+    final paint = Paint()
+      ..color = const Color(0xFFCBD5E1).withValues(alpha: 0.55)
+      ..strokeWidth = 0.5;
+
+    for (var y = spacing * scaleY; y < pageRect.height; y += spacing * scaleY) {
+      canvas.drawLine(
+        Offset(pageRect.left, pageRect.top + y),
+        Offset(pageRect.right, pageRect.top + y),
+        paint,
+      );
+    }
+    if (!showBackgroundColumns) {
+      return;
+    }
+    for (var x = spacing * scaleX; x < pageRect.width; x += spacing * scaleX) {
+      canvas.drawLine(
+        Offset(pageRect.left + x, pageRect.top),
+        Offset(pageRect.left + x, pageRect.bottom),
+        paint,
+      );
+    }
   }
 
   Rect _imageRect(ImageBlock block, double scaleX, double scaleY) {

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -22,12 +23,6 @@ import '../../state/editor_controller.dart';
 const Color _lassoAccentColor = Color(0xFF2E5AAC);
 const double _lassoActionOutset = 56.0;
 const double _lassoActionBarMinWidth = 112.0;
-
-bool _allowsTextDoubleTapEdit(DrawingTool tool) {
-  return tool != DrawingTool.pen &&
-      tool != DrawingTool.highlighter &&
-      !tool.isEraser;
-}
 
 class PageOverlay extends StatelessWidget {
   const PageOverlay({
@@ -62,13 +57,8 @@ class PageOverlay extends StatelessWidget {
         controller.lassoSelection?.pageIndex == effectivePageIndex
         ? controller.lassoSelection
         : null;
-    final hasActiveLasso = renderActive && lassoSelection != null;
-    final allowsTextDoubleTap = _allowsTextDoubleTapEdit(tool);
-
     return IgnorePointer(
-      ignoring:
-          (tool.isInk && !allowsTextDoubleTap && !hasActiveLasso) ||
-          !interactionEnabled,
+      ignoring: !interactionEnabled,
       child: Stack(
         children: [
           if (renderBackground)
@@ -76,7 +66,21 @@ class PageOverlay extends StatelessWidget {
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onTapDown: (details) async {
-                  if (controller.consumeBackgroundTapSuppression()) {
+                  if (tool == DrawingTool.text) {
+                    if (controller.activeTextBlockId != null) {
+                      controller.setTool(DrawingTool.pen);
+                      return;
+                    }
+                    if (controller.activeImageBlockId != null) {
+                      controller.clearActiveImageBlock();
+                    }
+                    if (controller.lassoSelection != null) {
+                      controller.clearLassoSelection();
+                    }
+                    await controller.handleTapOnPage(
+                      effectivePageIndex,
+                      details.localPosition + worldOrigin,
+                    );
                     return;
                   }
                   if (controller.activeTextBlockId != null ||
@@ -87,7 +91,7 @@ class PageOverlay extends StatelessWidget {
                     controller.clearLassoSelection();
                     return;
                   }
-                  if (tool == DrawingTool.text || tool == DrawingTool.image) {
+                  if (tool == DrawingTool.image) {
                     final message = await controller.handleTapOnPage(
                       effectivePageIndex,
                       details.localPosition + worldOrigin,
@@ -117,7 +121,7 @@ class PageOverlay extends StatelessWidget {
                     lassoSelection?.textBlockIds.contains(block.id) == true,
                 doubleTapOnly: false,
               ),
-          if (renderActive && tool.isInk && allowsTextDoubleTap)
+          if (renderActive && tool.isInk)
             for (final block in effectivePage.textBlocks)
               if (block.id != activeTextId)
                 _TextBlockWidget(
@@ -318,8 +322,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     final canEdit =
         controller.tool == DrawingTool.text && widget.interactionEnabled;
     final canTransform = !controller.tool.isInk && widget.interactionEnabled;
-    final canDoubleTapEdit =
-        _allowsTextDoubleTapEdit(controller.tool) && widget.interactionEnabled;
+    final canDoubleTapEdit = widget.interactionEnabled;
     _quillController.readOnly = !(isActive && canEdit);
 
     if (isActive &&
@@ -1060,13 +1063,23 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   Offset? _resizeStart;
   Size? _startSize;
   ImageBlock? _resizeBefore;
+  Offset? _lastResizeGlobalPosition;
   double? _startCropLeft;
   double? _startCropTop;
   double? _startCropRight;
   double? _startCropBottom;
   ResizeDirection? _activeResizeDirection;
+  ResizeDirection? _hoveredResizeDirection;
+  ResizeDirection? _draggingResizeDirection;
   String? _loadedImageSizePath;
   Size? _loadedImageSize;
+  static const double _imageCornerDotSize = 12.0;
+  static const double _imageHandleOutset = 64.0;
+  static const double _imageCornerDotHitSize = 112.0;
+  static const double _imageEdgeHandleHitSize = 96.0;
+  static const double _imageEdgeHandleLongSide = 28.0;
+  static const double _imageEdgeHandleShortSide = 6.0;
+  static const Color _imageFrameColor = Color(0xFF8E8E8E);
 
   @override
   void initState() {
@@ -1099,7 +1112,7 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     final heightFactor = (cropBottom - cropTop).clamp(0.08, 1.0);
     final visibleWidth = widget.block.width * widthFactor;
     final visibleHeight = widget.block.height * heightFactor;
-    final double extraHitArea = isSelected ? 32.0 : 0.0;
+    final double extraHitArea = isSelected ? _imageHandleOutset : 0.0;
 
     final child = GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -1156,55 +1169,139 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
               _startPosition = null;
             }
           : null,
-      child: Container(
-        padding: EdgeInsets.all(extraHitArea),
-        color: isSelected ? Colors.transparent : null,
-        child: ResizableFrame(
-          isSelected: isSelected && canTransform,
-          onResizeStart: _startResize,
-          onResizeUpdate: (direction, delta) =>
-              _updateResize(direction, delta, controller),
-          onResizeEnd: (_) => _endResize(controller),
-          child: Container(
-            width: visibleWidth,
-            height: visibleHeight,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.zero,
-              border: Border.all(
-                color: isSelected
-                    ? AppColors.inkBlack
-                    : widget.isLassoSelected
-                    ? _lassoAccentColor.withValues(alpha: 0.8)
-                    : AppColors.divider,
-                width: widget.isLassoSelected ? 2.0 : 1.0,
-              ),
-              boxShadow: widget.isLassoSelected
-                  ? [
-                      BoxShadow(
-                        color: _lassoAccentColor.withValues(alpha: 0.22),
-                        blurRadius: 10,
-                        spreadRadius: 1,
+      child: _imageResizeHitRegion(
+        frameLeft: extraHitArea,
+        frameTop: extraHitArea,
+        frameWidth: visibleWidth,
+        frameHeight: visibleHeight,
+        includeHorizontalEdges:
+            isSelected &&
+            canTransform &&
+            visibleWidth > _imageEdgeHandleLongSide,
+        includeVerticalEdges:
+            isSelected &&
+            canTransform &&
+            visibleHeight > _imageEdgeHandleLongSide,
+        isEnabled: isSelected && canTransform,
+        controller: controller,
+        child: SizedBox(
+          width: visibleWidth + extraHitArea * 2,
+          height: visibleHeight + extraHitArea * 2,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: extraHitArea,
+                top: extraHitArea,
+                width: visibleWidth,
+                height: visibleHeight,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.zero,
+                    border: Border.all(
+                      color: isSelected
+                          ? _imageFrameColor
+                          : widget.isLassoSelected
+                          ? _lassoAccentColor.withValues(alpha: 0.8)
+                          : AppColors.divider,
+                      width: isSelected
+                          ? 1.6
+                          : widget.isLassoSelected
+                          ? 2.0
+                          : 1.0,
+                    ),
+                    boxShadow: widget.isLassoSelected
+                        ? [
+                            BoxShadow(
+                              color: _lassoAccentColor.withValues(alpha: 0.22),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _imageChild(
+                          cropLeft: cropLeft,
+                          cropTop: cropTop,
+                          cropRight: cropRight,
+                          cropBottom: cropBottom,
+                          fullWidth: widget.block.width,
+                          fullHeight: widget.block.height,
+                          visibleWidth: visibleWidth,
+                          visibleHeight: visibleHeight,
+                          anchor: _anchorForDirection(_activeResizeDirection),
+                        ),
                       ),
-                    ]
-                  : null,
-            ),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: _imageChild(
-                    cropLeft: cropLeft,
-                    cropTop: cropTop,
-                    cropRight: cropRight,
-                    cropBottom: cropBottom,
-                    fullWidth: widget.block.width,
-                    fullHeight: widget.block.height,
-                    visibleWidth: visibleWidth,
-                    visibleHeight: visibleHeight,
-                    anchor: _anchorForDirection(_activeResizeDirection),
+                    ],
                   ),
                 ),
+              ),
+              if (isSelected && canTransform) ...[
+                if (visibleWidth > _imageEdgeHandleLongSide) ...[
+                  _imageEdgeHandle(
+                    direction: ResizeDirection.topCenter,
+                    frameLeft: extraHitArea,
+                    frameTop: extraHitArea,
+                    frameWidth: visibleWidth,
+                    frameHeight: visibleHeight,
+                  ),
+                  _imageEdgeHandle(
+                    direction: ResizeDirection.bottomCenter,
+                    frameLeft: extraHitArea,
+                    frameTop: extraHitArea,
+                    frameWidth: visibleWidth,
+                    frameHeight: visibleHeight,
+                  ),
+                ],
+                if (visibleHeight > _imageEdgeHandleLongSide) ...[
+                  _imageEdgeHandle(
+                    direction: ResizeDirection.centerLeft,
+                    frameLeft: extraHitArea,
+                    frameTop: extraHitArea,
+                    frameWidth: visibleWidth,
+                    frameHeight: visibleHeight,
+                  ),
+                  _imageEdgeHandle(
+                    direction: ResizeDirection.centerRight,
+                    frameLeft: extraHitArea,
+                    frameTop: extraHitArea,
+                    frameWidth: visibleWidth,
+                    frameHeight: visibleHeight,
+                  ),
+                ],
+                _imageCornerHandle(
+                  direction: ResizeDirection.topLeft,
+                  frameLeft: extraHitArea,
+                  frameTop: extraHitArea,
+                  frameWidth: visibleWidth,
+                  frameHeight: visibleHeight,
+                ),
+                _imageCornerHandle(
+                  direction: ResizeDirection.topRight,
+                  frameLeft: extraHitArea,
+                  frameTop: extraHitArea,
+                  frameWidth: visibleWidth,
+                  frameHeight: visibleHeight,
+                ),
+                _imageCornerHandle(
+                  direction: ResizeDirection.bottomLeft,
+                  frameLeft: extraHitArea,
+                  frameTop: extraHitArea,
+                  frameWidth: visibleWidth,
+                  frameHeight: visibleHeight,
+                ),
+                _imageCornerHandle(
+                  direction: ResizeDirection.bottomRight,
+                  frameLeft: extraHitArea,
+                  frameTop: extraHitArea,
+                  frameWidth: visibleWidth,
+                  frameHeight: visibleHeight,
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ),
@@ -1234,6 +1331,325 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
         return positioned(lassoDelta, child!);
       },
     );
+  }
+
+  Widget _imageCornerHandle({
+    required ResizeDirection direction,
+    required double frameLeft,
+    required double frameTop,
+    required double frameWidth,
+    required double frameHeight,
+  }) {
+    final isActive = _draggingResizeDirection == direction;
+    final borderColor = isActive ? AppColors.inkBlack : _imageFrameColor;
+    final center = _handleCenter(
+      direction: direction,
+      frameLeft: frameLeft,
+      frameTop: frameTop,
+      frameWidth: frameWidth,
+      frameHeight: frameHeight,
+    );
+    return Positioned(
+      left: center.dx - _imageCornerDotHitSize / 2,
+      top: center.dy - _imageCornerDotHitSize / 2,
+      width: _imageCornerDotHitSize,
+      height: _imageCornerDotHitSize,
+      child: IgnorePointer(
+        child: Center(
+          child: AnimatedScale(
+            scale: isActive ? 1.35 : 1.0,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOut,
+            child: Container(
+              width: _imageCornerDotSize,
+              height: _imageCornerDotSize,
+              decoration: BoxDecoration(
+                color: AppColors.paper,
+                border: Border.all(color: borderColor, width: 1.2),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Offset _handleCenter({
+    required ResizeDirection direction,
+    required double frameLeft,
+    required double frameTop,
+    required double frameWidth,
+    required double frameHeight,
+  }) {
+    return switch (direction) {
+      ResizeDirection.topLeft => Offset(frameLeft, frameTop),
+      ResizeDirection.topCenter => Offset(frameLeft + frameWidth / 2, frameTop),
+      ResizeDirection.topRight => Offset(frameLeft + frameWidth, frameTop),
+      ResizeDirection.centerLeft => Offset(
+        frameLeft,
+        frameTop + frameHeight / 2,
+      ),
+      ResizeDirection.centerRight => Offset(
+        frameLeft + frameWidth,
+        frameTop + frameHeight / 2,
+      ),
+      ResizeDirection.bottomLeft => Offset(frameLeft, frameTop + frameHeight),
+      ResizeDirection.bottomCenter => Offset(
+        frameLeft + frameWidth / 2,
+        frameTop + frameHeight,
+      ),
+      ResizeDirection.bottomRight => Offset(
+        frameLeft + frameWidth,
+        frameTop + frameHeight,
+      ),
+    };
+  }
+
+  Widget _imageEdgeHandle({
+    required ResizeDirection direction,
+    required double frameLeft,
+    required double frameTop,
+    required double frameWidth,
+    required double frameHeight,
+  }) {
+    final isHorizontal =
+        direction == ResizeDirection.topCenter ||
+        direction == ResizeDirection.bottomCenter;
+    final isActive = _draggingResizeDirection == direction;
+    final isHovered = _hoveredResizeDirection == direction;
+    final handleColor = (isActive || isHovered)
+        ? AppColors.inkBlack
+        : _imageFrameColor;
+    final center = _handleCenter(
+      direction: direction,
+      frameLeft: frameLeft,
+      frameTop: frameTop,
+      frameWidth: frameWidth,
+      frameHeight: frameHeight,
+    );
+    return Positioned(
+      left: center.dx - _imageEdgeHandleHitSize / 2,
+      top: center.dy - _imageEdgeHandleHitSize / 2,
+      width: _imageEdgeHandleHitSize,
+      height: _imageEdgeHandleHitSize,
+      child: IgnorePointer(
+        child: Center(
+          child: Container(
+            width: isHorizontal
+                ? _imageEdgeHandleLongSide
+                : _imageEdgeHandleShortSide,
+            height: isHorizontal
+                ? _imageEdgeHandleShortSide
+                : _imageEdgeHandleLongSide,
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              border: Border.all(color: handleColor, width: 1.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _imageResizeHitRegion({
+    required double frameLeft,
+    required double frameTop,
+    required double frameWidth,
+    required double frameHeight,
+    required bool includeHorizontalEdges,
+    required bool includeVerticalEdges,
+    required bool isEnabled,
+    required EditorController controller,
+    required Widget child,
+  }) {
+    if (!isEnabled) {
+      return child;
+    }
+    final hoveredDirection = _hoveredResizeDirection;
+    return MouseRegion(
+      cursor: _cursorForDirection(hoveredDirection),
+      onHover: (event) {
+        final direction = _nearestResizeDirection(
+          event.localPosition,
+          frameLeft: frameLeft,
+          frameTop: frameTop,
+          frameWidth: frameWidth,
+          frameHeight: frameHeight,
+          includeHorizontalEdges: includeHorizontalEdges,
+          includeVerticalEdges: includeVerticalEdges,
+        );
+        if (direction != _hoveredResizeDirection) {
+          setState(() => _hoveredResizeDirection = direction);
+        }
+      },
+      onExit: (_) {
+        if (_hoveredResizeDirection != null) {
+          setState(() => _hoveredResizeDirection = null);
+        }
+      },
+      child: RawGestureDetector(
+        behavior: HitTestBehavior.translucent,
+        gestures: {
+          LongPressGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+                () => LongPressGestureRecognizer(
+                  duration: kLongPressTimeout ~/ 2,
+                ),
+                (recognizer) {
+                  recognizer
+                    ..onLongPressStart = (details) {
+                      final direction = _nearestResizeDirection(
+                        details.localPosition,
+                        frameLeft: frameLeft,
+                        frameTop: frameTop,
+                        frameWidth: frameWidth,
+                        frameHeight: frameHeight,
+                        includeHorizontalEdges: includeHorizontalEdges,
+                        includeVerticalEdges: includeVerticalEdges,
+                      );
+                      if (direction == null) {
+                        return;
+                      }
+                      setState(() => _draggingResizeDirection = direction);
+                      _lastResizeGlobalPosition = details.globalPosition;
+                      _startResize(direction);
+                    }
+                    ..onLongPressMoveUpdate = (details) {
+                      final direction = _activeResizeDirection;
+                      if (direction == null) {
+                        return;
+                      }
+                      final previousGlobal =
+                          _lastResizeGlobalPosition ?? details.globalPosition;
+                      final delta = _globalDeltaToLocalDelta(
+                        context,
+                        start: previousGlobal,
+                        end: details.globalPosition,
+                      );
+                      _lastResizeGlobalPosition = details.globalPosition;
+                      _updateResize(direction, delta, controller);
+                    }
+                    ..onLongPressEnd = (_) {
+                      if (_activeResizeDirection == null) {
+                        return;
+                      }
+                      setState(() => _draggingResizeDirection = null);
+                      _endResize(controller);
+                    }
+                    ..onLongPressCancel = _cancelResize;
+                },
+              ),
+        },
+        child: child,
+      ),
+    );
+  }
+
+  ResizeDirection? _nearestResizeDirection(
+    Offset point, {
+    required double frameLeft,
+    required double frameTop,
+    required double frameWidth,
+    required double frameHeight,
+    required bool includeHorizontalEdges,
+    required bool includeVerticalEdges,
+  }) {
+    final frame = Rect.fromLTWH(frameLeft, frameTop, frameWidth, frameHeight);
+    if (!frame.inflate(_imageHandleOutset).contains(point) ||
+        _distanceToFrameEdge(point, frame) > _imageHandleOutset) {
+      return null;
+    }
+
+    ResizeDirection? bestDirection;
+    var bestDistance = double.infinity;
+
+    void consider(ResizeDirection direction, double distance) {
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestDirection = direction;
+      }
+    }
+
+    consider(ResizeDirection.topLeft, (point - frame.topLeft).distance);
+    consider(ResizeDirection.topRight, (point - frame.topRight).distance);
+    consider(ResizeDirection.bottomLeft, (point - frame.bottomLeft).distance);
+    consider(ResizeDirection.bottomRight, (point - frame.bottomRight).distance);
+
+    const edgeBias = 18.0;
+    if (includeHorizontalEdges) {
+      consider(
+        ResizeDirection.topCenter,
+        _distanceToSegment(point, frame.topLeft, frame.topRight) + edgeBias,
+      );
+      consider(
+        ResizeDirection.bottomCenter,
+        _distanceToSegment(point, frame.bottomLeft, frame.bottomRight) +
+            edgeBias,
+      );
+    }
+    if (includeVerticalEdges) {
+      consider(
+        ResizeDirection.centerLeft,
+        _distanceToSegment(point, frame.topLeft, frame.bottomLeft) + edgeBias,
+      );
+      consider(
+        ResizeDirection.centerRight,
+        _distanceToSegment(point, frame.topRight, frame.bottomRight) + edgeBias,
+      );
+    }
+
+    return bestDirection;
+  }
+
+  double _distanceToFrameEdge(Offset point, Rect frame) {
+    if (frame.contains(point)) {
+      return [
+        (point.dx - frame.left).abs(),
+        (frame.right - point.dx).abs(),
+        (point.dy - frame.top).abs(),
+        (frame.bottom - point.dy).abs(),
+      ].reduce((a, b) => a < b ? a : b);
+    }
+    final nearest = Offset(
+      point.dx.clamp(frame.left, frame.right).toDouble(),
+      point.dy.clamp(frame.top, frame.bottom).toDouble(),
+    );
+    return (point - nearest).distance;
+  }
+
+  double _distanceToSegment(Offset point, Offset start, Offset end) {
+    final segment = end - start;
+    final lengthSquared = segment.dx * segment.dx + segment.dy * segment.dy;
+    if (lengthSquared == 0) {
+      return (point - start).distance;
+    }
+    final t =
+        (((point.dx - start.dx) * segment.dx +
+                    (point.dy - start.dy) * segment.dy) /
+                lengthSquared)
+            .clamp(0.0, 1.0)
+            .toDouble();
+    final nearest = Offset(
+      start.dx + segment.dx * t,
+      start.dy + segment.dy * t,
+    );
+    return (point - nearest).distance;
+  }
+
+  MouseCursor _cursorForDirection(ResizeDirection? direction) {
+    return switch (direction) {
+      ResizeDirection.topLeft ||
+      ResizeDirection.bottomRight => SystemMouseCursors.resizeUpLeftDownRight,
+      ResizeDirection.topRight ||
+      ResizeDirection.bottomLeft => SystemMouseCursors.resizeUpRightDownLeft,
+      ResizeDirection.topCenter ||
+      ResizeDirection.bottomCenter => SystemMouseCursors.resizeUpDown,
+      ResizeDirection.centerLeft ||
+      ResizeDirection.centerRight => SystemMouseCursors.resizeLeftRight,
+      null => SystemMouseCursors.basic,
+    };
   }
 
   Widget _imageChild({
@@ -1602,6 +2018,16 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     _resizeStart = null;
     _startSize = null;
     _resizeBefore = null;
+    _lastResizeGlobalPosition = null;
+    _activeResizeDirection = null;
+  }
+
+  void _cancelResize() {
+    setState(() => _draggingResizeDirection = null);
+    _resizeStart = null;
+    _startSize = null;
+    _resizeBefore = null;
+    _lastResizeGlobalPosition = null;
     _activeResizeDirection = null;
   }
 
@@ -1683,76 +2109,14 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     BuildContext context,
     EditorController controller,
   ) async {
-    final textController = TextEditingController(text: widget.block.ocrText);
-    final focusNode = FocusNode();
     final updated = await showDialog<String>(
       context: context,
-      builder: (context) {
-        requestSoftKeyboardForFocus(context, focusNode);
-        var isRunning = false;
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('OCR text'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!controller.supportsOcr) ...[
-                    const Text(
-                      'Automatic OCR is available only in the Android and '
-                      'iOS apps. You can still enter or edit the text here.',
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  TextField(
-                    controller: textController,
-                    focusNode: focusNode,
-                    autofocus: true,
-                    maxLines: 5,
-                  ),
-                ],
-              ),
-              actions: [
-                if (controller.supportsOcr)
-                  TextButton(
-                    onPressed: isRunning
-                        ? null
-                        : () async {
-                            setState(() => isRunning = true);
-                            final message = await controller
-                                .runOcrForImageOnPage(
-                                  widget.pageIndex,
-                                  widget.block,
-                                );
-                            if (message != null && context.mounted) {
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(SnackBar(content: Text(message)));
-                            }
-                            final updatedBlock = controller.findImageBlockById(
-                              widget.block.id,
-                            );
-                            textController.text = updatedBlock?.ocrText ?? '';
-                            setState(() => isRunning = false);
-                          },
-                    child: const Text('Run OCR'),
-                  ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () =>
-                      Navigator.of(context).pop(textController.text),
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ).whenComplete(focusNode.dispose);
+      builder: (_) => _OcrTextDialog(
+        controller: controller,
+        pageIndex: widget.pageIndex,
+        block: widget.block,
+      ),
+    );
 
     if (updated == null || updated == widget.block.ocrText) {
       return;
@@ -1812,6 +2176,105 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
         ).showSnackBar(SnackBar(content: Text(message)));
       }
     }
+  }
+}
+
+class _OcrTextDialog extends StatefulWidget {
+  const _OcrTextDialog({
+    required this.controller,
+    required this.pageIndex,
+    required this.block,
+  });
+
+  final EditorController controller;
+  final int pageIndex;
+  final ImageBlock block;
+
+  @override
+  State<_OcrTextDialog> createState() => _OcrTextDialogState();
+}
+
+class _OcrTextDialogState extends State<_OcrTextDialog> {
+  late final TextEditingController _textController;
+  final FocusNode _focusNode = FocusNode();
+  bool _isRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: widget.block.ocrText);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        requestSoftKeyboardForFocus(context, _focusNode);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _runOcr() async {
+    setState(() => _isRunning = true);
+    final message = await widget.controller.runOcrForImageOnPage(
+      widget.pageIndex,
+      widget.block,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (message != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+    final updatedBlock = widget.controller.findImageBlockById(widget.block.id);
+    _textController.text = updatedBlock?.ocrText ?? '';
+    setState(() => _isRunning = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('OCR text'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!widget.controller.supportsOcr) ...[
+            const Text(
+              'Automatic OCR is available only in the Android and iOS apps. '
+              'You can still enter or edit the text here.',
+            ),
+            const SizedBox(height: 12),
+          ],
+          TextField(
+            controller: _textController,
+            focusNode: _focusNode,
+            autofocus: true,
+            maxLines: 5,
+          ),
+        ],
+      ),
+      actions: [
+        if (widget.controller.supportsOcr)
+          TextButton(
+            onPressed: _isRunning ? null : _runOcr,
+            child: const Text('Run OCR'),
+          ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_textController.text),
+          child: const Text('Save'),
+        ),
+      ],
+    );
   }
 }
 

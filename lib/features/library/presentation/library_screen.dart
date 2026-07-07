@@ -308,33 +308,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _promptNewFolder(LibraryController controller) async {
-    final textController = TextEditingController();
-    final focusNode = FocusNode();
     final result = await showDialog<String>(
       context: context,
-      builder: (context) {
-        requestSoftKeyboardForFocus(context, focusNode);
-        return AlertDialog(
-          title: const Text('New folder'),
-          content: TextField(
-            controller: textController,
-            focusNode: focusNode,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: 'Folder name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(textController.text),
-              child: const Text('Create'),
-            ),
-          ],
-        );
-      },
-    ).whenComplete(focusNode.dispose);
+      builder: (_) => const _NameInputDialog(
+        title: 'New folder',
+        hintText: 'Folder name',
+        actionLabel: 'Create',
+      ),
+    );
 
     if (result == null) {
       return;
@@ -346,33 +327,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
     LibraryController controller,
     String folder,
   ) async {
-    final textController = TextEditingController(text: folder);
-    final focusNode = FocusNode();
     final result = await showDialog<String>(
       context: context,
-      builder: (context) {
-        requestSoftKeyboardForFocus(context, focusNode);
-        return AlertDialog(
-          title: const Text('Rename folder'),
-          content: TextField(
-            controller: textController,
-            focusNode: focusNode,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: 'Folder name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(textController.text),
-              child: const Text('Rename'),
-            ),
-          ],
-        );
-      },
-    ).whenComplete(focusNode.dispose);
+      builder: (_) => _NameInputDialog(
+        title: 'Rename folder',
+        hintText: 'Folder name',
+        actionLabel: 'Rename',
+        initialText: folder,
+      ),
+    );
 
     if (result == null) {
       return;
@@ -384,37 +347,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
     LibraryController controller,
     Notebook item,
   ) async {
-    final textController = TextEditingController(text: item.title);
-    final focusNode = FocusNode();
-    textController.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: textController.text.length,
-    );
     final result = await showDialog<String>(
       context: context,
-      builder: (context) {
-        requestSoftKeyboardForFocus(context, focusNode);
-        return AlertDialog(
-          title: const Text('Rename item'),
-          content: TextField(
-            controller: textController,
-            focusNode: focusNode,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: 'Item name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(textController.text),
-              child: const Text('Rename'),
-            ),
-          ],
-        );
-      },
-    ).whenComplete(focusNode.dispose);
+      builder: (_) => _NameInputDialog(
+        title: 'Rename item',
+        hintText: 'Item name',
+        actionLabel: 'Rename',
+        initialText: item.title,
+        selectAll: true,
+      ),
+    );
 
     if (result == null) {
       return;
@@ -452,6 +394,36 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     await controller.deleteFolder(folder);
+  }
+
+  Future<void> _confirmDeleteItem(
+    LibraryController controller,
+    Notebook item,
+  ) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete item?'),
+          content: Text('This will permanently delete "${item.title}".'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != true) {
+      return;
+    }
+    await controller.deleteItem(item.uid);
   }
 
   void _maybeShowCorruptRecoveryDialog(LibraryController controller) {
@@ -522,6 +494,77 @@ class _LibraryScreenState extends State<LibraryScreen> {
       }
       controller.dismissCorruptRecoveryPrompt();
     });
+  }
+}
+
+class _NameInputDialog extends StatefulWidget {
+  const _NameInputDialog({
+    required this.title,
+    required this.hintText,
+    required this.actionLabel,
+    this.initialText = '',
+    this.selectAll = false,
+  });
+
+  final String title;
+  final String hintText;
+  final String actionLabel;
+  final String initialText;
+  final bool selectAll;
+
+  @override
+  State<_NameInputDialog> createState() => _NameInputDialogState();
+}
+
+class _NameInputDialogState extends State<_NameInputDialog> {
+  late final TextEditingController _textController;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: widget.initialText);
+    if (widget.selectAll) {
+      _textController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _textController.text.length,
+      );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        requestSoftKeyboardForFocus(context, _focusNode);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    _textController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _textController,
+        focusNode: _focusNode,
+        autofocus: true,
+        decoration: InputDecoration(hintText: widget.hintText),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_textController.text),
+          child: Text(widget.actionLabel),
+        ),
+      ],
+    );
   }
 }
 
@@ -891,7 +934,9 @@ class _LibraryItemsPane extends StatelessWidget {
                     onRename: () => context
                         .findAncestorStateOfType<_LibraryScreenState>()
                         ?._promptRenameItem(controller, item),
-                    onDelete: () => controller.deleteItem(item.uid),
+                    onDelete: () => context
+                        .findAncestorStateOfType<_LibraryScreenState>()
+                        ?._confirmDeleteItem(controller, item),
                   ),
                 );
               },
@@ -957,7 +1002,9 @@ class _LibraryItemsPane extends StatelessWidget {
                 onRename: () => context
                     .findAncestorStateOfType<_LibraryScreenState>()
                     ?._promptRenameItem(controller, item),
-                onDelete: () => controller.deleteItem(item.uid),
+                onDelete: () => context
+                    .findAncestorStateOfType<_LibraryScreenState>()
+                    ?._confirmDeleteItem(controller, item),
               );
             },
           ),

@@ -664,14 +664,10 @@ class NotebookExportService {
   static String _fileNameBase(String title) {
     final cleaned = title
         .trim()
-        .replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_')
-        .replaceAll(RegExp(r'_+'), '_');
-    final name = cleaned.isEmpty ? 'notatek_export' : cleaned;
-    final timestamp = DateTime.now()
-        .toIso8601String()
-        .replaceAll(':', '-')
-        .replaceAll('.', '-');
-    return '${name}_$timestamp';
+        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'[. ]+$'), '');
+    return cleaned.isEmpty ? 'notatek_export' : cleaned;
   }
 }
 

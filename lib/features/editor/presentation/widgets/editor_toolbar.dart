@@ -25,6 +25,10 @@ class EditorToolbar extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
+        final canDelete =
+            controller.activeTextBlockId != null ||
+            controller.activeImageBlockId != null ||
+            (controller.lassoSelection?.isEmpty == false);
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -62,6 +66,14 @@ class EditorToolbar extends StatelessWidget {
                         icon: Icons.open_with,
                         label: 'Move',
                         tool: DrawingTool.edit,
+                      ),
+                      _actionButton(
+                        icon: Icons.delete_outline,
+                        label: 'Delete',
+                        isActive: false,
+                        onPressed: canDelete
+                            ? controller.deleteActiveElement
+                            : null,
                       ),
                       _actionButton(
                         icon: Icons.add,
@@ -281,7 +293,7 @@ class EditorToolbar extends StatelessWidget {
     required IconData icon,
     required String label,
     required bool isActive,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
   }) {
     return Padding(
       padding: const EdgeInsets.only(right: 4),
