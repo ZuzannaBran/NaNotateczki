@@ -53,30 +53,39 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (398 linii)
+### `lib/app/app_scope.dart` (402 linii)
 
-Otwiera bazę, buduje serwisy/Providery i planuje backup po zapisie.
+Otwiera bazę, buduje serwisy/Providery, stosuje zapisany kolor akcentu i
+planuje backup po zapisie.
 
-- 21: `AppScope`; 28: `_AppScopeState`; 127: `_BackupStatusOverlay`;
-  188: `_StartupErrorScreen`; 264: `_BackupScheduler`.
+- 21: `AppScope`;
+  28: `_AppScopeState`;
+  131:
+  `_BackupStatusOverlay`; 192:
+  `_StartupErrorScreen`; 268:
+  `_BackupScheduler`.
 
 ## 3. Core
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (18): paleta aplikacji.
-  3: `AppColors`.
+- `lib/core/theme/app_colors.dart` (54): paleta aplikacji
+  i wybieralne kolory akcentu. 3:
+  `AppAccentColor`; 39:
+  `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (21): konfiguracja jasnego Material 3.
-  5: `AppTheme`.
+- `lib/core/theme/app_theme.dart` (26): konfiguracja jasnego
+  Material 3 z akcentem użytkownika. 5:
+  `AppTheme`.
 
 ### Wejście i preferencje
 
-- `lib/core/input/app_preferences_controller.dart` (84): globalny tryb
-  urządzenia zapisany w `app_prefs.json`.
-  7: `DeviceInputMode`; 9: `DeviceInputModeX`;
-  26: `AppPreferencesController`.
+- `lib/core/input/app_preferences_controller.dart` (118): globalny
+  tryb urządzenia i kolor akcentu zapisane w `app_prefs.json`.
+  8: `DeviceInputMode`;
+  27:
+  `AppPreferencesController`.
 - `lib/core/input/ink_activity_tracker.dart` (35): globalnie śledzi kontakt
   rysika i okres wyciszenia używany przez zapis/backup.
   3: `InkActivityTracker`.
@@ -338,13 +347,23 @@ aby nie obcinać prawej ramki i cienia strony.
 - 1799: `_PageFramePainter`; 1874: `_IndexTabsOverlay`;
   2014: `_ProjectMiniMapOverlay`; 2364: `_ProjectMiniMapPainter`.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (554 linie)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (613 linie)
 
-Ustawienia wejścia, tła oraz podgląd logów błędów, integralności i wydajności.
+Ustawienia wejścia, koloru akcentu, tła oraz podgląd logów błędów,
+integralności i wydajności.
 
-- 15: `EditorSettingsScreen`; 236: `_showErrorsDialog`;
-  318: `_showDataIntegrityDialog`; 405: `_showOptimizationDialog`;
-  491: `_BackgroundSection`.
+- 16:
+  `EditorSettingsScreen`;
+  242:
+  `_showErrorsDialog`;
+  324:
+  `_showDataIntegrityDialog`;
+  411:
+  `_showOptimizationDialog`;
+  497:
+  `_AccentColorSection`;
+  550:
+  `_BackgroundSection`.
 
 ### Widgety edytora
 

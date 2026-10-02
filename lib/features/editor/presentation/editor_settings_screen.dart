@@ -6,6 +6,7 @@ import '../../../core/diagnostics/data_integrity_log.dart';
 import '../../../core/diagnostics/optimization_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../state/editor_controller.dart';
 import '../state/input_mode.dart';
@@ -197,6 +198,11 @@ class EditorSettingsScreen extends StatelessWidget {
                       horizontal: 16,
                     ),
                     children: [
+                      _AccentColorSection(
+                        selected: preferences.accentColor,
+                        onChanged: preferences.setAccentColor,
+                      ),
+                      const SizedBox(height: 24),
                       _BackgroundSection(
                         title: 'Notebook default',
                         settings: controller.defaultBackgroundSettingsForKind(
@@ -486,6 +492,59 @@ Future<void> _showOptimizationDialog(BuildContext context) {
       );
     },
   );
+}
+
+class _AccentColorSection extends StatelessWidget {
+  const _AccentColorSection({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final AppAccentColor selected;
+  final ValueChanged<AppAccentColor> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Accent color',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Pick the main color used for controls and highlights.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final accent in AppAccentColor.values)
+              ChoiceChip(
+                selected: accent == selected,
+                showCheckmark: false,
+                avatar: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: accent.color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                ),
+                label: Text(accent.label),
+                onSelected: (_) => onChanged(accent),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 class _BackgroundSection extends StatelessWidget {

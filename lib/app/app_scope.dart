@@ -108,15 +108,19 @@ class _AppScopeState extends State<AppScope> {
               ),
             ),
           ],
-          child: MaterialApp(
-            debugShowCheckedModeBanner: false,
-            title: 'Notatek',
-            theme: AppTheme.light(),
-            home: const LibraryScreen(),
-            builder: (context, child) => _BackupStatusOverlay(
-              snapshotInProgress: backupService.snapshotInProgress,
-              child: child ?? const SizedBox.shrink(),
-            ),
+          child: Consumer<AppPreferencesController>(
+            builder: (context, preferences, _) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                title: 'Notatek',
+                theme: AppTheme.light(accentColor: preferences.accentColor),
+                home: const LibraryScreen(),
+                builder: (context, child) => _BackupStatusOverlay(
+                  snapshotInProgress: backupService.snapshotInProgress,
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              );
+            },
           ),
         );
       },
