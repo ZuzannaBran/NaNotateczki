@@ -22,7 +22,14 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  static const double _wideBreakpoint = 1100;
+  static const double _editorOverviewRight = 106;
+  static const double _editorPageWidth = 820;
+  static const double _editorPageMargin = 56;
+  static const double _wideBreakpoint =
+      _editorOverviewRight +
+      _editorPageMargin +
+      _editorPageWidth +
+      _editorPageMargin;
   static const double _folderPaneMinWidth = 56;
   static const double _folderPaneMaxWidth = 420;
   static const double _itemsPaneMinWidth = 56;
@@ -118,48 +125,53 @@ class _LibraryScreenState extends State<LibraryScreen> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final isWide = constraints.maxWidth >= _wideBreakpoint;
-                if (isWide) {
-                  final maxSideWidth = math.max(
-                    _folderPaneMinWidth + _itemsPaneMinWidth,
-                    constraints.maxWidth - 320,
+                final layoutWidth = math.max(
+                  constraints.maxWidth,
+                  _wideBreakpoint,
+                );
+                final maxSideWidth = math.max(
+                  _folderPaneMinWidth + _itemsPaneMinWidth,
+                  layoutWidth - 320,
+                );
+                var folderWidth = _folderPaneWidth
+                    .clamp(_folderPaneMinWidth, _folderPaneMaxWidth)
+                    .toDouble();
+                var itemsWidth = _itemsPaneWidth
+                    .clamp(_itemsPaneMinWidth, _itemsPaneMaxWidth)
+                    .toDouble();
+                final totalWidth = folderWidth + itemsWidth;
+                if (totalWidth > maxSideWidth) {
+                  final overflow = totalWidth - maxSideWidth;
+                  final shrinkFromItems = math.min(
+                    overflow,
+                    itemsWidth - _itemsPaneMinWidth,
                   );
-                  var folderWidth = _folderPaneWidth
-                      .clamp(_folderPaneMinWidth, _folderPaneMaxWidth)
-                      .toDouble();
-                  var itemsWidth = _itemsPaneWidth
-                      .clamp(_itemsPaneMinWidth, _itemsPaneMaxWidth)
-                      .toDouble();
-                  final totalWidth = folderWidth + itemsWidth;
-                  if (totalWidth > maxSideWidth) {
-                    final overflow = totalWidth - maxSideWidth;
-                    final shrinkFromItems = math.min(
-                      overflow,
-                      itemsWidth - _itemsPaneMinWidth,
+                  itemsWidth -= shrinkFromItems;
+                  final restOverflow = overflow - shrinkFromItems;
+                  if (restOverflow > 0) {
+                    folderWidth = math.max(
+                      _folderPaneMinWidth,
+                      folderWidth - restOverflow,
                     );
-                    itemsWidth -= shrinkFromItems;
-                    final restOverflow = overflow - shrinkFromItems;
-                    if (restOverflow > 0) {
-                      folderWidth = math.max(
-                        _folderPaneMinWidth,
-                        folderWidth - restOverflow,
-                      );
-                    }
                   }
+                }
 
-                  final folderIconOnly = folderWidth < 165;
-                  final itemsIconOnly = itemsWidth < 260;
-                  final itemsHeaderHeight = folderIconOnly ? 72.0 : 68.0;
-                  final expandedLeftZoneWidth =
-                      folderWidth +
-                      _resizeHandleWidth +
-                      itemsWidth +
-                      _resizeHandleWidth;
-                  final leftZoneWidth = _showLeftNavigation
-                      ? expandedLeftZoneWidth
-                      : 0.0;
+                final folderIconOnly = folderWidth < 165;
+                final itemsIconOnly = itemsWidth < 260;
+                final itemsHeaderHeight = folderIconOnly ? 72.0 : 68.0;
+                final expandedLeftZoneWidth =
+                    folderWidth +
+                    _resizeHandleWidth +
+                    itemsWidth +
+                    _resizeHandleWidth;
+                final leftZoneWidth = _showLeftNavigation
+                    ? expandedLeftZoneWidth
+                    : 0.0;
 
-                  return Stack(
+                final wideLayout = SizedBox(
+                  width: layoutWidth,
+                  height: constraints.maxHeight,
+                  child: Stack(
                     children: [
                       Row(
                         children: [
@@ -231,34 +243,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         ),
                       ),
                     ],
-                  );
+                  ),
+                );
+
+                if (constraints.maxWidth >= _wideBreakpoint) {
+                  return wideLayout;
                 }
 
-                return Column(
-                  children: [
-                    if (_showLeftNavigation) ...[
-                      _FolderChipBar(
-                        controller: controller,
-                        onSelect: controller.selectFolder,
-                      ),
-                      const Divider(height: 1),
-                    ],
-                    Expanded(
-                      child: _LibraryItemsPane(
-                        controller: controller,
-                        iconOnly: false,
-                        headerHeight: 64,
-                        onOpen: (item) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => _LibraryRoute(item: item),
-                            ),
-                          );
-                        },
-                        onCreate: _createAndOpenItem,
-                      ),
-                    ),
-                  ],
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: wideLayout,
                 );
               },
             ),
@@ -290,21 +284,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     await _promptRenameItem(controller, item);
-  }
-
-  Future<void> _createAndOpenItem(NotebookKind kind) async {
-    final controller = context.read<LibraryController>();
-    final item = await _createItem(kind);
-    if (!mounted) {
-      return;
-    }
-    await _promptRenameItem(controller, item);
-    if (!mounted) {
-      return;
-    }
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => _LibraryRoute(item: item)));
   }
 
   Future<void> _promptNewFolder(LibraryController controller) async {
@@ -713,75 +692,6 @@ class _FolderListPane extends StatelessWidget {
   }
 }
 
-class _FolderChipBar extends StatelessWidget {
-  const _FolderChipBar({required this.controller, required this.onSelect});
-
-  final LibraryController controller;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: 'New folder',
-            icon: const Icon(Icons.add),
-            onPressed: () => context
-                .findAncestorStateOfType<_LibraryScreenState>()
-                ?._promptNewFolder(controller),
-          ),
-          const SizedBox(width: 8),
-          for (final folder in controller.folderNames)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ChoiceChip(
-                    label: Text(folder),
-                    selected: folder == controller.selectedFolder,
-                    selectedColor: colorScheme.primary.withValues(alpha: 0.08),
-                    labelStyle: folder == controller.selectedFolder
-                        ? TextStyle(color: colorScheme.primary)
-                        : null,
-                    onSelected: (_) => onSelect(folder),
-                  ),
-                  PopupMenuButton<_FolderAction>(
-                    tooltip: 'Folder actions',
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (action) {
-                      final state = context
-                          .findAncestorStateOfType<_LibraryScreenState>();
-                      if (action == _FolderAction.rename) {
-                        state?._promptRenameFolder(controller, folder);
-                      } else {
-                        state?._confirmDeleteFolder(controller, folder);
-                      }
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: _FolderAction.rename,
-                        child: Text('Rename'),
-                      ),
-                      PopupMenuItem(
-                        value: _FolderAction.delete,
-                        child: Text('Delete'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class _LibraryItemsPane extends StatelessWidget {
   const _LibraryItemsPane({
     required this.controller,
@@ -1038,32 +948,6 @@ class _LibraryWorkspace extends StatelessWidget {
       key: ValueKey(item!.uid),
       create: (_) => EditorController(repository: repository, notebook: item!),
       child: isBoard ? const BoardScreen() : const NotebookScreen(),
-    );
-  }
-}
-
-class _LibraryRoute extends StatelessWidget {
-  const _LibraryRoute({required this.item});
-
-  final Notebook item;
-
-  @override
-  Widget build(BuildContext context) {
-    final repository = context.read<NotebookRepository>();
-    return FutureBuilder<Notebook?>(
-      future: repository.getNotebook(item.uid),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final resolved = snapshot.data ?? item;
-        final isBoard = resolved.kind == NotebookKind.board;
-        return ChangeNotifierProvider(
-          create: (_) =>
-              EditorController(repository: repository, notebook: resolved),
-          child: isBoard ? const BoardScreen() : const NotebookScreen(),
-        );
-      },
     );
   }
 }

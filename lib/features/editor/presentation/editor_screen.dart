@@ -38,12 +38,14 @@ class EditorScreen extends StatefulWidget {
 }
 
 class _EditorScreenState extends State<EditorScreen> {
+  static const double _logicalPageWidth = 820;
   static const double _pageGap = 26;
   static const double _leftMargin = 56;
   static const double _rightMargin = 56;
   static const double _topBottomPadding = 22;
   static const double _addPageButtonGap = 10;
   static const double _addPageFooterHeight = 56;
+  static const double _pageViewportBleed = 20;
   static const double _minPageScaleFactor = 0.25;
   static const double _maxPageScaleFloor = 1.8;
   static const double _postFitZoomFactor = 2.0;
@@ -52,8 +54,6 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _scrollPanSensitivity = 0.38;
   static const double _inkNavigationTouchSlop = 8.0;
   static const double _previewColumnRight = 118.0;
-  static const double _minUsableCanvasWidth = 640.0;
-  static const double _edgeStopTolerance = 0.5;
   static const Duration _touchContextMenuDelay = Duration(seconds: 1);
 
   final ScrollController _scrollController = ScrollController();
@@ -72,17 +72,16 @@ class _EditorScreenState extends State<EditorScreen> {
   double _panZoomLastScale = 1.0;
   Offset _panZoomLastLocalPosition = Offset.zero;
   double _pageScale = 1.0;
+  double _responsivePageScale = 1.0;
   Offset _pagePan = Offset.zero;
   double _pageMinScale = 1.0;
   double _pageMaxScale = 1.0;
-  double _pageColumnOffset = 0.0;
-  double _pageColumnMinOffset = 0.0;
-  double _pageColumnMaxOffset = _rightMargin;
   Offset _insertPosition = const Offset(120, 120);
   Timer? _touchContextMenuTimer;
   int? _touchContextMenuPointer;
   Offset? _touchContextMenuStart;
-  DateTime? _lastNarrowCanvasLogAt;
+
+  double get _effectivePageScale => _pageScale * _responsivePageScale;
 
   @override
   void initState() {
@@ -165,7 +164,7 @@ class _EditorScreenState extends State<EditorScreen> {
         .clamp(_pageMinScale, _pageMaxScale)
         .toDouble();
     final clampedPan = _clampPagePan(
-      scale: clampedScale,
+      scale: clampedScale * _responsivePageScale,
       pan: _pagePan,
       docWorldSize: docWorldSize,
       viewportSize: viewportSize,
@@ -181,72 +180,6 @@ class _EditorScreenState extends State<EditorScreen> {
         _pageScale = clampedScale;
         _pagePan = clampedPan;
       });
-    });
-  }
-
-  void _syncPageColumnOffsetBounds({required double basePageLeft}) {
-    final minOffset = math.min(0.0, _previewColumnRight - basePageLeft);
-    final maxOffset = _rightMargin;
-    _pageColumnMinOffset = minOffset;
-    _pageColumnMaxOffset = maxOffset;
-    final clampedOffset = _pageColumnOffset
-        .clamp(minOffset, maxOffset)
-        .toDouble();
-    if (clampedOffset == _pageColumnOffset) {
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _pageColumnOffset = clampedOffset;
-      });
-    });
-  }
-
-  void _applyPageColumnPan(double deltaX) {
-    if (deltaX.abs() < _edgeStopTolerance) {
-      return;
-    }
-    if (_pageColumnOffset <= _pageColumnMinOffset + _edgeStopTolerance &&
-        deltaX < 0) {
-      _snapPageColumnToEdge(_pageColumnMinOffset);
-      return;
-    }
-    if (_pageColumnOffset >= _pageColumnMaxOffset - _edgeStopTolerance &&
-        deltaX > 0) {
-      _snapPageColumnToEdge(_pageColumnMaxOffset);
-      return;
-    }
-    final nextOffset = (_pageColumnOffset + deltaX)
-        .clamp(_pageColumnMinOffset, _pageColumnMaxOffset)
-        .toDouble();
-    final snappedOffset = _snapToPageColumnEdge(nextOffset);
-    if ((snappedOffset - _pageColumnOffset).abs() < _edgeStopTolerance) {
-      return;
-    }
-    setState(() {
-      _pageColumnOffset = snappedOffset;
-    });
-  }
-
-  double _snapToPageColumnEdge(double offset) {
-    if ((offset - _pageColumnMinOffset).abs() < _edgeStopTolerance) {
-      return _pageColumnMinOffset;
-    }
-    if ((offset - _pageColumnMaxOffset).abs() < _edgeStopTolerance) {
-      return _pageColumnMaxOffset;
-    }
-    return offset;
-  }
-
-  void _snapPageColumnToEdge(double edge) {
-    if ((_pageColumnOffset - edge).abs() < 0.01) {
-      return;
-    }
-    setState(() {
-      _pageColumnOffset = edge;
     });
   }
 
@@ -352,10 +285,9 @@ class _EditorScreenState extends State<EditorScreen> {
         final panDelta = event.localPosition - _touchLastFocal;
         _touchLastFocal = event.localPosition;
         _touchLastDistance = 1.0;
-        _applyPageColumnPan(panDelta.dx * _touchPanSensitivity);
         _applyPageTransform(
           scaleDelta: 1.0,
-          panDelta: Offset(0, panDelta.dy) * _touchPanSensitivity,
+          panDelta: panDelta * _touchPanSensitivity,
           focalPoint: event.localPosition,
           docWorldSize: docWorldSize,
           viewportSize: viewportSize,
@@ -378,7 +310,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
     final controller = context.read<EditorController>();
     if (controller.isPinchToScaleImageActive) {
-      final safeScale = _pageScale <= 0 ? 1.0 : _pageScale;
+      final safeScale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
       controller.updatePinchToScaleActiveImage(
         scaleDelta,
         panDelta * _touchPanSensitivity / safeScale,
@@ -386,11 +318,9 @@ class _EditorScreenState extends State<EditorScreen> {
       return;
     }
 
-    final adjustedPanDelta = Offset(0, panDelta.dy);
-    _applyPageColumnPan(panDelta.dx * _touchPanSensitivity);
     _applyPageTransform(
       scaleDelta: scaleDelta,
-      panDelta: adjustedPanDelta * _touchPanSensitivity,
+      panDelta: panDelta * _touchPanSensitivity,
       focalPoint: focal,
       docWorldSize: docWorldSize,
       viewportSize: viewportSize,
@@ -448,7 +378,7 @@ class _EditorScreenState extends State<EditorScreen> {
       _touchLastDistance = 1.0;
     }
     final clampedPan = _clampPagePan(
-      scale: _pageScale,
+      scale: _effectivePageScale,
       pan: _pagePan,
       docWorldSize: docWorldSize,
       viewportSize: viewportSize,
@@ -473,7 +403,7 @@ class _EditorScreenState extends State<EditorScreen> {
     _panZoomLastScale = 1.0;
     _panZoomLastLocalPosition = event.localPosition;
     final clampedPan = _clampPagePan(
-      scale: _pageScale,
+      scale: _effectivePageScale,
       pan: _pagePan,
       docWorldSize: docWorldSize,
       viewportSize: viewportSize,
@@ -512,7 +442,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
     final controller = context.read<EditorController>();
     if (controller.isPinchToScaleImageActive) {
-      final safeScale = _pageScale <= 0 ? 1.0 : _pageScale;
+      final safeScale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
       controller.updatePinchToScaleActiveImage(
         scaleDelta,
         panDelta * _trackpadPanSensitivity / safeScale,
@@ -572,10 +502,12 @@ class _EditorScreenState extends State<EditorScreen> {
     required Size docWorldSize,
     required Size viewportSize,
   }) {
-    final currentScale = _pageScale <= 0 ? 1.0 : _pageScale;
-    final targetScale = (currentScale * scaleDelta)
+    final currentZoom = _pageScale <= 0 ? 1.0 : _pageScale;
+    final targetZoom = (currentZoom * scaleDelta)
         .clamp(_pageMinScale, _pageMaxScale)
         .toDouble();
+    final currentScale = currentZoom * _responsivePageScale;
+    final targetScale = targetZoom * _responsivePageScale;
 
     var desiredPan = _pagePan;
     if ((targetScale - currentScale).abs() > 0.0001) {
@@ -603,12 +535,12 @@ class _EditorScreenState extends State<EditorScreen> {
       }
     }
 
-    if (targetScale == _pageScale && clampedPan == _pagePan) {
+    if (targetZoom == _pageScale && clampedPan == _pagePan) {
       return;
     }
 
     setState(() {
-      _pageScale = targetScale;
+      _pageScale = targetZoom;
       _pagePan = clampedPan;
     });
   }
@@ -625,9 +557,9 @@ class _EditorScreenState extends State<EditorScreen> {
     late final double minX;
     late final double maxX;
     if (contentWidth <= viewportSize.width) {
-      final centeredX = (viewportSize.width - contentWidth) / 2;
-      minX = centeredX;
-      maxX = centeredX;
+      final rightAlignedX = viewportSize.width - contentWidth;
+      minX = rightAlignedX;
+      maxX = rightAlignedX;
     } else {
       minX = viewportSize.width - contentWidth;
       maxX = 0.0;
@@ -679,7 +611,7 @@ class _EditorScreenState extends State<EditorScreen> {
     required Size viewportSize,
   }) {
     final docHeight = docWorldSize.height;
-    final safeScale = _pageScale <= 0 ? 1.0 : _pageScale;
+    final safeScale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
 
     var clipTop = 0.0;
     var clipBottom = viewportSize.height;
@@ -1159,7 +1091,7 @@ class _EditorScreenState extends State<EditorScreen> {
       return null;
     }
     final local = renderBox.globalToLocal(globalPosition);
-    final scale = _pageScale <= 0 ? 1.0 : _pageScale;
+    final scale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
     final world = (local - _pagePan) / scale;
     if (pageCount <= 0) {
       return Offset(
@@ -1222,19 +1154,29 @@ class _EditorScreenState extends State<EditorScreen> {
     _touchContextMenuStart = null;
   }
 
-  void _logNarrowCanvas(double width) {
-    assert(() {
-      final now = DateTime.now();
-      final last = _lastNarrowCanvasLogAt;
-      if (last == null || now.difference(last) > const Duration(seconds: 2)) {
-        _lastNarrowCanvasLogAt = now;
-        debugPrint(
-          '[layout] nb narrow w=${width.toStringAsFixed(0)} '
-          'min=${_minUsableCanvasWidth.toStringAsFixed(0)}',
-        );
-      }
-      return true;
-    }());
+  Widget _buildTransformedDocumentLayer({
+    Key? transformKey,
+    required Matrix4 transform,
+    required Size worldSize,
+    required Widget child,
+  }) {
+    return OverflowBox(
+      alignment: Alignment.topLeft,
+      minWidth: worldSize.width,
+      maxWidth: worldSize.width,
+      minHeight: worldSize.height,
+      maxHeight: worldSize.height,
+      child: Transform(
+        key: transformKey,
+        alignment: Alignment.topLeft,
+        transform: transform,
+        child: SizedBox(
+          width: worldSize.width,
+          height: worldSize.height,
+          child: child,
+        ),
+      ),
+    );
   }
 
   @override
@@ -1258,26 +1200,16 @@ class _EditorScreenState extends State<EditorScreen> {
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              if (constraints.maxWidth < _minUsableCanvasWidth) {
-                _logNarrowCanvas(constraints.maxWidth);
-                return const ColoredBox(
-                  color: AppColors.paper,
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Widen the window to edit this notebook.',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                );
-              }
+              final showProjectOverview =
+                  constraints.maxWidth > _previewColumnRight + _rightMargin;
+              final pageLeftBoundary = showProjectOverview
+                  ? _previewColumnRight
+                  : _leftMargin;
               final maxPageWidth = math.max(
-                260.0,
-                constraints.maxWidth - (_leftMargin + _rightMargin),
+                1.0,
+                constraints.maxWidth - pageLeftBoundary - _rightMargin,
               );
-              final pageWidth = math.min(820.0, maxPageWidth);
+              const pageWidth = _logicalPageWidth;
               final pageHeight = pageWidth * AppMetrics.a4HeightRatio;
               final pageWorldSize = Size(pageWidth, pageHeight);
               controller.updatePageLayout(
@@ -1291,12 +1223,11 @@ class _EditorScreenState extends State<EditorScreen> {
               );
               final docWorldSize = Size(pageWorldSize.width, docHeight);
               final fitToWidthScale = (maxPageWidth / pageWidth)
-                  .clamp(1.0, 4.0)
+                  .clamp(0.01, 1.0)
                   .toDouble();
-              final clipScale = math.max(
-                1.0,
-                math.min(_pageScale, fitToWidthScale),
-              );
+              _responsivePageScale = fitToWidthScale;
+              final effectivePageScale = _effectivePageScale;
+              final clipScale = fitToWidthScale;
               final clipSize = Size(
                 docWorldSize.width * clipScale,
                 docWorldSize.height * clipScale,
@@ -1305,15 +1236,11 @@ class _EditorScreenState extends State<EditorScreen> {
                 clipSize.width,
                 clipSize.height + (_addPageFooterHeight * clipScale),
               );
-              final basePageLeft =
-                  constraints.maxWidth -
-                  _rightMargin -
-                  documentContentSize.width;
               final viewportSize = Size(
                 clipSize.width,
                 math.max(1.0, constraints.maxHeight - (_topBottomPadding * 2)),
               );
-              final zoomPercent = (_pageScale * 100).round();
+              final zoomPercent = (effectivePageScale * 100).round();
               final visibleDocumentRect = _visibleDocumentRect(
                 docWorldSize: docWorldSize,
                 viewportSize: viewportSize,
@@ -1335,15 +1262,14 @@ class _EditorScreenState extends State<EditorScreen> {
                 math.max(180.0, constraints.maxHeight - 24),
               );
               _pageExtent = pageWorldSize.height + _pageGap;
-              _syncPageColumnOffsetBounds(basePageLeft: basePageLeft);
               _syncPageTransformBounds(
                 docWorldSize: docWorldSize,
                 fitToWidthScale: fitToWidthScale,
                 viewportSize: viewportSize,
               );
               final pageTransform = Matrix4.diagonal3Values(
-                _pageScale,
-                _pageScale,
+                effectivePageScale,
+                effectivePageScale,
                 1.0,
               )..setTranslationRaw(_pagePan.dx, _pagePan.dy, 0.0);
 
@@ -1370,303 +1296,291 @@ class _EditorScreenState extends State<EditorScreen> {
                         ),
                         child: Align(
                           alignment: Alignment.topRight,
-                          child: Transform.translate(
-                            offset: Offset(_pageColumnOffset, 0),
-                            child: SizedBox(
-                              width: documentContentSize.width,
-                              height: documentContentSize.height,
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  SizedBox(
-                                    width: clipSize.width,
-                                    height: clipSize.height,
-                                    child: ClipRect(
-                                      child: GestureDetector(
-                                        onSecondaryTapDown: (details) =>
-                                            _showCanvasContextMenu(
-                                              details.globalPosition,
-                                              controller,
-                                              pageWorldSize,
-                                              controller.pages.length,
+                          child: SizedBox(
+                            width: documentContentSize.width,
+                            height: documentContentSize.height,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                SizedBox(
+                                  width: clipSize.width,
+                                  height: clipSize.height,
+                                  child: ClipRect(
+                                    clipper: const _PageViewportClipper(
+                                      _pageViewportBleed,
+                                    ),
+                                    child: GestureDetector(
+                                      onSecondaryTapDown: (details) =>
+                                          _showCanvasContextMenu(
+                                            details.globalPosition,
+                                            controller,
+                                            pageWorldSize,
+                                            controller.pages.length,
+                                          ),
+                                      child: Listener(
+                                        key: _canvasKey,
+                                        behavior: HitTestBehavior.translucent,
+                                        onPointerDown: (event) {
+                                          _startTouchContextMenuTimer(
+                                            event,
+                                            controller,
+                                            pageWorldSize,
+                                            controller.pages.length,
+                                          );
+                                          _onPointerDown(
+                                            event,
+                                            docWorldSize,
+                                            viewportSize,
+                                          );
+                                        },
+                                        onPointerMove: (event) {
+                                          _updateTouchContextMenuTimer(event);
+                                          _onPointerMove(
+                                            event,
+                                            docWorldSize,
+                                            viewportSize,
+                                          );
+                                        },
+                                        onPointerUp: (event) {
+                                          _cancelTouchContextMenu();
+                                          _onPointerUpOrCancel(event);
+                                        },
+                                        onPointerCancel: (event) {
+                                          _cancelTouchContextMenu();
+                                          _onPointerUpOrCancel(event);
+                                        },
+                                        onPointerPanZoomStart: (event) =>
+                                            _onPointerPanZoomStart(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
                                             ),
-                                        child: Listener(
-                                          key: _canvasKey,
-                                          behavior: HitTestBehavior.translucent,
-                                          onPointerDown: (event) {
-                                            _startTouchContextMenuTimer(
-                                              event,
-                                              controller,
-                                              pageWorldSize,
-                                              controller.pages.length,
-                                            );
-                                            _onPointerDown(
+                                        onPointerPanZoomUpdate: (event) =>
+                                            _onPointerPanZoomUpdate(
                                               event,
                                               docWorldSize,
                                               viewportSize,
-                                            );
-                                          },
-                                          onPointerMove: (event) {
-                                            _updateTouchContextMenuTimer(event);
-                                            _onPointerMove(
+                                            ),
+                                        onPointerPanZoomEnd:
+                                            _onPointerPanZoomEnd,
+                                        onPointerSignal: (event) =>
+                                            _onPointerSignal(
                                               event,
                                               docWorldSize,
                                               viewportSize,
-                                            );
-                                          },
-                                          onPointerUp: (event) {
-                                            _cancelTouchContextMenu();
-                                            _onPointerUpOrCancel(event);
-                                          },
-                                          onPointerCancel: (event) {
-                                            _cancelTouchContextMenu();
-                                            _onPointerUpOrCancel(event);
-                                          },
-                                          onPointerPanZoomStart: (event) =>
-                                              _onPointerPanZoomStart(
-                                                event,
-                                                docWorldSize,
-                                                viewportSize,
-                                              ),
-                                          onPointerPanZoomUpdate: (event) =>
-                                              _onPointerPanZoomUpdate(
-                                                event,
-                                                docWorldSize,
-                                                viewportSize,
-                                              ),
-                                          onPointerPanZoomEnd:
-                                              _onPointerPanZoomEnd,
-                                          onPointerSignal: (event) =>
-                                              _onPointerSignal(
-                                                event,
-                                                docWorldSize,
-                                                viewportSize,
-                                              ),
-                                          child: Transform(
-                                            alignment: Alignment.topLeft,
-                                            transform: pageTransform,
-                                            child: SizedBox(
-                                              width: docWorldSize.width,
-                                              height: docWorldSize.height,
-                                              child: Stack(
-                                                children: [
-                                                  for (
-                                                    var i =
-                                                        visiblePageRange.start;
-                                                    i < visiblePageRange.end;
-                                                    i++
-                                                  )
-                                                    Positioned(
-                                                      left: 0,
-                                                      top: i * _pageExtent,
-                                                      width:
-                                                          pageWorldSize.width,
-                                                      height:
-                                                          pageWorldSize.height,
-                                                      child: IgnorePointer(
-                                                        child: Stack(
-                                                          fit: StackFit.expand,
-                                                          children: [
-                                                            DecoratedBox(
-                                                              decoration: BoxDecoration(
+                                            ),
+                                        child: _buildTransformedDocumentLayer(
+                                          transformKey: const ValueKey(
+                                            'notebook-document-transform',
+                                          ),
+                                          transform: pageTransform,
+                                          worldSize: docWorldSize,
+                                          child: Stack(
+                                            children: [
+                                              for (
+                                                var i = visiblePageRange.start;
+                                                i < visiblePageRange.end;
+                                                i++
+                                              )
+                                                Positioned(
+                                                  left: 0,
+                                                  top: i * _pageExtent,
+                                                  width: pageWorldSize.width,
+                                                  height: pageWorldSize.height,
+                                                  child: IgnorePointer(
+                                                    child: Stack(
+                                                      fit: StackFit.expand,
+                                                      children: [
+                                                        DecoratedBox(
+                                                          decoration: BoxDecoration(
+                                                            color:
+                                                                AppColors.paper,
+                                                            boxShadow: const [
+                                                              BoxShadow(
                                                                 color: AppColors
-                                                                    .paper,
-                                                                boxShadow: const [
-                                                                  BoxShadow(
-                                                                    color: AppColors
-                                                                        .shadow,
-                                                                    blurRadius:
-                                                                        14,
-                                                                    offset:
-                                                                        Offset(
-                                                                          0,
-                                                                          6,
-                                                                        ),
-                                                                  ),
-                                                                ],
+                                                                    .shadow,
+                                                                blurRadius: 14,
+                                                                offset: Offset(
+                                                                  0,
+                                                                  6,
+                                                                ),
                                                               ),
-                                                            ),
-                                                            PageBackgroundPaint(
-                                                              settings: controller
-                                                                  .currentBackgroundSettings,
-                                                            ),
-                                                            Builder(
-                                                              builder: (context) {
-                                                                final visibility = _pageBoundaryVisibilityInDocument(
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        PageBackgroundPaint(
+                                                          settings: controller
+                                                              .currentBackgroundSettings,
+                                                        ),
+                                                        Builder(
+                                                          builder: (context) {
+                                                            final visibility =
+                                                                _pageBoundaryVisibilityInDocument(
                                                                   visibleDocumentRect:
                                                                       visibleDocumentRect,
                                                                   pageWorldSize:
                                                                       pageWorldSize,
                                                                   pageIndex: i,
                                                                 );
-                                                                return CustomPaint(
-                                                                  painter: _PageFramePainter(
-                                                                    showLeft:
-                                                                        visibility
-                                                                            .left,
-                                                                    showTop:
-                                                                        visibility
-                                                                            .top,
-                                                                    showRight:
-                                                                        visibility
-                                                                            .right,
-                                                                    showBottom:
-                                                                        visibility
-                                                                            .bottom,
-                                                                    highlightColor: Theme.of(context)
+                                                            return CustomPaint(
+                                                              painter: _PageFramePainter(
+                                                                showLeft:
+                                                                    visibility
+                                                                        .left,
+                                                                showTop:
+                                                                    visibility
+                                                                        .top,
+                                                                showRight:
+                                                                    visibility
+                                                                        .right,
+                                                                showBottom:
+                                                                    visibility
+                                                                        .bottom,
+                                                                highlightColor:
+                                                                    Theme.of(
+                                                                          context,
+                                                                        )
                                                                         .colorScheme
                                                                         .primary
                                                                         .withValues(
                                                                           alpha:
                                                                               0.75,
                                                                         ),
-                                                                  ),
-                                                                );
-                                                              },
-                                                            ),
-                                                          ],
+                                                              ),
+                                                            );
+                                                          },
                                                         ),
-                                                      ),
+                                                      ],
                                                     ),
-                                                  DocumentPageOverlay(
-                                                    controller: controller,
-                                                    interactionEnabled:
-                                                        !_isViewportNavigating,
-                                                    worldOrigin: Offset.zero,
-                                                    pages: controller.pages,
-                                                    pageSize: pageWorldSize,
-                                                    pageGap: _pageGap,
-                                                    firstPageIndex:
-                                                        visiblePageRange.start,
-                                                    lastPageIndex:
-                                                        visiblePageRange.end,
-                                                    renderBackground: true,
-                                                    renderInactive: true,
-                                                    renderActive: false,
                                                   ),
-                                                  DocumentDrawingCanvas(
-                                                    allowMultiTouch: false,
-                                                    effectiveScale: _pageScale,
-                                                    interactionEnabled:
-                                                        !_isViewportNavigating,
-                                                    worldOrigin: Offset.zero,
-                                                    pages: controller.pages,
-                                                    pageSize: pageWorldSize,
-                                                    pageGap: _pageGap,
-                                                    firstPageIndex:
-                                                        visiblePageRange.start,
-                                                    lastPageIndex:
-                                                        visiblePageRange.end,
-                                                  ),
-                                                  DocumentPageOverlay(
-                                                    controller: controller,
-                                                    interactionEnabled:
-                                                        !_isViewportNavigating,
-                                                    worldOrigin: Offset.zero,
-                                                    pages: controller.pages,
-                                                    pageSize: pageWorldSize,
-                                                    pageGap: _pageGap,
-                                                    firstPageIndex:
-                                                        visiblePageRange.start,
-                                                    lastPageIndex:
-                                                        visiblePageRange.end,
-                                                    renderBackground: false,
-                                                    renderInactive: false,
-                                                    renderActive: true,
-                                                  ),
-                                                ],
+                                                ),
+                                              DocumentPageOverlay(
+                                                controller: controller,
+                                                interactionEnabled:
+                                                    !_isViewportNavigating,
+                                                worldOrigin: Offset.zero,
+                                                pages: controller.pages,
+                                                pageSize: pageWorldSize,
+                                                pageGap: _pageGap,
+                                                firstPageIndex:
+                                                    visiblePageRange.start,
+                                                lastPageIndex:
+                                                    visiblePageRange.end,
+                                                renderBackground: true,
+                                                renderInactive: true,
+                                                renderActive: false,
                                               ),
-                                            ),
+                                              DocumentDrawingCanvas(
+                                                allowMultiTouch: false,
+                                                effectiveScale:
+                                                    effectivePageScale,
+                                                interactionEnabled:
+                                                    !_isViewportNavigating,
+                                                worldOrigin: Offset.zero,
+                                                pages: controller.pages,
+                                                pageSize: pageWorldSize,
+                                                pageGap: _pageGap,
+                                                firstPageIndex:
+                                                    visiblePageRange.start,
+                                                lastPageIndex:
+                                                    visiblePageRange.end,
+                                              ),
+                                              DocumentPageOverlay(
+                                                controller: controller,
+                                                interactionEnabled:
+                                                    !_isViewportNavigating,
+                                                worldOrigin: Offset.zero,
+                                                pages: controller.pages,
+                                                pageSize: pageWorldSize,
+                                                pageGap: _pageGap,
+                                                firstPageIndex:
+                                                    visiblePageRange.start,
+                                                lastPageIndex:
+                                                    visiblePageRange.end,
+                                                renderBackground: false,
+                                                renderInactive: false,
+                                                renderActive: true,
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                  Transform(
-                                    alignment: Alignment.topLeft,
-                                    transform: pageTransform,
-                                    child: _IndexTabsOverlay(
-                                      pages: controller.pages,
-                                      pageSize: pageWorldSize,
-                                      pageGap: _pageGap,
-                                      firstPageIndex: visiblePageRange.start,
-                                      lastPageIndex: visiblePageRange.end,
-                                      onEditTab: (pageIndex, tabId) =>
-                                          _showIndexTabEditor(
-                                            controller,
-                                            pageIndex,
-                                            tabId,
-                                          ),
-                                      onDragStart: (pageIndex, tabId) =>
-                                          controller.beginIndexTabDrag(
-                                            pageIndex: pageIndex,
-                                            id: tabId,
-                                          ),
-                                      onDragUpdate: (tabId, position) =>
-                                          controller.updateIndexTabDrag(
-                                            id: tabId,
-                                            position: position,
-                                          ),
-                                      onDragEnd: controller.commitIndexTabDrag,
-                                    ),
+                                ),
+                                _buildTransformedDocumentLayer(
+                                  transform: pageTransform,
+                                  worldSize: docWorldSize,
+                                  child: _IndexTabsOverlay(
+                                    pages: controller.pages,
+                                    pageSize: pageWorldSize,
+                                    pageGap: _pageGap,
+                                    firstPageIndex: visiblePageRange.start,
+                                    lastPageIndex: visiblePageRange.end,
+                                    onEditTab: (pageIndex, tabId) =>
+                                        _showIndexTabEditor(
+                                          controller,
+                                          pageIndex,
+                                          tabId,
+                                        ),
+                                    onDragStart: (pageIndex, tabId) =>
+                                        controller.beginIndexTabDrag(
+                                          pageIndex: pageIndex,
+                                          id: tabId,
+                                        ),
+                                    onDragUpdate: (tabId, position) =>
+                                        controller.updateIndexTabDrag(
+                                          id: tabId,
+                                          position: position,
+                                        ),
+                                    onDragEnd: controller.commitIndexTabDrag,
                                   ),
-                                  Transform(
-                                    alignment: Alignment.topLeft,
-                                    transform: pageTransform,
-                                    child: SizedBox(
-                                      width: docWorldSize.width,
-                                      height:
-                                          docWorldSize.height +
-                                          _addPageFooterHeight,
-                                      child: Stack(
-                                        children: [
-                                          Positioned(
-                                            top:
-                                                docWorldSize.height +
-                                                _addPageButtonGap,
-                                            left: 0,
-                                            width: docWorldSize.width,
-                                            child: Center(
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  FilledButton.icon(
-                                                    onPressed: () =>
-                                                        _addPageBelow(
-                                                          controller,
-                                                        ),
-                                                    icon: const Icon(Icons.add),
-                                                    label: const Text(
-                                                      'Add page',
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  OutlinedButton.icon(
-                                                    onPressed:
-                                                        controller
-                                                                .pages
-                                                                .length >
-                                                            1
-                                                        ? controller
-                                                              .deleteLastPage
-                                                        : null,
-                                                    icon: const Icon(
-                                                      Icons.delete_outline,
-                                                    ),
-                                                    label: const Text(
-                                                      'Delete page',
-                                                    ),
-                                                  ),
-                                                ],
+                                ),
+                                _buildTransformedDocumentLayer(
+                                  transform: pageTransform,
+                                  worldSize: Size(
+                                    docWorldSize.width,
+                                    docWorldSize.height + _addPageFooterHeight,
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      Positioned(
+                                        top:
+                                            docWorldSize.height +
+                                            _addPageButtonGap,
+                                        left: 0,
+                                        width: docWorldSize.width,
+                                        child: Center(
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              FilledButton.icon(
+                                                onPressed: () =>
+                                                    _addPageBelow(controller),
+                                                icon: const Icon(Icons.add),
+                                                label: const Text('Add page'),
                                               ),
-                                            ),
+                                              const SizedBox(width: 8),
+                                              OutlinedButton.icon(
+                                                onPressed:
+                                                    controller.pages.length > 1
+                                                    ? controller.deleteLastPage
+                                                    : null,
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                ),
+                                                label: const Text(
+                                                  'Delete page',
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -1679,19 +1593,21 @@ class _EditorScreenState extends State<EditorScreen> {
                         child: _ZoomPercentBadge(zoomPercent: zoomPercent),
                       ),
                     ),
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: _ProjectMiniMapOverlay(
-                        controller: controller,
-                        pages: controller.pages,
-                        currentPageIndex: controller.currentPageIndex,
-                        pageWorldSize: pageWorldSize,
-                        pageGap: _pageGap,
-                        panelHeight: minimapPanelHeight,
-                        visibleDocumentRect: visibleDocumentRect,
+                    if (showProjectOverview)
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: _ProjectMiniMapOverlay(
+                          key: const ValueKey('notebook-project-overview'),
+                          controller: controller,
+                          pages: controller.pages,
+                          currentPageIndex: controller.currentPageIndex,
+                          pageWorldSize: pageWorldSize,
+                          pageGap: _pageGap,
+                          panelHeight: minimapPanelHeight,
+                          visibleDocumentRect: visibleDocumentRect,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               );
@@ -1776,6 +1692,27 @@ class _EditorScreenState extends State<EditorScreen> {
 
 class _PasteFromClipboardIntent extends Intent {
   const _PasteFromClipboardIntent();
+}
+
+class _PageViewportClipper extends CustomClipper<Rect> {
+  const _PageViewportClipper(this.bleed);
+
+  final double bleed;
+
+  @override
+  Rect getClip(Size size) {
+    return Rect.fromLTRB(
+      -bleed,
+      -bleed,
+      size.width + bleed,
+      size.height + bleed,
+    );
+  }
+
+  @override
+  bool shouldReclip(_PageViewportClipper oldClipper) {
+    return oldClipper.bleed != bleed;
+  }
 }
 
 class _IndexTabEditResult {
@@ -2083,6 +2020,7 @@ class _ProjectMiniMapOverlay extends StatefulWidget {
     required this.pageGap,
     required this.panelHeight,
     required this.visibleDocumentRect,
+    super.key,
   });
 
   final EditorController controller;
