@@ -57,15 +57,17 @@ class AppPreferencesController extends ChangeNotifier {
         }
       }
 
-      final accentIndex = decoded['accentColor'];
-      if (accentIndex is int &&
-          accentIndex >= 0 &&
-          accentIndex < AppAccentColor.values.length) {
-        final loadedAccent = AppAccentColor.values[accentIndex];
-        if (loadedAccent != accentColor) {
-          accentColor = loadedAccent;
-          changed = true;
-        }
+      final accentValue = decoded['accentColor'];
+      final loadedAccent = switch (accentValue) {
+        final String name => _accentColorFromName(name),
+        final int index when index >= 0 &&
+            index < AppAccentColor.values.length =>
+          AppAccentColor.values[index],
+        _ => null,
+      };
+      if (loadedAccent != null && loadedAccent != accentColor) {
+        accentColor = loadedAccent;
+        changed = true;
       }
 
       if (changed) {
@@ -100,7 +102,7 @@ class AppPreferencesController extends ChangeNotifier {
         _fileName,
         jsonEncode({
           'deviceInputMode': deviceInputMode.index,
-          'accentColor': accentColor.index,
+          'accentColor': accentColor.name,
         }),
       );
     } catch (e) {
@@ -115,4 +117,13 @@ DeviceInputMode _defaultDeviceInputMode() {
     return DeviceInputMode.tablet;
   }
   return DeviceInputMode.computer;
+}
+
+AppAccentColor? _accentColorFromName(String name) {
+  for (final color in AppAccentColor.values) {
+    if (color.name == name) {
+      return color;
+    }
+  }
+  return null;
 }

@@ -523,26 +523,91 @@ class _AccentColorSection extends StatelessWidget {
           runSpacing: 10,
           children: [
             for (final accent in AppAccentColor.values)
-              ChoiceChip(
+              _AccentColorOption(
+                accent: accent,
                 selected: accent == selected,
-                showCheckmark: false,
-                avatar: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: accent.color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                  ),
-                ),
-                label: Text(accent.label),
-                onSelected: (_) => onChanged(accent),
+                onTap: () => onChanged(accent),
               ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _AccentColorOption extends StatelessWidget {
+  const _AccentColorOption({
+    required this.accent,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppAccentColor accent;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${accent.label} accent color',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            width: 118,
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? colorScheme.primaryContainer
+                  : colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.outlineVariant,
+                width: selected ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: accent.color,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: colorScheme.outline),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    accent.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (selected) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.check_rounded,
+                    size: 17,
+                    color: colorScheme.primary,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

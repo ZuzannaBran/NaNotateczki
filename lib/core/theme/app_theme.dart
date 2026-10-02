@@ -6,18 +6,15 @@ class AppTheme {
   static ThemeData light({
     AppAccentColor accentColor = AppAccentColor.classic,
   }) {
-    final seedColor = accentColor.color;
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: seedColor,
-      surface: AppColors.paper,
-    );
-
     return ThemeData(
-      colorScheme: colorScheme,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: accentColor.color,
+        surface: AppColors.paper,
+      ),
       scaffoldBackgroundColor: AppColors.paper,
       useMaterial3: true,
-      appBarTheme: AppBarTheme(
-        backgroundColor: Color.lerp(AppColors.toolbar, seedColor, 0.08),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.toolbar,
         elevation: 0,
       ),
       dividerColor: AppColors.divider,

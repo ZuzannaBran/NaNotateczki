@@ -53,17 +53,18 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (402 linii)
+### `lib/app/app_scope.dart` (409 linii)
 
-Otwiera bazę, buduje serwisy/Providery, stosuje zapisany kolor akcentu i
-planuje backup po zapisie.
+Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
+przebudowywania `MaterialApp` i planuje backup po zapisie.
 
 - 21: `AppScope`;
   28: `_AppScopeState`;
-  131:
-  `_BackupStatusOverlay`; 192:
-  `_StartupErrorScreen`; 268:
-  `_BackupScheduler`.
+  138:
+  `_BackupStatusOverlay`;
+  199:
+  `_StartupErrorScreen`;
+  275: `_BackupScheduler`.
 
 ## 3. Core
 
@@ -75,14 +76,15 @@ planuje backup po zapisie.
   `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (26): konfiguracja jasnego
-  Material 3 z akcentem użytkownika. 5:
-  `AppTheme`.
+- `lib/core/theme/app_theme.dart` (23): konfiguracja jasnego
+  Material 3 z wybieralnym akcentem i stałym kolorem powierzchni.
+  5: `AppTheme`.
 
 ### Wejście i preferencje
 
-- `lib/core/input/app_preferences_controller.dart` (118): globalny
-  tryb urządzenia i kolor akcentu zapisane w `app_prefs.json`.
+- `lib/core/input/app_preferences_controller.dart` (129): globalny
+  tryb urządzenia i kolor akcentu zapisane w `app_prefs.json`; akcent jest
+  zapisywany nazwą enuma z obsługą starszego indeksu.
   8: `DeviceInputMode`;
   27:
   `AppPreferencesController`.
@@ -347,10 +349,10 @@ aby nie obcinać prawej ramki i cienia strony.
 - 1799: `_PageFramePainter`; 1874: `_IndexTabsOverlay`;
   2014: `_ProjectMiniMapOverlay`; 2364: `_ProjectMiniMapPainter`.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (613 linie)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (678 linie)
 
-Ustawienia wejścia, koloru akcentu, tła oraz podgląd logów błędów,
-integralności i wydajności.
+Ustawienia wejścia, kompaktowego wyboru koloru akcentu, tła oraz podgląd logów
+błędów, integralności i wydajności.
 
 - 16:
   `EditorSettingsScreen`;
@@ -362,7 +364,7 @@ integralności i wydajności.
   `_showOptimizationDialog`;
   497:
   `_AccentColorSection`;
-  550:
+  615:
   `_BackgroundSection`.
 
 ### Widgety edytora
