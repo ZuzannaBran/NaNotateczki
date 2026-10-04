@@ -170,7 +170,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (1251 linii)
+### `lib/data/backup/local_backup_service.dart` (1357 linii)
 
 Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami SHA-256 (v3) i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
@@ -178,7 +178,8 @@ trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki.
 Przed i po serializacji natywny backup sprawdza, czy każdy obraz nadal ma
 dostępne bajty; wyścig z usunięciem pliku nie może utrwalić kopii bez obrazu; brak obrazu nie zastępuje
 ostatniej poprawnej kopii. Odczyt obsługuje manifesty v1/v2/v3, odrzuca niekompletny lub niespójny
-snapshot i próbuje kolejno starsze wersje. Web przechowuje pełny snapshot w `localStorage`.
+snapshot i próbuje kolejno starsze wersje. Manifest przechowuje też listę
+folderów biblioteki, w tym foldery puste. Web przechowuje pełny snapshot w `localStorage`.
 
 - 15: `LocalBackupService`; 90: `snapshot`; 280: `hasLatest`;
   430: `readLatest`; 545: `restoreFromLatest`.
@@ -265,7 +266,7 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (618 linie)
+### `lib/features/library/presentation/library_controller.dart` (619 linie)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
 
@@ -455,7 +456,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (917)
-- `test/local_backup_service_test.dart` (752)
+- `test/local_backup_service_test.dart` (779)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

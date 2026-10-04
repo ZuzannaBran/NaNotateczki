@@ -104,6 +104,7 @@ class LibraryController extends ChangeNotifier {
             items = await repository.fetchNotebooks();
             await _refreshCorruptRecoveryState();
           }
+          await _loadFolders();
           await repository.completeDatabaseRecovery();
         } else {
           AppErrorLog.instance.record(

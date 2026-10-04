@@ -36,6 +36,7 @@ class LocalBackupService {
   static const _trashRetention = 20;
   static const _latest = 'notebooks_latest.json';
   static const _webBackupKey = 'local_backup_web.json';
+  static const _libraryFoldersFile = 'library_folders.json';
   static const _temporarySuffix = '.tmp';
   static const _previousSuffix = '.previous';
 
@@ -237,8 +238,10 @@ class LocalBackupService {
       }
 
       _throwIfInterrupted(shouldInterrupt);
+      final folders = await _foldersForSnapshot(items);
       final manifestPayload = {
         'version': 3,
+        'folders': folders,
         'notebooks': [
           for (final notebook in items) currentEntries[notebook.uid]!.toJson(),
         ],
@@ -313,6 +316,61 @@ class LocalBackupService {
     } finally {
       _snapshotInProgress.value = false;
     }
+  }
+
+  Future<List<String>> _foldersForSnapshot(List<Notebook> items) async {
+    final names = <String>{
+      for (final notebook in items)
+        if (notebook.folder.trim().isNotEmpty) notebook.folder.trim(),
+    };
+    final content = await _readStoredFolders();
+    if (content != null) {
+      final decoded = jsonDecode(content);
+      if (decoded is! List<dynamic> ||
+          decoded.any((item) => item is! String)) {
+        throw const BackupDataException(
+          'Stored library folder metadata is malformed.',
+        );
+      }
+      names.addAll(
+        decoded
+            .cast<String>()
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty),
+      );
+    }
+    final folders = names.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return folders;
+  }
+
+  Future<String?> _readStoredFolders() async {
+    if (kIsWeb) {
+      return readStoredText(_libraryFoldersFile);
+    }
+    final docs = await _documentsDirectory();
+    final file = File('${docs.path}/$_libraryFoldersFile');
+    await _recoverAtomicWrite(file);
+    if (!await file.exists()) {
+      return null;
+    }
+    return file.readAsString();
+  }
+
+  Future<void> _restoreFolders(List<String>? folders) async {
+    if (folders == null) {
+      return;
+    }
+    final content = jsonEncode(folders);
+    if (kIsWeb) {
+      await writeStoredText(_libraryFoldersFile, content);
+      return;
+    }
+    final docs = await _documentsDirectory();
+    await _atomicWriteString(
+      File('${docs.path}/$_libraryFoldersFile'),
+      content,
+    );
   }
 
   Future<bool> hasLatest() async {
@@ -492,7 +550,7 @@ class LocalBackupService {
   }
 
   Future<List<Notebook>> readLatest() async {
-    return (await _readLatestResult()).notebooks;
+    return (await _readLatestResult()).data.notebooks;
   }
 
   Future<_BackupReadResult> _readLatestResult() async {
@@ -508,7 +566,12 @@ class LocalBackupService {
             'Web backup root is not a JSON list.',
           );
         }
-        return _BackupReadResult.found(_decodeCompleteNotebookList(decoded));
+        return _BackupReadResult.found(
+          _BackupSnapshotData(
+            notebooks: _decodeCompleteNotebookList(decoded),
+            folders: null,
+          ),
+        );
       } catch (e, st) {
         AppErrorLog.instance.record(
           e,
@@ -555,11 +618,11 @@ class LocalBackupService {
     return const _BackupReadResult.notFound();
   }
 
-  Future<List<Notebook>?> _readIncrementalLatest() async {
+  Future<_BackupSnapshotData?> _readIncrementalLatest() async {
     return _readManifestSnapshot(await _manifestFile());
   }
 
-  Future<List<Notebook>?> _readManifestSnapshot(File manifest) async {
+  Future<_BackupSnapshotData?> _readManifestSnapshot(File manifest) async {
     await _recoverAtomicWrite(manifest);
     if (!await manifest.exists()) {
       return null;
@@ -576,6 +639,7 @@ class LocalBackupService {
         'Unsupported backup manifest version: $rawVersion',
       );
     }
+    final folders = _foldersFromManifest(decoded);
     final notebookEntries = decoded['notebooks'];
     if (notebookEntries is! List<dynamic>) {
       throw const BackupValidationException(
@@ -636,10 +700,31 @@ class LocalBackupService {
       }
       notebooks.add(notebook);
     }
-    return notebooks;
+    return _BackupSnapshotData(notebooks: notebooks, folders: folders);
   }
 
-  Future<List<Notebook>?> _readLegacyLatest() async {
+  List<String>? _foldersFromManifest(Map<String, dynamic> manifest) {
+    final rawFolders = manifest['folders'];
+    if (rawFolders == null) {
+      return null;
+    }
+    if (rawFolders is! List<dynamic> ||
+        rawFolders.any((item) => item is! String)) {
+      throw const BackupValidationException(
+        'Manifest contains malformed folder metadata.',
+      );
+    }
+    final folders = rawFolders
+        .cast<String>()
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return folders;
+  }
+
+  Future<_BackupSnapshotData?> _readLegacyLatest() async {
     try {
       final file = await _file(_latest);
       if (!await file.exists()) {
@@ -652,7 +737,10 @@ class LocalBackupService {
           'Legacy backup root is not a JSON list.',
         );
       }
-      return _decodeCompleteNotebookList(decoded);
+      return _BackupSnapshotData(
+        notebooks: _decodeCompleteNotebookList(decoded),
+        folders: null,
+      );
     } catch (e, st) {
       debugPrint('LocalBackupService.readLegacyLatest failed: $e');
       AppErrorLog.instance.record(
@@ -685,7 +773,8 @@ class LocalBackupService {
         restoredCount: 0,
       );
     }
-    if (read.notebooks.isEmpty) {
+    if (read.data.notebooks.isEmpty) {
+      await _restoreFolders(read.data.folders);
       return const BackupRestoreReport(
         snapshotFound: true,
         succeeded: true,
@@ -694,11 +783,15 @@ class LocalBackupService {
     }
     try {
       final restored = await repository.restoreNotebooksAtomically(
-        read.notebooks,
+        read.data.notebooks,
       );
+      final succeeded = restored == read.data.notebooks.length;
+      if (succeeded) {
+        await _restoreFolders(read.data.folders);
+      }
       return BackupRestoreReport(
         snapshotFound: true,
-        succeeded: restored == read.notebooks.length,
+        succeeded: succeeded,
         restoredCount: restored,
       );
     } catch (e, st) {
@@ -1087,14 +1180,27 @@ _BackupWorkerResult _createBackupPayload(Notebook notebook) {
   );
 }
 
-class _BackupReadResult {
-  const _BackupReadResult.found(this.notebooks) : snapshotFound = true;
-
-  const _BackupReadResult.notFound()
-    : notebooks = const <Notebook>[],
-      snapshotFound = false;
+class _BackupSnapshotData {
+  const _BackupSnapshotData({
+    required this.notebooks,
+    required this.folders,
+  });
 
   final List<Notebook> notebooks;
+  final List<String>? folders;
+}
+
+class _BackupReadResult {
+  const _BackupReadResult.found(this.data) : snapshotFound = true;
+
+  const _BackupReadResult.notFound()
+    : data = const _BackupSnapshotData(
+        notebooks: <Notebook>[],
+        folders: null,
+      ),
+      snapshotFound = false;
+
+  final _BackupSnapshotData data;
   final bool snapshotFound;
 }
 

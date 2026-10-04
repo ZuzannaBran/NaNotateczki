@@ -574,6 +574,33 @@ void main() {
     expect(await orphan.exists(), isFalse);
   });
 
+  test('snapshot restores empty library folders from its manifest', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+    final folders = File('${directory.path}/library_folders.json');
+    await folders.writeAsString(
+      jsonEncode(['Empty Folder', 'Notes']),
+      flush: true,
+    );
+
+    await service.snapshot([_notebook()]);
+    await folders.writeAsString(jsonEncode(['Notes']), flush: true);
+    final report = await service.restoreFromLatestDetailed();
+
+    expect(report.succeeded, isTrue);
+    expect(
+      jsonDecode(await folders.readAsString()),
+      containsAll(['Empty Folder', 'Notes']),
+    );
+  });
+
   test('empty valid snapshot is a successful restore', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
