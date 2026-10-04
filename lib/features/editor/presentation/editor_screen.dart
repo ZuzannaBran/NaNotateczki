@@ -1285,7 +1285,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 color: Color.lerp(
                   Theme.of(context).colorScheme.surface,
                   Colors.white,
-                  0.25,
+                  0.40,
                 ),
                 child: Stack(
                   children: [

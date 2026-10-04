@@ -361,7 +361,7 @@ preferencje, viewport i zapis.
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
-panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, jest rozjaśniony o 25% w stronę bieli; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
+panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, jest rozjaśniony o 40% w stronę bieli; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
 skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma zarezerwowany lewy pas, a kolumna strony jest kotwiczona do
