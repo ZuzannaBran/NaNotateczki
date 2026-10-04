@@ -78,7 +78,7 @@ i ponawia przejściowy błąd backupu po 30 s.
   `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (0): konfiguracja jasnego
+- `lib/core/theme/app_theme.dart` (25): konfiguracja jasnego
   Material 3 z wybieralnym akcentem i globalną typografią Georgia
   (z serifowymi fallbackami). 5: `AppTheme`.
 
@@ -293,13 +293,13 @@ zwijać w całości i zmieniać jego szerokość.
 - 16: `LibraryScreen`;
   23:
   `_LibraryScreenState`;
-  525:
+  523:
   `_LibraryTreePane`;
-  753:
+  751:
   `_FolderTreeRow`;
-  867:
+  865:
   `_LibraryTreeItemRow`;
-  957:
+  955:
   `_LibraryWorkspace`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
