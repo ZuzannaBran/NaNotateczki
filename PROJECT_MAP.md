@@ -73,12 +73,14 @@ rysika i nie porzuca zmian po błędzie.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (134): wspólna paleta interfejsu oraz
-  `overviewViewport` = `#E8E0D2` dla wskaźnika widocznego obszaru na
-  overview. 3: `AppAccentColor`; 25: `AppAccentPalette`; 49: `AppColors`.
+- `lib/core/theme/app_colors.dart` (133): wspólna neutralna paleta
+  interfejsu. 3: `AppAccentColor`; 25: `AppAccentPalette`;
+  49: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (39): jasny Material 3 z ciemniejszym neutralnym tłem `#E6E6E6`, jasnym chromem `#FBFBFB` i separatorami `#DBDBDB`; kolory przewodnie nadal sterują akcentami i zaznaczeniami. 5: `AppTheme`.
+- `lib/core/theme/app_theme.dart` (41): jasny Material 3; AppBar zachowuje
+  stały kolor `AppColors.toolbar` bez surface tint i bez zmiany koloru przy
+  przewijaniu. 5: `AppTheme`.
 
 ### Wejście i preferencje
 
@@ -400,8 +402,8 @@ tylko pionowo.
 - 1622–1665: skróty klawiszowe; 1777: `_PageViewportClipper`.
 - 1879: `_PageFramePainter`; 1954: `_IndexTabsOverlay`;
   2096: `_ProjectMiniMapOverlay`; 2448: `_ProjectMiniMapPainter`.
-  Wskaźnik widocznego viewportu na overview używa ciemniejszego ciepłego
-  brązu `AppColors.overviewViewport` (`#E8E0D2`).
+  Wskaźnik widocznego viewportu na overview używa koloru nagłówków
+  `AppColors.toolbar` z przezroczystością 0.26.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 

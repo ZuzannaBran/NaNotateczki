@@ -55,7 +55,6 @@ class AppColors {
   static const inkBlack = Color(0xFF2B2B29);
   static const shadow = Color(0x22000000);
   static const divider = Color(0xFFCFCCC5);
-  static const overviewViewport = Color(0xFFE8E0D2);
 
   static const inkPalette = <Color>[
     inkBlack,
