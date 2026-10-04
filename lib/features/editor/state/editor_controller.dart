@@ -105,7 +105,10 @@ class EditorController extends ChangeNotifier {
       const PageBackgroundSettings();
   PageBackgroundSettings defaultBoardBackground =
       const PageBackgroundSettings();
-  Color inkColor = const Color(0xFF1E1E1E);
+  Color penColor = const Color(0xFF1E2A40);
+  Color highlighterColor = const Color(0xFF536783);
+  Color get inkColor =>
+      tool == DrawingTool.highlighter ? highlighterColor : penColor;
   double inkStrokeWidth = 2.5;
   final List<Color> quickColors = [
     Color(0xFF1E1E1E),
@@ -842,7 +845,11 @@ class EditorController extends ChangeNotifier {
   }
 
   void setColor(Color newColor) {
-    inkColor = newColor;
+    if (tool == DrawingTool.highlighter) {
+      highlighterColor = newColor;
+    } else {
+      penColor = newColor;
+    }
     _addRecentColor(newColor);
     _schedulePrefsSave();
     notifyListeners();
@@ -946,7 +953,8 @@ class EditorController extends ChangeNotifier {
       if (decoded is! Map<String, dynamic>) {
         return;
       }
-      final inkHex = decoded['inkColor']?.toString();
+      final penHex = decoded['penColor']?.toString();
+      final highlighterHex = decoded['highlighterColor']?.toString();
       final lastTextHex = decoded['lastTextColor']?.toString();
       final lastFont = decoded['lastTextFontFamily']?.toString();
       final lastSize = decoded['lastTextFontSize'];
@@ -960,10 +968,16 @@ class EditorController extends ChangeNotifier {
       final quick = decoded['quickColors'];
       final recent = decoded['recentColors'];
 
-      final inkParsed = _colorFromHex(inkHex);
-      if (inkParsed != null) {
-        inkColor = inkParsed;
+      final penParsed = _colorFromHex(penHex);
+      final highlighterParsed = _colorFromHex(highlighterHex);
+      if (penParsed != null) {
+        penColor = penParsed;
       }
+      if (highlighterParsed != null) {
+        highlighterColor = highlighterParsed;
+      }
+      final shouldPersistDrawingColorDefaults =
+          penParsed == null || highlighterParsed == null;
       final textParsed = _colorFromHex(lastTextHex);
       if (textParsed != null) {
         lastTextColor = textParsed;
@@ -1043,6 +1057,9 @@ class EditorController extends ChangeNotifier {
             ..addAll(mapped);
         }
       }
+      if (shouldPersistDrawingColorDefaults) {
+        _schedulePrefsSave();
+      }
       notifyListeners();
     } catch (e) {
       debugPrint('EditorController._loadEditorPrefs failed: $e');
@@ -1077,7 +1094,9 @@ class EditorController extends ChangeNotifier {
       );
       final dirtyLocalBackgroundIds = Set<String>.of(_dirtyLocalBackgroundIds);
       final payload = <String, dynamic>{
-        'inkColor': _colorToHex(inkColor),
+        'inkColor': _colorToHex(penColor),
+        'penColor': _colorToHex(penColor),
+        'highlighterColor': _colorToHex(highlighterColor),
         'quickColors': quickColors.map(_colorToHex).toList(),
         'recentColors': recentColors.map(_colorToHex).toList(),
         'lastTextColor': _colorToHex(lastTextColor),
