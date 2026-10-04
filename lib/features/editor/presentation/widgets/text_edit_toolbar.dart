@@ -70,7 +70,7 @@ class TextEditToolbar extends StatelessWidget {
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          color: Theme.of(context).colorScheme.surface,
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(

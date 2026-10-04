@@ -1282,7 +1282,7 @@ class _EditorScreenState extends State<EditorScreen> {
               )..setTranslationRaw(_pagePan.dx, _pagePan.dy, 0.0);
 
               return Container(
-                color: Colors.white,
+                color: AppColors.background,
                 child: Stack(
                   children: [
                     NotificationListener<ScrollNotification>(

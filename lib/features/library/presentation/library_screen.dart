@@ -997,11 +997,14 @@ class _PaneResizeHandle extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onHorizontalDragUpdate: (details) => onDragDelta(details.delta.dx),
-        child: SizedBox(
-          width: _LibraryScreenState._resizeHandleWidth,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Container(width: 1, color: dividerColor),
+        child: ColoredBox(
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          child: SizedBox(
+            width: _LibraryScreenState._resizeHandleWidth,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Container(width: 1, color: dividerColor),
+            ),
           ),
         ),
       ),

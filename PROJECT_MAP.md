@@ -72,19 +72,10 @@ i ponawia przejściowy błąd backupu po 30 s.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (132): paleta aplikacji
-  z pięcioma kolorami bazowymi i neutralnym tłem per motyw. Bazowe Cherry,
-  Bubblegum, Lavender, Peach i Baby blue pozostają bez zmian; nagłówek,
-  toolbary i niskie powierzchnie używają dokładnie koloru tła.
-  3: `AppAccentColor`;
-  61: `AppAccentPalette`;
-  117: `AppColors`.
+- `lib/core/theme/app_colors.dart` (133): kolory akcentów oraz wspólna neutralna paleta beżów interfejsu: `#F7F3EE` dla tła, `#E9E7E4` dla toolbarów/panelu folderów i `#CCC9C9` dla separatorów. Bazowe kolory Cherry, Bubblegum, Lavender, Peach i Baby blue pozostają bez zmian. 3: `AppAccentColor`; 61: `AppAccentPalette`; 117: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (39): konfiguracja
-  jasnego Material 3; AppBar, toolbar i surfaceContainerLow mają identyczny
-  kolor jak tło aktywnego motywu, a akcent pozostaje w kontrolkach i
-  zaznaczeniach. 5: `AppTheme`.
+- `lib/core/theme/app_theme.dart` (39): jasny Material 3 z neutralnym beżowym tłem `#F7F3EE`, ciemniejszym chromem `#E9E7E4` i separatorami `#CCC9C9`; kolory przewodnie nadal sterują akcentami i zaznaczeniami. 5: `AppTheme`.
 
 ### Wejście i preferencje
 
@@ -287,12 +278,12 @@ istniejącej, zdrowej bazy.
   417: `selectItem`;
   433: `selectFolder`.
 
-### `lib/features/library/presentation/library_screen.dart` (1046 linii)
+### `lib/features/library/presentation/library_screen.dart` (1049 linii)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
-kompaktowej typografii Georgia i powierzchni dziedziczonych z aktywnej palety. Panel można
+kompaktowej typografii Georgia i neutralnego ciemniejszego beżu panelu. Panel można
 zwijać w całości i zmieniać jego szerokość. Pionowy separator uchwytu ma 1 px, ten sam kolor co linia pod toolbarami i leży na prawej krawędzi, dzięki czemu linie stykają się.
 
 - 16: `LibraryScreen`;
@@ -361,7 +352,7 @@ preferencje, viewport i zapis.
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
-panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma czysto białe tło; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
+panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma neutralne jasne beżowe tło #F7F3EE; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
 skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma zarezerwowany lewy pas, a kolumna strony jest kotwiczona do
@@ -410,7 +401,7 @@ błędów, integralności i wydajności.
   render i preview tła. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
 - `lib/features/editor/presentation/widgets/editor_toolbar.dart` (937):
-  główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu; tło paska jest identyczne z tłem aplikacji;
+  główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu; tło paska używa ciemniejszego neutralnego beżu #E9E7E4;
   ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
@@ -421,7 +412,7 @@ błędów, integralności i wydajności.
   416: selektor kształtu;
   830: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (545):
-  formatowanie aktywnego bloku Quill; pasek ma identyczne tło jak aplikacja.
+  formatowanie aktywnego bloku Quill; pasek używa ciemniejszego neutralnego beżu #E9E7E4.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)

@@ -78,48 +78,49 @@ const _cherryPalette = AppAccentPalette(
   accentDark: Color(0xFFCF4065),
   accentLight: Color(0xFFE77593),
   primaryContainer: Color(0xFFF2B6C6),
-  background: Color(0xFFF4EFED),
-  divider: Color(0xFFDEBAB0),
+  background: AppColors.background,
+  divider: AppColors.divider,
 );
 
 const _bubblegumPalette = AppAccentPalette(
   accentDark: Color(0xFFD9A4AD),
   accentLight: Color(0xFFFFCAD4),
   primaryContainer: Color(0xFFFFD2DA),
-  background: Color(0xFFFFFAF5),
-  divider: Color(0xFFFFE4C2),
+  background: AppColors.background,
+  divider: AppColors.divider,
 );
 
 const _lavenderPalette = AppAccentPalette(
   accentDark: Color(0xFFA352F1),
   accentLight: Color(0xFFD4ADF8),
   primaryContainer: Color(0xFFDDBFFA),
-  background: Color(0xFFFBF6EB),
-  divider: Color(0xFFE5E1EA),
+  background: AppColors.background,
+  divider: AppColors.divider,
 );
 
 const _peachPalette = AppAccentPalette(
   accentDark: Color(0xFFFF7E56),
   accentLight: Color(0xFFFFBEAB),
   primaryContainer: Color(0xFFFFD2C4),
-  background: Color(0xFFFAF8F5),
-  divider: Color(0xFFE7C6B2),
+  background: AppColors.background,
+  divider: AppColors.divider,
 );
 
 const _babyBluePalette = AppAccentPalette(
   accentDark: Color(0xFF43ACE5),
   accentLight: Color(0xFF99D2F1),
   primaryContainer: Color(0xFFBCE1F6),
-  background: Color(0xFFF2F0EA),
-  divider: Color(0xFFDFD4BD),
+  background: AppColors.background,
+  divider: AppColors.divider,
 );
 
 class AppColors {
+  static const background = Color(0xFFF7F3EE);
+  static const toolbar = Color(0xFFE9E7E4);
   static const paper = Color(0xFFF8F6F2);
-  static const toolbar = Color(0xFFF1EEE8);
   static const inkBlack = Color(0xFF1E1E1E);
   static const shadow = Color(0x22000000);
-  static const divider = Color(0xFFE4E0D8);
+  static const divider = Color(0xFFCCC9C9);
 
   static const inkPalette = <Color>[
     inkBlack,
