@@ -298,8 +298,11 @@ class TextEditToolbar extends StatelessWidget {
     var green = _toByte(current.g).toDouble();
     var blue = _toByte(current.b).toDouble();
     var shade = 0.5;
+    final hexController = TextEditingController(
+      text: _toHex(current).toUpperCase(),
+    );
 
-    return showDialog<Color>(
+    final result = await showDialog<Color>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -311,6 +314,23 @@ class TextEditToolbar extends StatelessWidget {
               blue.round(),
             );
             final preview = _applyShade(base, shade);
+
+            void syncHex() {
+              final nextBase = Color.fromARGB(
+                255,
+                red.round(),
+                green.round(),
+                blue.round(),
+              );
+              final nextPreview = _applyShade(nextBase, shade);
+              final hex = _toHex(nextPreview).toUpperCase();
+              hexController.value = hexController.value.copyWith(
+                text: hex,
+                selection: TextSelection.collapsed(offset: hex.length),
+                composing: TextRange.empty,
+              );
+            }
+
             return AlertDialog(
               title: const Text('Pick color'),
               content: Column(
@@ -326,23 +346,57 @@ class TextEditToolbar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  SizedBox(
+                    width: 180,
+                    child: TextField(
+                      controller: hexController,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                        labelText: 'HEX',
+                        hintText: '#536783',
+                        isDense: true,
+                      ),
+                      onChanged: (value) {
+                        final parsed = _colorFromHex(value);
+                        if (parsed == null) {
+                          return;
+                        }
+                        setState(() {
+                          red = _toByte(parsed.r).toDouble();
+                          green = _toByte(parsed.g).toDouble();
+                          blue = _toByte(parsed.b).toDouble();
+                          shade = 0.5;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   _channelSlider(
                     label: 'R',
                     value: red,
                     color: Colors.red,
-                    onChanged: (value) => setState(() => red = value),
+                    onChanged: (value) => setState(() {
+                      red = value;
+                      syncHex();
+                    }),
                   ),
                   _channelSlider(
                     label: 'G',
                     value: green,
                     color: Colors.green,
-                    onChanged: (value) => setState(() => green = value),
+                    onChanged: (value) => setState(() {
+                      green = value;
+                      syncHex();
+                    }),
                   ),
                   _channelSlider(
                     label: 'B',
                     value: blue,
                     color: Colors.blue,
-                    onChanged: (value) => setState(() => blue = value),
+                    onChanged: (value) => setState(() {
+                      blue = value;
+                      syncHex();
+                    }),
                   ),
                   _channelSlider(
                     label: 'B/W',
@@ -350,7 +404,10 @@ class TextEditToolbar extends StatelessWidget {
                     color: Colors.grey,
                     min: 0,
                     max: 100,
-                    onChanged: (value) => setState(() => shade = value / 100),
+                    onChanged: (value) => setState(() {
+                      shade = value / 100;
+                      syncHex();
+                    }),
                   ),
                   if (recentColors.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -399,6 +456,8 @@ class TextEditToolbar extends StatelessWidget {
         );
       },
     );
+    hexController.dispose();
+    return result;
   }
 
   Widget _channelSlider({
@@ -417,7 +476,7 @@ class TextEditToolbar extends StatelessWidget {
             value: value,
             min: min,
             max: max,
-            activeColor: AppColors.divider,
+            activeColor: color,
             onChanged: onChanged,
           ),
         ),
