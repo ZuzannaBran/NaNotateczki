@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:drift/native.dart';
@@ -8,6 +9,7 @@ import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/drift/notes_database_connection.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
+import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/ink_stroke.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
@@ -637,6 +639,73 @@ void main() {
       database.notebookRows,
     )..where((row) => row.uid.equals(notebook.uid))).getSingleOrNull();
     expect(remaining, isNotNull);
+  });
+
+  test('missing stored image marks notebook as corrupt', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(
+      database,
+      readErrorHandler: (_, _, _) {},
+    );
+    final notebook = await repository.createNotebook();
+    await database.into(database.imageBlockRows).insert(
+      ImageBlockRowsCompanion.insert(
+        uid: 'missing-image',
+        pageUid: notebook.pages.single.id,
+        path: '/definitely/missing/image.png',
+        ocrText: '',
+        width: 100,
+        height: 100,
+        rotation: 0,
+        dx: 0,
+        dy: 0,
+        cropLeft: 0,
+        cropTop: 0,
+        cropRight: 1,
+        cropBottom: 1,
+        sortIndex: 0,
+      ),
+    );
+
+    final fetched = await repository.fetchNotebooks();
+
+    expect(fetched, hasLength(1));
+    expect(fetched.single.pages.single.imageBlocks, isEmpty);
+    expect(repository.lastFetchSkippedCorruptRows, isTrue);
+    expect(repository.lastCorruptNotebookIds, [notebook.uid]);
+  });
+
+  test('saveNotebook refuses an image whose file disappeared', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final broken = notebook.copyWith(
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        notebook.pages.single.copyWith(
+          imageBlocks: [
+            ImageBlock(
+              id: 'broken-image',
+              path: '/definitely/missing/image.png',
+              ocrText: '',
+              position: Offset.zero,
+              width: 100,
+              height: 100,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await expectLater(
+      repository.saveNotebook(broken),
+      throwsA(isA<FileSystemException>()),
+    );
+
+    final saved = await repository.getNotebook(notebook.uid);
+    expect(saved?.pages.single.imageBlocks, isEmpty);
   });
 
   test('malformed but valid points JSON marks notebook as corrupt', () async {

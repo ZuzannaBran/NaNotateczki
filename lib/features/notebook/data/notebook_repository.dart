@@ -788,6 +788,18 @@ class NotebookRepository {
   Future<ImageBlock> _persistInlineImageBytes(ImageBlock block) async {
     final bytes = block.bytes;
     if (bytes == null || bytes.isEmpty) {
+      if (kIsWeb || block.path.isEmpty) {
+        throw StateError(
+          'Image ${block.id} has no persistent file or inline bytes.',
+        );
+      }
+      final file = File(block.path);
+      if (!await file.exists() || await file.length() <= 0) {
+        throw FileSystemException(
+          'Image file is missing or empty.',
+          block.path,
+        );
+      }
       return block;
     }
     if (kIsWeb) {
@@ -1613,6 +1625,22 @@ class NotebookRepository {
   }
 
   ImageBlock _imageFromRow(ImageBlockRow row) {
+    final storedBytes = _bytesFromEntity(row.bytes);
+    if (row.path.isEmpty) {
+      if (storedBytes == null || storedBytes.isEmpty) {
+        throw FormatException(
+          'Stored image has neither a file path nor bytes: ${row.uid}',
+        );
+      }
+    } else if (!kIsWeb) {
+      final file = File(row.path);
+      if (!file.existsSync() || file.lengthSync() <= 0) {
+        throw FileSystemException(
+          'Stored image file is missing or empty.',
+          row.path,
+        );
+      }
+    }
     return ImageBlock(
       id: row.uid,
       path: row.path,
@@ -1620,7 +1648,7 @@ class NotebookRepository {
       position: Offset(row.dx, row.dy),
       width: row.width,
       height: row.height,
-      bytes: _bytesFromEntity(row.bytes),
+      bytes: storedBytes,
       imageExt: row.imageExt,
       imageMime: row.imageMime,
       rotation: row.rotation,
