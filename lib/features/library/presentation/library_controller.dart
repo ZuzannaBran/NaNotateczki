@@ -78,6 +78,10 @@ class LibraryController extends ChangeNotifier {
   Future<void> initialize() async {
     await _loadFolders();
     await loadItems();
+    if (!repository.lastFetchSkippedCorruptRows &&
+        (!wasReset || items.isNotEmpty || autoRestoreCount > 0)) {
+      await repository.cleanupOrphanedImages(items);
+    }
     await _loadCloudPath();
   }
 

@@ -57,6 +57,41 @@ class NotebookRepository {
       ? List<Notebook>.unmodifiable(_notebookCache.values)
       : null;
 
+  Future<int> cleanupOrphanedImages(List<Notebook> notebooks) async {
+    if (kIsWeb) {
+      return 0;
+    }
+    final docs = await getApplicationDocumentsDirectory();
+    final imagesDir = Directory('${docs.path}/images');
+    if (!await imagesDir.exists()) {
+      return 0;
+    }
+    final referencedPaths = <String>{
+      for (final notebook in notebooks)
+        for (final page in notebook.pages)
+          for (final image in page.imageBlocks)
+            if (image.path.isNotEmpty) File(image.path).absolute.path,
+    };
+    var removed = 0;
+    await for (final entity in imagesDir.list()) {
+      if (entity is! File ||
+          referencedPaths.contains(entity.absolute.path)) {
+        continue;
+      }
+      try {
+        await entity.delete();
+        removed++;
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'NotebookRepository.cleanupOrphanedImages',
+        );
+      }
+    }
+    return removed;
+  }
+
   Future<void> completeDatabaseRecovery() async {
     try {
       await database.clearRecoveryMarker();
