@@ -53,6 +53,7 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _trackpadPanSensitivity = 0.6;
   static const double _scrollPanSensitivity = 0.38;
   static const double _inkNavigationTouchSlop = 8.0;
+  static const double _overviewSideGap = 10.0;
   static const double _overviewRight = 106.0;
   static const Duration _touchContextMenuDelay = Duration(seconds: 1);
 
@@ -1278,9 +1279,9 @@ class _EditorScreenState extends State<EditorScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final showProjectOverview = constraints.maxWidth >
-                  _overviewRight + _leftMargin + _rightMargin;
+                  _overviewRight + _overviewSideGap + _rightMargin;
               final pageLeftBoundary = showProjectOverview
-                  ? _overviewRight + _leftMargin
+                  ? _overviewRight + _overviewSideGap
                   : _leftMargin;
               final maxPageWidth = math.max(
                 1.0,
