@@ -15,6 +15,8 @@ import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('unchanged notebook reuses its incremental backup', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
@@ -37,7 +39,9 @@ void main() {
     expect(second.notebookReports.single.jsonMs, 0);
   });
 
-  test('changed notebook switches manifest to a new versioned file', () async {
+  test(
+    'changed notebook retains previous file for history',
+    () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
     final database = NotesDatabase(NativeDatabase.memory());
@@ -75,12 +79,17 @@ void main() {
       isTrue,
     );
     expect(
-      Directory('${directory.path}/local_backup/trash')
-          .listSync()
-          .whereType<File>()
-          .any((file) => file.path.endsWith(firstFile)),
+      File('${directory.path}/local_backup/notebooks/$firstFile').existsSync(),
       isTrue,
     );
+    final history = Directory('${directory.path}/local_backup/history');
+    final historicalManifests = history
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.json'))
+        .toList();
+    expect(historicalManifests, hasLength(1));
+    expect(await historicalManifests.single.readAsString(), contains(firstFile));
     expect(File('${manifest.path}.tmp').existsSync(), isFalse);
     expect(File('${manifest.path}.previous').existsSync(), isFalse);
   });

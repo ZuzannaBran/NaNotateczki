@@ -966,8 +966,8 @@ class _BackupManifestEntry {
       'uid': uid,
       'updatedAt': updatedAt.toIso8601String(),
       'file': fileName,
-      if (checksum != null) 'checksum': checksum!,
-      if (jsonBytes != null) 'bytes': jsonBytes!,
+      'checksum': ?checksum,
+      'bytes': ?jsonBytes,
     };
   }
 }
