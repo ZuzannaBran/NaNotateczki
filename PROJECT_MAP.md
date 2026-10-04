@@ -402,17 +402,17 @@ błędów, integralności i wydajności.
 - `lib/features/editor/presentation/widgets/page_background_paint.dart` (123):
   render i preview tła. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1029):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (937):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
-  Lasso ma własną ikonę z przerywanym obrysem zaznaczenia i wskaźnikiem.
+  Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
+  przedstawia zaznaczanie obszaru kursorem.
   11: `EditorToolbar`;
-  211:
+  215:
   dialog tła;
-  362: selektor gumki;
-  428: selektor kształtu;
-  842: `_LassoIcon`;
-  922: `_EraserIcon`.
+  350: selektor gumki;
+  416: selektor kształtu;
+  830: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (545):
   formatowanie aktywnego bloku Quill.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
