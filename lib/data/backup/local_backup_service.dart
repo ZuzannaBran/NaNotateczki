@@ -481,6 +481,13 @@ class LocalBackupService {
     if (decoded is! Map<String, dynamic>) {
       throw const BackupValidationException('Manifest is not a JSON object.');
     }
+    final rawVersion = decoded['version'];
+    final version = rawVersion is num ? rawVersion.toInt() : null;
+    if (version != 1 && version != 2) {
+      throw BackupValidationException(
+        'Unsupported backup manifest version: $rawVersion',
+      );
+    }
     final notebookEntries = decoded['notebooks'];
     if (notebookEntries is! List<dynamic>) {
       throw const BackupValidationException(
@@ -489,6 +496,7 @@ class LocalBackupService {
     }
 
     final notebooks = <Notebook>[];
+    final seenUids = <String>{};
     for (final rawEntry in notebookEntries) {
       if (rawEntry is! Map<String, dynamic>) {
         throw const BackupValidationException(
@@ -501,13 +509,24 @@ class LocalBackupService {
           'Manifest contains an incomplete notebook entry.',
         );
       }
-      if (!await _isManifestEntryValid(entry)) {
+      if (!seenUids.add(entry.uid)) {
+        throw BackupValidationException(
+          'Manifest contains duplicate notebook uid: ${entry.uid}',
+        );
+      }
+      final file = await _notebookFile(entry.fileName);
+      await _recoverAtomicWrite(file);
+      if (!await file.exists()) {
+        throw BackupValidationException(
+          'Backup file is missing: ${entry.fileName}',
+        );
+      }
+      if (version == 2 && !await _isManifestEntryValid(entry)) {
         throw BackupValidationException(
           'Backup file failed checksum validation: ${entry.fileName}',
         );
       }
 
-      final file = await _notebookFile(entry.fileName);
       final notebookJson = jsonDecode(await file.readAsString());
       if (notebookJson is! Map<String, dynamic>) {
         throw BackupValidationException(

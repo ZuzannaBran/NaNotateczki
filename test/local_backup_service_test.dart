@@ -161,6 +161,69 @@ void main() {
     expect(restored, isEmpty);
   });
 
+  test('version 1 incremental manifest remains recoverable', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+    final notebook = _notebook();
+    final backupDir = Directory('${directory.path}/local_backup/notebooks');
+    await backupDir.create(recursive: true);
+    const fileName = 'notebook.json';
+    await File('${backupDir.path}/$fileName').writeAsString(
+      jsonEncode(NotebookRepository.encodeNotebook(notebook)),
+      flush: true,
+    );
+    await File('${directory.path}/local_backup/manifest.json').writeAsString(
+      jsonEncode({
+        'version': 1,
+        'notebooks': [
+          {
+            'uid': notebook.uid,
+            'updatedAt': notebook.updatedAt.toIso8601String(),
+            'file': fileName,
+          },
+        ],
+      }),
+      flush: true,
+    );
+
+    final restored = await service.readLatest();
+
+    expect(restored, hasLength(1));
+    expect(restored.single.uid, notebook.uid);
+    expect(restored.single.updatedAt, notebook.updatedAt);
+  });
+
+  test('duplicate notebook uid invalidates a manifest snapshot', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+    final notebook = _notebook();
+    await service.snapshot([notebook]);
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    final decoded =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final entries = decoded['notebooks'] as List<dynamic>;
+    decoded['notebooks'] = [...entries, entries.single];
+    await manifest.writeAsString(jsonEncode(decoded), flush: true);
+
+    final restored = await service.readLatest();
+
+    expect(restored, isEmpty);
+  });
+
   test('empty incremental snapshot does not resurrect legacy data', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));

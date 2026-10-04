@@ -168,15 +168,15 @@ walidacji i nie otwiera uszkodzonej bazy jako poprawnej.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (974 linii)
+### `lib/data/backup/local_backup_service.dart` (993 linii)
 
 Przyrostowy backup z atomowym `manifest.json`, checksumami i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
 trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki.
 Przed utworzeniem nowej wersji natywny backup sprawdza, czy każdy obraz
 wskazujący plik nadal istnieje i daje się odczytać; brak obrazu nie zastępuje
-ostatniej poprawnej kopii. Odczyt odrzuca niekompletny snapshot i próbuje
-kolejno starsze wersje. Web przechowuje pełny snapshot w `localStorage`.
+ostatniej poprawnej kopii. Odczyt obsługuje manifesty v1/v2, odrzuca niekompletny lub niespójny
+snapshot i próbuje kolejno starsze wersje. Web przechowuje pełny snapshot w `localStorage`.
 
 - 15: `LocalBackupService`; 90: `snapshot`; 280: `hasLatest`;
   430: `readLatest`; 545: `restoreFromLatest`.
@@ -452,7 +452,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (546)
-- `test/local_backup_service_test.dart` (413)
+- `test/local_backup_service_test.dart` (476)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
