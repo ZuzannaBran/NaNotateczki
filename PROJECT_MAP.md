@@ -170,7 +170,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2276 linii)
+### `lib/data/backup/local_backup_service.dart` (1421 linii)
 
 Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami SHA-256 plików i całego manifestu (v4) i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
