@@ -12,6 +12,7 @@ import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/image_block.dart';
 import '../../features/notebook/domain/notebook.dart';
+import '../../features/notebook/domain/notebook_kind.dart';
 import '../../features/notebook/domain/note_page.dart';
 import 'backup_eraser_flattening.dart';
 

@@ -30,9 +30,8 @@ typedef DataIntegrityIncidentHandler =
 class NotebookRepositoryChange {
   const NotebookRepositoryChange.full(this.uid) : pageIds = null;
 
-  NotebookRepositoryChange.pages(String uid, Set<String> pageIds)
-    : uid = uid,
-      pageIds = Set<String>.unmodifiable(pageIds);
+  NotebookRepositoryChange.pages(this.uid, Set<String> pageIds)
+    : pageIds = Set<String>.unmodifiable(pageIds);
 
   const NotebookRepositoryChange.metadata(this.uid)
     : pageIds = const <String>{};

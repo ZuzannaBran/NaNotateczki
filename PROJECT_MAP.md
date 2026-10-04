@@ -176,7 +176,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2595 linii)
+### `lib/data/backup/local_backup_service.dart` (2597 linii)
 
 Przyrostowy backup z atomowym `manifest.json` i checksumami SHA-256. Format
 v6 rozdziela notebook na niezmienne, content-addressed pliki stron w
@@ -195,13 +195,13 @@ checksumę każdej strony i assetu. Pliki stron i assetów nie są usuwane w hot
 path, żeby historia manifestów nie straciła zależności. Web nadal zapisuje
 pełny snapshot w `localStorage`.
 
-- 18: `LocalBackupService`; 36: `waitUntilIdle`; 152: `snapshot`;
-  83: `_pagesDir`.
-- 743: `_pageReferenceFromJson`; 1031: `readLatest`;
-  1262: `_readBackupPageJson`; 1488: `restoreFromLatest`.
-- 1867: `_BackupPageWorkerRequest`; 1906: `_BackupWorkerClient`;
-  2100: `_createPageBackupPayload`; 2506: `_BackupPageReference`.
-- 2392: `BackupSnapshotReport`.
+- 19: `LocalBackupService`; 37: `waitUntilIdle`; 153: `snapshot`;
+  84: `_pagesDir`.
+- 748: `_pageReferenceFromJson`; 1036: `readLatest`;
+  1267: `_readBackupPageJson`; 1493: `restoreFromLatest`.
+- 1872: `_BackupPageWorkerRequest`; 1911: `_BackupWorkerClient`;
+  2105: `_createPageBackupPayload`; 2511: `_BackupPageReference`.
+- 2397: `BackupSnapshotReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (271 linii)
 
@@ -256,7 +256,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2356 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2355 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. `NotebookRepositoryChange` rozróżnia pełną zmianę,
@@ -266,14 +266,14 @@ też oczekiwanie na wszystkie trwające zapisy per UID. Ręczny eksport pozostaj
 samowystarczalny i zachowuje obrazy inline.
 
 - 23: `DataIntegrityIncidentHandler`; 30: `NotebookRepositoryChange`;
-  46: `RepositoryChangeHandler`; 56: `NotebookRepository`.
-- 82: `waitForPendingSaves`; 486: `saveNotebook`;
-  516: `saveNotebookPages`; 728: `updateNotebookMetadata`;
-  1102: `deleteNotebook`.
-- 1243: `encodeNotebookForLocalBackup`; 1246:
+  45: `RepositoryChangeHandler`; 30: `NotebookRepository`.
+- 81: `waitForPendingSaves`; 485: `saveNotebook`;
+  515: `saveNotebookPages`; 727: `updateNotebookMetadata`;
+  1101: `deleteNotebook`.
+- 1242: `encodeNotebookForLocalBackup`; 1245:
   `encodePageForLocalBackup`.
-- 2171: `_toolFromIndex`; 2179: `_toolToIndex` — muszą pozostać symetryczne.
-- 2224: `DataIntegrityProtectionException`.
+- 2200: `_toolFromIndex`; 2208: `_toolToIndex` — muszą pozostać symetryczne.
+- 2253: `DataIntegrityProtectionException`.
 
 ### `lib/features/notebook/presentation/notebook_screen.dart` (24 linie)
 
