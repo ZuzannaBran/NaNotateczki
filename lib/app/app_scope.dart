@@ -275,11 +275,13 @@ class _BackupScheduler with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
   }
 
-  static const Duration _idleDelay = Duration(seconds: 8);
+  static const Duration _idleDelay = Duration(seconds: 2);
+  static const Duration _maximumDelay = Duration(seconds: 30);
 
   final NotebookRepository repository;
   final LocalBackupService backupService;
   Timer? _timer;
+  Timer? _maximumTimer;
   bool _dirty = false;
   bool _isRunning = false;
 
@@ -289,12 +291,18 @@ class _BackupScheduler with WidgetsBindingObserver {
     _timer = Timer(_idleDelay, () {
       unawaited(flush(reason: 'idle'));
     });
+    _maximumTimer ??= Timer(_maximumDelay, () {
+      _maximumTimer = null;
+      unawaited(flush(reason: 'maximum-delay'));
+    });
   }
 
   Future<void> flush({required String reason}) async {
     _timer?.cancel();
     _timer = null;
     if (!_dirty) {
+      _maximumTimer?.cancel();
+      _maximumTimer = null;
       return;
     }
     if (InkActivityTracker.instance.isBusy) {
@@ -307,6 +315,8 @@ class _BackupScheduler with WidgetsBindingObserver {
       _dirty = true;
       return;
     }
+    _maximumTimer?.cancel();
+    _maximumTimer = null;
     _dirty = false;
     _isRunning = true;
     final frameCursor = FrameTimingTracker.instance.captureCursor();
@@ -394,6 +404,7 @@ class _BackupScheduler with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       unawaited(flush(reason: state.name));
@@ -402,6 +413,7 @@ class _BackupScheduler with WidgetsBindingObserver {
 
   void dispose() {
     _timer?.cancel();
+    _maximumTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
   }
 }
