@@ -53,7 +53,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (440 linii)
+### `lib/app/app_scope.dart` (459 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scheduler robi
@@ -170,7 +170,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (1357 linii)
+### `lib/data/backup/local_backup_service.dart` (1375 linii)
 
 Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami SHA-256 (v3) i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
@@ -266,7 +266,7 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (619 linie)
+### `lib/features/library/presentation/library_controller.dart` (621 linie)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
 
@@ -456,7 +456,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (917)
-- `test/local_backup_service_test.dart` (779)
+- `test/local_backup_service_test.dart` (848)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

@@ -526,6 +526,75 @@ void main() {
     expect(await manifest.exists(), isFalse);
   });
 
+  test('required uid lookup falls back to history', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final protected = _notebook();
+    final healthy = _distinctNotebook();
+
+    await service.snapshot([protected, healthy]);
+    final newerHealthy = healthy.copyWith(
+      title: 'Healthy newer',
+      updatedAt: healthy.updatedAt.add(const Duration(seconds: 2)),
+    );
+    await service.snapshot([newerHealthy]);
+
+    final latest = await service.readLatest();
+    final recovery = await service.readLatest(
+      requiredUids: {protected.uid},
+    );
+
+    expect(latest.map((item) => item.uid), [healthy.uid]);
+    expect(recovery.map((item) => item.uid).toSet(), {
+      protected.uid,
+      healthy.uid,
+    });
+  });
+
+  test('safe historical copy can be carried into a new snapshot', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final protected = _notebook();
+    final healthy = _distinctNotebook();
+
+    await service.snapshot([protected, healthy]);
+    final newerHealthy = healthy.copyWith(
+      title: 'Healthy newer',
+      updatedAt: healthy.updatedAt.add(const Duration(seconds: 2)),
+    );
+    await service.snapshot([newerHealthy]);
+    final protectedRecovery = await service.readLatest(
+      requiredUids: {protected.uid},
+    );
+    final safeProtected = protectedRecovery.singleWhere(
+      (item) => item.uid == protected.uid,
+    );
+
+    await service.snapshot([newerHealthy, safeProtected]);
+    final latest = await service.readLatest();
+
+    expect(latest.map((item) => item.uid).toSet(), {
+      protected.uid,
+      healthy.uid,
+    });
+    expect(
+      latest.singleWhere((item) => item.uid == protected.uid).updatedAt,
+      protected.updatedAt,
+    );
+  });
+
   test('snapshot rejects an older version of an existing notebook', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));

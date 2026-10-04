@@ -549,11 +549,15 @@ class LocalBackupService {
     }
   }
 
-  Future<List<Notebook>> readLatest() async {
-    return (await _readLatestResult()).data.notebooks;
+  Future<List<Notebook>> readLatest({
+    Set<String> requiredUids = const <String>{},
+  }) async {
+    return (await _readLatestResult(requiredUids: requiredUids)).data.notebooks;
   }
 
-  Future<_BackupReadResult> _readLatestResult() async {
+  Future<_BackupReadResult> _readLatestResult({
+    Set<String> requiredUids = const <String>{},
+  }) async {
     if (kIsWeb) {
       try {
         final content = await readStoredText(_webBackupKey);
@@ -566,12 +570,13 @@ class LocalBackupService {
             'Web backup root is not a JSON list.',
           );
         }
-        return _BackupReadResult.found(
-          _BackupSnapshotData(
-            notebooks: _decodeCompleteNotebookList(decoded),
-            folders: null,
-          ),
+        final data = _BackupSnapshotData(
+          notebooks: _decodeCompleteNotebookList(decoded),
+          folders: null,
         );
+        return _containsRequiredUids(data, requiredUids)
+            ? _BackupReadResult.found(data)
+            : const _BackupReadResult.notFound();
       } catch (e, st) {
         AppErrorLog.instance.record(
           e,
@@ -584,7 +589,8 @@ class LocalBackupService {
 
     try {
       final incremental = await _readIncrementalLatest();
-      if (incremental != null) {
+      if (incremental != null &&
+          _containsRequiredUids(incremental, requiredUids)) {
         return _BackupReadResult.found(incremental);
       }
     } catch (e, st) {
@@ -599,7 +605,8 @@ class LocalBackupService {
     for (final manifest in await _historyManifestFiles()) {
       try {
         final historical = await _readManifestSnapshot(manifest);
-        if (historical != null) {
+        if (historical != null &&
+            _containsRequiredUids(historical, requiredUids)) {
           return _BackupReadResult.found(historical);
         }
       } catch (e, st) {
@@ -612,10 +619,21 @@ class LocalBackupService {
     }
 
     final legacy = await _readLegacyLatest();
-    if (legacy != null) {
+    if (legacy != null && _containsRequiredUids(legacy, requiredUids)) {
       return _BackupReadResult.found(legacy);
     }
     return const _BackupReadResult.notFound();
+  }
+
+  bool _containsRequiredUids(
+    _BackupSnapshotData data,
+    Set<String> requiredUids,
+  ) {
+    if (requiredUids.isEmpty) {
+      return true;
+    }
+    final available = data.notebooks.map((item) => item.uid).toSet();
+    return available.containsAll(requiredUids);
   }
 
   Future<_BackupSnapshotData?> _readIncrementalLatest() async {

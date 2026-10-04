@@ -591,8 +591,10 @@ class LibraryController extends ChangeNotifier {
       return;
     }
 
-    final backupNotebooks = await backup.readLatest();
     final corruptUids = repository.lastCorruptNotebookIds.toSet();
+    final backupNotebooks = await backup.readLatest(
+      requiredUids: corruptUids,
+    );
     recoverableCorruptDocuments =
         backupNotebooks
             .where((item) => corruptUids.contains(item.uid))

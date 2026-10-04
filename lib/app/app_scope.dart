@@ -333,27 +333,46 @@ class _BackupScheduler with WidgetsBindingObserver {
       fetchStopwatch.stop();
       fetchMs = fetchStopwatch.elapsedMilliseconds;
       itemCount = items.length;
-      if (repository.lastFetchSkippedCorruptRows) {
-        final frameSummary = FrameTimingTracker.instance.summarySince(
-          frameCursor,
-        );
-        debugPrint(
-          '[backup] reason=$reason skipped=corruptRows items=$itemCount '
-          'fetchMs=$fetchMs totalMs=${totalStopwatch.elapsedMilliseconds} '
-          '${frameSummary.toLogString()}',
-        );
-        OptimizationLog.instance.recordBackup(
-          reason: reason,
-          items: itemCount,
-          fetchMs: fetchMs,
-          snapshotMs: 0,
-          totalMs: totalStopwatch.elapsedMilliseconds,
-          status: 'corruptRows',
-        );
-        return;
+      final corruptUids = repository.lastCorruptNotebookIds.toSet();
+      final snapshotItems = <Notebook>[
+        for (final item in items)
+          if (!corruptUids.contains(item.uid)) item,
+      ];
+      if (corruptUids.isNotEmpty) {
+        for (final uid in corruptUids) {
+          final previous = await backupService.readLatest(
+            requiredUids: {uid},
+          );
+          final safeCopy = previous
+              .where((item) => item.uid == uid)
+              .firstOrNull;
+          if (safeCopy != null) {
+            snapshotItems.add(safeCopy);
+          }
+        }
+        if (snapshotItems.isEmpty) {
+          final frameSummary = FrameTimingTracker.instance.summarySince(
+            frameCursor,
+          );
+          debugPrint(
+            '[backup] reason=$reason skipped=noSafeDocuments '
+            'corrupt=${corruptUids.length} items=$itemCount '
+            'fetchMs=$fetchMs totalMs=${totalStopwatch.elapsedMilliseconds} '
+            '${frameSummary.toLogString()}',
+          );
+          OptimizationLog.instance.recordBackup(
+            reason: reason,
+            items: itemCount,
+            fetchMs: fetchMs,
+            snapshotMs: 0,
+            totalMs: totalStopwatch.elapsedMilliseconds,
+            status: 'noSafeDocuments',
+          );
+          return;
+        }
       }
       snapshotReport = await backupService.snapshot(
-        items,
+        snapshotItems,
         shouldInterrupt: () =>
             InkActivityTracker.instance.isBusy || _dirty,
       );
