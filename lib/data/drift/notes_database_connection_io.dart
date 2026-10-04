@@ -33,33 +33,46 @@ Future<String?> quarantineNotesDatabase(String name) async {
       .toIso8601String()
       .replaceAll(':', '-');
   final quarantinePath = '${file.path}.corrupt_$timestamp';
-  final moves = <(File source, File target)>[
-    (
-      File('${file.path}-wal'),
-      File('$quarantinePath-wal'),
-    ),
-    (
-      File('${file.path}-shm'),
-      File('$quarantinePath-shm'),
-    ),
+  final components = <(File source, File target)>[
+    (File('${file.path}-wal'), File('$quarantinePath-wal')),
+    (File('${file.path}-shm'), File('$quarantinePath-shm')),
+    (File('${file.path}-journal'), File('$quarantinePath-journal')),
     (file, File(quarantinePath)),
   ];
-  final completed = <(File source, File target)>[];
+  final existing = <(File source, File target)>[];
+  for (final component in components) {
+    if (await component.$1.exists()) {
+      existing.add(component);
+    }
+  }
+
+  for (final component in existing) {
+    await _copyAndFlush(component.$1, component.$2);
+  }
+
+  final deleted = <(File source, File target)>[];
   try {
-    for (final move in moves) {
-      if (!await move.$1.exists()) {
-        continue;
-      }
-      await move.$1.rename(move.$2.path);
-      completed.add(move);
+    for (final component in existing) {
+      await component.$1.delete();
+      deleted.add(component);
     }
   } catch (_) {
-    for (final move in completed.reversed) {
-      if (await move.$2.exists() && !await move.$1.exists()) {
-        await move.$2.rename(move.$1.path);
+    for (final component in deleted.reversed) {
+      if (!await component.$1.exists() && await component.$2.exists()) {
+        await _copyAndFlush(component.$2, component.$1);
       }
     }
     rethrow;
   }
   return quarantinePath;
+}
+
+Future<void> _copyAndFlush(File source, File target) async {
+  await source.copy(target.path);
+  final handle = await target.open(mode: FileMode.append);
+  try {
+    await handle.flush();
+  } finally {
+    await handle.close();
+  }
 }

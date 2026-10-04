@@ -157,7 +157,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
   natywnego lub webowego połączenia.
-- `lib/data/drift/notes_database_connection_io.dart` (66): SQLite w katalogu
+- `lib/data/drift/notes_database_connection_io.dart` (79): SQLite w katalogu
   dokumentów przez `NativeDatabase.createInBackground`.
   7: `NotesDatabaseConnection`; 14: `openNotesDatabaseConnection`.
 - `lib/data/drift/notes_database_connection_web.dart` (32): SQLite WASM z
