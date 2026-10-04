@@ -22,6 +22,7 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
   final dir = await getApplicationDocumentsDirectory();
   final file = File('${dir.path}/$name');
   final marker = _recoveryMarker(file);
+  await _recoverRecoveryMarker(marker);
   final freshFile = !file.existsSync();
 
   if (freshFile &&
@@ -104,8 +105,17 @@ Future<String?> quarantineNotesDatabase(String name) async {
 Future<void> clearNotesDatabaseRecoveryMarker(String name) async {
   final dir = await getApplicationDocumentsDirectory();
   final marker = _recoveryMarker(File('${dir.path}/$name'));
+  await _recoverRecoveryMarker(marker);
   if (await marker.exists()) {
     await marker.delete();
+  }
+  final previous = File('${marker.path}.previous');
+  final temporary = File('${marker.path}.tmp');
+  if (await previous.exists()) {
+    await previous.delete();
+  }
+  if (await temporary.exists()) {
+    await temporary.delete();
   }
 }
 
@@ -135,15 +145,43 @@ Future<bool> _hasLocalRecoveryCandidate(Directory documentsDir) async {
 }
 
 Future<void> _writeRecoveryMarker(File marker, String reason) async {
+  await _recoverRecoveryMarker(marker);
   final temporary = File('${marker.path}.tmp');
+  final previous = File('${marker.path}.previous');
   if (await temporary.exists()) {
     await temporary.delete();
   }
+  if (await previous.exists()) {
+    await previous.delete();
+  }
   await temporary.writeAsString(reason, flush: true);
   if (await marker.exists()) {
-    await marker.delete();
+    await marker.rename(previous.path);
   }
-  await temporary.rename(marker.path);
+  try {
+    await temporary.rename(marker.path);
+    if (await previous.exists()) {
+      await previous.delete();
+    }
+  } catch (_) {
+    if (!await marker.exists() && await previous.exists()) {
+      await previous.rename(marker.path);
+    }
+    rethrow;
+  }
+}
+
+Future<void> _recoverRecoveryMarker(File marker) async {
+  final temporary = File('${marker.path}.tmp');
+  final previous = File('${marker.path}.previous');
+  if (!await marker.exists() && await previous.exists()) {
+    await previous.rename(marker.path);
+  } else if (await previous.exists()) {
+    await previous.delete();
+  }
+  if (await temporary.exists()) {
+    await temporary.delete();
+  }
 }
 
 Future<void> _copyAndFlush(File source, File target) async {

@@ -159,7 +159,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
   natywnego lub webowego połączenia.
-- `lib/data/drift/notes_database_connection_io.dart` (158): SQLite w katalogu
+- `lib/data/drift/notes_database_connection_io.dart` (196): SQLite w katalogu
   dokumentów przez `NativeDatabase.createInBackground`.
   7: `NotesDatabaseConnection`; 14: `openNotesDatabaseConnection`.
 - `lib/data/drift/notes_database_connection_web.dart` (41): SQLite WASM z
@@ -239,7 +239,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2152 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2160 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. Recovery zapisuje cały batch atomowo i preferuje
