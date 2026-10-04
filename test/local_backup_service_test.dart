@@ -140,11 +140,7 @@ void main() {
       documentsDirectory: () async => directory,
     );
     final first = _notebook();
-    final second = first.copyWith(
-      uid: 'notebook-2',
-      title: 'Second',
-      updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
-    );
+    final second = _distinctNotebook();
 
     await service.snapshot([first, second]);
     final manifest = File('${directory.path}/local_backup/manifest.json');

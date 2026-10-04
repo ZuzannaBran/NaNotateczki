@@ -437,6 +437,8 @@ class LocalBackupService {
         }
       }
       return result;
+    } on BackupDataException {
+      rethrow;
     } catch (_) {
       return const <String, _BackupManifestEntry>{};
     }
