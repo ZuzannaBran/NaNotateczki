@@ -224,6 +224,31 @@ void main() {
     expect(restored, isEmpty);
   });
 
+  test('legacy full backup never decodes partially', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+    final legacyDir = Directory('${directory.path}/local_backup');
+    await legacyDir.create(recursive: true);
+    await File('${legacyDir.path}/notebooks_latest.json').writeAsString(
+      jsonEncode([
+        NotebookRepository.encodeNotebook(_notebook()),
+        'not-a-notebook',
+      ]),
+      flush: true,
+    );
+
+    final restored = await service.readLatest();
+
+    expect(restored, isEmpty);
+  });
+
   test('empty incremental snapshot does not resurrect legacy data', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));

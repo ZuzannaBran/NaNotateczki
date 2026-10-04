@@ -438,9 +438,10 @@ class LocalBackupService {
         return <Notebook>[];
       }
       final decoded = jsonDecode(content);
-      return decoded is List
-          ? repository.decodeNotebooks(decoded)
-          : <Notebook>[];
+      if (decoded is! List<dynamic>) {
+        return <Notebook>[];
+      }
+      return _decodeCompleteNotebookList(decoded);
     }
     try {
       final incremental = await _readIncrementalLatest();
@@ -565,10 +566,10 @@ class LocalBackupService {
       }
       final content = await file.readAsString();
       final decoded = jsonDecode(content);
-      if (decoded is! List) {
+      if (decoded is! List<dynamic>) {
         return <Notebook>[];
       }
-      return repository.decodeNotebooks(decoded);
+      return _decodeCompleteNotebookList(decoded);
     } catch (e) {
       debugPrint('LocalBackupService.readLegacyLatest failed: $e');
       AppErrorLog.instance.record(
@@ -578,6 +579,29 @@ class LocalBackupService {
       );
       return <Notebook>[];
     }
+  }
+
+  List<Notebook> _decodeCompleteNotebookList(List<dynamic> items) {
+    if (items.any((item) => item is! Map<String, dynamic>)) {
+      throw const BackupValidationException(
+        'Full backup contains a non-notebook entry.',
+      );
+    }
+    final notebooks = repository.decodeNotebooks(items);
+    if (notebooks.length != items.length) {
+      throw const BackupValidationException(
+        'Full backup could not be decoded completely.',
+      );
+    }
+    final seenUids = <String>{};
+    for (final notebook in notebooks) {
+      if (!seenUids.add(notebook.uid)) {
+        throw BackupValidationException(
+          'Full backup contains duplicate notebook uid: ${notebook.uid}',
+        );
+      }
+    }
+    return notebooks;
   }
 
   Future<int> restoreFromLatest() async {
