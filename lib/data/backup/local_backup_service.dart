@@ -594,9 +594,7 @@ class LocalBackupService {
     );
   }
 
-  _BackupAssetReference? _assetReferenceFromJson(
-    Map<String, dynamic> json,
-  ) {
+  _BackupAssetReference? _assetReferenceFromJson(Map<String, dynamic> json) {
     final imageId = json['imageId'];
     final checksum = json['checksum'];
     final rawBytes = json['bytes'];
@@ -659,9 +657,7 @@ class LocalBackupService {
     }
   }
 
-  Future<bool> _canReuseManifestEntryFast(
-    _BackupManifestEntry entry,
-  ) async {
+  Future<bool> _canReuseManifestEntryFast(_BackupManifestEntry entry) async {
     if (entry.checksum == null ||
         entry.jsonBytes == null ||
         (entry.checksumAlgorithm != _sha256Algorithm &&
@@ -899,8 +895,7 @@ class LocalBackupService {
         'Unsupported backup manifest version: $rawVersion',
       );
     }
-    if ((version == 4 || version == 5) &&
-        !_isManifestChecksumValid(decoded)) {
+    if ((version == 4 || version == 5) && !_isManifestChecksumValid(decoded)) {
       throw const BackupValidationException(
         'Backup manifest checksum validation failed.',
       );
@@ -1017,9 +1012,7 @@ class LocalBackupService {
             'Asset reference mismatch for image: $imageId',
           );
         }
-        rawImage['bytes'] = base64Encode(
-          await _readBackupAssetBytes(asset),
-        );
+        rawImage['bytes'] = base64Encode(await _readBackupAssetBytes(asset));
         seenImageIds.add(imageId);
       }
     }
@@ -1031,9 +1024,7 @@ class LocalBackupService {
     }
   }
 
-  Future<List<int>> _readBackupAssetBytes(
-    _BackupAssetReference asset,
-  ) async {
+  Future<List<int>> _readBackupAssetBytes(_BackupAssetReference asset) async {
     final file = await _assetFile(asset.checksum);
     await _recoverAtomicWrite(file);
     final primary = await _readValidAssetBytes(file, asset);
@@ -1720,9 +1711,7 @@ void _backupWorkerEntryPoint(SendPort responsePort) {
   });
 }
 
-_BackupWorkerResult _createBackupPayload(
-  _BackupWorkerRequest request,
-) {
+_BackupWorkerResult _createBackupPayload(_BackupWorkerRequest request) {
   final flattenStopwatch = Stopwatch()..start();
   final backupNotebook = flattenErasersForBackup(request.notebook);
   flattenStopwatch.stop();
@@ -1874,9 +1863,7 @@ _BackupAssetReference _writeBackupAsset({
 }
 
 File _workerAssetFile(String directoryPath, String checksum) {
-  return File(
-    '$directoryPath${Platform.pathSeparator}$checksum.bin',
-  );
+  return File('$directoryPath${Platform.pathSeparator}$checksum.bin');
 }
 
 void _recoverWorkerAssetWrite(File file) {

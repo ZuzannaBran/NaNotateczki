@@ -57,10 +57,7 @@ void main() {
       title: 'Updated',
       updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
     );
-    await service.snapshot(
-      [updated],
-      dirtyNotebookUids: {updated.uid},
-    );
+    await service.snapshot([updated], dirtyNotebookUids: {updated.uid});
 
     expect(service.debugBackupWorkerSpawnCount, 1);
   });
@@ -122,9 +119,9 @@ void main() {
     final decoded =
         jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
     final entries = decoded['notebooks'] as List<dynamic>;
-    final secondEntry = entries
-        .whereType<Map<String, dynamic>>()
-        .singleWhere((entry) => entry['uid'] == second.uid);
+    final secondEntry = entries.whereType<Map<String, dynamic>>().singleWhere(
+      (entry) => entry['uid'] == second.uid,
+    );
     final secondFile = File(
       '${directory.path}/local_backup/notebooks/${secondEntry['file']}',
     );
@@ -616,15 +613,16 @@ void main() {
 
     await service.snapshot([notebook]);
 
-    final manifest = jsonDecode(
-      await File(
-        '${directory.path}/local_backup/manifest.json',
-      ).readAsString(),
-    ) as Map<String, dynamic>;
+    final manifest =
+        jsonDecode(
+              await File(
+                '${directory.path}/local_backup/manifest.json',
+              ).readAsString(),
+            )
+            as Map<String, dynamic>;
     expect(manifest['version'], 5);
     final entry =
-        (manifest['notebooks'] as List<dynamic>).single
-            as Map<String, dynamic>;
+        (manifest['notebooks'] as List<dynamic>).single as Map<String, dynamic>;
     expect(entry['assetMode'], 'external-v1');
     final assets = entry['assets'] as List<dynamic>;
     expect(assets, hasLength(1));
@@ -641,11 +639,9 @@ void main() {
     final notebookJson =
         jsonDecode(await notebookFile.readAsString()) as Map<String, dynamic>;
     final page =
-        (notebookJson['pages'] as List<dynamic>).single
-            as Map<String, dynamic>;
+        (notebookJson['pages'] as List<dynamic>).single as Map<String, dynamic>;
     final image =
-        (page['imageBlocks'] as List<dynamic>).single
-            as Map<String, dynamic>;
+        (page['imageBlocks'] as List<dynamic>).single as Map<String, dynamic>;
     expect(image['bytes'], isNull);
     expect(image['asset'], checksum);
   });
@@ -674,10 +670,7 @@ void main() {
       title: 'Changed',
       updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
     );
-    await service.snapshot(
-      [changed],
-      dirtyNotebookUids: {changed.uid},
-    );
+    await service.snapshot([changed], dirtyNotebookUids: {changed.uid});
 
     final secondAssets = assetsDir.listSync().whereType<File>().toList();
     expect(secondAssets, hasLength(1));

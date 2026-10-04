@@ -1207,9 +1207,8 @@ class NotebookRepository {
   static Map<String, dynamic> encodeNotebook(Notebook notebook) =>
       _notebookToJson(notebook);
 
-  static Map<String, dynamic> encodeNotebookForLocalBackup(
-    Notebook notebook,
-  ) => _notebookToJson(notebook, includeImageBytes: false);
+  static Map<String, dynamic> encodeNotebookForLocalBackup(Notebook notebook) =>
+      _notebookToJson(notebook, includeImageBytes: false);
 
   List<Notebook> decodeNotebooks(List<dynamic> items) {
     return items
@@ -1913,10 +1912,7 @@ class NotebookRepository {
       'updatedAt': notebook.updatedAt.toIso8601String(),
       'pages': notebook.pages
           .map(
-            (page) => _pageToJson(
-              page,
-              includeImageBytes: includeImageBytes,
-            ),
+            (page) => _pageToJson(page, includeImageBytes: includeImageBytes),
           )
           .toList(),
     };
@@ -1951,10 +1947,8 @@ class NotebookRepository {
       'textBlocks': page.textBlocks.map(_textToJson).toList(),
       'imageBlocks': page.imageBlocks
           .map(
-            (image) => _imageToJson(
-              image,
-              includeImageBytes: includeImageBytes,
-            ),
+            (image) =>
+                _imageToJson(image, includeImageBytes: includeImageBytes),
           )
           .toList(),
       'inkStrokes': page.inkStrokes.map(_strokeToJson).toList(),
