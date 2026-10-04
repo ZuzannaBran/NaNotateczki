@@ -184,6 +184,107 @@ class NotebookRepository {
     return persisted.length;
   }
 
+  Future<int> importNotebooksAtomically(List<Notebook> notebooks) async {
+    if (notebooks.isEmpty) {
+      return 0;
+    }
+    _validateRecoveryBatch(notebooks);
+
+    final candidates = <Notebook>[];
+    final requestStackTrace = StackTrace.current;
+    for (final notebook in notebooks) {
+      final existingRow = await (database.select(
+        database.notebookRows,
+      )..where((row) => row.uid.equals(notebook.uid))).getSingleOrNull();
+      if (existingRow != null) {
+        final trackedAt = _latestPersistedUpdates[notebook.uid];
+        final latestAt =
+            trackedAt != null && trackedAt.isAfter(existingRow.updatedAt)
+            ? trackedAt
+            : existingRow.updatedAt;
+        if (latestAt.isAfter(notebook.updatedAt)) {
+          continue;
+        }
+        final existingResult = await _readNotebook(existingRow);
+        if (existingResult.hadCorruptRows) {
+          _markNotebookCorrupt(notebook.uid);
+          throw StateError(
+            'Cannot import over an unreadable notebook: ${notebook.uid}',
+          );
+        }
+        await _protectSuspiciousOverwrite(
+          before: existingResult.notebook,
+          attempted: notebook,
+          operation: 'importBackup',
+          affectedPageIds: notebook.pages.map((page) => page.id).toSet(),
+          requestStackTrace: requestStackTrace,
+        );
+      }
+      candidates.add(notebook);
+    }
+    if (candidates.isEmpty) {
+      return 0;
+    }
+
+    await _validateRecoveryImages(candidates);
+    final persisted = <Notebook>[];
+    final createdImagePaths = <String>[];
+    try {
+      for (final notebook in candidates) {
+        persisted.add(
+          await _persistRecoveryImages(notebook, createdImagePaths),
+        );
+      }
+
+      await database.transaction(() async {
+        for (final notebook in persisted) {
+          final existing = await (database.select(
+            database.notebookRows,
+          )..where((row) => row.uid.equals(notebook.uid))).getSingleOrNull();
+          final trackedAt = _latestPersistedUpdates[notebook.uid];
+          final existingAt = existing?.updatedAt;
+          final latestAt =
+              trackedAt != null &&
+                  (existingAt == null || trackedAt.isAfter(existingAt))
+              ? trackedAt
+              : existingAt;
+          if (latestAt != null && latestAt.isAfter(notebook.updatedAt)) {
+            throw StateError(
+              'Import target changed while import was running: '
+              '${notebook.uid}',
+            );
+          }
+          await database
+              .into(database.notebookRows)
+              .insertOnConflictUpdate(
+                NotebookRowsCompanion.insert(
+                  uid: notebook.uid,
+                  title: notebook.title,
+                  kindIndex: notebook.kind.indexValue,
+                  folder: notebook.folder,
+                  createdAt: notebook.createdAt,
+                  updatedAt: notebook.updatedAt,
+                ),
+              );
+          await _deleteNotebookChildren(notebook.uid);
+          for (final entry in notebook.pages.asMap().entries) {
+            await _insertPage(notebook.uid, entry.value, entry.key);
+          }
+        }
+      });
+    } catch (_) {
+      await _deleteRecoveryImages(createdImagePaths);
+      rethrow;
+    }
+
+    for (final notebook in persisted) {
+      _latestPersistedUpdates[notebook.uid] = notebook.updatedAt;
+      _notebookCache[notebook.uid] = notebook;
+    }
+    onChanged?.call();
+    return persisted.length;
+  }
+
   Future<void> archiveNotebookBeforeDelete(
     Notebook notebook, {
     String reason = 'deleted',
@@ -935,6 +1036,17 @@ class NotebookRepository {
     return items.map(encodeNotebook).toList();
   }
 
+  List<Map<String, dynamic>> encodeSelfContainedBackup(
+    List<Notebook> items,
+  ) {
+    _validateRecoveryBatch(items);
+    final payload = encodeNotebooks(items);
+    for (final notebook in payload) {
+      _ensureArchiveContainsImageBytes(notebook);
+    }
+    return payload;
+  }
+
   static Map<String, dynamic> encodeNotebook(Notebook notebook) =>
       _notebookToJson(notebook);
 
@@ -943,6 +1055,20 @@ class NotebookRepository {
         .whereType<Map<String, dynamic>>()
         .map(_notebookFromJson)
         .toList();
+  }
+
+  List<Notebook> decodeBackupStrict(List<dynamic> items) {
+    if (items.any((item) => item is! Map<String, dynamic>)) {
+      throw const FormatException(
+        'Backup contains an entry that is not a notebook.',
+      );
+    }
+    final notebooks = decodeNotebooks(items);
+    if (notebooks.length != items.length) {
+      throw const FormatException('Backup could not be decoded completely.');
+    }
+    _validateRecoveryBatch(notebooks);
+    return notebooks;
   }
 
   Future<_NotebookReadResult> _readNotebook(NotebookRow row) async {

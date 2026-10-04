@@ -417,12 +417,28 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<String> exportBackup() async {
+    final current = await repository.fetchNotebooks();
+    if (repository.lastFetchSkippedCorruptRows) {
+      throw StateError(
+        'Cannot export while unreadable notebook data is present.',
+      );
+    }
     final dir = await getApplicationDocumentsDirectory();
     final file = File(
-      '${dir.path}/notatek_backup_${DateTime.now().millisecondsSinceEpoch}.json',
+      '${dir.path}/notatek_backup_'
+      '${DateTime.now().microsecondsSinceEpoch}.json',
     );
-    final payload = repository.encodeNotebooks(items);
-    await file.writeAsString(jsonEncode(payload));
+    final temporary = File('${file.path}.tmp');
+    final payload = repository.encodeSelfContainedBackup(current);
+    try {
+      await temporary.writeAsString(jsonEncode(payload), flush: true);
+      await temporary.rename(file.path);
+    } catch (_) {
+      if (await temporary.exists()) {
+        await temporary.delete();
+      }
+      rethrow;
+    }
     return file.path;
   }
 
@@ -432,11 +448,12 @@ class LibraryController extends ChangeNotifier {
       throw Exception('Backup file not found.');
     }
     final content = await file.readAsString();
-    final data = jsonDecode(content) as List<dynamic>;
-    final decoded = repository.decodeNotebooks(data);
-    for (final notebook in decoded) {
-      await repository.saveNotebook(notebook);
+    final raw = jsonDecode(content);
+    if (raw is! List<dynamic>) {
+      throw const FormatException('Backup root must be a JSON list.');
     }
+    final decoded = repository.decodeBackupStrict(raw);
+    await repository.importNotebooksAtomically(decoded);
     await loadItems();
   }
 

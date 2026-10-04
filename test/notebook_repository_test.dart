@@ -93,6 +93,67 @@ void main() {
     expect(savedSecond?.pages.single.id, second.pages.single.id);
   });
 
+  test('decodeBackupStrict rejects partial non-notebook data', () {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = NotebookRepository.encodeNotebook(
+      Notebook(
+        uid: 'backup-notebook',
+        title: 'Backup',
+        kind: NotebookKind.notebook,
+        folder: 'Notes',
+        createdAt: DateTime.utc(2026, 1, 1),
+        updatedAt: DateTime.utc(2026, 1, 1),
+        pages: [
+          NotePage(
+            id: 'backup-page',
+            title: 'Page',
+            textBlocks: const [],
+            imageBlocks: const [],
+            inkStrokes: const [],
+            isBookmarked: false,
+            indexTabs: const [],
+          ),
+        ],
+      ),
+    );
+
+    expect(
+      () => repository.decodeBackupStrict([notebook, 'broken']),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('atomic import rolls back earlier writes on a later id conflict', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final first = await repository.createNotebook(title: 'First');
+    final second = await repository.createNotebook(title: 'Second');
+    final importedFirst = first.copyWith(
+      title: 'Imported First',
+      updatedAt: first.updatedAt.add(const Duration(seconds: 10)),
+    );
+    final conflictingNew = second.copyWith(
+      uid: 'new-notebook',
+      title: 'Conflicting New',
+      updatedAt: second.updatedAt.add(const Duration(seconds: 10)),
+    );
+
+    await expectLater(
+      repository.importNotebooksAtomically([importedFirst, conflictingNew]),
+      throwsA(isA<StateError>()),
+    );
+
+    final savedFirst = await repository.getNotebook(first.uid);
+    final savedSecond = await repository.getNotebook(second.uid);
+    final savedNew = await repository.getNotebook('new-notebook');
+    expect(savedFirst?.title, 'First');
+    expect(savedSecond?.title, 'Second');
+    expect(savedNew, isNull);
+  });
+
   test(
     'saveNotebookPages updates one page and refreshes backup cache',
     () async {
