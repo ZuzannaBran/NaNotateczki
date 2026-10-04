@@ -807,18 +807,10 @@ class LocalBackupService {
         restoredCount: 0,
       );
     }
+    int restored;
     try {
-      final restored = await repository.restoreNotebooksAtomically(
+      restored = await repository.restoreNotebooksAtomically(
         read.data.notebooks,
-      );
-      final succeeded = restored == read.data.notebooks.length;
-      if (succeeded) {
-        await _restoreFolders(read.data.folders);
-      }
-      return BackupRestoreReport(
-        snapshotFound: true,
-        succeeded: succeeded,
-        restoredCount: restored,
       );
     } catch (e, st) {
       debugPrint('LocalBackupService.restoreFromLatest failed: $e');
@@ -833,6 +825,24 @@ class LocalBackupService {
         restoredCount: 0,
       );
     }
+
+    final succeeded = restored == read.data.notebooks.length;
+    if (succeeded) {
+      try {
+        await _restoreFolders(read.data.folders);
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'LocalBackupService.restoreFoldersAfterDocuments',
+        );
+      }
+    }
+    return BackupRestoreReport(
+      snapshotFound: true,
+      succeeded: succeeded,
+      restoredCount: restored,
+    );
   }
 
   Future<BackupSnapshotReport> _snapshotForWeb(List<Notebook> items) async {

@@ -713,6 +713,29 @@ void main() {
     expect(report.restoredCount, 0);
   });
 
+  test('document restore stays successful if folder metadata write fails', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+
+    await service.snapshot([_notebook()]);
+    final foldersPath = '${directory.path}/library_folders.json';
+    final foldersDir = Directory(foldersPath);
+    await foldersDir.create(recursive: true);
+
+    final report = await service.restoreFromLatestDetailed();
+
+    expect(report.succeeded, isTrue);
+    expect(report.restoredCount, 1);
+    expect(await repository.fetchNotebooks(), hasLength(1));
+  });
+
   test('snapshot stops when ink becomes active', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
