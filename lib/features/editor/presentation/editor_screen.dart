@@ -1023,7 +1023,7 @@ class _EditorScreenState extends State<EditorScreen> {
             value: value,
             min: 0,
             max: 255,
-            activeColor: color,
+            activeColor: AppColors.divider,
             onChanged: onChanged,
           ),
         ),
