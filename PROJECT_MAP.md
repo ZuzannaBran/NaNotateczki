@@ -172,7 +172,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2578 linii)
+### `lib/data/backup/local_backup_service.dart` (2607 linii)
 
 Przyrostowy backup z atomowym `manifest.json` i checksumami SHA-256. Format
 v6 rozdziela notebook na niezmienne, content-addressed pliki stron w
@@ -193,11 +193,11 @@ pełny snapshot w `localStorage`.
 
 - 19: `LocalBackupService`; 37: `waitUntilIdle`; 153: `snapshot`;
   84: `_pagesDir`.
-- 744: `_pageReferenceFromJson`; 1026: `readLatest`;
-  1255: `_readBackupPageJson`; 1480: `restoreFromLatest`.
-- 1855: `_BackupPageWorkerRequest`; 1894: `_BackupWorkerClient`;
-  2088: `_createPageBackupPayload`; 2493: `_BackupPageReference`.
-- 2379: `BackupSnapshotReport`.
+- 772: `_pageReferenceFromJson`; 1054: `readLatest`;
+  1283: `_readBackupPageJson`; 1508: `restoreFromLatest`.
+- 1883: `_BackupPageWorkerRequest`; 1922: `_BackupWorkerClient`;
+  2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
+- 2407: `BackupSnapshotReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (271 linii)
 
@@ -492,13 +492,13 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (1000)
-- `test/local_backup_service_test.dart` (1335)
+- `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (98)
+- `test/library_screen_responsive_layout_test.dart` (100)
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)

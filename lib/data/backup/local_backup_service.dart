@@ -293,6 +293,35 @@ class LocalBackupService {
           continue;
         }
 
+        if (previousEntry != null &&
+            !notebook.updatedAt.isAfter(previousEntry.updatedAt) &&
+            await _isManifestEntryValid(previousEntry)) {
+          currentEntries[notebook.uid] = previousEntry;
+          if (!previousEntry.pageBacked && previousEntry.fileName != null) {
+            expectedFiles.add(
+              (await _notebookFile(previousEntry.fileName!)).path,
+            );
+          }
+          notebookStopwatch.stop();
+          notebookReports.add(
+            NotebookBackupReport(
+              uid: notebook.uid,
+              pages: notebook.pages.length,
+              strokes: 0,
+              points: 0,
+              jsonBytes: previousEntry.jsonBytes ?? 0,
+              flattenMs: 0,
+              encodeMs: 0,
+              jsonMs: 0,
+              compareMs: 0,
+              writeMs: 0,
+              totalMs: notebookStopwatch.elapsedMilliseconds,
+              changed: false,
+            ),
+          );
+          continue;
+        }
+
         final previousPages = previousEntry?.pageBacked ?? false
             ? <String, _BackupPageReference>{
                 for (final page in previousEntry!.pages) page.pageId: page,
@@ -342,7 +371,6 @@ class LocalBackupService {
         var processedStrokes = 0;
         var processedPoints = 0;
         for (final page in notebook.pages) {
-          _throwIfInterrupted(shouldInterrupt);
           if (!pageIdsToWrite.contains(page.id)) {
             final previousPage = previousPages[page.id];
             if (previousPage == null) {

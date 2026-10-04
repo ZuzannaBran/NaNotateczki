@@ -63,6 +63,7 @@ void main() {
       CloudSyncService(repository),
       LocalBackupService(repository),
     );
+    await controller.loadItems();
 
     await tester.pumpWidget(
       MaterialApp(

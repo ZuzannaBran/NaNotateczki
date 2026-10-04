@@ -1030,6 +1030,7 @@ void main() {
 
     expect(restored.single.title, 'Newer');
     expect(restored.single.updatedAt, newer.updatedAt);
+    expect(service.debugBackupWorkerSpawnCount, 1);
   });
 
   test('snapshot cleans orphaned atomic temp files', () async {
