@@ -547,9 +547,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
     final folders = controller.folderNames;
 
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLowest,
-      ),
+      decoration: BoxDecoration(color: colorScheme.surfaceContainerLowest),
       child: Column(
         children: [
           SizedBox(
@@ -790,9 +788,7 @@ class _FolderTreeRow extends StatelessWidget {
                 SizedBox(
                   width: 30,
                   child: IconButton(
-                    tooltip: expanded
-                        ? 'Collapse $folder'
-                        : 'Expand $folder',
+                    tooltip: expanded ? 'Collapse $folder' : 'Expand $folder',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints.tightFor(
                       width: 30,
@@ -809,9 +805,7 @@ class _FolderTreeRow extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  expanded
-                      ? Icons.folder_open_outlined
-                      : Icons.folder_outlined,
+                  expanded ? Icons.folder_open_outlined : Icons.folder_outlined,
                   size: 18,
                   color: colorScheme.onSurfaceVariant,
                 ),

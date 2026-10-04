@@ -29,9 +29,7 @@ void main() {
       MaterialApp(
         home: MultiProvider(
           providers: [
-            ChangeNotifierProvider<LibraryController>.value(
-              value: controller,
-            ),
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
             Provider<NotebookRepository>.value(value: repository),
           ],
           child: const LibraryScreen(),
@@ -52,19 +50,14 @@ void main() {
     await database.close();
   });
 
-  testWidgets('library tree expands and collapses each folder', (
-    tester,
-  ) async {
+  testWidgets('library tree expands and collapses each folder', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     final database = NotesDatabase(NativeDatabase.memory());
     final repository = NotebookRepository(database);
     final created = await repository.createNotebook(folder: 'Project A');
-    await repository.updateNotebookMetadata(
-      created.uid,
-      title: 'Nested note',
-    );
+    await repository.updateNotebookMetadata(created.uid, title: 'Nested note');
     final controller = LibraryController(
       repository,
       CloudSyncService(repository),
@@ -75,9 +68,7 @@ void main() {
       MaterialApp(
         home: MultiProvider(
           providers: [
-            ChangeNotifierProvider<LibraryController>.value(
-              value: controller,
-            ),
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
             Provider<NotebookRepository>.value(value: repository),
           ],
           child: const LibraryScreen(),

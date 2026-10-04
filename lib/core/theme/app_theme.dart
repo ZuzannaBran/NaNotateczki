@@ -7,21 +7,22 @@ class AppTheme {
     AppAccentColor accentColor = AppAccentColor.softBubblegum,
   }) {
     final palette = accentColor.palette;
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: accentColor.color,
-      surface: AppColors.background,
-    ).copyWith(
-      primaryContainer: palette.primaryContainer,
-      onPrimaryContainer: AppColors.inkBlack,
-      secondary: palette.accentDark,
-      onSecondary: AppColors.inkBlack,
-      secondaryContainer: palette.accentLight,
-      onSecondaryContainer: AppColors.inkBlack,
-      surface: AppColors.background,
-      surfaceContainerLowest: AppColors.toolbar,
-      surfaceContainerLow: AppColors.toolbar,
-      outlineVariant: AppColors.divider,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: accentColor.color,
+          surface: AppColors.background,
+        ).copyWith(
+          primaryContainer: palette.primaryContainer,
+          onPrimaryContainer: AppColors.inkBlack,
+          secondary: palette.accentDark,
+          onSecondary: AppColors.inkBlack,
+          secondaryContainer: palette.accentLight,
+          onSecondaryContainer: AppColors.inkBlack,
+          surface: AppColors.background,
+          surfaceContainerLowest: AppColors.toolbar,
+          surfaceContainerLow: AppColors.toolbar,
+          outlineVariant: AppColors.divider,
+        );
 
     return ThemeData(
       fontFamily: 'Georgia',

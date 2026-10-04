@@ -892,10 +892,9 @@ class _BoardZoomControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerLow
-            .withValues(alpha: 0.92),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerLow.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(10),
         boxShadow: const [
           BoxShadow(

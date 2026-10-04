@@ -70,8 +70,8 @@ class AppPreferencesController extends ChangeNotifier {
           : selectableAppAccentColors.contains(loadedAccent)
           ? loadedAccent
           : AppAccentColor.softBubblegum;
-      final migratedAccent = loadedAccent != null &&
-          normalizedAccent != loadedAccent;
+      final migratedAccent =
+          loadedAccent != null && normalizedAccent != loadedAccent;
       if (normalizedAccent != null && normalizedAccent != accentColor) {
         accentColor = normalizedAccent;
         changed = true;
