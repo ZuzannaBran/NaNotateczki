@@ -79,18 +79,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Project A'), findsOneWidget);
-    expect(find.text('Nested note'), findsOneWidget);
+    expect(find.text('Nested note'), findsNWidgets(2));
 
     await tester.tap(find.byTooltip('Collapse Project A'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Nested note'), findsNothing);
+    expect(find.text('Nested note'), findsOneWidget);
     expect(find.byTooltip('Expand Project A'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Expand Project A'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Nested note'), findsOneWidget);
+    expect(find.text('Nested note'), findsNWidgets(2));
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
