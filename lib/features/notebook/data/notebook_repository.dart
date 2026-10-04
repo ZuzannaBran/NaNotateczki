@@ -126,10 +126,16 @@ class NotebookRepository {
       return 0;
     }
     _validateRecoveryBatch(notebooks);
+    if (!await _isDatabaseEmptyForRestore()) {
+      throw StateError(
+        'Atomic recovery requires an empty database.',
+      );
+    }
+    await _validateRecoveryImages(notebooks);
 
     final persisted = <Notebook>[];
     for (final notebook in notebooks) {
-      persisted.add(await _persistInlineImages(notebook));
+      persisted.add(await _persistRecoveryImages(notebook));
     }
 
     await database.transaction(() async {
@@ -568,6 +574,56 @@ class NotebookRepository {
       onChanged?.call();
     }
     return updated;
+  }
+
+  Future<void> _validateRecoveryImages(List<Notebook> notebooks) async {
+    for (final notebook in notebooks) {
+      for (final page in notebook.pages) {
+        for (final block in page.imageBlocks) {
+          final bytes = block.bytes;
+          if (bytes != null && bytes.isNotEmpty) {
+            continue;
+          }
+          if (kIsWeb || block.path.isEmpty) {
+            throw FormatException(
+              'Recovery image has no usable bytes: ${block.id}',
+            );
+          }
+          final file = File(block.path);
+          if (!await file.exists() || await file.length() <= 0) {
+            throw FormatException(
+              'Recovery image file is missing or empty: ${block.id}',
+            );
+          }
+          await file.openRead(0, 1).drain<void>();
+        }
+      }
+    }
+  }
+
+  Future<Notebook> _persistRecoveryImages(Notebook notebook) async {
+    final migratedPages = <NotePage>[];
+    var migrated = false;
+    for (final page in notebook.pages) {
+      final migratedBlocks = <ImageBlock>[];
+      var pageMigrated = false;
+      for (final block in page.imageBlocks) {
+        final bytes = block.bytes;
+        final source = bytes != null && bytes.isNotEmpty
+            ? block.copyWith(path: '')
+            : block;
+        final persistedBlock = await _persistInlineImageBytes(source);
+        if (persistedBlock != block) {
+          pageMigrated = true;
+          migrated = true;
+        }
+        migratedBlocks.add(persistedBlock);
+      }
+      migratedPages.add(
+        pageMigrated ? page.copyWith(imageBlocks: migratedBlocks) : page,
+      );
+    }
+    return migrated ? notebook.copyWith(pages: migratedPages) : notebook;
   }
 
   Future<Notebook> _persistInlineImages(Notebook notebook) async {
