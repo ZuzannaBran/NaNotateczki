@@ -150,10 +150,10 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 - 9: `NotebookRows`; 21: `PageRows`; 32: `TextBlockRows`;
   49: `ImageBlockRows`; 72: `InkStrokeRows`.
 - 85: `DatabaseOpenResult`; 99: `DatabaseOpenStage`;
-  101: `DatabaseOpenException`; 143: `NotesDatabase`.
-- 150: `NotesDatabase.open`; 228: kontrola integralności;
+  110: `DatabaseOpenException`; 143: `NotesDatabase`.
+- 150: `NotesDatabase.open`; 294: kontrola integralności;
   322: `schemaVersion` (`2`); 325: `migration` — usuwa dane starego
-  mechanizmu zakładek podczas przejścia z v1.
+  mechanizmu Index tab podczas przejścia z v1.
 
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
   natywnego lub webowego połączenia.
@@ -163,7 +163,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 - `lib/data/drift/notes_database_connection_web.dart` (41): SQLite WASM z
   trwałym IndexedDB.
   6: `NotesDatabaseConnection`; 13: `openNotesDatabaseConnection`.
-- `lib/data/drift/notes_database.g.dart` (6075): kod wygenerowany przez Drift;
+- `lib/data/drift/notes_database.g.dart` (5181): kod wygenerowany przez Drift;
   nie czytaj ani nie edytuj ręcznie.
 
 ### Backup, eksport i synchronizacja
@@ -229,7 +229,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/notebook_kind.dart` (12): notebook lub board
   oraz bezpieczny zapis indeksu.
   1: `NotebookKind`; 3: `NotebookKindValue`.
-- `lib/features/notebook/domain/note_page.dart` (40): zawartość strony.
+- `lib/features/notebook/domain/note_page.dart` (39): zawartość strony.
   5: `NotePage`.
 - `lib/features/notebook/domain/drawing_tool.dart` (43): enum narzędzi i
   klasyfikacja eraser/shape/ink.
@@ -362,7 +362,7 @@ zgodą na zamknięcie aplikacji.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2310 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2307 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
@@ -385,8 +385,8 @@ tylko pionowo.
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
 - 1008: główny `build`; wspólna macierz `pageTransform` skaluje dokument.
-- 1505: `_PageViewportClipper`; 1580: `_PageFramePainter`;
-  1687: `_ProjectMiniMapOverlay`; 2039: `_ProjectMiniMapPainter`.
+- 1506: `_PageViewportClipper`; 1576: `_PageFramePainter`;
+  1683: `_ProjectMiniMapOverlay`; 2035: `_ProjectMiniMapPainter`.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -479,7 +479,8 @@ warstwami tła/canvasu/overlayu; pomocnicze panele UI dziedziczą aktywną palet
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart` (1000)
+- `test/notebook_repository_test.dart` (1079): zapis, ochrona danych i
+  migracja v1→v2 usuwająca dane Index tab bez utraty stron.
 - `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
@@ -491,7 +492,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
-- `test/editor_screen_responsive_layout_test.dart` (193)
+- `test/editor_screen_responsive_layout_test.dart` (196)
 - `test/page_overlay_text_gestures_test.dart` (113)
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)

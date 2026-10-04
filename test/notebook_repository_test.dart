@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:program/core/diagnostics/data_integrity_log.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -926,6 +927,83 @@ void main() {
 
     expect(openCount, 1);
     expect(result.freshFile, isTrue);
+  });
+
+  test('schema migration removes index tabs without losing pages', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'notes-migration-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/notes.sqlite');
+    final legacyDatabase = sqlite.sqlite3.open(file.path);
+    legacyDatabase
+      ..execute('''
+        CREATE TABLE notebook_rows (
+          uid TEXT NOT NULL PRIMARY KEY,
+          title TEXT NOT NULL,
+          kind_index INTEGER NOT NULL,
+          folder TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''')
+      ..execute('''
+        CREATE TABLE page_rows (
+          uid TEXT NOT NULL PRIMARY KEY,
+          notebook_uid TEXT NOT NULL REFERENCES notebook_rows (uid),
+          page_index INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          is_bookmarked INTEGER NOT NULL CHECK (is_bookmarked IN (0, 1)),
+          legacy_index_tab_color_value INTEGER,
+          legacy_index_tab_position REAL
+        )
+      ''')
+      ..execute('''
+        CREATE TABLE index_tab_rows (
+          uid TEXT NOT NULL PRIMARY KEY,
+          page_uid TEXT NOT NULL REFERENCES page_rows (uid),
+          color_value INTEGER NOT NULL,
+          position REAL NOT NULL
+        )
+      ''')
+      ..execute('''
+        INSERT INTO notebook_rows VALUES (
+          'notebook', 'Notebook', 0, 'Notes', 1, 1
+        )
+      ''')
+      ..execute('''
+        INSERT INTO page_rows VALUES (
+          'page', 'notebook', 0, 'Page', 1, 4282664004, 0.25
+        )
+      ''')
+      ..execute('''
+        INSERT INTO index_tab_rows VALUES (
+          'tab', 'page', 4282664004, 0.25
+        )
+      ''')
+      ..execute('PRAGMA user_version = 1')
+      ..close();
+
+    final database = NotesDatabase(NativeDatabase(file));
+    addTearDown(database.close);
+
+    final pages = await database.select(database.pageRows).get();
+    expect(pages, hasLength(1));
+    expect(pages.single.uid, 'page');
+    expect(pages.single.isBookmarked, isTrue);
+
+    final tableNames = await database
+        .customSelect("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .map((row) => row.read<String>('name'))
+        .get();
+    expect(tableNames, isNot(contains('index_tab_rows')));
+
+    final pageColumns = await database
+        .customSelect('PRAGMA table_info(page_rows)')
+        .map((row) => row.read<String>('name'))
+        .get();
+    expect(pageColumns, isNot(contains('legacy_index_tab_color_value')));
+    expect(pageColumns, isNot(contains('legacy_index_tab_position')));
   });
 
   test('database open quarantines a persistently invalid database', () async {

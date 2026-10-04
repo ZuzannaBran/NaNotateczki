@@ -16,7 +16,7 @@ import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 void main() {
-  testWidgets('narrow window keeps page clear of overview and right aligned', (
+  testWidgets('page stays clear of overview and inside right boundary', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 900));
@@ -51,8 +51,16 @@ void main() {
     );
     expect(_documentLayoutSize(tester).width, logicalPageWidth);
     expect(_documentScale(tester), closeTo(1.0, 0.001));
-    final wideRightMargin = 1000 - _documentTopRight(tester).dx;
-    expect(wideRightMargin, closeTo(56.0, 0.001));
+    final wideViewportRightMargin =
+        1000 -
+        tester
+            .getTopRight(find.byKey(const ValueKey('notebook-page-viewport')))
+            .dx;
+    expect(wideViewportRightMargin, closeTo(56.0, 0.001));
+    expect(
+      1000 - _documentTopRight(tester).dx,
+      greaterThanOrEqualTo(wideViewportRightMargin),
+    );
     expect(_pageViewportSize(tester).width, closeTo(828.0, 0.001));
     _expectOverviewSideGapsEqual(tester);
 
@@ -66,7 +74,7 @@ void main() {
     expect(_documentLayoutSize(tester).width, logicalPageWidth);
     expect(_documentScale(tester), closeTo((500 - 106 - 10 - 56) / 820, 0.001));
     final narrowRightMargin = 500 - _documentTopRight(tester).dx;
-    expect(narrowRightMargin, closeTo(wideRightMargin, 0.001));
+    expect(narrowRightMargin, closeTo(wideViewportRightMargin, 0.001));
     expect(_pageViewportSize(tester).width, closeTo(328.0, 0.001));
     _expectOverviewSideGapsEqual(tester);
     expect(find.text('Widen the window to edit this notebook.'), findsNothing);
