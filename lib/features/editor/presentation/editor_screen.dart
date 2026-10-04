@@ -558,9 +558,8 @@ class _EditorScreenState extends State<EditorScreen> {
     late final double minX;
     late final double maxX;
     if (contentWidth <= viewportSize.width) {
-      final rightAlignedX = viewportSize.width - contentWidth;
-      minX = rightAlignedX;
-      maxX = rightAlignedX;
+      minX = 0.0;
+      maxX = viewportSize.width - contentWidth;
     } else {
       minX = viewportSize.width - contentWidth;
       maxX = 0.0;

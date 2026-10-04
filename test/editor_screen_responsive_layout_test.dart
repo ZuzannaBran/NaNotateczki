@@ -72,6 +72,41 @@ void main() {
     _expectOverviewSideGapsEqual(tester);
     expect(find.text('Widen the window to edit this notebook.'), findsNothing);
 
+    await tester.binding.setSurfaceSize(const Size(1100, 900));
+    await tester.pump();
+
+    expect(_documentScale(tester), closeTo(1.0, 0.001));
+    expect(_pageViewportSize(tester).width, closeTo(928.0, 0.001));
+    expect(_documentTranslationX(tester), closeTo(0.0, 0.001));
+
+    final viewportCenter = tester.getCenter(
+      find.byKey(const ValueKey('notebook-page-viewport')),
+    );
+    final firstFinger = await tester.createGesture(
+      kind: PointerDeviceKind.touch,
+      pointer: 1,
+    );
+    final secondFinger = await tester.createGesture(
+      kind: PointerDeviceKind.touch,
+      pointer: 2,
+    );
+    await firstFinger.down(viewportCenter + const Offset(-60, 0));
+    await secondFinger.down(viewportCenter + const Offset(60, 0));
+    await tester.pump();
+
+    await firstFinger.moveBy(const Offset(80, 0));
+    await tester.pump();
+    await secondFinger.moveBy(const Offset(80, 0));
+    await tester.pump();
+
+    final translatedX = _documentTranslationX(tester);
+    expect(translatedX, greaterThan(0.0));
+    expect(translatedX, lessThanOrEqualTo(108.0));
+
+    await firstFinger.up();
+    await secondFinger.up();
+    await tester.pump();
+
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     preferences.dispose();
@@ -87,6 +122,13 @@ double _documentScale(WidgetTester tester) {
     find.byKey(const ValueKey('notebook-document-transform')),
   );
   return transform.transform.entry(0, 0);
+}
+
+double _documentTranslationX(WidgetTester tester) {
+  final transform = tester.widget<Transform>(
+    find.byKey(const ValueKey('notebook-document-transform')),
+  );
+  return transform.transform.entry(0, 3);
 }
 
 Size _documentLayoutSize(WidgetTester tester) {
