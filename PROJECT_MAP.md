@@ -170,7 +170,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (1193 linii)
+### `lib/data/backup/local_backup_service.dart` (1178 linii)
 
 Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami SHA-256 (v3) i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
@@ -239,7 +239,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (1965 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2078 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. Recovery zapisuje cały batch atomowo i preferuje
@@ -454,8 +454,8 @@ warstwami tła/canvasu/overlayu.
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart` (739)
-- `test/local_backup_service_test.dart` (669)
+- `test/notebook_repository_test.dart` (774)
+- `test/local_backup_service_test.dart` (709)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

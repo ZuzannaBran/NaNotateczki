@@ -296,6 +296,46 @@ void main() {
     expect(restored, isEmpty);
   });
 
+  test('version 1 backup rejects malformed nested content', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+    final encoded = NotebookRepository.encodeNotebook(_notebook());
+    final pages = encoded['pages'] as List<dynamic>;
+    final page = pages.single as Map<String, dynamic>;
+    page['imageBlocks'] = ['broken'];
+    final backupDir = Directory('${directory.path}/local_backup/notebooks');
+    await backupDir.create(recursive: true);
+    const fileName = 'malformed_v1.json';
+    await File('${backupDir.path}/$fileName').writeAsString(
+      jsonEncode(encoded),
+      flush: true,
+    );
+    await File('${directory.path}/local_backup/manifest.json').writeAsString(
+      jsonEncode({
+        'version': 1,
+        'notebooks': [
+          {
+            'uid': _notebook().uid,
+            'updatedAt': _notebook().updatedAt.toIso8601String(),
+            'file': fileName,
+          },
+        ],
+      }),
+      flush: true,
+    );
+
+    final restored = await service.readLatest();
+
+    expect(restored, isEmpty);
+  });
+
   test('empty incremental snapshot does not resurrect legacy data', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));

@@ -154,6 +154,41 @@ void main() {
     expect(savedNew, isNull);
   });
 
+  test('decodeBackupStrict rejects malformed nested lists', () {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = NotebookRepository.encodeNotebook(
+      Notebook(
+        uid: 'strict-notebook',
+        title: 'Strict',
+        kind: NotebookKind.notebook,
+        folder: 'Notes',
+        createdAt: DateTime.utc(2026, 1, 1),
+        updatedAt: DateTime.utc(2026, 1, 1),
+        pages: [
+          NotePage(
+            id: 'strict-page',
+            title: 'Page',
+            textBlocks: const [],
+            imageBlocks: const [],
+            inkStrokes: const [],
+            isBookmarked: false,
+            indexTabs: const [],
+          ),
+        ],
+      ),
+    );
+    final pages = notebook['pages'] as List<dynamic>;
+    final page = pages.single as Map<String, dynamic>;
+    page['textBlocks'] = ['broken'];
+
+    expect(
+      () => repository.decodeBackupStrict([notebook]),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
   test(
     'saveNotebookPages updates one page and refreshes backup cache',
     () async {

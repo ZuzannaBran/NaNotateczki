@@ -1058,17 +1058,130 @@ class NotebookRepository {
   }
 
   List<Notebook> decodeBackupStrict(List<dynamic> items) {
-    if (items.any((item) => item is! Map<String, dynamic>)) {
-      throw const FormatException(
-        'Backup contains an entry that is not a notebook.',
-      );
-    }
+    _validateBackupJsonStructure(items);
     final notebooks = decodeNotebooks(items);
     if (notebooks.length != items.length) {
       throw const FormatException('Backup could not be decoded completely.');
     }
     _validateRecoveryBatch(notebooks);
     return notebooks;
+  }
+
+  void _validateBackupJsonStructure(List<dynamic> items) {
+    for (var notebookIndex = 0; notebookIndex < items.length; notebookIndex++) {
+      final notebook = items[notebookIndex];
+      if (notebook is! Map<String, dynamic>) {
+        throw FormatException(
+          'Backup notebook[$notebookIndex] is not a JSON object.',
+        );
+      }
+      final pages = notebook['pages'];
+      if (pages is! List<dynamic>) {
+        throw FormatException(
+          'Backup notebook[$notebookIndex] has no valid page list.',
+        );
+      }
+      for (var pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        final page = pages[pageIndex];
+        if (page is! Map<String, dynamic>) {
+          throw FormatException(
+            'Backup notebook[$notebookIndex].pages[$pageIndex] '
+            'is not a JSON object.',
+          );
+        }
+        _requireMapList(
+          page,
+          'textBlocks',
+          'notebook[$notebookIndex].pages[$pageIndex]',
+        );
+        _requireMapList(
+          page,
+          'imageBlocks',
+          'notebook[$notebookIndex].pages[$pageIndex]',
+        );
+        final inkStrokes = _requireOptionalMapList(
+          page,
+          'inkStrokes',
+          'notebook[$notebookIndex].pages[$pageIndex]',
+        );
+        _requireOptionalMapList(
+          page,
+          'indexTabs',
+          'notebook[$notebookIndex].pages[$pageIndex]',
+        );
+
+        for (var strokeIndex = 0;
+            strokeIndex < inkStrokes.length;
+            strokeIndex++) {
+          final stroke = inkStrokes[strokeIndex];
+          final points = stroke['points'];
+          if (points == null) {
+            continue;
+          }
+          if (points is! List<dynamic> ||
+              points.any((point) => point is! Map<String, dynamic>)) {
+            throw FormatException(
+              'Backup notebook[$notebookIndex].pages[$pageIndex].'
+              'inkStrokes[$strokeIndex].points is malformed.',
+            );
+          }
+        }
+
+        final imageBlocks = page['imageBlocks'] as List<dynamic>;
+        for (var imageIndex = 0;
+            imageIndex < imageBlocks.length;
+            imageIndex++) {
+          final image = imageBlocks[imageIndex] as Map<String, dynamic>;
+          final bytes = image['bytes'];
+          if (bytes == null) {
+            continue;
+          }
+          if (bytes is! String || bytes.isEmpty) {
+            throw FormatException(
+              'Backup notebook[$notebookIndex].pages[$pageIndex].'
+              'imageBlocks[$imageIndex].bytes is malformed.',
+            );
+          }
+          try {
+            base64Decode(bytes);
+          } catch (_) {
+            throw FormatException(
+              'Backup notebook[$notebookIndex].pages[$pageIndex].'
+              'imageBlocks[$imageIndex].bytes is not valid base64.',
+            );
+          }
+        }
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> _requireMapList(
+    Map<String, dynamic> owner,
+    String key,
+    String path,
+  ) {
+    final value = owner[key];
+    if (value is! List<dynamic> ||
+        value.any((item) => item is! Map<String, dynamic>)) {
+      throw FormatException('Backup $path.$key is malformed.');
+    }
+    return value.cast<Map<String, dynamic>>();
+  }
+
+  List<Map<String, dynamic>> _requireOptionalMapList(
+    Map<String, dynamic> owner,
+    String key,
+    String path,
+  ) {
+    final value = owner[key];
+    if (value == null) {
+      return const <Map<String, dynamic>>[];
+    }
+    if (value is! List<dynamic> ||
+        value.any((item) => item is! Map<String, dynamic>)) {
+      throw FormatException('Backup $path.$key is malformed.');
+    }
+    return value.cast<Map<String, dynamic>>();
   }
 
   Future<_NotebookReadResult> _readNotebook(NotebookRow row) async {

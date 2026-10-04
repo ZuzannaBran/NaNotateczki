@@ -599,7 +599,7 @@ class LocalBackupService {
           'Backup notebook is not a JSON object: ${entry.fileName}',
         );
       }
-      final decodedNotebook = repository.decodeNotebooks([notebookJson]);
+      final decodedNotebook = repository.decodeBackupStrict([notebookJson]);
       if (decodedNotebook.length != 1) {
         throw BackupValidationException(
           'Backup notebook could not be decoded: ${entry.fileName}',
@@ -641,26 +641,11 @@ class LocalBackupService {
   }
 
   List<Notebook> _decodeCompleteNotebookList(List<dynamic> items) {
-    if (items.any((item) => item is! Map<String, dynamic>)) {
-      throw const BackupValidationException(
-        'Full backup contains a non-notebook entry.',
-      );
+    try {
+      return repository.decodeBackupStrict(items);
+    } on FormatException catch (e) {
+      throw BackupValidationException(e.message);
     }
-    final notebooks = repository.decodeNotebooks(items);
-    if (notebooks.length != items.length) {
-      throw const BackupValidationException(
-        'Full backup could not be decoded completely.',
-      );
-    }
-    final seenUids = <String>{};
-    for (final notebook in notebooks) {
-      if (!seenUids.add(notebook.uid)) {
-        throw BackupValidationException(
-          'Full backup contains duplicate notebook uid: ${notebook.uid}',
-        );
-      }
-    }
-    return notebooks;
   }
 
   Future<int> restoreFromLatest() async {
