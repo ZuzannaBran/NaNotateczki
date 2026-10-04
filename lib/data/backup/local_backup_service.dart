@@ -23,9 +23,19 @@ class LocalBackupService {
   final NotebookRepository repository;
   final Future<Directory> Function() _documentsDirectory;
   final ValueNotifier<bool> _snapshotInProgress = ValueNotifier(false);
+  final _BackupWorkerClient _backupWorker = _BackupWorkerClient();
   Future<void> _snapshotTail = Future<void>.value();
 
   ValueListenable<bool> get snapshotInProgress => _snapshotInProgress;
+
+  @visibleForTesting
+  int get debugBackupWorkerSpawnCount => _backupWorker.spawnCount;
+
+  Future<void> dispose() async {
+    _backupWorker.dispose();
+    await _snapshotTail;
+    _snapshotInProgress.dispose();
+  }
 
   static const _dirName = 'local_backup';
   static const _incrementalDirName = 'notebooks';
@@ -224,10 +234,10 @@ class LocalBackupService {
         }
 
         await _validateNotebookImages(notebook);
-        final workerResult = await _runBackupWorker<_BackupWorkerResult>(
+        final workerResult = await _backupWorker.run(
           _BackupWorkerOperation.snapshot,
           notebook,
-          shouldInterrupt,
+          shouldInterrupt: shouldInterrupt,
         );
         if (workerResult.missingImageIds.isNotEmpty) {
           throw BackupDataException(
@@ -1248,65 +1258,201 @@ class _BackupWorkerResult {
   final List<String> missingImageIds;
 }
 
-Future<T> _runBackupWorker<T>(
-  _BackupWorkerOperation operation,
-  Object message,
-  bool Function()? shouldInterrupt,
-) async {
-  if (shouldInterrupt?.call() ?? false) {
-    throw const BackupSnapshotInterrupted();
+const int _workerReadyMessage = 0;
+const int _workerResultMessage = 1;
+
+class _BackupWorkerClient {
+  Future<void>? _startFuture;
+  Isolate? _isolate;
+  ReceivePort? _responsePort;
+  StreamSubscription<dynamic>? _responseSubscription;
+  SendPort? _requestPort;
+  final Map<int, Completer<_BackupWorkerResult>> _pending =
+      <int, Completer<_BackupWorkerResult>>{};
+  int _nextRequestId = 0;
+  int _spawnCount = 0;
+  bool _disposed = false;
+
+  int get spawnCount => _spawnCount;
+
+  Future<_BackupWorkerResult> run(
+    _BackupWorkerOperation operation,
+    Object message, {
+    bool Function()? shouldInterrupt,
+  }) async {
+    if (_disposed) {
+      throw StateError('Backup worker is disposed.');
+    }
+    if (shouldInterrupt?.call() ?? false) {
+      throw const BackupSnapshotInterrupted();
+    }
+
+    await _ensureStarted();
+    if (_disposed) {
+      throw StateError('Backup worker is disposed.');
+    }
+    final requestPort = _requestPort;
+    if (requestPort == null) {
+      throw StateError('Backup worker did not start.');
+    }
+
+    final requestId = _nextRequestId++;
+    final completer = Completer<_BackupWorkerResult>();
+    _pending[requestId] = completer;
+    requestPort.send(<Object?>[requestId, operation.index, message]);
+
+    Timer? interruptTimer;
+    if (shouldInterrupt != null) {
+      interruptTimer = Timer.periodic(const Duration(milliseconds: 8), (_) {
+        if (!completer.isCompleted && shouldInterrupt()) {
+          _interruptActiveWork();
+        }
+      });
+    }
+
+    try {
+      return await completer.future;
+    } finally {
+      interruptTimer?.cancel();
+      _pending.remove(requestId);
+    }
   }
-  final resultPort = ReceivePort();
-  final completer = Completer<T>();
-  Isolate? isolate;
-  Timer? interruptTimer;
-  final subscription = resultPort.listen((message) {
-    if (completer.isCompleted) {
+
+  Future<void> _ensureStarted() async {
+    final existing = _startFuture;
+    if (existing != null) {
+      await existing;
       return;
     }
-    final response = message as List<Object?>;
-    if (response[0] as bool) {
-      completer.complete(response[1] as T);
-      return;
+
+    final start = _start();
+    _startFuture = start;
+    try {
+      await start;
+    } catch (_) {
+      if (identical(_startFuture, start)) {
+        _startFuture = null;
+      }
+      rethrow;
     }
-    completer.completeError(
-      RemoteError(response[1] as String, response[2] as String),
-    );
-  });
-  try {
-    isolate = await Isolate.spawn(_backupWorkerEntryPoint, <Object?>[
-      resultPort.sendPort,
-      operation.index,
-      message,
-    ]);
-    interruptTimer = Timer.periodic(const Duration(milliseconds: 8), (_) {
-      if (!completer.isCompleted && (shouldInterrupt?.call() ?? false)) {
-        isolate?.kill(priority: Isolate.immediate);
-        completer.completeError(const BackupSnapshotInterrupted());
+  }
+
+  Future<void> _start() async {
+    final responsePort = ReceivePort();
+    final ready = Completer<SendPort>();
+    _responsePort = responsePort;
+    _responseSubscription = responsePort.listen((message) {
+      final response = message as List<Object?>;
+      final type = response[0] as int;
+      if (type == _workerReadyMessage) {
+        if (!ready.isCompleted) {
+          ready.complete(response[1] as SendPort);
+        }
+        return;
+      }
+      if (type != _workerResultMessage) {
+        return;
+      }
+
+      final requestId = response[1] as int;
+      final completer = _pending.remove(requestId);
+      if (completer == null || completer.isCompleted) {
+        return;
+      }
+      if (response[2] as bool) {
+        completer.complete(response[3] as _BackupWorkerResult);
+      } else {
+        completer.completeError(
+          RemoteError(response[3] as String, response[4] as String),
+        );
       }
     });
-    return await completer.future;
-  } finally {
-    interruptTimer?.cancel();
-    isolate?.kill(priority: Isolate.immediate);
-    await subscription.cancel();
-    resultPort.close();
+
+    try {
+      _spawnCount++;
+      _isolate = await Isolate.spawn(
+        _backupWorkerEntryPoint,
+        responsePort.sendPort,
+      );
+      _requestPort = await ready.future;
+    } catch (_) {
+      _resetWorker();
+      rethrow;
+    }
+  }
+
+  void _interruptActiveWork() {
+    if (_pending.isEmpty) {
+      return;
+    }
+    for (final completer in _pending.values) {
+      if (!completer.isCompleted) {
+        completer.completeError(const BackupSnapshotInterrupted());
+      }
+    }
+    _pending.clear();
+    _resetWorker();
+  }
+
+  void _resetWorker() {
+    _isolate?.kill(priority: Isolate.immediate);
+    _isolate = null;
+    _requestPort = null;
+    _startFuture = null;
+
+    final subscription = _responseSubscription;
+    _responseSubscription = null;
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
+    _responsePort?.close();
+    _responsePort = null;
+  }
+
+  void dispose() {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
+    for (final completer in _pending.values) {
+      if (!completer.isCompleted) {
+        completer.completeError(StateError('Backup worker was disposed.'));
+      }
+    }
+    _pending.clear();
+    _resetWorker();
   }
 }
 
-void _backupWorkerEntryPoint(List<Object?> request) {
-  final sendPort = request[0] as SendPort;
-  try {
-    final operation = _BackupWorkerOperation.values[request[1] as int];
-    final result = switch (operation) {
-      _BackupWorkerOperation.snapshot => _createBackupPayload(
-        request[2] as Notebook,
-      ),
-    };
-    sendPort.send(<Object?>[true, result]);
-  } catch (error, stackTrace) {
-    sendPort.send(<Object?>[false, error.toString(), stackTrace.toString()]);
-  }
+void _backupWorkerEntryPoint(SendPort responsePort) {
+  final requestPort = ReceivePort();
+  responsePort.send(<Object?>[_workerReadyMessage, requestPort.sendPort]);
+  requestPort.listen((message) {
+    final request = message as List<Object?>;
+    final requestId = request[0] as int;
+    try {
+      final operation = _BackupWorkerOperation.values[request[1] as int];
+      final result = switch (operation) {
+        _BackupWorkerOperation.snapshot => _createBackupPayload(
+          request[2] as Notebook,
+        ),
+      };
+      responsePort.send(<Object?>[
+        _workerResultMessage,
+        requestId,
+        true,
+        result,
+      ]);
+    } catch (error, stackTrace) {
+      responsePort.send(<Object?>[
+        _workerResultMessage,
+        requestId,
+        false,
+        error.toString(),
+        stackTrace.toString(),
+      ]);
+    }
+  });
 }
 
 _BackupWorkerResult _createBackupPayload(Notebook notebook) {

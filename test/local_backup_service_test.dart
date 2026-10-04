@@ -26,6 +26,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final notebook = _notebook();
 
     final first = await service.snapshot([notebook]);
@@ -39,6 +40,31 @@ void main() {
     expect(second.notebookReports.single.jsonMs, 0);
   });
 
+  test('consecutive snapshots reuse the persistent backup worker', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    final notebook = _notebook();
+
+    await service.snapshot([notebook]);
+    final updated = notebook.copyWith(
+      title: 'Updated',
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+    );
+    await service.snapshot(
+      [updated],
+      dirtyNotebookUids: {updated.uid},
+    );
+
+    expect(service.debugBackupWorkerSpawnCount, 1);
+  });
+
   test('incremental snapshot serializes only the dirty notebook', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
@@ -48,6 +74,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final first = _notebook();
     final second = _distinctNotebook();
 
@@ -86,6 +113,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final first = _notebook();
     final second = _distinctNotebook();
 
@@ -129,6 +157,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final notebook = _notebook();
 
     await service.snapshot([notebook]);
@@ -185,6 +214,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final notebook = _notebook();
 
     await service.snapshot([notebook]);
@@ -220,6 +250,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final first = _notebook();
     final second = _distinctNotebook();
 
@@ -248,6 +279,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final first = _notebook();
     final second = _distinctNotebook();
 
@@ -285,6 +317,7 @@ void main() {
         NotebookRepository(database),
         documentsDirectory: () async => directory,
       );
+      addTearDown(service.dispose);
       final backupDir = Directory('${directory.path}/local_backup');
       await backupDir.create(recursive: true);
       final manifest = File('${backupDir.path}/manifest.json');
@@ -310,6 +343,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final notebook = _notebook();
     final content = jsonEncode(NotebookRepository.encodeNotebook(notebook));
     var hash = 0x811c9dc5;
@@ -356,6 +390,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final notebook = _notebook();
     final backupDir = Directory('${directory.path}/local_backup/notebooks');
     await backupDir.create(recursive: true);
@@ -395,6 +430,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final notebook = _notebook();
     await service.snapshot([notebook]);
     final manifest = File('${directory.path}/local_backup/manifest.json');
@@ -419,6 +455,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final legacyDir = Directory('${directory.path}/local_backup');
     await legacyDir.create(recursive: true);
     await File('${legacyDir.path}/notebooks_latest.json').writeAsString(
@@ -444,6 +481,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final encoded = NotebookRepository.encodeNotebook(_notebook());
     final pages = encoded['pages'] as List<dynamic>;
     final page = pages.single as Map<String, dynamic>;
@@ -483,6 +521,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
 
     await service.snapshot([]);
     final legacy = File('${directory.path}/local_backup/notebooks_latest.json');
@@ -504,6 +543,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final first = _notebook();
 
     await service.snapshot([first]);
@@ -539,6 +579,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     var notebook = _notebook();
 
     for (var index = 0; index < 8; index++) {
@@ -568,6 +609,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final imageFile = File('${directory.path}/image.png');
     await imageFile.writeAsBytes([1, 2, 3, 4], flush: true);
     final base = _notebook();
@@ -620,6 +662,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final first = _notebook();
     final second = _distinctNotebook();
 
@@ -642,6 +685,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final first = _notebook();
     final second = first.copyWith(
       uid: 'notebook-2',
@@ -666,6 +710,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final protected = _notebook();
     final healthy = _distinctNotebook();
 
@@ -695,6 +740,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final protected = _notebook();
     final healthy = _distinctNotebook();
 
@@ -733,6 +779,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final first = _notebook();
     final newer = first.copyWith(
       title: 'Newer',
@@ -760,6 +807,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final notebooksDir = Directory('${directory.path}/local_backup/notebooks');
     await notebooksDir.create(recursive: true);
     final orphan = File('${notebooksDir.path}/orphan.json.tmp');
@@ -780,6 +828,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final folders = File('${directory.path}/library_folders.json');
     await folders.writeAsString(
       jsonEncode(['Empty Folder', 'Notes']),
@@ -807,6 +856,7 @@ void main() {
       repository,
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
 
     await service.snapshot([]);
     final report = await service.restoreFromLatestDetailed();
@@ -828,6 +878,7 @@ void main() {
         NotebookRepository(database),
         documentsDirectory: () async => directory,
       );
+      addTearDown(service.dispose);
       final backupDir = Directory('${directory.path}/local_backup');
       await backupDir.create(recursive: true);
       await File(
@@ -854,6 +905,7 @@ void main() {
         repository,
         documentsDirectory: () async => directory,
       );
+      addTearDown(service.dispose);
 
       await service.snapshot([_notebook()]);
       final foldersPath = '${directory.path}/library_folders.json';
@@ -877,6 +929,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
 
     await expectLater(
       service.snapshot([_notebook()], shouldInterrupt: () => true),
@@ -884,7 +937,7 @@ void main() {
     );
   });
 
-  test('snapshot interrupts an active backup worker', () async {
+  test('explicit interruption restarts the persistent backup worker', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
     final database = NotesDatabase(NativeDatabase.memory());
@@ -893,6 +946,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
+    addTearDown(service.dispose);
     final snapshotStates = <bool>[];
     service.snapshotInProgress.addListener(
       () => snapshotStates.add(service.snapshotInProgress.value),
@@ -907,8 +961,13 @@ void main() {
     );
 
     expect(interruptChecks, greaterThanOrEqualTo(3));
+    expect(service.debugBackupWorkerSpawnCount, 1);
     expect(service.snapshotInProgress.value, isFalse);
-    expect(snapshotStates, containsAllInOrder([true, false]));
+
+    await service.snapshot([_notebook()]);
+
+    expect(service.debugBackupWorkerSpawnCount, 2);
+    expect(snapshotStates, containsAllInOrder([true, false, true, false]));
   });
 }
 

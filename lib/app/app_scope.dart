@@ -43,6 +43,10 @@ class _AppScopeState extends State<AppScope> {
   @override
   void dispose() {
     _backupScheduler?.dispose();
+    final backupService = _backupService;
+    if (backupService != null) {
+      unawaited(backupService.dispose());
+    }
     super.dispose();
   }
 
@@ -382,7 +386,6 @@ class _BackupScheduler with WidgetsBindingObserver {
       snapshotReport = await backupService.snapshot(
         snapshotItems,
         dirtyNotebookUids: pendingNotebookUids,
-        shouldInterrupt: () => InkActivityTracker.instance.isBusy || _dirty,
       );
       final frameSummary = FrameTimingTracker.instance.summarySince(
         frameCursor,
@@ -404,7 +407,7 @@ class _BackupScheduler with WidgetsBindingObserver {
     } on BackupSnapshotInterrupted {
       _dirtyNotebookUids.addAll(pendingNotebookUids);
       _dirty = true;
-      debugPrint('[backup] reason=$reason interrupted=ink');
+      debugPrint('[backup] reason=$reason interrupted=worker');
     } catch (e) {
       if (e is! BackupDataException) {
         _dirtyNotebookUids.addAll(pendingNotebookUids);

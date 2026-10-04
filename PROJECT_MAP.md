@@ -54,12 +54,13 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (469 linii)
+### `lib/app/app_scope.dart` (472 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scheduler zbiera
-UID-y zmienionych notebooków, robi kopię po 2 s bezczynności, wymusza próbę
-po maksymalnie 30 s ciągłych zmian i zachowuje dirty UID-y po przerwaniu.
+UID-y zmienionych notebooków i robi kopię po 2 s bezczynności. Rozpoczęty
+backup nie jest przerywany przez nowe pisanie; nowe dirty UID-y czekają na
+następny przebieg, a usługa zatrzymuje worker przy zamknięciu scope.
 
 - 22: `AppScope`;
   29: `_AppScopeState`;
@@ -169,13 +170,14 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (1519 linii)
+### `lib/data/backup/local_backup_service.dart` (1665 linii)
 
 Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami
 SHA-256 plików i całego manifestu (v4). Dirty UID-y pozwalają ponownie użyć
 nietkniętych wpisów po sprawdzeniu istnienia i rozmiaru pliku bez odczytu i
-SHA-256 całego JSON-a; brakujący lub ucięty plik jest odbudowywany. SHA-256
-zmienionego payloadu jest liczony w worker isolate. Do pięciu poprzednich manifestów jest
+SHA-256 całego JSON-a; brakujący lub ucięty plik jest odbudowywany. Jeden
+lazy, długowieczny worker isolate serializuje kolejne zmienione notebooki i
+liczy ich SHA-256 bez kosztu `Isolate.spawn` dla każdego zapisu. Do pięciu poprzednich manifestów jest
 trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki.
 Przed i po serializacji natywny backup sprawdza, czy każdy obraz nadal ma
 dostępne bajty; wyścig z usunięciem pliku nie może utrwalić kopii bez obrazu; brak obrazu nie zastępuje
@@ -184,7 +186,7 @@ snapshot i próbuje kolejno starsze wersje. Manifest przechowuje też listę fol
 
 - 16: `LocalBackupService`; 106: `snapshot`; 442: `hasLatest`;
   664: `readLatest`; 899: `restoreFromLatest`.
-- 1251: anulowalny worker serializacji i SHA-256.
+- 1264: `_BackupWorkerClient` — długowieczny worker serializacji i SHA-256; jawne przerwanie restartuje go.
 - 1381: `BackupSnapshotInterrupted`; 1385: `BackupValidationException`;
   1394: `BackupDataException`; 1403: `BackupSnapshotReport`;
   1454: `NotebookBackupReport`.
@@ -464,7 +466,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (1000)
-- `test/local_backup_service_test.dart` (1003)
+- `test/local_backup_service_test.dart` (1062)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
