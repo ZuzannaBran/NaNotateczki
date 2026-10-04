@@ -69,9 +69,8 @@ class LocalBackupService {
     return File('${dir.path}/$fileName');
   }
 
-  String _notebookVersionFileName(Notebook notebook) {
-    final uid = Uri.encodeComponent(notebook.uid);
-    return '${uid}_${notebook.updatedAt.microsecondsSinceEpoch}.json';
+  String _notebookContentFileName(String uid, String checksum) {
+    return '${Uri.encodeComponent(uid)}_$checksum.json';
   }
 
   bool _isSafeNotebookFileName(String fileName) {
@@ -102,6 +101,7 @@ class LocalBackupService {
       final totalStopwatch = Stopwatch()..start();
       final notebooksDir = await _notebooksDir();
       final previousEntries = await _readManifestEntries();
+      final currentEntries = <String, _BackupManifestEntry>{};
       final expectedFiles = <String>{};
       final notebookReports = <NotebookBackupReport>[];
       var readCompareMs = 0;
@@ -113,39 +113,50 @@ class LocalBackupService {
         final notebookStopwatch = Stopwatch()..start();
         final previousEntry = previousEntries[notebook.uid];
         if (previousEntry != null &&
-            previousEntry.updatedAt == notebook.updatedAt) {
+            previousEntry.updatedAt == notebook.updatedAt &&
+            await _isManifestEntryValid(previousEntry)) {
           final previousFile = await _notebookFile(previousEntry.fileName);
+          currentEntries[notebook.uid] = previousEntry;
           expectedFiles.add(previousFile.path);
-          await _recoverAtomicWrite(previousFile);
-          if (await previousFile.exists()) {
-            notebookStopwatch.stop();
-            notebookReports.add(
-              NotebookBackupReport(
-                uid: notebook.uid,
-                pages: notebook.pages.length,
-                strokes: _strokeCount(notebook),
-                points: _pointCount(notebook),
-                jsonBytes: await previousFile.length(),
-                flattenMs: 0,
-                encodeMs: 0,
-                jsonMs: 0,
-                compareMs: 0,
-                writeMs: 0,
-                totalMs: notebookStopwatch.elapsedMilliseconds,
-                changed: false,
-              ),
-            );
-            continue;
-          }
+          notebookStopwatch.stop();
+          notebookReports.add(
+            NotebookBackupReport(
+              uid: notebook.uid,
+              pages: notebook.pages.length,
+              strokes: _strokeCount(notebook),
+              points: _pointCount(notebook),
+              jsonBytes: previousEntry.jsonBytes!,
+              flattenMs: 0,
+              encodeMs: 0,
+              jsonMs: 0,
+              compareMs: 0,
+              writeMs: 0,
+              totalMs: notebookStopwatch.elapsedMilliseconds,
+              changed: false,
+            ),
+          );
+          continue;
         }
-        final file = await _notebookFile(_notebookVersionFileName(notebook));
-        expectedFiles.add(file.path);
+
         final workerResult = await _runBackupWorker<_BackupWorkerResult>(
           _BackupWorkerOperation.snapshot,
           notebook,
           shouldInterrupt,
         );
         final content = workerResult.content;
+        final checksum = _contentChecksum(content);
+        final jsonBytes = utf8.encode(content).length;
+        final fileName = _notebookContentFileName(notebook.uid, checksum);
+        final file = await _notebookFile(fileName);
+        final entry = _BackupManifestEntry(
+          uid: notebook.uid,
+          updatedAt: notebook.updatedAt,
+          fileName: fileName,
+          checksum: checksum,
+          jsonBytes: jsonBytes,
+        );
+        currentEntries[notebook.uid] = entry;
+        expectedFiles.add(file.path);
         _throwIfInterrupted(shouldInterrupt);
         var compareMs = 0;
         var writeMs = 0;
@@ -174,7 +185,7 @@ class LocalBackupService {
             pages: notebook.pages.length,
             strokes: _strokeCount(notebook),
             points: _pointCount(notebook),
-            jsonBytes: utf8.encode(content).length,
+            jsonBytes: jsonBytes,
             flattenMs: workerResult.flattenMs,
             encodeMs: workerResult.encodeMs,
             jsonMs: workerResult.jsonMs,
@@ -188,23 +199,9 @@ class LocalBackupService {
 
       _throwIfInterrupted(shouldInterrupt);
       final manifestPayload = {
-        'version': 1,
+        'version': 2,
         'notebooks': [
-          for (final notebook in items)
-            {
-              'uid': notebook.uid,
-              'updatedAt': notebook.updatedAt.toIso8601String(),
-              'file': previousEntries[notebook.uid]?.updatedAt ==
-                          notebook.updatedAt &&
-                      expectedFiles.any(
-                        (path) =>
-                            path.endsWith(
-                              previousEntries[notebook.uid]!.fileName,
-                            ),
-                      )
-                  ? previousEntries[notebook.uid]!.fileName
-                  : _notebookVersionFileName(notebook),
-            },
+          for (final notebook in items) currentEntries[notebook.uid]!.toJson(),
         ],
       };
       final manifestStopwatch = Stopwatch()..start();
@@ -307,11 +304,15 @@ class LocalBackupService {
           continue;
         }
         final parsed = DateTime.tryParse(updatedAt);
+        final checksum = entry['checksum'];
+        final jsonBytes = entry['bytes'];
         if (parsed != null) {
           result[uid] = _BackupManifestEntry(
             uid: uid,
             updatedAt: parsed,
             fileName: fileName,
+            checksum: checksum is String ? checksum : null,
+            jsonBytes: jsonBytes is num ? jsonBytes.toInt() : null,
           );
         }
       }
@@ -319,6 +320,33 @@ class LocalBackupService {
     } catch (_) {
       return const <String, _BackupManifestEntry>{};
     }
+  }
+
+  Future<bool> _isManifestEntryValid(_BackupManifestEntry entry) async {
+    if (entry.checksum == null || entry.jsonBytes == null) {
+      return false;
+    }
+    final file = await _notebookFile(entry.fileName);
+    await _recoverAtomicWrite(file);
+    if (!await file.exists()) {
+      return false;
+    }
+    try {
+      final content = await file.readAsString();
+      return utf8.encode(content).length == entry.jsonBytes &&
+          _contentChecksum(content) == entry.checksum;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _contentChecksum(String content) {
+    var hash = 0x811c9dc5;
+    for (final byte in utf8.encode(content)) {
+      hash ^= byte;
+      hash = (hash * 0x01000193) & 0xffffffff;
+    }
+    return hash.toRadixString(16).padLeft(8, '0');
   }
 
   void _throwIfInterrupted(bool Function()? shouldInterrupt) {
@@ -729,9 +757,23 @@ class _BackupManifestEntry {
     required this.uid,
     required this.updatedAt,
     required this.fileName,
+    this.checksum,
+    this.jsonBytes,
   });
 
   final String uid;
   final DateTime updatedAt;
   final String fileName;
+  final String? checksum;
+  final int? jsonBytes;
+
+  Map<String, Object> toJson() {
+    return {
+      'uid': uid,
+      'updatedAt': updatedAt.toIso8601String(),
+      'file': fileName,
+      if (checksum != null) 'checksum': checksum!,
+      if (jsonBytes != null) 'bytes': jsonBytes!,
+    };
+  }
 }

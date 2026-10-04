@@ -84,6 +84,41 @@ void main() {
     expect(File('${manifest.path}.previous').existsSync(), isFalse);
   });
 
+  test('checksum detects and repairs a corrupted notebook backup', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final notebook = _notebook();
+
+    await service.snapshot([notebook]);
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    final decoded =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final entry =
+        (decoded['notebooks'] as List<dynamic>).single as Map<String, dynamic>;
+    final backupFile = File(
+      '${directory.path}/local_backup/notebooks/${entry['file']}',
+    );
+    await backupFile.writeAsString('{"broken":');
+
+    final repaired = await service.snapshot([notebook]);
+
+    expect(repaired.changedCount, 1);
+    expect(jsonDecode(await backupFile.readAsString()), isA<Map>());
+    final repairedManifest =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final repairedEntry =
+        (repairedManifest['notebooks'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    expect(repairedEntry['checksum'], isA<String>());
+    expect(repairedEntry['bytes'], greaterThan(0));
+  });
+
   test('snapshot stops when ink becomes active', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
