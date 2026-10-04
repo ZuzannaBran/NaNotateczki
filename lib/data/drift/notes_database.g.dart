@@ -474,28 +474,6 @@ class $PageRowsTable extends PageRows with TableInfo<$PageRowsTable, PageRow> {
       'CHECK ("is_bookmarked" IN (0, 1))',
     ),
   );
-  static const VerificationMeta _legacyIndexTabColorValueMeta =
-      const VerificationMeta('legacyIndexTabColorValue');
-  @override
-  late final GeneratedColumn<int> legacyIndexTabColorValue =
-      GeneratedColumn<int>(
-        'legacy_index_tab_color_value',
-        aliasedName,
-        true,
-        type: DriftSqlType.int,
-        requiredDuringInsert: false,
-      );
-  static const VerificationMeta _legacyIndexTabPositionMeta =
-      const VerificationMeta('legacyIndexTabPosition');
-  @override
-  late final GeneratedColumn<double> legacyIndexTabPosition =
-      GeneratedColumn<double>(
-        'legacy_index_tab_position',
-        aliasedName,
-        true,
-        type: DriftSqlType.double,
-        requiredDuringInsert: false,
-      );
   @override
   List<GeneratedColumn> get $columns => [
     uid,
@@ -503,8 +481,6 @@ class $PageRowsTable extends PageRows with TableInfo<$PageRowsTable, PageRow> {
     pageIndex,
     title,
     isBookmarked,
-    legacyIndexTabColorValue,
-    legacyIndexTabPosition,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -564,24 +540,6 @@ class $PageRowsTable extends PageRows with TableInfo<$PageRowsTable, PageRow> {
     } else if (isInserting) {
       context.missing(_isBookmarkedMeta);
     }
-    if (data.containsKey('legacy_index_tab_color_value')) {
-      context.handle(
-        _legacyIndexTabColorValueMeta,
-        legacyIndexTabColorValue.isAcceptableOrUnknown(
-          data['legacy_index_tab_color_value']!,
-          _legacyIndexTabColorValueMeta,
-        ),
-      );
-    }
-    if (data.containsKey('legacy_index_tab_position')) {
-      context.handle(
-        _legacyIndexTabPositionMeta,
-        legacyIndexTabPosition.isAcceptableOrUnknown(
-          data['legacy_index_tab_position']!,
-          _legacyIndexTabPositionMeta,
-        ),
-      );
-    }
     return context;
   }
 
@@ -611,14 +569,6 @@ class $PageRowsTable extends PageRows with TableInfo<$PageRowsTable, PageRow> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_bookmarked'],
       )!,
-      legacyIndexTabColorValue: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}legacy_index_tab_color_value'],
-      ),
-      legacyIndexTabPosition: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
-        data['${effectivePrefix}legacy_index_tab_position'],
-      ),
     );
   }
 
@@ -634,16 +584,12 @@ class PageRow extends DataClass implements Insertable<PageRow> {
   final int pageIndex;
   final String title;
   final bool isBookmarked;
-  final int? legacyIndexTabColorValue;
-  final double? legacyIndexTabPosition;
   const PageRow({
     required this.uid,
     required this.notebookUid,
     required this.pageIndex,
     required this.title,
     required this.isBookmarked,
-    this.legacyIndexTabColorValue,
-    this.legacyIndexTabPosition,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -653,16 +599,6 @@ class PageRow extends DataClass implements Insertable<PageRow> {
     map['page_index'] = Variable<int>(pageIndex);
     map['title'] = Variable<String>(title);
     map['is_bookmarked'] = Variable<bool>(isBookmarked);
-    if (!nullToAbsent || legacyIndexTabColorValue != null) {
-      map['legacy_index_tab_color_value'] = Variable<int>(
-        legacyIndexTabColorValue,
-      );
-    }
-    if (!nullToAbsent || legacyIndexTabPosition != null) {
-      map['legacy_index_tab_position'] = Variable<double>(
-        legacyIndexTabPosition,
-      );
-    }
     return map;
   }
 
@@ -673,12 +609,6 @@ class PageRow extends DataClass implements Insertable<PageRow> {
       pageIndex: Value(pageIndex),
       title: Value(title),
       isBookmarked: Value(isBookmarked),
-      legacyIndexTabColorValue: legacyIndexTabColorValue == null && nullToAbsent
-          ? const Value.absent()
-          : Value(legacyIndexTabColorValue),
-      legacyIndexTabPosition: legacyIndexTabPosition == null && nullToAbsent
-          ? const Value.absent()
-          : Value(legacyIndexTabPosition),
     );
   }
 
@@ -693,12 +623,6 @@ class PageRow extends DataClass implements Insertable<PageRow> {
       pageIndex: serializer.fromJson<int>(json['pageIndex']),
       title: serializer.fromJson<String>(json['title']),
       isBookmarked: serializer.fromJson<bool>(json['isBookmarked']),
-      legacyIndexTabColorValue: serializer.fromJson<int?>(
-        json['legacyIndexTabColorValue'],
-      ),
-      legacyIndexTabPosition: serializer.fromJson<double?>(
-        json['legacyIndexTabPosition'],
-      ),
     );
   }
   @override
@@ -710,12 +634,6 @@ class PageRow extends DataClass implements Insertable<PageRow> {
       'pageIndex': serializer.toJson<int>(pageIndex),
       'title': serializer.toJson<String>(title),
       'isBookmarked': serializer.toJson<bool>(isBookmarked),
-      'legacyIndexTabColorValue': serializer.toJson<int?>(
-        legacyIndexTabColorValue,
-      ),
-      'legacyIndexTabPosition': serializer.toJson<double?>(
-        legacyIndexTabPosition,
-      ),
     };
   }
 
@@ -725,20 +643,12 @@ class PageRow extends DataClass implements Insertable<PageRow> {
     int? pageIndex,
     String? title,
     bool? isBookmarked,
-    Value<int?> legacyIndexTabColorValue = const Value.absent(),
-    Value<double?> legacyIndexTabPosition = const Value.absent(),
   }) => PageRow(
     uid: uid ?? this.uid,
     notebookUid: notebookUid ?? this.notebookUid,
     pageIndex: pageIndex ?? this.pageIndex,
     title: title ?? this.title,
     isBookmarked: isBookmarked ?? this.isBookmarked,
-    legacyIndexTabColorValue: legacyIndexTabColorValue.present
-        ? legacyIndexTabColorValue.value
-        : this.legacyIndexTabColorValue,
-    legacyIndexTabPosition: legacyIndexTabPosition.present
-        ? legacyIndexTabPosition.value
-        : this.legacyIndexTabPosition,
   );
   PageRow copyWithCompanion(PageRowsCompanion data) {
     return PageRow(
@@ -751,12 +661,6 @@ class PageRow extends DataClass implements Insertable<PageRow> {
       isBookmarked: data.isBookmarked.present
           ? data.isBookmarked.value
           : this.isBookmarked,
-      legacyIndexTabColorValue: data.legacyIndexTabColorValue.present
-          ? data.legacyIndexTabColorValue.value
-          : this.legacyIndexTabColorValue,
-      legacyIndexTabPosition: data.legacyIndexTabPosition.present
-          ? data.legacyIndexTabPosition.value
-          : this.legacyIndexTabPosition,
     );
   }
 
@@ -767,23 +671,14 @@ class PageRow extends DataClass implements Insertable<PageRow> {
           ..write('notebookUid: $notebookUid, ')
           ..write('pageIndex: $pageIndex, ')
           ..write('title: $title, ')
-          ..write('isBookmarked: $isBookmarked, ')
-          ..write('legacyIndexTabColorValue: $legacyIndexTabColorValue, ')
-          ..write('legacyIndexTabPosition: $legacyIndexTabPosition')
+          ..write('isBookmarked: $isBookmarked')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-    uid,
-    notebookUid,
-    pageIndex,
-    title,
-    isBookmarked,
-    legacyIndexTabColorValue,
-    legacyIndexTabPosition,
-  );
+  int get hashCode =>
+      Object.hash(uid, notebookUid, pageIndex, title, isBookmarked);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -792,9 +687,7 @@ class PageRow extends DataClass implements Insertable<PageRow> {
           other.notebookUid == this.notebookUid &&
           other.pageIndex == this.pageIndex &&
           other.title == this.title &&
-          other.isBookmarked == this.isBookmarked &&
-          other.legacyIndexTabColorValue == this.legacyIndexTabColorValue &&
-          other.legacyIndexTabPosition == this.legacyIndexTabPosition);
+          other.isBookmarked == this.isBookmarked);
 }
 
 class PageRowsCompanion extends UpdateCompanion<PageRow> {
@@ -803,8 +696,6 @@ class PageRowsCompanion extends UpdateCompanion<PageRow> {
   final Value<int> pageIndex;
   final Value<String> title;
   final Value<bool> isBookmarked;
-  final Value<int?> legacyIndexTabColorValue;
-  final Value<double?> legacyIndexTabPosition;
   final Value<int> rowid;
   const PageRowsCompanion({
     this.uid = const Value.absent(),
@@ -812,8 +703,6 @@ class PageRowsCompanion extends UpdateCompanion<PageRow> {
     this.pageIndex = const Value.absent(),
     this.title = const Value.absent(),
     this.isBookmarked = const Value.absent(),
-    this.legacyIndexTabColorValue = const Value.absent(),
-    this.legacyIndexTabPosition = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PageRowsCompanion.insert({
@@ -822,8 +711,6 @@ class PageRowsCompanion extends UpdateCompanion<PageRow> {
     required int pageIndex,
     required String title,
     required bool isBookmarked,
-    this.legacyIndexTabColorValue = const Value.absent(),
-    this.legacyIndexTabPosition = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : uid = Value(uid),
        notebookUid = Value(notebookUid),
@@ -836,8 +723,6 @@ class PageRowsCompanion extends UpdateCompanion<PageRow> {
     Expression<int>? pageIndex,
     Expression<String>? title,
     Expression<bool>? isBookmarked,
-    Expression<int>? legacyIndexTabColorValue,
-    Expression<double>? legacyIndexTabPosition,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -846,10 +731,6 @@ class PageRowsCompanion extends UpdateCompanion<PageRow> {
       if (pageIndex != null) 'page_index': pageIndex,
       if (title != null) 'title': title,
       if (isBookmarked != null) 'is_bookmarked': isBookmarked,
-      if (legacyIndexTabColorValue != null)
-        'legacy_index_tab_color_value': legacyIndexTabColorValue,
-      if (legacyIndexTabPosition != null)
-        'legacy_index_tab_position': legacyIndexTabPosition,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -860,8 +741,6 @@ class PageRowsCompanion extends UpdateCompanion<PageRow> {
     Value<int>? pageIndex,
     Value<String>? title,
     Value<bool>? isBookmarked,
-    Value<int?>? legacyIndexTabColorValue,
-    Value<double?>? legacyIndexTabPosition,
     Value<int>? rowid,
   }) {
     return PageRowsCompanion(
@@ -870,10 +749,6 @@ class PageRowsCompanion extends UpdateCompanion<PageRow> {
       pageIndex: pageIndex ?? this.pageIndex,
       title: title ?? this.title,
       isBookmarked: isBookmarked ?? this.isBookmarked,
-      legacyIndexTabColorValue:
-          legacyIndexTabColorValue ?? this.legacyIndexTabColorValue,
-      legacyIndexTabPosition:
-          legacyIndexTabPosition ?? this.legacyIndexTabPosition,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -896,16 +771,6 @@ class PageRowsCompanion extends UpdateCompanion<PageRow> {
     if (isBookmarked.present) {
       map['is_bookmarked'] = Variable<bool>(isBookmarked.value);
     }
-    if (legacyIndexTabColorValue.present) {
-      map['legacy_index_tab_color_value'] = Variable<int>(
-        legacyIndexTabColorValue.value,
-      );
-    }
-    if (legacyIndexTabPosition.present) {
-      map['legacy_index_tab_position'] = Variable<double>(
-        legacyIndexTabPosition.value,
-      );
-    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -920,326 +785,6 @@ class PageRowsCompanion extends UpdateCompanion<PageRow> {
           ..write('pageIndex: $pageIndex, ')
           ..write('title: $title, ')
           ..write('isBookmarked: $isBookmarked, ')
-          ..write('legacyIndexTabColorValue: $legacyIndexTabColorValue, ')
-          ..write('legacyIndexTabPosition: $legacyIndexTabPosition, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $IndexTabRowsTable extends IndexTabRows
-    with TableInfo<$IndexTabRowsTable, IndexTabRow> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $IndexTabRowsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _uidMeta = const VerificationMeta('uid');
-  @override
-  late final GeneratedColumn<String> uid = GeneratedColumn<String>(
-    'uid',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _pageUidMeta = const VerificationMeta(
-    'pageUid',
-  );
-  @override
-  late final GeneratedColumn<String> pageUid = GeneratedColumn<String>(
-    'page_uid',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES page_rows (uid)',
-    ),
-  );
-  static const VerificationMeta _colorValueMeta = const VerificationMeta(
-    'colorValue',
-  );
-  @override
-  late final GeneratedColumn<int> colorValue = GeneratedColumn<int>(
-    'color_value',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _positionMeta = const VerificationMeta(
-    'position',
-  );
-  @override
-  late final GeneratedColumn<double> position = GeneratedColumn<double>(
-    'position',
-    aliasedName,
-    false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: true,
-  );
-  @override
-  List<GeneratedColumn> get $columns => [uid, pageUid, colorValue, position];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'index_tab_rows';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<IndexTabRow> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('uid')) {
-      context.handle(
-        _uidMeta,
-        uid.isAcceptableOrUnknown(data['uid']!, _uidMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_uidMeta);
-    }
-    if (data.containsKey('page_uid')) {
-      context.handle(
-        _pageUidMeta,
-        pageUid.isAcceptableOrUnknown(data['page_uid']!, _pageUidMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_pageUidMeta);
-    }
-    if (data.containsKey('color_value')) {
-      context.handle(
-        _colorValueMeta,
-        colorValue.isAcceptableOrUnknown(data['color_value']!, _colorValueMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_colorValueMeta);
-    }
-    if (data.containsKey('position')) {
-      context.handle(
-        _positionMeta,
-        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_positionMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {uid};
-  @override
-  IndexTabRow map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return IndexTabRow(
-      uid: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}uid'],
-      )!,
-      pageUid: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}page_uid'],
-      )!,
-      colorValue: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}color_value'],
-      )!,
-      position: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
-        data['${effectivePrefix}position'],
-      )!,
-    );
-  }
-
-  @override
-  $IndexTabRowsTable createAlias(String alias) {
-    return $IndexTabRowsTable(attachedDatabase, alias);
-  }
-}
-
-class IndexTabRow extends DataClass implements Insertable<IndexTabRow> {
-  final String uid;
-  final String pageUid;
-  final int colorValue;
-  final double position;
-  const IndexTabRow({
-    required this.uid,
-    required this.pageUid,
-    required this.colorValue,
-    required this.position,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['uid'] = Variable<String>(uid);
-    map['page_uid'] = Variable<String>(pageUid);
-    map['color_value'] = Variable<int>(colorValue);
-    map['position'] = Variable<double>(position);
-    return map;
-  }
-
-  IndexTabRowsCompanion toCompanion(bool nullToAbsent) {
-    return IndexTabRowsCompanion(
-      uid: Value(uid),
-      pageUid: Value(pageUid),
-      colorValue: Value(colorValue),
-      position: Value(position),
-    );
-  }
-
-  factory IndexTabRow.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return IndexTabRow(
-      uid: serializer.fromJson<String>(json['uid']),
-      pageUid: serializer.fromJson<String>(json['pageUid']),
-      colorValue: serializer.fromJson<int>(json['colorValue']),
-      position: serializer.fromJson<double>(json['position']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'uid': serializer.toJson<String>(uid),
-      'pageUid': serializer.toJson<String>(pageUid),
-      'colorValue': serializer.toJson<int>(colorValue),
-      'position': serializer.toJson<double>(position),
-    };
-  }
-
-  IndexTabRow copyWith({
-    String? uid,
-    String? pageUid,
-    int? colorValue,
-    double? position,
-  }) => IndexTabRow(
-    uid: uid ?? this.uid,
-    pageUid: pageUid ?? this.pageUid,
-    colorValue: colorValue ?? this.colorValue,
-    position: position ?? this.position,
-  );
-  IndexTabRow copyWithCompanion(IndexTabRowsCompanion data) {
-    return IndexTabRow(
-      uid: data.uid.present ? data.uid.value : this.uid,
-      pageUid: data.pageUid.present ? data.pageUid.value : this.pageUid,
-      colorValue: data.colorValue.present
-          ? data.colorValue.value
-          : this.colorValue,
-      position: data.position.present ? data.position.value : this.position,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('IndexTabRow(')
-          ..write('uid: $uid, ')
-          ..write('pageUid: $pageUid, ')
-          ..write('colorValue: $colorValue, ')
-          ..write('position: $position')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(uid, pageUid, colorValue, position);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is IndexTabRow &&
-          other.uid == this.uid &&
-          other.pageUid == this.pageUid &&
-          other.colorValue == this.colorValue &&
-          other.position == this.position);
-}
-
-class IndexTabRowsCompanion extends UpdateCompanion<IndexTabRow> {
-  final Value<String> uid;
-  final Value<String> pageUid;
-  final Value<int> colorValue;
-  final Value<double> position;
-  final Value<int> rowid;
-  const IndexTabRowsCompanion({
-    this.uid = const Value.absent(),
-    this.pageUid = const Value.absent(),
-    this.colorValue = const Value.absent(),
-    this.position = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  IndexTabRowsCompanion.insert({
-    required String uid,
-    required String pageUid,
-    required int colorValue,
-    required double position,
-    this.rowid = const Value.absent(),
-  }) : uid = Value(uid),
-       pageUid = Value(pageUid),
-       colorValue = Value(colorValue),
-       position = Value(position);
-  static Insertable<IndexTabRow> custom({
-    Expression<String>? uid,
-    Expression<String>? pageUid,
-    Expression<int>? colorValue,
-    Expression<double>? position,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (uid != null) 'uid': uid,
-      if (pageUid != null) 'page_uid': pageUid,
-      if (colorValue != null) 'color_value': colorValue,
-      if (position != null) 'position': position,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  IndexTabRowsCompanion copyWith({
-    Value<String>? uid,
-    Value<String>? pageUid,
-    Value<int>? colorValue,
-    Value<double>? position,
-    Value<int>? rowid,
-  }) {
-    return IndexTabRowsCompanion(
-      uid: uid ?? this.uid,
-      pageUid: pageUid ?? this.pageUid,
-      colorValue: colorValue ?? this.colorValue,
-      position: position ?? this.position,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (uid.present) {
-      map['uid'] = Variable<String>(uid.value);
-    }
-    if (pageUid.present) {
-      map['page_uid'] = Variable<String>(pageUid.value);
-    }
-    if (colorValue.present) {
-      map['color_value'] = Variable<int>(colorValue.value);
-    }
-    if (position.present) {
-      map['position'] = Variable<double>(position.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('IndexTabRowsCompanion(')
-          ..write('uid: $uid, ')
-          ..write('pageUid: $pageUid, ')
-          ..write('colorValue: $colorValue, ')
-          ..write('position: $position, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3313,7 +2858,6 @@ abstract class _$NotesDatabase extends GeneratedDatabase {
   $NotesDatabaseManager get managers => $NotesDatabaseManager(this);
   late final $NotebookRowsTable notebookRows = $NotebookRowsTable(this);
   late final $PageRowsTable pageRows = $PageRowsTable(this);
-  late final $IndexTabRowsTable indexTabRows = $IndexTabRowsTable(this);
   late final $TextBlockRowsTable textBlockRows = $TextBlockRowsTable(this);
   late final $ImageBlockRowsTable imageBlockRows = $ImageBlockRowsTable(this);
   late final $InkStrokeRowsTable inkStrokeRows = $InkStrokeRowsTable(this);
@@ -3324,7 +2868,6 @@ abstract class _$NotesDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     notebookRows,
     pageRows,
-    indexTabRows,
     textBlockRows,
     imageBlockRows,
     inkStrokeRows,
@@ -3661,8 +3204,6 @@ typedef $$PageRowsTableCreateCompanionBuilder =
       required int pageIndex,
       required String title,
       required bool isBookmarked,
-      Value<int?> legacyIndexTabColorValue,
-      Value<double?> legacyIndexTabPosition,
       Value<int> rowid,
     });
 typedef $$PageRowsTableUpdateCompanionBuilder =
@@ -3672,8 +3213,6 @@ typedef $$PageRowsTableUpdateCompanionBuilder =
       Value<int> pageIndex,
       Value<String> title,
       Value<bool> isBookmarked,
-      Value<int?> legacyIndexTabColorValue,
-      Value<double?> legacyIndexTabPosition,
       Value<int> rowid,
     });
 
@@ -3696,24 +3235,6 @@ final class $$PageRowsTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static MultiTypedResultKey<$IndexTabRowsTable, List<IndexTabRow>>
-  _indexTabRowsRefsTable(_$NotesDatabase db) => MultiTypedResultKey.fromTable(
-    db.indexTabRows,
-    aliasName: 'page_rows__uid__index_tab_rows__page_uid',
-  );
-
-  $$IndexTabRowsTableProcessedTableManager get indexTabRowsRefs {
-    final manager = $$IndexTabRowsTableTableManager(
-      $_db,
-      $_db.indexTabRows,
-    ).filter((f) => f.pageUid.uid.sqlEquals($_itemColumn<String>('uid')!));
-
-    final cache = $_typedResult.readTableOrNull(_indexTabRowsRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
     );
   }
 
@@ -3801,16 +3322,6 @@ class $$PageRowsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get legacyIndexTabColorValue => $composableBuilder(
-    column: $table.legacyIndexTabColorValue,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<double> get legacyIndexTabPosition => $composableBuilder(
-    column: $table.legacyIndexTabPosition,
-    builder: (column) => ColumnFilters(column),
-  );
-
   $$NotebookRowsTableFilterComposer get notebookUid {
     final $$NotebookRowsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -3832,31 +3343,6 @@ class $$PageRowsTableFilterComposer
           ),
     );
     return composer;
-  }
-
-  Expression<bool> indexTabRowsRefs(
-    Expression<bool> Function($$IndexTabRowsTableFilterComposer f) f,
-  ) {
-    final $$IndexTabRowsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.uid,
-      referencedTable: $db.indexTabRows,
-      getReferencedColumn: (t) => t.pageUid,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$IndexTabRowsTableFilterComposer(
-            $db: $db,
-            $table: $db.indexTabRows,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
   }
 
   Expression<bool> textBlockRowsRefs(
@@ -3964,16 +3450,6 @@ class $$PageRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get legacyIndexTabColorValue => $composableBuilder(
-    column: $table.legacyIndexTabColorValue,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<double> get legacyIndexTabPosition => $composableBuilder(
-    column: $table.legacyIndexTabPosition,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   $$NotebookRowsTableOrderingComposer get notebookUid {
     final $$NotebookRowsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -4021,16 +3497,6 @@ class $$PageRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get legacyIndexTabColorValue => $composableBuilder(
-    column: $table.legacyIndexTabColorValue,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<double> get legacyIndexTabPosition => $composableBuilder(
-    column: $table.legacyIndexTabPosition,
-    builder: (column) => column,
-  );
-
   $$NotebookRowsTableAnnotationComposer get notebookUid {
     final $$NotebookRowsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -4052,31 +3518,6 @@ class $$PageRowsTableAnnotationComposer
           ),
     );
     return composer;
-  }
-
-  Expression<T> indexTabRowsRefs<T extends Object>(
-    Expression<T> Function($$IndexTabRowsTableAnnotationComposer a) f,
-  ) {
-    final $$IndexTabRowsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.uid,
-      referencedTable: $db.indexTabRows,
-      getReferencedColumn: (t) => t.pageUid,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$IndexTabRowsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.indexTabRows,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
   }
 
   Expression<T> textBlockRowsRefs<T extends Object>(
@@ -4170,7 +3611,6 @@ class $$PageRowsTableTableManager
           PageRow,
           PrefetchHooks Function({
             bool notebookUid,
-            bool indexTabRowsRefs,
             bool textBlockRowsRefs,
             bool imageBlockRowsRefs,
             bool inkStrokeRowsRefs,
@@ -4194,8 +3634,6 @@ class $$PageRowsTableTableManager
                 Value<int> pageIndex = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<bool> isBookmarked = const Value.absent(),
-                Value<int?> legacyIndexTabColorValue = const Value.absent(),
-                Value<double?> legacyIndexTabPosition = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PageRowsCompanion(
                 uid: uid,
@@ -4203,8 +3641,6 @@ class $$PageRowsTableTableManager
                 pageIndex: pageIndex,
                 title: title,
                 isBookmarked: isBookmarked,
-                legacyIndexTabColorValue: legacyIndexTabColorValue,
-                legacyIndexTabPosition: legacyIndexTabPosition,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4214,8 +3650,6 @@ class $$PageRowsTableTableManager
                 required int pageIndex,
                 required String title,
                 required bool isBookmarked,
-                Value<int?> legacyIndexTabColorValue = const Value.absent(),
-                Value<double?> legacyIndexTabPosition = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PageRowsCompanion.insert(
                 uid: uid,
@@ -4223,8 +3657,6 @@ class $$PageRowsTableTableManager
                 pageIndex: pageIndex,
                 title: title,
                 isBookmarked: isBookmarked,
-                legacyIndexTabColorValue: legacyIndexTabColorValue,
-                legacyIndexTabPosition: legacyIndexTabPosition,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4238,7 +3670,6 @@ class $$PageRowsTableTableManager
           prefetchHooksCallback:
               ({
                 notebookUid = false,
-                indexTabRowsRefs = false,
                 textBlockRowsRefs = false,
                 imageBlockRowsRefs = false,
                 inkStrokeRowsRefs = false,
@@ -4246,7 +3677,6 @@ class $$PageRowsTableTableManager
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
-                    if (indexTabRowsRefs) db.indexTabRows,
                     if (textBlockRowsRefs) db.textBlockRows,
                     if (imageBlockRowsRefs) db.imageBlockRows,
                     if (inkStrokeRowsRefs) db.inkStrokeRows,
@@ -4285,27 +3715,6 @@ class $$PageRowsTableTableManager
                       },
                   getPrefetchedDataCallback: (items) async {
                     return [
-                      if (indexTabRowsRefs)
-                        await $_getPrefetchedData<
-                          PageRow,
-                          $PageRowsTable,
-                          IndexTabRow
-                        >(
-                          currentTable: table,
-                          referencedTable: $$PageRowsTableReferences
-                              ._indexTabRowsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$PageRowsTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).indexTabRowsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.pageUid == item.uid,
-                              ),
-                          typedResults: items,
-                        ),
                       if (textBlockRowsRefs)
                         await $_getPrefetchedData<
                           PageRow,
@@ -4391,311 +3800,10 @@ typedef $$PageRowsTableProcessedTableManager =
       PageRow,
       PrefetchHooks Function({
         bool notebookUid,
-        bool indexTabRowsRefs,
         bool textBlockRowsRefs,
         bool imageBlockRowsRefs,
         bool inkStrokeRowsRefs,
       })
-    >;
-typedef $$IndexTabRowsTableCreateCompanionBuilder =
-    IndexTabRowsCompanion Function({
-      required String uid,
-      required String pageUid,
-      required int colorValue,
-      required double position,
-      Value<int> rowid,
-    });
-typedef $$IndexTabRowsTableUpdateCompanionBuilder =
-    IndexTabRowsCompanion Function({
-      Value<String> uid,
-      Value<String> pageUid,
-      Value<int> colorValue,
-      Value<double> position,
-      Value<int> rowid,
-    });
-
-final class $$IndexTabRowsTableReferences
-    extends BaseReferences<_$NotesDatabase, $IndexTabRowsTable, IndexTabRow> {
-  $$IndexTabRowsTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static $PageRowsTable _pageUidTable(_$NotesDatabase db) =>
-      db.pageRows.createAlias('index_tab_rows__page_uid__page_rows__uid');
-
-  $$PageRowsTableProcessedTableManager get pageUid {
-    final $_column = $_itemColumn<String>('page_uid')!;
-
-    final manager = $$PageRowsTableTableManager(
-      $_db,
-      $_db.pageRows,
-    ).filter((f) => f.uid.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_pageUidTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-}
-
-class $$IndexTabRowsTableFilterComposer
-    extends Composer<_$NotesDatabase, $IndexTabRowsTable> {
-  $$IndexTabRowsTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get uid => $composableBuilder(
-    column: $table.uid,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get colorValue => $composableBuilder(
-    column: $table.colorValue,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<double> get position => $composableBuilder(
-    column: $table.position,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  $$PageRowsTableFilterComposer get pageUid {
-    final $$PageRowsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.pageUid,
-      referencedTable: $db.pageRows,
-      getReferencedColumn: (t) => t.uid,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$PageRowsTableFilterComposer(
-            $db: $db,
-            $table: $db.pageRows,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $$IndexTabRowsTableOrderingComposer
-    extends Composer<_$NotesDatabase, $IndexTabRowsTable> {
-  $$IndexTabRowsTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get uid => $composableBuilder(
-    column: $table.uid,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get colorValue => $composableBuilder(
-    column: $table.colorValue,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<double> get position => $composableBuilder(
-    column: $table.position,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  $$PageRowsTableOrderingComposer get pageUid {
-    final $$PageRowsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.pageUid,
-      referencedTable: $db.pageRows,
-      getReferencedColumn: (t) => t.uid,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$PageRowsTableOrderingComposer(
-            $db: $db,
-            $table: $db.pageRows,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $$IndexTabRowsTableAnnotationComposer
-    extends Composer<_$NotesDatabase, $IndexTabRowsTable> {
-  $$IndexTabRowsTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get uid =>
-      $composableBuilder(column: $table.uid, builder: (column) => column);
-
-  GeneratedColumn<int> get colorValue => $composableBuilder(
-    column: $table.colorValue,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<double> get position =>
-      $composableBuilder(column: $table.position, builder: (column) => column);
-
-  $$PageRowsTableAnnotationComposer get pageUid {
-    final $$PageRowsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.pageUid,
-      referencedTable: $db.pageRows,
-      getReferencedColumn: (t) => t.uid,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$PageRowsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.pageRows,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $$IndexTabRowsTableTableManager
-    extends
-        RootTableManager<
-          _$NotesDatabase,
-          $IndexTabRowsTable,
-          IndexTabRow,
-          $$IndexTabRowsTableFilterComposer,
-          $$IndexTabRowsTableOrderingComposer,
-          $$IndexTabRowsTableAnnotationComposer,
-          $$IndexTabRowsTableCreateCompanionBuilder,
-          $$IndexTabRowsTableUpdateCompanionBuilder,
-          (IndexTabRow, $$IndexTabRowsTableReferences),
-          IndexTabRow,
-          PrefetchHooks Function({bool pageUid})
-        > {
-  $$IndexTabRowsTableTableManager(_$NotesDatabase db, $IndexTabRowsTable table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$IndexTabRowsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$IndexTabRowsTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$IndexTabRowsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> uid = const Value.absent(),
-                Value<String> pageUid = const Value.absent(),
-                Value<int> colorValue = const Value.absent(),
-                Value<double> position = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => IndexTabRowsCompanion(
-                uid: uid,
-                pageUid: pageUid,
-                colorValue: colorValue,
-                position: position,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String uid,
-                required String pageUid,
-                required int colorValue,
-                required double position,
-                Value<int> rowid = const Value.absent(),
-              }) => IndexTabRowsCompanion.insert(
-                uid: uid,
-                pageUid: pageUid,
-                colorValue: colorValue,
-                position: position,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $$IndexTabRowsTableReferences(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback: ({pageUid = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (pageUid) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.pageUid,
-                                referencedTable: $$IndexTabRowsTableReferences
-                                    ._pageUidTable(db),
-                                referencedColumn: $$IndexTabRowsTableReferences
-                                    ._pageUidTable(db)
-                                    .uid,
-                              )
-                              as T;
-                    }
-
-                    return state;
-                  },
-              getPrefetchedDataCallback: (items) async {
-                return [];
-              },
-            );
-          },
-        ),
-      );
-}
-
-typedef $$IndexTabRowsTableProcessedTableManager =
-    ProcessedTableManager<
-      _$NotesDatabase,
-      $IndexTabRowsTable,
-      IndexTabRow,
-      $$IndexTabRowsTableFilterComposer,
-      $$IndexTabRowsTableOrderingComposer,
-      $$IndexTabRowsTableAnnotationComposer,
-      $$IndexTabRowsTableCreateCompanionBuilder,
-      $$IndexTabRowsTableUpdateCompanionBuilder,
-      (IndexTabRow, $$IndexTabRowsTableReferences),
-      IndexTabRow,
-      PrefetchHooks Function({bool pageUid})
     >;
 typedef $$TextBlockRowsTableCreateCompanionBuilder =
     TextBlockRowsCompanion Function({
@@ -6064,8 +5172,6 @@ class $NotesDatabaseManager {
       $$NotebookRowsTableTableManager(_db, _db.notebookRows);
   $$PageRowsTableTableManager get pageRows =>
       $$PageRowsTableTableManager(_db, _db.pageRows);
-  $$IndexTabRowsTableTableManager get indexTabRows =>
-      $$IndexTabRowsTableTableManager(_db, _db.indexTabRows);
   $$TextBlockRowsTableTableManager get textBlockRows =>
       $$TextBlockRowsTableTableManager(_db, _db.textBlockRows);
   $$ImageBlockRowsTableTableManager get imageBlockRows =>
