@@ -34,7 +34,6 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
   return NotesDatabaseConnection(executor: executor, freshFile: freshFile);
 }
 
-
 Future<String?> quarantineNotesDatabase(String name) async => null;
 
 Future<void> clearNotesDatabaseRecoveryMarker(String name) async {}

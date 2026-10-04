@@ -59,10 +59,10 @@ Future<String?> quarantineNotesDatabase(String name) async {
     return null;
   }
 
-  final timestamp = DateTime.now()
-      .toUtc()
-      .toIso8601String()
-      .replaceAll(':', '-');
+  final timestamp = DateTime.now().toUtc().toIso8601String().replaceAll(
+    ':',
+    '-',
+  );
   final quarantinePath = '${file.path}.corrupt_$timestamp';
   final components = <(File source, File target)>[
     (File('${file.path}-wal'), File('$quarantinePath-wal')),

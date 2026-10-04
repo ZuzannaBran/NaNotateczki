@@ -773,13 +773,14 @@ class LocalBackupService {
         'Manifest contains malformed folder metadata.',
       );
     }
-    final folders = rawFolders
-        .cast<String>()
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final folders =
+        rawFolders
+            .cast<String>()
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return folders;
   }
 
@@ -1016,7 +1017,10 @@ class LocalBackupService {
       }
       if (entity.path.endsWith(_temporarySuffix)) {
         targetPaths.add(
-          entity.path.substring(0, entity.path.length - _temporarySuffix.length),
+          entity.path.substring(
+            0,
+            entity.path.length - _temporarySuffix.length,
+          ),
         );
       } else if (entity.path.endsWith(_previousSuffix)) {
         targetPaths.add(
@@ -1250,10 +1254,7 @@ _BackupWorkerResult _createBackupPayload(Notebook notebook) {
 }
 
 class _BackupSnapshotData {
-  const _BackupSnapshotData({
-    required this.notebooks,
-    required this.folders,
-  });
+  const _BackupSnapshotData({required this.notebooks, required this.folders});
 
   final List<Notebook> notebooks;
   final List<String>? folders;
@@ -1263,10 +1264,7 @@ class _BackupReadResult {
   const _BackupReadResult.found(this.data) : snapshotFound = true;
 
   const _BackupReadResult.notFound()
-    : data = const _BackupSnapshotData(
-        notebooks: <Notebook>[],
-        folders: null,
-      ),
+    : data = const _BackupSnapshotData(notebooks: <Notebook>[], folders: null),
       snapshotFound = false;
 
   final _BackupSnapshotData data;

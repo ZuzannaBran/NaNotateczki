@@ -2389,9 +2389,7 @@ class EditorController extends ChangeNotifier {
         ? extension
         : 'png';
     final imagesDir = await _imagesDir();
-    final target = File(
-      '${imagesDir.path}/img_${_uuid.v4()}.$safeExtension',
-    );
+    final target = File('${imagesDir.path}/img_${_uuid.v4()}.$safeExtension');
     final bytes = await source.readAsBytes();
     await target.writeAsBytes(bytes, flush: true);
     return target;
@@ -2403,9 +2401,7 @@ class EditorController extends ChangeNotifier {
         ? extension
         : 'png';
     final imagesDir = await _imagesDir();
-    final target = File(
-      '${imagesDir.path}/img_${_uuid.v4()}.$safeExtension',
-    );
+    final target = File('${imagesDir.path}/img_${_uuid.v4()}.$safeExtension');
     await target.writeAsBytes(bytes, flush: true);
     return target;
   }

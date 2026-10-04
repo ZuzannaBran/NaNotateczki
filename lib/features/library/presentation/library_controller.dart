@@ -78,9 +78,7 @@ class LibraryController extends ChangeNotifier {
   Future<void> initialize() async {
     await _loadFolders();
     await loadItems();
-    if (!wasReset &&
-        !freshFile &&
-        !repository.lastFetchSkippedCorruptRows) {
+    if (!wasReset && !freshFile && !repository.lastFetchSkippedCorruptRows) {
       await repository.cleanupOrphanedImages(items);
     }
     await _loadCloudPath();
@@ -130,8 +128,7 @@ class LibraryController extends ChangeNotifier {
 
       if (items.isNotEmpty) {
         final folders = folderNames;
-        if (folders.isNotEmpty &&
-            !folders.contains(selectedFolder)) {
+        if (folders.isNotEmpty && !folders.contains(selectedFolder)) {
           selectedFolder = folders.first;
         }
         if (!_selectedItemIsInFolder(selectedFolder)) {

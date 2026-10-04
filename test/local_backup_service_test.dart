@@ -39,9 +39,7 @@ void main() {
     expect(second.notebookReports.single.jsonMs, 0);
   });
 
-  test(
-    'changed notebook retains previous file for history',
-    () async {
+  test('changed notebook retains previous file for history', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
     final database = NotesDatabase(NativeDatabase.memory());
@@ -192,10 +190,7 @@ void main() {
 
     final restored = await service.readLatest();
 
-    expect(restored.map((item) => item.uid).toSet(), {
-      first.uid,
-      second.uid,
-    });
+    expect(restored.map((item) => item.uid).toSet(), {first.uid, second.uid});
     expect(
       restored.singleWhere((item) => item.uid == second.uid).title,
       second.title,
@@ -205,27 +200,28 @@ void main() {
   test(
     'snapshot never overwrites an unknown future manifest version',
     () async {
-    final directory = await Directory.systemTemp.createTemp('backup-test-');
-    addTearDown(() => directory.delete(recursive: true));
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final service = LocalBackupService(
-      NotebookRepository(database),
-      documentsDirectory: () async => directory,
-    );
-    final backupDir = Directory('${directory.path}/local_backup');
-    await backupDir.create(recursive: true);
-    final manifest = File('${backupDir.path}/manifest.json');
-    const futureManifest = '{"version":99,"notebooks":[]}';
-    await manifest.writeAsString(futureManifest, flush: true);
+      final directory = await Directory.systemTemp.createTemp('backup-test-');
+      addTearDown(() => directory.delete(recursive: true));
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final service = LocalBackupService(
+        NotebookRepository(database),
+        documentsDirectory: () async => directory,
+      );
+      final backupDir = Directory('${directory.path}/local_backup');
+      await backupDir.create(recursive: true);
+      final manifest = File('${backupDir.path}/manifest.json');
+      const futureManifest = '{"version":99,"notebooks":[]}';
+      await manifest.writeAsString(futureManifest, flush: true);
 
-    await expectLater(
-      service.snapshot([_notebook()]),
-      throwsA(isA<BackupDataException>()),
-    );
+      await expectLater(
+        service.snapshot([_notebook()]),
+        throwsA(isA<BackupDataException>()),
+      );
 
-    expect(await manifest.readAsString(), futureManifest);
-  });
+      expect(await manifest.readAsString(), futureManifest);
+    },
+  );
 
   test('version 2 FNV checksum remains recoverable', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
@@ -248,10 +244,9 @@ void main() {
     final backupDir = Directory('${directory.path}/local_backup/notebooks');
     await backupDir.create(recursive: true);
     const fileName = 'notebook_legacy.json';
-    await File('${backupDir.path}/$fileName').writeAsString(
-      content,
-      flush: true,
-    );
+    await File(
+      '${backupDir.path}/$fileName',
+    ).writeAsString(content, flush: true);
     await File('${directory.path}/local_backup/manifest.json').writeAsString(
       jsonEncode({
         'version': 2,
@@ -379,10 +374,9 @@ void main() {
     final backupDir = Directory('${directory.path}/local_backup/notebooks');
     await backupDir.create(recursive: true);
     const fileName = 'malformed_v1.json';
-    await File('${backupDir.path}/$fileName').writeAsString(
-      jsonEncode(encoded),
-      flush: true,
-    );
+    await File(
+      '${backupDir.path}/$fileName',
+    ).writeAsString(jsonEncode(encoded), flush: true);
     await File('${directory.path}/local_backup/manifest.json').writeAsString(
       jsonEncode({
         'version': 1,
@@ -544,10 +538,7 @@ void main() {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     var changed = 0;
-    final repository = NotebookRepository(
-      database,
-      onChanged: () => changed++,
-    );
+    final repository = NotebookRepository(database, onChanged: () => changed++);
     final service = LocalBackupService(
       repository,
       documentsDirectory: () async => directory,
@@ -561,10 +552,7 @@ void main() {
     expect(restored, 2);
     expect(changed, 1);
     final saved = await repository.fetchNotebooks();
-    expect(saved.map((item) => item.uid).toSet(), {
-      first.uid,
-      second.uid,
-    });
+    expect(saved.map((item) => item.uid).toSet(), {first.uid, second.uid});
   });
 
   test('snapshot rejects duplicate nested ids before writing', () async {
@@ -612,9 +600,7 @@ void main() {
     await service.snapshot([newerHealthy]);
 
     final latest = await service.readLatest();
-    final recovery = await service.readLatest(
-      requiredUids: {protected.uid},
-    );
+    final recovery = await service.readLatest(requiredUids: {protected.uid});
 
     expect(latest.map((item) => item.uid), [healthy.uid]);
     expect(recovery.map((item) => item.uid).toSet(), {
@@ -697,9 +683,7 @@ void main() {
       NotebookRepository(database),
       documentsDirectory: () async => directory,
     );
-    final notebooksDir = Directory(
-      '${directory.path}/local_backup/notebooks',
-    );
+    final notebooksDir = Directory('${directory.path}/local_backup/notebooks');
     await notebooksDir.create(recursive: true);
     final orphan = File('${notebooksDir.path}/orphan.json.tmp');
     await orphan.writeAsString('partial', flush: true);
@@ -759,52 +743,53 @@ void main() {
   test(
     'invalid snapshot is not reported as a successful empty restore',
     () async {
-    final directory = await Directory.systemTemp.createTemp('backup-test-');
-    addTearDown(() => directory.delete(recursive: true));
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final service = LocalBackupService(
-      NotebookRepository(database),
-      documentsDirectory: () async => directory,
-    );
-    final backupDir = Directory('${directory.path}/local_backup');
-    await backupDir.create(recursive: true);
-    await File('${backupDir.path}/manifest.json').writeAsString(
-      '{"version":3,"notebooks":"broken"}',
-      flush: true,
-    );
+      final directory = await Directory.systemTemp.createTemp('backup-test-');
+      addTearDown(() => directory.delete(recursive: true));
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final service = LocalBackupService(
+        NotebookRepository(database),
+        documentsDirectory: () async => directory,
+      );
+      final backupDir = Directory('${directory.path}/local_backup');
+      await backupDir.create(recursive: true);
+      await File(
+        '${backupDir.path}/manifest.json',
+      ).writeAsString('{"version":3,"notebooks":"broken"}', flush: true);
 
-    final report = await service.restoreFromLatestDetailed();
+      final report = await service.restoreFromLatestDetailed();
 
-    expect(report.succeeded, isFalse);
-    expect(report.snapshotFound, isFalse);
-    expect(report.restoredCount, 0);
-  });
+      expect(report.succeeded, isFalse);
+      expect(report.snapshotFound, isFalse);
+      expect(report.restoredCount, 0);
+    },
+  );
 
   test(
     'document restore stays successful if folder metadata write fails',
     () async {
-    final directory = await Directory.systemTemp.createTemp('backup-test-');
-    addTearDown(() => directory.delete(recursive: true));
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    final service = LocalBackupService(
-      repository,
-      documentsDirectory: () async => directory,
-    );
+      final directory = await Directory.systemTemp.createTemp('backup-test-');
+      addTearDown(() => directory.delete(recursive: true));
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final service = LocalBackupService(
+        repository,
+        documentsDirectory: () async => directory,
+      );
 
-    await service.snapshot([_notebook()]);
-    final foldersPath = '${directory.path}/library_folders.json';
-    final foldersDir = Directory(foldersPath);
-    await foldersDir.create(recursive: true);
+      await service.snapshot([_notebook()]);
+      final foldersPath = '${directory.path}/library_folders.json';
+      final foldersDir = Directory(foldersPath);
+      await foldersDir.create(recursive: true);
 
-    final report = await service.restoreFromLatestDetailed();
+      final report = await service.restoreFromLatestDetailed();
 
-    expect(report.succeeded, isTrue);
-    expect(report.restoredCount, 1);
-    expect(await repository.fetchNotebooks(), hasLength(1));
-  });
+      expect(report.succeeded, isTrue);
+      expect(report.restoredCount, 1);
+      expect(await repository.fetchNotebooks(), hasLength(1));
+    },
+  );
 
   test('snapshot stops when ink becomes active', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');

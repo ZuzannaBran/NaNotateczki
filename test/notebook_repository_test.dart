@@ -39,43 +39,44 @@ void main() {
   test(
     'saveRecoveredCopy remaps nested ids to avoid SQLite conflicts',
     () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    final notebook = await repository.createNotebook();
-    final stroke = InkStroke(
-      id: 'original-stroke',
-      points: const [InkPoint(dx: 1, dy: 2, pressure: 0.5)],
-      color: const Color(0xFF000000),
-      width: 2,
-      tool: DrawingTool.pen,
-    );
-    final source = notebook.copyWith(
-      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
-      pages: [
-        notebook.pages.single.copyWith(inkStrokes: [stroke]),
-      ],
-    );
-    expect(await repository.saveNotebook(source), isTrue);
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final notebook = await repository.createNotebook();
+      final stroke = InkStroke(
+        id: 'original-stroke',
+        points: const [InkPoint(dx: 1, dy: 2, pressure: 0.5)],
+        color: const Color(0xFF000000),
+        width: 2,
+        tool: DrawingTool.pen,
+      );
+      final source = notebook.copyWith(
+        updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+        pages: [
+          notebook.pages.single.copyWith(inkStrokes: [stroke]),
+        ],
+      );
+      expect(await repository.saveNotebook(source), isTrue);
 
-    final recovered = await repository.saveRecoveredCopy(
-      source,
-      reason: 'Recovered',
-    );
+      final recovered = await repository.saveRecoveredCopy(
+        source,
+        reason: 'Recovered',
+      );
 
-    expect(recovered.uid, isNot(source.uid));
-    expect(recovered.pages.single.id, isNot(source.pages.single.id));
-    expect(
-      recovered.pages.single.inkStrokes.single.id,
-      isNot(source.pages.single.inkStrokes.single.id),
-    );
-    final saved = await repository.fetchNotebooks();
-    expect(saved, hasLength(2));
-    expect(saved.map((item) => item.uid).toSet(), {
-      source.uid,
-      recovered.uid,
-    });
-  });
+      expect(recovered.uid, isNot(source.uid));
+      expect(recovered.pages.single.id, isNot(source.pages.single.id));
+      expect(
+        recovered.pages.single.inkStrokes.single.id,
+        isNot(source.pages.single.inkStrokes.single.id),
+      );
+      final saved = await repository.fetchNotebooks();
+      expect(saved, hasLength(2));
+      expect(saved.map((item) => item.uid).toSet(), {
+        source.uid,
+        recovered.uid,
+      });
+    },
+  );
 
   test('page id collision cannot steal a page from another notebook', () async {
     final database = NotesDatabase(NativeDatabase.memory());
@@ -85,9 +86,7 @@ void main() {
     final second = await repository.createNotebook(title: 'Second');
     final conflicting = first.copyWith(
       updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
-      pages: [
-        first.pages.single.copyWith(id: second.pages.single.id),
-      ],
+      pages: [first.pages.single.copyWith(id: second.pages.single.id)],
     );
 
     await expectLater(
@@ -211,33 +210,34 @@ void main() {
   test(
     'atomic import rolls back earlier writes on a later id conflict',
     () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    final first = await repository.createNotebook(title: 'First');
-    final second = await repository.createNotebook(title: 'Second');
-    final importedFirst = first.copyWith(
-      title: 'Imported First',
-      updatedAt: first.updatedAt.add(const Duration(seconds: 10)),
-    );
-    final conflictingNew = second.copyWith(
-      uid: 'new-notebook',
-      title: 'Conflicting New',
-      updatedAt: second.updatedAt.add(const Duration(seconds: 10)),
-    );
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final first = await repository.createNotebook(title: 'First');
+      final second = await repository.createNotebook(title: 'Second');
+      final importedFirst = first.copyWith(
+        title: 'Imported First',
+        updatedAt: first.updatedAt.add(const Duration(seconds: 10)),
+      );
+      final conflictingNew = second.copyWith(
+        uid: 'new-notebook',
+        title: 'Conflicting New',
+        updatedAt: second.updatedAt.add(const Duration(seconds: 10)),
+      );
 
-    await expectLater(
-      repository.importNotebooksAtomically([importedFirst, conflictingNew]),
-      throwsA(isA<StateError>()),
-    );
+      await expectLater(
+        repository.importNotebooksAtomically([importedFirst, conflictingNew]),
+        throwsA(isA<StateError>()),
+      );
 
-    final savedFirst = await repository.getNotebook(first.uid);
-    final savedSecond = await repository.getNotebook(second.uid);
-    final savedNew = await repository.getNotebook('new-notebook');
-    expect(savedFirst?.title, 'First');
-    expect(savedSecond?.title, 'Second');
-    expect(savedNew, isNull);
-  });
+      final savedFirst = await repository.getNotebook(first.uid);
+      final savedSecond = await repository.getNotebook(second.uid);
+      final savedNew = await repository.getNotebook('new-notebook');
+      expect(savedFirst?.title, 'First');
+      expect(savedSecond?.title, 'Second');
+      expect(savedNew, isNull);
+    },
+  );
 
   test('decodeBackupStrict rejects malformed nested lists', () {
     final database = NotesDatabase(NativeDatabase.memory());
@@ -700,17 +700,19 @@ void main() {
       readErrorHandler: (_, _, _) {},
     );
     final notebook = await repository.createNotebook();
-    await database.into(database.inkStrokeRows).insert(
-      InkStrokeRowsCompanion.insert(
-        uid: 'corrupt-delete-stroke',
-        pageUid: notebook.pages.single.id,
-        colorValue: 0xFF000000,
-        width: 2,
-        toolIndex: 0,
-        pointsJson: '{not valid json',
-        sortIndex: 0,
-      ),
-    );
+    await database
+        .into(database.inkStrokeRows)
+        .insert(
+          InkStrokeRowsCompanion.insert(
+            uid: 'corrupt-delete-stroke',
+            pageUid: notebook.pages.single.id,
+            colorValue: 0xFF000000,
+            width: 2,
+            toolIndex: 0,
+            pointsJson: '{not valid json',
+            sortIndex: 0,
+          ),
+        );
     await repository.fetchNotebooks();
 
     await expectLater(
@@ -732,24 +734,26 @@ void main() {
       readErrorHandler: (_, _, _) {},
     );
     final notebook = await repository.createNotebook();
-    await database.into(database.imageBlockRows).insert(
-      ImageBlockRowsCompanion.insert(
-        uid: 'missing-image',
-        pageUid: notebook.pages.single.id,
-        path: '/definitely/missing/image.png',
-        ocrText: '',
-        width: 100,
-        height: 100,
-        rotation: 0,
-        dx: 0,
-        dy: 0,
-        cropLeft: 0,
-        cropTop: 0,
-        cropRight: 1,
-        cropBottom: 1,
-        sortIndex: 0,
-      ),
-    );
+    await database
+        .into(database.imageBlockRows)
+        .insert(
+          ImageBlockRowsCompanion.insert(
+            uid: 'missing-image',
+            pageUid: notebook.pages.single.id,
+            path: '/definitely/missing/image.png',
+            ocrText: '',
+            width: 100,
+            height: 100,
+            rotation: 0,
+            dx: 0,
+            dy: 0,
+            cropLeft: 0,
+            cropTop: 0,
+            cropRight: 1,
+            cropBottom: 1,
+            sortIndex: 0,
+          ),
+        );
 
     final fetched = await repository.fetchNotebooks();
 
@@ -800,17 +804,19 @@ void main() {
       readErrorHandler: (error, _, _) => readErrors.add(error),
     );
     final notebook = await repository.createNotebook();
-    await database.into(database.inkStrokeRows).insert(
-      InkStrokeRowsCompanion.insert(
-        uid: 'malformed-points',
-        pageUid: notebook.pages.single.id,
-        colorValue: 0xFF000000,
-        width: 2,
-        toolIndex: 0,
-        pointsJson: '[{"dx": 1, "dy": 2}, "broken"]',
-        sortIndex: 0,
-      ),
-    );
+    await database
+        .into(database.inkStrokeRows)
+        .insert(
+          InkStrokeRowsCompanion.insert(
+            uid: 'malformed-points',
+            pageUid: notebook.pages.single.id,
+            colorValue: 0xFF000000,
+            width: 2,
+            toolIndex: 0,
+            pointsJson: '[{"dx": 1, "dy": 2}, "broken"]',
+            sortIndex: 0,
+          ),
+        );
 
     final fetched = await repository.fetchNotebooks();
 
@@ -829,17 +835,19 @@ void main() {
       readErrorHandler: (_, _, _) {},
     );
     final notebook = await repository.createNotebook();
-    await database.into(database.inkStrokeRows).insert(
-      InkStrokeRowsCompanion.insert(
-        uid: 'unknown-tool',
-        pageUid: notebook.pages.single.id,
-        colorValue: 0xFF000000,
-        width: 2,
-        toolIndex: 999,
-        pointsJson: '[{"dx": 1, "dy": 2, "pressure": 0.5}]',
-        sortIndex: 0,
-      ),
-    );
+    await database
+        .into(database.inkStrokeRows)
+        .insert(
+          InkStrokeRowsCompanion.insert(
+            uid: 'unknown-tool',
+            pageUid: notebook.pages.single.id,
+            colorValue: 0xFF000000,
+            width: 2,
+            toolIndex: 999,
+            pointsJson: '[{"dx": 1, "dy": 2, "pressure": 0.5}]',
+            sortIndex: 0,
+          ),
+        );
 
     final fetched = await repository.fetchNotebooks();
 

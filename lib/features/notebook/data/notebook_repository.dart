@@ -28,10 +28,7 @@ typedef DataIntegrityIncidentHandler =
     );
 
 class PortableBackupData {
-  const PortableBackupData({
-    required this.notebooks,
-    required this.folders,
-  });
+  const PortableBackupData({required this.notebooks, required this.folders});
 
   final List<Notebook> notebooks;
   final List<String> folders;
@@ -85,8 +82,7 @@ class NotebookRepository {
     };
     var removed = 0;
     await for (final entity in imagesDir.list()) {
-      if (entity is! File ||
-          referencedPaths.contains(entity.absolute.path)) {
+      if (entity is! File || referencedPaths.contains(entity.absolute.path)) {
         continue;
       }
       try {
@@ -185,9 +181,7 @@ class NotebookRepository {
     }
     _validateRecoveryBatch(notebooks);
     if (!await _isDatabaseEmptyForRestore()) {
-      throw StateError(
-        'Atomic recovery requires an empty database.',
-      );
+      throw StateError('Atomic recovery requires an empty database.');
     }
     await _validateRecoveryImages(notebooks);
 
@@ -202,21 +196,21 @@ class NotebookRepository {
 
       await database.transaction(() async {
         if (!await _isDatabaseEmptyForRestore()) {
-          throw StateError(
-            'Atomic recovery requires an empty database.',
-          );
+          throw StateError('Atomic recovery requires an empty database.');
         }
         for (final notebook in persisted) {
-          await database.into(database.notebookRows).insert(
-            NotebookRowsCompanion.insert(
-              uid: notebook.uid,
-              title: notebook.title,
-              kindIndex: notebook.kind.indexValue,
-              folder: notebook.folder,
-              createdAt: notebook.createdAt,
-              updatedAt: notebook.updatedAt,
-            ),
-          );
+          await database
+              .into(database.notebookRows)
+              .insert(
+                NotebookRowsCompanion.insert(
+                  uid: notebook.uid,
+                  title: notebook.title,
+                  kindIndex: notebook.kind.indexValue,
+                  folder: notebook.folder,
+                  createdAt: notebook.createdAt,
+                  updatedAt: notebook.updatedAt,
+                ),
+              );
           for (final entry in notebook.pages.asMap().entries) {
             await _insertPage(notebook.uid, entry.value, entry.key);
           }
@@ -229,9 +223,7 @@ class NotebookRepository {
 
     _latestPersistedUpdates
       ..clear()
-      ..addEntries(
-        persisted.map((item) => MapEntry(item.uid, item.updatedAt)),
-      );
+      ..addEntries(persisted.map((item) => MapEntry(item.uid, item.updatedAt)));
     _notebookCache
       ..clear()
       ..addEntries(persisted.map((item) => MapEntry(item.uid, item)));
@@ -1106,9 +1098,7 @@ class NotebookRepository {
     return items.map(encodeNotebook).toList();
   }
 
-  List<Map<String, dynamic>> encodeSelfContainedBackup(
-    List<Notebook> items,
-  ) {
+  List<Map<String, dynamic>> encodeSelfContainedBackup(List<Notebook> items) {
     _validateRecoveryBatch(items);
     final payload = encodeNotebooks(items);
     for (final notebook in payload) {
@@ -1122,21 +1112,23 @@ class NotebookRepository {
     required Iterable<String> folders,
   }) {
     final notebooks = encodeSelfContainedBackup(items);
-    final normalizedFolders = <String>{
-      for (final item in items)
-        if (item.folder.trim().isNotEmpty) item.folder.trim(),
-      for (final folder in folders)
-        if (folder.trim().isNotEmpty) folder.trim(),
-    }.toList()
-      ..sort((a, b) {
-        final lower = a.toLowerCase().compareTo(b.toLowerCase());
-        return lower != 0 ? lower : a.compareTo(b);
-      });
+    final normalizedFolders =
+        <String>{
+          for (final item in items)
+            if (item.folder.trim().isNotEmpty) item.folder.trim(),
+          for (final folder in folders)
+            if (folder.trim().isNotEmpty) folder.trim(),
+        }.toList()..sort((a, b) {
+          final lower = a.toLowerCase().compareTo(b.toLowerCase());
+          return lower != 0 ? lower : a.compareTo(b);
+        });
     final payload = <String, dynamic>{
       'folders': normalizedFolders,
       'notebooks': notebooks,
     };
-    final checksum = sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+    final checksum = sha256
+        .convert(utf8.encode(jsonEncode(payload)))
+        .toString();
     return <String, dynamic>{
       'format': 'nanotateczki-backup',
       'version': 1,
@@ -1149,14 +1141,14 @@ class NotebookRepository {
   PortableBackupData decodePortableBackup(Object? raw) {
     if (raw is List<dynamic>) {
       final notebooks = decodeBackupStrict(raw);
-      final folders = <String>{
-        for (final notebook in notebooks)
-          if (notebook.folder.trim().isNotEmpty) notebook.folder.trim(),
-      }.toList()
-        ..sort((a, b) {
-          final lower = a.toLowerCase().compareTo(b.toLowerCase());
-          return lower != 0 ? lower : a.compareTo(b);
-        });
+      final folders =
+          <String>{
+            for (final notebook in notebooks)
+              if (notebook.folder.trim().isNotEmpty) notebook.folder.trim(),
+          }.toList()..sort((a, b) {
+            final lower = a.toLowerCase().compareTo(b.toLowerCase());
+            return lower != 0 ? lower : a.compareTo(b);
+          });
       return PortableBackupData(notebooks: notebooks, folders: folders);
     }
     if (raw is! Map<String, dynamic>) {
@@ -1179,8 +1171,9 @@ class NotebookRepository {
       throw const FormatException('Malformed backup envelope.');
     }
 
-    final actualChecksum =
-        sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+    final actualChecksum = sha256
+        .convert(utf8.encode(jsonEncode(payload)))
+        .toString();
     if (actualChecksum != checksum) {
       throw const FormatException('Backup checksum mismatch.');
     }
@@ -1194,18 +1187,18 @@ class NotebookRepository {
     }
 
     final notebooks = decodeBackupStrict(rawNotebooks);
-    final folders = <String>{
-      ...rawFolders
-          .cast<String>()
-          .map((folder) => folder.trim())
-          .where((folder) => folder.isNotEmpty),
-      for (final notebook in notebooks)
-        if (notebook.folder.trim().isNotEmpty) notebook.folder.trim(),
-    }.toList()
-      ..sort((a, b) {
-        final lower = a.toLowerCase().compareTo(b.toLowerCase());
-        return lower != 0 ? lower : a.compareTo(b);
-      });
+    final folders =
+        <String>{
+          ...rawFolders
+              .cast<String>()
+              .map((folder) => folder.trim())
+              .where((folder) => folder.isNotEmpty),
+          for (final notebook in notebooks)
+            if (notebook.folder.trim().isNotEmpty) notebook.folder.trim(),
+        }.toList()..sort((a, b) {
+          final lower = a.toLowerCase().compareTo(b.toLowerCase());
+          return lower != 0 ? lower : a.compareTo(b);
+        });
     return PortableBackupData(notebooks: notebooks, folders: folders);
   }
 
@@ -1283,9 +1276,11 @@ class NotebookRepository {
           'notebook[$notebookIndex].pages[$pageIndex]',
         );
 
-        for (var strokeIndex = 0;
-            strokeIndex < inkStrokes.length;
-            strokeIndex++) {
+        for (
+          var strokeIndex = 0;
+          strokeIndex < inkStrokes.length;
+          strokeIndex++
+        ) {
           final stroke = inkStrokes[strokeIndex];
           final tool = stroke['tool'];
           if (tool != null) {
@@ -1313,9 +1308,11 @@ class NotebookRepository {
         }
 
         final imageBlocks = page['imageBlocks'] as List<dynamic>;
-        for (var imageIndex = 0;
-            imageIndex < imageBlocks.length;
-            imageIndex++) {
+        for (
+          var imageIndex = 0;
+          imageIndex < imageBlocks.length;
+          imageIndex++
+        ) {
           final image = imageBlocks[imageIndex] as Map<String, dynamic>;
           final bytes = image['bytes'];
           if (bytes == null) {

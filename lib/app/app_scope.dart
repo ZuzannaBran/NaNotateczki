@@ -341,9 +341,7 @@ class _BackupScheduler with WidgetsBindingObserver {
       ];
       if (corruptUids.isNotEmpty) {
         for (final uid in corruptUids) {
-          final previous = await backupService.readLatest(
-            requiredUids: {uid},
-          );
+          final previous = await backupService.readLatest(requiredUids: {uid});
           Notebook? safeCopy;
           for (final candidate in previous) {
             if (candidate.uid == uid) {
@@ -378,8 +376,7 @@ class _BackupScheduler with WidgetsBindingObserver {
       }
       snapshotReport = await backupService.snapshot(
         snapshotItems,
-        shouldInterrupt: () =>
-            InkActivityTracker.instance.isBusy || _dirty,
+        shouldInterrupt: () => InkActivityTracker.instance.isBusy || _dirty,
       );
       final frameSummary = FrameTimingTracker.instance.summarySince(
         frameCursor,
