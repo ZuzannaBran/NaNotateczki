@@ -414,7 +414,7 @@ void main() {
     });
   });
 
-  test('restore rolls back the batch when ids collide', () async {
+  test('snapshot rejects duplicate nested ids before writing', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
     final database = NotesDatabase(NativeDatabase.memory());
@@ -430,11 +430,61 @@ void main() {
       updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
     );
 
-    await service.snapshot([first, second]);
-    final restored = await service.restoreFromLatest();
+    await expectLater(
+      service.snapshot([first, second]),
+      throwsA(isA<BackupDataException>()),
+    );
 
-    expect(restored, 0);
-    expect(await repository.fetchNotebooks(), isEmpty);
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    expect(await manifest.exists(), isFalse);
+  });
+
+  test('snapshot rejects an older version of an existing notebook', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final first = _notebook();
+    final newer = first.copyWith(
+      title: 'Newer',
+      updatedAt: first.updatedAt.add(const Duration(seconds: 2)),
+    );
+    final older = first.copyWith(
+      title: 'Older',
+      updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
+    );
+
+    await service.snapshot([newer]);
+    await service.snapshot([older]);
+    final restored = await service.readLatest();
+
+    expect(restored.single.title, 'Newer');
+    expect(restored.single.updatedAt, newer.updatedAt);
+  });
+
+  test('snapshot cleans orphaned atomic temp files', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final notebooksDir = Directory(
+      '${directory.path}/local_backup/notebooks',
+    );
+    await notebooksDir.create(recursive: true);
+    final orphan = File('${notebooksDir.path}/orphan.json.tmp');
+    await orphan.writeAsString('partial', flush: true);
+
+    await service.snapshot([_notebook()]);
+
+    expect(await orphan.exists(), isFalse);
   });
 
   test('snapshot stops when ink becomes active', () async {

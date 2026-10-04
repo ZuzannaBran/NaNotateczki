@@ -22,6 +22,7 @@ class LocalBackupService {
   final NotebookRepository repository;
   final Future<Directory> Function() _documentsDirectory;
   final ValueNotifier<bool> _snapshotInProgress = ValueNotifier(false);
+  Future<void> _snapshotTail = Future<void>.value();
 
   ValueListenable<bool> get snapshotInProgress => _snapshotInProgress;
 
@@ -31,6 +32,7 @@ class LocalBackupService {
   static const _trashDirName = 'trash';
   static const _manifest = 'manifest.json';
   static const _historyRetention = 5;
+  static const _trashRetention = 20;
   static const _latest = 'notebooks_latest.json';
   static const _webBackupKey = 'local_backup_web.json';
   static const _temporarySuffix = '.tmp';
@@ -103,6 +105,22 @@ class LocalBackupService {
     List<Notebook> items, {
     bool Function()? shouldInterrupt,
   }) async {
+    final previous = _snapshotTail;
+    final completion = Completer<void>();
+    _snapshotTail = completion.future;
+    try {
+      await previous;
+      return await _snapshotNow(items, shouldInterrupt: shouldInterrupt);
+    } finally {
+      completion.complete();
+    }
+  }
+
+  Future<BackupSnapshotReport> _snapshotNow(
+    List<Notebook> items, {
+    bool Function()? shouldInterrupt,
+  }) async {
+    _validateSnapshotItems(items);
     _snapshotInProgress.value = true;
     try {
       if (kIsWeb) {
@@ -110,6 +128,8 @@ class LocalBackupService {
       }
       final totalStopwatch = Stopwatch()..start();
       final notebooksDir = await _notebooksDir();
+      await _recoverDirectoryAtomicWrites(notebooksDir);
+      await _recoverDirectoryAtomicWrites(await _historyDir());
       final previousEntries = await _readManifestEntries();
       final currentEntries = <String, _BackupManifestEntry>{};
       final expectedFiles = <String>{};
@@ -123,7 +143,7 @@ class LocalBackupService {
         final notebookStopwatch = Stopwatch()..start();
         final previousEntry = previousEntries[notebook.uid];
         if (previousEntry != null &&
-            previousEntry.updatedAt == notebook.updatedAt &&
+            !notebook.updatedAt.isAfter(previousEntry.updatedAt) &&
             await _isManifestEntryValid(previousEntry)) {
           final previousFile = await _notebookFile(previousEntry.fileName);
           currentEntries[notebook.uid] = previousEntry;
@@ -244,10 +264,12 @@ class LocalBackupService {
         if (entity is File &&
             entity.path.endsWith('.json') &&
             !retainedFiles.contains(entity.path)) {
-          await _moveStaleNotebookBackupToTrash(entity);
-          staleMoved++;
+          if (await _moveStaleNotebookBackupToTrash(entity)) {
+            staleMoved++;
+          }
         }
       }
+      await _trimTrash();
       staleStopwatch.stop();
       staleListMs = staleStopwatch.elapsedMilliseconds;
 
@@ -650,6 +672,47 @@ class LocalBackupService {
     );
   }
 
+  void _validateSnapshotItems(List<Notebook> items) {
+    final notebookIds = <String>{};
+    final pageIds = <String>{};
+    final tabIds = <String>{};
+    final textIds = <String>{};
+    final imageIds = <String>{};
+    final strokeIds = <String>{};
+
+    void requireUnique(Set<String> ids, String id, String type) {
+      if (id.isEmpty || !ids.add(id)) {
+        throw BackupDataException(
+          'Snapshot contains an empty or duplicate $type id: $id',
+        );
+      }
+    }
+
+    for (final notebook in items) {
+      requireUnique(notebookIds, notebook.uid, 'notebook');
+      if (notebook.pages.isEmpty) {
+        throw BackupDataException(
+          'Snapshot notebook has no pages: ${notebook.uid}',
+        );
+      }
+      for (final page in notebook.pages) {
+        requireUnique(pageIds, page.id, 'page');
+        for (final tab in page.indexTabs) {
+          requireUnique(tabIds, tab.id, 'index tab');
+        }
+        for (final block in page.textBlocks) {
+          requireUnique(textIds, block.id, 'text block');
+        }
+        for (final block in page.imageBlocks) {
+          requireUnique(imageIds, block.id, 'image block');
+        }
+        for (final stroke in page.inkStrokes) {
+          requireUnique(strokeIds, stroke.id, 'ink stroke');
+        }
+      }
+    }
+  }
+
   Future<void> _archiveManifest(String content) async {
     final history = await _historyDir();
     final file = File(
@@ -711,6 +774,27 @@ class LocalBackupService {
     return result;
   }
 
+  Future<void> _recoverDirectoryAtomicWrites(Directory directory) async {
+    final targetPaths = <String>{};
+    await for (final entity in directory.list()) {
+      if (entity is! File) {
+        continue;
+      }
+      if (entity.path.endsWith(_temporarySuffix)) {
+        targetPaths.add(
+          entity.path.substring(0, entity.path.length - _temporarySuffix.length),
+        );
+      } else if (entity.path.endsWith(_previousSuffix)) {
+        targetPaths.add(
+          entity.path.substring(0, entity.path.length - _previousSuffix.length),
+        );
+      }
+    }
+    for (final path in targetPaths) {
+      await _recoverAtomicWrite(File(path));
+    }
+  }
+
   Future<void> _atomicWriteString(File file, String content) async {
     await _recoverAtomicWrite(file);
     final temporary = File('${file.path}$_temporarySuffix');
@@ -751,7 +835,7 @@ class LocalBackupService {
     }
   }
 
-  Future<void> _moveStaleNotebookBackupToTrash(File file) async {
+  Future<bool> _moveStaleNotebookBackupToTrash(File file) async {
     try {
       final trashDir = await _trashDir();
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
@@ -759,6 +843,7 @@ class LocalBackupService {
         '${trashDir.path}/${timestamp}_${file.uri.pathSegments.last}',
       );
       await file.rename(target.path);
+      return true;
     } catch (e, st) {
       debugPrint(
         'LocalBackupService._moveStaleNotebookBackupToTrash failed: $e\n$st',
@@ -768,6 +853,33 @@ class LocalBackupService {
         st,
         source: 'LocalBackupService._moveStaleNotebookBackupToTrash',
       );
+      return false;
+    }
+  }
+
+  Future<void> _trimTrash() async {
+    final trash = await _trashDir();
+    final files = <File>[];
+    await for (final entity in trash.list()) {
+      if (entity is File) {
+        files.add(entity);
+      }
+    }
+    files.sort((a, b) => a.path.compareTo(b.path));
+    final removeCount = files.length - _trashRetention;
+    if (removeCount <= 0) {
+      return;
+    }
+    for (final file in files.take(removeCount)) {
+      try {
+        await file.delete();
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'LocalBackupService._trimTrash',
+        );
+      }
     }
   }
 
