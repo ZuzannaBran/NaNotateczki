@@ -72,11 +72,12 @@ i ponawia przejściowy błąd backupu po 30 s.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (61): paleta aplikacji
-  i kolory akcentu; w ustawieniach dostępne są tylko Bubblegum, Lavender,
-  Peach i Baby blue. 3:
-  `AppAccentColor`; 13:
-  `selectableAppAccentColors`; 46:
+- `lib/core/theme/app_colors.dart` (65): paleta aplikacji
+  i kolory akcentu; w ustawieniach dostępne są Cherry, Bubblegum, Lavender,
+  Peach i Baby blue. Cherry ma #E05278, a Bubblegum #FFC1CC.
+  3: `AppAccentColor`;
+  14:
+  `selectableAppAccentColors`; 50:
   `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
@@ -89,7 +90,8 @@ i ponawia przejściowy błąd backupu po 30 s.
 
 - `lib/core/input/app_preferences_controller.dart` (139):
   globalny tryb urządzenia i kolor akcentu zapisane w `app_prefs.json`;
-  starsze Classic, Sakura i Mint są migrowane do Bubblegum.
+  starsze Classic, Sakura i Mint są migrowane do nowego Bubblegum.
+  Dotychczasowy zapis `bubblegum` zachowuje stary wybór jako Cherry.
   8: `DeviceInputMode`;
   27:
   `AppPreferencesController`.

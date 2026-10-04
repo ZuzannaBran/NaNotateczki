@@ -8,10 +8,12 @@ enum AppAccentColor {
   peach,
   mint,
   babyBlue,
+  softBubblegum,
 }
 
 const selectableAppAccentColors = <AppAccentColor>[
   AppAccentColor.bubblegum,
+  AppAccentColor.softBubblegum,
   AppAccentColor.lavender,
   AppAccentColor.peach,
   AppAccentColor.babyBlue,
@@ -22,7 +24,8 @@ extension AppAccentColorX on AppAccentColor {
     return switch (this) {
       AppAccentColor.classic => 'Classic',
       AppAccentColor.sakura => 'Sakura',
-      AppAccentColor.bubblegum => 'Bubblegum',
+      AppAccentColor.bubblegum => 'Cherry',
+      AppAccentColor.softBubblegum => 'Bubblegum',
       AppAccentColor.lavender => 'Lavender',
       AppAccentColor.peach => 'Peach',
       AppAccentColor.mint => 'Mint',
@@ -34,7 +37,8 @@ extension AppAccentColorX on AppAccentColor {
     return switch (this) {
       AppAccentColor.classic => AppColors.inkBlack,
       AppAccentColor.sakura => const Color(0xFFF48FB1),
-      AppAccentColor.bubblegum => const Color(0xFFFF80AB),
+      AppAccentColor.bubblegum => const Color(0xFFE05278),
+      AppAccentColor.softBubblegum => const Color(0xFFFFC1CC),
       AppAccentColor.lavender => const Color(0xFFCA9BF7),
       AppAccentColor.peach => const Color(0xFFFFAB91),
       AppAccentColor.mint => const Color(0xFF80CBC4),
