@@ -27,8 +27,11 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: ChangeNotifierProvider<LibraryController>.value(
-          value: controller,
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
+            Provider<NotebookRepository>.value(value: repository),
+          ],
           child: const LibraryScreen(),
         ),
       ),
@@ -41,6 +44,52 @@ void main() {
     await tester.pump();
 
     expect(find.text('Pick an item'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
+
+  testWidgets('library tree expands and collapses each folder', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final created = await repository.createNotebook(folder: 'Project A');
+    await repository.updateNotebookMetadata(created.uid, title: 'Nested note');
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
+            Provider<NotebookRepository>.value(value: repository),
+          ],
+          child: const LibraryScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Project A'), findsOneWidget);
+    expect(find.text('Nested note'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Collapse Project A'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nested note'), findsNothing);
+    expect(find.byTooltip('Expand Project A'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Expand Project A'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nested note'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();

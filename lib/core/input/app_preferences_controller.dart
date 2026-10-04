@@ -28,7 +28,7 @@ class AppPreferencesController extends ChangeNotifier {
   static const _fileName = 'app_prefs.json';
 
   DeviceInputMode deviceInputMode = _defaultDeviceInputMode();
-  AppAccentColor accentColor = AppAccentColor.classic;
+  AppAccentColor accentColor = AppAccentColor.softBubblegum;
 
   bool get shouldRequestSoftKeyboard {
     return deviceInputMode == DeviceInputMode.tablet;
@@ -65,13 +65,23 @@ class AppPreferencesController extends ChangeNotifier {
           AppAccentColor.values[index],
         _ => null,
       };
-      if (loadedAccent != null && loadedAccent != accentColor) {
-        accentColor = loadedAccent;
+      final normalizedAccent = loadedAccent == null
+          ? null
+          : selectableAppAccentColors.contains(loadedAccent)
+          ? loadedAccent
+          : AppAccentColor.softBubblegum;
+      final migratedAccent =
+          loadedAccent != null && normalizedAccent != loadedAccent;
+      if (normalizedAccent != null && normalizedAccent != accentColor) {
+        accentColor = normalizedAccent;
         changed = true;
       }
 
       if (changed) {
         notifyListeners();
+      }
+      if (migratedAccent) {
+        await _save();
       }
     } catch (e) {
       debugPrint('AppPreferencesController.load failed: $e');

@@ -155,7 +155,10 @@ void main() {
       firstPages[notebook.pages.last.id],
     );
     expect(report.notebookReports.single.flattenMs, greaterThanOrEqualTo(0));
-    expect((await service.readLatest()).single.pages.first.title, 'Changed page');
+    expect(
+      (await service.readLatest()).single.pages.first.title,
+      'Changed page',
+    );
   });
 
   test('metadata-only snapshot reuses every page file', () async {
@@ -230,8 +233,7 @@ void main() {
       (entry) => entry['uid'] == second.uid,
     );
     final secondPage =
-        (secondEntry['pages'] as List<dynamic>).single
-            as Map<String, dynamic>;
+        (secondEntry['pages'] as List<dynamic>).single as Map<String, dynamic>;
     final secondFile = File(
       '${directory.path}/local_backup/pages/${secondPage['file']}',
     );
@@ -275,15 +277,12 @@ void main() {
         (firstManifest['notebooks'] as List<dynamic>).single
             as Map<String, dynamic>;
     final firstPage =
-        (firstEntry['pages'] as List<dynamic>).single
-            as Map<String, dynamic>;
+        (firstEntry['pages'] as List<dynamic>).single as Map<String, dynamic>;
     final firstFile = firstPage['file'] as String;
 
     final updated = notebook.copyWith(
       updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
-      pages: [
-        notebook.pages.single.copyWith(title: 'Changed page'),
-      ],
+      pages: [notebook.pages.single.copyWith(title: 'Changed page')],
     );
     await service.snapshot([updated]);
 
@@ -293,8 +292,7 @@ void main() {
         (secondManifest['notebooks'] as List<dynamic>).single
             as Map<String, dynamic>;
     final secondPage =
-        (secondEntry['pages'] as List<dynamic>).single
-            as Map<String, dynamic>;
+        (secondEntry['pages'] as List<dynamic>).single as Map<String, dynamic>;
     final secondFile = secondPage['file'] as String;
 
     expect(secondFile, isNot(firstFile));
@@ -383,8 +381,7 @@ void main() {
     final entries = decoded['notebooks'] as List<dynamic>;
     final brokenEntry = entries.last as Map<String, dynamic>;
     final brokenPage =
-        (brokenEntry['pages'] as List<dynamic>).single
-            as Map<String, dynamic>;
+        (brokenEntry['pages'] as List<dynamic>).single as Map<String, dynamic>;
     final brokenFile = File(
       '${directory.path}/local_backup/pages/${brokenPage['file']}',
     );
@@ -675,9 +672,7 @@ void main() {
     final second = first.copyWith(
       title: 'Newer title',
       updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
-      pages: [
-        first.pages.single.copyWith(title: 'Newer page'),
-      ],
+      pages: [first.pages.single.copyWith(title: 'Newer page')],
     );
     await service.snapshot([second]);
 

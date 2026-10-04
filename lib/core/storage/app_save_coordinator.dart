@@ -43,10 +43,7 @@ class AppSaveCoordinator {
 }
 
 class _SaveParticipant {
-  const _SaveParticipant({
-    required this.hasPendingWork,
-    required this.flush,
-  });
+  const _SaveParticipant({required this.hasPendingWork, required this.flush});
 
   final bool Function() hasPendingWork;
   final Future<void> Function() flush;

@@ -191,7 +191,8 @@ class LocalBackupService {
   }) async {
     final verifyUntouchedPageBackups =
         dirtyPageIdsByNotebook == null && dirtyNotebookUids != null;
-    final requestedChanges = dirtyPageIdsByNotebook ??
+    final requestedChanges =
+        dirtyPageIdsByNotebook ??
         (dirtyNotebookUids == null
             ? null
             : <String, Set<String>?>{
@@ -242,9 +243,7 @@ class LocalBackupService {
             notebookChanges[notebook.uid] = null;
             continue;
           }
-          final currentPageIds = [
-            for (final page in notebook.pages) page.id,
-          ];
+          final currentPageIds = [for (final page in notebook.pages) page.id];
           final previousPageIds = [
             for (final page in previousEntry.pages) page.pageId,
           ];
@@ -683,10 +682,7 @@ class LocalBackupService {
         fileName: null,
         checksum: null,
         checksumAlgorithm: null,
-        jsonBytes: pages.fold<int>(
-          0,
-          (sum, page) => sum + page.jsonBytes,
-        ),
+        jsonBytes: pages.fold<int>(0, (sum, page) => sum + page.jsonBytes),
         pageBacked: true,
         title: title,
         kindIndex: kind.toInt(),
@@ -745,9 +741,7 @@ class LocalBackupService {
     );
   }
 
-  _BackupPageReference? _pageReferenceFromJson(
-    Map<String, dynamic> json,
-  ) {
+  _BackupPageReference? _pageReferenceFromJson(Map<String, dynamic> json) {
     final pageId = json['pageId'];
     final fileName = json['file'];
     final checksum = json['checksum'];
@@ -787,9 +781,7 @@ class LocalBackupService {
     );
   }
 
-  _BackupAssetReference? _assetReferenceFromJson(
-    Map<String, dynamic> json,
-  ) {
+  _BackupAssetReference? _assetReferenceFromJson(Map<String, dynamic> json) {
     final imageId = json['imageId'];
     final checksum = json['checksum'];
     final rawBytes = json['bytes'];
@@ -891,9 +883,7 @@ class LocalBackupService {
     }
   }
 
-  Future<bool> _canReusePageBackedEntryFast(
-    _BackupManifestEntry entry,
-  ) async {
+  Future<bool> _canReusePageBackedEntryFast(_BackupManifestEntry entry) async {
     for (final page in entry.pages) {
       if (!await _canReusePageReferenceFast(page)) {
         return false;
@@ -1194,9 +1184,7 @@ class LocalBackupService {
         final file = await _notebookFile(fileName);
         await _recoverAtomicWrite(file);
         if (!await file.exists()) {
-          throw BackupValidationException(
-            'Backup file is missing: $fileName',
-          );
+          throw BackupValidationException('Backup file is missing: $fileName');
         }
         if (version != 1 && !await _isManifestEntryValid(entry)) {
           throw BackupValidationException(
@@ -1282,8 +1270,7 @@ class LocalBackupService {
       );
     }
     final decoded = jsonDecode(content);
-    if (decoded is! Map<String, dynamic> ||
-        decoded['id'] != reference.pageId) {
+    if (decoded is! Map<String, dynamic> || decoded['id'] != reference.pageId) {
       throw BackupValidationException(
         'Backup page metadata mismatch: ${reference.fileName}',
       );
@@ -1610,9 +1597,7 @@ class LocalBackupService {
 
   void _validateSnapshotItems(List<Notebook> items) {
     _validateSnapshotNotebookAndPageIds(items);
-    _validateSnapshotPages([
-      for (final notebook in items) ...notebook.pages,
-    ]);
+    _validateSnapshotPages([for (final notebook in items) ...notebook.pages]);
   }
 
   void _validateSnapshotPages(Iterable<NotePage> pages) {
@@ -1697,9 +1682,7 @@ class LocalBackupService {
         }
         for (final raw in entries.whereType<Map<String, dynamic>>()) {
           final entry = _manifestEntryFromJson(raw);
-          if (entry != null &&
-              !entry.pageBacked &&
-              entry.fileName != null) {
+          if (entry != null && !entry.pageBacked && entry.fileName != null) {
             result.add((await _notebookFile(entry.fileName!)).path);
           }
         }
@@ -2152,8 +2135,7 @@ _BackupPageWorkerResult _createPageBackupPayload(
   jsonStopwatch.stop();
   final contentBytes = utf8.encode(content);
   final checksum = sha256.convert(contentBytes).toString();
-  final fileName =
-      '${Uri.encodeComponent(backupPage.id)}_$checksum.json';
+  final fileName = '${Uri.encodeComponent(backupPage.id)}_$checksum.json';
   var writeMs = 0;
   if (missingImageIds.isEmpty) {
     final writeStopwatch = Stopwatch()..start();

@@ -54,7 +54,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (686 linie)
+### `lib/app/app_scope.dart` (679 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -67,27 +67,23 @@ rysika i nie porzuca zmian po błędzie.
 
 - 24: `AppScope`; 31: `_AppScopeState`; 73: `didRequestAppExit`.
 - 302: `_FinishingExitOverlay`; 410: `_BackupScheduler`;
-  610: `flushForExit`.
+  606: `flushForExit`.
 
 ## 3. Core
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (54): paleta aplikacji
-  i wybieralne kolory akcentu. 3:
-  `AppAccentColor`; 39:
-  `AppColors`.
+- `lib/core/theme/app_colors.dart` (133): kolory akcentów oraz wspólna neutralna paleta beżów interfejsu: `#E6E6E6` dla tła, `#FBFBFB` dla toolbarów/panelu folderów i `#DBDBDB` dla separatorów. Bazowe kolory Cherry, Bubblegum, Lavender, Peach i Baby blue pozostają bez zmian. 3: `AppAccentColor`; 61: `AppAccentPalette`; 117: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (23): konfiguracja jasnego
-  Material 3 z wybieralnym akcentem i stałym kolorem powierzchni.
-  5: `AppTheme`.
+- `lib/core/theme/app_theme.dart` (39): jasny Material 3 z ciemniejszym neutralnym tłem `#E6E6E6`, jasnym chromem `#FBFBFB` i separatorami `#DBDBDB`; kolory przewodnie nadal sterują akcentami i zaznaczeniami. 5: `AppTheme`.
 
 ### Wejście i preferencje
 
-- `lib/core/input/app_preferences_controller.dart` (129): globalny
-  tryb urządzenia i kolor akcentu zapisane w `app_prefs.json`; akcent jest
-  zapisywany nazwą enuma z obsługą starszego indeksu.
+- `lib/core/input/app_preferences_controller.dart` (139):
+  globalny tryb urządzenia i kolor akcentu zapisane w `app_prefs.json`;
+  starsze Classic, Sakura i Mint są migrowane do nowego Bubblegum.
+  Dotychczasowy zapis `bubblegum` zachowuje stary wybór jako Cherry.
   8: `DeviceInputMode`;
   27:
   `AppPreferencesController`.
@@ -105,7 +101,7 @@ rysika i nie porzuca zmian po błędzie.
 
 ### Storage i diagnostyka
 
-- `lib/core/storage/app_save_coordinator.dart` (53): rejestr aktywnych
+- `lib/core/storage/app_save_coordinator.dart` (50): rejestr aktywnych
   edytorów i wspólny flush ich oczekujących zapisów przed zamknięciem.
   3: `AppSaveCoordinator`.
 - `lib/core/storage/text_storage.dart` (2): conditional export IO/web.
@@ -176,7 +172,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2597 linii)
+### `lib/data/backup/local_backup_service.dart` (2578 linii)
 
 Przyrostowy backup z atomowym `manifest.json` i checksumami SHA-256. Format
 v6 rozdziela notebook na niezmienne, content-addressed pliki stron w
@@ -197,11 +193,11 @@ pełny snapshot w `localStorage`.
 
 - 19: `LocalBackupService`; 37: `waitUntilIdle`; 153: `snapshot`;
   84: `_pagesDir`.
-- 748: `_pageReferenceFromJson`; 1036: `readLatest`;
-  1267: `_readBackupPageJson`; 1493: `restoreFromLatest`.
-- 1872: `_BackupPageWorkerRequest`; 1911: `_BackupWorkerClient`;
-  2105: `_createPageBackupPayload`; 2511: `_BackupPageReference`.
-- 2397: `BackupSnapshotReport`.
+- 744: `_pageReferenceFromJson`; 1026: `readLatest`;
+  1255: `_readBackupPageJson`; 1480: `restoreFromLatest`.
+- 1855: `_BackupPageWorkerRequest`; 1894: `_BackupWorkerClient`;
+  2088: `_createPageBackupPayload`; 2493: `_BackupPageReference`.
+- 2379: `BackupSnapshotReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (271 linii)
 
@@ -256,7 +252,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2355 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2350 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. `NotebookRepositoryChange` rozróżnia pełną zmianę,
@@ -266,14 +262,14 @@ też oczekiwanie na wszystkie trwające zapisy per UID. Ręczny eksport pozostaj
 samowystarczalny i zachowuje obrazy inline.
 
 - 23: `DataIntegrityIncidentHandler`; 30: `NotebookRepositoryChange`;
-  45: `RepositoryChangeHandler`; 30: `NotebookRepository`.
+  45: `RepositoryChangeHandler`; 55: `NotebookRepository`.
 - 81: `waitForPendingSaves`; 485: `saveNotebook`;
-  515: `saveNotebookPages`; 727: `updateNotebookMetadata`;
-  1101: `deleteNotebook`.
-- 1242: `encodeNotebookForLocalBackup`; 1245:
+  515: `saveNotebookPages`; 723: `updateNotebookMetadata`;
+  1097: `deleteNotebook`.
+- 1238: `encodeNotebookForLocalBackup`; 1241:
   `encodePageForLocalBackup`.
-- 2200: `_toolFromIndex`; 2208: `_toolToIndex` — muszą pozostać symetryczne.
-- 2253: `DataIntegrityProtectionException`.
+- 2196: `_toolFromIndex`; 2204: `_toolToIndex` — muszą pozostać symetryczne.
+- 2249: `DataIntegrityProtectionException`.
 
 ### `lib/features/notebook/presentation/notebook_screen.dart` (24 linie)
 
@@ -283,35 +279,41 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (637 linii)
+### `lib/features/library/presentation/library_controller.dart` (640 linii)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
-Zapis samych folderów zgłasza pusty zestaw UID-ów, więc aktualizuje manifest
-bez oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
+Wybór dokumentu synchronizuje też aktywny folder, dzięki czemu drzewko
+biblioteki zaznacza folder i notatkę jednocześnie. Zapis samych folderów
+zgłasza pusty zestaw zmian repozytorium, więc aktualizuje manifest bez
+oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
 tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
 - 14: `LibraryController`; 78: `initialize`; 87: `loadItems`;
   159: `restoreCorruptDocumentsFromBackup`; 217: `syncNow`.
 - 261–389: tworzenie/zmiana/usuwanie folderów i dokumentów.
-- 417: `selectItem`; 429: `selectFolder`; 438: `setSearchQuery`.
-- 443: `exportBackup`; 472: `importBackup`; 485: `selectedItem`.
-- 559: `_saveFolders` — zapis folderów zgłasza pusty zestaw dirty UID-ów.
+- 417: `selectItem`; 433: `selectFolder`; 442: `setSearchQuery`.
+- 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
+- 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1025 linii)
+### `lib/features/library/presentation/library_screen.dart` (1043 linie)
 
-Układ foldery | dokumenty | workspace oraz dialogi CRUD/recovery. Szeroki
-layout blokuje minimalną szerokość zamiast przełączać się na kompakt; poniżej
-progu używa poziomego scrolla, co działa tak samo na wszystkich platformach.
-Próg wynika z geometrii edytora: overview, strona 820 px i równe marginesy
-56 px po lewej od strony oraz po prawej.
+Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
+rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
+i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
+kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
+zwijać w całości i zmieniać jego szerokość. Pionowy separator uchwytu ma 1 px, ten sam kolor co linia pod toolbarami i leży na prawej krawędzi, dzięki czemu linie stykają się.
 
-- 17: `LibraryScreen`; 24: `_LibraryScreenState`; 28: `_wideBreakpoint`;
-  53: główny `build`.
-- 285–408: tworzenie, zmiana nazw, usuwanie i dialog recovery.
-- 479: `_NameInputDialog`; 552: `_FolderListPane`;
-  695: `_LibraryItemsPane`.
-- 927: `_LibraryWorkspace`; 957: `_PaneResizeHandle`;
-  979: `_LeftZoneToggleTab`.
+- 16: `LibraryScreen`;
+  23:
+  `_LibraryScreenState`;
+  523:
+  `_LibraryTreePane`;
+  749:
+  `_FolderTreeRow`;
+  859:
+  `_LibraryTreeItemRow`;
+  949:
+  `_LibraryWorkspace`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -367,10 +369,12 @@ zgodą na zamknięcie aplikacji.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2647 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2664 linie)
 
-Wielostronicowy edytor notebooka: viewport, wirtualizowane strony, canvasy,
-zakładki, minimapa, skróty i import/eksport. Strona zachowuje logiczną
+Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
+kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
+panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
+skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma zarezerwowany lewy pas, a kolumna strony jest kotwiczona do
 stałego prawego marginesu 56 px. Clip viewportu ma wyłącznie wizualny bleed,
@@ -389,8 +393,8 @@ aby nie obcinać prawej ramki i cienia strony.
 - 1457–1488: tło/inactive `DocumentPageOverlay`, `DocumentDrawingCanvas`
   i active `DocumentPageOverlay` we wspólnej przestrzeni transformacji.
 - 1622–1665: skróty klawiszowe; 1697: `_PageViewportClipper`.
-- 1799: `_PageFramePainter`; 1874: `_IndexTabsOverlay`;
-  2014: `_ProjectMiniMapOverlay`; 2364: `_ProjectMiniMapPainter`.
+- 1802: `_PageFramePainter`; 1877: `_IndexTabsOverlay`;
+  2014: `_ProjectMiniMapOverlay`; 2367: `_ProjectMiniMapPainter`.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -417,12 +421,19 @@ błędów, integralności i wydajności.
 - `lib/features/editor/presentation/widgets/page_background_paint.dart` (123):
   render i preview tła. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (929): główny
-  toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu.
-  11: `EditorToolbar`; 215: dialog tła; 346: selektor gumki;
-  410: selektor kształtu; 822: `_EraserIcon`.
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (937):
+  główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu; tło paska używa jasnej neutralnej powierzchni #FBFBFB;
+  ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
+  Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
+  przedstawia zaznaczanie obszaru kursorem.
+  11: `EditorToolbar`;
+  215:
+  dialog tła;
+  350: selektor gumki;
+  416: selektor kształtu;
+  830: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (545):
-  formatowanie aktywnego bloku Quill.
+  formatowanie aktywnego bloku Quill; pasek używa jasnej neutralnej powierzchni #FBFBFB.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
@@ -457,7 +468,7 @@ bloki overlayu.
 ### `lib/features/board/presentation/board_screen.dart` (941 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
-warstwami tła/canvasu/overlayu.
+warstwami tła/canvasu/overlayu; pomocnicze panele UI dziedziczą aktywną paletę.
 
 - 29: `BoardScreen`; 36: `_BoardScreenState`.
 - 57: `_buildBoardRect`; 75–360: obsługa pointerów i viewportu.
@@ -481,14 +492,15 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (1000)
-- `test/local_backup_service_test.dart` (1341)
-- `test/editor_save_flush_test.dart` (66): wymuszenie dirty page save przed
+- `test/local_backup_service_test.dart` (1335)
+- `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (49)
-- `test/ink_activity_tracker_test.dart` — exit guard czeka na koniec aktywnego kontaktu rysika.
+- `test/library_screen_responsive_layout_test.dart` (98)
+- `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
+  aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (133)

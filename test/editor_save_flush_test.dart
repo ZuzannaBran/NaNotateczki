@@ -25,13 +25,10 @@ void main() {
     );
     addTearDown(controller.dispose);
 
-    controller.addInkStroke(
-      const [
-        InkPoint(dx: 5, dy: 6, pressure: 0.5),
-        InkPoint(dx: 15, dy: 16, pressure: 0.5),
-      ],
-      toolOverride: DrawingTool.pen,
-    );
+    controller.addInkStroke(const [
+      InkPoint(dx: 5, dy: 6, pressure: 0.5),
+      InkPoint(dx: 15, dy: 16, pressure: 0.5),
+    ], toolOverride: DrawingTool.pen);
 
     await controller.flushPendingSaves();
     await repository.waitForPendingSaves();

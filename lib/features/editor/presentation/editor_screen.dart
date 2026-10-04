@@ -1197,6 +1197,13 @@ class _EditorScreenState extends State<EditorScreen> {
             editorController: controller,
             activeTextBlockId: controller.activeTextBlockId,
           ),
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: Theme.of(
+            context,
+          ).colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -1274,7 +1281,7 @@ class _EditorScreenState extends State<EditorScreen> {
               )..setTranslationRaw(_pagePan.dx, _pagePan.dy, 0.0);
 
               return Container(
-                color: AppColors.paper.withValues(alpha: 0.35),
+                color: AppColors.background,
                 child: Stack(
                   children: [
                     NotificationListener<ScrollNotification>(
@@ -1671,7 +1678,10 @@ class _EditorScreenState extends State<EditorScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: useWideTitleInset ? 44 : null,
-        title: Text(controller.notebook.title),
+        title: Text(
+          controller.notebook.title,
+          style: const TextStyle(fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -1990,7 +2000,9 @@ class _ZoomPercentBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.toolbar.withValues(alpha: 0.92),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerLow.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(10),
         boxShadow: const [
           BoxShadow(
@@ -2281,7 +2293,9 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.toolbar.withValues(alpha: 0.9),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerLow.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(outerRadius),
         boxShadow: const [
           BoxShadow(

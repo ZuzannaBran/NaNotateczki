@@ -607,9 +607,7 @@ class NotebookRepository {
       final persistedNotebook = notebook.copyWith(updatedAt: savedAt);
       _latestPersistedUpdates[notebook.uid] = savedAt;
       _notebookCache[notebook.uid] = persistedNotebook;
-      onChanged?.call([
-        NotebookRepositoryChange.pages(notebook.uid, pageIds),
-      ]);
+      onChanged?.call([NotebookRepositoryChange.pages(notebook.uid, pageIds)]);
     }
     return saved;
   }
@@ -717,9 +715,7 @@ class NotebookRepository {
       );
       _latestPersistedUpdates[notebookToSave.uid] = savedAt;
       _notebookCache[notebookToSave.uid] = persisted;
-      onChanged?.call([
-        NotebookRepositoryChange.full(notebookToSave.uid),
-      ]);
+      onChanged?.call([NotebookRepositoryChange.full(notebookToSave.uid)]);
     }
     return saved;
   }

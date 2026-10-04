@@ -415,6 +415,10 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> selectItem(String uid) async {
+    final cached = _itemById(uid);
+    if (cached != null) {
+      selectedFolder = cached.folder;
+    }
     selectedItemId = uid;
     isLoadingSelectedItem = true;
     _activeNotebook = null;

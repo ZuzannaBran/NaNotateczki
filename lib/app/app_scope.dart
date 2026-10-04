@@ -423,11 +423,9 @@ class _BackupScheduler with WidgetsBindingObserver {
   bool _dirty = false;
   bool _isRunning = false;
   bool _closing = false;
-  final Map<String, Set<String>?> _pendingChanges =
-      <String, Set<String>?>{};
+  final Map<String, Set<String>?> _pendingChanges = <String, Set<String>?>{};
 
-  bool get hasPendingWork =>
-      _dirty || _isRunning || _pendingChanges.isNotEmpty;
+  bool get hasPendingWork => _dirty || _isRunning || _pendingChanges.isNotEmpty;
 
   void schedule({
     Iterable<NotebookRepositoryChange> changes =
@@ -476,9 +474,7 @@ class _BackupScheduler with WidgetsBindingObserver {
     _maximumTimer = null;
     final pendingChanges = <String, Set<String>?>{
       for (final entry in _pendingChanges.entries)
-        entry.key: entry.value == null
-            ? null
-            : Set<String>.from(entry.value!),
+        entry.key: entry.value == null ? null : Set<String>.from(entry.value!),
     };
     _pendingChanges.clear();
     _dirty = false;
@@ -645,9 +641,7 @@ class _BackupScheduler with WidgetsBindingObserver {
 
   void _mergeChange(String uid, Set<String>? pageIds) {
     if (!_pendingChanges.containsKey(uid)) {
-      _pendingChanges[uid] = pageIds == null
-          ? null
-          : Set<String>.from(pageIds);
+      _pendingChanges[uid] = pageIds == null ? null : Set<String>.from(pageIds);
       return;
     }
     final existing = _pendingChanges[uid];
