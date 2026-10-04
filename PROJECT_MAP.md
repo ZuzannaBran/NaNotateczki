@@ -61,12 +61,10 @@ przebudowywania `MaterialApp` i planuje backup po zapisie. Scheduler zbiera
 UID-y zmienionych notebooków, robi kopię po 2 s bezczynności, wymusza próbę
 po maksymalnie 30 s ciągłych zmian i zachowuje dirty UID-y po przerwaniu.
 
-- 21: `AppScope`;
-  28: `_AppScopeState`;
-  136:
-  `_BackupStatusOverlay`;
-  197:
-  `_StartupErrorScreen`;
+- 22: `AppScope`;
+  29: `_AppScopeState`;
+  138: `_BackupStatusOverlay`;
+  199: `_StartupErrorScreen`;
   275: `_BackupScheduler`.
 
 ## 3. Core
@@ -187,9 +185,9 @@ snapshot i próbuje kolejno starsze wersje. Manifest przechowuje też listę fol
 - 16: `LocalBackupService`; 106: `snapshot`; 442: `hasLatest`;
   664: `readLatest`; 899: `restoreFromLatest`.
 - 1251: anulowalny worker serializacji i SHA-256.
-- 792: `BackupSnapshotInterrupted`; 796: `BackupValidationException`;
-  807: `BackupDataException`; 818: `BackupSnapshotReport`;
-  869: `NotebookBackupReport`.
+- 1381: `BackupSnapshotInterrupted`; 1385: `BackupValidationException`;
+  1394: `BackupDataException`; 1403: `BackupSnapshotReport`;
+  1454: `NotebookBackupReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (270 linii)
 
@@ -251,17 +249,18 @@ zmienionych notebooków. Recovery zapisuje cały batch atomowo i preferuje
 bajty obrazów z backupu nad istniejącymi ścieżkami. Ręczny eksport używa
 koperty z checksumą SHA-256 i zachowuje także puste foldery.
 
-- 23: `DataIntegrityIncidentHandler`; 30: `RepositoryChangeHandler`; 39: `NotebookRepository`.
-- 60: `fetchNotebooks`; 110: `saveRecoveredCopy`;
-  124: `restoreNotebooksAtomically`; 178: `archiveNotebookBeforeDelete`.
-- 159: `createNotebook`; 185: `createBoard`; 211: `getNotebook`.
-- 238: `saveNotebook`; 268: `saveNotebookPages`;
-  476: `updateNotebookMetadata`; 740: `deleteNotebook`.
-- 521: `_persistInlineImages`; 595: `_protectSuspiciousOverwrite`;
-  646: `_recordDataIntegrityIncident`.
-- 756–763: publiczne kodowanie/dekodowanie JSON.
-- 1394: `_toolFromIndex`; 1402: `_toolToIndex` — muszą pozostać symetryczne.
-- 1447: `DataIntegrityProtectionException`.
+- 23: `DataIntegrityIncidentHandler`; 30: `RepositoryChangeHandler`;
+  39: `NotebookRepository`.
+- 116: `fetchNotebooks`; 166: `saveRecoveredCopy`;
+  180: `restoreNotebooksAtomically`; 340: `archiveNotebookBeforeDelete`.
+- 378: `createNotebook`; 404: `createBoard`; 430: `getNotebook`.
+- 457: `saveNotebook`; 487: `saveNotebookPages`;
+  695: `updateNotebookMetadata`; 1069: `deleteNotebook`.
+- 817: `_persistInlineImages`; 902: `_protectSuspiciousOverwrite`;
+  953: `_recordDataIntegrityIncident`.
+- 1099–1210: publiczne kodowanie/dekodowanie JSON.
+- 2142: `_toolFromIndex`; 2150: `_toolToIndex` — muszą pozostać symetryczne.
+- 2195: `DataIntegrityProtectionException`.
 
 ### `lib/features/notebook/presentation/notebook_screen.dart` (24 linie)
 
@@ -278,11 +277,12 @@ Zapis samych folderów zgłasza pusty zestaw UID-ów, więc aktualizuje manifest
 bez oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
 tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
-- 14: `LibraryController`; 78: `initialize`; 84: `loadItems`;
-  140: `restoreCorruptDocumentsFromBackup`; 193: `syncNow`.
-- 237–365: tworzenie/zmiana/usuwanie folderów i dokumentów.
-- 393: `selectItem`; 405: `selectFolder`; 414: `setSearchQuery`.
-- 419: `exportBackup`; 429: `importBackup`; 443: `selectedItem`.
+- 14: `LibraryController`; 78: `initialize`; 87: `loadItems`;
+  159: `restoreCorruptDocumentsFromBackup`; 217: `syncNow`.
+- 261–389: tworzenie/zmiana/usuwanie folderów i dokumentów.
+- 417: `selectItem`; 429: `selectFolder`; 438: `setSearchQuery`.
+- 443: `exportBackup`; 472: `importBackup`; 485: `selectedItem`.
+- 559: `_saveFolders` — zapis folderów zgłasza pusty zestaw dirty UID-ów.
 
 ### `lib/features/library/presentation/library_screen.dart` (1025 linii)
 
