@@ -46,7 +46,7 @@ class EditorToolbar extends StatelessWidget {
                         tool: DrawingTool.pen,
                       ),
                       _toolButton(
-                        icon: Icons.border_color_outlined,
+                        icon: Icons.edit_outlined,
                         label: 'Highlighter',
                         tool: DrawingTool.highlighter,
                       ),
