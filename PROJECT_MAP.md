@@ -64,9 +64,9 @@ następny przebieg, a usługa zatrzymuje worker przy zamknięciu scope.
 
 - 22: `AppScope`;
   29: `_AppScopeState`;
-  138: `_BackupStatusOverlay`;
-  199: `_StartupErrorScreen`;
-  275: `_BackupScheduler`.
+  142: `_BackupStatusOverlay`;
+  203: `_StartupErrorScreen`;
+  279: `_BackupScheduler`.
 
 ## 3. Core
 
@@ -184,12 +184,12 @@ dostępne bajty; wyścig z usunięciem pliku nie może utrwalić kopii bez obraz
 ostatniej poprawnej kopii. Odczyt obsługuje manifesty v1/v2/v3/v4, odrzuca niekompletny lub niespójny
 snapshot i próbuje kolejno starsze wersje. Manifest przechowuje też listę folderów biblioteki, w tym foldery puste; uszkodzenie samego pliku folderów nie blokuje backupu notebooków. Web przechowuje pełny snapshot w `localStorage`.
 
-- 16: `LocalBackupService`; 106: `snapshot`; 442: `hasLatest`;
-  664: `readLatest`; 899: `restoreFromLatest`.
+- 16: `LocalBackupService`; 116: `snapshot`; 452: `hasLatest`;
+  674: `readLatest`; 909: `restoreFromLatest`.
 - 1264: `_BackupWorkerClient` — długowieczny worker serializacji i SHA-256; jawne przerwanie restartuje go.
-- 1381: `BackupSnapshotInterrupted`; 1385: `BackupValidationException`;
-  1394: `BackupDataException`; 1403: `BackupSnapshotReport`;
-  1454: `NotebookBackupReport`.
+- 1527: `BackupSnapshotInterrupted`; 1531: `BackupValidationException`;
+  1540: `BackupDataException`; 1549: `BackupSnapshotReport`;
+  1600: `NotebookBackupReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (270 linii)
 

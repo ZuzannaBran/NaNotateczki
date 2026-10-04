@@ -32,8 +32,8 @@ class LocalBackupService {
   int get debugBackupWorkerSpawnCount => _backupWorker.spawnCount;
 
   Future<void> dispose() async {
-    _backupWorker.dispose();
     await _snapshotTail;
+    _backupWorker.dispose();
     _snapshotInProgress.dispose();
   }
 
