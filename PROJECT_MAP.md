@@ -170,7 +170,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2123 linii)
+### `lib/data/backup/local_backup_service.dart` (2109 linii)
 
 Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami
 SHA-256 plików i całego manifestu (v5). Zmienione notebooki zapisują obrazy
@@ -191,13 +191,13 @@ zapisów assetu jest wykonywane tylko dla używanego pliku, bez skanowania całe
 `localStorage`.
 
 - 17: `LocalBackupService`; 134: `snapshot`; 478: `hasLatest`;
-  790: `readLatest`; 1133: `restoreFromLatest`.
-- 77: `_assetsDir`; 975: `_hydrateAssetBackedNotebookJson`.
-- 1492: `_BackupWorkerRequest`; 1529: `_BackupWorkerClient`;
-  1882: `_recoverWorkerAssetWrite`; 2062: `_BackupAssetReference`.
-- 1952: `BackupSnapshotInterrupted`; 1956: `BackupValidationException`;
-  1965: `BackupDataException`; 1974: `BackupSnapshotReport`;
-  2025: `NotebookBackupReport`.
+  786: `readLatest`; 1124: `restoreFromLatest`.
+- 77: `_assetsDir`; 970: `_hydrateAssetBackedNotebookJson`.
+- 1483: `_BackupWorkerRequest`; 1520: `_BackupWorkerClient`;
+  1869: `_recoverWorkerAssetWrite`; 2049: `_BackupAssetReference`.
+- 1939: `BackupSnapshotInterrupted`; 1943: `BackupValidationException`;
+  1952: `BackupDataException`; 1961: `BackupSnapshotReport`;
+  2012: `NotebookBackupReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (270 linii)
 

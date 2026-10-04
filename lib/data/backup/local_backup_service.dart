@@ -2067,8 +2067,7 @@ class _BackupAssetReference {
       'checksum': checksum,
       'bytes': bytes,
       'sourcePath': sourcePath,
-      if (sourceModifiedMicros != null)
-        'sourceModifiedMicros': sourceModifiedMicros!,
+      'sourceModifiedMicros': ?sourceModifiedMicros,
     };
   }
 }
