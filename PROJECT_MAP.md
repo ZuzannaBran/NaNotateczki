@@ -268,29 +268,39 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ### `lib/features/library/presentation/library_controller.dart` (640 linie)
 
-Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery. Zapis folderów uruchamia scheduler backupu także wtedy, gdy zmieniają się wyłącznie puste foldery. Sprzątanie osieroconych obrazów działa tylko przy normalnym starcie istniejącej, zdrowej bazy.
+Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
+Wybór dokumentu synchronizuje też aktywny folder, dzięki czemu drzewko
+biblioteki zaznacza folder i notatkę jednocześnie. Zapis folderów uruchamia
+scheduler backupu także wtedy, gdy zmieniają się wyłącznie puste foldery.
+Sprzątanie osieroconych obrazów działa tylko przy normalnym starcie
+istniejącej, zdrowej bazy.
 
-- 14: `LibraryController`; 78: `initialize`; 84: `loadItems`;
-  140: `restoreCorruptDocumentsFromBackup`; 193: `syncNow`.
-- 237–365: tworzenie/zmiana/usuwanie folderów i dokumentów.
-- 393: `selectItem`; 405: `selectFolder`; 414: `setSearchQuery`.
-- 419: `exportBackup`; 429: `importBackup`; 443: `selectedItem`.
+- 14:
+  `LibraryController`;
+  78: `initialize`;
+  87: `loadItems`;
+  417: `selectItem`;
+  433: `selectFolder`.
 
-### `lib/features/library/presentation/library_screen.dart` (1025 linii)
+### `lib/features/library/presentation/library_screen.dart` (1043 linii)
 
-Układ foldery | dokumenty | workspace oraz dialogi CRUD/recovery. Szeroki
-layout blokuje minimalną szerokość zamiast przełączać się na kompakt; poniżej
-progu używa poziomego scrolla, co działa tak samo na wszystkich platformach.
-Próg wynika z geometrii edytora: overview, strona 820 px i równe marginesy
-56 px po lewej od strony oraz po prawej.
+Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
+rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
+i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
+kompaktowej typografii Inter z systemowymi fallbackami. Panel można
+zwijać w całości i zmieniać jego szerokość.
 
-- 17: `LibraryScreen`; 24: `_LibraryScreenState`; 28: `_wideBreakpoint`;
-  53: główny `build`.
-- 285–408: tworzenie, zmiana nazw, usuwanie i dialog recovery.
-- 479: `_NameInputDialog`; 552: `_FolderListPane`;
-  695: `_LibraryItemsPane`.
-- 927: `_LibraryWorkspace`; 957: `_PaneResizeHandle`;
-  979: `_LeftZoneToggleTab`.
+- 16: `LibraryScreen`;
+  23:
+  `_LibraryScreenState`;
+  525:
+  `_LibraryTreePane`;
+  753:
+  `_FolderTreeRow`;
+  867:
+  `_LibraryTreeItemRow`;
+  957:
+  `_LibraryWorkspace`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -460,7 +470,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (49)
+- `test/library_screen_responsive_layout_test.dart` (107)
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (133)

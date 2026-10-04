@@ -12,7 +12,6 @@ import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/presentation/notebook_screen.dart';
 import 'library_controller.dart';
-import 'widgets/library_item_card.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -30,15 +29,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _editorPageMargin +
       _editorPageWidth +
       _editorPageMargin;
-  static const double _folderPaneMinWidth = 56;
-  static const double _folderPaneMaxWidth = 420;
-  static const double _itemsPaneMinWidth = 56;
-  static const double _itemsPaneMaxWidth = 520;
+  static const double _navigationPaneMinWidth = 240;
+  static const double _navigationPaneMaxWidth = 420;
   static const double _resizeHandleWidth = 12;
 
   bool _showLeftNavigation = true;
-  double _folderPaneWidth = 220;
-  double _itemsPaneWidth = 320;
+  double _navigationPaneWidth = 320;
   bool _isShowingCorruptRecoveryDialog = false;
 
   @override
@@ -140,43 +136,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   constraints.maxWidth,
                   _wideBreakpoint,
                 );
-                final maxSideWidth = math.max(
-                  _folderPaneMinWidth + _itemsPaneMinWidth,
+                final maxNavigationWidth = math.max(
+                  _navigationPaneMinWidth,
                   layoutWidth - 320,
                 );
-                var folderWidth = _folderPaneWidth
-                    .clamp(_folderPaneMinWidth, _folderPaneMaxWidth)
+                final navigationMax = math.min(
+                  _navigationPaneMaxWidth,
+                  maxNavigationWidth,
+                );
+                final navigationWidth = _navigationPaneWidth
+                    .clamp(_navigationPaneMinWidth, navigationMax)
                     .toDouble();
-                var itemsWidth = _itemsPaneWidth
-                    .clamp(_itemsPaneMinWidth, _itemsPaneMaxWidth)
-                    .toDouble();
-                final totalWidth = folderWidth + itemsWidth;
-                if (totalWidth > maxSideWidth) {
-                  final overflow = totalWidth - maxSideWidth;
-                  final shrinkFromItems = math.min(
-                    overflow,
-                    itemsWidth - _itemsPaneMinWidth,
-                  );
-                  itemsWidth -= shrinkFromItems;
-                  final restOverflow = overflow - shrinkFromItems;
-                  if (restOverflow > 0) {
-                    folderWidth = math.max(
-                      _folderPaneMinWidth,
-                      folderWidth - restOverflow,
-                    );
-                  }
-                }
-
-                final folderIconOnly = folderWidth < 165;
-                final itemsIconOnly = itemsWidth < 260;
-                final itemsHeaderHeight = folderIconOnly ? 72.0 : 68.0;
-                final expandedLeftZoneWidth =
-                    folderWidth +
-                    _resizeHandleWidth +
-                    itemsWidth +
-                    _resizeHandleWidth;
                 final leftZoneWidth = _showLeftNavigation
-                    ? expandedLeftZoneWidth
+                    ? navigationWidth + _resizeHandleWidth
                     : 0.0;
 
                 final wideLayout = SizedBox(
@@ -192,45 +164,25 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 ? Row(
                                     children: [
                                       SizedBox(
-                                        width: folderWidth,
-                                        child: _FolderListPane(
-                                          controller: controller,
-                                          onSelect: controller.selectFolder,
-                                          iconOnly: folderIconOnly,
-                                        ),
-                                      ),
-                                      _PaneResizeHandle(
-                                        onDragDelta: (delta) {
-                                          setState(() {
-                                            _folderPaneWidth =
-                                                (_folderPaneWidth + delta)
-                                                    .clamp(
-                                                      _folderPaneMinWidth,
-                                                      _folderPaneMaxWidth,
-                                                    )
-                                                    .toDouble();
-                                          });
-                                        },
-                                      ),
-                                      SizedBox(
-                                        width: itemsWidth,
-                                        child: _LibraryItemsPane(
+                                        width: navigationWidth,
+                                        child: _LibraryTreePane(
                                           controller: controller,
                                           onOpen: (item) =>
                                               controller.selectItem(item.uid),
                                           onCreate: _createAndSelectItem,
-                                          headerHeight: itemsHeaderHeight,
-                                          iconOnly: itemsIconOnly,
+                                          onCreateFolder: () {
+                                            _promptNewFolder(controller);
+                                          },
                                         ),
                                       ),
                                       _PaneResizeHandle(
                                         onDragDelta: (delta) {
                                           setState(() {
-                                            _itemsPaneWidth =
-                                                (_itemsPaneWidth + delta)
+                                            _navigationPaneWidth =
+                                                (_navigationPaneWidth + delta)
                                                     .clamp(
-                                                      _itemsPaneMinWidth,
-                                                      _itemsPaneMaxWidth,
+                                                      _navigationPaneMinWidth,
+                                                      _navigationPaneMaxWidth,
                                                     )
                                                     .toDouble();
                                           });
@@ -560,377 +512,444 @@ class _NameInputDialogState extends State<_NameInputDialog> {
 
 enum _FolderAction { rename, delete }
 
-class _FolderListPane extends StatelessWidget {
-  const _FolderListPane({
-    required this.controller,
-    required this.onSelect,
-    this.iconOnly = false,
-  });
+enum _ItemAction { rename, delete }
 
-  final LibraryController controller;
-  final ValueChanged<String> onSelect;
-  final bool iconOnly;
+const TextStyle _sidebarTextStyle = TextStyle(
+  fontFamily: 'Inter',
+  fontFamilyFallback: ['Segoe UI', 'Roboto', 'Arial'],
+  fontSize: 14,
+  height: 1.2,
+  letterSpacing: -0.05,
+);
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final selectedColor = colorScheme.primary.withValues(alpha: 0.08);
-    final folders = controller.folderNames;
-
-    if (iconOnly) {
-      return ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: [
-          SizedBox(
-            height: 64,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: IconButton(
-                  tooltip: 'New folder',
-                  icon: const Icon(Icons.add),
-                  onPressed: () => context
-                      .findAncestorStateOfType<_LibraryScreenState>()
-                      ?._promptNewFolder(controller),
-                ),
-              ),
-            ),
-          ),
-          const Divider(height: 1),
-          for (var index = 0; index < folders.length; index++) ...[
-            if (index > 0) const Divider(height: 1),
-            Tooltip(
-              message: folders[index],
-              waitDuration: const Duration(milliseconds: 350),
-              child: ListTile(
-                contentPadding: const EdgeInsets.only(left: 16, right: 2),
-                title: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Icon(
-                    folders[index] == controller.selectedFolder
-                        ? Icons.folder
-                        : Icons.folder_outlined,
-                    size: 20,
-                  ),
-                ),
-                selected: folders[index] == controller.selectedFolder,
-                selectedColor: colorScheme.primary,
-                selectedTileColor: selectedColor,
-                onTap: () => onSelect(folders[index]),
-              ),
-            ),
-          ],
-        ],
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Folders',
-                  style: Theme.of(context).textTheme.titleSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                tooltip: 'New folder',
-                icon: const Icon(Icons.add),
-                onPressed: () => context
-                    .findAncestorStateOfType<_LibraryScreenState>()
-                    ?._promptNewFolder(controller),
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        for (var index = 0; index < folders.length; index++) ...[
-          if (index > 0) const Divider(height: 1),
-          ListTile(
-            contentPadding: const EdgeInsets.only(left: 16, right: 2),
-            title: Text(
-              folders[index],
-              style: Theme.of(context).textTheme.bodyLarge,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            selected: folders[index] == controller.selectedFolder,
-            selectedColor: colorScheme.primary,
-            selectedTileColor: selectedColor,
-            trailing: PopupMenuButton<_FolderAction>(
-              tooltip: 'Folder actions',
-              icon: const Icon(Icons.more_vert),
-              padding: EdgeInsets.zero,
-              onSelected: (action) {
-                final state = context
-                    .findAncestorStateOfType<_LibraryScreenState>();
-                if (action == _FolderAction.rename) {
-                  state?._promptRenameFolder(controller, folders[index]);
-                } else {
-                  state?._confirmDeleteFolder(controller, folders[index]);
-                }
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: _FolderAction.rename,
-                  child: ListTile(
-                    leading: Icon(Icons.drive_file_rename_outline),
-                    title: Text('Rename'),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: _FolderAction.delete,
-                  child: ListTile(
-                    leading: Icon(Icons.delete_outline),
-                    title: Text('Delete'),
-                  ),
-                ),
-              ],
-            ),
-            onTap: () => onSelect(folders[index]),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _LibraryItemsPane extends StatelessWidget {
-  const _LibraryItemsPane({
+class _LibraryTreePane extends StatefulWidget {
+  const _LibraryTreePane({
     required this.controller,
     required this.onOpen,
     required this.onCreate,
-    required this.headerHeight,
-    this.iconOnly = false,
+    required this.onCreateFolder,
   });
 
   final LibraryController controller;
   final ValueChanged<Notebook> onOpen;
   final Future<void> Function(NotebookKind kind) onCreate;
-  final double headerHeight;
-  final bool iconOnly;
+  final VoidCallback onCreateFolder;
+
+  @override
+  State<_LibraryTreePane> createState() => _LibraryTreePaneState();
+}
+
+class _LibraryTreePaneState extends State<_LibraryTreePane> {
+  final Set<String> _collapsedFolders = <String>{};
 
   @override
   Widget build(BuildContext context) {
-    if (controller.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    final controller = widget.controller;
+    final colorScheme = Theme.of(context).colorScheme;
+    final folders = controller.folderNames;
 
-    if (controller.items.isEmpty) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'No items yet',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Create a notebook or board to get started.',
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => onCreate(NotebookKind.notebook),
-                    icon: const Icon(Icons.menu_book),
-                    label: const Text('New notebook'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => onCreate(NotebookKind.board),
-                    icon: const Icon(Icons.dashboard_outlined),
-                    label: const Text('New board'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (controller.visibleItems.isEmpty) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'No items here yet',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Create a notebook or board in this folder.',
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => onCreate(NotebookKind.notebook),
-                    icon: const Icon(Icons.menu_book),
-                    label: const Text('New notebook'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => onCreate(NotebookKind.board),
-                    icon: const Icon(Icons.dashboard_outlined),
-                    label: const Text('New board'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (iconOnly) {
-      return Column(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+      ),
+      child: Column(
         children: [
           SizedBox(
-            height: headerHeight,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: PopupMenuButton<_CreateAction>(
-                  tooltip: 'Create',
-                  onSelected: (action) {
-                    if (action == _CreateAction.notebook) {
-                      onCreate(NotebookKind.notebook);
-                    } else {
-                      onCreate(NotebookKind.board);
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: _CreateAction.notebook,
-                      child: Text('New notebook'),
+            height: 58,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 14, right: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Projects',
+                      style: _sidebarTextStyle.copyWith(
+                        color: colorScheme.onSurface,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    PopupMenuItem(
-                      value: _CreateAction.board,
-                      child: Text('New board'),
-                    ),
-                  ],
-                  child: const Icon(Icons.add),
-                ),
+                  ),
+                  PopupMenuButton<_CreateAction>(
+                    tooltip: 'Create',
+                    icon: const Icon(Icons.add_rounded, size: 21),
+                    onSelected: _handleCreateAction,
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: _CreateAction.folder,
+                        child: Row(
+                          children: [
+                            Icon(Icons.create_new_folder_outlined),
+                            SizedBox(width: 10),
+                            Text('New folder'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: _CreateAction.notebook,
+                        child: Row(
+                          children: [
+                            Icon(Icons.description_outlined),
+                            SizedBox(width: 10),
+                            Text('New notebook'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: _CreateAction.board,
+                        child: Row(
+                          children: [
+                            Icon(Icons.dashboard_outlined),
+                            SizedBox(width: 10),
+                            Text('New board'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+          ),
           Expanded(
-            child: ListView.separated(
-              itemCount: controller.visibleItems.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = controller.visibleItems[index];
-                return Tooltip(
-                  message: item.title,
-                  waitDuration: const Duration(milliseconds: 350),
-                  child: LibraryItemCard(
-                    item: item,
-                    selected: item.uid == controller.selectedItemId,
-                    iconOnly: true,
-                    onTap: () => onOpen(item),
-                    onRename: () => context
-                        .findAncestorStateOfType<_LibraryScreenState>()
-                        ?._promptRenameItem(controller, item),
-                    onDelete: () => context
-                        .findAncestorStateOfType<_LibraryScreenState>()
-                        ?._confirmDeleteItem(controller, item),
+            child: controller.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : folders.isEmpty
+                ? _EmptyLibraryTree(onCreate: _handleCreateAction)
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+                    children: [
+                      for (final folder in folders) _buildFolder(folder),
+                    ],
                   ),
-                );
-              },
-            ),
           ),
         ],
-      );
-    }
+      ),
+    );
+  }
 
-    return Column(
-      children: [
-        SizedBox(
-          height: headerHeight,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    controller.selectedFolder,
-                    style: Theme.of(context).textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                PopupMenuButton<_CreateAction>(
-                  tooltip: 'Create',
-                  onSelected: (action) {
-                    if (action == _CreateAction.notebook) {
-                      onCreate(NotebookKind.notebook);
-                    } else {
-                      onCreate(NotebookKind.board);
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: _CreateAction.notebook,
-                      child: Text('New notebook'),
-                    ),
-                    PopupMenuItem(
-                      value: _CreateAction.board,
-                      child: Text('New board'),
-                    ),
-                  ],
-                  child: const Icon(Icons.add),
-                ),
-              ],
-            ),
+  Widget _buildFolder(String folder) {
+    final controller = widget.controller;
+    final expanded = !_collapsedFolders.contains(folder);
+    final items = controller.items
+        .where((item) => item.folder == folder)
+        .toList();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _FolderTreeRow(
+            folder: folder,
+            expanded: expanded,
+            selected: controller.selectedFolder == folder,
+            onToggle: () {
+              setState(() {
+                if (expanded) {
+                  _collapsedFolders.add(folder);
+                } else {
+                  _collapsedFolders.remove(folder);
+                }
+              });
+            },
+            onTap: () => controller.selectFolder(folder),
+            onRename: () => context
+                .findAncestorStateOfType<_LibraryScreenState>()
+                ?._promptRenameFolder(controller, folder),
+            onDelete: () => context
+                .findAncestorStateOfType<_LibraryScreenState>()
+                ?._confirmDeleteFolder(controller, folder),
           ),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: ListView.separated(
-            itemCount: controller.visibleItems.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final item = controller.visibleItems[index];
-              return LibraryItemCard(
+          if (expanded)
+            for (final item in items)
+              _LibraryTreeItemRow(
                 item: item,
-                selected: item.uid == controller.selectedItemId,
-                iconOnly: false,
-                onTap: () => onOpen(item),
+                selected: controller.selectedItemId == item.uid,
+                onTap: () => widget.onOpen(item),
                 onRename: () => context
                     .findAncestorStateOfType<_LibraryScreenState>()
                     ?._promptRenameItem(controller, item),
                 onDelete: () => context
                     .findAncestorStateOfType<_LibraryScreenState>()
                     ?._confirmDeleteItem(controller, item),
-              );
-            },
+              ),
+        ],
+      ),
+    );
+  }
+
+  void _handleCreateAction(_CreateAction action) {
+    switch (action) {
+      case _CreateAction.folder:
+        widget.onCreateFolder();
+        return;
+      case _CreateAction.notebook:
+        widget.onCreate(NotebookKind.notebook);
+        return;
+      case _CreateAction.board:
+        widget.onCreate(NotebookKind.board);
+        return;
+    }
+  }
+}
+
+class _EmptyLibraryTree extends StatelessWidget {
+  const _EmptyLibraryTree({required this.onCreate});
+
+  final ValueChanged<_CreateAction> onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.folder_open_outlined,
+              size: 28,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'No projects yet',
+              style: _sidebarTextStyle.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Create a folder or note to get started.',
+              style: _sidebarTextStyle.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 12.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () => onCreate(_CreateAction.folder),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('New folder'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FolderTreeRow extends StatelessWidget {
+  const _FolderTreeRow({
+    required this.folder,
+    required this.expanded,
+    required this.selected,
+    required this.onToggle,
+    required this.onTap,
+    required this.onRename,
+    required this.onDelete,
+  });
+
+  final String folder;
+  final bool expanded;
+  final bool selected;
+  final VoidCallback onToggle;
+  final VoidCallback onTap;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Material(
+        color: selected
+            ? colorScheme.surfaceContainerHighest
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          hoverColor: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+          onTap: onTap,
+          child: SizedBox(
+            height: 38,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 30,
+                  child: IconButton(
+                    tooltip: expanded
+                        ? 'Collapse $folder'
+                        : 'Expand $folder',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 30,
+                      height: 36,
+                    ),
+                    splashRadius: 16,
+                    onPressed: onToggle,
+                    icon: Icon(
+                      expanded
+                          ? Icons.keyboard_arrow_down_rounded
+                          : Icons.keyboard_arrow_right_rounded,
+                      size: 19,
+                    ),
+                  ),
+                ),
+                Icon(
+                  expanded
+                      ? Icons.folder_open_outlined
+                      : Icons.folder_outlined,
+                  size: 18,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    folder,
+                    style: _sidebarTextStyle.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                PopupMenuButton<_FolderAction>(
+                  tooltip: 'Folder actions',
+                  icon: Icon(
+                    Icons.more_horiz_rounded,
+                    size: 18,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  padding: EdgeInsets.zero,
+                  onSelected: (action) {
+                    if (action == _FolderAction.rename) {
+                      onRename();
+                    } else {
+                      onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _FolderAction.rename,
+                      child: Text('Rename'),
+                    ),
+                    PopupMenuItem(
+                      value: _FolderAction.delete,
+                      child: Text('Delete'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _LibraryTreeItemRow extends StatelessWidget {
+  const _LibraryTreeItemRow({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+    required this.onRename,
+    required this.onDelete,
+  });
+
+  final Notebook item;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Material(
+        color: selected
+            ? colorScheme.surfaceContainerHighest
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          hoverColor: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+          onTap: onTap,
+          child: SizedBox(
+            height: 36,
+            child: Row(
+              children: [
+                const SizedBox(width: 38),
+                Icon(
+                  item.kind == NotebookKind.board
+                      ? Icons.dashboard_outlined
+                      : Icons.description_outlined,
+                  size: 15,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    style: _sidebarTextStyle.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                PopupMenuButton<_ItemAction>(
+                  tooltip: 'Item actions',
+                  icon: Icon(
+                    Icons.more_horiz_rounded,
+                    size: 17,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  padding: EdgeInsets.zero,
+                  onSelected: (action) {
+                    if (action == _ItemAction.rename) {
+                      onRename();
+                    } else {
+                      onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _ItemAction.rename,
+                      child: Text('Rename'),
+                    ),
+                    PopupMenuItem(
+                      value: _ItemAction.delete,
+                      child: Text('Delete'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -963,7 +982,7 @@ class _LibraryWorkspace extends StatelessWidget {
   }
 }
 
-enum _CreateAction { notebook, board }
+enum _CreateAction { folder, notebook, board }
 
 class _PaneResizeHandle extends StatelessWidget {
   const _PaneResizeHandle({required this.onDragDelta});
