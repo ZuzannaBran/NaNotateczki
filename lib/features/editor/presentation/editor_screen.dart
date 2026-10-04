@@ -1671,7 +1671,10 @@ class _EditorScreenState extends State<EditorScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: useWideTitleInset ? 44 : null,
-        title: Text(controller.notebook.title),
+        title: Text(
+          controller.notebook.title,
+          style: const TextStyle(fontSize: 18),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),

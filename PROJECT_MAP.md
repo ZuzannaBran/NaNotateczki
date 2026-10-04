@@ -352,9 +352,9 @@ preferencje, viewport i zapis.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2647 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2650 linie)
 
-Wielostronicowy edytor notebooka: viewport, wirtualizowane strony, canvasy,
+Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px, viewport, wirtualizowane strony, canvasy,
 zakładki, minimapa, skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma zarezerwowany lewy pas, a kolumna strony jest kotwiczona do
@@ -374,8 +374,8 @@ aby nie obcinać prawej ramki i cienia strony.
 - 1457–1488: tło/inactive `DocumentPageOverlay`, `DocumentDrawingCanvas`
   i active `DocumentPageOverlay` we wspólnej przestrzeni transformacji.
 - 1622–1665: skróty klawiszowe; 1697: `_PageViewportClipper`.
-- 1799: `_PageFramePainter`; 1874: `_IndexTabsOverlay`;
-  2014: `_ProjectMiniMapOverlay`; 2364: `_ProjectMiniMapPainter`.
+- 1802: `_PageFramePainter`; 1877: `_IndexTabsOverlay`;
+  2014: `_ProjectMiniMapOverlay`; 2367: `_ProjectMiniMapPainter`.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
