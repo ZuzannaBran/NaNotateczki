@@ -53,7 +53,7 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _trackpadPanSensitivity = 0.6;
   static const double _scrollPanSensitivity = 0.38;
   static const double _inkNavigationTouchSlop = 8.0;
-  static const double _previewColumnRight = 118.0;
+  static const double _overviewRight = 106.0;
   static const Duration _touchContextMenuDelay = Duration(seconds: 1);
 
   final ScrollController _scrollController = ScrollController();
@@ -497,8 +497,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   void _applyPageTransform({
     required double scaleDelta,
-    required Offset panDelta,
-    required Offset focalPoint,
+    required Offset panDelta,    required Offset focalPoint,
     required Size docWorldSize,
     required Size viewportSize,
   }) {
@@ -997,8 +996,7 @@ class _EditorScreenState extends State<EditorScreen> {
                     color: Colors.red,
                     onChanged: (value) => setDialogState(() {
                       red = value;
-                      syncHex();
-                    }),
+                      syncHex();                    }),
                   ),
                   _indexTabChannelSlider(
                     label: 'G',
@@ -1277,10 +1275,10 @@ class _EditorScreenState extends State<EditorScreen> {
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final showProjectOverview =
-                  constraints.maxWidth > _previewColumnRight + _rightMargin;
+              final showProjectOverview = constraints.maxWidth >
+                  _overviewRight + _leftMargin + _rightMargin;
               final pageLeftBoundary = showProjectOverview
-                  ? _previewColumnRight
+                  ? _overviewRight + _leftMargin
                   : _leftMargin;
               final maxPageWidth = math.max(
                 1.0,
@@ -1497,8 +1495,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                                                       visibleDocumentRect,
                                                                   pageWorldSize:
                                                                       pageWorldSize,
-                                                                  pageIndex: i,
-                                                                );
+                                                                  pageIndex: i,                                                                );
                                                             return CustomPaint(
                                                               painter: _PageFramePainter(
                                                                 showLeft:
@@ -1782,9 +1779,9 @@ class _PageViewportClipper extends CustomClipper<Rect> {
   @override
   Rect getClip(Size size) {
     return Rect.fromLTRB(
+      0,
       -bleed,
-      -bleed,
-      size.width + bleed,
+      size.width,
       size.height + bleed,
     );
   }
@@ -1997,8 +1994,7 @@ class _IndexTabsOverlayState extends State<_IndexTabsOverlay> {
         children: [
           for (var i = widget.firstPageIndex; i < widget.lastPageIndex; i++)
             for (final tab in widget.pages[i].indexTabs)
-              Positioned(
-                left: -_IndexTabsOverlay._tabOverhang,
+              Positioned(                left: -_IndexTabsOverlay._tabOverhang,
                 top:
                     i * (widget.pageSize.height + widget.pageGap) +
                     _tabTop(tab.position),
@@ -2497,8 +2493,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
     for (var i = 0; i < pages.length; i++) {
       final page = pages[i];
       final pageTopWorld = i * (pageWorldSize.height + pageGap);
-      final pageTop = pageTopWorld * scaleY;
-      final pageHeight = pageWorldSize.height * scaleY;
+      final pageTop = pageTopWorld * scaleY;      final pageHeight = pageWorldSize.height * scaleY;
       final pageRect = Rect.fromLTWH(0, pageTop, size.width, pageHeight);
       final isCurrentPage = i == currentPageIndex;
 

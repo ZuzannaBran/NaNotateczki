@@ -48,10 +48,13 @@ void main() {
       const Size(logicalPageWidth, logicalPageWidth * AppMetrics.a4HeightRatio),
     );
     expect(_documentLayoutSize(tester).width, logicalPageWidth);
-    expect(_documentScale(tester), closeTo(1.0, 0.001));
+    expect(
+      _documentScale(tester),
+      closeTo((1000 - 106 - 56 - 56) / 820, 0.001),
+    );
     final wideRightMargin = 1000 - _documentTopRight(tester).dx;
     expect(wideRightMargin, closeTo(56.0, 0.001));
-    _expectDocumentClearOfOverview(tester);
+    _expectSymmetricHorizontalMargins(tester);
 
     await tester.binding.setSurfaceSize(const Size(500, 900));
     await tester.pump();
@@ -61,10 +64,13 @@ void main() {
       const Size(logicalPageWidth, logicalPageWidth * AppMetrics.a4HeightRatio),
     );
     expect(_documentLayoutSize(tester).width, logicalPageWidth);
-    expect(_documentScale(tester), closeTo((500 - 118 - 56) / 820, 0.001));
+    expect(
+      _documentScale(tester),
+      closeTo((500 - 106 - 56 - 56) / 820, 0.001),
+    );
     final narrowRightMargin = 500 - _documentTopRight(tester).dx;
     expect(narrowRightMargin, closeTo(wideRightMargin, 0.001));
-    _expectDocumentClearOfOverview(tester);
+    _expectSymmetricHorizontalMargins(tester);
     expect(find.text('Widen the window to edit this notebook.'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -99,14 +105,19 @@ Offset _documentTopRight(WidgetTester tester) {
       MatrixUtils.transformPoint(transform, Offset(layoutSize.width, 0));
 }
 
-void _expectDocumentClearOfOverview(WidgetTester tester) {
+void _expectSymmetricHorizontalMargins(WidgetTester tester) {
   final documentLeft = tester
       .getTopLeft(find.byKey(const ValueKey('notebook-document-transform')))
       .dx;
   final overviewRight = tester
       .getTopRight(find.byKey(const ValueKey('notebook-project-overview')))
       .dx;
-  expect(documentLeft, greaterThanOrEqualTo(overviewRight + 12));
+  final viewportRight = tester.getTopRight(find.byType(EditorScreen)).dx;
+  final documentRight = _documentTopRight(tester).dx;
+  final leftGap = documentLeft - overviewRight;
+  final rightGap = viewportRight - documentRight;
+  expect(leftGap, closeTo(rightGap, 0.001));
+  expect(rightGap, closeTo(56.0, 0.001));
 }
 
 Notebook _notebook() {

@@ -297,8 +297,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
 ### `lib/features/library/presentation/library_screen.dart` (1045 linie)
 
-Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
-rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
+Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
 zwijać w całości i zmieniać jego szerokość. Pionowy separator uchwytu ma 1 px, ten sam kolor co linia pod toolbarami i leży na prawej krawędzi, dzięki czemu linie stykają się.
@@ -376,9 +375,10 @@ kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
 panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
 skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
-Overview ma zarezerwowany lewy pas, a kolumna strony jest kotwiczona do
-stałego prawego marginesu 56 px. Clip viewportu ma wyłącznie wizualny bleed,
-aby nie obcinać prawej ramki i cienia strony.
+Overview kończy się przy x=106; viewport strony zaczyna się po 56 px
+przerwy i kończy 56 px przed prawą krawędzią. Poziomy clip jest twardy, więc
+strona nie wchodzi pod marginesy; bleed pozostaje tylko pionowo dla ramki
+i cienia.
 
 - 33: `EditorScreen`; 40: `_EditorScreenState`.
 - 41: `_logicalPageWidth`; 84: `_effectivePageScale` — skala okna pomnożona
@@ -527,8 +527,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 6. Notebook ma stałą logiczną szerokość strony 820 px. Przy zmianie okna
    skaluj wspólną macierz dokumentu; nie przeliczaj rozmiarów/pozycji tekstu,
    obrazów ani ink i nie dodawaj osobnej skali wewnątrz overlayów. Zachowaj
-   pas overview do `x=118` i stały prawy margines strony 56 px. Wizualny bleed
-   clippera może odsłaniać ramkę/cień, ale nie może zmieniać geometrii układu.
+   overview do `x=106`, 56 px odstępu do strony i 56 px od strony do prawej
+   krawędzi. Clipper nie może wypuszczać strony poziomo pod marginesy; bleed
+   może być tylko pionowy.
 7. OCR działa tylko na Android/iOS. Import PDF na Linuxie używa `pdftoppm`
    (`poppler-utils`); pozostałe platformy używają `pdfx`.
 8. Obrazy natywne mają trwałe ścieżki; inline `bytes` są przeznaczone dla web
