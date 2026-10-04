@@ -72,21 +72,21 @@ i ponawia przejściowy błąd backupu po 30 s.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (160): paleta aplikacji
-  i pięć pełnych zestawów kolorystycznych dla Cherry, Bubblegum, Lavender,
-  Peach i Baby blue. Każdy zestaw zachowuje kolor bazowy i definiuje
-  internetowo dobrane odcienie ciemne, jasne, zaznaczenia, panele, tło
-  oraz divider. 3:
+- `lib/core/theme/app_colors.dart` (139): paleta aplikacji
+  z pięcioma kolorami bazowymi i dopasowanymi neutralnymi tłami. Bazowe
+  Cherry, Bubblegum, Lavender, Peach i Baby blue pozostają bez zmian;
+  tło, sidebar, toolbary i dividery używają beżów/cream zaczerpniętych
+  z podobnych palet. 3:
   `AppAccentColor`; 61:
-  `AppAccentPalette`; 145:
+  `AppAccentPalette`; 124:
   `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (42): konfiguracja
-  jasnego Material 3 z pełną paletą zależną od wybranego akcentu: scaffold,
-  app bar, surface containers, selection, secondary tones i dividery są
-  spójne z bazowym kolorem. 5:
-  `AppTheme`.
+- `lib/core/theme/app_theme.dart` (39): konfiguracja
+  jasnego Material 3; stałe powierzchnie aplikacji używają dopasowanego
+  beżu/cream, a wyższe surface containers pozostają generowane z bazowego
+  akcentu dla subtelnych hoverów i zaznaczeń.
+  5: `AppTheme`.
 
 ### Wejście i preferencje
 

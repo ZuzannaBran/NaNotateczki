@@ -20,9 +20,6 @@ class AppTheme {
       surface: palette.background,
       surfaceContainerLowest: palette.background,
       surfaceContainerLow: palette.surfaceContainerLow,
-      surfaceContainer: palette.surfaceContainer,
-      surfaceContainerHigh: palette.surfaceContainerHigh,
-      surfaceContainerHighest: palette.surfaceContainerHighest,
       outlineVariant: palette.divider,
     );
 
