@@ -160,25 +160,20 @@ pliku po awarii.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (826 linie)
+### `lib/data/backup/local_backup_service.dart` (930 linii)
 
-Przyrostowy backup z atomowym `manifest.json` i plikami notebooków nazwanymi
-checksumą zawartości. Manifest v2 zapisuje checksumę FNV-1a oraz rozmiar JSON.
-Odczyt jest rygorystyczny: brak, uszkodzenie lub niezgodność choć jednego
-zadeklarowanego pliku odrzuca cały snapshot zamiast zwracać częściowe dane.
-Stare pliki są przenoszone do `trash/` dopiero po utrwaleniu manifestu. Web
-przechowuje pełny snapshot w `localStorage`.
+Przyrostowy backup z atomowym `manifest.json`, checksumami i plikami
+notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
+trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki,
+więc historia nie duplikuje całego snapshotu. Odczyt odrzuca niekompletny
+snapshot i próbuje kolejno starsze wersje. Web przechowuje pełny snapshot w
+`localStorage`.
 
-- 15: `LocalBackupService`;
-  92: `snapshot`;
-  267: `hasLatest`;
-  366: `readLatest`;
-  479: `restoreFromLatest`.
-- 825: anulowalny worker serializacji.
-- 699: `BackupSnapshotInterrupted`;
-  703: `BackupValidationException`;
-  712: `BackupSnapshotReport`;
-  763: `NotebookBackupReport`.
+- 15: `LocalBackupService`; 90: `snapshot`; 280: `hasLatest`;
+  385: `readLatest`; 500: `restoreFromLatest`.
+- 650: anulowalny worker serializacji.
+- 747: `BackupSnapshotInterrupted`; 751: `BackupValidationException`;
+  762: `BackupSnapshotReport`; 813: `NotebookBackupReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (270 linii)
 
@@ -447,7 +442,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (496)
-- `test/local_backup_service_test.dart` (291)
+- `test/local_backup_service_test.dart` (355)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

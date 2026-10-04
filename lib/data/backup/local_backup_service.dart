@@ -27,8 +27,10 @@ class LocalBackupService {
 
   static const _dirName = 'local_backup';
   static const _incrementalDirName = 'notebooks';
+  static const _historyDirName = 'history';
   static const _trashDirName = 'trash';
   static const _manifest = 'manifest.json';
+  static const _historyRetention = 5;
   static const _latest = 'notebooks_latest.json';
   static const _webBackupKey = 'local_backup_web.json';
   static const _temporarySuffix = '.tmp';
@@ -59,6 +61,14 @@ class LocalBackupService {
   Future<File> _manifestFile() async {
     final dir = await _backupDir();
     return File('${dir.path}/$_manifest');
+  }
+
+  Future<Directory> _historyDir() async {
+    final dir = Directory('${(await _backupDir()).path}/$_historyDirName');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
   }
 
   Future<File> _notebookFile(String fileName) async {
@@ -205,19 +215,28 @@ class LocalBackupService {
         ],
       };
       final manifestStopwatch = Stopwatch()..start();
-      await _atomicWriteString(
-        await _manifestFile(),
-        jsonEncode(manifestPayload),
-      );
+      final manifest = await _manifestFile();
+      await _recoverAtomicWrite(manifest);
+      final manifestContent = jsonEncode(manifestPayload);
+      if (await manifest.exists()) {
+        final previousManifest = await manifest.readAsString();
+        if (previousManifest != manifestContent) {
+          await _archiveManifest(previousManifest);
+        }
+      }
+      await _atomicWriteString(manifest, manifestContent);
+      await _trimHistory();
       manifestStopwatch.stop();
       manifestMs = manifestStopwatch.elapsedMilliseconds;
 
       _throwIfInterrupted(shouldInterrupt);
+      final retainedFiles = await _referencedNotebookPaths();
+      retainedFiles.addAll(expectedFiles);
       final staleStopwatch = Stopwatch()..start();
       await for (final entity in notebooksDir.list()) {
         if (entity is File &&
             entity.path.endsWith('.json') &&
-            !expectedFiles.contains(entity.path)) {
+            !retainedFiles.contains(entity.path)) {
           await _moveStaleNotebookBackupToTrash(entity);
           staleMoved++;
         }
@@ -271,7 +290,13 @@ class LocalBackupService {
       }
       final manifest = await _manifestFile();
       await _recoverAtomicWrite(manifest);
-      return await manifest.exists() || await (await _file(_latest)).exists();
+      if (await manifest.exists()) {
+        return true;
+      }
+      if ((await _historyManifestFiles()).isNotEmpty) {
+        return true;
+      }
+      return await (await _file(_latest)).exists();
     } catch (_) {
       return false;
     }
@@ -387,11 +412,29 @@ class LocalBackupService {
         source: 'LocalBackupService.readLatest(incremental)',
       );
     }
+
+    for (final manifest in await _historyManifestFiles()) {
+      try {
+        final historical = await _readManifestSnapshot(manifest);
+        if (historical != null) {
+          return historical;
+        }
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'LocalBackupService.readLatest(history)',
+        );
+      }
+    }
     return _readLegacyLatest();
   }
 
   Future<List<Notebook>?> _readIncrementalLatest() async {
-    final manifest = await _manifestFile();
+    return _readManifestSnapshot(await _manifestFile());
+  }
+
+  Future<List<Notebook>?> _readManifestSnapshot(File manifest) async {
     await _recoverAtomicWrite(manifest);
     if (!await manifest.exists()) {
       return null;
@@ -521,6 +564,67 @@ class LocalBackupService {
       totalMs: stopwatch.elapsedMilliseconds,
       notebookReports: const [],
     );
+  }
+
+  Future<void> _archiveManifest(String content) async {
+    final history = await _historyDir();
+    final file = File(
+      '${history.path}/manifest_'
+      '${DateTime.now().microsecondsSinceEpoch}.json',
+    );
+    await _atomicWriteString(file, content);
+  }
+
+  Future<List<File>> _historyManifestFiles() async {
+    final history = await _historyDir();
+    final files = <File>[];
+    await for (final entity in history.list()) {
+      if (entity is File &&
+          entity.uri.pathSegments.last.startsWith('manifest_') &&
+          entity.path.endsWith('.json')) {
+        files.add(entity);
+      }
+    }
+    files.sort((a, b) => b.path.compareTo(a.path));
+    return files;
+  }
+
+  Future<void> _trimHistory() async {
+    final files = await _historyManifestFiles();
+    for (final file in files.skip(_historyRetention)) {
+      await file.delete();
+    }
+  }
+
+  Future<Set<String>> _referencedNotebookPaths() async {
+    final result = <String>{};
+    final manifests = <File>[await _manifestFile()];
+    manifests.addAll(await _historyManifestFiles());
+    for (final manifest in manifests) {
+      await _recoverAtomicWrite(manifest);
+      if (!await manifest.exists()) {
+        continue;
+      }
+      try {
+        final decoded = jsonDecode(await manifest.readAsString());
+        if (decoded is! Map<String, dynamic>) {
+          continue;
+        }
+        final entries = decoded['notebooks'];
+        if (entries is! List<dynamic>) {
+          continue;
+        }
+        for (final raw in entries.whereType<Map<String, dynamic>>()) {
+          final entry = _manifestEntryFromJson(raw);
+          if (entry != null) {
+            result.add((await _notebookFile(entry.fileName)).path);
+          }
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return result;
   }
 
   Future<void> _atomicWriteString(File file, String content) async {

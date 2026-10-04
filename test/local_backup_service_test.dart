@@ -175,6 +175,70 @@ void main() {
     expect(restored, isEmpty);
   });
 
+  test('readLatest falls back to the newest valid history snapshot', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final first = _notebook();
+
+    await service.snapshot([first]);
+    final second = first.copyWith(
+      title: 'Newer title',
+      updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
+    );
+    await service.snapshot([second]);
+
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    final decoded =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final entry =
+        (decoded['notebooks'] as List<dynamic>).single as Map<String, dynamic>;
+    final currentFile = File(
+      '${directory.path}/local_backup/notebooks/${entry['file']}',
+    );
+    await currentFile.writeAsString('{"broken":');
+
+    final restored = await service.readLatest();
+
+    expect(restored, hasLength(1));
+    expect(restored.single.title, first.title);
+    expect(restored.single.updatedAt, first.updatedAt);
+  });
+
+  test('history keeps only five previous manifests', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    var notebook = _notebook();
+
+    for (var index = 0; index < 8; index++) {
+      notebook = notebook.copyWith(
+        title: 'Version $index',
+        updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      );
+      await service.snapshot([notebook]);
+    }
+
+    final history = Directory('${directory.path}/local_backup/history');
+    final manifests = history
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.json'))
+        .toList();
+
+    expect(manifests.length, lessThanOrEqualTo(5));
+  });
+
   test('snapshot stops when ink becomes active', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
