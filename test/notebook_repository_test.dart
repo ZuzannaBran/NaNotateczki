@@ -72,6 +72,27 @@ void main() {
     });
   });
 
+  test('page id collision cannot steal a page from another notebook', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final first = await repository.createNotebook(title: 'First');
+    final second = await repository.createNotebook(title: 'Second');
+    final conflicting = first.copyWith(
+      updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        first.pages.single.copyWith(id: second.pages.single.id),
+      ],
+    );
+
+    await expectLater(repository.saveNotebook(conflicting), throwsA(isA<StateError>()));
+
+    final savedFirst = await repository.getNotebook(first.uid);
+    final savedSecond = await repository.getNotebook(second.uid);
+    expect(savedFirst?.pages.single.id, first.pages.single.id);
+    expect(savedSecond?.pages.single.id, second.pages.single.id);
+  });
+
   test(
     'saveNotebookPages updates one page and refreshes backup cache',
     () async {

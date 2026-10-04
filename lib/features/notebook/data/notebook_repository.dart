@@ -1179,6 +1179,15 @@ class NotebookRepository {
     NotePage page,
     int pageIndex,
   ) async {
+    final existingPage = await (database.select(
+      database.pageRows,
+    )..where((row) => row.uid.equals(page.id))).getSingleOrNull();
+    if (existingPage != null && existingPage.notebookUid != notebookUid) {
+      throw StateError(
+        'Page id ${page.id} already belongs to notebook '
+        '${existingPage.notebookUid}.',
+      );
+    }
     await database
         .into(database.pageRows)
         .insertOnConflictUpdate(
