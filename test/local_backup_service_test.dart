@@ -119,6 +119,62 @@ void main() {
     expect(repairedEntry['bytes'], greaterThan(0));
   });
 
+  test('readLatest never returns a partial corrupted snapshot', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final first = _notebook();
+    final second = first.copyWith(
+      uid: 'notebook-2',
+      title: 'Second',
+      updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
+    );
+
+    await service.snapshot([first, second]);
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    final decoded =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final entries = decoded['notebooks'] as List<dynamic>;
+    final brokenEntry = entries.last as Map<String, dynamic>;
+    final brokenFile = File(
+      '${directory.path}/local_backup/notebooks/${brokenEntry['file']}',
+    );
+    await brokenFile.writeAsString('{"broken":');
+
+    final restored = await service.readLatest();
+
+    expect(restored, isEmpty);
+  });
+
+  test('empty incremental snapshot does not resurrect legacy data', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+
+    await service.snapshot([]);
+    final legacy = File(
+      '${directory.path}/local_backup/notebooks_latest.json',
+    );
+    await legacy.writeAsString(
+      jsonEncode(repository.encodeNotebooks([_notebook()])),
+    );
+
+    final restored = await service.readLatest();
+
+    expect(restored, isEmpty);
+  });
+
   test('snapshot stops when ink becomes active', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));

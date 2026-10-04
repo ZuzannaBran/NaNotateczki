@@ -294,32 +294,40 @@ class LocalBackupService {
       }
       final result = <String, _BackupManifestEntry>{};
       for (final entry in entries.whereType<Map<String, dynamic>>()) {
-        final uid = entry['uid'];
-        final updatedAt = entry['updatedAt'];
-        final fileName = entry['file'];
-        if (uid is! String ||
-            updatedAt is! String ||
-            fileName is! String ||
-            !_isSafeNotebookFileName(fileName)) {
-          continue;
-        }
-        final parsed = DateTime.tryParse(updatedAt);
-        final checksum = entry['checksum'];
-        final jsonBytes = entry['bytes'];
+        final parsed = _manifestEntryFromJson(entry);
         if (parsed != null) {
-          result[uid] = _BackupManifestEntry(
-            uid: uid,
-            updatedAt: parsed,
-            fileName: fileName,
-            checksum: checksum is String ? checksum : null,
-            jsonBytes: jsonBytes is num ? jsonBytes.toInt() : null,
-          );
+          result[parsed.uid] = parsed;
         }
       }
       return result;
     } catch (_) {
       return const <String, _BackupManifestEntry>{};
     }
+  }
+
+  _BackupManifestEntry? _manifestEntryFromJson(Map<String, dynamic> json) {
+    final uid = json['uid'];
+    final updatedAt = json['updatedAt'];
+    final fileName = json['file'];
+    if (uid is! String ||
+        updatedAt is! String ||
+        fileName is! String ||
+        !_isSafeNotebookFileName(fileName)) {
+      return null;
+    }
+    final parsed = DateTime.tryParse(updatedAt);
+    if (parsed == null) {
+      return null;
+    }
+    final checksum = json['checksum'];
+    final jsonBytes = json['bytes'];
+    return _BackupManifestEntry(
+      uid: uid,
+      updatedAt: parsed,
+      fileName: fileName,
+      checksum: checksum is String ? checksum : null,
+      jsonBytes: jsonBytes is num ? jsonBytes.toInt() : null,
+    );
   }
 
   Future<bool> _isManifestEntryValid(_BackupManifestEntry entry) async {
@@ -366,54 +374,83 @@ class LocalBackupService {
           ? repository.decodeNotebooks(decoded)
           : <Notebook>[];
     }
-    final incremental = await _readIncrementalLatest();
-    if (incremental.isNotEmpty) {
-      return incremental;
+    try {
+      final incremental = await _readIncrementalLatest();
+      if (incremental != null) {
+        return incremental;
+      }
+    } catch (e, st) {
+      debugPrint('LocalBackupService.readLatest incremental failed: $e');
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LocalBackupService.readLatest(incremental)',
+      );
     }
     return _readLegacyLatest();
   }
 
-  Future<List<Notebook>> _readIncrementalLatest() async {
-    try {
-      final manifest = await _manifestFile();
-      await _recoverAtomicWrite(manifest);
-      if (!await manifest.exists()) {
-        return <Notebook>[];
-      }
-      final decoded = jsonDecode(await manifest.readAsString());
-      if (decoded is! Map<String, dynamic>) {
-        return <Notebook>[];
-      }
-      final notebookEntries = decoded['notebooks'];
-      if (notebookEntries is! List) {
-        return <Notebook>[];
-      }
-      final decodedNotebooks = <Object?>[];
-      for (final entry in notebookEntries) {
-        if (entry is! Map<String, dynamic>) {
-          continue;
-        }
-        final fileName = entry['file'];
-        if (fileName is! String || !_isSafeNotebookFileName(fileName)) {
-          continue;
-        }
-        final file = await _notebookFile(fileName);
-        await _recoverAtomicWrite(file);
-        if (!await file.exists()) {
-          continue;
-        }
-        decodedNotebooks.add(jsonDecode(await file.readAsString()));
-      }
-      return repository.decodeNotebooks(decodedNotebooks);
-    } catch (e) {
-      debugPrint('LocalBackupService.readIncrementalLatest failed: $e');
-      AppErrorLog.instance.record(
-        e,
-        null,
-        source: 'LocalBackupService.readIncrementalLatest',
-      );
-      return <Notebook>[];
+  Future<List<Notebook>?> _readIncrementalLatest() async {
+    final manifest = await _manifestFile();
+    await _recoverAtomicWrite(manifest);
+    if (!await manifest.exists()) {
+      return null;
     }
+
+    final decoded = jsonDecode(await manifest.readAsString());
+    if (decoded is! Map<String, dynamic>) {
+      throw const BackupValidationException('Manifest is not a JSON object.');
+    }
+    final notebookEntries = decoded['notebooks'];
+    if (notebookEntries is! List<dynamic>) {
+      throw const BackupValidationException(
+        'Manifest does not contain a notebook list.',
+      );
+    }
+
+    final notebooks = <Notebook>[];
+    for (final rawEntry in notebookEntries) {
+      if (rawEntry is! Map<String, dynamic>) {
+        throw const BackupValidationException(
+          'Manifest contains an invalid notebook entry.',
+        );
+      }
+      final entry = _manifestEntryFromJson(rawEntry);
+      if (entry == null) {
+        throw const BackupValidationException(
+          'Manifest contains an incomplete notebook entry.',
+        );
+      }
+      if (!await _isManifestEntryValid(entry)) {
+        throw BackupValidationException(
+          'Backup file failed checksum validation: ${entry.fileName}',
+        );
+      }
+
+      final file = await _notebookFile(entry.fileName);
+      final notebookJson = jsonDecode(await file.readAsString());
+      if (notebookJson is! Map<String, dynamic>) {
+        throw BackupValidationException(
+          'Backup notebook is not a JSON object: ${entry.fileName}',
+        );
+      }
+      final decodedNotebook = repository.decodeNotebooks([notebookJson]);
+      if (decodedNotebook.length != 1) {
+        throw BackupValidationException(
+          'Backup notebook could not be decoded: ${entry.fileName}',
+        );
+      }
+      final notebook = decodedNotebook.single;
+      if (notebook.uid != entry.uid ||
+          notebook.updatedAt != entry.updatedAt) {
+        throw BackupValidationException(
+          'Backup notebook metadata does not match manifest: '
+          '${entry.fileName}',
+        );
+      }
+      notebooks.add(notebook);
+    }
+    return notebooks;
   }
 
   Future<List<Notebook>> _readLegacyLatest() async {
@@ -661,6 +698,15 @@ _BackupWorkerResult _createBackupPayload(Notebook notebook) {
 
 class BackupSnapshotInterrupted implements Exception {
   const BackupSnapshotInterrupted();
+}
+
+class BackupValidationException implements Exception {
+  const BackupValidationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'BackupValidationException: $message';
 }
 
 class BackupSnapshotReport {

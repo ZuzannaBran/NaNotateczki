@@ -160,23 +160,25 @@ pliku po awarii.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (780 linie)
+### `lib/data/backup/local_backup_service.dart` (826 linie)
 
 Przyrostowy backup z atomowym `manifest.json` i plikami notebooków nazwanymi
-checksumą zawartości. Manifest v2 zapisuje checksumę FNV-1a oraz rozmiar JSON,
-więc uszkodzony albo ucięty plik nie jest uznawany za aktualną kopię. Stare
-pliki są przenoszone do `trash/` dopiero po utrwaleniu manifestu. Web
+checksumą zawartości. Manifest v2 zapisuje checksumę FNV-1a oraz rozmiar JSON.
+Odczyt jest rygorystyczny: brak, uszkodzenie lub niezgodność choć jednego
+zadeklarowanego pliku odrzuca cały snapshot zamiast zwracać częściowe dane.
+Stare pliki są przenoszone do `trash/` dopiero po utrwaleniu manifestu. Web
 przechowuje pełny snapshot w `localStorage`.
 
 - 15: `LocalBackupService`;
   92: `snapshot`;
   267: `hasLatest`;
-  358: `readLatest`;
-  442: `restoreFromLatest`.
-- 583: anulowalny worker serializacji.
-- 662: `BackupSnapshotInterrupted`;
-  666: `BackupSnapshotReport`;
-  717: `NotebookBackupReport`.
+  366: `readLatest`;
+  479: `restoreFromLatest`.
+- 825: anulowalny worker serializacji.
+- 699: `BackupSnapshotInterrupted`;
+  703: `BackupValidationException`;
+  712: `BackupSnapshotReport`;
+  763: `NotebookBackupReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (270 linii)
 
@@ -445,7 +447,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (496)
-- `test/local_backup_service_test.dart` (235)
+- `test/local_backup_service_test.dart` (291)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
