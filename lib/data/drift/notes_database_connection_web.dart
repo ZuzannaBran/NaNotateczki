@@ -4,10 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:sqlite3/wasm.dart';
 
 class NotesDatabaseConnection {
-  NotesDatabaseConnection({required this.executor, required this.freshFile});
+  NotesDatabaseConnection({
+    required this.executor,
+    required this.freshFile,
+    this.recoveryPending = false,
+    this.recoveryReason,
+  });
 
   final QueryExecutor executor;
   final bool freshFile;
+  final bool recoveryPending;
+  final String? recoveryReason;
 }
 
 Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
@@ -29,3 +36,5 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
 
 
 Future<String?> quarantineNotesDatabase(String name) async => null;
+
+Future<void> clearNotesDatabaseRecoveryMarker(String name) async {}

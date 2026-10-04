@@ -200,8 +200,9 @@ class NotesDatabase extends _$NotesDatabase {
         await validateIntegrity(database);
         return DatabaseOpenResult(
           database: database,
-          wasReset: false,
+          wasReset: connection.recoveryPending,
           freshFile: connection.freshFile,
+          resetReason: connection.recoveryReason,
         );
       } catch (error, stackTrace) {
         lastError = error;
@@ -249,8 +250,9 @@ class NotesDatabase extends _$NotesDatabase {
             wasReset: true,
             freshFile: connection.freshFile,
             resetReason:
+                connection.recoveryReason ??
                 'SQLite validation failed. The previous database was '
-                'quarantined at $quarantinePath.',
+                    'quarantined at $quarantinePath.',
           );
         }
       } catch (error, stackTrace) {
@@ -296,6 +298,10 @@ class NotesDatabase extends _$NotesDatabase {
         message.contains('sqlite_corrupt') ||
         message.contains('sqlite_notadb') ||
         message.contains('malformed database schema');
+  }
+
+  Future<void> clearRecoveryMarker() {
+    return clearNotesDatabaseRecoveryMarker(_databaseFileName);
   }
 
   Future<void> _validateIntegrity() async {

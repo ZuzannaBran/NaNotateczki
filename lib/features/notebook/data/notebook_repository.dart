@@ -57,6 +57,10 @@ class NotebookRepository {
       ? List<Notebook>.unmodifiable(_notebookCache.values)
       : null;
 
+  Future<void> completeDatabaseRecovery() {
+    return database.clearRecoveryMarker();
+  }
+
   Future<List<Notebook>> fetchNotebooks() async {
     try {
       final rows =

@@ -97,6 +97,7 @@ class LibraryController extends ChangeNotifier {
         if (autoRestoreCount > 0) {
           items = await repository.fetchNotebooks();
           await _refreshCorruptRecoveryState();
+          await repository.completeDatabaseRecovery();
         } else {
           AppErrorLog.instance.record(
             'Database restore was attempted after startup reset, but no '
@@ -112,6 +113,10 @@ class LibraryController extends ChangeNotifier {
           null,
           source: 'LibraryController.loadItems(reset_without_backup)',
         );
+      }
+
+      if (wasReset && items.isNotEmpty) {
+        await repository.completeDatabaseRecovery();
       }
 
       if (items.isNotEmpty) {

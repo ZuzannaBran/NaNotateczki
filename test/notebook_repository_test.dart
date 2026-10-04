@@ -807,6 +807,23 @@ void main() {
     )..where((row) => row.uid.equals('corrupt-stroke'))).get();
     expect(corruptRows, hasLength(1));
   });
+  test('database open propagates a pending recovery marker', () async {
+    final result = await NotesDatabase.open(
+      connectionOpener: (_) async => NotesDatabaseConnection(
+        executor: NativeDatabase.memory(),
+        freshFile: false,
+        recoveryPending: true,
+        recoveryReason: 'Recovery pending',
+      ),
+      retryDelay: (_) async {},
+      errorRecorder: (_, _, _) {},
+    );
+    addTearDown(result.database.close);
+
+    expect(result.wasReset, isTrue);
+    expect(result.resetReason, 'Recovery pending');
+  });
+
   test('database open accepts a healthy SQLite integrity check', () async {
     var openCount = 0;
     final result = await NotesDatabase.open(

@@ -138,7 +138,7 @@ i ponawia przejściowy błąd backupu po 30 s.
 
 ### Drift
 
-### `lib/data/drift/notes_database.dart` (339 linii)
+### `lib/data/drift/notes_database.dart` (345 linii)
 
 Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami. Start sprawdza
 `PRAGMA quick_check` i `PRAGMA foreign_key_check`; po potwierdzonej korupcji lub naruszeniu integralności natywna baza jest
@@ -159,10 +159,10 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
   natywnego lub webowego połączenia.
-- `lib/data/drift/notes_database_connection_io.dart` (79): SQLite w katalogu
+- `lib/data/drift/notes_database_connection_io.dart` (158): SQLite w katalogu
   dokumentów przez `NativeDatabase.createInBackground`.
   7: `NotesDatabaseConnection`; 14: `openNotesDatabaseConnection`.
-- `lib/data/drift/notes_database_connection_web.dart` (32): SQLite WASM z
+- `lib/data/drift/notes_database_connection_web.dart` (41): SQLite WASM z
   trwałym IndexedDB.
   6: `NotesDatabaseConnection`; 13: `openNotesDatabaseConnection`.
 - `lib/data/drift/notes_database.g.dart` (6075): kod wygenerowany przez Drift;
@@ -239,7 +239,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2148 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2152 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. Recovery zapisuje cały batch atomowo i preferuje
@@ -265,7 +265,7 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (606 linie)
+### `lib/features/library/presentation/library_controller.dart` (611 linie)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
 
@@ -454,7 +454,7 @@ warstwami tła/canvasu/overlayu.
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart` (900)
+- `test/notebook_repository_test.dart` (917)
 - `test/local_backup_service_test.dart` (709)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
