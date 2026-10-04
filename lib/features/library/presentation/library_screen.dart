@@ -989,7 +989,9 @@ class _PaneResizeHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dividerColor = Theme.of(context).dividerColor;
+    final dividerColor = Theme.of(
+      context,
+    ).colorScheme.outlineVariant.withValues(alpha: 0.45);
     return MouseRegion(
       cursor: SystemMouseCursors.resizeColumn,
       child: GestureDetector(
@@ -997,7 +999,10 @@ class _PaneResizeHandle extends StatelessWidget {
         onHorizontalDragUpdate: (details) => onDragDelta(details.delta.dx),
         child: SizedBox(
           width: _LibraryScreenState._resizeHandleWidth,
-          child: Center(child: Container(width: 1, color: dividerColor)),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(width: 1, color: dividerColor),
+          ),
         ),
       ),
     );

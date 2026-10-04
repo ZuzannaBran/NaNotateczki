@@ -287,13 +287,13 @@ istniejącej, zdrowej bazy.
   417: `selectItem`;
   433: `selectFolder`.
 
-### `lib/features/library/presentation/library_screen.dart` (1043 linii)
+### `lib/features/library/presentation/library_screen.dart` (1046 linii)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i powierzchni dziedziczonych z aktywnej palety. Panel można
-zwijać w całości i zmieniać jego szerokość.
+zwijać w całości i zmieniać jego szerokość. Pionowy separator uchwytu ma 1 px, ten sam kolor co linia pod toolbarami i leży na prawej krawędzi, dzięki czemu linie stykają się.
 
 - 16: `LibraryScreen`;
   23:
