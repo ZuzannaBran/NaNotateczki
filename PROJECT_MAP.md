@@ -275,7 +275,7 @@ Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
 - 393: `selectItem`; 405: `selectFolder`; 414: `setSearchQuery`.
 - 419: `exportBackup`; 429: `importBackup`; 443: `selectedItem`.
 
-### `lib/features/library/presentation/library_screen.dart` (1013 linii)
+### `lib/features/library/presentation/library_screen.dart` (1025 linii)
 
 Układ foldery | dokumenty | workspace oraz dialogi CRUD/recovery. Szeroki
 layout blokuje minimalną szerokość zamiast przełączać się na kompakt; poniżej

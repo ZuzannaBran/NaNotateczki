@@ -63,13 +63,24 @@ class _LibraryScreenState extends State<LibraryScreen> {
               backgroundColor: Colors.amber.shade100,
               content: Text(
                 controller.autoRestoreCount > 0
-                    ? 'Baza została zresetowana po zmianie struktury. Przywrócono ${controller.autoRestoreCount} notatek z lokalnego backupu.'
-                    : 'Baza została zresetowana po zmianie struktury danych. Lokalny backup nie był dostępny.',
+                    ? 'Local database recovery completed. Restored '
+                          '${controller.autoRestoreCount} documents from the '
+                          'local backup.'
+                    : 'The previous local database was preserved after a '
+                          'recovery event, but no documents were restored '
+                          'automatically.',
               ),
               actions: [
+                if (controller.autoRestoreCount == 0)
+                  TextButton(
+                    onPressed: controller.isLoading
+                        ? null
+                        : controller.loadItems,
+                    child: const Text('Retry recovery'),
+                  ),
                 TextButton(
                   onPressed: controller.dismissResetBanner,
-                  child: const Text('OK'),
+                  child: const Text('Dismiss'),
                 ),
               ],
             ),
