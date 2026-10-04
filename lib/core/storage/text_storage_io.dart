@@ -6,6 +6,10 @@ import 'package:path_provider/path_provider.dart';
 final Map<String, Future<void>> _writeTails = <String, Future<void>>{};
 
 Future<String?> readStoredText(String key) async {
+  final pendingWrite = _writeTails[key];
+  if (pendingWrite != null) {
+    await pendingWrite;
+  }
   final file = await _fileForKey(key);
   await _recoverAtomicWrite(file);
   if (!await file.exists()) {
