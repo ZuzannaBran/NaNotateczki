@@ -20,8 +20,9 @@ mapie. Każdy nowy plik w `lib/` musi dostać tu własny wpis.
 - Główny przepływ:
   `main` → `AppScope` → `LibraryController` → `EditorController` →
   `NotebookRepository` → Drift.
-- Po zapisie repozytorium planuje przyrostowy lokalny backup. Backup czeka na
-  bezczynność rysika i może przerwać worker po wznowieniu pisania.
+- Po zapisie repozytorium przekazuje schedulerowi UID-y zmienionych
+  notebooków. Backup czeka na bezczynność rysika, przetwarza tylko dirty
+  dokumenty i może przerwać worker po wznowieniu pisania.
 - `features/editor` obsługuje wspólny model notebooka i boarda; różnią się
   ekranem oraz układem współrzędnych canvasu.
 
@@ -53,12 +54,12 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (464 linii)
+### `lib/app/app_scope.dart` (469 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
-przebudowywania `MaterialApp` i planuje backup po zapisie. Scheduler robi
-kopię po 2 s bezczynności, wymusza próbę po maksymalnie 30 s ciągłych zmian
-i ponawia przejściowy błąd backupu po 30 s.
+przebudowywania `MaterialApp` i planuje backup po zapisie. Scheduler zbiera
+UID-y zmienionych notebooków, robi kopię po 2 s bezczynności, wymusza próbę
+po maksymalnie 30 s ciągłych zmian i zachowuje dirty UID-y po przerwaniu.
 
 - 21: `AppScope`;
   28: `_AppScopeState`;
@@ -66,7 +67,7 @@ i ponawia przejściowy błąd backupu po 30 s.
   `_BackupStatusOverlay`;
   197:
   `_StartupErrorScreen`;
-  273: `_BackupScheduler`.
+  275: `_BackupScheduler`.
 
 ## 3. Core
 
@@ -170,19 +171,22 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (1426 linii)
+### `lib/data/backup/local_backup_service.dart` (1519 linii)
 
-Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami SHA-256 plików i całego manifestu (v4) i plikami
-notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
+Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami
+SHA-256 plików i całego manifestu (v4). Dirty UID-y pozwalają ponownie użyć
+nietkniętych wpisów po sprawdzeniu istnienia i rozmiaru pliku bez odczytu i
+SHA-256 całego JSON-a; brakujący lub ucięty plik jest odbudowywany. SHA-256
+zmienionego payloadu jest liczony w worker isolate. Do pięciu poprzednich manifestów jest
 trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki.
 Przed i po serializacji natywny backup sprawdza, czy każdy obraz nadal ma
 dostępne bajty; wyścig z usunięciem pliku nie może utrwalić kopii bez obrazu; brak obrazu nie zastępuje
 ostatniej poprawnej kopii. Odczyt obsługuje manifesty v1/v2/v3/v4, odrzuca niekompletny lub niespójny
 snapshot i próbuje kolejno starsze wersje. Manifest przechowuje też listę folderów biblioteki, w tym foldery puste; uszkodzenie samego pliku folderów nie blokuje backupu notebooków. Web przechowuje pełny snapshot w `localStorage`.
 
-- 15: `LocalBackupService`; 90: `snapshot`; 280: `hasLatest`;
-  430: `readLatest`; 545: `restoreFromLatest`.
-- 695: anulowalny worker serializacji.
+- 16: `LocalBackupService`; 106: `snapshot`; 442: `hasLatest`;
+  664: `readLatest`; 899: `restoreFromLatest`.
+- 1251: anulowalny worker serializacji i SHA-256.
 - 792: `BackupSnapshotInterrupted`; 796: `BackupValidationException`;
   807: `BackupDataException`; 818: `BackupSnapshotReport`;
   869: `NotebookBackupReport`.
@@ -239,14 +243,15 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2298 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2297 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
-podejrzaną utratą danych. Recovery zapisuje cały batch atomowo i preferuje
+podejrzaną utratą danych. Callback zmian przekazuje schedulerowi UID-y
+zmienionych notebooków. Recovery zapisuje cały batch atomowo i preferuje
 bajty obrazów z backupu nad istniejącymi ścieżkami. Ręczny eksport używa
 koperty z checksumą SHA-256 i zachowuje także puste foldery.
 
-- 22: `DataIntegrityIncidentHandler`; 29: `NotebookRepository`.
+- 23: `DataIntegrityIncidentHandler`; 30: `RepositoryChangeHandler`; 39: `NotebookRepository`.
 - 60: `fetchNotebooks`; 110: `saveRecoveredCopy`;
   124: `restoreNotebooksAtomically`; 178: `archiveNotebookBeforeDelete`.
 - 159: `createNotebook`; 185: `createBoard`; 211: `getNotebook`.
@@ -266,9 +271,12 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (640 linie)
+### `lib/features/library/presentation/library_controller.dart` (637 linii)
 
-Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery. Zapis folderów uruchamia scheduler backupu także wtedy, gdy zmieniają się wyłącznie puste foldery. Sprzątanie osieroconych obrazów działa tylko przy normalnym starcie istniejącej, zdrowej bazy.
+Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
+Zapis samych folderów zgłasza pusty zestaw UID-ów, więc aktualizuje manifest
+bez oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
+tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
 - 14: `LibraryController`; 78: `initialize`; 84: `loadItems`;
   140: `restoreCorruptDocumentsFromBackup`; 193: `syncNow`.
@@ -456,7 +464,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (1000)
-- `test/local_backup_service_test.dart` (922)
+- `test/local_backup_service_test.dart` (1003)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

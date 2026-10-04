@@ -105,14 +105,22 @@ class LocalBackupService {
 
   Future<BackupSnapshotReport> snapshot(
     List<Notebook> items, {
+    Set<String>? dirtyNotebookUids,
     bool Function()? shouldInterrupt,
   }) async {
+    final requestedDirtyUids = dirtyNotebookUids == null
+        ? null
+        : Set<String>.unmodifiable(dirtyNotebookUids);
     final previous = _snapshotTail;
     final completion = Completer<void>();
     _snapshotTail = completion.future;
     try {
       await previous;
-      return await _snapshotNow(items, shouldInterrupt: shouldInterrupt);
+      return await _snapshotNow(
+        items,
+        dirtyNotebookUids: requestedDirtyUids,
+        shouldInterrupt: shouldInterrupt,
+      );
     } finally {
       completion.complete();
     }
@@ -120,9 +128,14 @@ class LocalBackupService {
 
   Future<BackupSnapshotReport> _snapshotNow(
     List<Notebook> items, {
+    Set<String>? dirtyNotebookUids,
     bool Function()? shouldInterrupt,
   }) async {
-    _validateSnapshotItems(items);
+    if (dirtyNotebookUids == null || kIsWeb) {
+      _validateSnapshotItems(items);
+    } else {
+      _validateSnapshotNotebookIds(items);
+    }
     _snapshotInProgress.value = true;
     try {
       if (kIsWeb) {
@@ -133,6 +146,22 @@ class LocalBackupService {
       await _recoverDirectoryAtomicWrites(notebooksDir);
       await _recoverDirectoryAtomicWrites(await _historyDir());
       final previousEntries = await _readManifestEntries();
+      final notebookUidsToSnapshot = dirtyNotebookUids == null
+          ? items.map((notebook) => notebook.uid).toSet()
+          : Set<String>.from(dirtyNotebookUids);
+      if (dirtyNotebookUids != null) {
+        for (final notebook in items) {
+          final previousEntry = previousEntries[notebook.uid];
+          if (previousEntry == null ||
+              !await _canReuseManifestEntryFast(previousEntry)) {
+            notebookUidsToSnapshot.add(notebook.uid);
+          }
+        }
+        _validateSnapshotItems([
+          for (final notebook in items)
+            if (notebookUidsToSnapshot.contains(notebook.uid)) notebook,
+        ]);
+      }
       final currentEntries = <String, _BackupManifestEntry>{};
       final expectedFiles = <String>{};
       final notebookReports = <NotebookBackupReport>[];
@@ -144,6 +173,30 @@ class LocalBackupService {
         _throwIfInterrupted(shouldInterrupt);
         final notebookStopwatch = Stopwatch()..start();
         final previousEntry = previousEntries[notebook.uid];
+        if (!notebookUidsToSnapshot.contains(notebook.uid)) {
+          final reusableEntry = previousEntry!;
+          final previousFile = await _notebookFile(reusableEntry.fileName);
+          currentEntries[notebook.uid] = reusableEntry;
+          expectedFiles.add(previousFile.path);
+          notebookStopwatch.stop();
+          notebookReports.add(
+            NotebookBackupReport(
+              uid: notebook.uid,
+              pages: notebook.pages.length,
+              strokes: _strokeCount(notebook),
+              points: _pointCount(notebook),
+              jsonBytes: reusableEntry.jsonBytes!,
+              flattenMs: 0,
+              encodeMs: 0,
+              jsonMs: 0,
+              compareMs: 0,
+              writeMs: 0,
+              totalMs: notebookStopwatch.elapsedMilliseconds,
+              changed: false,
+            ),
+          );
+          continue;
+        }
         if (previousEntry != null &&
             !notebook.updatedAt.isAfter(previousEntry.updatedAt) &&
             await _isManifestEntryValid(previousEntry)) {
@@ -183,8 +236,8 @@ class LocalBackupService {
           );
         }
         final content = workerResult.content;
-        final checksum = _sha256Checksum(content);
-        final jsonBytes = utf8.encode(content).length;
+        final checksum = workerResult.checksum;
+        final jsonBytes = workerResult.jsonBytes;
         final fileName = _notebookContentFileName(notebook.uid, checksum);
         final file = await _notebookFile(fileName);
         final entry = _BackupManifestEntry(
@@ -508,6 +561,27 @@ class LocalBackupService {
           );
         }
       }
+    }
+  }
+
+  Future<bool> _canReuseManifestEntryFast(
+    _BackupManifestEntry entry,
+  ) async {
+    if (entry.checksum == null ||
+        entry.jsonBytes == null ||
+        (entry.checksumAlgorithm != _sha256Algorithm &&
+            entry.checksumAlgorithm != _legacyFnv1a32Algorithm)) {
+      return false;
+    }
+    final file = await _notebookFile(entry.fileName);
+    await _recoverAtomicWrite(file);
+    if (!await file.exists()) {
+      return false;
+    }
+    try {
+      return await file.length() == entry.jsonBytes;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -909,8 +983,20 @@ class LocalBackupService {
     );
   }
 
-  void _validateSnapshotItems(List<Notebook> items) {
+  void _validateSnapshotNotebookIds(List<Notebook> items) {
     final notebookIds = <String>{};
+    for (final notebook in items) {
+      if (notebook.uid.isEmpty || !notebookIds.add(notebook.uid)) {
+        throw BackupDataException(
+          'Snapshot contains an empty or duplicate notebook id: '
+          '${notebook.uid}',
+        );
+      }
+    }
+  }
+
+  void _validateSnapshotItems(List<Notebook> items) {
+    _validateSnapshotNotebookIds(items);
     final pageIds = <String>{};
     final tabIds = <String>{};
     final textIds = <String>{};
@@ -926,7 +1012,6 @@ class LocalBackupService {
     }
 
     for (final notebook in items) {
-      requireUnique(notebookIds, notebook.uid, 'notebook');
       if (notebook.pages.isEmpty) {
         throw BackupDataException(
           'Snapshot notebook has no pages: ${notebook.uid}',
@@ -1146,6 +1231,8 @@ enum _BackupWorkerOperation { snapshot }
 class _BackupWorkerResult {
   const _BackupWorkerResult({
     required this.content,
+    required this.checksum,
+    required this.jsonBytes,
     required this.flattenMs,
     required this.encodeMs,
     required this.jsonMs,
@@ -1153,6 +1240,8 @@ class _BackupWorkerResult {
   });
 
   final String content;
+  final String checksum;
+  final int jsonBytes;
   final int flattenMs;
   final int encodeMs;
   final int jsonMs;
@@ -1246,8 +1335,12 @@ _BackupWorkerResult _createBackupPayload(Notebook notebook) {
   final jsonStopwatch = Stopwatch()..start();
   final content = jsonEncode(encoded);
   jsonStopwatch.stop();
+  final contentBytes = utf8.encode(content);
+  final checksum = sha256.convert(contentBytes).toString();
   return _BackupWorkerResult(
     content: content,
+    checksum: checksum,
+    jsonBytes: contentBytes.length,
     flattenMs: flattenStopwatch.elapsedMilliseconds,
     encodeMs: encodeStopwatch.elapsedMilliseconds,
     jsonMs: jsonStopwatch.elapsedMilliseconds,

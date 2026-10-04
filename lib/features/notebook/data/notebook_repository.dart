@@ -27,6 +27,8 @@ typedef DataIntegrityIncidentHandler =
       Notebook attempted,
     );
 
+typedef RepositoryChangeHandler = void Function(Set<String> notebookUids);
+
 class PortableBackupData {
   const PortableBackupData({required this.notebooks, required this.folders});
 
@@ -45,7 +47,7 @@ class NotebookRepository {
        _dataIntegrityIncidentHandler = dataIntegrityIncidentHandler;
 
   final NotesDatabase database;
-  final void Function()? onChanged;
+  final RepositoryChangeHandler? onChanged;
   final void Function(Object error, StackTrace stackTrace, String source)?
   _readErrorHandler;
   final DataIntegrityIncidentHandler? _dataIntegrityIncidentHandler;
@@ -230,7 +232,7 @@ class NotebookRepository {
     _lastFetchSkippedCorruptRows = false;
     _lastCorruptNotebookIds.clear();
     _isNotebookCacheComplete = true;
-    onChanged?.call();
+    onChanged?.call(persisted.map((item) => item.uid).toSet());
     return persisted.length;
   }
 
@@ -331,7 +333,7 @@ class NotebookRepository {
       _latestPersistedUpdates[notebook.uid] = notebook.updatedAt;
       _notebookCache[notebook.uid] = notebook;
     }
-    onChanged?.call();
+    onChanged?.call(persisted.map((item) => item.uid).toSet());
     return persisted.length;
   }
 
@@ -577,7 +579,7 @@ class NotebookRepository {
       final persistedNotebook = notebook.copyWith(updatedAt: savedAt);
       _latestPersistedUpdates[notebook.uid] = savedAt;
       _notebookCache[notebook.uid] = persistedNotebook;
-      onChanged?.call();
+      onChanged?.call({notebook.uid});
     }
     return saved;
   }
@@ -685,7 +687,7 @@ class NotebookRepository {
       );
       _latestPersistedUpdates[notebookToSave.uid] = savedAt;
       _notebookCache[notebookToSave.uid] = persisted;
-      onChanged?.call();
+      onChanged?.call({notebookToSave.uid});
     }
     return saved;
   }
@@ -730,7 +732,7 @@ class NotebookRepository {
     if (updated != null) {
       _latestPersistedUpdates[uid] = preciseUpdatedAt!;
       _notebookCache[uid] = updated;
-      onChanged?.call();
+      onChanged?.call({uid});
     }
     return updated;
   }
@@ -1091,7 +1093,7 @@ class NotebookRepository {
     });
     _latestPersistedUpdates.remove(uid);
     _notebookCache.remove(uid);
-    onChanged?.call();
+    onChanged?.call({uid});
   }
 
   List<Map<String, dynamic>> encodeNotebooks(List<Notebook> items) {

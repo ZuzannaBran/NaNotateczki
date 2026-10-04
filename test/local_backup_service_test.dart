@@ -39,6 +39,87 @@ void main() {
     expect(second.notebookReports.single.jsonMs, 0);
   });
 
+  test('incremental snapshot serializes only the dirty notebook', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final first = _notebook();
+    final second = _distinctNotebook();
+
+    await service.snapshot([first, second]);
+    final updatedFirst = first.copyWith(
+      title: 'Updated',
+      updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
+    );
+
+    final report = await service.snapshot(
+      [updatedFirst, second],
+      dirtyNotebookUids: {first.uid},
+    );
+    final firstReport = report.notebookReports.singleWhere(
+      (item) => item.uid == first.uid,
+    );
+    final secondReport = report.notebookReports.singleWhere(
+      (item) => item.uid == second.uid,
+    );
+
+    expect(report.changedCount, 1);
+    expect(report.unchangedCount, 1);
+    expect(firstReport.changed, isTrue);
+    expect(secondReport.changed, isFalse);
+    expect(secondReport.flattenMs, 0);
+    expect(secondReport.encodeMs, 0);
+    expect(secondReport.jsonMs, 0);
+  });
+
+  test('incremental snapshot repairs a missing untouched backup', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final first = _notebook();
+    final second = _distinctNotebook();
+
+    await service.snapshot([first, second]);
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    final decoded =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final entries = decoded['notebooks'] as List<dynamic>;
+    final secondEntry = entries
+        .whereType<Map<String, dynamic>>()
+        .singleWhere((entry) => entry['uid'] == second.uid);
+    final secondFile = File(
+      '${directory.path}/local_backup/notebooks/${secondEntry['file']}',
+    );
+    await secondFile.delete();
+
+    final updatedFirst = first.copyWith(
+      title: 'Updated',
+      updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
+    );
+    final report = await service.snapshot(
+      [updatedFirst, second],
+      dirtyNotebookUids: {first.uid},
+    );
+
+    expect(report.changedCount, 2);
+    expect(report.unchangedCount, 0);
+    expect(await secondFile.exists(), isTrue);
+    expect((await service.readLatest()).map((item) => item.uid).toSet(), {
+      first.uid,
+      second.uid,
+    });
+  });
+
   test('changed notebook retains previous file for history', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
