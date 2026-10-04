@@ -32,7 +32,7 @@ class EditorToolbar extends StatelessWidget {
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          color: AppColors.toolbar,
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
           child: Row(
             children: [
               Expanded(

@@ -45,7 +45,102 @@ extension AppAccentColorX on AppAccentColor {
       AppAccentColor.babyBlue => const Color(0xFF77C3EC),
     };
   }
+
+  AppAccentPalette get palette {
+    return switch (this) {
+      AppAccentColor.bubblegum => _cherryPalette,
+      AppAccentColor.softBubblegum => _bubblegumPalette,
+      AppAccentColor.lavender => _lavenderPalette,
+      AppAccentColor.peach => _peachPalette,
+      AppAccentColor.babyBlue => _babyBluePalette,
+      _ => _bubblegumPalette,
+    };
+  }
 }
+
+class AppAccentPalette {
+  const AppAccentPalette({
+    required this.accentDark,
+    required this.accentLight,
+    required this.primaryContainer,
+    required this.background,
+    required this.surfaceContainerLow,
+    required this.surfaceContainer,
+    required this.surfaceContainerHigh,
+    required this.surfaceContainerHighest,
+    required this.divider,
+  });
+
+  final Color accentDark;
+  final Color accentLight;
+  final Color primaryContainer;
+  final Color background;
+  final Color surfaceContainerLow;
+  final Color surfaceContainer;
+  final Color surfaceContainerHigh;
+  final Color surfaceContainerHighest;
+  final Color divider;
+}
+
+const _cherryPalette = AppAccentPalette(
+  accentDark: Color(0xFFCF4065),
+  accentLight: Color(0xFFE77593),
+  primaryContainer: Color(0xFFF2B6C6),
+  background: Color(0xFFFEF9FA),
+  surfaceContainerLow: Color(0xFFFBE8ED),
+  surfaceContainer: Color(0xFFF8D7E0),
+  surfaceContainerHigh: Color(0xFFF5C7D3),
+  surfaceContainerHighest: Color(0xFFF2B6C6),
+  divider: Color(0xFFF5C7D3),
+);
+
+const _bubblegumPalette = AppAccentPalette(
+  accentDark: Color(0xFFD9A4AD),
+  accentLight: Color(0xFFFFCAD4),
+  primaryContainer: Color(0xFFFFD2DA),
+  background: Color(0xFFFFF3F5),
+  surfaceContainerLow: Color(0xFFFFEEF1),
+  surfaceContainer: Color(0xFFFFEBEF),
+  surfaceContainerHigh: Color(0xFFFFE4E9),
+  surfaceContainerHighest: Color(0xFFFFD9E0),
+  divider: Color(0xFFFFDFE5),
+);
+
+const _lavenderPalette = AppAccentPalette(
+  accentDark: Color(0xFFA352F1),
+  accentLight: Color(0xFFD4ADF8),
+  primaryContainer: Color(0xFFDDBFFA),
+  background: Color(0xFFFAF6FE),
+  surfaceContainerLow: Color(0xFFF1E4FD),
+  surfaceContainer: Color(0xFFE7D1FB),
+  surfaceContainerHigh: Color(0xFFDDBFFA),
+  surfaceContainerHighest: Color(0xFFD4ADF8),
+  divider: Color(0xFFE7D1FB),
+);
+
+const _peachPalette = AppAccentPalette(
+  accentDark: Color(0xFFFF7E56),
+  accentLight: Color(0xFFFFBEAB),
+  primaryContainer: Color(0xFFFFD2C4),
+  background: Color(0xFFFFF6F3),
+  surfaceContainerLow: Color(0xFFFFE7DF),
+  surfaceContainer: Color(0xFFFFD8CC),
+  surfaceContainerHigh: Color(0xFFFFD2C4),
+  surfaceContainerHighest: Color(0xFFFFC9B8),
+  divider: Color(0xFFFFD8CC),
+);
+
+const _babyBluePalette = AppAccentPalette(
+  accentDark: Color(0xFF43ACE5),
+  accentLight: Color(0xFF99D2F1),
+  primaryContainer: Color(0xFFBCE1F6),
+  background: Color(0xFFEFF8FD),
+  surfaceContainerLow: Color(0xFFDEF1FA),
+  surfaceContainer: Color(0xFFCDE9F8),
+  surfaceContainerHigh: Color(0xFFBCE1F6),
+  surfaceContainerHighest: Color(0xFFABDAF3),
+  divider: Color(0xFFCDE9F8),
+);
 
 class AppColors {
   static const paper = Color(0xFFF8F6F2);

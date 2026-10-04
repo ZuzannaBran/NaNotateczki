@@ -72,18 +72,20 @@ i ponawia przejściowy błąd backupu po 30 s.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (65): paleta aplikacji
-  i kolory akcentu; w ustawieniach dostępne są Cherry, Bubblegum, Lavender,
-  Peach i Baby blue. Cherry ma #E05278, a Bubblegum #FFC1CC.
-  3: `AppAccentColor`;
-  14:
-  `selectableAppAccentColors`; 50:
+- `lib/core/theme/app_colors.dart` (160): paleta aplikacji
+  i pięć pełnych zestawów kolorystycznych dla Cherry, Bubblegum, Lavender,
+  Peach i Baby blue. Każdy zestaw zachowuje kolor bazowy i definiuje
+  internetowo dobrane odcienie ciemne, jasne, zaznaczenia, panele, tło
+  oraz divider. 3:
+  `AppAccentColor`; 61:
+  `AppAccentPalette`; 145:
   `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (25): konfiguracja
-  jasnego Material 3 z domyślnym akcentem Bubblegum i globalną typografią
-  Georgia (z serifowymi fallbackami). 5:
+- `lib/core/theme/app_theme.dart` (42): konfiguracja
+  jasnego Material 3 z pełną paletą zależną od wybranego akcentu: scaffold,
+  app bar, surface containers, selection, secondary tones i dividery są
+  spójne z bazowym kolorem. 5:
   `AppTheme`.
 
 ### Wejście i preferencje
@@ -292,7 +294,7 @@ istniejącej, zdrowej bazy.
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
-kompaktowej typografii dziedziczonej z globalnego motywu Georgia. Panel można
+kompaktowej typografii Georgia i powierzchni dziedziczonych z aktywnej palety. Panel można
 zwijać w całości i zmieniać jego szerokość.
 
 - 16: `LibraryScreen`;
@@ -359,7 +361,7 @@ preferencje, viewport i zapis.
 
 ### `lib/features/editor/presentation/editor_screen.dart` (2650 linie)
 
-Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px, viewport, wirtualizowane strony, canvasy,
+Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px, a overlaye UI dziedziczą aktywną paletę; viewport, wirtualizowane strony, canvasy,
 zakładki, minimapa, skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma zarezerwowany lewy pas, a kolumna strony jest kotwiczona do
@@ -408,7 +410,7 @@ błędów, integralności i wydajności.
   render i preview tła. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
 - `lib/features/editor/presentation/widgets/editor_toolbar.dart` (937):
-  główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
+  główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu; tło paska dziedziczy aktywną paletę;
   ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
@@ -419,7 +421,7 @@ błędów, integralności i wydajności.
   416: selektor kształtu;
   830: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (545):
-  formatowanie aktywnego bloku Quill.
+  formatowanie aktywnego bloku Quill; pasek dziedziczy aktywną paletę.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
@@ -454,7 +456,7 @@ bloki overlayu.
 ### `lib/features/board/presentation/board_screen.dart` (941 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
-warstwami tła/canvasu/overlayu.
+warstwami tła/canvasu/overlayu; pomocnicze panele UI dziedziczą aktywną paletę.
 
 - 29: `BoardScreen`; 36: `_BoardScreenState`.
 - 57: `_buildBoardRect`; 75–360: obsługa pointerów i viewportu.

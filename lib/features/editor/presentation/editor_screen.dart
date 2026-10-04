@@ -1993,7 +1993,10 @@ class _ZoomPercentBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.toolbar.withValues(alpha: 0.92),
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerLow
+            .withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(10),
         boxShadow: const [
           BoxShadow(
@@ -2284,7 +2287,10 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.toolbar.withValues(alpha: 0.9),
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerLow
+            .withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(outerRadius),
         boxShadow: const [
           BoxShadow(
