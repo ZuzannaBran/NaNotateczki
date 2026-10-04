@@ -35,10 +35,10 @@ extension AppAccentColorX on AppAccentColor {
       AppAccentColor.classic => AppColors.inkBlack,
       AppAccentColor.sakura => const Color(0xFFF48FB1),
       AppAccentColor.bubblegum => const Color(0xFFFF80AB),
-      AppAccentColor.lavender => const Color(0xFFB39DDB),
+      AppAccentColor.lavender => const Color(0xFFCA9BF7),
       AppAccentColor.peach => const Color(0xFFFFAB91),
       AppAccentColor.mint => const Color(0xFF80CBC4),
-      AppAccentColor.babyBlue => const Color(0xFF90CAF9),
+      AppAccentColor.babyBlue => const Color(0xFF77C3EC),
     };
   }
 }
