@@ -1197,6 +1197,14 @@ class _EditorScreenState extends State<EditorScreen> {
             editorController: controller,
             activeTextBlockId: controller.activeTextBlockId,
           ),
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: 0.45),
+        ),
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {

@@ -72,21 +72,19 @@ i ponawia przejściowy błąd backupu po 30 s.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (139): paleta aplikacji
-  z pięcioma kolorami bazowymi i dopasowanymi neutralnymi tłami. Bazowe
-  Cherry, Bubblegum, Lavender, Peach i Baby blue pozostają bez zmian;
-  tło, sidebar, toolbary i dividery używają beżów/cream zaczerpniętych
-  z podobnych palet. 3:
-  `AppAccentColor`; 61:
-  `AppAccentPalette`; 124:
-  `AppColors`.
+- `lib/core/theme/app_colors.dart` (132): paleta aplikacji
+  z pięcioma kolorami bazowymi i neutralnym tłem per motyw. Bazowe Cherry,
+  Bubblegum, Lavender, Peach i Baby blue pozostają bez zmian; nagłówek,
+  toolbary i niskie powierzchnie używają dokładnie koloru tła.
+  3: `AppAccentColor`;
+  61: `AppAccentPalette`;
+  117: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
 - `lib/core/theme/app_theme.dart` (39): konfiguracja
-  jasnego Material 3; stałe powierzchnie aplikacji używają dopasowanego
-  beżu/cream, a wyższe surface containers pozostają generowane z bazowego
-  akcentu dla subtelnych hoverów i zaznaczeń.
-  5: `AppTheme`.
+  jasnego Material 3; AppBar, toolbar i surfaceContainerLow mają identyczny
+  kolor jak tło aktywnego motywu, a akcent pozostaje w kontrolkach i
+  zaznaczeniach. 5: `AppTheme`.
 
 ### Wejście i preferencje
 
@@ -359,10 +357,12 @@ preferencje, viewport i zapis.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2650 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2664 linie)
 
-Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px, a overlaye UI dziedziczą aktywną paletę; viewport, wirtualizowane strony, canvasy,
-zakładki, minimapa, skróty i import/eksport. Strona zachowuje logiczną
+Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
+kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
+panel folderów. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
+skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma zarezerwowany lewy pas, a kolumna strony jest kotwiczona do
 stałego prawego marginesu 56 px. Clip viewportu ma wyłącznie wizualny bleed,
@@ -410,7 +410,7 @@ błędów, integralności i wydajności.
   render i preview tła. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
 - `lib/features/editor/presentation/widgets/editor_toolbar.dart` (937):
-  główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu; tło paska dziedziczy aktywną paletę;
+  główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu; tło paska jest identyczne z tłem aplikacji;
   ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
@@ -421,7 +421,7 @@ błędów, integralności i wydajności.
   416: selektor kształtu;
   830: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (545):
-  formatowanie aktywnego bloku Quill; pasek dziedziczy aktywną paletę.
+  formatowanie aktywnego bloku Quill; pasek ma identyczne tło jak aplikacja.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)

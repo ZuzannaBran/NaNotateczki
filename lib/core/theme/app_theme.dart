@@ -19,7 +19,7 @@ class AppTheme {
       onSecondaryContainer: AppColors.inkBlack,
       surface: palette.background,
       surfaceContainerLowest: palette.background,
-      surfaceContainerLow: palette.surfaceContainerLow,
+      surfaceContainerLow: palette.background,
       outlineVariant: palette.divider,
     );
 
@@ -30,7 +30,7 @@ class AppTheme {
       scaffoldBackgroundColor: palette.background,
       useMaterial3: true,
       appBarTheme: AppBarTheme(
-        backgroundColor: palette.surfaceContainerLow,
+        backgroundColor: palette.background,
         elevation: 0,
       ),
       dividerColor: palette.divider,

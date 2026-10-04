@@ -64,7 +64,6 @@ class AppAccentPalette {
     required this.accentLight,
     required this.primaryContainer,
     required this.background,
-    required this.surfaceContainerLow,
     required this.divider,
   });
 
@@ -72,7 +71,6 @@ class AppAccentPalette {
   final Color accentLight;
   final Color primaryContainer;
   final Color background;
-  final Color surfaceContainerLow;
   final Color divider;
 }
 
@@ -81,7 +79,6 @@ const _cherryPalette = AppAccentPalette(
   accentLight: Color(0xFFE77593),
   primaryContainer: Color(0xFFF2B6C6),
   background: Color(0xFFF4EFED),
-  surfaceContainerLow: Color(0xFFFAF3F2),
   divider: Color(0xFFDEBAB0),
 );
 
@@ -90,7 +87,6 @@ const _bubblegumPalette = AppAccentPalette(
   accentLight: Color(0xFFFFCAD4),
   primaryContainer: Color(0xFFFFD2DA),
   background: Color(0xFFFFFAF5),
-  surfaceContainerLow: Color(0xFFFFEFDB),
   divider: Color(0xFFFFE4C2),
 );
 
@@ -99,7 +95,6 @@ const _lavenderPalette = AppAccentPalette(
   accentLight: Color(0xFFD4ADF8),
   primaryContainer: Color(0xFFDDBFFA),
   background: Color(0xFFFBF6EB),
-  surfaceContainerLow: Color(0xFFFAF3E6),
   divider: Color(0xFFE5E1EA),
 );
 
@@ -108,7 +103,6 @@ const _peachPalette = AppAccentPalette(
   accentLight: Color(0xFFFFBEAB),
   primaryContainer: Color(0xFFFFD2C4),
   background: Color(0xFFFAF8F5),
-  surfaceContainerLow: Color(0xFFF7EBE6),
   divider: Color(0xFFE7C6B2),
 );
 
@@ -117,7 +111,6 @@ const _babyBluePalette = AppAccentPalette(
   accentLight: Color(0xFF99D2F1),
   primaryContainer: Color(0xFFBCE1F6),
   background: Color(0xFFF2F0EA),
-  surfaceContainerLow: Color(0xFFEFEBE1),
   divider: Color(0xFFDFD4BD),
 );
 
