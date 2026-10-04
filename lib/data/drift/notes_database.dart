@@ -158,6 +158,8 @@ class NotesDatabase extends _$NotesDatabase {
     @visibleForTesting
     void Function(Object error, StackTrace stackTrace, String source)?
     errorRecorder,
+    @visibleForTesting
+    Future<void> Function(NotesDatabase database)? integrityValidator,
   }) async {
     final openConnection = connectionOpener ?? openNotesDatabaseConnection;
     final waitBeforeRetry = retryDelay ?? Future<void>.delayed;
@@ -166,6 +168,9 @@ class NotesDatabase extends _$NotesDatabase {
         (Object error, StackTrace stackTrace, String source) {
           AppErrorLog.instance.record(error, stackTrace, source: source);
         };
+    final validateIntegrity =
+        integrityValidator ??
+        (NotesDatabase database) => database._validateIntegrity();
     Object? lastError;
     StackTrace? lastStackTrace;
     DatabaseOpenStage? lastStage;
@@ -178,6 +183,7 @@ class NotesDatabase extends _$NotesDatabase {
         stage = DatabaseOpenStage.validation;
         database = NotesDatabase(connection.executor);
         await database.customSelect('select 1').getSingle();
+        await validateIntegrity(database);
         return DatabaseOpenResult(
           database: database,
           wasReset: false,
@@ -221,6 +227,29 @@ class NotesDatabase extends _$NotesDatabase {
       ),
       lastStackTrace!,
     );
+  }
+
+  Future<void> _validateIntegrity() async {
+    final quickCheck = await customSelect('PRAGMA quick_check').get();
+    if (quickCheck.isEmpty) {
+      throw StateError('SQLite quick_check returned no result.');
+    }
+    for (final row in quickCheck) {
+      final values = row.data.values;
+      if (values.length != 1 || values.first != 'ok') {
+        throw StateError('SQLite quick_check failed: ${row.data}');
+      }
+    }
+
+    final foreignKeyErrors = await customSelect(
+      'PRAGMA foreign_key_check',
+    ).get();
+    if (foreignKeyErrors.isNotEmpty) {
+      throw StateError(
+        'SQLite foreign_key_check found '
+        '${foreignKeyErrors.length} violation(s).',
+      );
+    }
   }
 
   @override

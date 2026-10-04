@@ -493,4 +493,53 @@ void main() {
     )..where((row) => row.uid.equals('corrupt-stroke'))).get();
     expect(corruptRows, hasLength(1));
   });
+  test('database open accepts a healthy SQLite integrity check', () async {
+    var openCount = 0;
+    final result = await NotesDatabase.open(
+      connectionOpener: (_) async {
+        openCount++;
+        return NotesDatabaseConnection(
+          executor: NativeDatabase.memory(),
+          freshFile: true,
+        );
+      },
+      retryDelay: (_) async {},
+      errorRecorder: (_, _, _) {},
+    );
+    addTearDown(result.database.close);
+
+    expect(openCount, 1);
+    expect(result.freshFile, isTrue);
+  });
+
+  test('database open treats integrity failure as validation failure', () async {
+    var validationCount = 0;
+
+    await expectLater(
+      NotesDatabase.open(
+        connectionOpener: (_) async => NotesDatabaseConnection(
+          executor: NativeDatabase.memory(),
+          freshFile: true,
+        ),
+        retryDelay: (_) async {},
+        errorRecorder: (_, _, _) {},
+        integrityValidator: (_) async {
+          validationCount++;
+          throw StateError('integrity failed');
+        },
+      ),
+      throwsA(
+        isA<DatabaseOpenException>()
+            .having(
+              (error) => error.stage,
+              'stage',
+              DatabaseOpenStage.validation,
+            )
+            .having((error) => error.attempts, 'attempts', 3),
+      ),
+    );
+
+    expect(validationCount, 3);
+  });
+
 }

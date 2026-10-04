@@ -135,17 +135,24 @@ przebudowywania `MaterialApp` i planuje backup po zapisie.
 
 ### Drift
 
-### `lib/data/drift/notes_database.dart` (236 linii)
+### `lib/data/drift/notes_database.dart` (266 linii)
 
 Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami bez kasowania
-pliku po awarii.
+pliku po awarii. Start sprawdza również `PRAGMA quick_check` i
+`PRAGMA foreign_key_check`; błąd integralności jest traktowany jak błąd
+walidacji i nie otwiera uszkodzonej bazy jako poprawnej.
 
-- 9: `NotebookRows`; 21: `PageRows`; 34: `IndexTabRows`;
-  44: `TextBlockRows`; 61: `ImageBlockRows`; 84: `InkStrokeRows`.
-- 97: `DatabaseOpenResult`; 111: `DatabaseOpenStage`;
-  113: `DatabaseOpenException`; 147: `NotesDatabase`.
-- 154: `NotesDatabase.open`; 227: `schemaVersion` (`1`);
-  230: `migration`.
+- 9: `NotebookRows`; 21: `PageRows`;
+  34: `IndexTabRows`; 44: `TextBlockRows`;
+  61: `ImageBlockRows`; 84: `InkStrokeRows`.
+- 97: `DatabaseOpenResult`;
+  111: `DatabaseOpenStage`;
+  113: `DatabaseOpenException`;
+  147: `NotesDatabase`.
+- 154: `NotesDatabase.open`;
+  232: kontrola integralności;
+  256: `schemaVersion` (`1`);
+  259: `migration`.
 
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
   natywnego lub webowego połączenia.
@@ -443,7 +450,7 @@ warstwami tła/canvasu/overlayu.
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart` (496)
+- `test/notebook_repository_test.dart` (546)
 - `test/local_backup_service_test.dart` (406)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
