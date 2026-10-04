@@ -240,11 +240,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (3377 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2298 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. Recovery zapisuje cały batch atomowo i preferuje
-bajty obrazów z backupu nad istniejącymi ścieżkami.
+bajty obrazów z backupu nad istniejącymi ścieżkami. Ręczny eksport używa
+koperty z checksumą SHA-256 i zachowuje także puste foldery.
 
 - 22: `DataIntegrityIncidentHandler`; 29: `NotebookRepository`.
 - 60: `fetchNotebooks`; 110: `saveRecoveredCopy`;
