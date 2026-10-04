@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -25,6 +26,16 @@ typedef DataIntegrityIncidentHandler =
       Notebook before,
       Notebook attempted,
     );
+
+class PortableBackupData {
+  const PortableBackupData({
+    required this.notebooks,
+    required this.folders,
+  });
+
+  final List<Notebook> notebooks;
+  final List<String> folders;
+}
 
 class NotebookRepository {
   NotebookRepository(
@@ -1104,6 +1115,1177 @@ class NotebookRepository {
       _ensureArchiveContainsImageBytes(notebook);
     }
     return payload;
+  }
+
+  Map<String, dynamic> encodePortableBackup(
+    List<Notebook> items, {
+    required Iterable<String> folders,
+  }) {
+    final notebooks = encodeSelfContainedBackup(items);
+    final normalizedFolders = <String>{
+      for (final item in items)
+        if (item.folder.trim().isNotEmpty) item.folder.trim(),
+      for (final folder in folders)
+        if (folder.trim().isNotEmpty) folder.trim(),
+    }.toList()
+      ..sort((a, b) {
+        final lower = a.toLowerCase().compareTo(b.toLowerCase());
+        return lower != 0 ? lower : a.compareTo(b);
+      });
+    final payload = <String, dynamic>{
+      'folders': normalizedFolders,
+      'notebooks': notebooks,
+    };
+    final checksum = sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+    return <String, dynamic>{
+      'format': 'nanotateczki-backup',
+      'version': 1,
+      'checksumAlgorithm': 'sha256',
+      'checksum': checksum,
+      'payload': payload,
+    };
+  }
+
+  PortableBackupData decodePortableBackup(Object? raw) {
+    if (raw is List<dynamic>) {
+      final notebooks = decodeBackupStrict(raw);
+      final folders = <String>{
+        for (final notebook in notebooks)
+          if (notebook.folder.trim().isNotEmpty) notebook.folder.trim(),
+      }.toList()
+        ..sort((a, b) {
+          final lower = a.toLowerCase().compareTo(b.toLowerCase());
+          return lower != 0 ? lower : a.compareTo(b);
+        });
+      return PortableBackupData(notebooks: notebooks, folders: folders);
+    }
+    if (raw is! Map<String, dynamic>) {
+      throw const FormatException(
+        'Backup root must be a JSON object or legacy list.',
+      );
+    }
+    if (raw['format'] != 'nanotateczki-backup' ||
+        raw['version'] is! int ||
+        raw['version'] != 1 ||
+        raw['checksumAlgorithm'] != 'sha256') {
+      throw const FormatException('Unsupported backup envelope.');
+    }
+    final checksum = raw['checksum'];
+    final payload = raw['payload'];
+    if (checksum is! String ||
+        !RegExp(r'^[0-9a-f]{64}
+      _notebookToJson(notebook);
+
+  List<Notebook> decodeNotebooks(List<dynamic> items) {
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(_notebookFromJson)
+        .toList();
+  }
+
+  List<Notebook> decodeBackupStrict(List<dynamic> items) {
+    _validateBackupJsonStructure(items);
+    final notebooks = decodeNotebooks(items);
+    if (notebooks.length != items.length) {
+      throw const FormatException('Backup could not be decoded completely.');
+    }
+    _validateRecoveryBatch(notebooks);
+    return notebooks;
+  }
+
+  void _validateBackupJsonStructure(List<dynamic> items) {
+    for (var notebookIndex = 0; notebookIndex < items.length; notebookIndex++) {
+      final notebook = items[notebookIndex];
+      if (notebook is! Map<String, dynamic>) {
+        throw FormatException(
+          'Backup notebook[$notebookIndex] is not a JSON object.',
+        );
+      }
+      final kind = notebook['kind'];
+      if (kind != null) {
+        if (kind is! num ||
+            kind.toInt() != kind ||
+            kind.toInt() < 0 ||
+            kind.toInt() >= NotebookKind.values.length) {
+          throw FormatException(
+            'Backup notebook[$notebookIndex] has an unknown kind.',
+          );
+        }
+      }
+      final pages = notebook['pages'];
+      if (pages is! List<dynamic>) {
+        throw FormatException(
+          'Backup notebook[$notebookIndex] has no valid page list.',
+        );
+      }
+      for (var pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        final page = pages[pageIndex];
+        if (page is! Map<String, dynamic>) {
+          throw FormatException(
+            'Backup notebook[$notebookIndex].pages[$pageIndex] '
+            'is not a JSON object.',
+          );
+        }
+        _requireMapList(
+          page,
+          'textBlocks',
+          'notebook[$notebookIndex].pages[$pageIndex]',
+        );
+        _requireMapList(
+          page,
+          'imageBlocks',
+          'notebook[$notebookIndex].pages[$pageIndex]',
+        );
+        final inkStrokes = _requireOptionalMapList(
+          page,
+          'inkStrokes',
+          'notebook[$notebookIndex].pages[$pageIndex]',
+        );
+        _requireOptionalMapList(
+          page,
+          'indexTabs',
+          'notebook[$notebookIndex].pages[$pageIndex]',
+        );
+
+        for (var strokeIndex = 0;
+            strokeIndex < inkStrokes.length;
+            strokeIndex++) {
+          final stroke = inkStrokes[strokeIndex];
+          final tool = stroke['tool'];
+          if (tool != null) {
+            if (tool is! num ||
+                tool.toInt() != tool ||
+                tool.toInt() < 0 ||
+                tool.toInt() >= DrawingTool.values.length) {
+              throw FormatException(
+                'Backup notebook[$notebookIndex].pages[$pageIndex].'
+                'inkStrokes[$strokeIndex].tool is unknown.',
+              );
+            }
+          }
+          final points = stroke['points'];
+          if (points == null) {
+            continue;
+          }
+          if (points is! List<dynamic> ||
+              points.any((point) => point is! Map<String, dynamic>)) {
+            throw FormatException(
+              'Backup notebook[$notebookIndex].pages[$pageIndex].'
+              'inkStrokes[$strokeIndex].points is malformed.',
+            );
+          }
+        }
+
+        final imageBlocks = page['imageBlocks'] as List<dynamic>;
+        for (var imageIndex = 0;
+            imageIndex < imageBlocks.length;
+            imageIndex++) {
+          final image = imageBlocks[imageIndex] as Map<String, dynamic>;
+          final bytes = image['bytes'];
+          if (bytes == null) {
+            continue;
+          }
+          if (bytes is! String || bytes.isEmpty) {
+            throw FormatException(
+              'Backup notebook[$notebookIndex].pages[$pageIndex].'
+              'imageBlocks[$imageIndex].bytes is malformed.',
+            );
+          }
+          try {
+            base64Decode(bytes);
+          } catch (_) {
+            throw FormatException(
+              'Backup notebook[$notebookIndex].pages[$pageIndex].'
+              'imageBlocks[$imageIndex].bytes is not valid base64.',
+            );
+          }
+        }
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> _requireMapList(
+    Map<String, dynamic> owner,
+    String key,
+    String path,
+  ) {
+    final value = owner[key];
+    if (value is! List<dynamic> ||
+        value.any((item) => item is! Map<String, dynamic>)) {
+      throw FormatException('Backup $path.$key is malformed.');
+    }
+    return value.cast<Map<String, dynamic>>();
+  }
+
+  List<Map<String, dynamic>> _requireOptionalMapList(
+    Map<String, dynamic> owner,
+    String key,
+    String path,
+  ) {
+    final value = owner[key];
+    if (value == null) {
+      return const <Map<String, dynamic>>[];
+    }
+    if (value is! List<dynamic> ||
+        value.any((item) => item is! Map<String, dynamic>)) {
+      throw FormatException('Backup $path.$key is malformed.');
+    }
+    return value.cast<Map<String, dynamic>>();
+  }
+
+  Future<_NotebookReadResult> _readNotebook(NotebookRow row) async {
+    var hadCorruptRows = false;
+    final pageRows = await _readRowsSafely(
+      read: () =>
+          (database.select(database.pageRows)
+                ..where((item) => item.notebookUid.equals(row.uid))
+                ..orderBy([(item) => OrderingTerm.asc(item.pageIndex)]))
+              .get(),
+      source: 'NotebookRepository._readNotebook(${row.uid}, pages)',
+      onError: () => hadCorruptRows = true,
+    );
+    final pages = <NotePage>[];
+    for (final pageRow in pageRows) {
+      try {
+        final result = await _readPage(pageRow);
+        pages.add(result.page);
+        hadCorruptRows = hadCorruptRows || result.hadCorruptRows;
+      } catch (error, stackTrace) {
+        hadCorruptRows = true;
+        _recordReadError(
+          error,
+          stackTrace,
+          'NotebookRepository._readNotebook(${row.uid}, page=${pageRow.uid})',
+        );
+      }
+    }
+    return _NotebookReadResult(
+      notebook: Notebook(
+        uid: row.uid,
+        title: row.title,
+        kind: _notebookKindFromStoredIndex(row.kindIndex),
+        folder: row.folder,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        pages: pages,
+      ),
+      hadCorruptRows: hadCorruptRows,
+    );
+  }
+
+  Future<_PageReadResult> _readPage(PageRow row) async {
+    var hadCorruptRows = false;
+    void markCorrupt() => hadCorruptRows = true;
+    final tabs = await _readRowsSafely(
+      read: () => (database.select(
+        database.indexTabRows,
+      )..where((item) => item.pageUid.equals(row.uid))).get(),
+      source: 'NotebookRepository._readPage(${row.uid}, tabs)',
+      onError: markCorrupt,
+    );
+    final textBlocks = await _readRowsSafely(
+      read: () =>
+          (database.select(database.textBlockRows)
+                ..where((item) => item.pageUid.equals(row.uid))
+                ..orderBy([(item) => OrderingTerm.asc(item.sortIndex)]))
+              .get(),
+      source: 'NotebookRepository._readPage(${row.uid}, text)',
+      onError: markCorrupt,
+    );
+    final imageBlocks = await _readRowsSafely(
+      read: () =>
+          (database.select(database.imageBlockRows)
+                ..where((item) => item.pageUid.equals(row.uid))
+                ..orderBy([(item) => OrderingTerm.asc(item.sortIndex)]))
+              .get(),
+      source: 'NotebookRepository._readPage(${row.uid}, images)',
+      onError: markCorrupt,
+    );
+    final strokes = await _readRowsSafely(
+      read: () =>
+          (database.select(database.inkStrokeRows)
+                ..where((item) => item.pageUid.equals(row.uid))
+                ..orderBy([(item) => OrderingTerm.asc(item.sortIndex)]))
+              .get(),
+      source: 'NotebookRepository._readPage(${row.uid}, strokes)',
+      onError: markCorrupt,
+    );
+    return _PageReadResult(
+      page: NotePage(
+        id: row.uid,
+        title: row.title,
+        textBlocks: _convertRowsSafely(
+          textBlocks,
+          _textFromRow,
+          'NotebookRepository._readPage(${row.uid}, text row)',
+          markCorrupt,
+        ),
+        imageBlocks: _convertRowsSafely(
+          imageBlocks,
+          _imageFromRow,
+          'NotebookRepository._readPage(${row.uid}, image row)',
+          markCorrupt,
+        ),
+        inkStrokes: _convertRowsSafely(
+          strokes,
+          _strokeFromRow,
+          'NotebookRepository._readPage(${row.uid}, stroke row)',
+          markCorrupt,
+        ),
+        isBookmarked: row.isBookmarked,
+        indexTabs: _indexTabsFromRows(
+          row,
+          _convertRowsSafely(
+            tabs,
+            _indexTabFromRow,
+            'NotebookRepository._readPage(${row.uid}, tab row)',
+            markCorrupt,
+          ),
+        ),
+      ),
+      hadCorruptRows: hadCorruptRows,
+    );
+  }
+
+  Future<List<T>> _readRowsSafely<T>({
+    required Future<List<T>> Function() read,
+    required String source,
+    required void Function() onError,
+  }) async {
+    try {
+      return await read();
+    } catch (error, stackTrace) {
+      onError();
+      _recordReadError(error, stackTrace, source);
+      return <T>[];
+    }
+  }
+
+  List<R> _convertRowsSafely<T, R>(
+    List<T> rows,
+    R Function(T row) convert,
+    String source,
+    void Function() onError,
+  ) {
+    final converted = <R>[];
+    for (final row in rows) {
+      try {
+        converted.add(convert(row));
+      } catch (error, stackTrace) {
+        onError();
+        _recordReadError(error, stackTrace, source);
+      }
+    }
+    return converted;
+  }
+
+  void _recordReadError(Object error, StackTrace stackTrace, String source) {
+    debugPrint('$source: $error');
+    final handler = _readErrorHandler;
+    if (handler != null) {
+      handler(error, stackTrace, source);
+      return;
+    }
+    AppErrorLog.instance.record(error, stackTrace, source: source);
+  }
+
+  List<IndexTab> _indexTabsFromRows(PageRow page, List<IndexTab> tabs) {
+    if (tabs.isNotEmpty || page.legacyIndexTabColorValue == null) {
+      return tabs;
+    }
+    return [
+      IndexTab(
+        id: _uuid.v4(),
+        color: Color(page.legacyIndexTabColorValue!),
+        position: page.legacyIndexTabPosition ?? 0.0,
+      ),
+    ];
+  }
+
+  void _validateRecoveryBatch(List<Notebook> notebooks) {
+    final notebookIds = <String>{};
+    final pageIds = <String>{};
+    final tabIds = <String>{};
+    final textIds = <String>{};
+    final imageIds = <String>{};
+    final strokeIds = <String>{};
+
+    void requireUnique(Set<String> ids, String id, String type) {
+      if (id.isEmpty || !ids.add(id)) {
+        throw FormatException(
+          'Recovery contains an empty or duplicate $type id: $id',
+        );
+      }
+    }
+
+    for (final notebook in notebooks) {
+      requireUnique(notebookIds, notebook.uid, 'notebook');
+      if (notebook.pages.isEmpty) {
+        throw FormatException(
+          'Recovery notebook has no pages: ${notebook.uid}',
+        );
+      }
+      for (final page in notebook.pages) {
+        requireUnique(pageIds, page.id, 'page');
+        for (final tab in page.indexTabs) {
+          requireUnique(tabIds, tab.id, 'index tab');
+        }
+        for (final block in page.textBlocks) {
+          requireUnique(textIds, block.id, 'text block');
+        }
+        for (final block in page.imageBlocks) {
+          requireUnique(imageIds, block.id, 'image block');
+        }
+        for (final stroke in page.inkStrokes) {
+          requireUnique(strokeIds, stroke.id, 'ink stroke');
+        }
+      }
+    }
+  }
+
+  Future<bool> _isDatabaseEmptyForRestore() async {
+    if ((await database.select(database.notebookRows).get()).isNotEmpty) {
+      return false;
+    }
+    if ((await database.select(database.pageRows).get()).isNotEmpty) {
+      return false;
+    }
+    if ((await database.select(database.indexTabRows).get()).isNotEmpty) {
+      return false;
+    }
+    if ((await database.select(database.textBlockRows).get()).isNotEmpty) {
+      return false;
+    }
+    if ((await database.select(database.imageBlockRows).get()).isNotEmpty) {
+      return false;
+    }
+    return (await database.select(database.inkStrokeRows).get()).isEmpty;
+  }
+
+  Future<void> _insertPage(
+    String notebookUid,
+    NotePage page,
+    int pageIndex,
+  ) async {
+    final existingPage = await (database.select(
+      database.pageRows,
+    )..where((row) => row.uid.equals(page.id))).getSingleOrNull();
+    if (existingPage != null && existingPage.notebookUid != notebookUid) {
+      throw StateError(
+        'Page id ${page.id} already belongs to notebook '
+        '${existingPage.notebookUid}.',
+      );
+    }
+    await database
+        .into(database.pageRows)
+        .insertOnConflictUpdate(
+          PageRowsCompanion.insert(
+            uid: page.id,
+            notebookUid: notebookUid,
+            pageIndex: pageIndex,
+            title: page.title,
+            isBookmarked: page.isBookmarked,
+            legacyIndexTabColorValue: Value(
+              page.indexTabs.firstOrNull?.color.toARGB32(),
+            ),
+            legacyIndexTabPosition: Value(page.indexTabs.firstOrNull?.position),
+          ),
+        );
+    for (final tab in page.indexTabs) {
+      await database
+          .into(database.indexTabRows)
+          .insert(_indexTabToCompanion(page.id, tab));
+    }
+    for (final entry in page.textBlocks.asMap().entries) {
+      await database
+          .into(database.textBlockRows)
+          .insert(_textToCompanion(page.id, entry.value, entry.key));
+    }
+    for (final entry in page.imageBlocks.asMap().entries) {
+      await database
+          .into(database.imageBlockRows)
+          .insert(_imageToCompanion(page.id, entry.value, entry.key));
+    }
+    for (final entry in page.inkStrokes.asMap().entries) {
+      await database
+          .into(database.inkStrokeRows)
+          .insert(_strokeToCompanion(page.id, entry.value, entry.key));
+    }
+  }
+
+  Future<void> _deleteNotebookChildren(String notebookUid) async {
+    final pages = await (database.select(
+      database.pageRows,
+    )..where((item) => item.notebookUid.equals(notebookUid))).get();
+    for (final page in pages) {
+      await _deletePageChildren(page.uid);
+    }
+    await (database.delete(
+      database.pageRows,
+    )..where((item) => item.notebookUid.equals(notebookUid))).go();
+  }
+
+  Future<void> _deletePageChildren(String pageUid) async {
+    await (database.delete(
+      database.indexTabRows,
+    )..where((item) => item.pageUid.equals(pageUid))).go();
+    await (database.delete(
+      database.textBlockRows,
+    )..where((item) => item.pageUid.equals(pageUid))).go();
+    await (database.delete(
+      database.imageBlockRows,
+    )..where((item) => item.pageUid.equals(pageUid))).go();
+    await (database.delete(
+      database.inkStrokeRows,
+    )..where((item) => item.pageUid.equals(pageUid))).go();
+  }
+
+  Notebook _buildRecoveredCopy(Notebook notebook, String reason) {
+    final now = DateTime.now();
+    return Notebook(
+      uid: _uuid.v4(),
+      title: _buildRecoveredTitle(notebook.title, reason),
+      kind: notebook.kind,
+      folder: notebook.folder,
+      createdAt: now,
+      updatedAt: now,
+      pages: [
+        for (final page in notebook.pages)
+          NotePage(
+            id: _uuid.v4(),
+            title: page.title,
+            textBlocks: [
+              for (final block in page.textBlocks)
+                block.copyWith(id: _uuid.v4()),
+            ],
+            imageBlocks: [
+              for (final block in page.imageBlocks)
+                block.copyWith(
+                  id: _uuid.v4(),
+                  path: block.bytes?.isNotEmpty ?? false ? '' : block.path,
+                ),
+            ],
+            inkStrokes: [
+              for (final stroke in page.inkStrokes)
+                stroke.copyWith(id: _uuid.v4()),
+            ],
+            isBookmarked: page.isBookmarked,
+            indexTabs: [
+              for (final tab in page.indexTabs)
+                IndexTab(
+                  id: _uuid.v4(),
+                  color: tab.color,
+                  position: tab.position,
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  String _buildRecoveredTitle(String title, String reason) {
+    final trimmedTitle = title.trim().isEmpty ? 'Untitled' : title.trim();
+    return '$trimmedTitle ($reason)';
+  }
+
+  IndexTab _indexTabFromRow(IndexTabRow row) {
+    return IndexTab(
+      id: row.uid,
+      color: Color(row.colorValue),
+      position: row.position,
+    );
+  }
+
+  IndexTabRowsCompanion _indexTabToCompanion(String pageUid, IndexTab tab) {
+    return IndexTabRowsCompanion.insert(
+      uid: tab.id,
+      pageUid: pageUid,
+      colorValue: tab.color.toARGB32(),
+      position: tab.position,
+    );
+  }
+
+  TextBlock _textFromRow(TextBlockRow row) {
+    return TextBlock(
+      id: row.uid,
+      text: row.plainText,
+      deltaJson: row.deltaJson,
+      position: Offset(row.dx, row.dy),
+      fontSize: row.fontSize,
+      color: Color(row.colorValue),
+      width: row.width,
+      rotation: row.rotation,
+    );
+  }
+
+  TextBlockRowsCompanion _textToCompanion(
+    String pageUid,
+    TextBlock block,
+    int sortIndex,
+  ) {
+    return TextBlockRowsCompanion.insert(
+      uid: block.id,
+      pageUid: pageUid,
+      plainText: block.text,
+      deltaJson: Value(block.deltaJson),
+      fontSize: block.fontSize,
+      colorValue: block.color.toARGB32(),
+      width: block.width,
+      rotation: block.rotation,
+      dx: block.position.dx,
+      dy: block.position.dy,
+      sortIndex: sortIndex,
+    );
+  }
+
+  ImageBlock _imageFromRow(ImageBlockRow row) {
+    final storedBytes = _bytesFromEntity(row.bytes);
+    if (row.path.isEmpty) {
+      if (storedBytes == null || storedBytes.isEmpty) {
+        throw FormatException(
+          'Stored image has neither a file path nor bytes: ${row.uid}',
+        );
+      }
+    } else if (!kIsWeb) {
+      final file = File(row.path);
+      if (!file.existsSync() || file.lengthSync() <= 0) {
+        throw FileSystemException(
+          'Stored image file is missing or empty.',
+          row.path,
+        );
+      }
+    }
+    return ImageBlock(
+      id: row.uid,
+      path: row.path,
+      ocrText: row.ocrText,
+      position: Offset(row.dx, row.dy),
+      width: row.width,
+      height: row.height,
+      bytes: storedBytes,
+      imageExt: row.imageExt,
+      imageMime: row.imageMime,
+      rotation: row.rotation,
+      cropLeft: row.cropLeft,
+      cropTop: row.cropTop,
+      cropRight: row.cropRight,
+      cropBottom: row.cropBottom,
+    );
+  }
+
+  ImageBlockRowsCompanion _imageToCompanion(
+    String pageUid,
+    ImageBlock block,
+    int sortIndex,
+  ) {
+    return ImageBlockRowsCompanion.insert(
+      uid: block.id,
+      pageUid: pageUid,
+      path: block.path,
+      ocrText: block.ocrText,
+      bytes: Value(block.path.isEmpty ? block.bytes : null),
+      imageExt: Value(block.imageExt),
+      imageMime: Value(block.imageMime),
+      width: block.width,
+      height: block.height,
+      rotation: block.rotation,
+      dx: block.position.dx,
+      dy: block.position.dy,
+      cropLeft: block.cropLeft,
+      cropTop: block.cropTop,
+      cropRight: block.cropRight,
+      cropBottom: block.cropBottom,
+      sortIndex: sortIndex,
+    );
+  }
+
+  InkStroke _strokeFromRow(InkStrokeRow row) {
+    return InkStroke(
+      id: row.uid,
+      points: _pointsFromJson(row.pointsJson),
+      color: Color(row.colorValue),
+      width: row.width,
+      tool: _toolFromStoredIndex(row.toolIndex),
+    );
+  }
+
+  InkStrokeRowsCompanion _strokeToCompanion(
+    String pageUid,
+    InkStroke stroke,
+    int sortIndex,
+  ) {
+    return InkStrokeRowsCompanion.insert(
+      uid: stroke.id,
+      pageUid: pageUid,
+      colorValue: stroke.color.toARGB32(),
+      width: stroke.width,
+      toolIndex: _toolToIndex(stroke.tool),
+      pointsJson: _pointsToJson(stroke.points),
+      sortIndex: sortIndex,
+    );
+  }
+
+  String _pointsToJson(List<InkPoint> points) {
+    return jsonEncode(
+      points
+          .map(
+            (point) => {
+              'dx': point.dx,
+              'dy': point.dy,
+              'pressure': point.pressure,
+            },
+          )
+          .toList(),
+    );
+  }
+
+  List<InkPoint> _pointsFromJson(String value) {
+    final decoded = jsonDecode(value);
+    if (decoded is! List<dynamic>) {
+      throw const FormatException('Stored ink points are not a JSON list.');
+    }
+    if (decoded.any((point) => point is! Map<String, dynamic>)) {
+      throw const FormatException(
+        'Stored ink points contain a malformed entry.',
+      );
+    }
+    return decoded
+        .cast<Map<String, dynamic>>()
+        .map(
+          (point) => InkPoint(
+            dx: (point['dx'] as num).toDouble(),
+            dy: (point['dy'] as num).toDouble(),
+            pressure: (point['pressure'] as num?)?.toDouble() ?? 0.5,
+          ),
+        )
+        .toList();
+  }
+
+  static Map<String, dynamic> _notebookToJson(Notebook notebook) {
+    return {
+      'uid': notebook.uid,
+      'title': notebook.title,
+      'kind': notebook.kind.indexValue,
+      'folder': notebook.folder,
+      'createdAt': notebook.createdAt.toIso8601String(),
+      'updatedAt': notebook.updatedAt.toIso8601String(),
+      'pages': notebook.pages.map(_pageToJson).toList(),
+    };
+  }
+
+  Notebook _notebookFromJson(Map<String, dynamic> json) {
+    return Notebook(
+      uid: json['uid'] as String,
+      title: json['title'] as String,
+      kind: NotebookKindValue.fromIndex((json['kind'] as num?)?.toInt() ?? 0),
+      folder: (json['folder'] as String?) ?? 'Notes',
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      pages: (json['pages'] as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(_pageFromJson)
+          .toList(),
+    );
+  }
+
+  static Map<String, dynamic> _pageToJson(NotePage page) {
+    return {
+      'id': page.id,
+      'title': page.title,
+      'isBookmarked': page.isBookmarked,
+      'indexTabColor': page.indexTabs.firstOrNull?.color.toARGB32(),
+      'indexTabPosition': page.indexTabs.firstOrNull?.position,
+      'indexTabs': page.indexTabs.map(_indexTabToJson).toList(),
+      'textBlocks': page.textBlocks.map(_textToJson).toList(),
+      'imageBlocks': page.imageBlocks.map(_imageToJson).toList(),
+      'inkStrokes': page.inkStrokes.map(_strokeToJson).toList(),
+    };
+  }
+
+  NotePage _pageFromJson(Map<String, dynamic> json) {
+    return NotePage(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      textBlocks: (json['textBlocks'] as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(_textFromJson)
+          .toList(),
+      imageBlocks: (json['imageBlocks'] as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(_imageFromJson)
+          .toList(),
+      inkStrokes: (json['inkStrokes'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(_strokeFromJson)
+          .toList(),
+      isBookmarked: json['isBookmarked'] as bool? ?? false,
+      indexTabs: _indexTabsFromJson(json),
+    );
+  }
+
+  static Map<String, dynamic> _indexTabToJson(IndexTab tab) {
+    return {
+      'id': tab.id,
+      'color': tab.color.toARGB32(),
+      'position': tab.position,
+    };
+  }
+
+  List<IndexTab> _indexTabsFromJson(Map<String, dynamic> json) {
+    final tabs = (json['indexTabs'] as List<dynamic>? ?? <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(_indexTabFromJson)
+        .toList();
+    if (tabs.isNotEmpty || json['indexTabColor'] == null) {
+      return tabs;
+    }
+    return [
+      IndexTab(
+        id: _uuid.v4(),
+        color: Color(json['indexTabColor'] as int),
+        position: (json['indexTabPosition'] as num?)?.toDouble() ?? 0.0,
+      ),
+    ];
+  }
+
+  IndexTab _indexTabFromJson(Map<String, dynamic> json) {
+    return IndexTab(
+      id: (json['id'] as String?) ?? _uuid.v4(),
+      color: Color(json['color'] as int),
+      position: (json['position'] as num).toDouble(),
+    );
+  }
+
+  static Map<String, dynamic> _textToJson(TextBlock block) {
+    return {
+      'id': block.id,
+      'text': block.text,
+      'deltaJson': block.deltaJson,
+      'fontSize': block.fontSize,
+      'color': block.color.toARGB32(),
+      'width': block.width,
+      'rotation': block.rotation,
+      'dx': block.position.dx,
+      'dy': block.position.dy,
+    };
+  }
+
+  TextBlock _textFromJson(Map<String, dynamic> json) {
+    return TextBlock(
+      id: json['id'] as String,
+      text: json['text'] as String,
+      deltaJson: json['deltaJson'] as String?,
+      position: Offset(
+        (json['dx'] as num).toDouble(),
+        (json['dy'] as num).toDouble(),
+      ),
+      fontSize: (json['fontSize'] as num).toDouble(),
+      color: Color(json['color'] as int),
+      width: (json['width'] as num).toDouble(),
+      rotation: (json['rotation'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+
+  static Map<String, dynamic> _imageToJson(ImageBlock block) {
+    final bytesBase64 = _bytesToBase64(_imageBytesForJson(block));
+    return {
+      'id': block.id,
+      'path': block.path,
+      'ocrText': block.ocrText,
+      'bytes': bytesBase64,
+      'imageExt': block.imageExt,
+      'imageMime': block.imageMime,
+      'width': block.width,
+      'height': block.height,
+      'rotation': block.rotation,
+      'cropLeft': block.cropLeft,
+      'cropTop': block.cropTop,
+      'cropRight': block.cropRight,
+      'cropBottom': block.cropBottom,
+      'dx': block.position.dx,
+      'dy': block.position.dy,
+    };
+  }
+
+  ImageBlock _imageFromJson(Map<String, dynamic> json) {
+    return ImageBlock(
+      id: json['id'] as String,
+      path: json['path'] as String? ?? '',
+      ocrText: json['ocrText'] as String? ?? '',
+      bytes: _bytesFromBase64(json['bytes']),
+      imageExt: json['imageExt'] as String?,
+      imageMime: json['imageMime'] as String?,
+      position: Offset(
+        (json['dx'] as num).toDouble(),
+        (json['dy'] as num).toDouble(),
+      ),
+      width: (json['width'] as num).toDouble(),
+      height: (json['height'] as num).toDouble(),
+      rotation: (json['rotation'] as num?)?.toDouble() ?? 0.0,
+      cropLeft: (json['cropLeft'] as num?)?.toDouble() ?? 0.0,
+      cropTop: (json['cropTop'] as num?)?.toDouble() ?? 0.0,
+      cropRight: (json['cropRight'] as num?)?.toDouble() ?? 1.0,
+      cropBottom: (json['cropBottom'] as num?)?.toDouble() ?? 1.0,
+    );
+  }
+
+  static Uint8List? _imageBytesForJson(ImageBlock block) {
+    final bytes = block.bytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      return bytes;
+    }
+    if (block.path.isEmpty) {
+      return null;
+    }
+    if (kIsWeb) {
+      return null;
+    }
+    final file = File(block.path);
+    if (!file.existsSync()) {
+      return null;
+    }
+    try {
+      return file.readAsBytesSync();
+    } catch (e) {
+      debugPrint('NotebookRepository._imageBytesForJson failed: $e');
+      return null;
+    }
+  }
+
+  static Map<String, dynamic> _strokeToJson(InkStroke stroke) {
+    return {
+      'id': stroke.id,
+      'color': stroke.color.toARGB32(),
+      'width': stroke.width,
+      'tool': _toolToIndex(stroke.tool),
+      'points': stroke.points
+          .map(
+            (point) => {
+              'dx': point.dx,
+              'dy': point.dy,
+              'pressure': point.pressure,
+            },
+          )
+          .toList(),
+    };
+  }
+
+  InkStroke _strokeFromJson(Map<String, dynamic> json) {
+    final toolIndex = (json['tool'] as num?)?.toInt() ?? 0;
+    return InkStroke(
+      id: json['id'] as String,
+      color: Color(json['color'] as int),
+      width: (json['width'] as num).toDouble(),
+      tool: _toolFromIndex(toolIndex),
+      points: (json['points'] as List<dynamic>? ?? <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (point) => InkPoint(
+              dx: (point['dx'] as num).toDouble(),
+              dy: (point['dy'] as num).toDouble(),
+              pressure: (point['pressure'] as num?)?.toDouble() ?? 0.5,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  NotebookKind _notebookKindFromStoredIndex(int index) {
+    if (index < 0 || index >= NotebookKind.values.length) {
+      throw FormatException('Unknown stored notebook kind index: $index');
+    }
+    return NotebookKind.values[index];
+  }
+
+  DrawingTool _toolFromStoredIndex(int index) {
+    if (index < 0 || index >= DrawingTool.values.length) {
+      throw FormatException('Unknown stored drawing tool index: $index');
+    }
+    return DrawingTool.values[index];
+  }
+
+  DrawingTool _toolFromIndex(int index) {
+    final values = DrawingTool.values;
+    if (index < 0 || index >= values.length) {
+      return DrawingTool.pen;
+    }
+    return values[index];
+  }
+
+  static int _toolToIndex(DrawingTool tool) => tool.index;
+
+  Uint8List? _bytesFromEntity(Uint8List? bytes) {
+    if (bytes == null || bytes.isEmpty) {
+      return null;
+    }
+    return Uint8List.fromList(bytes);
+  }
+
+  static String? _bytesToBase64(Uint8List? bytes) {
+    if (bytes == null || bytes.isEmpty) {
+      return null;
+    }
+    return base64Encode(bytes);
+  }
+
+  Uint8List? _bytesFromBase64(Object? value) {
+    if (value is! String || value.isEmpty) {
+      return null;
+    }
+    try {
+      return base64Decode(value);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class _NotebookReadResult {
+  const _NotebookReadResult({
+    required this.notebook,
+    required this.hadCorruptRows,
+  });
+
+  final Notebook notebook;
+  final bool hadCorruptRows;
+}
+
+class _PageReadResult {
+  const _PageReadResult({required this.page, required this.hadCorruptRows});
+
+  final NotePage page;
+  final bool hadCorruptRows;
+}
+
+class DataIntegrityProtectionException implements Exception {
+  const DataIntegrityProtectionException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'DataIntegrityProtectionException: $message';
+}
+
+class _NotebookContentSummary {
+  const _NotebookContentSummary({
+    required this.pages,
+    required this.textBlocks,
+    required this.textCharacters,
+    required this.imageBlocks,
+    required this.inkStrokes,
+    required this.inkPoints,
+    required this.indexTabs,
+  });
+
+  factory _NotebookContentSummary.fromNotebook(Notebook notebook) {
+    return _NotebookContentSummary.fromPages(notebook.pages);
+  }
+
+  factory _NotebookContentSummary.fromPages(List<NotePage> pages) {
+    var textBlocks = 0;
+    var textCharacters = 0;
+    var imageBlocks = 0;
+    var inkStrokes = 0;
+    var inkPoints = 0;
+    var indexTabs = 0;
+    for (final page in pages) {
+      textBlocks += page.textBlocks.length;
+      textCharacters += page.textBlocks.fold<int>(
+        0,
+        (sum, block) => sum + block.text.length,
+      );
+      imageBlocks += page.imageBlocks.length;
+      inkStrokes += page.inkStrokes.length;
+      inkPoints += page.inkStrokes.fold<int>(
+        0,
+        (sum, stroke) => sum + stroke.points.length,
+      );
+      indexTabs += page.indexTabs.length;
+    }
+    return _NotebookContentSummary(
+      pages: pages.length,
+      textBlocks: textBlocks,
+      textCharacters: textCharacters,
+      imageBlocks: imageBlocks,
+      inkStrokes: inkStrokes,
+      inkPoints: inkPoints,
+      indexTabs: indexTabs,
+    );
+  }
+
+  final int pages;
+  final int textBlocks;
+  final int textCharacters;
+  final int imageBlocks;
+  final int inkStrokes;
+  final int inkPoints;
+  final int indexTabs;
+
+  int get contentItems => textBlocks + imageBlocks + inkStrokes;
+
+  int get contentScore =>
+      textCharacters + imageBlocks * 100 + inkStrokes * 10 + inkPoints;
+
+  Map<String, int> toJson() {
+    return {
+      'pages': pages,
+      'textBlocks': textBlocks,
+      'textCharacters': textCharacters,
+      'imageBlocks': imageBlocks,
+      'inkStrokes': inkStrokes,
+      'inkPoints': inkPoints,
+      'indexTabs': indexTabs,
+      'contentItems': contentItems,
+      'contentScore': contentScore,
+    };
+  }
+}
+
+List<String> _suspiciousReductionReasons(
+  _NotebookContentSummary before,
+  _NotebookContentSummary attempted,
+) {
+  final reasons = <String>[];
+  if (before.contentItems > 0 && attempted.contentItems == 0) {
+    reasons.add('all_content_removed');
+  }
+  if (before.pages > attempted.pages &&
+      before.contentItems > attempted.contentItems) {
+    reasons.add('pages_and_content_removed');
+  }
+  if (before.contentScore >= 100 &&
+      attempted.contentScore * 10 <= before.contentScore) {
+    reasons.add('content_score_dropped_at_least_90_percent');
+  }
+  return reasons;
+}
+).hasMatch(checksum) ||
+        payload is! Map<String, dynamic>) {
+      throw const FormatException('Backup envelope is malformed.');
+    }
+    final actual = sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+    if (actual != checksum) {
+      throw const FormatException('Backup checksum validation failed.');
+    }
+    final rawFolders = payload['folders'];
+    final rawNotebooks = payload['notebooks'];
+    if (rawFolders is! List<dynamic> ||
+        rawFolders.any((item) => item is! String) ||
+        rawNotebooks is! List<dynamic>) {
+      throw const FormatException('Backup payload is malformed.');
+    }
+    final notebooks = decodeBackupStrict(rawNotebooks);
+    final folders = rawFolders
+        .cast<String>()
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort((a, b) {
+        final lower = a.toLowerCase().compareTo(b.toLowerCase());
+        return lower != 0 ? lower : a.compareTo(b);
+      });
+    return PortableBackupData(notebooks: notebooks, folders: folders);
   }
 
   static Map<String, dynamic> encodeNotebook(Notebook notebook) =>

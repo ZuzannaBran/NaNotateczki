@@ -240,7 +240,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2195 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (3377 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. Recovery zapisuje cały batch atomowo i preferuje
@@ -266,7 +266,7 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (625 linie)
+### `lib/features/library/presentation/library_controller.dart` (626 linie)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
 
@@ -455,7 +455,7 @@ warstwami tła/canvasu/overlayu.
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart` (917)
+- `test/notebook_repository_test.dart` (992)
 - `test/local_backup_service_test.dart` (848)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)

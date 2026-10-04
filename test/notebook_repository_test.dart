@@ -95,6 +95,81 @@ void main() {
     expect(savedSecond?.pages.single.id, second.pages.single.id);
   });
 
+  test('portable backup detects checksum-preserving JSON corruption', () {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = Notebook(
+      uid: 'portable-notebook',
+      title: 'Portable',
+      kind: NotebookKind.notebook,
+      folder: 'Notes',
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+      pages: [
+        NotePage(
+          id: 'portable-page',
+          title: 'Page',
+          textBlocks: const [],
+          imageBlocks: const [],
+          inkStrokes: const [],
+          isBookmarked: false,
+          indexTabs: const [],
+        ),
+      ],
+    );
+    final encoded = repository.encodePortableBackup(
+      [notebook],
+      folders: ['Empty Folder'],
+    );
+    final payload = encoded['payload'] as Map<String, dynamic>;
+    payload['folders'] = ['Tampered Folder'];
+
+    expect(
+      () => repository.decodePortableBackup(encoded),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('portable backup keeps empty folders and decodes legacy lists', () {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = Notebook(
+      uid: 'portable-notebook',
+      title: 'Portable',
+      kind: NotebookKind.notebook,
+      folder: 'Notes',
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+      pages: [
+        NotePage(
+          id: 'portable-page',
+          title: 'Page',
+          textBlocks: const [],
+          imageBlocks: const [],
+          inkStrokes: const [],
+          isBookmarked: false,
+          indexTabs: const [],
+        ),
+      ],
+    );
+
+    final encoded = repository.encodePortableBackup(
+      [notebook],
+      folders: ['Empty Folder'],
+    );
+    final decoded = repository.decodePortableBackup(encoded);
+    final legacy = repository.decodePortableBackup(
+      repository.encodeNotebooks([notebook]),
+    );
+
+    expect(decoded.notebooks.single.uid, notebook.uid);
+    expect(decoded.folders, containsAll(['Empty Folder', 'Notes']));
+    expect(legacy.notebooks.single.uid, notebook.uid);
+    expect(legacy.folders, ['Notes']);
+  });
+
   test('decodeBackupStrict rejects partial non-notebook data', () {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);

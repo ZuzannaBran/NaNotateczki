@@ -442,7 +442,10 @@ class LibraryController extends ChangeNotifier {
       '${DateTime.now().microsecondsSinceEpoch}.json',
     );
     final temporary = File('${file.path}.tmp');
-    final payload = repository.encodeSelfContainedBackup(current);
+    final payload = repository.encodePortableBackup(
+      current,
+      folders: folderNames,
+    );
     try {
       await temporary.writeAsString(jsonEncode(payload), flush: true);
       await temporary.rename(file.path);
@@ -461,12 +464,10 @@ class LibraryController extends ChangeNotifier {
       throw Exception('Backup file not found.');
     }
     final content = await file.readAsString();
-    final raw = jsonDecode(content);
-    if (raw is! List<dynamic>) {
-      throw const FormatException('Backup root must be a JSON list.');
-    }
-    final decoded = repository.decodeBackupStrict(raw);
-    await repository.importNotebooksAtomically(decoded);
+    final decoded = repository.decodePortableBackup(jsonDecode(content));
+    await repository.importNotebooksAtomically(decoded.notebooks);
+    _folders.addAll(decoded.folders);
+    await _saveFolders();
     await loadItems();
   }
 
