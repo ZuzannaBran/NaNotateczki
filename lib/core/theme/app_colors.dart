@@ -115,12 +115,12 @@ const _babyBluePalette = AppAccentPalette(
 );
 
 class AppColors {
-  static const background = Color(0xFFF5F0E5);
-  static const toolbar = Color(0xFFE8E0D2);
+  static const background = Color(0xFFE6E6E6);
+  static const toolbar = Color(0xFFFBFBFB);
   static const paper = Color(0xFFF8F6F2);
   static const inkBlack = Color(0xFF1E1E1E);
   static const shadow = Color(0x22000000);
-  static const divider = Color(0xFFD6C9B8);
+  static const divider = Color(0xFFDBDBDB);
 
   static const inkPalette = <Color>[
     inkBlack,
