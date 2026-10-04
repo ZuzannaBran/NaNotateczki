@@ -398,6 +398,8 @@ tylko pionowo.
 - 1622–1665: skróty klawiszowe; 1777: `_PageViewportClipper`.
 - 1879: `_PageFramePainter`; 1954: `_IndexTabsOverlay`;
   2096: `_ProjectMiniMapOverlay`; 2448: `_ProjectMiniMapPainter`.
+  Wskaźnik widocznego viewportu na overview używa neutralnego
+  `AppColors.divider`, nie czarnego overlayu.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
