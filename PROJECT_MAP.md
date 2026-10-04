@@ -168,7 +168,7 @@ walidacji i nie otwiera uszkodzonej bazy jako poprawnej.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (993 linii)
+### `lib/data/backup/local_backup_service.dart` (992 linii)
 
 Przyrostowy backup z atomowym `manifest.json`, checksumami i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
@@ -237,14 +237,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (1548 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (1658 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych.
 
 - 22: `DataIntegrityIncidentHandler`; 29: `NotebookRepository`.
 - 60: `fetchNotebooks`; 110: `saveRecoveredCopy`;
-  124: `archiveNotebookBeforeDelete`.
+  124: `restoreNotebooksAtomically`; 178: `archiveNotebookBeforeDelete`.
 - 159: `createNotebook`; 185: `createBoard`; 211: `getNotebook`.
 - 238: `saveNotebook`; 268: `saveNotebookPages`;
   476: `updateNotebookMetadata`; 740: `deleteNotebook`.
@@ -452,7 +452,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (546)
-- `test/local_backup_service_test.dart` (476)
+- `test/local_backup_service_test.dart` (547)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

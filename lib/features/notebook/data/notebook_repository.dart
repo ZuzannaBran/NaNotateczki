@@ -121,6 +121,55 @@ class NotebookRepository {
     return recovered;
   }
 
+  Future<int> restoreNotebooksAtomically(List<Notebook> notebooks) async {
+    if (notebooks.isEmpty) {
+      return 0;
+    }
+    _validateRecoveryBatch(notebooks);
+
+    final persisted = <Notebook>[];
+    for (final notebook in notebooks) {
+      persisted.add(await _persistInlineImages(notebook));
+    }
+
+    await database.transaction(() async {
+      if (!await _isDatabaseEmptyForRestore()) {
+        throw StateError(
+          'Atomic recovery requires an empty database.',
+        );
+      }
+      for (final notebook in persisted) {
+        await database.into(database.notebookRows).insert(
+          NotebookRowsCompanion.insert(
+            uid: notebook.uid,
+            title: notebook.title,
+            kindIndex: notebook.kind.indexValue,
+            folder: notebook.folder,
+            createdAt: notebook.createdAt,
+            updatedAt: notebook.updatedAt,
+          ),
+        );
+        for (final entry in notebook.pages.asMap().entries) {
+          await _insertPage(notebook.uid, entry.value, entry.key);
+        }
+      }
+    });
+
+    _latestPersistedUpdates
+      ..clear()
+      ..addEntries(
+        persisted.map((item) => MapEntry(item.uid, item.updatedAt)),
+      );
+    _notebookCache
+      ..clear()
+      ..addEntries(persisted.map((item) => MapEntry(item.uid, item)));
+    _lastFetchSkippedCorruptRows = false;
+    _lastCorruptNotebookIds.clear();
+    _isNotebookCacheComplete = true;
+    onChanged?.call();
+    return persisted.length;
+  }
+
   Future<void> archiveNotebookBeforeDelete(
     Notebook notebook, {
     String reason = 'deleted',
@@ -934,6 +983,66 @@ class NotebookRepository {
         position: page.legacyIndexTabPosition ?? 0.0,
       ),
     ];
+  }
+
+  void _validateRecoveryBatch(List<Notebook> notebooks) {
+    final notebookIds = <String>{};
+    final pageIds = <String>{};
+    final tabIds = <String>{};
+    final textIds = <String>{};
+    final imageIds = <String>{};
+    final strokeIds = <String>{};
+
+    void requireUnique(Set<String> ids, String id, String type) {
+      if (id.isEmpty || !ids.add(id)) {
+        throw FormatException(
+          'Recovery contains an empty or duplicate $type id: $id',
+        );
+      }
+    }
+
+    for (final notebook in notebooks) {
+      requireUnique(notebookIds, notebook.uid, 'notebook');
+      if (notebook.pages.isEmpty) {
+        throw FormatException(
+          'Recovery notebook has no pages: ${notebook.uid}',
+        );
+      }
+      for (final page in notebook.pages) {
+        requireUnique(pageIds, page.id, 'page');
+        for (final tab in page.indexTabs) {
+          requireUnique(tabIds, tab.id, 'index tab');
+        }
+        for (final block in page.textBlocks) {
+          requireUnique(textIds, block.id, 'text block');
+        }
+        for (final block in page.imageBlocks) {
+          requireUnique(imageIds, block.id, 'image block');
+        }
+        for (final stroke in page.inkStrokes) {
+          requireUnique(strokeIds, stroke.id, 'ink stroke');
+        }
+      }
+    }
+  }
+
+  Future<bool> _isDatabaseEmptyForRestore() async {
+    if ((await database.select(database.notebookRows).get()).isNotEmpty) {
+      return false;
+    }
+    if ((await database.select(database.pageRows).get()).isNotEmpty) {
+      return false;
+    }
+    if ((await database.select(database.indexTabRows).get()).isNotEmpty) {
+      return false;
+    }
+    if ((await database.select(database.textBlockRows).get()).isNotEmpty) {
+      return false;
+    }
+    if ((await database.select(database.imageBlockRows).get()).isNotEmpty) {
+      return false;
+    }
+    return (await database.select(database.inkStrokeRows).get()).isEmpty;
   }
 
   Future<void> _insertPage(

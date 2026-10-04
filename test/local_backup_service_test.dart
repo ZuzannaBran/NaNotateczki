@@ -360,6 +360,58 @@ void main() {
     expect(restored.single.pages.single.imageBlocks.single.bytes, isNotEmpty);
   });
 
+  test('restore commits a complete batch and notifies once', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    var changed = 0;
+    final repository = NotebookRepository(
+      database,
+      onChanged: () => changed++,
+    );
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+    final first = _notebook();
+    final second = _distinctNotebook();
+
+    await service.snapshot([first, second]);
+    final restored = await service.restoreFromLatest();
+
+    expect(restored, 2);
+    expect(changed, 1);
+    final saved = await repository.fetchNotebooks();
+    expect(saved.map((item) => item.uid).toSet(), {
+      first.uid,
+      second.uid,
+    });
+  });
+
+  test('restore rolls back the batch when ids collide', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+    final first = _notebook();
+    final second = first.copyWith(
+      uid: 'notebook-2',
+      updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
+    );
+
+    await service.snapshot([first, second]);
+    final restored = await service.restoreFromLatest();
+
+    expect(restored, 0);
+    expect(await repository.fetchNotebooks(), isEmpty);
+  });
+
   test('snapshot stops when ink becomes active', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
@@ -433,6 +485,25 @@ Notebook _notebook() {
         ],
         isBookmarked: false,
         indexTabs: const [],
+      ),
+    ],
+  );
+}
+
+Notebook _distinctNotebook() {
+  final first = _notebook();
+  final page = first.pages.single;
+  return first.copyWith(
+    uid: 'notebook-2',
+    title: 'Notebook 2',
+    updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
+    pages: [
+      page.copyWith(
+        id: 'page-2',
+        inkStrokes: [
+          for (final stroke in page.inkStrokes)
+            stroke.copyWith(id: '${stroke.id}-2'),
+        ],
       ),
     ],
   );

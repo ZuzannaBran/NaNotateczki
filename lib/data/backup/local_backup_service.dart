@@ -576,21 +576,20 @@ class LocalBackupService {
 
   Future<int> restoreFromLatest() async {
     final notebooks = await readLatest();
-    var restored = 0;
-    for (final notebook in notebooks) {
-      try {
-        await repository.saveNotebook(notebook);
-        restored++;
-      } catch (e) {
-        debugPrint('LocalBackupService.restore: skipping ${notebook.uid}: $e');
-        AppErrorLog.instance.record(
-          e,
-          null,
-          source: 'LocalBackupService.restoreFromLatest(${notebook.uid})',
-        );
-      }
+    if (notebooks.isEmpty) {
+      return 0;
     }
-    return restored;
+    try {
+      return await repository.restoreNotebooksAtomically(notebooks);
+    } catch (e, st) {
+      debugPrint('LocalBackupService.restoreFromLatest failed: $e');
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LocalBackupService.restoreFromLatest',
+      );
+      return 0;
+    }
   }
 
   Future<BackupSnapshotReport> _snapshotForWeb(List<Notebook> items) async {
