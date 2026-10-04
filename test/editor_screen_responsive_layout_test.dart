@@ -54,6 +54,7 @@ void main() {
     );
     final wideRightMargin = 1000 - _documentTopRight(tester).dx;
     expect(wideRightMargin, closeTo(56.0, 0.001));
+    expect(_pageViewportSize(tester).width, closeTo(782.0, 0.001));
     _expectSymmetricHorizontalMargins(tester);
 
     await tester.binding.setSurfaceSize(const Size(500, 900));
@@ -70,6 +71,7 @@ void main() {
     );
     final narrowRightMargin = 500 - _documentTopRight(tester).dx;
     expect(narrowRightMargin, closeTo(wideRightMargin, 0.001));
+    expect(_pageViewportSize(tester).width, closeTo(282.0, 0.001));
     _expectSymmetricHorizontalMargins(tester);
     expect(find.text('Widen the window to edit this notebook.'), findsNothing);
 
@@ -93,6 +95,12 @@ double _documentScale(WidgetTester tester) {
 Size _documentLayoutSize(WidgetTester tester) {
   return tester.getSize(
     find.byKey(const ValueKey('notebook-document-transform')),
+  );
+}
+
+Size _pageViewportSize(WidgetTester tester) {
+  return tester.getSize(
+    find.byKey(const ValueKey('notebook-page-viewport')),
   );
 }
 

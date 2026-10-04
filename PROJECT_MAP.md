@@ -369,17 +369,17 @@ zgodą na zamknięcie aplikacji.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2731 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2733 linie)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
 panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
 skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
-Overview kończy się przy x=106; viewport strony zaczyna się po 56 px
-przerwy i kończy 56 px przed prawą krawędzią. Poziomy clip jest twardy, więc
-strona nie wchodzi pod marginesy; bleed pozostaje tylko pionowo dla ramki
-i cienia.
+Overview kończy się przy x=106; poziomy viewport strony zawsze zajmuje cały
+pas od 56 px za overview do 56 px przed prawą krawędzią. Zoom i pan działają
+wewnątrz tego pasa, więc powiększona strona nie jest przedwcześnie ucinana
+ani nie wchodzi pod marginesy; bleed pozostaje tylko pionowo.
 
 - 33: `EditorScreen`; 40: `_EditorScreenState`.
 - 41: `_logicalPageWidth`; 84: `_effectivePageScale` — skala okna pomnożona
@@ -504,7 +504,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
-- `test/editor_screen_responsive_layout_test.dart` (144)
+- `test/editor_screen_responsive_layout_test.dart` (153)
 - `test/page_overlay_text_gestures_test.dart` (113)
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
@@ -528,9 +528,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 6. Notebook ma stałą logiczną szerokość strony 820 px. Przy zmianie okna
    skaluj wspólną macierz dokumentu; nie przeliczaj rozmiarów/pozycji tekstu,
    obrazów ani ink i nie dodawaj osobnej skali wewnątrz overlayów. Zachowaj
-   overview do `x=106`, 56 px odstępu do strony i 56 px od strony do prawej
-   krawędzi. Clipper nie może wypuszczać strony poziomo pod marginesy; bleed
-   może być tylko pionowy.
+   overview do `x=106`, a viewport strony od `x=162` do 56 px przed prawą
+   krawędzią. Przy zoomie nie zwężaj viewportu do bazowej szerokości strony.
+   Clipper nie może wypuszczać strony poziomo pod marginesy; bleed może być
+   tylko pionowy.
 7. OCR działa tylko na Android/iOS. Import PDF na Linuxie używa `pdftoppm`
    (`poppler-utils`); pozostałe platformy używają `pdfx`.
 8. Obrazy natywne mają trwałe ścieżki; inline `bytes` są przeznaczone dla web
