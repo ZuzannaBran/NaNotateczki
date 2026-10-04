@@ -600,7 +600,7 @@ void main() {
       integrityValidator: (_) async {
         validationCount++;
         if (validationCount <= 3) {
-          throw StateError('integrity failed');
+          throw const DatabaseIntegrityException('integrity failed');
         }
       },
       databaseQuarantine: (_) async {
@@ -634,6 +634,9 @@ void main() {
           integrityValidator: (_) async {
             validationCount++;
             throw StateError('integrity failed');
+          },
+          databaseQuarantine: (_) async {
+            fail('generic validation errors must not quarantine the database');
           },
         ),
         throwsA(

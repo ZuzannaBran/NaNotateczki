@@ -136,11 +136,11 @@ kopię po 2 s bezczynności i wymusza próbę po maksymalnie 30 s ciągłych zmi
 
 ### Drift
 
-### `lib/data/drift/notes_database.dart` (313 linii)
+### `lib/data/drift/notes_database.dart` (339 linii)
 
 Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami. Start sprawdza
-`PRAGMA quick_check` i `PRAGMA foreign_key_check`; po trwałym błędzie
-walidacji natywna baza jest zachowywana jako plik `.corrupt_*`, a aplikacja
+`PRAGMA quick_check` i `PRAGMA foreign_key_check`; po potwierdzonej korupcji lub naruszeniu integralności natywna baza jest
+zachowywana jako plik `.corrupt_*`, a aplikacja
 otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 - 9: `NotebookRows`; 21: `PageRows`;
@@ -452,7 +452,7 @@ warstwami tła/canvasu/overlayu.
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart` (654)
+- `test/notebook_repository_test.dart` (657)
 - `test/local_backup_service_test.dart` (622)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)

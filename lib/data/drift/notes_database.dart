@@ -110,6 +110,15 @@ class DatabaseOpenResult {
 
 enum DatabaseOpenStage { connection, validation }
 
+class DatabaseIntegrityException implements Exception {
+  const DatabaseIntegrityException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'DatabaseIntegrityException: $message';
+}
+
 class DatabaseOpenException implements Exception {
   const DatabaseOpenException({
     required this.stage,
@@ -225,7 +234,8 @@ class NotesDatabase extends _$NotesDatabase {
     }
 
     if (lastStage == DatabaseOpenStage.validation &&
-        quarantineDatabase != null) {
+        quarantineDatabase != null &&
+        _isDatabaseCorruption(lastError!)) {
       NotesDatabase? recoveredDatabase;
       try {
         final quarantinePath = await quarantineDatabase(_databaseFileName);
@@ -276,15 +286,31 @@ class NotesDatabase extends _$NotesDatabase {
     );
   }
 
+  static bool _isDatabaseCorruption(Object error) {
+    if (error is DatabaseIntegrityException) {
+      return true;
+    }
+    final message = error.toString().toLowerCase();
+    return message.contains('database disk image is malformed') ||
+        message.contains('file is not a database') ||
+        message.contains('sqlite_corrupt') ||
+        message.contains('sqlite_notadb') ||
+        message.contains('malformed database schema');
+  }
+
   Future<void> _validateIntegrity() async {
     final quickCheck = await customSelect('PRAGMA quick_check').get();
     if (quickCheck.isEmpty) {
-      throw StateError('SQLite quick_check returned no result.');
+      throw const DatabaseIntegrityException(
+        'SQLite quick_check returned no result.',
+      );
     }
     for (final row in quickCheck) {
       final values = row.data.values;
       if (values.length != 1 || values.first != 'ok') {
-        throw StateError('SQLite quick_check failed: ${row.data}');
+        throw DatabaseIntegrityException(
+          'SQLite quick_check failed: ${row.data}',
+        );
       }
     }
 
@@ -292,7 +318,7 @@ class NotesDatabase extends _$NotesDatabase {
       'PRAGMA foreign_key_check',
     ).get();
     if (foreignKeyErrors.isNotEmpty) {
-      throw StateError(
+      throw DatabaseIntegrityException(
         'SQLite foreign_key_check found '
         '${foreignKeyErrors.length} violation(s).',
       );
