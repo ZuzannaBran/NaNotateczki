@@ -160,20 +160,22 @@ pliku po awarii.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (930 linii)
+### `lib/data/backup/local_backup_service.dart` (976 linii)
 
 Przyrostowy backup z atomowym `manifest.json`, checksumami i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
-trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki,
-więc historia nie duplikuje całego snapshotu. Odczyt odrzuca niekompletny
-snapshot i próbuje kolejno starsze wersje. Web przechowuje pełny snapshot w
-`localStorage`.
+trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki.
+Przed utworzeniem nowej wersji natywny backup sprawdza, czy każdy obraz
+wskazujący plik nadal istnieje i daje się odczytać; brak obrazu nie zastępuje
+ostatniej poprawnej kopii. Odczyt odrzuca niekompletny snapshot i próbuje
+kolejno starsze wersje. Web przechowuje pełny snapshot w `localStorage`.
 
 - 15: `LocalBackupService`; 90: `snapshot`; 280: `hasLatest`;
-  385: `readLatest`; 500: `restoreFromLatest`.
-- 650: anulowalny worker serializacji.
-- 747: `BackupSnapshotInterrupted`; 751: `BackupValidationException`;
-  762: `BackupSnapshotReport`; 813: `NotebookBackupReport`.
+  430: `readLatest`; 545: `restoreFromLatest`.
+- 695: anulowalny worker serializacji.
+- 792: `BackupSnapshotInterrupted`; 796: `BackupValidationException`;
+  807: `BackupDataException`; 818: `BackupSnapshotReport`;
+  869: `NotebookBackupReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (270 linii)
 
@@ -442,7 +444,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (496)
-- `test/local_backup_service_test.dart` (355)
+- `test/local_backup_service_test.dart` (406)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

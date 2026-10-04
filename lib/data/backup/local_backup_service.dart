@@ -148,6 +148,7 @@ class LocalBackupService {
           continue;
         }
 
+        await _validateNotebookImages(notebook);
         final workerResult = await _runBackupWorker<_BackupWorkerResult>(
           _BackupWorkerOperation.snapshot,
           notebook,
@@ -353,6 +354,42 @@ class LocalBackupService {
       checksum: checksum is String ? checksum : null,
       jsonBytes: jsonBytes is num ? jsonBytes.toInt() : null,
     );
+  }
+
+  Future<void> _validateNotebookImages(Notebook notebook) async {
+    for (final page in notebook.pages) {
+      for (final image in page.imageBlocks) {
+        final inlineBytes = image.bytes;
+        if (inlineBytes != null && inlineBytes.isNotEmpty) {
+          continue;
+        }
+        if (image.path.isEmpty) {
+          throw BackupDataException(
+            'Image ${image.id} has no persisted file or inline bytes.',
+          );
+        }
+        final file = File(image.path);
+        if (!await file.exists()) {
+          throw BackupDataException(
+            'Image file is missing for ${image.id}: ${image.path}',
+          );
+        }
+        try {
+          if (await file.length() <= 0) {
+            throw BackupDataException(
+              'Image file is empty for ${image.id}: ${image.path}',
+            );
+          }
+          await file.openRead(0, 1).drain<void>();
+        } on BackupDataException {
+          rethrow;
+        } catch (e) {
+          throw BackupDataException(
+            'Image file cannot be read for ${image.id}: ${image.path}; $e',
+          );
+        }
+      }
+    }
   }
 
   Future<bool> _isManifestEntryValid(_BackupManifestEntry entry) async {
@@ -811,6 +848,15 @@ class BackupValidationException implements Exception {
 
   @override
   String toString() => 'BackupValidationException: $message';
+}
+
+class BackupDataException implements Exception {
+  const BackupDataException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'BackupDataException: $message';
 }
 
 class BackupSnapshotReport {

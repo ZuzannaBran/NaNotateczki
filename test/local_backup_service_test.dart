@@ -8,6 +8,7 @@ import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
+import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/ink_stroke.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
@@ -237,6 +238,56 @@ void main() {
         .toList();
 
     expect(manifests.length, lessThanOrEqualTo(5));
+  });
+
+  test('missing image never replaces the last good backup', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final imageFile = File('${directory.path}/image.png');
+    await imageFile.writeAsBytes([1, 2, 3, 4], flush: true);
+    final base = _notebook();
+    final withImage = base.copyWith(
+      pages: [
+        base.pages.single.copyWith(
+          imageBlocks: [
+            ImageBlock(
+              id: 'image',
+              path: imageFile.path,
+              ocrText: '',
+              position: Offset.zero,
+              width: 100,
+              height: 100,
+              imageExt: 'png',
+              imageMime: 'image/png',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await service.snapshot([withImage]);
+    await imageFile.delete();
+    final changed = withImage.copyWith(
+      title: 'Changed after image disappeared',
+      updatedAt: withImage.updatedAt.add(const Duration(seconds: 1)),
+    );
+
+    await expectLater(
+      service.snapshot([changed]),
+      throwsA(isA<BackupDataException>()),
+    );
+
+    final restored = await service.readLatest();
+    expect(restored, hasLength(1));
+    expect(restored.single.updatedAt, withImage.updatedAt);
+    expect(restored.single.pages.single.imageBlocks, hasLength(1));
+    expect(restored.single.pages.single.imageBlocks.single.bytes, isNotEmpty);
   });
 
   test('snapshot stops when ink becomes active', () async {
