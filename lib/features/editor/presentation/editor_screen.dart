@@ -2478,11 +2478,11 @@ class _ProjectMiniMapPainter extends CustomPainter {
       panelRect,
       Radius.circular(cornerRadius),
     );
-    final background = Paint()..color = const Color(0xFFF8FAFD);
+    final background = Paint()..color = AppColors.background;
     canvas.drawRRect(panelRRect, background);
 
     final border = Paint()
-      ..color = const Color(0xFFCFD7E4)
+      ..color = AppColors.divider
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     canvas.drawRRect(panelRRect.deflate(0.5), border);
@@ -2503,11 +2503,11 @@ class _ProjectMiniMapPainter extends CustomPainter {
       final pageRect = Rect.fromLTWH(0, pageTop, size.width, pageHeight);
       final isCurrentPage = i == currentPageIndex;
 
-      final pageFill = Paint()..color = const Color(0xFFFDFEFF);
+      final pageFill = Paint()..color = AppColors.paper;
       final pageBorder = Paint()
         ..color = isCurrentPage
-            ? const Color(0xFFC8D2E0)
-            : const Color(0xFFD4DCE8)
+            ? AppColors.inkBlack.withValues(alpha: 0.22)
+            : AppColors.divider
         ..style = PaintingStyle.stroke
         ..strokeWidth = isCurrentPage ? 0.7 : 0.6;
       canvas.drawRect(pageRect, pageFill);
@@ -2527,7 +2527,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
       }
 
       if (pageGap > 0 && i < pages.length - 1) {
-        final separator = Paint()..color = const Color(0xFFE4EAF2);
+        final separator = Paint()..color = AppColors.toolbar;
         final sepTop = (pageTopWorld + pageWorldSize.height) * scaleY;
         final sepHeight = (pageGap * scaleY).clamp(0.5, 3.0).toDouble();
         canvas.drawRect(
@@ -2544,9 +2544,9 @@ class _ProjectMiniMapPainter extends CustomPainter {
       canvas.save();
       canvas.clipRect(pageRect);
 
-      final imageFill = Paint()..color = const Color(0xFFE6ECF5);
+      final imageFill = Paint()..color = AppColors.toolbar;
       final imageBorder = Paint()
-        ..color = const Color(0xFFB7C2D0)
+        ..color = AppColors.divider
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.55;
       for (final block in page.imageBlocks) {
@@ -2575,7 +2575,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
         canvas.drawRect(rect, imageBorder);
       }
 
-      final textPaint = Paint()..color = const Color(0xFF95A2B4);
+      final textPaint = Paint()..color = AppColors.inkBlack.withValues(alpha: 0.48);
       for (final block in page.textBlocks) {
         final topLeft = documentPointToMap(block.position + const Offset(0, 2));
         final lineWidth = (block.width * scaleX * 0.8)
@@ -2666,7 +2666,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
     }
     final spacing = backgroundSpacing.clamp(16.0, 64.0);
     final paint = Paint()
-      ..color = const Color(0xFFCBD5E1).withValues(alpha: 0.55)
+      ..color = AppColors.divider.withValues(alpha: 0.55)
       ..strokeWidth = 0.5;
 
     for (var y = spacing * scaleY; y < pageRect.height; y += spacing * scaleY) {
