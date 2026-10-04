@@ -188,12 +188,14 @@ class NotebookRepository {
         '${archiveDir.path}/${timestamp}_${Uri.encodeComponent(notebook.uid)}.json',
       );
       final payload = encodeNotebooks([notebook]).single;
+      _ensureArchiveContainsImageBytes(payload);
       await file.writeAsString(
         jsonEncode({
           'reason': reason,
           'archivedAt': DateTime.now().toIso8601String(),
           'notebook': payload,
         }),
+        flush: true,
       );
     } catch (e, st) {
       debugPrint('Failed to archive notebook ${notebook.uid}: $e\n$st');
@@ -202,6 +204,7 @@ class NotebookRepository {
         st,
         source: 'NotebookRepository.archiveNotebookBeforeDelete',
       );
+      rethrow;
     }
   }
 
@@ -777,6 +780,28 @@ class NotebookRepository {
     return file.path;
   }
 
+  void _ensureArchiveContainsImageBytes(Map<String, dynamic> notebook) {
+    final pages = notebook['pages'];
+    if (pages is! List<dynamic>) {
+      throw const FormatException('Archive notebook has no page list.');
+    }
+    for (final page in pages.whereType<Map<String, dynamic>>()) {
+      final images = page['imageBlocks'];
+      if (images is! List<dynamic>) {
+        continue;
+      }
+      for (final image in images.whereType<Map<String, dynamic>>()) {
+        final bytes = image['bytes'];
+        if (bytes is! String || bytes.isEmpty) {
+          throw StateError(
+            'Cannot archive image without bytes: '
+            '${image['id'] ?? '<unknown>'}',
+          );
+        }
+      }
+    }
+  }
+
   void _markNotebookCorrupt(String uid) {
     _lastFetchSkippedCorruptRows = true;
     if (!_lastCorruptNotebookIds.contains(uid)) {
@@ -787,9 +812,23 @@ class NotebookRepository {
 
   Future<void> deleteNotebook(String uid) async {
     final notebook = await getNotebook(uid);
-    if (notebook != null) {
-      await archiveNotebookBeforeDelete(notebook);
+    if (_lastCorruptNotebookIds.contains(uid)) {
+      throw StateError(
+        'Cannot delete a notebook with unreadable rows before recovery: $uid',
+      );
     }
+    if (notebook == null) {
+      final existing = await (database.select(
+        database.notebookRows,
+      )..where((row) => row.uid.equals(uid))).getSingleOrNull();
+      if (existing != null) {
+        throw StateError(
+          'Cannot delete notebook because it could not be read safely: $uid',
+        );
+      }
+      return;
+    }
+    await archiveNotebookBeforeDelete(notebook);
     await database.transaction(() async {
       await _deleteNotebookChildren(uid);
       await (database.delete(

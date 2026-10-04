@@ -490,6 +490,38 @@ void main() {
     },
   );
 
+  test('deleteNotebook refuses to delete a corrupt notebook', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(
+      database,
+      readErrorHandler: (_, _, _) {},
+    );
+    final notebook = await repository.createNotebook();
+    await database.into(database.inkStrokeRows).insert(
+      InkStrokeRowsCompanion.insert(
+        uid: 'corrupt-delete-stroke',
+        pageUid: notebook.pages.single.id,
+        colorValue: 0xFF000000,
+        width: 2,
+        toolIndex: 0,
+        pointsJson: '{not valid json',
+        sortIndex: 0,
+      ),
+    );
+    await repository.fetchNotebooks();
+
+    await expectLater(
+      repository.deleteNotebook(notebook.uid),
+      throwsA(isA<StateError>()),
+    );
+
+    final remaining = await (database.select(
+      database.notebookRows,
+    )..where((row) => row.uid.equals(notebook.uid))).getSingleOrNull();
+    expect(remaining, isNotNull);
+  });
+
   test('corrupt stroke does not hide its notebook or page', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
