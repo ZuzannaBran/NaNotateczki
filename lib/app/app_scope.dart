@@ -354,7 +354,8 @@ class _BackupScheduler with WidgetsBindingObserver {
       }
       snapshotReport = await backupService.snapshot(
         items,
-        shouldInterrupt: () => InkActivityTracker.instance.isBusy,
+        shouldInterrupt: () =>
+            InkActivityTracker.instance.isBusy || _dirty,
       );
       final frameSummary = FrameTimingTracker.instance.summarySince(
         frameCursor,

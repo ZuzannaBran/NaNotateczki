@@ -253,6 +253,7 @@ class LocalBackupService {
           await _archiveManifest(previousManifest);
         }
       }
+      _throwIfInterrupted(shouldInterrupt);
       await _atomicWriteString(manifest, manifestContent);
       await _trimHistory();
       manifestStopwatch.stop();
