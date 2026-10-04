@@ -170,7 +170,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (1375 linii)
+### `lib/data/backup/local_backup_service.dart` (1383 linii)
 
 Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami SHA-256 (v3) i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
@@ -178,8 +178,7 @@ trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki.
 Przed i po serializacji natywny backup sprawdza, czy każdy obraz nadal ma
 dostępne bajty; wyścig z usunięciem pliku nie może utrwalić kopii bez obrazu; brak obrazu nie zastępuje
 ostatniej poprawnej kopii. Odczyt obsługuje manifesty v1/v2/v3, odrzuca niekompletny lub niespójny
-snapshot i próbuje kolejno starsze wersje. Manifest przechowuje też listę
-folderów biblioteki, w tym foldery puste. Web przechowuje pełny snapshot w `localStorage`.
+snapshot i próbuje kolejno starsze wersje. Manifest przechowuje też listę folderów biblioteki, w tym foldery puste; uszkodzenie samego pliku folderów nie blokuje backupu notebooków. Web przechowuje pełny snapshot w `localStorage`.
 
 - 15: `LocalBackupService`; 90: `snapshot`; 280: `hasLatest`;
   430: `readLatest`; 545: `restoreFromLatest`.

@@ -323,20 +323,28 @@ class LocalBackupService {
       for (final notebook in items)
         if (notebook.folder.trim().isNotEmpty) notebook.folder.trim(),
     };
-    final content = await _readStoredFolders();
-    if (content != null) {
-      final decoded = jsonDecode(content);
-      if (decoded is! List<dynamic> ||
-          decoded.any((item) => item is! String)) {
-        throw const BackupDataException(
-          'Stored library folder metadata is malformed.',
+    try {
+      final content = await _readStoredFolders();
+      if (content != null) {
+        final decoded = jsonDecode(content);
+        if (decoded is! List<dynamic> ||
+            decoded.any((item) => item is! String)) {
+          throw const FormatException(
+            'Stored library folder metadata is malformed.',
+          );
+        }
+        names.addAll(
+          decoded
+              .cast<String>()
+              .map((item) => item.trim())
+              .where((item) => item.isNotEmpty),
         );
       }
-      names.addAll(
-        decoded
-            .cast<String>()
-            .map((item) => item.trim())
-            .where((item) => item.isNotEmpty),
+    } catch (e, st) {
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LocalBackupService._foldersForSnapshot',
       );
     }
     final folders = names.toList()
