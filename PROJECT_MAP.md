@@ -53,7 +53,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (459 linii)
+### `lib/app/app_scope.dart` (463 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scheduler robi
@@ -266,7 +266,7 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (621 linie)
+### `lib/features/library/presentation/library_controller.dart` (625 linie)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
 

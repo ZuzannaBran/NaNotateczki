@@ -343,9 +343,13 @@ class _BackupScheduler with WidgetsBindingObserver {
           final previous = await backupService.readLatest(
             requiredUids: {uid},
           );
-          final safeCopy = previous
-              .where((item) => item.uid == uid)
-              .firstOrNull;
+          Notebook? safeCopy;
+          for (final candidate in previous) {
+            if (candidate.uid == uid) {
+              safeCopy = candidate;
+              break;
+            }
+          }
           if (safeCopy != null) {
             snapshotItems.add(safeCopy);
           }

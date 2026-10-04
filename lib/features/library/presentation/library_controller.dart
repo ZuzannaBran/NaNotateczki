@@ -592,14 +592,18 @@ class LibraryController extends ChangeNotifier {
     }
 
     final corruptUids = repository.lastCorruptNotebookIds.toSet();
-    final backupNotebooks = await backup.readLatest(
-      requiredUids: corruptUids,
-    );
-    recoverableCorruptDocuments =
-        backupNotebooks
-            .where((item) => corruptUids.contains(item.uid))
-            .toList()
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final recoverable = <Notebook>[];
+    for (final uid in corruptUids) {
+      final backupNotebooks = await backup.readLatest(requiredUids: {uid});
+      for (final item in backupNotebooks) {
+        if (item.uid == uid) {
+          recoverable.add(item);
+          break;
+        }
+      }
+    }
+    recoverableCorruptDocuments = recoverable
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
     AppErrorLog.instance.record(
       'Detected $corruptDocumentCount unreadable notebook rows. '
