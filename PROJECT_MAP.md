@@ -295,7 +295,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
 - 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1043 linie)
+### `lib/features/library/presentation/library_screen.dart` (1045 linie)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
@@ -498,7 +498,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (100)
+- `test/library_screen_responsive_layout_test.dart` (112)
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)

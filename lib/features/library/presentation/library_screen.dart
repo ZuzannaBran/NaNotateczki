@@ -876,6 +876,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
+      key: ValueKey('library-tree-item:${item.uid}'),
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
         color: selected

@@ -78,19 +78,31 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final treeItem = find.byKey(
+      ValueKey('library-tree-item:${created.uid}'),
+    );
+
     expect(find.text('Project A'), findsOneWidget);
-    expect(find.text('Nested note'), findsNWidgets(2));
+    expect(treeItem, findsOneWidget);
+    expect(
+      find.descendant(of: treeItem, matching: find.text('Nested note')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('Collapse Project A'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Nested note'), findsOneWidget);
+    expect(treeItem, findsNothing);
     expect(find.byTooltip('Expand Project A'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Expand Project A'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Nested note'), findsNWidgets(2));
+    expect(treeItem, findsOneWidget);
+    expect(
+      find.descendant(of: treeItem, matching: find.text('Nested note')),
+      findsOneWidget,
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
