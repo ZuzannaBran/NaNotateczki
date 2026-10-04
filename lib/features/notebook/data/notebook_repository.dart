@@ -111,13 +111,13 @@ class NotebookRepository {
     Notebook notebook, {
     String reason = 'Recovered copy',
   }) async {
-    final recovered = notebook.copyWith(
-      uid: _uuid.v4(),
-      title: _buildRecoveredTitle(notebook.title, reason),
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-    await saveNotebook(recovered);
+    final recovered = _buildRecoveredCopy(notebook, reason);
+    final saved = await saveNotebook(recovered);
+    if (!saved) {
+      throw StateError(
+        'Recovered copy could not be persisted: ${recovered.uid}',
+      );
+    }
     return recovered;
   }
 
@@ -1112,6 +1112,49 @@ class NotebookRepository {
     await (database.delete(
       database.inkStrokeRows,
     )..where((item) => item.pageUid.equals(pageUid))).go();
+  }
+
+  Notebook _buildRecoveredCopy(Notebook notebook, String reason) {
+    final now = DateTime.now();
+    return Notebook(
+      uid: _uuid.v4(),
+      title: _buildRecoveredTitle(notebook.title, reason),
+      kind: notebook.kind,
+      folder: notebook.folder,
+      createdAt: now,
+      updatedAt: now,
+      pages: [
+        for (final page in notebook.pages)
+          NotePage(
+            id: _uuid.v4(),
+            title: page.title,
+            textBlocks: [
+              for (final block in page.textBlocks)
+                block.copyWith(id: _uuid.v4()),
+            ],
+            imageBlocks: [
+              for (final block in page.imageBlocks)
+                block.copyWith(
+                  id: _uuid.v4(),
+                  path: block.bytes?.isNotEmpty ?? false ? '' : block.path,
+                ),
+            ],
+            inkStrokes: [
+              for (final stroke in page.inkStrokes)
+                stroke.copyWith(id: _uuid.v4()),
+            ],
+            isBookmarked: page.isBookmarked,
+            indexTabs: [
+              for (final tab in page.indexTabs)
+                IndexTab(
+                  id: _uuid.v4(),
+                  color: tab.color,
+                  position: tab.position,
+                ),
+            ],
+          ),
+      ],
+    );
   }
 
   String _buildRecoveredTitle(String title, String reason) {

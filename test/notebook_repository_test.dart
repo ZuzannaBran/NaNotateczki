@@ -33,6 +33,45 @@ void main() {
     },
   );
 
+  test('saveRecoveredCopy remaps nested ids to avoid SQLite conflicts', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final stroke = InkStroke(
+      id: 'original-stroke',
+      points: const [InkPoint(dx: 1, dy: 2, pressure: 0.5)],
+      color: const Color(0xFF000000),
+      width: 2,
+      tool: DrawingTool.pen,
+    );
+    final source = notebook.copyWith(
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        notebook.pages.single.copyWith(inkStrokes: [stroke]),
+      ],
+    );
+    expect(await repository.saveNotebook(source), isTrue);
+
+    final recovered = await repository.saveRecoveredCopy(
+      source,
+      reason: 'Recovered',
+    );
+
+    expect(recovered.uid, isNot(source.uid));
+    expect(recovered.pages.single.id, isNot(source.pages.single.id));
+    expect(
+      recovered.pages.single.inkStrokes.single.id,
+      isNot(source.pages.single.inkStrokes.single.id),
+    );
+    final saved = await repository.fetchNotebooks();
+    expect(saved, hasLength(2));
+    expect(saved.map((item) => item.uid).toSet(), {
+      source.uid,
+      recovered.uid,
+    });
+  });
+
   test(
     'saveNotebookPages updates one page and refreshes backup cache',
     () async {
