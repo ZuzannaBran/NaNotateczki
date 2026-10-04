@@ -39,9 +39,7 @@ class AppTheme {
       useMaterial3: true,
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.toolbar,
-        surfaceTintColor: Colors.transparent,
         elevation: 0,
-        scrolledUnderElevation: 0,
       ),
       dividerColor: AppColors.divider,
       sliderTheme: SliderThemeData(

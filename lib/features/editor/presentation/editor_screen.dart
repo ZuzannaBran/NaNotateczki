@@ -2720,7 +2720,7 @@ class _MiniMapViewportOverlayPainter extends CustomPainter {
       return;
     }
     final fill = Paint()
-      ..color = AppColors.toolbar.withValues(alpha: 0.26)
+      ..color = Colors.black.withValues(alpha: 0.26)
       ..style = PaintingStyle.fill;
     canvas.drawRect(indicatorRect, fill);
   }
