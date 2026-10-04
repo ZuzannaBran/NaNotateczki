@@ -357,11 +357,11 @@ preferencje, viewport i zapis.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2668 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2669 linie)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
-panel folderów. Strefa robocza notatnika jest zawsze rozjaśniona o 25% w stronę bieli względem aktywnego tła motywu. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
+panel folderów. Tylko kolumna zawierająca właściwe strony notesu jest rozjaśniona o 25% w stronę bieli; pozostała strefa robocza zachowuje wcześniejsze tło. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
 skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma zarezerwowany lewy pas, a kolumna strony jest kotwiczona do

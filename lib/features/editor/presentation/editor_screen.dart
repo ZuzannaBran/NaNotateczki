@@ -1282,11 +1282,7 @@ class _EditorScreenState extends State<EditorScreen> {
               )..setTranslationRaw(_pagePan.dx, _pagePan.dy, 0.0);
 
               return Container(
-                color: Color.lerp(
-                  Theme.of(context).colorScheme.surface,
-                  Colors.white,
-                  0.25,
-                ),
+                color: AppColors.paper.withValues(alpha: 0.35),
                 child: Stack(
                   children: [
                     NotificationListener<ScrollNotification>(
@@ -1308,9 +1304,14 @@ class _EditorScreenState extends State<EditorScreen> {
                         ),
                         child: Align(
                           alignment: Alignment.topRight,
-                          child: SizedBox(
+                          child: Container(
                             width: documentContentSize.width,
                             height: documentContentSize.height,
+                            color: Color.lerp(
+                              Theme.of(context).colorScheme.surface,
+                              Colors.white,
+                              0.25,
+                            ),
                             child: Stack(
                               clipBehavior: Clip.none,
                               children: [
