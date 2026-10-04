@@ -266,9 +266,9 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (627 linie)
+### `lib/features/library/presentation/library_controller.dart` (628 linie)
 
-Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery. Sprzątanie osieroconych obrazów działa tylko przy normalnym starcie istniejącej, zdrowej bazy.
+Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery. Zapis folderów uruchamia scheduler backupu także wtedy, gdy zmieniają się wyłącznie puste foldery. Sprzątanie osieroconych obrazów działa tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
 - 14: `LibraryController`; 78: `initialize`; 84: `loadItems`;
   140: `restoreCorruptDocumentsFromBackup`; 193: `syncNow`.
