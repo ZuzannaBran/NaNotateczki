@@ -134,32 +134,40 @@ class NotebookRepository {
     await _validateRecoveryImages(notebooks);
 
     final persisted = <Notebook>[];
-    for (final notebook in notebooks) {
-      persisted.add(await _persistRecoveryImages(notebook));
-    }
+    final createdImagePaths = <String>[];
+    try {
+      for (final notebook in notebooks) {
+        persisted.add(
+          await _persistRecoveryImages(notebook, createdImagePaths),
+        );
+      }
 
-    await database.transaction(() async {
-      if (!await _isDatabaseEmptyForRestore()) {
-        throw StateError(
-          'Atomic recovery requires an empty database.',
-        );
-      }
-      for (final notebook in persisted) {
-        await database.into(database.notebookRows).insert(
-          NotebookRowsCompanion.insert(
-            uid: notebook.uid,
-            title: notebook.title,
-            kindIndex: notebook.kind.indexValue,
-            folder: notebook.folder,
-            createdAt: notebook.createdAt,
-            updatedAt: notebook.updatedAt,
-          ),
-        );
-        for (final entry in notebook.pages.asMap().entries) {
-          await _insertPage(notebook.uid, entry.value, entry.key);
+      await database.transaction(() async {
+        if (!await _isDatabaseEmptyForRestore()) {
+          throw StateError(
+            'Atomic recovery requires an empty database.',
+          );
         }
-      }
-    });
+        for (final notebook in persisted) {
+          await database.into(database.notebookRows).insert(
+            NotebookRowsCompanion.insert(
+              uid: notebook.uid,
+              title: notebook.title,
+              kindIndex: notebook.kind.indexValue,
+              folder: notebook.folder,
+              createdAt: notebook.createdAt,
+              updatedAt: notebook.updatedAt,
+            ),
+          );
+          for (final entry in notebook.pages.asMap().entries) {
+            await _insertPage(notebook.uid, entry.value, entry.key);
+          }
+        }
+      });
+    } catch (_) {
+      await _deleteRecoveryImages(createdImagePaths);
+      rethrow;
+    }
 
     _latestPersistedUpdates
       ..clear()
@@ -601,7 +609,10 @@ class NotebookRepository {
     }
   }
 
-  Future<Notebook> _persistRecoveryImages(Notebook notebook) async {
+  Future<Notebook> _persistRecoveryImages(
+    Notebook notebook,
+    List<String> createdImagePaths,
+  ) async {
     final migratedPages = <NotePage>[];
     var migrated = false;
     for (final page in notebook.pages) {
@@ -613,6 +624,13 @@ class NotebookRepository {
             ? block.copyWith(path: '')
             : block;
         final persistedBlock = await _persistInlineImageBytes(source);
+        if (!kIsWeb &&
+            bytes != null &&
+            bytes.isNotEmpty &&
+            persistedBlock.path.isNotEmpty &&
+            persistedBlock.path != block.path) {
+          createdImagePaths.add(persistedBlock.path);
+        }
         if (persistedBlock != block) {
           pageMigrated = true;
           migrated = true;
@@ -624,6 +642,23 @@ class NotebookRepository {
       );
     }
     return migrated ? notebook.copyWith(pages: migratedPages) : notebook;
+  }
+
+  Future<void> _deleteRecoveryImages(List<String> paths) async {
+    for (final path in paths.reversed) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'NotebookRepository._deleteRecoveryImages',
+        );
+      }
+    }
   }
 
   Future<Notebook> _persistInlineImages(Notebook notebook) async {
