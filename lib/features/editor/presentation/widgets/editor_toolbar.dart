@@ -57,11 +57,7 @@ class EditorToolbar extends StatelessWidget {
                         label: 'Text',
                         tool: DrawingTool.text,
                       ),
-                      _toolButton(
-                        icon: Icons.select_all,
-                        label: 'Lasso / Select',
-                        tool: DrawingTool.lasso,
-                      ),
+                      _lassoButton(),
                       _toolButton(
                         icon: Icons.open_with,
                         label: 'Move',
@@ -305,6 +301,22 @@ class EditorToolbar extends StatelessWidget {
             : AppColors.inkBlack.withValues(alpha: 0.72),
         style: _toolHighlightStyle(isActive),
         onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _lassoButton() {
+    final selected = controller.tool == DrawingTool.lasso;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: IconButton(
+        icon: const _LassoIcon(),
+        tooltip: 'Lasso / Select',
+        color: selected
+            ? AppColors.inkBlack
+            : AppColors.inkBlack.withValues(alpha: 0.72),
+        style: _toolHighlightStyle(selected),
+        onPressed: () => controller.setTool(DrawingTool.lasso),
       ),
     );
   }
@@ -824,6 +836,86 @@ class EditorToolbar extends StatelessWidget {
 
   int _toByte(double component) {
     return (component * 255.0).round().clamp(0, 255).toInt();
+  }
+}
+
+class _LassoIcon extends StatelessWidget {
+  const _LassoIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    final iconTheme = IconTheme.of(context);
+    final size = iconTheme.size ?? 20;
+    return SizedBox.square(
+      dimension: size,
+      child: CustomPaint(
+        painter: _LassoIconPainter(
+          color: iconTheme.color ?? AppColors.inkBlack,
+        ),
+      ),
+    );
+  }
+}
+
+class _LassoIconPainter extends CustomPainter {
+  const _LassoIconPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scaleX = size.width / 20;
+    final scaleY = size.height / 20;
+    canvas.save();
+    canvas.scale(scaleX, scaleY);
+
+    final outline = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.35
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final lasso = Path()
+      ..moveTo(4.2, 5.3)
+      ..cubicTo(2.0, 7.0, 2.0, 11.9, 4.7, 14.0)
+      ..cubicTo(7.2, 16.0, 12.4, 16.1, 15.0, 13.7)
+      ..cubicTo(17.2, 11.7, 16.2, 7.6, 13.8, 5.8)
+      ..cubicTo(11.5, 4.0, 6.7, 3.5, 4.2, 5.3);
+
+    _drawDashedPath(canvas, lasso, outline);
+
+    final pointer = Path()
+      ..moveTo(10.7, 9.8)
+      ..lineTo(17.3, 12.6)
+      ..lineTo(14.4, 13.5)
+      ..lineTo(16.2, 16.7)
+      ..lineTo(14.7, 17.5)
+      ..lineTo(12.9, 14.3)
+      ..lineTo(10.9, 16.8)
+      ..close();
+
+    final pointerPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(pointer, pointerPaint);
+    canvas.restore();
+  }
+
+  void _drawDashedPath(Canvas canvas, Path path, Paint paint) {
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final end = (distance + 2.3).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, end), paint);
+        distance += 3.7;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LassoIconPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }
 
