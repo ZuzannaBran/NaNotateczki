@@ -103,9 +103,10 @@ i ponawia przejściowy błąd backupu po 30 s.
 ### Storage i diagnostyka
 
 - `lib/core/storage/text_storage.dart` (2): conditional export IO/web.
-- `lib/core/storage/text_storage_io.dart` (21): małe pliki tekstowe w
-  dokumentach aplikacji.
-  5: `readStoredText`; 13: `writeStoredText`.
+- `lib/core/storage/text_storage_io.dart` (78): małe pliki tekstowe w
+  dokumentach aplikacji; zapisy są serializowane per plik i atomowe przez
+  `.tmp`/`.previous` z odzyskiem po przerwanym zapisie.
+  8: `readStoredText`; 17: `writeStoredText`.
 - `lib/core/storage/text_storage_web.dart` (9): odpowiednik w `localStorage`.
   3: `readStoredText`; 7: `writeStoredText`.
 - `lib/core/error/app_error_log.dart` (161): trwały bufor błędów z ostatnich
