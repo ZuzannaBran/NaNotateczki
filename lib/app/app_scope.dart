@@ -17,6 +17,7 @@ import '../data/sync/cloud_sync_service.dart';
 import '../features/library/presentation/library_controller.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notebook/data/notebook_repository.dart';
+import '../features/notebook/domain/notebook.dart';
 
 class AppScope extends StatefulWidget {
   const AppScope({super.key});

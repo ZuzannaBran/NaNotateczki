@@ -12,6 +12,7 @@ import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/ink_stroke.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
+import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 
 void main() {
