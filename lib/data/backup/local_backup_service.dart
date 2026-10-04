@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../core/error/app_error_log.dart';
 import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
+import '../../features/notebook/domain/image_block.dart';
 import '../../features/notebook/domain/notebook.dart';
 import 'backup_eraser_flattening.dart';
 
@@ -39,6 +40,7 @@ class LocalBackupService {
 
   static const _dirName = 'local_backup';
   static const _incrementalDirName = 'notebooks';
+  static const _assetsDirName = 'assets';
   static const _historyDirName = 'history';
   static const _trashDirName = 'trash';
   static const _manifest = 'manifest.json';
@@ -70,6 +72,22 @@ class LocalBackupService {
       await dir.create(recursive: true);
     }
     return dir;
+  }
+
+  Future<Directory> _assetsDir() async {
+    final dir = Directory('${(await _backupDir()).path}/$_assetsDirName');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  Future<File> _assetFile(String checksum) async {
+    if (!_isSafeAssetChecksum(checksum)) {
+      throw FormatException('Unsafe backup asset checksum: $checksum');
+    }
+    final dir = await _assetsDir();
+    return File('${dir.path}/$checksum.bin');
   }
 
   Future<File> _manifestFile() async {
@@ -153,6 +171,7 @@ class LocalBackupService {
       }
       final totalStopwatch = Stopwatch()..start();
       final notebooksDir = await _notebooksDir();
+      final assetsDir = await _assetsDir();
       await _recoverDirectoryAtomicWrites(notebooksDir);
       await _recoverDirectoryAtomicWrites(await _historyDir());
       final previousEntries = await _readManifestEntries();
@@ -236,7 +255,12 @@ class LocalBackupService {
         await _validateNotebookImages(notebook);
         final workerResult = await _backupWorker.run(
           _BackupWorkerOperation.snapshot,
-          notebook,
+          _BackupWorkerRequest(
+            notebook: notebook,
+            assetsDirectoryPath: assetsDir.path,
+            previousAssets:
+                previousEntry?.assets ?? const <_BackupAssetReference>[],
+          ),
           shouldInterrupt: shouldInterrupt,
         );
         if (workerResult.missingImageIds.isNotEmpty) {
@@ -257,6 +281,8 @@ class LocalBackupService {
           checksum: checksum,
           checksumAlgorithm: _sha256Algorithm,
           jsonBytes: jsonBytes,
+          assetBacked: true,
+          assets: workerResult.assets,
         );
         currentEntries[notebook.uid] = entry;
         expectedFiles.add(file.path);
@@ -309,7 +335,7 @@ class LocalBackupService {
         ],
       };
       final manifestPayload = <String, dynamic>{
-        'version': 4,
+        'version': 5,
         'checksumAlgorithm': _sha256Algorithm,
         'checksum': _sha256Checksum(jsonEncode(manifestBody)),
         ...manifestBody,
@@ -480,12 +506,17 @@ class LocalBackupService {
         return const <String, _BackupManifestEntry>{};
       }
       final version = (decoded['version'] as num?)?.toInt();
-      if (version != 1 && version != 2 && version != 3 && version != 4) {
+      if (version != 1 &&
+          version != 2 &&
+          version != 3 &&
+          version != 4 &&
+          version != 5) {
         throw BackupDataException(
           'Unsupported existing backup manifest version: ${decoded['version']}',
         );
       }
-      if (version == 4 && !_isManifestChecksumValid(decoded)) {
+      if ((version == 4 || version == 5) &&
+          !_isManifestChecksumValid(decoded)) {
         return const <String, _BackupManifestEntry>{};
       }
       final entries = decoded['notebooks'];
@@ -528,6 +559,29 @@ class LocalBackupService {
         ? rawAlgorithm
         : _inferChecksumAlgorithm(parsedChecksum);
     final jsonBytes = json['bytes'];
+    final rawAssetMode = json['assetMode'];
+    if (rawAssetMode != null && rawAssetMode != _externalAssetMode) {
+      return null;
+    }
+    final assetBacked = rawAssetMode == _externalAssetMode;
+    final assets = <_BackupAssetReference>[];
+    if (assetBacked) {
+      final rawAssets = json['assets'];
+      if (rawAssets is! List<dynamic>) {
+        return null;
+      }
+      final seenImageIds = <String>{};
+      for (final rawAsset in rawAssets) {
+        if (rawAsset is! Map<String, dynamic>) {
+          return null;
+        }
+        final asset = _assetReferenceFromJson(rawAsset);
+        if (asset == null || !seenImageIds.add(asset.imageId)) {
+          return null;
+        }
+        assets.add(asset);
+      }
+    }
     return _BackupManifestEntry(
       uid: uid,
       updatedAt: parsed,
@@ -535,6 +589,37 @@ class LocalBackupService {
       checksum: parsedChecksum,
       checksumAlgorithm: checksumAlgorithm,
       jsonBytes: jsonBytes is num ? jsonBytes.toInt() : null,
+      assetBacked: assetBacked,
+      assets: assets,
+    );
+  }
+
+  _BackupAssetReference? _assetReferenceFromJson(
+    Map<String, dynamic> json,
+  ) {
+    final imageId = json['imageId'];
+    final checksum = json['checksum'];
+    final rawBytes = json['bytes'];
+    final sourcePath = json['sourcePath'];
+    final sourceModifiedMicros = json['sourceModifiedMicros'];
+    if (imageId is! String ||
+        imageId.isEmpty ||
+        checksum is! String ||
+        !_isSafeAssetChecksum(checksum) ||
+        rawBytes is! num ||
+        rawBytes.toInt() <= 0 ||
+        sourcePath is! String ||
+        (sourceModifiedMicros != null && sourceModifiedMicros is! num)) {
+      return null;
+    }
+    return _BackupAssetReference(
+      imageId: imageId,
+      checksum: checksum,
+      bytes: rawBytes.toInt(),
+      sourcePath: sourcePath,
+      sourceModifiedMicros: sourceModifiedMicros is num
+          ? sourceModifiedMicros.toInt()
+          : null,
     );
   }
 
@@ -589,7 +674,21 @@ class LocalBackupService {
       return false;
     }
     try {
-      return await file.length() == entry.jsonBytes;
+      if (await file.length() != entry.jsonBytes) {
+        return false;
+      }
+      if (!entry.assetBacked) {
+        return true;
+      }
+      for (final asset in entry.assets) {
+        final assetFile = await _assetFile(asset.checksum);
+        await _recoverAtomicWrite(assetFile);
+        if (!await assetFile.exists() ||
+            await assetFile.length() != asset.bytes) {
+          return false;
+        }
+      }
+      return true;
     } catch (_) {
       return false;
     }
@@ -616,7 +715,19 @@ class LocalBackupService {
         _legacyFnv1a32Algorithm => _legacyFnv1a32Checksum(content),
         _ => null,
       };
-      return actual != null && actual == entry.checksum;
+      if (actual == null || actual != entry.checksum) {
+        return false;
+      }
+      if (entry.assetBacked) {
+        for (final asset in entry.assets) {
+          try {
+            await _readBackupAssetBytes(asset);
+          } on BackupValidationException {
+            return false;
+          }
+        }
+      }
+      return true;
     } catch (_) {
       return false;
     }
@@ -624,6 +735,11 @@ class LocalBackupService {
 
   static const _sha256Algorithm = 'sha256';
   static const _legacyFnv1a32Algorithm = 'fnv1a32';
+  static const _externalAssetMode = 'external-v1';
+
+  bool _isSafeAssetChecksum(String checksum) {
+    return RegExp(r'^[0-9a-f]{64}$').hasMatch(checksum);
+  }
 
   String? _inferChecksumAlgorithm(String? checksum) {
     if (checksum == null) {
@@ -774,12 +890,17 @@ class LocalBackupService {
     }
     final rawVersion = decoded['version'];
     final version = rawVersion is num ? rawVersion.toInt() : null;
-    if (version != 1 && version != 2 && version != 3 && version != 4) {
+    if (version != 1 &&
+        version != 2 &&
+        version != 3 &&
+        version != 4 &&
+        version != 5) {
       throw BackupValidationException(
         'Unsupported backup manifest version: $rawVersion',
       );
     }
-    if (version == 4 && !_isManifestChecksumValid(decoded)) {
+    if ((version == 4 || version == 5) &&
+        !_isManifestChecksumValid(decoded)) {
       throw const BackupValidationException(
         'Backup manifest checksum validation failed.',
       );
@@ -830,6 +951,9 @@ class LocalBackupService {
           'Backup notebook is not a JSON object: ${entry.fileName}',
         );
       }
+      if (entry.assetBacked) {
+        await _hydrateAssetBackedNotebookJson(notebookJson, entry);
+      }
       final decodedNotebook = repository.decodeBackupStrict([notebookJson]);
       if (decodedNotebook.length != 1) {
         throw BackupValidationException(
@@ -846,6 +970,106 @@ class LocalBackupService {
       notebooks.add(notebook);
     }
     return _BackupSnapshotData(notebooks: notebooks, folders: folders);
+  }
+
+  Future<void> _hydrateAssetBackedNotebookJson(
+    Map<String, dynamic> notebookJson,
+    _BackupManifestEntry entry,
+  ) async {
+    final assetsByImageId = <String, _BackupAssetReference>{
+      for (final asset in entry.assets) asset.imageId: asset,
+    };
+    final seenImageIds = <String>{};
+    final pages = notebookJson['pages'];
+    if (pages is! List<dynamic>) {
+      throw const BackupValidationException(
+        'Asset-backed notebook has no page list.',
+      );
+    }
+    for (final page in pages) {
+      if (page is! Map<String, dynamic>) {
+        throw const BackupValidationException(
+          'Asset-backed notebook contains a malformed page.',
+        );
+      }
+      final images = page['imageBlocks'];
+      if (images is! List<dynamic>) {
+        throw const BackupValidationException(
+          'Asset-backed notebook contains malformed image blocks.',
+        );
+      }
+      for (final rawImage in images) {
+        if (rawImage is! Map<String, dynamic>) {
+          throw const BackupValidationException(
+            'Asset-backed notebook contains a malformed image block.',
+          );
+        }
+        final imageId = rawImage['id'];
+        final checksum = rawImage['asset'];
+        if (imageId is! String || checksum is! String) {
+          throw const BackupValidationException(
+            'Asset-backed image is missing its asset reference.',
+          );
+        }
+        final asset = assetsByImageId[imageId];
+        if (asset == null || asset.checksum != checksum) {
+          throw BackupValidationException(
+            'Asset reference mismatch for image: $imageId',
+          );
+        }
+        rawImage['bytes'] = base64Encode(
+          await _readBackupAssetBytes(asset),
+        );
+        seenImageIds.add(imageId);
+      }
+    }
+    if (seenImageIds.length != assetsByImageId.length ||
+        !seenImageIds.containsAll(assetsByImageId.keys)) {
+      throw const BackupValidationException(
+        'Manifest contains unreferenced backup assets.',
+      );
+    }
+  }
+
+  Future<List<int>> _readBackupAssetBytes(
+    _BackupAssetReference asset,
+  ) async {
+    final file = await _assetFile(asset.checksum);
+    await _recoverAtomicWrite(file);
+    final primary = await _readValidAssetBytes(file, asset);
+    if (primary != null) {
+      return primary;
+    }
+
+    if (asset.sourcePath.isNotEmpty) {
+      final source = File(asset.sourcePath);
+      final fallback = await _readValidAssetBytes(source, asset);
+      if (fallback != null) {
+        await _atomicWriteBytes(file, fallback);
+        return fallback;
+      }
+    }
+    throw BackupValidationException(
+      'Backup asset failed checksum validation: ${asset.checksum}',
+    );
+  }
+
+  Future<List<int>?> _readValidAssetBytes(
+    File file,
+    _BackupAssetReference asset,
+  ) async {
+    try {
+      if (!await file.exists() || await file.length() != asset.bytes) {
+        return null;
+      }
+      final bytes = await file.readAsBytes();
+      if (sha256.convert(bytes).toString() != asset.checksum) {
+        return null;
+      }
+      return bytes;
+    } catch (_) {
+      return null;
+    }
   }
 
   List<String>? _foldersFromManifest(Map<String, dynamic> manifest) {
@@ -1157,6 +1381,33 @@ class LocalBackupService {
     }
   }
 
+  Future<void> _atomicWriteBytes(File file, List<int> bytes) async {
+    await _recoverAtomicWrite(file);
+    final temporary = File('${file.path}$_temporarySuffix');
+    final previous = File('${file.path}$_previousSuffix');
+    if (await temporary.exists()) {
+      await temporary.delete();
+    }
+    if (await previous.exists()) {
+      await previous.delete();
+    }
+    await temporary.writeAsBytes(bytes, flush: true);
+    if (await file.exists()) {
+      await file.rename(previous.path);
+    }
+    try {
+      await temporary.rename(file.path);
+      if (await previous.exists()) {
+        await previous.delete();
+      }
+    } catch (_) {
+      if (!await file.exists() && await previous.exists()) {
+        await previous.rename(file.path);
+      }
+      rethrow;
+    }
+  }
+
   Future<void> _recoverAtomicWrite(File file) async {
     final temporary = File('${file.path}$_temporarySuffix');
     final previous = File('${file.path}$_previousSuffix');
@@ -1238,6 +1489,18 @@ class LocalBackupService {
 
 enum _BackupWorkerOperation { snapshot }
 
+class _BackupWorkerRequest {
+  const _BackupWorkerRequest({
+    required this.notebook,
+    required this.assetsDirectoryPath,
+    required this.previousAssets,
+  });
+
+  final Notebook notebook;
+  final String assetsDirectoryPath;
+  final List<_BackupAssetReference> previousAssets;
+}
+
 class _BackupWorkerResult {
   const _BackupWorkerResult({
     required this.content,
@@ -1247,6 +1510,7 @@ class _BackupWorkerResult {
     required this.encodeMs,
     required this.jsonMs,
     required this.missingImageIds,
+    required this.assets,
   });
 
   final String content;
@@ -1256,6 +1520,7 @@ class _BackupWorkerResult {
   final int encodeMs;
   final int jsonMs;
   final List<String> missingImageIds;
+  final List<_BackupAssetReference> assets;
 }
 
 const int _workerReadyMessage = 0;
@@ -1434,7 +1699,7 @@ void _backupWorkerEntryPoint(SendPort responsePort) {
       final operation = _BackupWorkerOperation.values[request[1] as int];
       final result = switch (operation) {
         _BackupWorkerOperation.snapshot => _createBackupPayload(
-          request[2] as Notebook,
+          request[2] as _BackupWorkerRequest,
         ),
       };
       responsePort.send(<Object?>[
@@ -1455,13 +1720,18 @@ void _backupWorkerEntryPoint(SendPort responsePort) {
   });
 }
 
-_BackupWorkerResult _createBackupPayload(Notebook notebook) {
+_BackupWorkerResult _createBackupPayload(
+  _BackupWorkerRequest request,
+) {
   final flattenStopwatch = Stopwatch()..start();
-  final backupNotebook = flattenErasersForBackup(notebook);
+  final backupNotebook = flattenErasersForBackup(request.notebook);
   flattenStopwatch.stop();
+
   final encodeStopwatch = Stopwatch()..start();
-  final encoded = NotebookRepository.encodeNotebook(backupNotebook);
-  final missingImageIds = <String>[];
+  final encoded = NotebookRepository.encodeNotebookForLocalBackup(
+    backupNotebook,
+  );
+  final encodedImages = <String, Map<String, dynamic>>{};
   final pages = encoded['pages'];
   if (pages is List<dynamic>) {
     for (final page in pages.whereType<Map<String, dynamic>>()) {
@@ -1470,14 +1740,41 @@ _BackupWorkerResult _createBackupPayload(Notebook notebook) {
         continue;
       }
       for (final image in images.whereType<Map<String, dynamic>>()) {
-        final bytes = image['bytes'];
-        if (bytes is! String || bytes.isEmpty) {
-          missingImageIds.add(image['id']?.toString() ?? '<unknown>');
+        final id = image['id'];
+        if (id is String) {
+          encodedImages[id] = image;
         }
       }
     }
   }
+
+  final previousAssets = <String, _BackupAssetReference>{
+    for (final asset in request.previousAssets) asset.imageId: asset,
+  };
+  final assets = <_BackupAssetReference>[];
+  final missingImageIds = <String>[];
+  for (final page in backupNotebook.pages) {
+    for (final image in page.imageBlocks) {
+      final encodedImage = encodedImages[image.id];
+      if (encodedImage == null) {
+        missingImageIds.add(image.id);
+        continue;
+      }
+      try {
+        final asset = _prepareBackupAsset(
+          image,
+          request.assetsDirectoryPath,
+          previousAssets[image.id],
+        );
+        assets.add(asset);
+        encodedImage['asset'] = asset.checksum;
+      } catch (_) {
+        missingImageIds.add(image.id);
+      }
+    }
+  }
   encodeStopwatch.stop();
+
   final jsonStopwatch = Stopwatch()..start();
   final content = jsonEncode(encoded);
   jsonStopwatch.stop();
@@ -1491,7 +1788,135 @@ _BackupWorkerResult _createBackupPayload(Notebook notebook) {
     encodeMs: encodeStopwatch.elapsedMilliseconds,
     jsonMs: jsonStopwatch.elapsedMilliseconds,
     missingImageIds: missingImageIds,
+    assets: assets,
   );
+}
+
+_BackupAssetReference _prepareBackupAsset(
+  ImageBlock image,
+  String assetsDirectoryPath,
+  _BackupAssetReference? previous,
+) {
+  final inlineBytes = image.bytes;
+  if (inlineBytes != null && inlineBytes.isNotEmpty) {
+    return _writeBackupAsset(
+      imageId: image.id,
+      bytes: inlineBytes,
+      assetsDirectoryPath: assetsDirectoryPath,
+      sourcePath: '',
+      sourceModifiedMicros: null,
+    );
+  }
+  if (image.path.isEmpty) {
+    throw StateError('Image has no source.');
+  }
+
+  final source = File(image.path);
+  final stat = source.statSync();
+  if (stat.type != FileSystemEntityType.file || stat.size <= 0) {
+    throw StateError('Image source is missing.');
+  }
+  final modifiedMicros = stat.modified.microsecondsSinceEpoch;
+  if (previous != null &&
+      previous.sourcePath == image.path &&
+      previous.bytes == stat.size &&
+      previous.sourceModifiedMicros == modifiedMicros) {
+    final previousFile = _workerAssetFile(
+      assetsDirectoryPath,
+      previous.checksum,
+    );
+    _recoverWorkerAssetWrite(previousFile);
+    if (previousFile.existsSync() &&
+        previousFile.lengthSync() == previous.bytes) {
+      return previous;
+    }
+  }
+
+  final bytes = source.readAsBytesSync();
+  if (bytes.isEmpty) {
+    throw StateError('Image source is empty.');
+  }
+  return _writeBackupAsset(
+    imageId: image.id,
+    bytes: bytes,
+    assetsDirectoryPath: assetsDirectoryPath,
+    sourcePath: image.path,
+    sourceModifiedMicros: modifiedMicros,
+  );
+}
+
+_BackupAssetReference _writeBackupAsset({
+  required String imageId,
+  required List<int> bytes,
+  required String assetsDirectoryPath,
+  required String sourcePath,
+  required int? sourceModifiedMicros,
+}) {
+  final checksum = sha256.convert(bytes).toString();
+  final file = _workerAssetFile(assetsDirectoryPath, checksum);
+  _recoverWorkerAssetWrite(file);
+  final reference = _BackupAssetReference(
+    imageId: imageId,
+    checksum: checksum,
+    bytes: bytes.length,
+    sourcePath: sourcePath,
+    sourceModifiedMicros: sourceModifiedMicros,
+  );
+  if (file.existsSync() && file.lengthSync() == bytes.length) {
+    try {
+      if (sha256.convert(file.readAsBytesSync()).toString() == checksum) {
+        return reference;
+      }
+    } catch (_) {}
+  }
+  _atomicWriteWorkerAsset(file, bytes);
+  return reference;
+}
+
+File _workerAssetFile(String directoryPath, String checksum) {
+  return File(
+    '$directoryPath${Platform.pathSeparator}$checksum.bin',
+  );
+}
+
+void _recoverWorkerAssetWrite(File file) {
+  final temporary = File('${file.path}.tmp');
+  final previous = File('${file.path}.previous');
+  if (!file.existsSync() && previous.existsSync()) {
+    previous.renameSync(file.path);
+  } else if (previous.existsSync()) {
+    previous.deleteSync();
+  }
+  if (temporary.existsSync()) {
+    temporary.deleteSync();
+  }
+}
+
+void _atomicWriteWorkerAsset(File file, List<int> bytes) {
+  file.parent.createSync(recursive: true);
+  final temporary = File('${file.path}.tmp');
+  final previous = File('${file.path}.previous');
+  if (temporary.existsSync()) {
+    temporary.deleteSync();
+  }
+  if (previous.existsSync()) {
+    previous.deleteSync();
+  }
+  temporary.writeAsBytesSync(bytes, flush: true);
+  if (file.existsSync()) {
+    file.renameSync(previous.path);
+  }
+  try {
+    temporary.renameSync(file.path);
+    if (previous.existsSync()) {
+      previous.deleteSync();
+    }
+  } catch (_) {
+    if (!file.existsSync() && previous.existsSync()) {
+      previous.renameSync(file.path);
+    }
+    rethrow;
+  }
 }
 
 class _BackupSnapshotData {
@@ -1634,6 +2059,33 @@ class NotebookBackupReport {
   }
 }
 
+class _BackupAssetReference {
+  const _BackupAssetReference({
+    required this.imageId,
+    required this.checksum,
+    required this.bytes,
+    required this.sourcePath,
+    required this.sourceModifiedMicros,
+  });
+
+  final String imageId;
+  final String checksum;
+  final int bytes;
+  final String sourcePath;
+  final int? sourceModifiedMicros;
+
+  Map<String, Object> toJson() {
+    return {
+      'imageId': imageId,
+      'checksum': checksum,
+      'bytes': bytes,
+      'sourcePath': sourcePath,
+      if (sourceModifiedMicros != null)
+        'sourceModifiedMicros': sourceModifiedMicros!,
+    };
+  }
+}
+
 class _BackupManifestEntry {
   const _BackupManifestEntry({
     required this.uid,
@@ -1642,6 +2094,8 @@ class _BackupManifestEntry {
     this.checksum,
     this.checksumAlgorithm,
     this.jsonBytes,
+    this.assetBacked = false,
+    this.assets = const <_BackupAssetReference>[],
   });
 
   final String uid;
@@ -1650,6 +2104,8 @@ class _BackupManifestEntry {
   final String? checksum;
   final String? checksumAlgorithm;
   final int? jsonBytes;
+  final bool assetBacked;
+  final List<_BackupAssetReference> assets;
 
   Map<String, Object> toJson() {
     return {
@@ -1659,6 +2115,8 @@ class _BackupManifestEntry {
       'checksum': ?checksum,
       'checksumAlgorithm': ?checksumAlgorithm,
       'bytes': ?jsonBytes,
+      if (assetBacked) 'assetMode': LocalBackupService._externalAssetMode,
+      if (assetBacked) 'assets': [for (final asset in assets) asset.toJson()],
     };
   }
 }

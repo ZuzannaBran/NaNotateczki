@@ -170,26 +170,34 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (1665 linii)
+### `lib/data/backup/local_backup_service.dart` (2123 linii)
 
 Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami
-SHA-256 plików i całego manifestu (v4). Dirty UID-y pozwalają ponownie użyć
-nietkniętych wpisów po sprawdzeniu istnienia i rozmiaru pliku bez odczytu i
-SHA-256 całego JSON-a; brakujący lub ucięty plik jest odbudowywany. Jeden
-lazy, długowieczny worker isolate serializuje kolejne zmienione notebooki i
-liczy ich SHA-256 bez kosztu `Isolate.spawn` dla każdego zapisu. Do pięciu poprzednich manifestów jest
-trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki.
-Przed i po serializacji natywny backup sprawdza, czy każdy obraz nadal ma
-dostępne bajty; wyścig z usunięciem pliku nie może utrwalić kopii bez obrazu; brak obrazu nie zastępuje
-ostatniej poprawnej kopii. Odczyt obsługuje manifesty v1/v2/v3/v4, odrzuca niekompletny lub niespójny
-snapshot i próbuje kolejno starsze wersje. Manifest przechowuje też listę folderów biblioteki, w tym foldery puste; uszkodzenie samego pliku folderów nie blokuje backupu notebooków. Web przechowuje pełny snapshot w `localStorage`.
+SHA-256 plików i całego manifestu (v5). Zmienione notebooki zapisują obrazy
+jako niezmienne, content-addressed assety w `local_backup/assets/`; JSON
+notebooka przechowuje tylko checksumę assetu, bez base64. Worker wykorzystuje
+poprzednią referencję obrazu po zgodnym id, ścieżce, rozmiarze i czasie
+modyfikacji, więc zwykła zmiana ink nie czyta ponownie całego obrazu.
+Manifest v5 może mieszać nowe wpisy asset-backed ze starszymi plikami inline,
+więc migracja jest stopniowa. Odczyt obsługuje manifesty v1–v5, a restore
+weryfikuje SHA-256 assetu i dopiero wtedy odtwarza inline bytes dla istniejącego
+mechanizmu recovery. Brakujący asset może zostać naprawiony z nadal dostępnego
+pliku źródłowego. Assety nie są automatycznie usuwane, żeby nie osłabiać
+bezpieczeństwa historii backupu. Dirty UID-y nadal pozwalają ponownie użyć
+nietkniętych wpisów bez pełnego hashowania. Długowieczny worker isolate
+serializuje kolejne notebooki i liczy SHA-256 poza UI; recovery atomowych
+zapisów assetu jest wykonywane tylko dla używanego pliku, bez skanowania całego
+`assets/` przy każdym snapshotcie. Web nadal przechowuje pełny snapshot w
+`localStorage`.
 
-- 16: `LocalBackupService`; 116: `snapshot`; 452: `hasLatest`;
-  674: `readLatest`; 909: `restoreFromLatest`.
-- 1264: `_BackupWorkerClient` — długowieczny worker serializacji i SHA-256; jawne przerwanie restartuje go.
-- 1527: `BackupSnapshotInterrupted`; 1531: `BackupValidationException`;
-  1540: `BackupDataException`; 1549: `BackupSnapshotReport`;
-  1600: `NotebookBackupReport`.
+- 17: `LocalBackupService`; 134: `snapshot`; 478: `hasLatest`;
+  790: `readLatest`; 1133: `restoreFromLatest`.
+- 77: `_assetsDir`; 975: `_hydrateAssetBackedNotebookJson`.
+- 1492: `_BackupWorkerRequest`; 1529: `_BackupWorkerClient`;
+  1882: `_recoverWorkerAssetWrite`; 2062: `_BackupAssetReference`.
+- 1952: `BackupSnapshotInterrupted`; 1956: `BackupValidationException`;
+  1965: `BackupDataException`; 1974: `BackupSnapshotReport`;
+  2025: `NotebookBackupReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (270 linii)
 
@@ -243,7 +251,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2297 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2326 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. Callback zmian przekazuje schedulerowi UID-y
@@ -260,9 +268,11 @@ koperty z checksumą SHA-256 i zachowuje także puste foldery.
   695: `updateNotebookMetadata`; 1069: `deleteNotebook`.
 - 817: `_persistInlineImages`; 902: `_protectSuspiciousOverwrite`;
   953: `_recordDataIntegrityIncident`.
-- 1099–1210: publiczne kodowanie/dekodowanie JSON.
-- 2142: `_toolFromIndex`; 2150: `_toolToIndex` — muszą pozostać symetryczne.
-- 2195: `DataIntegrityProtectionException`.
+- 1099–1239: publiczne kodowanie/dekodowanie JSON; 1210:
+  `encodeNotebookForLocalBackup` pomija bajty obrazów tylko dla lokalnego
+  backupu, bez zmiany formatu ręcznego eksportu.
+- 2171: `_toolFromIndex`; 2179: `_toolToIndex` — muszą pozostać symetryczne.
+- 2224: `DataIntegrityProtectionException`.
 
 ### `lib/features/notebook/presentation/notebook_screen.dart` (24 linie)
 
@@ -466,7 +476,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (1000)
-- `test/local_backup_service_test.dart` (1062)
+- `test/local_backup_service_test.dart` (1196)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

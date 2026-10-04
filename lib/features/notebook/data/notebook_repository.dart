@@ -1207,6 +1207,10 @@ class NotebookRepository {
   static Map<String, dynamic> encodeNotebook(Notebook notebook) =>
       _notebookToJson(notebook);
 
+  static Map<String, dynamic> encodeNotebookForLocalBackup(
+    Notebook notebook,
+  ) => _notebookToJson(notebook, includeImageBytes: false);
+
   List<Notebook> decodeNotebooks(List<dynamic> items) {
     return items
         .whereType<Map<String, dynamic>>()
@@ -1896,7 +1900,10 @@ class NotebookRepository {
         .toList();
   }
 
-  static Map<String, dynamic> _notebookToJson(Notebook notebook) {
+  static Map<String, dynamic> _notebookToJson(
+    Notebook notebook, {
+    bool includeImageBytes = true,
+  }) {
     return {
       'uid': notebook.uid,
       'title': notebook.title,
@@ -1904,7 +1911,14 @@ class NotebookRepository {
       'folder': notebook.folder,
       'createdAt': notebook.createdAt.toIso8601String(),
       'updatedAt': notebook.updatedAt.toIso8601String(),
-      'pages': notebook.pages.map(_pageToJson).toList(),
+      'pages': notebook.pages
+          .map(
+            (page) => _pageToJson(
+              page,
+              includeImageBytes: includeImageBytes,
+            ),
+          )
+          .toList(),
     };
   }
 
@@ -1923,7 +1937,10 @@ class NotebookRepository {
     );
   }
 
-  static Map<String, dynamic> _pageToJson(NotePage page) {
+  static Map<String, dynamic> _pageToJson(
+    NotePage page, {
+    required bool includeImageBytes,
+  }) {
     return {
       'id': page.id,
       'title': page.title,
@@ -1932,7 +1949,14 @@ class NotebookRepository {
       'indexTabPosition': page.indexTabs.firstOrNull?.position,
       'indexTabs': page.indexTabs.map(_indexTabToJson).toList(),
       'textBlocks': page.textBlocks.map(_textToJson).toList(),
-      'imageBlocks': page.imageBlocks.map(_imageToJson).toList(),
+      'imageBlocks': page.imageBlocks
+          .map(
+            (image) => _imageToJson(
+              image,
+              includeImageBytes: includeImageBytes,
+            ),
+          )
+          .toList(),
       'inkStrokes': page.inkStrokes.map(_strokeToJson).toList(),
     };
   }
@@ -2021,8 +2045,13 @@ class NotebookRepository {
     );
   }
 
-  static Map<String, dynamic> _imageToJson(ImageBlock block) {
-    final bytesBase64 = _bytesToBase64(_imageBytesForJson(block));
+  static Map<String, dynamic> _imageToJson(
+    ImageBlock block, {
+    required bool includeImageBytes,
+  }) {
+    final bytesBase64 = includeImageBytes
+        ? _bytesToBase64(_imageBytesForJson(block))
+        : null;
     return {
       'id': block.id,
       'path': block.path,

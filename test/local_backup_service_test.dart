@@ -600,6 +600,115 @@ void main() {
     expect(manifests.length, lessThanOrEqualTo(5));
   });
 
+  test('local backup stores image bytes in a content asset', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    final imageFile = File('${directory.path}/asset-source.png');
+    await imageFile.writeAsBytes([1, 2, 3, 4, 5], flush: true);
+    final notebook = _notebookWithImage(imageFile.path);
+
+    await service.snapshot([notebook]);
+
+    final manifest = jsonDecode(
+      await File(
+        '${directory.path}/local_backup/manifest.json',
+      ).readAsString(),
+    ) as Map<String, dynamic>;
+    expect(manifest['version'], 5);
+    final entry =
+        (manifest['notebooks'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    expect(entry['assetMode'], 'external-v1');
+    final assets = entry['assets'] as List<dynamic>;
+    expect(assets, hasLength(1));
+    final asset = assets.single as Map<String, dynamic>;
+    final checksum = asset['checksum'] as String;
+    final assetFile = File(
+      '${directory.path}/local_backup/assets/$checksum.bin',
+    );
+    expect(await assetFile.readAsBytes(), [1, 2, 3, 4, 5]);
+
+    final notebookFile = File(
+      '${directory.path}/local_backup/notebooks/${entry['file']}',
+    );
+    final notebookJson =
+        jsonDecode(await notebookFile.readAsString()) as Map<String, dynamic>;
+    final page =
+        (notebookJson['pages'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    final image =
+        (page['imageBlocks'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    expect(image['bytes'], isNull);
+    expect(image['asset'], checksum);
+  });
+
+  test('changed notebook reuses the same immutable image asset', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    final imageFile = File('${directory.path}/asset-source.png');
+    await imageFile.writeAsBytes([6, 7, 8, 9], flush: true);
+    final notebook = _notebookWithImage(imageFile.path);
+
+    await service.snapshot([notebook]);
+    final assetsDir = Directory('${directory.path}/local_backup/assets');
+    final firstAssets = assetsDir.listSync().whereType<File>().toList();
+    expect(firstAssets, hasLength(1));
+    final firstPath = firstAssets.single.path;
+
+    final changed = notebook.copyWith(
+      title: 'Changed',
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+    );
+    await service.snapshot(
+      [changed],
+      dirtyNotebookUids: {changed.uid},
+    );
+
+    final secondAssets = assetsDir.listSync().whereType<File>().toList();
+    expect(secondAssets, hasLength(1));
+    expect(secondAssets.single.path, firstPath);
+  });
+
+  test('corrupted image asset is never returned as a valid backup', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    final imageFile = File('${directory.path}/asset-source.png');
+    await imageFile.writeAsBytes([10, 11, 12, 13], flush: true);
+    final notebook = _notebookWithImage(imageFile.path);
+
+    await service.snapshot([notebook]);
+    final assetsDir = Directory('${directory.path}/local_backup/assets');
+    final asset = assetsDir.listSync().whereType<File>().single;
+    await imageFile.delete();
+    await asset.writeAsBytes([90, 91, 92, 93], flush: true);
+
+    final restored = await service.readLatest();
+
+    expect(restored, isEmpty);
+  });
+
   test('missing image never replaces the last good backup', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
@@ -657,7 +766,10 @@ void main() {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     var changed = 0;
-    final repository = NotebookRepository(database, onChanged: () => changed++);
+    final repository = NotebookRepository(
+      database,
+      onChanged: (_) => changed++,
+    );
     final service = LocalBackupService(
       repository,
       documentsDirectory: () async => directory,
@@ -1000,6 +1112,28 @@ Notebook _notebook() {
         ],
         isBookmarked: false,
         indexTabs: const [],
+      ),
+    ],
+  );
+}
+
+Notebook _notebookWithImage(String imagePath) {
+  final notebook = _notebook();
+  return notebook.copyWith(
+    pages: [
+      notebook.pages.single.copyWith(
+        imageBlocks: [
+          ImageBlock(
+            id: 'image',
+            path: imagePath,
+            ocrText: '',
+            position: Offset.zero,
+            width: 100,
+            height: 100,
+            imageExt: 'png',
+            imageMime: 'image/png',
+          ),
+        ],
       ),
     ],
   );
