@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
@@ -33,6 +34,54 @@ void main() {
     expect(second.notebookReports.single.flattenMs, 0);
     expect(second.notebookReports.single.encodeMs, 0);
     expect(second.notebookReports.single.jsonMs, 0);
+  });
+
+  test('changed notebook switches manifest to a new versioned file', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final notebook = _notebook();
+
+    await service.snapshot([notebook]);
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    final firstManifest =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final firstEntry =
+        (firstManifest['notebooks'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    final firstFile = firstEntry['file'] as String;
+
+    final updated = notebook.copyWith(
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+    );
+    await service.snapshot([updated]);
+
+    final secondManifest =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final secondEntry =
+        (secondManifest['notebooks'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    final secondFile = secondEntry['file'] as String;
+
+    expect(secondFile, isNot(firstFile));
+    expect(
+      File('${directory.path}/local_backup/notebooks/$secondFile').existsSync(),
+      isTrue,
+    );
+    expect(
+      Directory('${directory.path}/local_backup/trash')
+          .listSync()
+          .whereType<File>()
+          .any((file) => file.path.endsWith(firstFile)),
+      isTrue,
+    );
+    expect(File('${manifest.path}.tmp').existsSync(), isFalse);
+    expect(File('${manifest.path}.previous').existsSync(), isFalse);
   });
 
   test('snapshot stops when ink becomes active', () async {

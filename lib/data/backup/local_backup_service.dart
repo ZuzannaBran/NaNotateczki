@@ -31,6 +31,8 @@ class LocalBackupService {
   static const _manifest = 'manifest.json';
   static const _latest = 'notebooks_latest.json';
   static const _webBackupKey = 'local_backup_web.json';
+  static const _temporarySuffix = '.tmp';
+  static const _previousSuffix = '.previous';
 
   Future<Directory> _backupDir() async {
     final docs = await _documentsDirectory();
@@ -59,9 +61,25 @@ class LocalBackupService {
     return File('${dir.path}/$_manifest');
   }
 
-  Future<File> _notebookFile(String uid) async {
+  Future<File> _notebookFile(String fileName) async {
+    if (!_isSafeNotebookFileName(fileName)) {
+      throw FormatException('Unsafe backup notebook file name: $fileName');
+    }
     final dir = await _notebooksDir();
-    return File('${dir.path}/${Uri.encodeComponent(uid)}.json');
+    return File('${dir.path}/$fileName');
+  }
+
+  String _notebookVersionFileName(Notebook notebook) {
+    final uid = Uri.encodeComponent(notebook.uid);
+    return '${uid}_${notebook.updatedAt.microsecondsSinceEpoch}.json';
+  }
+
+  bool _isSafeNotebookFileName(String fileName) {
+    return fileName.isNotEmpty &&
+        fileName.endsWith('.json') &&
+        !fileName.contains('/') &&
+        !fileName.contains(r'\') &&
+        !fileName.contains('..');
   }
 
   Future<Directory> _trashDir() async {
@@ -83,7 +101,7 @@ class LocalBackupService {
       }
       final totalStopwatch = Stopwatch()..start();
       final notebooksDir = await _notebooksDir();
-      final previousUpdates = await _readManifestUpdates();
+      final previousEntries = await _readManifestEntries();
       final expectedFiles = <String>{};
       final notebookReports = <NotebookBackupReport>[];
       var readCompareMs = 0;
@@ -93,29 +111,35 @@ class LocalBackupService {
       for (final notebook in items) {
         _throwIfInterrupted(shouldInterrupt);
         final notebookStopwatch = Stopwatch()..start();
-        final file = await _notebookFile(notebook.uid);
-        expectedFiles.add(file.path);
-        if (previousUpdates[notebook.uid] == notebook.updatedAt &&
-            await file.exists()) {
-          notebookStopwatch.stop();
-          notebookReports.add(
-            NotebookBackupReport(
-              uid: notebook.uid,
-              pages: notebook.pages.length,
-              strokes: _strokeCount(notebook),
-              points: _pointCount(notebook),
-              jsonBytes: await file.length(),
-              flattenMs: 0,
-              encodeMs: 0,
-              jsonMs: 0,
-              compareMs: 0,
-              writeMs: 0,
-              totalMs: notebookStopwatch.elapsedMilliseconds,
-              changed: false,
-            ),
-          );
-          continue;
+        final previousEntry = previousEntries[notebook.uid];
+        if (previousEntry != null &&
+            previousEntry.updatedAt == notebook.updatedAt) {
+          final previousFile = await _notebookFile(previousEntry.fileName);
+          expectedFiles.add(previousFile.path);
+          await _recoverAtomicWrite(previousFile);
+          if (await previousFile.exists()) {
+            notebookStopwatch.stop();
+            notebookReports.add(
+              NotebookBackupReport(
+                uid: notebook.uid,
+                pages: notebook.pages.length,
+                strokes: _strokeCount(notebook),
+                points: _pointCount(notebook),
+                jsonBytes: await previousFile.length(),
+                flattenMs: 0,
+                encodeMs: 0,
+                jsonMs: 0,
+                compareMs: 0,
+                writeMs: 0,
+                totalMs: notebookStopwatch.elapsedMilliseconds,
+                changed: false,
+              ),
+            );
+            continue;
+          }
         }
+        final file = await _notebookFile(_notebookVersionFileName(notebook));
+        expectedFiles.add(file.path);
         final workerResult = await _runBackupWorker<_BackupWorkerResult>(
           _BackupWorkerOperation.snapshot,
           notebook,
@@ -139,7 +163,7 @@ class LocalBackupService {
         }
         if (changed) {
           final writeStopwatch = Stopwatch()..start();
-          await file.writeAsString(content);
+          await _atomicWriteString(file, content);
           writeStopwatch.stop();
           writeMs = writeStopwatch.elapsedMilliseconds;
         }
@@ -163,6 +187,35 @@ class LocalBackupService {
       }
 
       _throwIfInterrupted(shouldInterrupt);
+      final manifestPayload = {
+        'version': 1,
+        'notebooks': [
+          for (final notebook in items)
+            {
+              'uid': notebook.uid,
+              'updatedAt': notebook.updatedAt.toIso8601String(),
+              'file': previousEntries[notebook.uid]?.updatedAt ==
+                          notebook.updatedAt &&
+                      expectedFiles.any(
+                        (path) =>
+                            path.endsWith(
+                              previousEntries[notebook.uid]!.fileName,
+                            ),
+                      )
+                  ? previousEntries[notebook.uid]!.fileName
+                  : _notebookVersionFileName(notebook),
+            },
+        ],
+      };
+      final manifestStopwatch = Stopwatch()..start();
+      await _atomicWriteString(
+        await _manifestFile(),
+        jsonEncode(manifestPayload),
+      );
+      manifestStopwatch.stop();
+      manifestMs = manifestStopwatch.elapsedMilliseconds;
+
+      _throwIfInterrupted(shouldInterrupt);
       final staleStopwatch = Stopwatch()..start();
       await for (final entity in notebooksDir.list()) {
         if (entity is File &&
@@ -175,21 +228,6 @@ class LocalBackupService {
       staleStopwatch.stop();
       staleListMs = staleStopwatch.elapsedMilliseconds;
 
-      final manifestPayload = {
-        'version': 1,
-        'notebooks': [
-          for (final notebook in items)
-            {
-              'uid': notebook.uid,
-              'updatedAt': notebook.updatedAt.toIso8601String(),
-              'file': '${Uri.encodeComponent(notebook.uid)}.json',
-            },
-        ],
-      };
-      final manifestStopwatch = Stopwatch()..start();
-      await (await _manifestFile()).writeAsString(jsonEncode(manifestPayload));
-      manifestStopwatch.stop();
-      manifestMs = manifestStopwatch.elapsedMilliseconds;
       totalStopwatch.stop();
       return BackupSnapshotReport(
         notebookCount: items.length,
@@ -234,41 +272,52 @@ class LocalBackupService {
       if (kIsWeb) {
         return await readStoredText(_webBackupKey) != null;
       }
-      return await (await _manifestFile()).exists() ||
-          await (await _file(_latest)).exists();
+      final manifest = await _manifestFile();
+      await _recoverAtomicWrite(manifest);
+      return await manifest.exists() || await (await _file(_latest)).exists();
     } catch (_) {
       return false;
     }
   }
 
-  Future<Map<String, DateTime>> _readManifestUpdates() async {
+  Future<Map<String, _BackupManifestEntry>> _readManifestEntries() async {
     final file = await _manifestFile();
+    await _recoverAtomicWrite(file);
     if (!await file.exists()) {
-      return const <String, DateTime>{};
+      return const <String, _BackupManifestEntry>{};
     }
     try {
       final decoded = jsonDecode(await file.readAsString());
       if (decoded is! Map<String, dynamic>) {
-        return const <String, DateTime>{};
+        return const <String, _BackupManifestEntry>{};
       }
       final entries = decoded['notebooks'];
       if (entries is! List<dynamic>) {
-        return const <String, DateTime>{};
+        return const <String, _BackupManifestEntry>{};
       }
-      final updates = <String, DateTime>{};
+      final result = <String, _BackupManifestEntry>{};
       for (final entry in entries.whereType<Map<String, dynamic>>()) {
         final uid = entry['uid'];
         final updatedAt = entry['updatedAt'];
-        if (uid is String && updatedAt is String) {
-          final parsed = DateTime.tryParse(updatedAt);
-          if (parsed != null) {
-            updates[uid] = parsed;
-          }
+        final fileName = entry['file'];
+        if (uid is! String ||
+            updatedAt is! String ||
+            fileName is! String ||
+            !_isSafeNotebookFileName(fileName)) {
+          continue;
+        }
+        final parsed = DateTime.tryParse(updatedAt);
+        if (parsed != null) {
+          result[uid] = _BackupManifestEntry(
+            uid: uid,
+            updatedAt: parsed,
+            fileName: fileName,
+          );
         }
       }
-      return updates;
+      return result;
     } catch (_) {
-      return const <String, DateTime>{};
+      return const <String, _BackupManifestEntry>{};
     }
   }
 
@@ -299,6 +348,7 @@ class LocalBackupService {
   Future<List<Notebook>> _readIncrementalLatest() async {
     try {
       final manifest = await _manifestFile();
+      await _recoverAtomicWrite(manifest);
       if (!await manifest.exists()) {
         return <Notebook>[];
       }
@@ -316,10 +366,11 @@ class LocalBackupService {
           continue;
         }
         final fileName = entry['file'];
-        if (fileName is! String || fileName.isEmpty) {
+        if (fileName is! String || !_isSafeNotebookFileName(fileName)) {
           continue;
         }
-        final file = File('${(await _notebooksDir()).path}/$fileName');
+        final file = await _notebookFile(fileName);
+        await _recoverAtomicWrite(file);
         if (!await file.exists()) {
           continue;
         }
@@ -405,6 +456,46 @@ class LocalBackupService {
       totalMs: stopwatch.elapsedMilliseconds,
       notebookReports: const [],
     );
+  }
+
+  Future<void> _atomicWriteString(File file, String content) async {
+    await _recoverAtomicWrite(file);
+    final temporary = File('${file.path}$_temporarySuffix');
+    final previous = File('${file.path}$_previousSuffix');
+    if (await temporary.exists()) {
+      await temporary.delete();
+    }
+    if (await previous.exists()) {
+      await previous.delete();
+    }
+    await temporary.writeAsString(content, flush: true);
+    if (await file.exists()) {
+      await file.rename(previous.path);
+    }
+    try {
+      await temporary.rename(file.path);
+      if (await previous.exists()) {
+        await previous.delete();
+      }
+    } catch (_) {
+      if (!await file.exists() && await previous.exists()) {
+        await previous.rename(file.path);
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _recoverAtomicWrite(File file) async {
+    final temporary = File('${file.path}$_temporarySuffix');
+    final previous = File('${file.path}$_previousSuffix');
+    if (!await file.exists() && await previous.exists()) {
+      await previous.rename(file.path);
+    } else if (await previous.exists()) {
+      await previous.delete();
+    }
+    if (await temporary.exists()) {
+      await temporary.delete();
+    }
   }
 
   Future<void> _moveStaleNotebookBackupToTrash(File file) async {
@@ -630,4 +721,17 @@ class NotebookBackupReport {
         'flattenMs=$flattenMs encodeMs=$encodeMs jsonMs=$jsonMs '
         'compareMs=$compareMs writeMs=$writeMs totalMs=$totalMs';
   }
+}
+
+
+class _BackupManifestEntry {
+  const _BackupManifestEntry({
+    required this.uid,
+    required this.updatedAt,
+    required this.fileName,
+  });
+
+  final String uid;
+  final DateTime updatedAt;
+  final String fileName;
 }

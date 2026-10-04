@@ -160,16 +160,22 @@ pliku po awarii.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (633 linie)
+### `lib/data/backup/local_backup_service.dart` (738 linie)
 
-Przyrostowy backup `manifest.json` + `notebooks/<uid>.json`; web przechowuje
-pełny snapshot w `localStorage`, a stare natywne snapshoty są fallbackiem.
+Przyrostowy backup z atomowym `manifest.json` i wersjonowanymi plikami
+`notebooks/<uid>_<updatedAt>.json`; manifest jest przełączany dopiero po
+utrwaleniu nowych plików, a stare kopie trafiają później do `trash/`. Web
+przechowuje pełny snapshot w `localStorage`.
 
-- 15: `LocalBackupService`; 75: `snapshot`; 232: `hasLatest`;
-  281: `readLatest`; 363: `restoreFromLatest`.
-- 448–525: anulowalny worker serializacji.
-- 543: `BackupSnapshotInterrupted`; 547: `BackupSnapshotReport`;
-  598: `NotebookBackupReport`.
+- 15: `LocalBackupService`;
+  93: `snapshot`;
+  270: `hasLatest`;
+  330: `readLatest`;
+  414: `restoreFromLatest`.
+- 555: anulowalny worker serializacji.
+- 634: `BackupSnapshotInterrupted`;
+  638: `BackupSnapshotReport`;
+  689: `NotebookBackupReport`.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (270 linii)
 
@@ -438,7 +444,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (496)
-- `test/local_backup_service_test.dart` (150)
+- `test/local_backup_service_test.dart` (200)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
