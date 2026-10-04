@@ -297,7 +297,8 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
 ### `lib/features/library/presentation/library_screen.dart` (1045 linie)
 
-Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
+Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
+rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
 zwijać w całości i zmieniać jego szerokość. Pionowy separator uchwytu ma 1 px, ten sam kolor co linia pod toolbarami i leży na prawej krawędzi, dzięki czemu linie stykają się.
@@ -368,7 +369,7 @@ zgodą na zamknięcie aplikacji.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2664 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2731 linie)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
@@ -385,16 +386,16 @@ i cienia.
   przez zoom użytkownika.
 - 196–598: gesty pan/zoom i transformacje; 704: zakres widocznych stron.
 - 764–863: busy overlay, import/eksport/clipboard i index tabs.
-- 1157: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
+- 1227: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 1183: główny `build`; 1225: responsywna skala dopasowania;
-  1264: wspólna macierz `pageTransform`.
+- 1253: główny `build`; 1302: responsywna skala dopasowania;
+  1347: wspólna macierz `pageTransform`.
 - 1457–1488: tło/inactive `DocumentPageOverlay`, `DocumentDrawingCanvas`
   i active `DocumentPageOverlay` we wspólnej przestrzeni transformacji.
-- 1622–1665: skróty klawiszowe; 1697: `_PageViewportClipper`.
-- 1802: `_PageFramePainter`; 1877: `_IndexTabsOverlay`;
-  2014: `_ProjectMiniMapOverlay`; 2367: `_ProjectMiniMapPainter`.
+- 1622–1665: skróty klawiszowe; 1777: `_PageViewportClipper`.
+- 1879: `_PageFramePainter`; 1954: `_IndexTabsOverlay`;
+  2096: `_ProjectMiniMapOverlay`; 2448: `_ProjectMiniMapPainter`.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -503,7 +504,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
-- `test/editor_screen_responsive_layout_test.dart` (133)
+- `test/editor_screen_responsive_layout_test.dart` (144)
 - `test/page_overlay_text_gestures_test.dart` (113)
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
