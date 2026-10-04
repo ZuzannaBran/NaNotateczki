@@ -60,8 +60,8 @@ class AppPreferencesController extends ChangeNotifier {
       final accentValue = decoded['accentColor'];
       final loadedAccent = switch (accentValue) {
         final String name => _accentColorFromName(name),
-        final int index when index >= 0 &&
-            index < AppAccentColor.values.length =>
+        final int index
+            when index >= 0 && index < AppAccentColor.values.length =>
           AppAccentColor.values[index],
         _ => null,
       };

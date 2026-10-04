@@ -53,18 +53,18 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (409 linii)
+### `lib/app/app_scope.dart` (407 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie.
 
 - 21: `AppScope`;
   28: `_AppScopeState`;
-  138:
+  136:
   `_BackupStatusOverlay`;
-  199:
+  197:
   `_StartupErrorScreen`;
-  275: `_BackupScheduler`.
+  273: `_BackupScheduler`.
 
 ## 3. Core
 
@@ -349,7 +349,7 @@ aby nie obcinać prawej ramki i cienia strony.
 - 1799: `_PageFramePainter`; 1874: `_IndexTabsOverlay`;
   2014: `_ProjectMiniMapOverlay`; 2364: `_ProjectMiniMapPainter`.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (678 linie)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
 Ustawienia wejścia, kompaktowego wyboru koloru akcentu, tła oraz podgląd logów
 błędów, integralności i wydajności.
@@ -364,7 +364,7 @@ błędów, integralności i wydajności.
   `_showOptimizationDialog`;
   497:
   `_AccentColorSection`;
-  615:
+  609:
   `_BackgroundSection`.
 
 ### Widgety edytora

@@ -117,9 +117,7 @@ class _AppScopeState extends State<AppScope> {
               return Consumer<AppPreferencesController>(
                 builder: (context, preferences, _) {
                   return Theme(
-                    data: AppTheme.light(
-                      accentColor: preferences.accentColor,
-                    ),
+                    data: AppTheme.light(accentColor: preferences.accentColor),
                     child: _BackupStatusOverlay(
                       snapshotInProgress: backupService.snapshotInProgress,
                       child: child ?? const SizedBox.shrink(),

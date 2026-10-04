@@ -495,10 +495,7 @@ Future<void> _showOptimizationDialog(BuildContext context) {
 }
 
 class _AccentColorSection extends StatelessWidget {
-  const _AccentColorSection({
-    required this.selected,
-    required this.onChanged,
-  });
+  const _AccentColorSection({required this.selected, required this.onChanged});
 
   final AppAccentColor selected;
   final ValueChanged<AppAccentColor> onChanged;
@@ -508,10 +505,7 @@ class _AccentColorSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Accent color',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Accent color', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 6),
         Text(
           'Pick the main color used for controls and highlights.',
