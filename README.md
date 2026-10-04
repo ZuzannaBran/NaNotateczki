@@ -34,7 +34,6 @@ w wybranym katalogu.
 - Zoom i przesuwanie widoku myszką, touchpadem oraz gestami dotykowymi.
 - Mini-mapa dokumentu z podglądem stron, treści i aktualnego obszaru widoku.
 - Oznaczanie notatek jako ulubione/ważne przez zakładkę w pasku aplikacji.
-- Kolorowe zakładki indeksujące na stronach, z edycją koloru i pozycji.
 - Renderowanie tylko widocznego zakresu stron, żeby duże notatniki działały
   sprawniej.
 
@@ -95,7 +94,7 @@ w wybranym katalogu.
 
 ### Cofanie, zapis i bezpieczeństwo danych
 
-- Undo/redo dla operacji na tekstach, obrazach, kreskach, zakładkach i lasso.
+- Undo/redo dla operacji na tekstach, obrazach, kreskach i lasso.
 - Automatyczny zapis notatki po zmianach.
 - Lokalna baza Drift/SQLite.
 - Rotowany lokalny backup JSON: najnowszy snapshot oraz dwie poprzednie kopie.
