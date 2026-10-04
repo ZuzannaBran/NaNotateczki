@@ -78,9 +78,9 @@ i ponawia przejściowy błąd backupu po 30 s.
   `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (23): konfiguracja jasnego
-  Material 3 z wybieralnym akcentem i stałym kolorem powierzchni.
-  5: `AppTheme`.
+- `lib/core/theme/app_theme.dart` (0): konfiguracja jasnego
+  Material 3 z wybieralnym akcentem i globalną typografią Georgia
+  (z serifowymi fallbackami). 5: `AppTheme`.
 
 ### Wejście i preferencje
 
@@ -287,7 +287,7 @@ istniejącej, zdrowej bazy.
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
-kompaktowej typografii Inter z systemowymi fallbackami. Panel można
+kompaktowej typografii dziedziczonej z globalnego motywu Georgia. Panel można
 zwijać w całości i zmieniać jego szerokość.
 
 - 16: `LibraryScreen`;

@@ -7,6 +7,8 @@ class AppTheme {
     AppAccentColor accentColor = AppAccentColor.classic,
   }) {
     return ThemeData(
+      fontFamily: 'Georgia',
+      fontFamilyFallback: const ['Times New Roman', 'Noto Serif', 'serif'],
       colorScheme: ColorScheme.fromSeed(
         seedColor: accentColor.color,
         surface: AppColors.paper,

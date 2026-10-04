@@ -515,8 +515,6 @@ enum _FolderAction { rename, delete }
 enum _ItemAction { rename, delete }
 
 const TextStyle _sidebarTextStyle = TextStyle(
-  fontFamily: 'Inter',
-  fontFamilyFallback: ['Segoe UI', 'Roboto', 'Arial'],
   fontSize: 14,
   height: 1.2,
   letterSpacing: -0.05,
