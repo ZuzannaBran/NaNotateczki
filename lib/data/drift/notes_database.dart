@@ -160,6 +160,8 @@ class NotesDatabase extends _$NotesDatabase {
     errorRecorder,
     @visibleForTesting
     Future<void> Function(NotesDatabase database)? integrityValidator,
+    @visibleForTesting
+    Future<String?> Function(String name)? databaseQuarantine,
   }) async {
     final openConnection = connectionOpener ?? openNotesDatabaseConnection;
     final waitBeforeRetry = retryDelay ?? Future<void>.delayed;
@@ -171,6 +173,9 @@ class NotesDatabase extends _$NotesDatabase {
     final validateIntegrity =
         integrityValidator ??
         (NotesDatabase database) => database._validateIntegrity();
+    final quarantineDatabase =
+        databaseQuarantine ??
+        (connectionOpener == null ? quarantineNotesDatabase : null);
     Object? lastError;
     StackTrace? lastStackTrace;
     DatabaseOpenStage? lastStage;
@@ -215,6 +220,48 @@ class NotesDatabase extends _$NotesDatabase {
         }
         if (attempt < _openAttemptCount) {
           await waitBeforeRetry(_openRetryDelay);
+        }
+      }
+    }
+
+    if (lastStage == DatabaseOpenStage.validation &&
+        quarantineDatabase != null) {
+      NotesDatabase? recoveredDatabase;
+      try {
+        final quarantinePath = await quarantineDatabase(_databaseFileName);
+        if (quarantinePath != null) {
+          final connection = await openConnection(_databaseFileName);
+          recoveredDatabase = NotesDatabase(connection.executor);
+          await recoveredDatabase.customSelect('select 1').getSingle();
+          await validateIntegrity(recoveredDatabase);
+          return DatabaseOpenResult(
+            database: recoveredDatabase,
+            wasReset: true,
+            freshFile: connection.freshFile,
+            resetReason:
+                'SQLite validation failed. The previous database was '
+                'quarantined at $quarantinePath.',
+          );
+        }
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStackTrace = stackTrace;
+        lastStage = DatabaseOpenStage.validation;
+        recordError(
+          error,
+          stackTrace,
+          'NotesDatabase.open(quarantine_recovery)',
+        );
+        if (recoveredDatabase != null) {
+          try {
+            await recoveredDatabase.close();
+          } catch (closeError, closeStackTrace) {
+            recordError(
+              closeError,
+              closeStackTrace,
+              'NotesDatabase.open(quarantine_close_failed)',
+            );
+          }
         }
       }
     }

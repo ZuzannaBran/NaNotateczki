@@ -26,3 +26,6 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
   debugPrint('[web-db] Drift executor ready');
   return NotesDatabaseConnection(executor: executor, freshFile: freshFile);
 }
+
+
+Future<String?> quarantineNotesDatabase(String name) async => null;

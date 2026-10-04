@@ -551,6 +551,41 @@ void main() {
     expect(result.freshFile, isTrue);
   });
 
+  test('database open quarantines a persistently invalid database', () async {
+    var openCount = 0;
+    var validationCount = 0;
+    var quarantineCount = 0;
+    final result = await NotesDatabase.open(
+      connectionOpener: (_) async {
+        openCount++;
+        return NotesDatabaseConnection(
+          executor: NativeDatabase.memory(),
+          freshFile: openCount > 3,
+        );
+      },
+      retryDelay: (_) async {},
+      errorRecorder: (_, _, _) {},
+      integrityValidator: (_) async {
+        validationCount++;
+        if (validationCount <= 3) {
+          throw StateError('integrity failed');
+        }
+      },
+      databaseQuarantine: (_) async {
+        quarantineCount++;
+        return '/tmp/notes.sqlite.corrupt';
+      },
+    );
+    addTearDown(result.database.close);
+
+    expect(openCount, 4);
+    expect(validationCount, 4);
+    expect(quarantineCount, 1);
+    expect(result.wasReset, isTrue);
+    expect(result.freshFile, isTrue);
+    expect(result.resetReason, contains('quarantined'));
+  });
+
   test(
     'database open treats integrity failure as validation failure',
     () async {

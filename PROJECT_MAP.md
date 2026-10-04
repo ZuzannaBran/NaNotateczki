@@ -136,12 +136,12 @@ kopię po 2 s bezczynności i wymusza próbę po maksymalnie 30 s ciągłych zmi
 
 ### Drift
 
-### `lib/data/drift/notes_database.dart` (266 linii)
+### `lib/data/drift/notes_database.dart` (313 linii)
 
-Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami bez kasowania
-pliku po awarii. Start sprawdza również `PRAGMA quick_check` i
-`PRAGMA foreign_key_check`; błąd integralności jest traktowany jak błąd
-walidacji i nie otwiera uszkodzonej bazy jako poprawnej.
+Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami. Start sprawdza
+`PRAGMA quick_check` i `PRAGMA foreign_key_check`; po trwałym błędzie
+walidacji natywna baza jest zachowywana jako plik `.corrupt_*`, a aplikacja
+otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 - 9: `NotebookRows`; 21: `PageRows`;
   34: `IndexTabRows`; 44: `TextBlockRows`;
@@ -157,10 +157,10 @@ walidacji i nie otwiera uszkodzonej bazy jako poprawnej.
 
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
   natywnego lub webowego połączenia.
-- `lib/data/drift/notes_database_connection_io.dart` (21): SQLite w katalogu
+- `lib/data/drift/notes_database_connection_io.dart` (66): SQLite w katalogu
   dokumentów przez `NativeDatabase.createInBackground`.
   7: `NotesDatabaseConnection`; 14: `openNotesDatabaseConnection`.
-- `lib/data/drift/notes_database_connection_web.dart` (28): SQLite WASM z
+- `lib/data/drift/notes_database_connection_web.dart` (32): SQLite WASM z
   trwałym IndexedDB.
   6: `NotesDatabaseConnection`; 13: `openNotesDatabaseConnection`.
 - `lib/data/drift/notes_database.g.dart` (6075): kod wygenerowany przez Drift;
@@ -451,7 +451,7 @@ warstwami tła/canvasu/overlayu.
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart` (587)
+- `test/notebook_repository_test.dart` (622)
 - `test/local_backup_service_test.dart` (547)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
