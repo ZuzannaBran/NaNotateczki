@@ -54,13 +54,14 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (472 linii)
+### `lib/app/app_scope.dart` (502 linie)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scheduler zbiera
-UID-y zmienionych notebooków i robi kopię po 2 s bezczynności. Rozpoczęty
-backup nie jest przerywany przez nowe pisanie; nowe dirty UID-y czekają na
-następny przebieg, a usługa zatrzymuje worker przy zamknięciu scope.
+zmiany jako UID notebooka + zbiór dirty page IDs; `null` oznacza pełną lub
+strukturalną zmianę notebooka, a pusty zbiór zmianę samych metadanych.
+Rozpoczęty backup nie jest przerywany przez nowe pisanie; kolejne zmiany są
+scalane i czekają na następny przebieg.
 
 - 22: `AppScope`;
   29: `_AppScopeState`;
@@ -170,41 +171,39 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2109 linii)
+### `lib/data/backup/local_backup_service.dart` (2592 linie)
 
-Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami
-SHA-256 plików i całego manifestu (v5). Zmienione notebooki zapisują obrazy
-jako niezmienne, content-addressed assety w `local_backup/assets/`; JSON
-notebooka przechowuje tylko checksumę assetu, bez base64. Worker wykorzystuje
-poprzednią referencję obrazu po zgodnym id, ścieżce, rozmiarze i czasie
-modyfikacji, więc zwykła zmiana ink nie czyta ponownie całego obrazu.
-Manifest v5 może mieszać nowe wpisy asset-backed ze starszymi plikami inline,
-więc migracja jest stopniowa. Odczyt obsługuje manifesty v1–v5, a restore
-weryfikuje SHA-256 assetu i dopiero wtedy odtwarza inline bytes dla istniejącego
-mechanizmu recovery. Brakujący asset może zostać naprawiony z nadal dostępnego
-pliku źródłowego. Assety nie są automatycznie usuwane, żeby nie osłabiać
-bezpieczeństwa historii backupu. Dirty UID-y nadal pozwalają ponownie użyć
-nietkniętych wpisów bez pełnego hashowania. Długowieczny worker isolate
-serializuje kolejne notebooki i liczy SHA-256 poza UI; recovery atomowych
-zapisów assetu jest wykonywane tylko dla używanego pliku, bez skanowania całego
-`assets/` przy każdym snapshotcie. Web nadal przechowuje pełny snapshot w
-`localStorage`.
+Przyrostowy backup z atomowym `manifest.json` i checksumami SHA-256. Format
+v6 rozdziela notebook na niezmienne, content-addressed pliki stron w
+`local_backup/pages/`; manifest przechowuje metadane notebooka oraz
+referencje do stron. Przy zwykłym `saveNotebookPages` worker dostaje tylko
+dirty `NotePage`, aplikuje gumki, koduje JSON, liczy SHA-256 i atomowo zapisuje
+plik strony bez odsyłania dużego JSON-a do UI isolate. Niezmienione strony są
+ponownie używane po lekkiej kontroli pliku. Zmiana metadanych nie serializuje
+żadnej strony.
 
-- 17: `LocalBackupService`; 134: `snapshot`; 478: `hasLatest`;
-  786: `readLatest`; 1124: `restoreFromLatest`.
-- 77: `_assetsDir`; 970: `_hydrateAssetBackedNotebookJson`.
-- 1483: `_BackupWorkerRequest`; 1520: `_BackupWorkerClient`;
-  1869: `_recoverWorkerAssetWrite`; 2049: `_BackupAssetReference`.
-- 1939: `BackupSnapshotInterrupted`; 1943: `BackupValidationException`;
-  1952: `BackupDataException`; 1961: `BackupSnapshotReport`;
-  2012: `NotebookBackupReport`.
+Obrazy pozostają niezmiennymi assetami w `local_backup/assets/`; referencje
+assetów są przechowywane per strona. Pierwsza zmiana notebooka ze starszego
+formatu migruje go do v6, potem zapis jest page-level. Odczyt pozostaje zgodny
+z manifestami v1–v5 oraz mieszanymi wpisami legacy/v6. Restore weryfikuje
+checksumę każdej strony i assetu. Pliki stron i assetów nie są usuwane w hot
+path, żeby historia manifestów nie straciła zależności. Web nadal zapisuje
+pełny snapshot w `localStorage`.
 
-### `lib/data/backup/backup_eraser_flattening.dart` (270 linii)
+- 18: `LocalBackupService`; 148: `snapshot`; 79: `_pagesDir`.
+- 743: `_pageReferenceFromJson`; 1031: `readLatest`;
+  1262: `_readBackupPageJson`; 1488: `restoreFromLatest`.
+- 1867: `_BackupPageWorkerRequest`; 1906: `_BackupWorkerClient`;
+  2100: `_createPageBackupPayload`; 2506: `_BackupPageReference`.
+- 2392: `BackupSnapshotReport`.
+
+### `lib/data/backup/backup_eraser_flattening.dart` (271 linii)
 
 Stosuje gumki do wcześniejszych stroke'ów przed backupem i usuwa stroke'i
-gumki z payloadu.
+gumki z payloadu. Udostępnia też wariant per strona dla backupu v6.
 
-- 9: `flattenErasersForBackup`; 48: `_applyBrushEraser`;
+- 9: `flattenErasersForBackup`; 15: `flattenPageErasersForBackup`;
+  49: `_applyBrushEraser`;
   72: `_applyAreaEraser`; 95: `_splitStroke`; 148–265: geometria.
 
 ### `lib/data/export/notebook_export_service.dart` (679 linii)
@@ -251,26 +250,22 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2326 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2356 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
-podejrzaną utratą danych. Callback zmian przekazuje schedulerowi UID-y
-zmienionych notebooków. Recovery zapisuje cały batch atomowo i preferuje
-bajty obrazów z backupu nad istniejącymi ścieżkami. Ręczny eksport używa
-koperty z checksumą SHA-256 i zachowuje także puste foldery.
+podejrzaną utratą danych. `NotebookRepositoryChange` rozróżnia pełną zmianę,
+zmianę konkretnych page IDs i zmianę samych metadanych, dzięki czemu scheduler
+może uruchomić backup v6 tylko dla właściwych stron. Repozytorium udostępnia
+też oczekiwanie na wszystkie trwające zapisy per UID. Ręczny eksport pozostaje
+samowystarczalny i zachowuje obrazy inline.
 
-- 23: `DataIntegrityIncidentHandler`; 30: `RepositoryChangeHandler`;
-  39: `NotebookRepository`.
-- 116: `fetchNotebooks`; 166: `saveRecoveredCopy`;
-  180: `restoreNotebooksAtomically`; 340: `archiveNotebookBeforeDelete`.
-- 378: `createNotebook`; 404: `createBoard`; 430: `getNotebook`.
-- 457: `saveNotebook`; 487: `saveNotebookPages`;
-  695: `updateNotebookMetadata`; 1069: `deleteNotebook`.
-- 817: `_persistInlineImages`; 902: `_protectSuspiciousOverwrite`;
-  953: `_recordDataIntegrityIncident`.
-- 1099–1239: publiczne kodowanie/dekodowanie JSON; 1210:
-  `encodeNotebookForLocalBackup` pomija bajty obrazów tylko dla lokalnego
-  backupu, bez zmiany formatu ręcznego eksportu.
+- 23: `DataIntegrityIncidentHandler`; 30: `NotebookRepositoryChange`;
+  46: `RepositoryChangeHandler`; 56: `NotebookRepository`.
+- 82: `waitForPendingSaves`; 486: `saveNotebook`;
+  516: `saveNotebookPages`; 728: `updateNotebookMetadata`;
+  1102: `deleteNotebook`.
+- 1243: `encodeNotebookForLocalBackup`; 1246:
+  `encodePageForLocalBackup`.
 - 2171: `_toolFromIndex`; 2179: `_toolToIndex` — muszą pozostać symetryczne.
 - 2224: `DataIntegrityProtectionException`.
 
@@ -476,7 +471,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (1000)
-- `test/local_backup_service_test.dart` (1196)
+- `test/local_backup_service_test.dart` (1341)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

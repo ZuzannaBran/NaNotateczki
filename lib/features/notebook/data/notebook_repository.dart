@@ -27,7 +27,24 @@ typedef DataIntegrityIncidentHandler =
       Notebook attempted,
     );
 
-typedef RepositoryChangeHandler = void Function(Set<String> notebookUids);
+class NotebookRepositoryChange {
+  const NotebookRepositoryChange.full(this.uid) : pageIds = null;
+
+  NotebookRepositoryChange.pages(String uid, Set<String> pageIds)
+    : uid = uid,
+      pageIds = Set<String>.unmodifiable(pageIds);
+
+  const NotebookRepositoryChange.metadata(this.uid)
+    : pageIds = const <String>{};
+
+  final String uid;
+  final Set<String>? pageIds;
+
+  bool get isFull => pageIds == null;
+}
+
+typedef RepositoryChangeHandler =
+    void Function(Iterable<NotebookRepositoryChange> changes);
 
 class PortableBackupData {
   const PortableBackupData({required this.notebooks, required this.folders});
@@ -60,6 +77,14 @@ class NotebookRepository {
   bool _isNotebookCacheComplete = false;
 
   bool get lastFetchSkippedCorruptRows => _lastFetchSkippedCorruptRows;
+  bool get hasPendingSaves => _saveTails.isNotEmpty;
+
+  Future<void> waitForPendingSaves() async {
+    while (_saveTails.isNotEmpty) {
+      await Future.wait(_saveTails.values.toList());
+    }
+  }
+
   int get lastCorruptNotebookCount => _lastCorruptNotebookIds.length;
   List<String> get lastCorruptNotebookIds =>
       List.unmodifiable(_lastCorruptNotebookIds);
@@ -232,7 +257,9 @@ class NotebookRepository {
     _lastFetchSkippedCorruptRows = false;
     _lastCorruptNotebookIds.clear();
     _isNotebookCacheComplete = true;
-    onChanged?.call(persisted.map((item) => item.uid).toSet());
+    onChanged?.call([
+      for (final item in persisted) NotebookRepositoryChange.full(item.uid),
+    ]);
     return persisted.length;
   }
 
@@ -333,7 +360,9 @@ class NotebookRepository {
       _latestPersistedUpdates[notebook.uid] = notebook.updatedAt;
       _notebookCache[notebook.uid] = notebook;
     }
-    onChanged?.call(persisted.map((item) => item.uid).toSet());
+    onChanged?.call([
+      for (final item in persisted) NotebookRepositoryChange.full(item.uid),
+    ]);
     return persisted.length;
   }
 
@@ -579,7 +608,9 @@ class NotebookRepository {
       final persistedNotebook = notebook.copyWith(updatedAt: savedAt);
       _latestPersistedUpdates[notebook.uid] = savedAt;
       _notebookCache[notebook.uid] = persistedNotebook;
-      onChanged?.call({notebook.uid});
+      onChanged?.call([
+        NotebookRepositoryChange.pages(notebook.uid, pageIds),
+      ]);
     }
     return saved;
   }
@@ -687,7 +718,9 @@ class NotebookRepository {
       );
       _latestPersistedUpdates[notebookToSave.uid] = savedAt;
       _notebookCache[notebookToSave.uid] = persisted;
-      onChanged?.call({notebookToSave.uid});
+      onChanged?.call([
+        NotebookRepositoryChange.full(notebookToSave.uid),
+      ]);
     }
     return saved;
   }
@@ -732,7 +765,7 @@ class NotebookRepository {
     if (updated != null) {
       _latestPersistedUpdates[uid] = preciseUpdatedAt!;
       _notebookCache[uid] = updated;
-      onChanged?.call({uid});
+      onChanged?.call([NotebookRepositoryChange.metadata(uid)]);
     }
     return updated;
   }
@@ -1093,7 +1126,7 @@ class NotebookRepository {
     });
     _latestPersistedUpdates.remove(uid);
     _notebookCache.remove(uid);
-    onChanged?.call({uid});
+    onChanged?.call([NotebookRepositoryChange.full(uid)]);
   }
 
   List<Map<String, dynamic>> encodeNotebooks(List<Notebook> items) {
@@ -1209,6 +1242,9 @@ class NotebookRepository {
 
   static Map<String, dynamic> encodeNotebookForLocalBackup(Notebook notebook) =>
       _notebookToJson(notebook, includeImageBytes: false);
+
+  static Map<String, dynamic> encodePageForLocalBackup(NotePage page) =>
+      _pageToJson(page, includeImageBytes: false);
 
   List<Notebook> decodeNotebooks(List<dynamic> items) {
     return items

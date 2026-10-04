@@ -560,7 +560,7 @@ class LibraryController extends ChangeNotifier {
     try {
       final payload = _folders.toList()..sort(_compareFolderNames);
       await writeStoredText(_foldersFileName, jsonEncode(payload));
-      repository.onChanged?.call(const <String>{});
+      repository.onChanged?.call(const <NotebookRepositoryChange>[]);
     } catch (e) {
       debugPrint('LibraryController._saveFolders failed: $e');
     }

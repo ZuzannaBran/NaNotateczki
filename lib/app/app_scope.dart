@@ -83,8 +83,8 @@ class _AppScopeState extends State<AppScope> {
             _repository ??
             NotebookRepository(
               result.database,
-              onChanged: (notebookUids) =>
-                  _backupScheduler?.schedule(notebookUids: notebookUids),
+              onChanged: (changes) =>
+                  _backupScheduler?.schedule(changes: changes),
             );
         _repository = repository;
         final backupService = _backupService ?? LocalBackupService(repository);
@@ -291,11 +291,17 @@ class _BackupScheduler with WidgetsBindingObserver {
   Timer? _maximumTimer;
   bool _dirty = false;
   bool _isRunning = false;
-  final Set<String> _dirtyNotebookUids = <String>{};
+  final Map<String, Set<String>?> _pendingChanges =
+      <String, Set<String>?>{};
 
-  void schedule({Set<String> notebookUids = const <String>{}}) {
+  void schedule({
+    Iterable<NotebookRepositoryChange> changes =
+        const <NotebookRepositoryChange>[],
+  }) {
     _dirty = true;
-    _dirtyNotebookUids.addAll(notebookUids);
+    for (final change in changes) {
+      _mergeChange(change.uid, change.pageIds);
+    }
     _timer?.cancel();
     _timer = Timer(_idleDelay, () {
       unawaited(flush(reason: 'idle'));
@@ -326,8 +332,13 @@ class _BackupScheduler with WidgetsBindingObserver {
     }
     _maximumTimer?.cancel();
     _maximumTimer = null;
-    final pendingNotebookUids = Set<String>.from(_dirtyNotebookUids);
-    _dirtyNotebookUids.clear();
+    final pendingChanges = <String, Set<String>?>{
+      for (final entry in _pendingChanges.entries)
+        entry.key: entry.value == null
+            ? null
+            : Set<String>.from(entry.value!),
+    };
+    _pendingChanges.clear();
     _dirty = false;
     _isRunning = true;
     final frameCursor = FrameTimingTracker.instance.captureCursor();
@@ -385,7 +396,7 @@ class _BackupScheduler with WidgetsBindingObserver {
       }
       snapshotReport = await backupService.snapshot(
         snapshotItems,
-        dirtyNotebookUids: pendingNotebookUids,
+        dirtyPageIdsByNotebook: pendingChanges,
       );
       final frameSummary = FrameTimingTracker.instance.summarySince(
         frameCursor,
@@ -405,12 +416,16 @@ class _BackupScheduler with WidgetsBindingObserver {
         status: 'ok',
       );
     } on BackupSnapshotInterrupted {
-      _dirtyNotebookUids.addAll(pendingNotebookUids);
+      for (final entry in pendingChanges.entries) {
+        _mergeChange(entry.key, entry.value);
+      }
       _dirty = true;
       debugPrint('[backup] reason=$reason interrupted=worker');
     } catch (e) {
       if (e is! BackupDataException) {
-        _dirtyNotebookUids.addAll(pendingNotebookUids);
+        for (final entry in pendingChanges.entries) {
+          _mergeChange(entry.key, entry.value);
+        }
         _dirty = true;
         retryAfterFailure = true;
       }
@@ -442,6 +457,21 @@ class _BackupScheduler with WidgetsBindingObserver {
         }
       }
     }
+  }
+
+  void _mergeChange(String uid, Set<String>? pageIds) {
+    if (!_pendingChanges.containsKey(uid)) {
+      _pendingChanges[uid] = pageIds == null
+          ? null
+          : Set<String>.from(pageIds);
+      return;
+    }
+    final existing = _pendingChanges[uid];
+    if (existing == null || pageIds == null) {
+      _pendingChanges[uid] = null;
+      return;
+    }
+    existing.addAll(pageIds);
   }
 
   void _scheduleFailureRetry() {

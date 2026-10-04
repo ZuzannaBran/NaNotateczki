@@ -12,6 +12,7 @@ import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/image_block.dart';
 import '../../features/notebook/domain/notebook.dart';
+import '../../features/notebook/domain/note_page.dart';
 import 'backup_eraser_flattening.dart';
 
 class LocalBackupService {
@@ -40,6 +41,7 @@ class LocalBackupService {
 
   static const _dirName = 'local_backup';
   static const _incrementalDirName = 'notebooks';
+  static const _pagesDirName = 'pages';
   static const _assetsDirName = 'assets';
   static const _historyDirName = 'history';
   static const _trashDirName = 'trash';
@@ -72,6 +74,22 @@ class LocalBackupService {
       await dir.create(recursive: true);
     }
     return dir;
+  }
+
+  Future<Directory> _pagesDir() async {
+    final dir = Directory('${(await _backupDir()).path}/$_pagesDirName');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  Future<File> _pageFile(String fileName) async {
+    if (!_isSafeNotebookFileName(fileName)) {
+      throw FormatException('Unsafe backup page file name: $fileName');
+    }
+    final dir = await _pagesDir();
+    return File('${dir.path}/$fileName');
   }
 
   Future<Directory> _assetsDir() async {
@@ -111,10 +129,6 @@ class LocalBackupService {
     return File('${dir.path}/$fileName');
   }
 
-  String _notebookContentFileName(String uid, String checksum) {
-    return '${Uri.encodeComponent(uid)}_$checksum.json';
-  }
-
   bool _isSafeNotebookFileName(String fileName) {
     return fileName.isNotEmpty &&
         fileName.endsWith('.json') &&
@@ -134,11 +148,20 @@ class LocalBackupService {
   Future<BackupSnapshotReport> snapshot(
     List<Notebook> items, {
     Set<String>? dirtyNotebookUids,
+    Map<String, Set<String>?>? dirtyPageIdsByNotebook,
     bool Function()? shouldInterrupt,
   }) async {
     final requestedDirtyUids = dirtyNotebookUids == null
         ? null
         : Set<String>.unmodifiable(dirtyNotebookUids);
+    final requestedDirtyPages = dirtyPageIdsByNotebook == null
+        ? null
+        : <String, Set<String>?>{
+            for (final entry in dirtyPageIdsByNotebook.entries)
+              entry.key: entry.value == null
+                  ? null
+                  : Set<String>.unmodifiable(entry.value!),
+          };
     final previous = _snapshotTail;
     final completion = Completer<void>();
     _snapshotTail = completion.future;
@@ -147,6 +170,7 @@ class LocalBackupService {
       return await _snapshotNow(
         items,
         dirtyNotebookUids: requestedDirtyUids,
+        dirtyPageIdsByNotebook: requestedDirtyPages,
         shouldInterrupt: shouldInterrupt,
       );
     } finally {
@@ -157,12 +181,21 @@ class LocalBackupService {
   Future<BackupSnapshotReport> _snapshotNow(
     List<Notebook> items, {
     Set<String>? dirtyNotebookUids,
+    Map<String, Set<String>?>? dirtyPageIdsByNotebook,
     bool Function()? shouldInterrupt,
   }) async {
-    if (dirtyNotebookUids == null || kIsWeb) {
+    final verifyUntouchedPageBackups =
+        dirtyPageIdsByNotebook == null && dirtyNotebookUids != null;
+    final requestedChanges = dirtyPageIdsByNotebook ??
+        (dirtyNotebookUids == null
+            ? null
+            : <String, Set<String>?>{
+                for (final uid in dirtyNotebookUids) uid: null,
+              });
+    if (requestedChanges == null || kIsWeb) {
       _validateSnapshotItems(items);
     } else {
-      _validateSnapshotNotebookIds(items);
+      _validateSnapshotNotebookAndPageIds(items);
     }
     _snapshotInProgress.value = true;
     try {
@@ -171,26 +204,51 @@ class LocalBackupService {
       }
       final totalStopwatch = Stopwatch()..start();
       final notebooksDir = await _notebooksDir();
+      final pagesDir = await _pagesDir();
       final assetsDir = await _assetsDir();
       await _recoverDirectoryAtomicWrites(notebooksDir);
       await _recoverDirectoryAtomicWrites(await _historyDir());
       final previousEntries = await _readManifestEntries();
-      final notebookUidsToSnapshot = dirtyNotebookUids == null
-          ? items.map((notebook) => notebook.uid).toSet()
-          : Set<String>.from(dirtyNotebookUids);
-      if (dirtyNotebookUids != null) {
+      final notebookChanges = requestedChanges == null
+          ? <String, Set<String>?>{
+              for (final notebook in items) notebook.uid: null,
+            }
+          : <String, Set<String>?>{
+              for (final entry in requestedChanges.entries)
+                entry.key: entry.value == null
+                    ? null
+                    : Set<String>.from(entry.value!),
+            };
+
+      if (requestedChanges != null) {
         for (final notebook in items) {
           final previousEntry = previousEntries[notebook.uid];
-          if (previousEntry == null ||
-              !await _canReuseManifestEntryFast(previousEntry)) {
-            notebookUidsToSnapshot.add(notebook.uid);
+          if (!notebookChanges.containsKey(notebook.uid)) {
+            if (previousEntry == null ||
+                !await _canReuseManifestEntryFast(previousEntry) ||
+                (verifyUntouchedPageBackups &&
+                    previousEntry.pageBacked &&
+                    !await _canReusePageBackedEntryFast(previousEntry))) {
+              notebookChanges[notebook.uid] = null;
+            }
+            continue;
+          }
+          if (previousEntry == null || !previousEntry.pageBacked) {
+            notebookChanges[notebook.uid] = null;
+            continue;
+          }
+          final currentPageIds = [
+            for (final page in notebook.pages) page.id,
+          ];
+          final previousPageIds = [
+            for (final page in previousEntry.pages) page.pageId,
+          ];
+          if (!listEquals(currentPageIds, previousPageIds)) {
+            notebookChanges[notebook.uid] = null;
           }
         }
-        _validateSnapshotItems([
-          for (final notebook in items)
-            if (notebookUidsToSnapshot.contains(notebook.uid)) notebook,
-        ]);
       }
+
       final currentEntries = <String, _BackupManifestEntry>{};
       final expectedFiles = <String>{};
       final notebookReports = <NotebookBackupReport>[];
@@ -198,48 +256,27 @@ class LocalBackupService {
       var staleListMs = 0;
       var manifestMs = 0;
       var staleMoved = 0;
+
       for (final notebook in items) {
         _throwIfInterrupted(shouldInterrupt);
         final notebookStopwatch = Stopwatch()..start();
         final previousEntry = previousEntries[notebook.uid];
-        if (!notebookUidsToSnapshot.contains(notebook.uid)) {
+        if (!notebookChanges.containsKey(notebook.uid)) {
           final reusableEntry = previousEntry!;
-          final previousFile = await _notebookFile(reusableEntry.fileName);
           currentEntries[notebook.uid] = reusableEntry;
-          expectedFiles.add(previousFile.path);
+          if (!reusableEntry.pageBacked && reusableEntry.fileName != null) {
+            expectedFiles.add(
+              (await _notebookFile(reusableEntry.fileName!)).path,
+            );
+          }
           notebookStopwatch.stop();
           notebookReports.add(
             NotebookBackupReport(
               uid: notebook.uid,
               pages: notebook.pages.length,
-              strokes: _strokeCount(notebook),
-              points: _pointCount(notebook),
-              jsonBytes: reusableEntry.jsonBytes!,
-              flattenMs: 0,
-              encodeMs: 0,
-              jsonMs: 0,
-              compareMs: 0,
-              writeMs: 0,
-              totalMs: notebookStopwatch.elapsedMilliseconds,
-              changed: false,
-            ),
-          );
-          continue;
-        }
-        if (previousEntry != null &&
-            !notebook.updatedAt.isAfter(previousEntry.updatedAt) &&
-            await _isManifestEntryValid(previousEntry)) {
-          final previousFile = await _notebookFile(previousEntry.fileName);
-          currentEntries[notebook.uid] = previousEntry;
-          expectedFiles.add(previousFile.path);
-          notebookStopwatch.stop();
-          notebookReports.add(
-            NotebookBackupReport(
-              uid: notebook.uid,
-              pages: notebook.pages.length,
-              strokes: _strokeCount(notebook),
-              points: _pointCount(notebook),
-              jsonBytes: previousEntry.jsonBytes!,
+              strokes: 0,
+              points: 0,
+              jsonBytes: reusableEntry.jsonBytes ?? 0,
               flattenMs: 0,
               encodeMs: 0,
               jsonMs: 0,
@@ -252,76 +289,127 @@ class LocalBackupService {
           continue;
         }
 
-        await _validateNotebookImages(notebook);
-        final workerResult = await _backupWorker.run(
-          _BackupWorkerOperation.snapshot,
-          _BackupWorkerRequest(
-            notebook: notebook,
-            assetsDirectoryPath: assetsDir.path,
-            previousAssets:
-                previousEntry?.assets ?? const <_BackupAssetReference>[],
-          ),
-          shouldInterrupt: shouldInterrupt,
-        );
-        if (workerResult.missingImageIds.isNotEmpty) {
+        final previousPages = previousEntry?.pageBacked ?? false
+            ? <String, _BackupPageReference>{
+                for (final page in previousEntry!.pages) page.pageId: page,
+              }
+            : const <String, _BackupPageReference>{};
+        final requestedPageIds = notebookChanges[notebook.uid];
+        final pageIdsToWrite = requestedPageIds == null
+            ? <String>{for (final page in notebook.pages) page.id}
+            : Set<String>.from(requestedPageIds);
+
+        if (previousEntry?.pageBacked ?? false) {
+          for (final page in notebook.pages) {
+            if (pageIdsToWrite.contains(page.id)) {
+              continue;
+            }
+            final previousPage = previousPages[page.id];
+            if (previousPage == null ||
+                !await _canReusePageReferenceFast(previousPage)) {
+              pageIdsToWrite.add(page.id);
+            }
+          }
+        } else {
+          pageIdsToWrite
+            ..clear()
+            ..addAll(notebook.pages.map((page) => page.id));
+        }
+
+        final pagesToWrite = <NotePage>[
+          for (final page in notebook.pages)
+            if (pageIdsToWrite.contains(page.id)) page,
+        ];
+        if (pagesToWrite.length != pageIdsToWrite.length) {
           throw BackupDataException(
-            'Images disappeared or became unreadable during backup: '
-            '${workerResult.missingImageIds.join(', ')}',
+            'Dirty page set does not match notebook ${notebook.uid}.',
           );
         }
-        final content = workerResult.content;
-        final checksum = workerResult.checksum;
-        final jsonBytes = workerResult.jsonBytes;
-        final fileName = _notebookContentFileName(notebook.uid, checksum);
-        final file = await _notebookFile(fileName);
+        _validateSnapshotPages(pagesToWrite);
+        for (final page in pagesToWrite) {
+          await _validatePageImages(page);
+        }
+
+        final pageReferences = <_BackupPageReference>[];
+        var flattenMs = 0;
+        var encodeMs = 0;
+        var jsonMs = 0;
+        var writeMs = 0;
+        var processedStrokes = 0;
+        var processedPoints = 0;
+        for (final page in notebook.pages) {
+          _throwIfInterrupted(shouldInterrupt);
+          if (!pageIdsToWrite.contains(page.id)) {
+            final previousPage = previousPages[page.id];
+            if (previousPage == null) {
+              throw BackupDataException(
+                'Missing reusable page backup: ${page.id}',
+              );
+            }
+            pageReferences.add(previousPage);
+            continue;
+          }
+
+          final workerResult = await _backupWorker.run(
+            _BackupWorkerOperation.snapshot,
+            _BackupPageWorkerRequest(
+              page: page,
+              pagesDirectoryPath: pagesDir.path,
+              assetsDirectoryPath: assetsDir.path,
+              previousAssets:
+                  previousPages[page.id]?.assets ??
+                  const <_BackupAssetReference>[],
+            ),
+            shouldInterrupt: shouldInterrupt,
+          );
+          if (workerResult.missingImageIds.isNotEmpty) {
+            throw BackupDataException(
+              'Images disappeared or became unreadable during backup: '
+              '${workerResult.missingImageIds.join(', ')}',
+            );
+          }
+          pageReferences.add(workerResult.reference);
+          flattenMs += workerResult.flattenMs;
+          encodeMs += workerResult.encodeMs;
+          jsonMs += workerResult.jsonMs;
+          writeMs += workerResult.writeMs;
+          processedStrokes += workerResult.strokeCount;
+          processedPoints += workerResult.pointCount;
+        }
+
         final entry = _BackupManifestEntry(
           uid: notebook.uid,
           updatedAt: notebook.updatedAt,
-          fileName: fileName,
-          checksum: checksum,
-          checksumAlgorithm: _sha256Algorithm,
-          jsonBytes: jsonBytes,
-          assetBacked: true,
-          assets: workerResult.assets,
+          fileName: null,
+          checksum: null,
+          checksumAlgorithm: null,
+          jsonBytes: pageReferences.fold<int>(
+            0,
+            (sum, page) => sum + page.jsonBytes,
+          ),
+          pageBacked: true,
+          title: notebook.title,
+          kindIndex: notebook.kind.indexValue,
+          folder: notebook.folder,
+          createdAt: notebook.createdAt,
+          pages: pageReferences,
         );
         currentEntries[notebook.uid] = entry;
-        expectedFiles.add(file.path);
-        _throwIfInterrupted(shouldInterrupt);
-        var compareMs = 0;
-        var writeMs = 0;
-        var changed = true;
-        if (await file.exists()) {
-          final compareStopwatch = Stopwatch()..start();
-          final previous = await file.readAsString();
-          compareStopwatch.stop();
-          _throwIfInterrupted(shouldInterrupt);
-          compareMs = compareStopwatch.elapsedMilliseconds;
-          readCompareMs += compareMs;
-          if (previous == content) {
-            changed = false;
-          }
-        }
-        if (changed) {
-          final writeStopwatch = Stopwatch()..start();
-          await _atomicWriteString(file, content);
-          writeStopwatch.stop();
-          writeMs = writeStopwatch.elapsedMilliseconds;
-        }
         notebookStopwatch.stop();
         notebookReports.add(
           NotebookBackupReport(
             uid: notebook.uid,
             pages: notebook.pages.length,
-            strokes: _strokeCount(notebook),
-            points: _pointCount(notebook),
-            jsonBytes: jsonBytes,
-            flattenMs: workerResult.flattenMs,
-            encodeMs: workerResult.encodeMs,
-            jsonMs: workerResult.jsonMs,
-            compareMs: compareMs,
+            strokes: processedStrokes,
+            points: processedPoints,
+            jsonBytes: entry.jsonBytes ?? 0,
+            flattenMs: flattenMs,
+            encodeMs: encodeMs,
+            jsonMs: jsonMs,
+            compareMs: 0,
             writeMs: writeMs,
             totalMs: notebookStopwatch.elapsedMilliseconds,
-            changed: changed,
+            changed: true,
           ),
         );
       }
@@ -335,7 +423,7 @@ class LocalBackupService {
         ],
       };
       final manifestPayload = <String, dynamic>{
-        'version': 5,
+        'version': 6,
         'checksumAlgorithm': _sha256Algorithm,
         'checksum': _sha256Checksum(jsonEncode(manifestBody)),
         ...manifestBody,
@@ -380,12 +468,14 @@ class LocalBackupService {
           0,
           (sum, notebook) => sum + notebook.pages.length,
         ),
-        strokeCount: items.fold<int>(0, (sum, notebook) {
-          return sum + _strokeCount(notebook);
-        }),
-        pointCount: items.fold<int>(0, (sum, notebook) {
-          return sum + _pointCount(notebook);
-        }),
+        strokeCount: notebookReports.fold<int>(
+          0,
+          (sum, report) => sum + report.strokes,
+        ),
+        pointCount: notebookReports.fold<int>(
+          0,
+          (sum, report) => sum + report.points,
+        ),
         jsonBytes: notebookReports.fold<int>(
           0,
           (sum, report) => sum + report.jsonBytes,
@@ -510,12 +600,13 @@ class LocalBackupService {
           version != 2 &&
           version != 3 &&
           version != 4 &&
-          version != 5) {
+          version != 5 &&
+          version != 6) {
         throw BackupDataException(
           'Unsupported existing backup manifest version: ${decoded['version']}',
         );
       }
-      if ((version == 4 || version == 5) &&
+      if ((version == 4 || version == 5 || version == 6) &&
           !_isManifestChecksumValid(decoded)) {
         return const <String, _BackupManifestEntry>{};
       }
@@ -541,15 +632,70 @@ class LocalBackupService {
   _BackupManifestEntry? _manifestEntryFromJson(Map<String, dynamic> json) {
     final uid = json['uid'];
     final updatedAt = json['updatedAt'];
-    final fileName = json['file'];
-    if (uid is! String ||
-        updatedAt is! String ||
-        fileName is! String ||
-        !_isSafeNotebookFileName(fileName)) {
+    if (uid is! String || uid.isEmpty || updatedAt is! String) {
       return null;
     }
-    final parsed = DateTime.tryParse(updatedAt);
-    if (parsed == null) {
+    final parsedUpdatedAt = DateTime.tryParse(updatedAt);
+    if (parsedUpdatedAt == null) {
+      return null;
+    }
+
+    final storageMode = json['storageMode'];
+    if (storageMode == _pageStorageMode) {
+      final title = json['title'];
+      final kind = json['kind'];
+      final folder = json['folder'];
+      final createdAt = json['createdAt'];
+      final rawPages = json['pages'];
+      if (title is! String ||
+          kind is! num ||
+          kind.toInt() != kind ||
+          folder is! String ||
+          createdAt is! String ||
+          rawPages is! List<dynamic> ||
+          rawPages.isEmpty) {
+        return null;
+      }
+      final parsedCreatedAt = DateTime.tryParse(createdAt);
+      if (parsedCreatedAt == null) {
+        return null;
+      }
+      final pages = <_BackupPageReference>[];
+      final seenPageIds = <String>{};
+      for (final rawPage in rawPages) {
+        if (rawPage is! Map<String, dynamic>) {
+          return null;
+        }
+        final page = _pageReferenceFromJson(rawPage);
+        if (page == null || !seenPageIds.add(page.pageId)) {
+          return null;
+        }
+        pages.add(page);
+      }
+      return _BackupManifestEntry(
+        uid: uid,
+        updatedAt: parsedUpdatedAt,
+        fileName: null,
+        checksum: null,
+        checksumAlgorithm: null,
+        jsonBytes: pages.fold<int>(
+          0,
+          (sum, page) => sum + page.jsonBytes,
+        ),
+        pageBacked: true,
+        title: title,
+        kindIndex: kind.toInt(),
+        folder: folder,
+        createdAt: parsedCreatedAt,
+        pages: pages,
+      );
+    }
+    if (storageMode != null) {
+      return null;
+    }
+
+    final fileName = json['file'];
+    if (fileName is! String || !_isSafeNotebookFileName(fileName)) {
       return null;
     }
     final checksum = json['checksum'];
@@ -584,7 +730,7 @@ class LocalBackupService {
     }
     return _BackupManifestEntry(
       uid: uid,
-      updatedAt: parsed,
+      updatedAt: parsedUpdatedAt,
       fileName: fileName,
       checksum: parsedChecksum,
       checksumAlgorithm: checksumAlgorithm,
@@ -594,7 +740,51 @@ class LocalBackupService {
     );
   }
 
-  _BackupAssetReference? _assetReferenceFromJson(Map<String, dynamic> json) {
+  _BackupPageReference? _pageReferenceFromJson(
+    Map<String, dynamic> json,
+  ) {
+    final pageId = json['pageId'];
+    final fileName = json['file'];
+    final checksum = json['checksum'];
+    final rawBytes = json['bytes'];
+    final rawAssetMode = json['assetMode'];
+    final rawAssets = json['assets'];
+    if (pageId is! String ||
+        pageId.isEmpty ||
+        fileName is! String ||
+        !_isSafeNotebookFileName(fileName) ||
+        checksum is! String ||
+        !_isSafeAssetChecksum(checksum) ||
+        rawBytes is! num ||
+        rawBytes.toInt() <= 0 ||
+        rawAssetMode != _externalAssetMode ||
+        rawAssets is! List<dynamic>) {
+      return null;
+    }
+    final assets = <_BackupAssetReference>[];
+    final seenImageIds = <String>{};
+    for (final rawAsset in rawAssets) {
+      if (rawAsset is! Map<String, dynamic>) {
+        return null;
+      }
+      final asset = _assetReferenceFromJson(rawAsset);
+      if (asset == null || !seenImageIds.add(asset.imageId)) {
+        return null;
+      }
+      assets.add(asset);
+    }
+    return _BackupPageReference(
+      pageId: pageId,
+      fileName: fileName,
+      checksum: checksum,
+      jsonBytes: rawBytes.toInt(),
+      assets: assets,
+    );
+  }
+
+  _BackupAssetReference? _assetReferenceFromJson(
+    Map<String, dynamic> json,
+  ) {
     final imageId = json['imageId'];
     final checksum = json['checksum'];
     final rawBytes = json['bytes'];
@@ -621,50 +811,56 @@ class LocalBackupService {
     );
   }
 
-  Future<void> _validateNotebookImages(Notebook notebook) async {
-    for (final page in notebook.pages) {
-      for (final image in page.imageBlocks) {
-        final inlineBytes = image.bytes;
-        if (inlineBytes != null && inlineBytes.isNotEmpty) {
-          continue;
-        }
-        if (image.path.isEmpty) {
+  Future<void> _validatePageImages(NotePage page) async {
+    for (final image in page.imageBlocks) {
+      final inlineBytes = image.bytes;
+      if (inlineBytes != null && inlineBytes.isNotEmpty) {
+        continue;
+      }
+      if (image.path.isEmpty) {
+        throw BackupDataException(
+          'Image ${image.id} has no persisted file or inline bytes.',
+        );
+      }
+      final file = File(image.path);
+      if (!await file.exists()) {
+        throw BackupDataException(
+          'Image file is missing for ${image.id}: ${image.path}',
+        );
+      }
+      try {
+        if (await file.length() <= 0) {
           throw BackupDataException(
-            'Image ${image.id} has no persisted file or inline bytes.',
+            'Image file is empty for ${image.id}: ${image.path}',
           );
         }
-        final file = File(image.path);
-        if (!await file.exists()) {
-          throw BackupDataException(
-            'Image file is missing for ${image.id}: ${image.path}',
-          );
-        }
-        try {
-          if (await file.length() <= 0) {
-            throw BackupDataException(
-              'Image file is empty for ${image.id}: ${image.path}',
-            );
-          }
-          await file.openRead(0, 1).drain<void>();
-        } on BackupDataException {
-          rethrow;
-        } catch (e) {
-          throw BackupDataException(
-            'Image file cannot be read for ${image.id}: ${image.path}; $e',
-          );
-        }
+        await file.openRead(0, 1).drain<void>();
+      } on BackupDataException {
+        rethrow;
+      } catch (e) {
+        throw BackupDataException(
+          'Image file cannot be read for ${image.id}: ${image.path}; $e',
+        );
       }
     }
   }
 
   Future<bool> _canReuseManifestEntryFast(_BackupManifestEntry entry) async {
-    if (entry.checksum == null ||
+    if (entry.pageBacked) {
+      return entry.pages.isNotEmpty &&
+          entry.title != null &&
+          entry.kindIndex != null &&
+          entry.folder != null &&
+          entry.createdAt != null;
+    }
+    if (entry.fileName == null ||
+        entry.checksum == null ||
         entry.jsonBytes == null ||
         (entry.checksumAlgorithm != _sha256Algorithm &&
             entry.checksumAlgorithm != _legacyFnv1a32Algorithm)) {
       return false;
     }
-    final file = await _notebookFile(entry.fileName);
+    final file = await _notebookFile(entry.fileName!);
     await _recoverAtomicWrite(file);
     if (!await file.exists()) {
       return false;
@@ -690,13 +886,61 @@ class LocalBackupService {
     }
   }
 
+  Future<bool> _canReusePageBackedEntryFast(
+    _BackupManifestEntry entry,
+  ) async {
+    for (final page in entry.pages) {
+      if (!await _canReusePageReferenceFast(page)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<bool> _canReusePageReferenceFast(
+    _BackupPageReference reference,
+  ) async {
+    final file = await _pageFile(reference.fileName);
+    await _recoverAtomicWrite(file);
+    if (!await file.exists()) {
+      return false;
+    }
+    try {
+      if (await file.length() != reference.jsonBytes) {
+        return false;
+      }
+      for (final asset in reference.assets) {
+        final assetFile = await _assetFile(asset.checksum);
+        await _recoverAtomicWrite(assetFile);
+        if (!await assetFile.exists() ||
+            await assetFile.length() != asset.bytes) {
+          return false;
+        }
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> _isManifestEntryValid(_BackupManifestEntry entry) async {
-    if (entry.checksum == null ||
+    if (entry.pageBacked) {
+      for (final page in entry.pages) {
+        try {
+          await _readBackupPageJson(page);
+        } on BackupValidationException {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (entry.fileName == null ||
+        entry.checksum == null ||
         entry.checksumAlgorithm == null ||
         entry.jsonBytes == null) {
       return false;
     }
-    final file = await _notebookFile(entry.fileName);
+    final file = await _notebookFile(entry.fileName!);
     await _recoverAtomicWrite(file);
     if (!await file.exists()) {
       return false;
@@ -732,6 +976,7 @@ class LocalBackupService {
   static const _sha256Algorithm = 'sha256';
   static const _legacyFnv1a32Algorithm = 'fnv1a32';
   static const _externalAssetMode = 'external-v1';
+  static const _pageStorageMode = 'pages-v1';
 
   bool _isSafeAssetChecksum(String checksum) {
     return RegExp(r'^[0-9a-f]{64}$').hasMatch(checksum);
@@ -890,12 +1135,14 @@ class LocalBackupService {
         version != 2 &&
         version != 3 &&
         version != 4 &&
-        version != 5) {
+        version != 5 &&
+        version != 6) {
       throw BackupValidationException(
         'Unsupported backup manifest version: $rawVersion',
       );
     }
-    if ((version == 4 || version == 5) && !_isManifestChecksumValid(decoded)) {
+    if ((version == 4 || version == 5 || version == 6) &&
+        !_isManifestChecksumValid(decoded)) {
       throw const BackupValidationException(
         'Backup manifest checksum validation failed.',
       );
@@ -927,44 +1174,161 @@ class LocalBackupService {
           'Manifest contains duplicate notebook uid: ${entry.uid}',
         );
       }
-      final file = await _notebookFile(entry.fileName);
-      await _recoverAtomicWrite(file);
-      if (!await file.exists()) {
-        throw BackupValidationException(
-          'Backup file is missing: ${entry.fileName}',
-        );
-      }
-      if (version != 1 && !await _isManifestEntryValid(entry)) {
-        throw BackupValidationException(
-          'Backup file failed checksum validation: ${entry.fileName}',
-        );
-      }
+      Map<String, dynamic> notebookJson;
+      String backupLabel;
+      if (entry.pageBacked) {
+        notebookJson = await _readPageBackedNotebookJson(entry);
+        backupLabel = entry.uid;
+      } else {
+        final fileName = entry.fileName;
+        if (fileName == null) {
+          throw const BackupValidationException(
+            'Legacy backup entry has no file name.',
+          );
+        }
+        final file = await _notebookFile(fileName);
+        await _recoverAtomicWrite(file);
+        if (!await file.exists()) {
+          throw BackupValidationException(
+            'Backup file is missing: $fileName',
+          );
+        }
+        if (version != 1 && !await _isManifestEntryValid(entry)) {
+          throw BackupValidationException(
+            'Backup file failed checksum validation: $fileName',
+          );
+        }
 
-      final notebookJson = jsonDecode(await file.readAsString());
-      if (notebookJson is! Map<String, dynamic>) {
-        throw BackupValidationException(
-          'Backup notebook is not a JSON object: ${entry.fileName}',
-        );
-      }
-      if (entry.assetBacked) {
-        await _hydrateAssetBackedNotebookJson(notebookJson, entry);
+        final decodedNotebook = jsonDecode(await file.readAsString());
+        if (decodedNotebook is! Map<String, dynamic>) {
+          throw BackupValidationException(
+            'Backup notebook is not a JSON object: $fileName',
+          );
+        }
+        notebookJson = decodedNotebook;
+        if (entry.assetBacked) {
+          await _hydrateAssetBackedNotebookJson(notebookJson, entry);
+        }
+        backupLabel = fileName;
       }
       final decodedNotebook = repository.decodeBackupStrict([notebookJson]);
       if (decodedNotebook.length != 1) {
         throw BackupValidationException(
-          'Backup notebook could not be decoded: ${entry.fileName}',
+          'Backup notebook could not be decoded: $backupLabel',
         );
       }
       final notebook = decodedNotebook.single;
       if (notebook.uid != entry.uid || notebook.updatedAt != entry.updatedAt) {
         throw BackupValidationException(
-          'Backup notebook metadata does not match manifest: '
-          '${entry.fileName}',
+          'Backup notebook metadata does not match manifest: $backupLabel',
         );
       }
       notebooks.add(notebook);
     }
     return _BackupSnapshotData(notebooks: notebooks, folders: folders);
+  }
+
+  Future<Map<String, dynamic>> _readPageBackedNotebookJson(
+    _BackupManifestEntry entry,
+  ) async {
+    final title = entry.title;
+    final kindIndex = entry.kindIndex;
+    final folder = entry.folder;
+    final createdAt = entry.createdAt;
+    if (title == null ||
+        kindIndex == null ||
+        folder == null ||
+        createdAt == null ||
+        entry.pages.isEmpty) {
+      throw const BackupValidationException(
+        'Page-backed notebook metadata is incomplete.',
+      );
+    }
+    final pages = <Map<String, dynamic>>[];
+    for (final reference in entry.pages) {
+      pages.add(await _readBackupPageJson(reference));
+    }
+    return <String, dynamic>{
+      'uid': entry.uid,
+      'title': title,
+      'kind': kindIndex,
+      'folder': folder,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': entry.updatedAt.toIso8601String(),
+      'pages': pages,
+    };
+  }
+
+  Future<Map<String, dynamic>> _readBackupPageJson(
+    _BackupPageReference reference,
+  ) async {
+    final file = await _pageFile(reference.fileName);
+    await _recoverAtomicWrite(file);
+    if (!await file.exists()) {
+      throw BackupValidationException(
+        'Backup page file is missing: ${reference.fileName}',
+      );
+    }
+    final content = await file.readAsString();
+    if (utf8.encode(content).length != reference.jsonBytes ||
+        _sha256Checksum(content) != reference.checksum) {
+      throw BackupValidationException(
+        'Backup page failed checksum validation: ${reference.fileName}',
+      );
+    }
+    final decoded = jsonDecode(content);
+    if (decoded is! Map<String, dynamic> ||
+        decoded['id'] != reference.pageId) {
+      throw BackupValidationException(
+        'Backup page metadata mismatch: ${reference.fileName}',
+      );
+    }
+    await _hydrateAssetBackedPageJson(decoded, reference.assets);
+    return decoded;
+  }
+
+  Future<void> _hydrateAssetBackedPageJson(
+    Map<String, dynamic> pageJson,
+    List<_BackupAssetReference> assets,
+  ) async {
+    final assetsByImageId = <String, _BackupAssetReference>{
+      for (final asset in assets) asset.imageId: asset,
+    };
+    final seenImageIds = <String>{};
+    final images = pageJson['imageBlocks'];
+    if (images is! List<dynamic>) {
+      throw const BackupValidationException(
+        'Asset-backed page contains malformed image blocks.',
+      );
+    }
+    for (final rawImage in images) {
+      if (rawImage is! Map<String, dynamic>) {
+        throw const BackupValidationException(
+          'Asset-backed page contains a malformed image block.',
+        );
+      }
+      final imageId = rawImage['id'];
+      final checksum = rawImage['asset'];
+      if (imageId is! String || checksum is! String) {
+        throw const BackupValidationException(
+          'Asset-backed image is missing its asset reference.',
+        );
+      }
+      final asset = assetsByImageId[imageId];
+      if (asset == null || asset.checksum != checksum) {
+        throw BackupValidationException(
+          'Asset reference mismatch for image: $imageId',
+        );
+      }
+      rawImage['bytes'] = base64Encode(await _readBackupAssetBytes(asset));
+      seenImageIds.add(imageId);
+    }
+    if (seenImageIds.length != assetsByImageId.length ||
+        !seenImageIds.containsAll(assetsByImageId.keys)) {
+      throw const BackupValidationException(
+        'Page manifest contains unreferenced backup assets.',
+      );
+    }
   }
 
   Future<void> _hydrateAssetBackedNotebookJson(
@@ -1220,8 +1584,33 @@ class LocalBackupService {
     }
   }
 
-  void _validateSnapshotItems(List<Notebook> items) {
+  void _validateSnapshotNotebookAndPageIds(List<Notebook> items) {
     _validateSnapshotNotebookIds(items);
+    final pageIds = <String>{};
+    for (final notebook in items) {
+      if (notebook.pages.isEmpty) {
+        throw BackupDataException(
+          'Snapshot notebook has no pages: ${notebook.uid}',
+        );
+      }
+      for (final page in notebook.pages) {
+        if (page.id.isEmpty || !pageIds.add(page.id)) {
+          throw BackupDataException(
+            'Snapshot contains an empty or duplicate page id: ${page.id}',
+          );
+        }
+      }
+    }
+  }
+
+  void _validateSnapshotItems(List<Notebook> items) {
+    _validateSnapshotNotebookAndPageIds(items);
+    _validateSnapshotPages([
+      for (final notebook in items) ...notebook.pages,
+    ]);
+  }
+
+  void _validateSnapshotPages(Iterable<NotePage> pages) {
     final pageIds = <String>{};
     final tabIds = <String>{};
     final textIds = <String>{};
@@ -1236,26 +1625,19 @@ class LocalBackupService {
       }
     }
 
-    for (final notebook in items) {
-      if (notebook.pages.isEmpty) {
-        throw BackupDataException(
-          'Snapshot notebook has no pages: ${notebook.uid}',
-        );
+    for (final page in pages) {
+      requireUnique(pageIds, page.id, 'page');
+      for (final tab in page.indexTabs) {
+        requireUnique(tabIds, tab.id, 'index tab');
       }
-      for (final page in notebook.pages) {
-        requireUnique(pageIds, page.id, 'page');
-        for (final tab in page.indexTabs) {
-          requireUnique(tabIds, tab.id, 'index tab');
-        }
-        for (final block in page.textBlocks) {
-          requireUnique(textIds, block.id, 'text block');
-        }
-        for (final block in page.imageBlocks) {
-          requireUnique(imageIds, block.id, 'image block');
-        }
-        for (final stroke in page.inkStrokes) {
-          requireUnique(strokeIds, stroke.id, 'ink stroke');
-        }
+      for (final block in page.textBlocks) {
+        requireUnique(textIds, block.id, 'text block');
+      }
+      for (final block in page.imageBlocks) {
+        requireUnique(imageIds, block.id, 'image block');
+      }
+      for (final stroke in page.inkStrokes) {
+        requireUnique(strokeIds, stroke.id, 'ink stroke');
       }
     }
   }
@@ -1310,8 +1692,10 @@ class LocalBackupService {
         }
         for (final raw in entries.whereType<Map<String, dynamic>>()) {
           final entry = _manifestEntryFromJson(raw);
-          if (entry != null) {
-            result.add((await _notebookFile(entry.fileName)).path);
+          if (entry != null &&
+              !entry.pageBacked &&
+              entry.fileName != null) {
+            result.add((await _notebookFile(entry.fileName!)).path);
           }
         }
       } catch (_) {
@@ -1480,38 +1864,40 @@ class LocalBackupService {
 
 enum _BackupWorkerOperation { snapshot }
 
-class _BackupWorkerRequest {
-  const _BackupWorkerRequest({
-    required this.notebook,
+class _BackupPageWorkerRequest {
+  const _BackupPageWorkerRequest({
+    required this.page,
+    required this.pagesDirectoryPath,
     required this.assetsDirectoryPath,
     required this.previousAssets,
   });
 
-  final Notebook notebook;
+  final NotePage page;
+  final String pagesDirectoryPath;
   final String assetsDirectoryPath;
   final List<_BackupAssetReference> previousAssets;
 }
 
-class _BackupWorkerResult {
-  const _BackupWorkerResult({
-    required this.content,
-    required this.checksum,
-    required this.jsonBytes,
+class _BackupPageWorkerResult {
+  const _BackupPageWorkerResult({
+    required this.reference,
     required this.flattenMs,
     required this.encodeMs,
     required this.jsonMs,
+    required this.writeMs,
     required this.missingImageIds,
-    required this.assets,
+    required this.strokeCount,
+    required this.pointCount,
   });
 
-  final String content;
-  final String checksum;
-  final int jsonBytes;
+  final _BackupPageReference reference;
   final int flattenMs;
   final int encodeMs;
   final int jsonMs;
+  final int writeMs;
   final List<String> missingImageIds;
-  final List<_BackupAssetReference> assets;
+  final int strokeCount;
+  final int pointCount;
 }
 
 const int _workerReadyMessage = 0;
@@ -1523,15 +1909,15 @@ class _BackupWorkerClient {
   ReceivePort? _responsePort;
   StreamSubscription<dynamic>? _responseSubscription;
   SendPort? _requestPort;
-  final Map<int, Completer<_BackupWorkerResult>> _pending =
-      <int, Completer<_BackupWorkerResult>>{};
+  final Map<int, Completer<_BackupPageWorkerResult>> _pending =
+      <int, Completer<_BackupPageWorkerResult>>{};
   int _nextRequestId = 0;
   int _spawnCount = 0;
   bool _disposed = false;
 
   int get spawnCount => _spawnCount;
 
-  Future<_BackupWorkerResult> run(
+  Future<_BackupPageWorkerResult> run(
     _BackupWorkerOperation operation,
     Object message, {
     bool Function()? shouldInterrupt,
@@ -1553,7 +1939,7 @@ class _BackupWorkerClient {
     }
 
     final requestId = _nextRequestId++;
-    final completer = Completer<_BackupWorkerResult>();
+    final completer = Completer<_BackupPageWorkerResult>();
     _pending[requestId] = completer;
     requestPort.send(<Object?>[requestId, operation.index, message]);
 
@@ -1616,7 +2002,7 @@ class _BackupWorkerClient {
         return;
       }
       if (response[2] as bool) {
-        completer.complete(response[3] as _BackupWorkerResult);
+        completer.complete(response[3] as _BackupPageWorkerResult);
       } else {
         completer.completeError(
           RemoteError(response[3] as String, response[4] as String),
@@ -1689,8 +2075,8 @@ void _backupWorkerEntryPoint(SendPort responsePort) {
     try {
       final operation = _BackupWorkerOperation.values[request[1] as int];
       final result = switch (operation) {
-        _BackupWorkerOperation.snapshot => _createBackupPayload(
-          request[2] as _BackupWorkerRequest,
+        _BackupWorkerOperation.snapshot => _createPageBackupPayload(
+          request[2] as _BackupPageWorkerRequest,
         ),
       };
       responsePort.send(<Object?>[
@@ -1711,28 +2097,22 @@ void _backupWorkerEntryPoint(SendPort responsePort) {
   });
 }
 
-_BackupWorkerResult _createBackupPayload(_BackupWorkerRequest request) {
+_BackupPageWorkerResult _createPageBackupPayload(
+  _BackupPageWorkerRequest request,
+) {
   final flattenStopwatch = Stopwatch()..start();
-  final backupNotebook = flattenErasersForBackup(request.notebook);
+  final backupPage = flattenPageErasersForBackup(request.page);
   flattenStopwatch.stop();
 
   final encodeStopwatch = Stopwatch()..start();
-  final encoded = NotebookRepository.encodeNotebookForLocalBackup(
-    backupNotebook,
-  );
+  final encoded = NotebookRepository.encodePageForLocalBackup(backupPage);
   final encodedImages = <String, Map<String, dynamic>>{};
-  final pages = encoded['pages'];
-  if (pages is List<dynamic>) {
-    for (final page in pages.whereType<Map<String, dynamic>>()) {
-      final images = page['imageBlocks'];
-      if (images is! List<dynamic>) {
-        continue;
-      }
-      for (final image in images.whereType<Map<String, dynamic>>()) {
-        final id = image['id'];
-        if (id is String) {
-          encodedImages[id] = image;
-        }
+  final images = encoded['imageBlocks'];
+  if (images is List<dynamic>) {
+    for (final image in images.whereType<Map<String, dynamic>>()) {
+      final id = image['id'];
+      if (id is String) {
+        encodedImages[id] = image;
       }
     }
   }
@@ -1742,24 +2122,22 @@ _BackupWorkerResult _createBackupPayload(_BackupWorkerRequest request) {
   };
   final assets = <_BackupAssetReference>[];
   final missingImageIds = <String>[];
-  for (final page in backupNotebook.pages) {
-    for (final image in page.imageBlocks) {
-      final encodedImage = encodedImages[image.id];
-      if (encodedImage == null) {
-        missingImageIds.add(image.id);
-        continue;
-      }
-      try {
-        final asset = _prepareBackupAsset(
-          image,
-          request.assetsDirectoryPath,
-          previousAssets[image.id],
-        );
-        assets.add(asset);
-        encodedImage['asset'] = asset.checksum;
-      } catch (_) {
-        missingImageIds.add(image.id);
-      }
+  for (final image in backupPage.imageBlocks) {
+    final encodedImage = encodedImages[image.id];
+    if (encodedImage == null) {
+      missingImageIds.add(image.id);
+      continue;
+    }
+    try {
+      final asset = _prepareBackupAsset(
+        image,
+        request.assetsDirectoryPath,
+        previousAssets[image.id],
+      );
+      assets.add(asset);
+      encodedImage['asset'] = asset.checksum;
+    } catch (_) {
+      missingImageIds.add(image.id);
     }
   }
   encodeStopwatch.stop();
@@ -1769,15 +2147,41 @@ _BackupWorkerResult _createBackupPayload(_BackupWorkerRequest request) {
   jsonStopwatch.stop();
   final contentBytes = utf8.encode(content);
   final checksum = sha256.convert(contentBytes).toString();
-  return _BackupWorkerResult(
-    content: content,
-    checksum: checksum,
-    jsonBytes: contentBytes.length,
+  final fileName =
+      '${Uri.encodeComponent(backupPage.id)}_$checksum.json';
+  var writeMs = 0;
+  if (missingImageIds.isEmpty) {
+    final writeStopwatch = Stopwatch()..start();
+    _atomicWriteWorkerString(
+      File(
+        '${request.pagesDirectoryPath}'
+        '${Platform.pathSeparator}$fileName',
+      ),
+      content,
+    );
+    writeStopwatch.stop();
+    writeMs = writeStopwatch.elapsedMilliseconds;
+  }
+  final strokeCount = backupPage.inkStrokes.length;
+  final pointCount = backupPage.inkStrokes.fold<int>(
+    0,
+    (sum, stroke) => sum + stroke.points.length,
+  );
+  return _BackupPageWorkerResult(
+    reference: _BackupPageReference(
+      pageId: backupPage.id,
+      fileName: fileName,
+      checksum: checksum,
+      jsonBytes: contentBytes.length,
+      assets: assets,
+    ),
     flattenMs: flattenStopwatch.elapsedMilliseconds,
     encodeMs: encodeStopwatch.elapsedMilliseconds,
     jsonMs: jsonStopwatch.elapsedMilliseconds,
+    writeMs: writeMs,
     missingImageIds: missingImageIds,
-    assets: assets,
+    strokeCount: strokeCount,
+    pointCount: pointCount,
   );
 }
 
@@ -1864,6 +2268,33 @@ _BackupAssetReference _writeBackupAsset({
 
 File _workerAssetFile(String directoryPath, String checksum) {
   return File('$directoryPath${Platform.pathSeparator}$checksum.bin');
+}
+
+void _atomicWriteWorkerString(File file, String content) {
+  file.parent.createSync(recursive: true);
+  final temporary = File('${file.path}.tmp');
+  final previous = File('${file.path}.previous');
+  if (temporary.existsSync()) {
+    temporary.deleteSync();
+  }
+  if (previous.existsSync()) {
+    previous.deleteSync();
+  }
+  temporary.writeAsStringSync(content, flush: true);
+  if (file.existsSync()) {
+    file.renameSync(previous.path);
+  }
+  try {
+    temporary.renameSync(file.path);
+    if (previous.existsSync()) {
+      previous.deleteSync();
+    }
+  } catch (_) {
+    if (!file.existsSync() && previous.existsSync()) {
+      previous.renameSync(file.path);
+    }
+    rethrow;
+  }
 }
 
 void _recoverWorkerAssetWrite(File file) {
@@ -2072,6 +2503,33 @@ class _BackupAssetReference {
   }
 }
 
+class _BackupPageReference {
+  const _BackupPageReference({
+    required this.pageId,
+    required this.fileName,
+    required this.checksum,
+    required this.jsonBytes,
+    required this.assets,
+  });
+
+  final String pageId;
+  final String fileName;
+  final String checksum;
+  final int jsonBytes;
+  final List<_BackupAssetReference> assets;
+
+  Map<String, Object> toJson() {
+    return {
+      'pageId': pageId,
+      'file': fileName,
+      'checksum': checksum,
+      'bytes': jsonBytes,
+      'assetMode': LocalBackupService._externalAssetMode,
+      'assets': [for (final asset in assets) asset.toJson()],
+    };
+  }
+}
+
 class _BackupManifestEntry {
   const _BackupManifestEntry({
     required this.uid,
@@ -2082,22 +2540,47 @@ class _BackupManifestEntry {
     this.jsonBytes,
     this.assetBacked = false,
     this.assets = const <_BackupAssetReference>[],
+    this.pageBacked = false,
+    this.title,
+    this.kindIndex,
+    this.folder,
+    this.createdAt,
+    this.pages = const <_BackupPageReference>[],
   });
 
   final String uid;
   final DateTime updatedAt;
-  final String fileName;
+  final String? fileName;
   final String? checksum;
   final String? checksumAlgorithm;
   final int? jsonBytes;
   final bool assetBacked;
   final List<_BackupAssetReference> assets;
+  final bool pageBacked;
+  final String? title;
+  final int? kindIndex;
+  final String? folder;
+  final DateTime? createdAt;
+  final List<_BackupPageReference> pages;
 
   Map<String, Object> toJson() {
+    if (pageBacked) {
+      return {
+        'uid': uid,
+        'updatedAt': updatedAt.toIso8601String(),
+        'storageMode': LocalBackupService._pageStorageMode,
+        'title': title!,
+        'kind': kindIndex!,
+        'folder': folder!,
+        'createdAt': createdAt!.toIso8601String(),
+        'bytes': jsonBytes ?? 0,
+        'pages': [for (final page in pages) page.toJson()],
+      };
+    }
     return {
       'uid': uid,
       'updatedAt': updatedAt.toIso8601String(),
-      'file': fileName,
+      'file': fileName!,
       'checksum': ?checksum,
       'checksumAlgorithm': ?checksumAlgorithm,
       'bytes': ?jsonBytes,

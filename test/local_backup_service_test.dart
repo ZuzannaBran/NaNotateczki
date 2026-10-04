@@ -101,6 +101,113 @@ void main() {
     expect(secondReport.jsonMs, 0);
   });
 
+  test('page-level snapshot rewrites only the dirty page', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    final notebook = _twoPageNotebook();
+
+    await service.snapshot([notebook]);
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    final firstManifest =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final firstEntry =
+        (firstManifest['notebooks'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    final firstPages = {
+      for (final raw in firstEntry['pages'] as List<dynamic>)
+        (raw as Map<String, dynamic>)['pageId'] as String:
+            raw['file'] as String,
+    };
+
+    final changedPage = notebook.pages.first.copyWith(title: 'Changed page');
+    final updated = notebook.copyWith(
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      pages: [changedPage, notebook.pages.last],
+    );
+    final report = await service.snapshot(
+      [updated],
+      dirtyPageIdsByNotebook: {
+        updated.uid: {changedPage.id},
+      },
+    );
+
+    final secondManifest =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final secondEntry =
+        (secondManifest['notebooks'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    final secondPages = {
+      for (final raw in secondEntry['pages'] as List<dynamic>)
+        (raw as Map<String, dynamic>)['pageId'] as String:
+            raw['file'] as String,
+    };
+
+    expect(secondPages[changedPage.id], isNot(firstPages[changedPage.id]));
+    expect(
+      secondPages[notebook.pages.last.id],
+      firstPages[notebook.pages.last.id],
+    );
+    expect(report.notebookReports.single.flattenMs, greaterThanOrEqualTo(0));
+    expect((await service.readLatest()).single.pages.first.title, 'Changed page');
+  });
+
+  test('metadata-only snapshot reuses every page file', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    final notebook = _twoPageNotebook();
+
+    await service.snapshot([notebook]);
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    final firstManifest =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final firstEntry =
+        (firstManifest['notebooks'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    final firstFiles = [
+      for (final raw in firstEntry['pages'] as List<dynamic>)
+        (raw as Map<String, dynamic>)['file'],
+    ];
+
+    final renamed = notebook.copyWith(
+      title: 'Renamed',
+      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+    );
+    final report = await service.snapshot(
+      [renamed],
+      dirtyPageIdsByNotebook: {renamed.uid: <String>{}},
+    );
+
+    final secondManifest =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final secondEntry =
+        (secondManifest['notebooks'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    final secondFiles = [
+      for (final raw in secondEntry['pages'] as List<dynamic>)
+        (raw as Map<String, dynamic>)['file'],
+    ];
+
+    expect(secondFiles, firstFiles);
+    expect(report.notebookReports.single.flattenMs, 0);
+    expect(report.notebookReports.single.encodeMs, 0);
+    expect(report.notebookReports.single.jsonMs, 0);
+    expect(report.notebookReports.single.writeMs, 0);
+  });
+
   test('incremental snapshot repairs a missing untouched backup', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
@@ -122,8 +229,11 @@ void main() {
     final secondEntry = entries.whereType<Map<String, dynamic>>().singleWhere(
       (entry) => entry['uid'] == second.uid,
     );
+    final secondPage =
+        (secondEntry['pages'] as List<dynamic>).single
+            as Map<String, dynamic>;
     final secondFile = File(
-      '${directory.path}/local_backup/notebooks/${secondEntry['file']}',
+      '${directory.path}/local_backup/pages/${secondPage['file']}',
     );
     await secondFile.delete();
 
@@ -164,10 +274,16 @@ void main() {
     final firstEntry =
         (firstManifest['notebooks'] as List<dynamic>).single
             as Map<String, dynamic>;
-    final firstFile = firstEntry['file'] as String;
+    final firstPage =
+        (firstEntry['pages'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    final firstFile = firstPage['file'] as String;
 
     final updated = notebook.copyWith(
       updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        notebook.pages.single.copyWith(title: 'Changed page'),
+      ],
     );
     await service.snapshot([updated]);
 
@@ -176,15 +292,18 @@ void main() {
     final secondEntry =
         (secondManifest['notebooks'] as List<dynamic>).single
             as Map<String, dynamic>;
-    final secondFile = secondEntry['file'] as String;
+    final secondPage =
+        (secondEntry['pages'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    final secondFile = secondPage['file'] as String;
 
     expect(secondFile, isNot(firstFile));
     expect(
-      File('${directory.path}/local_backup/notebooks/$secondFile').existsSync(),
+      File('${directory.path}/local_backup/pages/$secondFile').existsSync(),
       isTrue,
     );
     expect(
-      File('${directory.path}/local_backup/notebooks/$firstFile').existsSync(),
+      File('${directory.path}/local_backup/pages/$firstFile').existsSync(),
       isTrue,
     );
     final history = Directory('${directory.path}/local_backup/history');
@@ -220,8 +339,10 @@ void main() {
         jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
     final entry =
         (decoded['notebooks'] as List<dynamic>).single as Map<String, dynamic>;
+    final page =
+        (entry['pages'] as List<dynamic>).single as Map<String, dynamic>;
     final backupFile = File(
-      '${directory.path}/local_backup/notebooks/${entry['file']}',
+      '${directory.path}/local_backup/pages/${page['file']}',
     );
     await backupFile.writeAsString('{"broken":');
 
@@ -234,8 +355,12 @@ void main() {
     final repairedEntry =
         (repairedManifest['notebooks'] as List<dynamic>).single
             as Map<String, dynamic>;
-    expect(repairedEntry['checksum'], isA<String>());
-    expect(repairedEntry['bytes'], greaterThan(0));
+    expect(repairedEntry['storageMode'], 'pages-v1');
+    final repairedPage =
+        (repairedEntry['pages'] as List<dynamic>).single
+            as Map<String, dynamic>;
+    expect(repairedPage['checksum'], isA<String>());
+    expect(repairedPage['bytes'], greaterThan(0));
   });
 
   test('readLatest never returns a partial corrupted snapshot', () async {
@@ -257,8 +382,11 @@ void main() {
         jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
     final entries = decoded['notebooks'] as List<dynamic>;
     final brokenEntry = entries.last as Map<String, dynamic>;
+    final brokenPage =
+        (brokenEntry['pages'] as List<dynamic>).single
+            as Map<String, dynamic>;
     final brokenFile = File(
-      '${directory.path}/local_backup/notebooks/${brokenEntry['file']}',
+      '${directory.path}/local_backup/pages/${brokenPage['file']}',
     );
     await brokenFile.writeAsString('{"broken":');
 
@@ -547,6 +675,9 @@ void main() {
     final second = first.copyWith(
       title: 'Newer title',
       updatedAt: first.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        first.pages.single.copyWith(title: 'Newer page'),
+      ],
     );
     await service.snapshot([second]);
 
@@ -555,8 +686,10 @@ void main() {
         jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
     final entry =
         (decoded['notebooks'] as List<dynamic>).single as Map<String, dynamic>;
+    final currentPage =
+        (entry['pages'] as List<dynamic>).single as Map<String, dynamic>;
     final currentFile = File(
-      '${directory.path}/local_backup/notebooks/${entry['file']}',
+      '${directory.path}/local_backup/pages/${currentPage['file']}',
     );
     await currentFile.writeAsString('{"broken":');
 
@@ -620,11 +753,14 @@ void main() {
               ).readAsString(),
             )
             as Map<String, dynamic>;
-    expect(manifest['version'], 5);
+    expect(manifest['version'], 6);
     final entry =
         (manifest['notebooks'] as List<dynamic>).single as Map<String, dynamic>;
-    expect(entry['assetMode'], 'external-v1');
-    final assets = entry['assets'] as List<dynamic>;
+    expect(entry['storageMode'], 'pages-v1');
+    final pageReference =
+        (entry['pages'] as List<dynamic>).single as Map<String, dynamic>;
+    expect(pageReference['assetMode'], 'external-v1');
+    final assets = pageReference['assets'] as List<dynamic>;
     expect(assets, hasLength(1));
     final asset = assets.single as Map<String, dynamic>;
     final checksum = asset['checksum'] as String;
@@ -633,13 +769,11 @@ void main() {
     );
     expect(await assetFile.readAsBytes(), [1, 2, 3, 4, 5]);
 
-    final notebookFile = File(
-      '${directory.path}/local_backup/notebooks/${entry['file']}',
+    final pageFile = File(
+      '${directory.path}/local_backup/pages/${pageReference['file']}',
     );
-    final notebookJson =
-        jsonDecode(await notebookFile.readAsString()) as Map<String, dynamic>;
     final page =
-        (notebookJson['pages'] as List<dynamic>).single as Map<String, dynamic>;
+        jsonDecode(await pageFile.readAsString()) as Map<String, dynamic>;
     final image =
         (page['imageBlocks'] as List<dynamic>).single as Map<String, dynamic>;
     expect(image['bytes'], isNull);
@@ -1105,6 +1239,24 @@ Notebook _notebook() {
         ],
         isBookmarked: false,
         indexTabs: const [],
+      ),
+    ],
+  );
+}
+
+Notebook _twoPageNotebook() {
+  final notebook = _notebook();
+  final firstPage = notebook.pages.single;
+  return notebook.copyWith(
+    pages: [
+      firstPage,
+      firstPage.copyWith(
+        id: 'page-2',
+        title: 'Page 2',
+        inkStrokes: [
+          for (final stroke in firstPage.inkStrokes)
+            stroke.copyWith(id: '${stroke.id}-2'),
+        ],
       ),
     ],
   );

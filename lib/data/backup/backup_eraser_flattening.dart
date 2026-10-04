@@ -8,11 +8,11 @@ import '../../features/notebook/domain/notebook.dart';
 
 Notebook flattenErasersForBackup(Notebook notebook) {
   return notebook.copyWith(
-    pages: notebook.pages.map(_flattenPageErasers).toList(),
+    pages: notebook.pages.map(flattenPageErasersForBackup).toList(),
   );
 }
 
-NotePage _flattenPageErasers(NotePage page) {
+NotePage flattenPageErasersForBackup(NotePage page) {
   var fragmentIndex = 0;
   final flattened = <InkStroke>[];
   for (final stroke in page.inkStrokes) {
