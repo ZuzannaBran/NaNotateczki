@@ -199,6 +199,29 @@ void main() {
     );
   });
 
+  test('snapshot never overwrites an unknown future manifest version', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final backupDir = Directory('${directory.path}/local_backup');
+    await backupDir.create(recursive: true);
+    final manifest = File('${backupDir.path}/manifest.json');
+    const futureManifest = '{"version":99,"notebooks":[]}';
+    await manifest.writeAsString(futureManifest, flush: true);
+
+    await expectLater(
+      service.snapshot([_notebook()]),
+      throwsA(isA<BackupDataException>()),
+    );
+
+    expect(await manifest.readAsString(), futureManifest);
+  });
+
   test('version 2 FNV checksum remains recoverable', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));

@@ -170,7 +170,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (1421 linii)
+### `lib/data/backup/local_backup_service.dart` (1426 linii)
 
 Przyrostowy, serializowany backup z atomowym `manifest.json`, checksumami SHA-256 plików i całego manifestu (v4) i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
@@ -456,7 +456,7 @@ Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (992)
-- `test/local_backup_service_test.dart` (909)
+- `test/local_backup_service_test.dart` (932)
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

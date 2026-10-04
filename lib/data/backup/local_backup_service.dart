@@ -417,6 +417,11 @@ class LocalBackupService {
         return const <String, _BackupManifestEntry>{};
       }
       final version = (decoded['version'] as num?)?.toInt();
+      if (version != 1 && version != 2 && version != 3 && version != 4) {
+        throw BackupDataException(
+          'Unsupported existing backup manifest version: ${decoded['version']}',
+        );
+      }
       if (version == 4 && !_isManifestChecksumValid(decoded)) {
         return const <String, _BackupManifestEntry>{};
       }
