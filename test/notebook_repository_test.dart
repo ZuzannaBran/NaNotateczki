@@ -512,34 +512,36 @@ void main() {
     expect(result.freshFile, isTrue);
   });
 
-  test('database open treats integrity failure as validation failure', () async {
-    var validationCount = 0;
+  test(
+    'database open treats integrity failure as validation failure',
+    () async {
+      var validationCount = 0;
 
-    await expectLater(
-      NotesDatabase.open(
-        connectionOpener: (_) async => NotesDatabaseConnection(
-          executor: NativeDatabase.memory(),
-          freshFile: true,
+      await expectLater(
+        NotesDatabase.open(
+          connectionOpener: (_) async => NotesDatabaseConnection(
+            executor: NativeDatabase.memory(),
+            freshFile: true,
+          ),
+          retryDelay: (_) async {},
+          errorRecorder: (_, _, _) {},
+          integrityValidator: (_) async {
+            validationCount++;
+            throw StateError('integrity failed');
+          },
         ),
-        retryDelay: (_) async {},
-        errorRecorder: (_, _, _) {},
-        integrityValidator: (_) async {
-          validationCount++;
-          throw StateError('integrity failed');
-        },
-      ),
-      throwsA(
-        isA<DatabaseOpenException>()
-            .having(
-              (error) => error.stage,
-              'stage',
-              DatabaseOpenStage.validation,
-            )
-            .having((error) => error.attempts, 'attempts', 3),
-      ),
-    );
+        throwsA(
+          isA<DatabaseOpenException>()
+              .having(
+                (error) => error.stage,
+                'stage',
+                DatabaseOpenStage.validation,
+              )
+              .having((error) => error.attempts, 'attempts', 3),
+        ),
+      );
 
-    expect(validationCount, 3);
-  });
-
+      expect(validationCount, 3);
+    },
+  );
 }

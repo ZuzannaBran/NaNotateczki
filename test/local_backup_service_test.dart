@@ -164,9 +164,7 @@ void main() {
     );
 
     await service.snapshot([]);
-    final legacy = File(
-      '${directory.path}/local_backup/notebooks_latest.json',
-    );
+    final legacy = File('${directory.path}/local_backup/notebooks_latest.json');
     await legacy.writeAsString(
       jsonEncode(repository.encodeNotebooks([_notebook()])),
     );

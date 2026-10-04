@@ -521,8 +521,7 @@ class LocalBackupService {
         );
       }
       final notebook = decodedNotebook.single;
-      if (notebook.uid != entry.uid ||
-          notebook.updatedAt != entry.updatedAt) {
+      if (notebook.uid != entry.uid || notebook.updatedAt != entry.updatedAt) {
         throw BackupValidationException(
           'Backup notebook metadata does not match manifest: '
           '${entry.fileName}',
@@ -946,7 +945,6 @@ class NotebookBackupReport {
         'compareMs=$compareMs writeMs=$writeMs totalMs=$totalMs';
   }
 }
-
 
 class _BackupManifestEntry {
   const _BackupManifestEntry({
