@@ -27,6 +27,7 @@ import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/text_block.dart';
 import '../../../core/input/ink_activity_tracker.dart';
+import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
 import 'editor_actions.dart';
 import 'input_mode.dart';
@@ -79,6 +80,11 @@ class EditorController extends ChangeNotifier {
   EditorController({required this.repository, required this.notebook}) {
     pages = notebook.pages;
     currentPageIndex = 0;
+    AppSaveCoordinator.instance.register(
+      this,
+      hasPendingWork: () => _hasPendingSaveWork,
+      flush: flushPendingSaves,
+    );
     _loadEditorPrefs();
   }
 
@@ -119,6 +125,7 @@ class EditorController extends ChangeNotifier {
   final Set<NotebookKind> _dirtyBackgroundDefaultKinds = <NotebookKind>{};
   final Set<String> _dirtyLocalBackgroundIds = <String>{};
   Timer? _prefsSaveDebounce;
+  Future<void>? _activePrefsSave;
   Timer? _notebookSaveDebounce;
   final Set<String> _dirtyPageIds = <String>{};
   bool _fullSavePending = false;
@@ -180,12 +187,57 @@ class EditorController extends ChangeNotifier {
     };
   }
 
+  bool get _hasPendingSaveWork =>
+      _prefsSaveDebounce != null ||
+      _activePrefsSave != null ||
+      _notebookSaveDebounce != null ||
+      _fullSavePending ||
+      _dirtyPageIds.isNotEmpty ||
+      _activeTextEditBefore != null;
+
+  Future<void> flushPendingSaves() async {
+    if (_isDisposed) {
+      await repository.waitForPendingSaves();
+      return;
+    }
+    _commitActiveTextEdit();
+    _notebookSaveDebounce?.cancel();
+    _notebookSaveDebounce = null;
+
+    if (_prefsSaveDebounce != null) {
+      _prefsSaveDebounce?.cancel();
+      _prefsSaveDebounce = null;
+      await _queueEditorPrefsSave();
+    } else {
+      final activePrefsSave = _activePrefsSave;
+      if (activePrefsSave != null) {
+        await activePrefsSave;
+      }
+    }
+
+    await repository.waitForPendingSaves();
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (_fullSavePending) {
+        await _save();
+      } else if (_dirtyPageIds.isNotEmpty) {
+        await _saveDirtyPages();
+      }
+      await repository.waitForPendingSaves();
+      if (!_fullSavePending && _dirtyPageIds.isEmpty) {
+        return;
+      }
+    }
+    throw StateError('Editor save did not settle before application exit.');
+  }
+
   @override
   void dispose() {
     _commitActiveTextEdit();
+    AppSaveCoordinator.instance.unregister(this);
     if (_prefsSaveDebounce != null) {
       _prefsSaveDebounce?.cancel();
-      unawaited(_saveEditorPrefs());
+      _prefsSaveDebounce = null;
+      unawaited(_queueEditorPrefsSave());
     }
     if (_notebookSaveDebounce != null ||
         _fullSavePending ||
@@ -1000,8 +1052,21 @@ class EditorController extends ChangeNotifier {
   void _schedulePrefsSave() {
     _prefsSaveDebounce?.cancel();
     _prefsSaveDebounce = Timer(const Duration(milliseconds: 250), () {
-      _saveEditorPrefs();
+      _prefsSaveDebounce = null;
+      unawaited(_queueEditorPrefsSave());
     });
+  }
+
+  Future<void> _queueEditorPrefsSave() {
+    final previous = _activePrefsSave ?? Future<void>.value();
+    late final Future<void> next;
+    next = previous.then((_) => _saveEditorPrefs()).whenComplete(() {
+      if (identical(_activePrefsSave, next)) {
+        _activePrefsSave = null;
+      }
+    });
+    _activePrefsSave = next;
+    return next;
   }
 
   Future<void> _saveEditorPrefs() async {

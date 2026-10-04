@@ -54,20 +54,19 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (502 linie)
+### `lib/app/app_scope.dart` (683 linie)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
-przebudowywania `MaterialApp` i planuje backup po zapisie. Scheduler zbiera
-zmiany jako UID notebooka + zbiór dirty page IDs; `null` oznacza pełną lub
-strukturalną zmianę notebooka, a pusty zbiór zmianę samych metadanych.
-Rozpoczęty backup nie jest przerywany przez nowe pisanie; kolejne zmiany są
-scalane i czekają na następny przebieg.
+przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
+anulowalne żądanie zamknięcia aplikacji: gdy edytor, repozytorium lub backup
+ma pracę w toku, odrzuca pierwsze wyjście, pokazuje blokujący spinner, wymusza
+zapis edytora → opróżnienie kolejki SQLite → końcowy backup i dopiero potem
+żąda obowiązkowego zamknięcia. Scheduler w trybie exit nie czeka na idle
+rysika i nie porzuca zmian po błędzie.
 
-- 22: `AppScope`;
-  29: `_AppScopeState`;
-  142: `_BackupStatusOverlay`;
-  203: `_StartupErrorScreen`;
-  279: `_BackupScheduler`.
+- 23: `AppScope`; 31: `_AppScopeState`; 72: `didRequestAppExit`.
+- 300: `_FinishingExitOverlay`; 408: `_BackupScheduler`;
+  608: `flushForExit`.
 
 ## 3. Core
 
@@ -103,6 +102,9 @@ scalane i czekają na następny przebieg.
 
 ### Storage i diagnostyka
 
+- `lib/core/storage/app_save_coordinator.dart` (53): rejestr aktywnych
+  edytorów i wspólny flush ich oczekujących zapisów przed zamknięciem.
+  3: `AppSaveCoordinator`.
 - `lib/core/storage/text_storage.dart` (2): conditional export IO/web.
 - `lib/core/storage/text_storage_io.dart` (82): małe pliki tekstowe w
   dokumentach aplikacji; odczyty czekają na trwający zapis, a zapisy są serializowane per plik i atomowe przez
@@ -171,7 +173,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2592 linie)
+### `lib/data/backup/local_backup_service.dart` (2595 linii)
 
 Przyrostowy backup z atomowym `manifest.json` i checksumami SHA-256. Format
 v6 rozdziela notebook na niezmienne, content-addressed pliki stron w
@@ -190,7 +192,8 @@ checksumę każdej strony i assetu. Pliki stron i assetów nie są usuwane w hot
 path, żeby historia manifestów nie straciła zależności. Web nadal zapisuje
 pełny snapshot w `localStorage`.
 
-- 18: `LocalBackupService`; 148: `snapshot`; 79: `_pagesDir`.
+- 18: `LocalBackupService`; 36: `waitUntilIdle`; 152: `snapshot`;
+  83: `_pagesDir`.
 - 743: `_pageReferenceFromJson`; 1031: `readLatest`;
   1262: `_readBackupPageJson`; 1488: `restoreFromLatest`.
 - 1867: `_BackupPageWorkerRequest`; 1906: `_BackupWorkerClient`;
@@ -339,21 +342,25 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2725 linii)
+### `lib/features/editor/state/editor_controller.dart` (2785 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
-preferencje, viewport i zapis.
+preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
+`flushPendingSaves` commit'uje aktywną edycję tekstu, anuluje debounce,
+czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
+zgodą na zamknięcie aplikacji.
 
-- 35: `LassoSelection`; 74: `EditorController`.
-- 205–263: layout i transformacje viewportu.
+- 35: `LassoSelection`; 75: `EditorController`;
+  198: `flushPendingSaves`.
+- 266–324: layout i transformacje viewportu.
 - 341–477: operacje `*OnPage` używane przez canvasy/overlaye.
 - 486–870: narzędzia, aktywne elementy, lasso i preferencje.
 - 1140–1324: undo/redo, strony, bookmarki i index tabs.
 - 1351–1467: operacje tekstowe.
 - 1481–1750: import oraz clipboard.
 - 2182–2330: OCR, obrazy i ink; 2449: `supportsOcr`.
-- 2502: `_applyAction`; 2511: `_applyInkAction`;
-  2613: `_scheduleSave`; 2634: `_saveDirtyPages`; 2656: `_save`.
+- 2575: `_applyAction`; 2584: `_applyInkAction`;
+  2686: `_scheduleSave`; 2707: `_saveDirtyPages`; 2729: `_save`.
 
 ## 8. UI edytora
 
@@ -472,6 +479,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (1000)
 - `test/local_backup_service_test.dart` (1341)
+- `test/editor_save_flush_test.dart` (66): wymuszenie dirty page save przed
+  zamknięciem.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)

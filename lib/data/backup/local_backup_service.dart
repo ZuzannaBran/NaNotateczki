@@ -33,8 +33,12 @@ class LocalBackupService {
   @visibleForTesting
   int get debugBackupWorkerSpawnCount => _backupWorker.spawnCount;
 
-  Future<void> dispose() async {
+  Future<void> waitUntilIdle() async {
     await _snapshotTail;
+  }
+
+  Future<void> dispose() async {
+    await waitUntilIdle();
     _backupWorker.dispose();
     _snapshotInProgress.dispose();
   }

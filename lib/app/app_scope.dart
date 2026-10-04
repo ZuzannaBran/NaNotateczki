@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import '../core/diagnostics/optimization_log.dart';
 import '../core/error/app_error_log.dart';
 import '../core/input/app_preferences_controller.dart';
 import '../core/input/ink_activity_tracker.dart';
+import '../core/storage/app_save_coordinator.dart';
 import '../core/theme/app_theme.dart';
 import '../data/backup/local_backup_service.dart';
 import '../data/drift/notes_database.dart';
@@ -26,28 +28,108 @@ class AppScope extends StatefulWidget {
   State<AppScope> createState() => _AppScopeState();
 }
 
-class _AppScopeState extends State<AppScope> {
+class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   late final Future<DatabaseOpenResult> _openFuture = NotesDatabase.open();
   NotebookRepository? _repository;
   LocalBackupService? _backupService;
   CloudSyncService? _cloudSync;
   _BackupScheduler? _backupScheduler;
+  final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
+  Future<void>? _exitDrain;
+  bool _allowExit = false;
   bool _openErrorRecorded = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     FrameTimingTracker.instance.initialize();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _backupScheduler?.dispose();
     final backupService = _backupService;
     if (backupService != null) {
       unawaited(backupService.dispose());
     }
+    _finishingExit.dispose();
     super.dispose();
+  }
+
+  bool get _hasPendingExitWork {
+    final repository = _repository;
+    final backupService = _backupService;
+    final scheduler = _backupScheduler;
+    return AppSaveCoordinator.instance.hasPendingWork ||
+        (repository?.hasPendingSaves ?? false) ||
+        (scheduler?.hasPendingWork ?? false) ||
+        (backupService?.snapshotInProgress.value ?? false);
+  }
+
+  @override
+  Future<ui.AppExitResponse> didRequestAppExit() async {
+    if (_allowExit || !_hasPendingExitWork) {
+      return ui.AppExitResponse.exit;
+    }
+    _exitDrain ??= _finishPendingWorkAndExit();
+    return ui.AppExitResponse.cancel;
+  }
+
+  Future<void> _finishPendingWorkAndExit() async {
+    final repository = _repository;
+    final backupService = _backupService;
+    final scheduler = _backupScheduler;
+    if (repository == null || backupService == null || scheduler == null) {
+      _allowExit = true;
+      await ServicesBinding.instance.exitApplication(ui.AppExitType.required);
+      return;
+    }
+
+    _finishingExit.value = true;
+    try {
+      for (var attempt = 0; attempt < 3; attempt++) {
+        await AppSaveCoordinator.instance.flushPending();
+        await repository.waitForPendingSaves();
+        if (!AppSaveCoordinator.instance.hasPendingWork &&
+            !repository.hasPendingSaves) {
+          break;
+        }
+      }
+      if (AppSaveCoordinator.instance.hasPendingWork ||
+          repository.hasPendingSaves) {
+        throw StateError('Pending editor saves did not settle.');
+      }
+
+      await scheduler.flushForExit();
+      await backupService.waitUntilIdle();
+
+      _allowExit = true;
+      final response = await ServicesBinding.instance.exitApplication(
+        ui.AppExitType.required,
+      );
+      if (response == ui.AppExitResponse.cancel) {
+        _allowExit = false;
+        scheduler.resumeAfterExitCancellation();
+        _finishingExit.value = false;
+      }
+    } catch (error, stackTrace) {
+      _allowExit = false;
+      scheduler.resumeAfterExitCancellation();
+      AppErrorLog.instance.record(
+        error,
+        stackTrace,
+        source: 'AppScope.finishPendingWorkAndExit',
+      );
+      if (mounted) {
+        _finishingExit.value = false;
+      }
+    } finally {
+      if (!_allowExit) {
+        _exitDrain = null;
+      }
+    }
   }
 
   @override
@@ -126,6 +208,7 @@ class _AppScopeState extends State<AppScope> {
                     data: AppTheme.light(accentColor: preferences.accentColor),
                     child: _BackupStatusOverlay(
                       snapshotInProgress: backupService.snapshotInProgress,
+                      finishingExit: _finishingExit,
                       child: child ?? const SizedBox.shrink(),
                     ),
                   );
@@ -142,60 +225,106 @@ class _AppScopeState extends State<AppScope> {
 class _BackupStatusOverlay extends StatelessWidget {
   const _BackupStatusOverlay({
     required this.snapshotInProgress,
+    required this.finishingExit,
     required this.child,
   });
 
   final ValueListenable<bool> snapshotInProgress;
+  final ValueListenable<bool> finishingExit;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        child,
-        ValueListenableBuilder<bool>(
-          valueListenable: snapshotInProgress,
-          builder: (context, isSaving, _) {
-            if (!isSaving) {
-              return const SizedBox.shrink();
-            }
-            return Positioned(
-              left: 16,
-              right: 16,
-              bottom: 24,
-              child: SafeArea(
-                child: IgnorePointer(
-                  child: Center(
-                    child: Card(
-                      elevation: 6,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+    return ValueListenableBuilder<bool>(
+      valueListenable: finishingExit,
+      builder: (context, isFinishingExit, _) {
+        return Stack(
+          children: [
+            child,
+            if (isFinishingExit)
+              const Positioned.fill(child: _FinishingExitOverlay())
+            else
+              ValueListenableBuilder<bool>(
+                valueListenable: snapshotInProgress,
+                builder: (context, isSaving, _) {
+                  if (!isSaving) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 24,
+                    child: SafeArea(
+                      child: IgnorePointer(
+                        child: Center(
+                          child: Card(
+                            elevation: 6,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Saving local backup...',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Saving local backup...',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
-            );
-          },
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _FinishingExitOverlay extends StatelessWidget {
+  const _FinishingExitOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AbsorbPointer(
+      child: ColoredBox(
+        color: Colors.black26,
+        child: Center(
+          child: Card(
+            elevation: 8,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox.square(
+                    dimension: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  ),
+                  SizedBox(width: 14),
+                  Text('Finishing saves before closing...'),
+                ],
+              ),
+            ),
+          ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -291,8 +420,12 @@ class _BackupScheduler with WidgetsBindingObserver {
   Timer? _maximumTimer;
   bool _dirty = false;
   bool _isRunning = false;
+  bool _closing = false;
   final Map<String, Set<String>?> _pendingChanges =
       <String, Set<String>?>{};
+
+  bool get hasPendingWork =>
+      _dirty || _isRunning || _pendingChanges.isNotEmpty;
 
   void schedule({
     Iterable<NotebookRepositoryChange> changes =
@@ -301,6 +434,9 @@ class _BackupScheduler with WidgetsBindingObserver {
     _dirty = true;
     for (final change in changes) {
       _mergeChange(change.uid, change.pageIds);
+    }
+    if (_closing) {
+      return;
     }
     _timer?.cancel();
     _timer = Timer(_idleDelay, () {
@@ -312,7 +448,11 @@ class _BackupScheduler with WidgetsBindingObserver {
     });
   }
 
-  Future<void> flush({required String reason}) async {
+  Future<void> flush({
+    required String reason,
+    bool ignoreInkActivity = false,
+    bool rethrowFailures = false,
+  }) async {
     _timer?.cancel();
     _timer = null;
     if (!_dirty) {
@@ -320,7 +460,7 @@ class _BackupScheduler with WidgetsBindingObserver {
       _maximumTimer = null;
       return;
     }
-    if (InkActivityTracker.instance.isBusy) {
+    if (!ignoreInkActivity && InkActivityTracker.instance.isBusy) {
       _timer = Timer(InkActivityTracker.idleDelay, () {
         unawaited(flush(reason: reason));
       });
@@ -421,13 +561,16 @@ class _BackupScheduler with WidgetsBindingObserver {
       }
       _dirty = true;
       debugPrint('[backup] reason=$reason interrupted=worker');
+      if (rethrowFailures) {
+        rethrow;
+      }
     } catch (e) {
-      if (e is! BackupDataException) {
+      if (e is! BackupDataException || rethrowFailures || _closing) {
         for (final entry in pendingChanges.entries) {
           _mergeChange(entry.key, entry.value);
         }
         _dirty = true;
-        retryAfterFailure = true;
+        retryAfterFailure = !rethrowFailures && !_closing;
       }
       final frameSummary = FrameTimingTracker.instance.summarySince(
         frameCursor,
@@ -447,15 +590,54 @@ class _BackupScheduler with WidgetsBindingObserver {
         status: 'failed',
         error: e.toString(),
       );
+      if (rethrowFailures) {
+        rethrow;
+      }
     } finally {
       _isRunning = false;
-      if (_dirty) {
+      if (_dirty && !_closing) {
         if (retryAfterFailure) {
           _scheduleFailureRetry();
         } else {
           schedule();
         }
       }
+    }
+  }
+
+  Future<void> flushForExit() async {
+    _closing = true;
+    _timer?.cancel();
+    _timer = null;
+    _maximumTimer?.cancel();
+    _maximumTimer = null;
+    try {
+      while (_isRunning) {
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+      }
+      while (_dirty) {
+        await flush(
+          reason: 'exit',
+          ignoreInkActivity: true,
+          rethrowFailures: true,
+        );
+        while (_isRunning) {
+          await Future<void>.delayed(const Duration(milliseconds: 16));
+        }
+      }
+    } catch (_) {
+      resumeAfterExitCancellation();
+      rethrow;
+    }
+  }
+
+  void resumeAfterExitCancellation() {
+    if (!_closing) {
+      return;
+    }
+    _closing = false;
+    if (_dirty) {
+      schedule();
     }
   }
 
