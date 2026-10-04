@@ -206,7 +206,7 @@ class LocalBackupService {
     _snapshotInProgress.value = true;
     try {
       if (kIsWeb) {
-        return _snapshotForWeb(items);
+        return await _snapshotForWeb(items);
       }
       final totalStopwatch = Stopwatch()..start();
       final notebooksDir = await _notebooksDir();

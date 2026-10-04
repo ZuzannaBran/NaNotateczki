@@ -759,7 +759,7 @@ class EditorToolbar extends StatelessWidget {
 
   String _toHexColor(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
-    return '#' + value.substring(2).toUpperCase();
+    return '#${value.substring(2).toUpperCase()}';
   }
 
   Color? _colorFromHex(String value) {
