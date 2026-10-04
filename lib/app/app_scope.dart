@@ -62,7 +62,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final repository = _repository;
     final backupService = _backupService;
     final scheduler = _backupScheduler;
-    return AppSaveCoordinator.instance.hasPendingWork ||
+    return InkActivityTracker.instance.hasActiveContacts ||
+        AppSaveCoordinator.instance.hasPendingWork ||
         (repository?.hasPendingSaves ?? false) ||
         (scheduler?.hasPendingWork ?? false) ||
         (backupService?.snapshotInProgress.value ?? false);
@@ -89,6 +90,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
     _finishingExit.value = true;
     try {
+      await InkActivityTracker.instance.waitForNoActiveContacts();
       for (var attempt = 0; attempt < 3; attempt++) {
         await AppSaveCoordinator.instance.flushPending();
         await repository.waitForPendingSaves();

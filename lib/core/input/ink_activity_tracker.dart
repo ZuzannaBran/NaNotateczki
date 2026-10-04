@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 class InkActivityTracker extends ChangeNotifier {
@@ -9,10 +11,33 @@ class InkActivityTracker extends ChangeNotifier {
   int _activeContacts = 0;
   DateTime? _busyUntil;
 
+  bool get hasActiveContacts => _activeContacts > 0;
+
   bool get isBusy {
     final busyUntil = _busyUntil;
-    return _activeContacts > 0 ||
+    return hasActiveContacts ||
         (busyUntil != null && DateTime.now().isBefore(busyUntil));
+  }
+
+  Future<void> waitForNoActiveContacts() async {
+    if (!hasActiveContacts) {
+      return;
+    }
+
+    final completer = Completer<void>();
+    void listener() {
+      if (!hasActiveContacts && !completer.isCompleted) {
+        completer.complete();
+      }
+    }
+
+    addListener(listener);
+    try {
+      listener();
+      await completer.future;
+    } finally {
+      removeListener(listener);
+    }
   }
 
   void beginContact() {

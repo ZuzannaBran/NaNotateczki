@@ -54,19 +54,20 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (683 linie)
+### `lib/app/app_scope.dart` (686 linie)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
-anulowalne żądanie zamknięcia aplikacji: gdy edytor, repozytorium lub backup
-ma pracę w toku, odrzuca pierwsze wyjście, pokazuje blokujący spinner, wymusza
-zapis edytora → opróżnienie kolejki SQLite → końcowy backup i dopiero potem
-żąda obowiązkowego zamknięcia. Scheduler w trybie exit nie czeka na idle
+anulowalne żądanie zamknięcia aplikacji: gdy rysik ma aktywny kontakt,
+edytor, repozytorium lub backup ma pracę w toku, odrzuca pierwsze wyjście,
+pokazuje blokujący spinner, czeka na zakończenie stroke'a, wymusza zapis
+edytora → opróżnienie kolejki SQLite → końcowy backup i dopiero potem żąda
+obowiązkowego zamknięcia. Scheduler w trybie exit nie czeka na idle
 rysika i nie porzuca zmian po błędzie.
 
-- 23: `AppScope`; 31: `_AppScopeState`; 72: `didRequestAppExit`.
-- 300: `_FinishingExitOverlay`; 408: `_BackupScheduler`;
-  608: `flushForExit`.
+- 24: `AppScope`; 31: `_AppScopeState`; 73: `didRequestAppExit`.
+- 302: `_FinishingExitOverlay`; 410: `_BackupScheduler`;
+  610: `flushForExit`.
 
 ## 3. Core
 
@@ -90,9 +91,11 @@ rysika i nie porzuca zmian po błędzie.
   8: `DeviceInputMode`;
   27:
   `AppPreferencesController`.
-- `lib/core/input/ink_activity_tracker.dart` (35): globalnie śledzi kontakt
-  rysika i okres wyciszenia używany przez zapis/backup.
-  3: `InkActivityTracker`.
+- `lib/core/input/ink_activity_tracker.dart` (61): globalnie śledzi kontakt
+  rysika i okres wyciszenia używany przez zapis/backup; exit guard może czekać
+  na zakończenie aktywnego kontaktu przed flushowaniem edytora.
+  5: `InkActivityTracker`; 14: `hasActiveContacts`;
+  22: `waitForNoActiveContacts`.
 - `lib/core/input/soft_keyboard.dart` (22): prosi o klawiaturę ekranową w
   trybie tablet.
   7: `requestSoftKeyboardForFocus`.
@@ -485,6 +488,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
 - `test/library_screen_responsive_layout_test.dart` (49)
+- `test/ink_activity_tracker_test.dart` — exit guard czeka na koniec aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (133)
