@@ -161,6 +161,53 @@ void main() {
     expect(restored, isEmpty);
   });
 
+  test('version 2 FNV checksum remains recoverable', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+    final notebook = _notebook();
+    final content = jsonEncode(NotebookRepository.encodeNotebook(notebook));
+    var hash = 0x811c9dc5;
+    for (final byte in utf8.encode(content)) {
+      hash ^= byte;
+      hash = (hash * 0x01000193) & 0xffffffff;
+    }
+    final checksum = hash.toRadixString(16).padLeft(8, '0');
+    final backupDir = Directory('${directory.path}/local_backup/notebooks');
+    await backupDir.create(recursive: true);
+    const fileName = 'notebook_legacy.json';
+    await File('${backupDir.path}/$fileName').writeAsString(
+      content,
+      flush: true,
+    );
+    await File('${directory.path}/local_backup/manifest.json').writeAsString(
+      jsonEncode({
+        'version': 2,
+        'notebooks': [
+          {
+            'uid': notebook.uid,
+            'updatedAt': notebook.updatedAt.toIso8601String(),
+            'file': fileName,
+            'checksum': checksum,
+            'bytes': utf8.encode(content).length,
+          },
+        ],
+      }),
+      flush: true,
+    );
+
+    final restored = await service.readLatest();
+
+    expect(restored, hasLength(1));
+    expect(restored.single.uid, notebook.uid);
+  });
+
   test('version 1 incremental manifest remains recoverable', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));

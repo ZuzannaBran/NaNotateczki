@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -181,7 +182,7 @@ class LocalBackupService {
           );
         }
         final content = workerResult.content;
-        final checksum = _contentChecksum(content);
+        final checksum = _sha256Checksum(content);
         final jsonBytes = utf8.encode(content).length;
         final fileName = _notebookContentFileName(notebook.uid, checksum);
         final file = await _notebookFile(fileName);
@@ -190,6 +191,7 @@ class LocalBackupService {
           updatedAt: notebook.updatedAt,
           fileName: fileName,
           checksum: checksum,
+          checksumAlgorithm: _sha256Algorithm,
           jsonBytes: jsonBytes,
         );
         currentEntries[notebook.uid] = entry;
@@ -236,7 +238,7 @@ class LocalBackupService {
 
       _throwIfInterrupted(shouldInterrupt);
       final manifestPayload = {
-        'version': 2,
+        'version': 3,
         'notebooks': [
           for (final notebook in items) currentEntries[notebook.uid]!.toJson(),
         ],
@@ -374,12 +376,18 @@ class LocalBackupService {
       return null;
     }
     final checksum = json['checksum'];
+    final rawAlgorithm = json['checksumAlgorithm'];
+    final parsedChecksum = checksum is String ? checksum : null;
+    final checksumAlgorithm = rawAlgorithm is String
+        ? rawAlgorithm
+        : _inferChecksumAlgorithm(parsedChecksum);
     final jsonBytes = json['bytes'];
     return _BackupManifestEntry(
       uid: uid,
       updatedAt: parsed,
       fileName: fileName,
-      checksum: checksum is String ? checksum : null,
+      checksum: parsedChecksum,
+      checksumAlgorithm: checksumAlgorithm,
       jsonBytes: jsonBytes is num ? jsonBytes.toInt() : null,
     );
   }
@@ -421,7 +429,9 @@ class LocalBackupService {
   }
 
   Future<bool> _isManifestEntryValid(_BackupManifestEntry entry) async {
-    if (entry.checksum == null || entry.jsonBytes == null) {
+    if (entry.checksum == null ||
+        entry.checksumAlgorithm == null ||
+        entry.jsonBytes == null) {
       return false;
     }
     final file = await _notebookFile(entry.fileName);
@@ -431,14 +441,1454 @@ class LocalBackupService {
     }
     try {
       final content = await file.readAsString();
-      return utf8.encode(content).length == entry.jsonBytes &&
-          _contentChecksum(content) == entry.checksum;
+      if (utf8.encode(content).length != entry.jsonBytes) {
+        return false;
+      }
+      final actual = switch (entry.checksumAlgorithm) {
+        _sha256Algorithm => _sha256Checksum(content),
+        _legacyFnv1a32Algorithm => _legacyFnv1a32Checksum(content),
+        _ => null,
+      };
+      return actual != null && actual == entry.checksum;
     } catch (_) {
       return false;
     }
   }
 
-  String _contentChecksum(String content) {
+  static const _sha256Algorithm = 'sha256';
+  static const _legacyFnv1a32Algorithm = 'fnv1a32';
+
+  String? _inferChecksumAlgorithm(String? checksum) {
+    if (checksum == null) {
+      return null;
+    }
+    if (RegExp(r'^[0-9a-f]{64}
+
+  void _throwIfInterrupted(bool Function()? shouldInterrupt) {
+    if (shouldInterrupt?.call() ?? false) {
+      throw const BackupSnapshotInterrupted();
+    }
+  }
+
+  Future<List<Notebook>> readLatest() async {
+    if (kIsWeb) {
+      final content = await readStoredText(_webBackupKey);
+      if (content == null) {
+        return <Notebook>[];
+      }
+      final decoded = jsonDecode(content);
+      if (decoded is! List<dynamic>) {
+        return <Notebook>[];
+      }
+      return _decodeCompleteNotebookList(decoded);
+    }
+    try {
+      final incremental = await _readIncrementalLatest();
+      if (incremental != null) {
+        return incremental;
+      }
+    } catch (e, st) {
+      debugPrint('LocalBackupService.readLatest incremental failed: $e');
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LocalBackupService.readLatest(incremental)',
+      );
+    }
+
+    for (final manifest in await _historyManifestFiles()) {
+      try {
+        final historical = await _readManifestSnapshot(manifest);
+        if (historical != null) {
+          return historical;
+        }
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'LocalBackupService.readLatest(history)',
+        );
+      }
+    }
+    return _readLegacyLatest();
+  }
+
+  Future<List<Notebook>?> _readIncrementalLatest() async {
+    return _readManifestSnapshot(await _manifestFile());
+  }
+
+  Future<List<Notebook>?> _readManifestSnapshot(File manifest) async {
+    await _recoverAtomicWrite(manifest);
+    if (!await manifest.exists()) {
+      return null;
+    }
+
+    final decoded = jsonDecode(await manifest.readAsString());
+    if (decoded is! Map<String, dynamic>) {
+      throw const BackupValidationException('Manifest is not a JSON object.');
+    }
+    final rawVersion = decoded['version'];
+    final version = rawVersion is num ? rawVersion.toInt() : null;
+    if (version != 1 && version != 2 && version != 3) {
+      throw BackupValidationException(
+        'Unsupported backup manifest version: $rawVersion',
+      );
+    }
+    final notebookEntries = decoded['notebooks'];
+    if (notebookEntries is! List<dynamic>) {
+      throw const BackupValidationException(
+        'Manifest does not contain a notebook list.',
+      );
+    }
+
+    final notebooks = <Notebook>[];
+    final seenUids = <String>{};
+    for (final rawEntry in notebookEntries) {
+      if (rawEntry is! Map<String, dynamic>) {
+        throw const BackupValidationException(
+          'Manifest contains an invalid notebook entry.',
+        );
+      }
+      final entry = _manifestEntryFromJson(rawEntry);
+      if (entry == null) {
+        throw const BackupValidationException(
+          'Manifest contains an incomplete notebook entry.',
+        );
+      }
+      if (!seenUids.add(entry.uid)) {
+        throw BackupValidationException(
+          'Manifest contains duplicate notebook uid: ${entry.uid}',
+        );
+      }
+      final file = await _notebookFile(entry.fileName);
+      await _recoverAtomicWrite(file);
+      if (!await file.exists()) {
+        throw BackupValidationException(
+          'Backup file is missing: ${entry.fileName}',
+        );
+      }
+      if (version != 1 && !await _isManifestEntryValid(entry)) {
+        throw BackupValidationException(
+          'Backup file failed checksum validation: ${entry.fileName}',
+        );
+      }
+
+      final notebookJson = jsonDecode(await file.readAsString());
+      if (notebookJson is! Map<String, dynamic>) {
+        throw BackupValidationException(
+          'Backup notebook is not a JSON object: ${entry.fileName}',
+        );
+      }
+      final decodedNotebook = repository.decodeNotebooks([notebookJson]);
+      if (decodedNotebook.length != 1) {
+        throw BackupValidationException(
+          'Backup notebook could not be decoded: ${entry.fileName}',
+        );
+      }
+      final notebook = decodedNotebook.single;
+      if (notebook.uid != entry.uid || notebook.updatedAt != entry.updatedAt) {
+        throw BackupValidationException(
+          'Backup notebook metadata does not match manifest: '
+          '${entry.fileName}',
+        );
+      }
+      notebooks.add(notebook);
+    }
+    return notebooks;
+  }
+
+  Future<List<Notebook>> _readLegacyLatest() async {
+    try {
+      final file = await _file(_latest);
+      if (!await file.exists()) {
+        return <Notebook>[];
+      }
+      final content = await file.readAsString();
+      final decoded = jsonDecode(content);
+      if (decoded is! List<dynamic>) {
+        return <Notebook>[];
+      }
+      return _decodeCompleteNotebookList(decoded);
+    } catch (e) {
+      debugPrint('LocalBackupService.readLegacyLatest failed: $e');
+      AppErrorLog.instance.record(
+        e,
+        null,
+        source: 'LocalBackupService.readLegacyLatest',
+      );
+      return <Notebook>[];
+    }
+  }
+
+  List<Notebook> _decodeCompleteNotebookList(List<dynamic> items) {
+    if (items.any((item) => item is! Map<String, dynamic>)) {
+      throw const BackupValidationException(
+        'Full backup contains a non-notebook entry.',
+      );
+    }
+    final notebooks = repository.decodeNotebooks(items);
+    if (notebooks.length != items.length) {
+      throw const BackupValidationException(
+        'Full backup could not be decoded completely.',
+      );
+    }
+    final seenUids = <String>{};
+    for (final notebook in notebooks) {
+      if (!seenUids.add(notebook.uid)) {
+        throw BackupValidationException(
+          'Full backup contains duplicate notebook uid: ${notebook.uid}',
+        );
+      }
+    }
+    return notebooks;
+  }
+
+  Future<int> restoreFromLatest() async {
+    final notebooks = await readLatest();
+    if (notebooks.isEmpty) {
+      return 0;
+    }
+    try {
+      return await repository.restoreNotebooksAtomically(notebooks);
+    } catch (e, st) {
+      debugPrint('LocalBackupService.restoreFromLatest failed: $e');
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LocalBackupService.restoreFromLatest',
+      );
+      return 0;
+    }
+  }
+
+  Future<BackupSnapshotReport> _snapshotForWeb(List<Notebook> items) async {
+    final stopwatch = Stopwatch()..start();
+    final encoded = repository.encodeNotebooks(
+      items.map(flattenErasersForBackup).toList(),
+    );
+    final content = jsonEncode(encoded);
+    await writeStoredText(_webBackupKey, content);
+    stopwatch.stop();
+    return BackupSnapshotReport(
+      notebookCount: items.length,
+      pageCount: items.fold(0, (sum, notebook) => sum + notebook.pages.length),
+      strokeCount: items.fold(
+        0,
+        (sum, notebook) => sum + _strokeCount(notebook),
+      ),
+      pointCount: items.fold(0, (sum, notebook) => sum + _pointCount(notebook)),
+      jsonBytes: utf8.encode(content).length,
+      changedCount: items.length,
+      unchangedCount: 0,
+      readCompareMs: 0,
+      staleListMs: 0,
+      staleMoved: 0,
+      manifestMs: 0,
+      totalMs: stopwatch.elapsedMilliseconds,
+      notebookReports: const [],
+    );
+  }
+
+  void _validateSnapshotItems(List<Notebook> items) {
+    final notebookIds = <String>{};
+    final pageIds = <String>{};
+    final tabIds = <String>{};
+    final textIds = <String>{};
+    final imageIds = <String>{};
+    final strokeIds = <String>{};
+
+    void requireUnique(Set<String> ids, String id, String type) {
+      if (id.isEmpty || !ids.add(id)) {
+        throw BackupDataException(
+          'Snapshot contains an empty or duplicate $type id: $id',
+        );
+      }
+    }
+
+    for (final notebook in items) {
+      requireUnique(notebookIds, notebook.uid, 'notebook');
+      if (notebook.pages.isEmpty) {
+        throw BackupDataException(
+          'Snapshot notebook has no pages: ${notebook.uid}',
+        );
+      }
+      for (final page in notebook.pages) {
+        requireUnique(pageIds, page.id, 'page');
+        for (final tab in page.indexTabs) {
+          requireUnique(tabIds, tab.id, 'index tab');
+        }
+        for (final block in page.textBlocks) {
+          requireUnique(textIds, block.id, 'text block');
+        }
+        for (final block in page.imageBlocks) {
+          requireUnique(imageIds, block.id, 'image block');
+        }
+        for (final stroke in page.inkStrokes) {
+          requireUnique(strokeIds, stroke.id, 'ink stroke');
+        }
+      }
+    }
+  }
+
+  Future<void> _archiveManifest(String content) async {
+    final history = await _historyDir();
+    final file = File(
+      '${history.path}/manifest_'
+      '${DateTime.now().microsecondsSinceEpoch}.json',
+    );
+    await _atomicWriteString(file, content);
+  }
+
+  Future<List<File>> _historyManifestFiles() async {
+    final history = await _historyDir();
+    final files = <File>[];
+    await for (final entity in history.list()) {
+      if (entity is File &&
+          entity.uri.pathSegments.last.startsWith('manifest_') &&
+          entity.path.endsWith('.json')) {
+        files.add(entity);
+      }
+    }
+    files.sort((a, b) => b.path.compareTo(a.path));
+    return files;
+  }
+
+  Future<void> _trimHistory() async {
+    final files = await _historyManifestFiles();
+    for (final file in files.skip(_historyRetention)) {
+      await file.delete();
+    }
+  }
+
+  Future<Set<String>> _referencedNotebookPaths() async {
+    final result = <String>{};
+    final manifests = <File>[await _manifestFile()];
+    manifests.addAll(await _historyManifestFiles());
+    for (final manifest in manifests) {
+      await _recoverAtomicWrite(manifest);
+      if (!await manifest.exists()) {
+        continue;
+      }
+      try {
+        final decoded = jsonDecode(await manifest.readAsString());
+        if (decoded is! Map<String, dynamic>) {
+          continue;
+        }
+        final entries = decoded['notebooks'];
+        if (entries is! List<dynamic>) {
+          continue;
+        }
+        for (final raw in entries.whereType<Map<String, dynamic>>()) {
+          final entry = _manifestEntryFromJson(raw);
+          if (entry != null) {
+            result.add((await _notebookFile(entry.fileName)).path);
+          }
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return result;
+  }
+
+  Future<void> _recoverDirectoryAtomicWrites(Directory directory) async {
+    final targetPaths = <String>{};
+    await for (final entity in directory.list()) {
+      if (entity is! File) {
+        continue;
+      }
+      if (entity.path.endsWith(_temporarySuffix)) {
+        targetPaths.add(
+          entity.path.substring(0, entity.path.length - _temporarySuffix.length),
+        );
+      } else if (entity.path.endsWith(_previousSuffix)) {
+        targetPaths.add(
+          entity.path.substring(0, entity.path.length - _previousSuffix.length),
+        );
+      }
+    }
+    for (final path in targetPaths) {
+      await _recoverAtomicWrite(File(path));
+    }
+  }
+
+  Future<void> _atomicWriteString(File file, String content) async {
+    await _recoverAtomicWrite(file);
+    final temporary = File('${file.path}$_temporarySuffix');
+    final previous = File('${file.path}$_previousSuffix');
+    if (await temporary.exists()) {
+      await temporary.delete();
+    }
+    if (await previous.exists()) {
+      await previous.delete();
+    }
+    await temporary.writeAsString(content, flush: true);
+    if (await file.exists()) {
+      await file.rename(previous.path);
+    }
+    try {
+      await temporary.rename(file.path);
+      if (await previous.exists()) {
+        await previous.delete();
+      }
+    } catch (_) {
+      if (!await file.exists() && await previous.exists()) {
+        await previous.rename(file.path);
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _recoverAtomicWrite(File file) async {
+    final temporary = File('${file.path}$_temporarySuffix');
+    final previous = File('${file.path}$_previousSuffix');
+    if (!await file.exists() && await previous.exists()) {
+      await previous.rename(file.path);
+    } else if (await previous.exists()) {
+      await previous.delete();
+    }
+    if (await temporary.exists()) {
+      await temporary.delete();
+    }
+  }
+
+  Future<bool> _moveStaleNotebookBackupToTrash(File file) async {
+    try {
+      final trashDir = await _trashDir();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final target = File(
+        '${trashDir.path}/${timestamp}_${file.uri.pathSegments.last}',
+      );
+      await file.rename(target.path);
+      return true;
+    } catch (e, st) {
+      debugPrint(
+        'LocalBackupService._moveStaleNotebookBackupToTrash failed: $e\n$st',
+      );
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LocalBackupService._moveStaleNotebookBackupToTrash',
+      );
+      return false;
+    }
+  }
+
+  Future<void> _trimTrash() async {
+    final trash = await _trashDir();
+    final files = <File>[];
+    await for (final entity in trash.list()) {
+      if (entity is File) {
+        files.add(entity);
+      }
+    }
+    files.sort((a, b) => a.path.compareTo(b.path));
+    final removeCount = files.length - _trashRetention;
+    if (removeCount <= 0) {
+      return;
+    }
+    for (final file in files.take(removeCount)) {
+      try {
+        await file.delete();
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'LocalBackupService._trimTrash',
+        );
+      }
+    }
+  }
+
+  int _strokeCount(Notebook notebook) {
+    return notebook.pages.fold<int>(
+      0,
+      (sum, page) => sum + page.inkStrokes.length,
+    );
+  }
+
+  int _pointCount(Notebook notebook) {
+    return notebook.pages.fold<int>(0, (sum, page) {
+      return sum +
+          page.inkStrokes.fold<int>(
+            0,
+            (strokeSum, stroke) => strokeSum + stroke.points.length,
+          );
+    });
+  }
+}
+
+enum _BackupWorkerOperation { snapshot }
+
+class _BackupWorkerResult {
+  const _BackupWorkerResult({
+    required this.content,
+    required this.flattenMs,
+    required this.encodeMs,
+    required this.jsonMs,
+    required this.missingImageIds,
+  });
+
+  final String content;
+  final int flattenMs;
+  final int encodeMs;
+  final int jsonMs;
+  final List<String> missingImageIds;
+}
+
+Future<T> _runBackupWorker<T>(
+  _BackupWorkerOperation operation,
+  Object message,
+  bool Function()? shouldInterrupt,
+) async {
+  if (shouldInterrupt?.call() ?? false) {
+    throw const BackupSnapshotInterrupted();
+  }
+  final resultPort = ReceivePort();
+  final completer = Completer<T>();
+  Isolate? isolate;
+  Timer? interruptTimer;
+  final subscription = resultPort.listen((message) {
+    if (completer.isCompleted) {
+      return;
+    }
+    final response = message as List<Object?>;
+    if (response[0] as bool) {
+      completer.complete(response[1] as T);
+      return;
+    }
+    completer.completeError(
+      RemoteError(response[1] as String, response[2] as String),
+    );
+  });
+  try {
+    isolate = await Isolate.spawn(_backupWorkerEntryPoint, <Object?>[
+      resultPort.sendPort,
+      operation.index,
+      message,
+    ]);
+    interruptTimer = Timer.periodic(const Duration(milliseconds: 8), (_) {
+      if (!completer.isCompleted && (shouldInterrupt?.call() ?? false)) {
+        isolate?.kill(priority: Isolate.immediate);
+        completer.completeError(const BackupSnapshotInterrupted());
+      }
+    });
+    return await completer.future;
+  } finally {
+    interruptTimer?.cancel();
+    isolate?.kill(priority: Isolate.immediate);
+    await subscription.cancel();
+    resultPort.close();
+  }
+}
+
+void _backupWorkerEntryPoint(List<Object?> request) {
+  final sendPort = request[0] as SendPort;
+  try {
+    final operation = _BackupWorkerOperation.values[request[1] as int];
+    final result = switch (operation) {
+      _BackupWorkerOperation.snapshot => _createBackupPayload(
+        request[2] as Notebook,
+      ),
+    };
+    sendPort.send(<Object?>[true, result]);
+  } catch (error, stackTrace) {
+    sendPort.send(<Object?>[false, error.toString(), stackTrace.toString()]);
+  }
+}
+
+_BackupWorkerResult _createBackupPayload(Notebook notebook) {
+  final flattenStopwatch = Stopwatch()..start();
+  final backupNotebook = flattenErasersForBackup(notebook);
+  flattenStopwatch.stop();
+  final encodeStopwatch = Stopwatch()..start();
+  final encoded = NotebookRepository.encodeNotebook(backupNotebook);
+  final missingImageIds = <String>[];
+  final pages = encoded['pages'];
+  if (pages is List<dynamic>) {
+    for (final page in pages.whereType<Map<String, dynamic>>()) {
+      final images = page['imageBlocks'];
+      if (images is! List<dynamic>) {
+        continue;
+      }
+      for (final image in images.whereType<Map<String, dynamic>>()) {
+        final bytes = image['bytes'];
+        if (bytes is! String || bytes.isEmpty) {
+          missingImageIds.add(image['id']?.toString() ?? '<unknown>');
+        }
+      }
+    }
+  }
+  encodeStopwatch.stop();
+  final jsonStopwatch = Stopwatch()..start();
+  final content = jsonEncode(encoded);
+  jsonStopwatch.stop();
+  return _BackupWorkerResult(
+    content: content,
+    flattenMs: flattenStopwatch.elapsedMilliseconds,
+    encodeMs: encodeStopwatch.elapsedMilliseconds,
+    jsonMs: jsonStopwatch.elapsedMilliseconds,
+    missingImageIds: missingImageIds,
+  );
+}
+
+class BackupSnapshotInterrupted implements Exception {
+  const BackupSnapshotInterrupted();
+}
+
+class BackupValidationException implements Exception {
+  const BackupValidationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'BackupValidationException: $message';
+}
+
+class BackupDataException implements Exception {
+  const BackupDataException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'BackupDataException: $message';
+}
+
+class BackupSnapshotReport {
+  const BackupSnapshotReport({
+    required this.notebookCount,
+    required this.pageCount,
+    required this.strokeCount,
+    required this.pointCount,
+    required this.jsonBytes,
+    required this.changedCount,
+    required this.unchangedCount,
+    required this.readCompareMs,
+    required this.staleListMs,
+    required this.staleMoved,
+    required this.manifestMs,
+    required this.totalMs,
+    required this.notebookReports,
+  });
+
+  final int notebookCount;
+  final int pageCount;
+  final int strokeCount;
+  final int pointCount;
+  final int jsonBytes;
+  final int changedCount;
+  final int unchangedCount;
+  final int readCompareMs;
+  final int staleListMs;
+  final int staleMoved;
+  final int manifestMs;
+  final int totalMs;
+  final List<NotebookBackupReport> notebookReports;
+
+  String toLogString() {
+    final slowest = _slowestNotebook;
+    return 'nb=$notebookCount pages=$pageCount strokes=$strokeCount '
+        'pts=$pointCount jsonBytes=$jsonBytes changed=$changedCount '
+        'same=$unchangedCount compareMs=$readCompareMs '
+        'staleListMs=$staleListMs staleMoved=$staleMoved '
+        'manifestMs=$manifestMs'
+        '${slowest == null ? "" : " slowest{${slowest.toLogString()}}"}';
+  }
+
+  NotebookBackupReport? get _slowestNotebook {
+    if (notebookReports.isEmpty) {
+      return null;
+    }
+    final sorted = List<NotebookBackupReport>.from(notebookReports)
+      ..sort((a, b) => b.totalMs.compareTo(a.totalMs));
+    return sorted.first;
+  }
+}
+
+class NotebookBackupReport {
+  const NotebookBackupReport({
+    required this.uid,
+    required this.pages,
+    required this.strokes,
+    required this.points,
+    required this.jsonBytes,
+    required this.flattenMs,
+    required this.encodeMs,
+    required this.jsonMs,
+    required this.compareMs,
+    required this.writeMs,
+    required this.totalMs,
+    required this.changed,
+  });
+
+  final String uid;
+  final int pages;
+  final int strokes;
+  final int points;
+  final int jsonBytes;
+  final int flattenMs;
+  final int encodeMs;
+  final int jsonMs;
+  final int compareMs;
+  final int writeMs;
+  final int totalMs;
+  final bool changed;
+
+  String toLogString() {
+    return 'uid=$uid pages=$pages strokes=$strokes pts=$points '
+        'jsonBytes=$jsonBytes changed=${changed ? 1 : 0} '
+        'flattenMs=$flattenMs encodeMs=$encodeMs jsonMs=$jsonMs '
+        'compareMs=$compareMs writeMs=$writeMs totalMs=$totalMs';
+  }
+}
+
+class _BackupManifestEntry {
+  const _BackupManifestEntry({
+    required this.uid,
+    required this.updatedAt,
+    required this.fileName,
+    this.checksum,
+    this.checksumAlgorithm,
+    this.jsonBytes,
+  });
+
+  final String uid;
+  final DateTime updatedAt;
+  final String fileName;
+  final String? checksum;
+  final String? checksumAlgorithm;
+  final int? jsonBytes;
+
+  Map<String, Object> toJson() {
+    return {
+      'uid': uid,
+      'updatedAt': updatedAt.toIso8601String(),
+      'file': fileName,
+      'checksum': ?checksum,
+      'checksumAlgorithm': ?checksumAlgorithm,
+      'bytes': ?jsonBytes,
+    };
+  }
+}
+).hasMatch(checksum)) {
+      return _sha256Algorithm;
+    }
+    if (RegExp(r'^[0-9a-f]{8}
+
+  void _throwIfInterrupted(bool Function()? shouldInterrupt) {
+    if (shouldInterrupt?.call() ?? false) {
+      throw const BackupSnapshotInterrupted();
+    }
+  }
+
+  Future<List<Notebook>> readLatest() async {
+    if (kIsWeb) {
+      final content = await readStoredText(_webBackupKey);
+      if (content == null) {
+        return <Notebook>[];
+      }
+      final decoded = jsonDecode(content);
+      if (decoded is! List<dynamic>) {
+        return <Notebook>[];
+      }
+      return _decodeCompleteNotebookList(decoded);
+    }
+    try {
+      final incremental = await _readIncrementalLatest();
+      if (incremental != null) {
+        return incremental;
+      }
+    } catch (e, st) {
+      debugPrint('LocalBackupService.readLatest incremental failed: $e');
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LocalBackupService.readLatest(incremental)',
+      );
+    }
+
+    for (final manifest in await _historyManifestFiles()) {
+      try {
+        final historical = await _readManifestSnapshot(manifest);
+        if (historical != null) {
+          return historical;
+        }
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'LocalBackupService.readLatest(history)',
+        );
+      }
+    }
+    return _readLegacyLatest();
+  }
+
+  Future<List<Notebook>?> _readIncrementalLatest() async {
+    return _readManifestSnapshot(await _manifestFile());
+  }
+
+  Future<List<Notebook>?> _readManifestSnapshot(File manifest) async {
+    await _recoverAtomicWrite(manifest);
+    if (!await manifest.exists()) {
+      return null;
+    }
+
+    final decoded = jsonDecode(await manifest.readAsString());
+    if (decoded is! Map<String, dynamic>) {
+      throw const BackupValidationException('Manifest is not a JSON object.');
+    }
+    final rawVersion = decoded['version'];
+    final version = rawVersion is num ? rawVersion.toInt() : null;
+    if (version != 1 && version != 2) {
+      throw BackupValidationException(
+        'Unsupported backup manifest version: $rawVersion',
+      );
+    }
+    final notebookEntries = decoded['notebooks'];
+    if (notebookEntries is! List<dynamic>) {
+      throw const BackupValidationException(
+        'Manifest does not contain a notebook list.',
+      );
+    }
+
+    final notebooks = <Notebook>[];
+    final seenUids = <String>{};
+    for (final rawEntry in notebookEntries) {
+      if (rawEntry is! Map<String, dynamic>) {
+        throw const BackupValidationException(
+          'Manifest contains an invalid notebook entry.',
+        );
+      }
+      final entry = _manifestEntryFromJson(rawEntry);
+      if (entry == null) {
+        throw const BackupValidationException(
+          'Manifest contains an incomplete notebook entry.',
+        );
+      }
+      if (!seenUids.add(entry.uid)) {
+        throw BackupValidationException(
+          'Manifest contains duplicate notebook uid: ${entry.uid}',
+        );
+      }
+      final file = await _notebookFile(entry.fileName);
+      await _recoverAtomicWrite(file);
+      if (!await file.exists()) {
+        throw BackupValidationException(
+          'Backup file is missing: ${entry.fileName}',
+        );
+      }
+      if (version == 2 && !await _isManifestEntryValid(entry)) {
+        throw BackupValidationException(
+          'Backup file failed checksum validation: ${entry.fileName}',
+        );
+      }
+
+      final notebookJson = jsonDecode(await file.readAsString());
+      if (notebookJson is! Map<String, dynamic>) {
+        throw BackupValidationException(
+          'Backup notebook is not a JSON object: ${entry.fileName}',
+        );
+      }
+      final decodedNotebook = repository.decodeNotebooks([notebookJson]);
+      if (decodedNotebook.length != 1) {
+        throw BackupValidationException(
+          'Backup notebook could not be decoded: ${entry.fileName}',
+        );
+      }
+      final notebook = decodedNotebook.single;
+      if (notebook.uid != entry.uid || notebook.updatedAt != entry.updatedAt) {
+        throw BackupValidationException(
+          'Backup notebook metadata does not match manifest: '
+          '${entry.fileName}',
+        );
+      }
+      notebooks.add(notebook);
+    }
+    return notebooks;
+  }
+
+  Future<List<Notebook>> _readLegacyLatest() async {
+    try {
+      final file = await _file(_latest);
+      if (!await file.exists()) {
+        return <Notebook>[];
+      }
+      final content = await file.readAsString();
+      final decoded = jsonDecode(content);
+      if (decoded is! List<dynamic>) {
+        return <Notebook>[];
+      }
+      return _decodeCompleteNotebookList(decoded);
+    } catch (e) {
+      debugPrint('LocalBackupService.readLegacyLatest failed: $e');
+      AppErrorLog.instance.record(
+        e,
+        null,
+        source: 'LocalBackupService.readLegacyLatest',
+      );
+      return <Notebook>[];
+    }
+  }
+
+  List<Notebook> _decodeCompleteNotebookList(List<dynamic> items) {
+    if (items.any((item) => item is! Map<String, dynamic>)) {
+      throw const BackupValidationException(
+        'Full backup contains a non-notebook entry.',
+      );
+    }
+    final notebooks = repository.decodeNotebooks(items);
+    if (notebooks.length != items.length) {
+      throw const BackupValidationException(
+        'Full backup could not be decoded completely.',
+      );
+    }
+    final seenUids = <String>{};
+    for (final notebook in notebooks) {
+      if (!seenUids.add(notebook.uid)) {
+        throw BackupValidationException(
+          'Full backup contains duplicate notebook uid: ${notebook.uid}',
+        );
+      }
+    }
+    return notebooks;
+  }
+
+  Future<int> restoreFromLatest() async {
+    final notebooks = await readLatest();
+    if (notebooks.isEmpty) {
+      return 0;
+    }
+    try {
+      return await repository.restoreNotebooksAtomically(notebooks);
+    } catch (e, st) {
+      debugPrint('LocalBackupService.restoreFromLatest failed: $e');
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LocalBackupService.restoreFromLatest',
+      );
+      return 0;
+    }
+  }
+
+  Future<BackupSnapshotReport> _snapshotForWeb(List<Notebook> items) async {
+    final stopwatch = Stopwatch()..start();
+    final encoded = repository.encodeNotebooks(
+      items.map(flattenErasersForBackup).toList(),
+    );
+    final content = jsonEncode(encoded);
+    await writeStoredText(_webBackupKey, content);
+    stopwatch.stop();
+    return BackupSnapshotReport(
+      notebookCount: items.length,
+      pageCount: items.fold(0, (sum, notebook) => sum + notebook.pages.length),
+      strokeCount: items.fold(
+        0,
+        (sum, notebook) => sum + _strokeCount(notebook),
+      ),
+      pointCount: items.fold(0, (sum, notebook) => sum + _pointCount(notebook)),
+      jsonBytes: utf8.encode(content).length,
+      changedCount: items.length,
+      unchangedCount: 0,
+      readCompareMs: 0,
+      staleListMs: 0,
+      staleMoved: 0,
+      manifestMs: 0,
+      totalMs: stopwatch.elapsedMilliseconds,
+      notebookReports: const [],
+    );
+  }
+
+  void _validateSnapshotItems(List<Notebook> items) {
+    final notebookIds = <String>{};
+    final pageIds = <String>{};
+    final tabIds = <String>{};
+    final textIds = <String>{};
+    final imageIds = <String>{};
+    final strokeIds = <String>{};
+
+    void requireUnique(Set<String> ids, String id, String type) {
+      if (id.isEmpty || !ids.add(id)) {
+        throw BackupDataException(
+          'Snapshot contains an empty or duplicate $type id: $id',
+        );
+      }
+    }
+
+    for (final notebook in items) {
+      requireUnique(notebookIds, notebook.uid, 'notebook');
+      if (notebook.pages.isEmpty) {
+        throw BackupDataException(
+          'Snapshot notebook has no pages: ${notebook.uid}',
+        );
+      }
+      for (final page in notebook.pages) {
+        requireUnique(pageIds, page.id, 'page');
+        for (final tab in page.indexTabs) {
+          requireUnique(tabIds, tab.id, 'index tab');
+        }
+        for (final block in page.textBlocks) {
+          requireUnique(textIds, block.id, 'text block');
+        }
+        for (final block in page.imageBlocks) {
+          requireUnique(imageIds, block.id, 'image block');
+        }
+        for (final stroke in page.inkStrokes) {
+          requireUnique(strokeIds, stroke.id, 'ink stroke');
+        }
+      }
+    }
+  }
+
+  Future<void> _archiveManifest(String content) async {
+    final history = await _historyDir();
+    final file = File(
+      '${history.path}/manifest_'
+      '${DateTime.now().microsecondsSinceEpoch}.json',
+    );
+    await _atomicWriteString(file, content);
+  }
+
+  Future<List<File>> _historyManifestFiles() async {
+    final history = await _historyDir();
+    final files = <File>[];
+    await for (final entity in history.list()) {
+      if (entity is File &&
+          entity.uri.pathSegments.last.startsWith('manifest_') &&
+          entity.path.endsWith('.json')) {
+        files.add(entity);
+      }
+    }
+    files.sort((a, b) => b.path.compareTo(a.path));
+    return files;
+  }
+
+  Future<void> _trimHistory() async {
+    final files = await _historyManifestFiles();
+    for (final file in files.skip(_historyRetention)) {
+      await file.delete();
+    }
+  }
+
+  Future<Set<String>> _referencedNotebookPaths() async {
+    final result = <String>{};
+    final manifests = <File>[await _manifestFile()];
+    manifests.addAll(await _historyManifestFiles());
+    for (final manifest in manifests) {
+      await _recoverAtomicWrite(manifest);
+      if (!await manifest.exists()) {
+        continue;
+      }
+      try {
+        final decoded = jsonDecode(await manifest.readAsString());
+        if (decoded is! Map<String, dynamic>) {
+          continue;
+        }
+        final entries = decoded['notebooks'];
+        if (entries is! List<dynamic>) {
+          continue;
+        }
+        for (final raw in entries.whereType<Map<String, dynamic>>()) {
+          final entry = _manifestEntryFromJson(raw);
+          if (entry != null) {
+            result.add((await _notebookFile(entry.fileName)).path);
+          }
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return result;
+  }
+
+  Future<void> _recoverDirectoryAtomicWrites(Directory directory) async {
+    final targetPaths = <String>{};
+    await for (final entity in directory.list()) {
+      if (entity is! File) {
+        continue;
+      }
+      if (entity.path.endsWith(_temporarySuffix)) {
+        targetPaths.add(
+          entity.path.substring(0, entity.path.length - _temporarySuffix.length),
+        );
+      } else if (entity.path.endsWith(_previousSuffix)) {
+        targetPaths.add(
+          entity.path.substring(0, entity.path.length - _previousSuffix.length),
+        );
+      }
+    }
+    for (final path in targetPaths) {
+      await _recoverAtomicWrite(File(path));
+    }
+  }
+
+  Future<void> _atomicWriteString(File file, String content) async {
+    await _recoverAtomicWrite(file);
+    final temporary = File('${file.path}$_temporarySuffix');
+    final previous = File('${file.path}$_previousSuffix');
+    if (await temporary.exists()) {
+      await temporary.delete();
+    }
+    if (await previous.exists()) {
+      await previous.delete();
+    }
+    await temporary.writeAsString(content, flush: true);
+    if (await file.exists()) {
+      await file.rename(previous.path);
+    }
+    try {
+      await temporary.rename(file.path);
+      if (await previous.exists()) {
+        await previous.delete();
+      }
+    } catch (_) {
+      if (!await file.exists() && await previous.exists()) {
+        await previous.rename(file.path);
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _recoverAtomicWrite(File file) async {
+    final temporary = File('${file.path}$_temporarySuffix');
+    final previous = File('${file.path}$_previousSuffix');
+    if (!await file.exists() && await previous.exists()) {
+      await previous.rename(file.path);
+    } else if (await previous.exists()) {
+      await previous.delete();
+    }
+    if (await temporary.exists()) {
+      await temporary.delete();
+    }
+  }
+
+  Future<bool> _moveStaleNotebookBackupToTrash(File file) async {
+    try {
+      final trashDir = await _trashDir();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final target = File(
+        '${trashDir.path}/${timestamp}_${file.uri.pathSegments.last}',
+      );
+      await file.rename(target.path);
+      return true;
+    } catch (e, st) {
+      debugPrint(
+        'LocalBackupService._moveStaleNotebookBackupToTrash failed: $e\n$st',
+      );
+      AppErrorLog.instance.record(
+        e,
+        st,
+        source: 'LocalBackupService._moveStaleNotebookBackupToTrash',
+      );
+      return false;
+    }
+  }
+
+  Future<void> _trimTrash() async {
+    final trash = await _trashDir();
+    final files = <File>[];
+    await for (final entity in trash.list()) {
+      if (entity is File) {
+        files.add(entity);
+      }
+    }
+    files.sort((a, b) => a.path.compareTo(b.path));
+    final removeCount = files.length - _trashRetention;
+    if (removeCount <= 0) {
+      return;
+    }
+    for (final file in files.take(removeCount)) {
+      try {
+        await file.delete();
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'LocalBackupService._trimTrash',
+        );
+      }
+    }
+  }
+
+  int _strokeCount(Notebook notebook) {
+    return notebook.pages.fold<int>(
+      0,
+      (sum, page) => sum + page.inkStrokes.length,
+    );
+  }
+
+  int _pointCount(Notebook notebook) {
+    return notebook.pages.fold<int>(0, (sum, page) {
+      return sum +
+          page.inkStrokes.fold<int>(
+            0,
+            (strokeSum, stroke) => strokeSum + stroke.points.length,
+          );
+    });
+  }
+}
+
+enum _BackupWorkerOperation { snapshot }
+
+class _BackupWorkerResult {
+  const _BackupWorkerResult({
+    required this.content,
+    required this.flattenMs,
+    required this.encodeMs,
+    required this.jsonMs,
+    required this.missingImageIds,
+  });
+
+  final String content;
+  final int flattenMs;
+  final int encodeMs;
+  final int jsonMs;
+  final List<String> missingImageIds;
+}
+
+Future<T> _runBackupWorker<T>(
+  _BackupWorkerOperation operation,
+  Object message,
+  bool Function()? shouldInterrupt,
+) async {
+  if (shouldInterrupt?.call() ?? false) {
+    throw const BackupSnapshotInterrupted();
+  }
+  final resultPort = ReceivePort();
+  final completer = Completer<T>();
+  Isolate? isolate;
+  Timer? interruptTimer;
+  final subscription = resultPort.listen((message) {
+    if (completer.isCompleted) {
+      return;
+    }
+    final response = message as List<Object?>;
+    if (response[0] as bool) {
+      completer.complete(response[1] as T);
+      return;
+    }
+    completer.completeError(
+      RemoteError(response[1] as String, response[2] as String),
+    );
+  });
+  try {
+    isolate = await Isolate.spawn(_backupWorkerEntryPoint, <Object?>[
+      resultPort.sendPort,
+      operation.index,
+      message,
+    ]);
+    interruptTimer = Timer.periodic(const Duration(milliseconds: 8), (_) {
+      if (!completer.isCompleted && (shouldInterrupt?.call() ?? false)) {
+        isolate?.kill(priority: Isolate.immediate);
+        completer.completeError(const BackupSnapshotInterrupted());
+      }
+    });
+    return await completer.future;
+  } finally {
+    interruptTimer?.cancel();
+    isolate?.kill(priority: Isolate.immediate);
+    await subscription.cancel();
+    resultPort.close();
+  }
+}
+
+void _backupWorkerEntryPoint(List<Object?> request) {
+  final sendPort = request[0] as SendPort;
+  try {
+    final operation = _BackupWorkerOperation.values[request[1] as int];
+    final result = switch (operation) {
+      _BackupWorkerOperation.snapshot => _createBackupPayload(
+        request[2] as Notebook,
+      ),
+    };
+    sendPort.send(<Object?>[true, result]);
+  } catch (error, stackTrace) {
+    sendPort.send(<Object?>[false, error.toString(), stackTrace.toString()]);
+  }
+}
+
+_BackupWorkerResult _createBackupPayload(Notebook notebook) {
+  final flattenStopwatch = Stopwatch()..start();
+  final backupNotebook = flattenErasersForBackup(notebook);
+  flattenStopwatch.stop();
+  final encodeStopwatch = Stopwatch()..start();
+  final encoded = NotebookRepository.encodeNotebook(backupNotebook);
+  final missingImageIds = <String>[];
+  final pages = encoded['pages'];
+  if (pages is List<dynamic>) {
+    for (final page in pages.whereType<Map<String, dynamic>>()) {
+      final images = page['imageBlocks'];
+      if (images is! List<dynamic>) {
+        continue;
+      }
+      for (final image in images.whereType<Map<String, dynamic>>()) {
+        final bytes = image['bytes'];
+        if (bytes is! String || bytes.isEmpty) {
+          missingImageIds.add(image['id']?.toString() ?? '<unknown>');
+        }
+      }
+    }
+  }
+  encodeStopwatch.stop();
+  final jsonStopwatch = Stopwatch()..start();
+  final content = jsonEncode(encoded);
+  jsonStopwatch.stop();
+  return _BackupWorkerResult(
+    content: content,
+    flattenMs: flattenStopwatch.elapsedMilliseconds,
+    encodeMs: encodeStopwatch.elapsedMilliseconds,
+    jsonMs: jsonStopwatch.elapsedMilliseconds,
+    missingImageIds: missingImageIds,
+  );
+}
+
+class BackupSnapshotInterrupted implements Exception {
+  const BackupSnapshotInterrupted();
+}
+
+class BackupValidationException implements Exception {
+  const BackupValidationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'BackupValidationException: $message';
+}
+
+class BackupDataException implements Exception {
+  const BackupDataException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'BackupDataException: $message';
+}
+
+class BackupSnapshotReport {
+  const BackupSnapshotReport({
+    required this.notebookCount,
+    required this.pageCount,
+    required this.strokeCount,
+    required this.pointCount,
+    required this.jsonBytes,
+    required this.changedCount,
+    required this.unchangedCount,
+    required this.readCompareMs,
+    required this.staleListMs,
+    required this.staleMoved,
+    required this.manifestMs,
+    required this.totalMs,
+    required this.notebookReports,
+  });
+
+  final int notebookCount;
+  final int pageCount;
+  final int strokeCount;
+  final int pointCount;
+  final int jsonBytes;
+  final int changedCount;
+  final int unchangedCount;
+  final int readCompareMs;
+  final int staleListMs;
+  final int staleMoved;
+  final int manifestMs;
+  final int totalMs;
+  final List<NotebookBackupReport> notebookReports;
+
+  String toLogString() {
+    final slowest = _slowestNotebook;
+    return 'nb=$notebookCount pages=$pageCount strokes=$strokeCount '
+        'pts=$pointCount jsonBytes=$jsonBytes changed=$changedCount '
+        'same=$unchangedCount compareMs=$readCompareMs '
+        'staleListMs=$staleListMs staleMoved=$staleMoved '
+        'manifestMs=$manifestMs'
+        '${slowest == null ? "" : " slowest{${slowest.toLogString()}}"}';
+  }
+
+  NotebookBackupReport? get _slowestNotebook {
+    if (notebookReports.isEmpty) {
+      return null;
+    }
+    final sorted = List<NotebookBackupReport>.from(notebookReports)
+      ..sort((a, b) => b.totalMs.compareTo(a.totalMs));
+    return sorted.first;
+  }
+}
+
+class NotebookBackupReport {
+  const NotebookBackupReport({
+    required this.uid,
+    required this.pages,
+    required this.strokes,
+    required this.points,
+    required this.jsonBytes,
+    required this.flattenMs,
+    required this.encodeMs,
+    required this.jsonMs,
+    required this.compareMs,
+    required this.writeMs,
+    required this.totalMs,
+    required this.changed,
+  });
+
+  final String uid;
+  final int pages;
+  final int strokes;
+  final int points;
+  final int jsonBytes;
+  final int flattenMs;
+  final int encodeMs;
+  final int jsonMs;
+  final int compareMs;
+  final int writeMs;
+  final int totalMs;
+  final bool changed;
+
+  String toLogString() {
+    return 'uid=$uid pages=$pages strokes=$strokes pts=$points '
+        'jsonBytes=$jsonBytes changed=${changed ? 1 : 0} '
+        'flattenMs=$flattenMs encodeMs=$encodeMs jsonMs=$jsonMs '
+        'compareMs=$compareMs writeMs=$writeMs totalMs=$totalMs';
+  }
+}
+
+class _BackupManifestEntry {
+  const _BackupManifestEntry({
+    required this.uid,
+    required this.updatedAt,
+    required this.fileName,
+    this.checksum,
+    this.jsonBytes,
+  });
+
+  final String uid;
+  final DateTime updatedAt;
+  final String fileName;
+  final String? checksum;
+  final int? jsonBytes;
+
+  Map<String, Object> toJson() {
+    return {
+      'uid': uid,
+      'updatedAt': updatedAt.toIso8601String(),
+      'file': fileName,
+      'checksum': ?checksum,
+      'bytes': ?jsonBytes,
+    };
+  }
+}
+).hasMatch(checksum)) {
+      return _legacyFnv1a32Algorithm;
+    }
+    return null;
+  }
+
+  String _sha256Checksum(String content) {
+    return sha256.convert(utf8.encode(content)).toString();
+  }
+
+  String _legacyFnv1a32Checksum(String content) {
     var hash = 0x811c9dc5;
     for (final byte in utf8.encode(content)) {
       hash ^= byte;
