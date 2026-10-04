@@ -154,6 +154,12 @@ class LocalBackupService {
           notebook,
           shouldInterrupt,
         );
+        if (workerResult.missingImageIds.isNotEmpty) {
+          throw BackupDataException(
+            'Images disappeared or became unreadable during backup: '
+            '${workerResult.missingImageIds.join(', ')}',
+          );
+        }
         final content = workerResult.content;
         final checksum = _contentChecksum(content);
         final jsonBytes = utf8.encode(content).length;
@@ -767,12 +773,14 @@ class _BackupWorkerResult {
     required this.flattenMs,
     required this.encodeMs,
     required this.jsonMs,
+    required this.missingImageIds,
   });
 
   final String content;
   final int flattenMs;
   final int encodeMs;
   final int jsonMs;
+  final List<String> missingImageIds;
 }
 
 Future<T> _runBackupWorker<T>(
@@ -842,6 +850,22 @@ _BackupWorkerResult _createBackupPayload(Notebook notebook) {
   flattenStopwatch.stop();
   final encodeStopwatch = Stopwatch()..start();
   final encoded = NotebookRepository.encodeNotebook(backupNotebook);
+  final missingImageIds = <String>[];
+  final pages = encoded['pages'];
+  if (pages is List<dynamic>) {
+    for (final page in pages.whereType<Map<String, dynamic>>()) {
+      final images = page['imageBlocks'];
+      if (images is! List<dynamic>) {
+        continue;
+      }
+      for (final image in images.whereType<Map<String, dynamic>>()) {
+        final bytes = image['bytes'];
+        if (bytes is! String || bytes.isEmpty) {
+          missingImageIds.add(image['id']?.toString() ?? '<unknown>');
+        }
+      }
+    }
+  }
   encodeStopwatch.stop();
   final jsonStopwatch = Stopwatch()..start();
   final content = jsonEncode(encoded);
@@ -851,6 +875,7 @@ _BackupWorkerResult _createBackupPayload(Notebook notebook) {
     flattenMs: flattenStopwatch.elapsedMilliseconds,
     encodeMs: encodeStopwatch.elapsedMilliseconds,
     jsonMs: jsonStopwatch.elapsedMilliseconds,
+    missingImageIds: missingImageIds,
   );
 }
 

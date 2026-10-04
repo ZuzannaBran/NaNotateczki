@@ -168,13 +168,13 @@ walidacji i nie otwiera uszkodzonej bazy jako poprawnej.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (992 linii)
+### `lib/data/backup/local_backup_service.dart` (1017 linii)
 
 Przyrostowy backup z atomowym `manifest.json`, checksumami i plikami
 notebooków nazwanymi zawartością. Do pięciu poprzednich manifestów jest
 trzymanych w `local_backup/history/`; wskazują na te same niezmienne pliki.
-Przed utworzeniem nowej wersji natywny backup sprawdza, czy każdy obraz
-wskazujący plik nadal istnieje i daje się odczytać; brak obrazu nie zastępuje
+Przed i po serializacji natywny backup sprawdza, czy każdy obraz nadal ma
+dostępne bajty; wyścig z usunięciem pliku nie może utrwalić kopii bez obrazu; brak obrazu nie zastępuje
 ostatniej poprawnej kopii. Odczyt obsługuje manifesty v1/v2, odrzuca niekompletny lub niespójny
 snapshot i próbuje kolejno starsze wersje. Web przechowuje pełny snapshot w `localStorage`.
 
@@ -237,7 +237,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (1701 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (1700 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych.

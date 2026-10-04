@@ -615,8 +615,7 @@ class NotebookRepository {
         ? extension
         : 'png';
     final file = File(
-      '${imagesDir.path}/restored_${block.id}_'
-      '${DateTime.now().millisecondsSinceEpoch}.$safeExtension',
+      '${imagesDir.path}/restored_${_uuid.v4()}.$safeExtension',
     );
     await file.writeAsBytes(bytes, flush: true);
     return block.copyWith(path: file.path, clearBytes: true);
