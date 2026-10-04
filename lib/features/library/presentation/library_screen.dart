@@ -563,7 +563,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                       'Projects',
                       style: _sidebarTextStyle.copyWith(
                         color: colorScheme.onSurface,
-                        fontSize: 15.5,
+                        fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -882,7 +882,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
         color: selected
             ? colorScheme.surfaceContainerHighest
