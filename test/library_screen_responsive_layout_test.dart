@@ -78,9 +78,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final treeItem = find.byKey(
-      ValueKey('library-tree-item:${created.uid}'),
-    );
+    final treeItem = find.byKey(ValueKey('library-tree-item:${created.uid}'));
 
     expect(find.text('Project A'), findsOneWidget);
     expect(treeItem, findsOneWidget);

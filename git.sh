@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-BRANCH="dev_ui"
+BRANCH="dev"
 REMOTE="origin"
 INTERVAL=30
 
