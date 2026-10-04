@@ -516,7 +516,7 @@ class _AccentColorSection extends StatelessWidget {
           spacing: 10,
           runSpacing: 10,
           children: [
-            for (final accent in AppAccentColor.values)
+            for (final accent in selectableAppAccentColors)
               _AccentColorOption(
                 accent: accent,
                 selected: accent == selected,

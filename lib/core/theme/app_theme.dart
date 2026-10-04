@@ -4,7 +4,7 @@ import 'app_colors.dart';
 
 class AppTheme {
   static ThemeData light({
-    AppAccentColor accentColor = AppAccentColor.classic,
+    AppAccentColor accentColor = AppAccentColor.bubblegum,
   }) {
     return ThemeData(
       fontFamily: 'Georgia',

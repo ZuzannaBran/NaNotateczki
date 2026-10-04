@@ -10,6 +10,13 @@ enum AppAccentColor {
   babyBlue,
 }
 
+const selectableAppAccentColors = <AppAccentColor>[
+  AppAccentColor.bubblegum,
+  AppAccentColor.lavender,
+  AppAccentColor.peach,
+  AppAccentColor.babyBlue,
+];
+
 extension AppAccentColorX on AppAccentColor {
   String get label {
     return switch (this) {

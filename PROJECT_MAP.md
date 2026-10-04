@@ -72,21 +72,24 @@ i ponawia przejściowy błąd backupu po 30 s.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (54): paleta aplikacji
-  i wybieralne kolory akcentu. 3:
-  `AppAccentColor`; 39:
+- `lib/core/theme/app_colors.dart` (61): paleta aplikacji
+  i kolory akcentu; w ustawieniach dostępne są tylko Bubblegum, Lavender,
+  Peach i Baby blue. 3:
+  `AppAccentColor`; 13:
+  `selectableAppAccentColors`; 46:
   `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (25): konfiguracja jasnego
-  Material 3 z wybieralnym akcentem i globalną typografią Georgia
-  (z serifowymi fallbackami). 5: `AppTheme`.
+- `lib/core/theme/app_theme.dart` (25): konfiguracja
+  jasnego Material 3 z domyślnym akcentem Bubblegum i globalną typografią
+  Georgia (z serifowymi fallbackami). 5:
+  `AppTheme`.
 
 ### Wejście i preferencje
 
-- `lib/core/input/app_preferences_controller.dart` (129): globalny
-  tryb urządzenia i kolor akcentu zapisane w `app_prefs.json`; akcent jest
-  zapisywany nazwą enuma z obsługą starszego indeksu.
+- `lib/core/input/app_preferences_controller.dart` (139):
+  globalny tryb urządzenia i kolor akcentu zapisane w `app_prefs.json`;
+  starsze Classic, Sakura i Mint są migrowane do Bubblegum.
   8: `DeviceInputMode`;
   27:
   `AppPreferencesController`.
