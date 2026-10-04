@@ -878,6 +878,9 @@ class _EditorScreenState extends State<EditorScreen> {
     var green = _toByte(currentColor.g).toDouble();
     var blue = _toByte(currentColor.b).toDouble();
     var position = tab.position.clamp(0.0, 1.0).toDouble();
+    final hexController = TextEditingController(
+      text: _toHexColor(currentColor),
+    );
 
     final result = await showDialog<_IndexTabEditResult>(
       context: context,
@@ -890,6 +893,22 @@ class _EditorScreenState extends State<EditorScreen> {
               green.round(),
               blue.round(),
             );
+
+            void syncHex() {
+              final color = Color.fromARGB(
+                255,
+                red.round(),
+                green.round(),
+                blue.round(),
+              );
+              final hex = _toHexColor(color);
+              hexController.value = hexController.value.copyWith(
+                text: hex,
+                selection: TextSelection.collapsed(offset: hex.length),
+                composing: TextRange.empty,
+              );
+            }
+
             return AlertDialog(
               title: const Text('Edit tab'),
               content: Column(
@@ -948,23 +967,56 @@ class _EditorScreenState extends State<EditorScreen> {
                       ],
                     ),
                   ),
+                  SizedBox(
+                    width: 180,
+                    child: TextField(
+                      controller: hexController,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                        labelText: 'HEX',
+                        hintText: '#536783',
+                        isDense: true,
+                      ),
+                      onChanged: (value) {
+                        final parsed = _colorFromHex(value);
+                        if (parsed == null) {
+                          return;
+                        }
+                        setDialogState(() {
+                          red = _toByte(parsed.r).toDouble();
+                          green = _toByte(parsed.g).toDouble();
+                          blue = _toByte(parsed.b).toDouble();
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   _indexTabChannelSlider(
                     label: 'R',
                     value: red,
                     color: Colors.red,
-                    onChanged: (value) => setDialogState(() => red = value),
+                    onChanged: (value) => setDialogState(() {
+                      red = value;
+                      syncHex();
+                    }),
                   ),
                   _indexTabChannelSlider(
                     label: 'G',
                     value: green,
                     color: Colors.green,
-                    onChanged: (value) => setDialogState(() => green = value),
+                    onChanged: (value) => setDialogState(() {
+                      green = value;
+                      syncHex();
+                    }),
                   ),
                   _indexTabChannelSlider(
                     label: 'B',
                     value: blue,
                     color: Colors.blue,
-                    onChanged: (value) => setDialogState(() => blue = value),
+                    onChanged: (value) => setDialogState(() {
+                      blue = value;
+                      syncHex();
+                    }),
                   ),
                 ],
               ),
@@ -994,6 +1046,7 @@ class _EditorScreenState extends State<EditorScreen> {
       },
     );
 
+    hexController.dispose();
     if (result == null) {
       return;
     }
@@ -1023,12 +1076,29 @@ class _EditorScreenState extends State<EditorScreen> {
             value: value,
             min: 0,
             max: 255,
-            activeColor: AppColors.divider,
+            activeColor: color,
             onChanged: onChanged,
           ),
         ),
       ],
     );
+  }
+
+  String _toHexColor(Color color) {
+    final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
+    return '#' + value.substring(2).toUpperCase();
+  }
+
+  Color? _colorFromHex(String value) {
+    final normalized = value.replaceAll('#', '').trim();
+    if (normalized.length != 6) {
+      return null;
+    }
+    final parsed = int.tryParse(normalized, radix: 16);
+    if (parsed == null) {
+      return null;
+    }
+    return Color(0xFF000000 | parsed);
   }
 
   int _toByte(double component) {
