@@ -417,7 +417,7 @@ class TextEditToolbar extends StatelessWidget {
             value: value,
             min: min,
             max: max,
-            activeColor: color,
+            activeColor: AppColors.divider,
             onChanged: onChanged,
           ),
         ),
