@@ -53,11 +53,12 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (420 linii)
+### `lib/app/app_scope.dart` (439 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scheduler robi
-kopię po 2 s bezczynności i wymusza próbę po maksymalnie 30 s ciągłych zmian.
+kopię po 2 s bezczynności, wymusza próbę po maksymalnie 30 s ciągłych zmian
+i ponawia przejściowy błąd backupu po 30 s.
 
 - 21: `AppScope`;
   28: `_AppScopeState`;

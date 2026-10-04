@@ -277,6 +277,7 @@ class _BackupScheduler with WidgetsBindingObserver {
 
   static const Duration _idleDelay = Duration(seconds: 2);
   static const Duration _maximumDelay = Duration(seconds: 30);
+  static const Duration _failureRetryDelay = Duration(seconds: 30);
 
   final NotebookRepository repository;
   final LocalBackupService backupService;
@@ -324,6 +325,7 @@ class _BackupScheduler with WidgetsBindingObserver {
     var fetchMs = 0;
     BackupSnapshotReport? snapshotReport;
     var itemCount = 0;
+    var retryAfterFailure = false;
     try {
       final fetchStopwatch = Stopwatch()..start();
       final items =
@@ -375,6 +377,10 @@ class _BackupScheduler with WidgetsBindingObserver {
       _dirty = true;
       debugPrint('[backup] reason=$reason interrupted=ink');
     } catch (e) {
+      if (e is! BackupDataException) {
+        _dirty = true;
+        retryAfterFailure = true;
+      }
       final frameSummary = FrameTimingTracker.instance.summarySince(
         frameCursor,
       );
@@ -396,9 +402,22 @@ class _BackupScheduler with WidgetsBindingObserver {
     } finally {
       _isRunning = false;
       if (_dirty) {
-        schedule();
+        if (retryAfterFailure) {
+          _scheduleFailureRetry();
+        } else {
+          schedule();
+        }
       }
     }
+  }
+
+  void _scheduleFailureRetry() {
+    _timer?.cancel();
+    _maximumTimer?.cancel();
+    _maximumTimer = null;
+    _timer = Timer(_failureRetryDelay, () {
+      unawaited(flush(reason: 'retry'));
+    });
   }
 
   @override
