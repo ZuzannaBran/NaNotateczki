@@ -130,13 +130,21 @@ class LibraryController extends ChangeNotifier {
 
       if (items.isNotEmpty) {
         final folders = folderNames;
-        if (folders.isNotEmpty) {
+        if (folders.isNotEmpty &&
+            !folders.contains(selectedFolder)) {
           selectedFolder = folders.first;
         }
-        selectedItemId ??= _firstItemInFolder(selectedFolder)?.uid;
-        if (_activeNotebook == null && selectedItemId != null) {
+        if (!_selectedItemIsInFolder(selectedFolder)) {
+          selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
+          _activeNotebook = selectedItemId == null
+              ? null
+              : _itemById(selectedItemId!);
+        } else if (_activeNotebook == null && selectedItemId != null) {
           _activeNotebook = _itemById(selectedItemId!);
         }
+      } else {
+        selectedItemId = null;
+        _activeNotebook = null;
       }
     } catch (error, stackTrace) {
       loadError = error;
@@ -179,10 +187,15 @@ class LibraryController extends ChangeNotifier {
       await _refreshCorruptRecoveryState();
       if (items.isNotEmpty) {
         selectedFolder = folderNames.isEmpty ? '' : folderNames.first;
-        selectedItemId ??= _firstItemInFolder(selectedFolder)?.uid;
+        if (!_selectedItemIsInFolder(selectedFolder)) {
+          selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
+        }
         _activeNotebook = selectedItemId == null
             ? null
             : _itemById(selectedItemId!);
+      } else {
+        selectedItemId = null;
+        _activeNotebook = null;
       }
     } catch (e, st) {
       AppErrorLog.instance.record(
@@ -483,13 +496,12 @@ class LibraryController extends ChangeNotifier {
   }
 
   Notebook? _itemById(String uid) {
-    if (items.isEmpty) {
-      return null;
+    for (final item in items) {
+      if (item.uid == uid) {
+        return item;
+      }
     }
-    return items.firstWhere(
-      (item) => item.uid == uid,
-      orElse: () => items.first,
-    );
+    return null;
   }
 
   Notebook? _firstItemInFolder(String folder) {
