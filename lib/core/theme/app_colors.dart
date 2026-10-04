@@ -81,7 +81,7 @@ const _cherryPalette = AppAccentPalette(
   accentLight: Color(0xFFE77593),
   primaryContainer: Color(0xFFF2B6C6),
   background: Color(0xFFF4EFED),
-  surfaceContainerLow: Color(0xFFF3E4DA),
+  surfaceContainerLow: Color(0xFFF6EFDF),
   divider: Color(0xFFDEBAB0),
 );
 
