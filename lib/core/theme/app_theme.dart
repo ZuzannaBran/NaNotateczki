@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 class AppTheme {
-  static ThemeData light() {
+  static ThemeData light({
+    AppAccentColor accentColor = AppAccentColor.classic,
+  }) {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.inkBlack,
+        seedColor: accentColor.color,
         surface: AppColors.paper,
       ),
       scaffoldBackgroundColor: AppColors.paper,

@@ -1,5 +1,41 @@
 import 'package:flutter/material.dart';
 
+enum AppAccentColor {
+  classic,
+  sakura,
+  bubblegum,
+  lavender,
+  peach,
+  mint,
+  babyBlue,
+}
+
+extension AppAccentColorX on AppAccentColor {
+  String get label {
+    return switch (this) {
+      AppAccentColor.classic => 'Classic',
+      AppAccentColor.sakura => 'Sakura',
+      AppAccentColor.bubblegum => 'Bubblegum',
+      AppAccentColor.lavender => 'Lavender',
+      AppAccentColor.peach => 'Peach',
+      AppAccentColor.mint => 'Mint',
+      AppAccentColor.babyBlue => 'Baby blue',
+    };
+  }
+
+  Color get color {
+    return switch (this) {
+      AppAccentColor.classic => AppColors.inkBlack,
+      AppAccentColor.sakura => const Color(0xFFF48FB1),
+      AppAccentColor.bubblegum => const Color(0xFFFF80AB),
+      AppAccentColor.lavender => const Color(0xFFB39DDB),
+      AppAccentColor.peach => const Color(0xFFFFAB91),
+      AppAccentColor.mint => const Color(0xFF80CBC4),
+      AppAccentColor.babyBlue => const Color(0xFF90CAF9),
+    };
+  }
+}
+
 class AppColors {
   static const paper = Color(0xFFF8F6F2);
   static const toolbar = Color(0xFFF1EEE8);

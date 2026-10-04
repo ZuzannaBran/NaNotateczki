@@ -6,6 +6,7 @@ import '../../../core/diagnostics/data_integrity_log.dart';
 import '../../../core/diagnostics/optimization_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../state/editor_controller.dart';
 import '../state/input_mode.dart';
@@ -197,6 +198,11 @@ class EditorSettingsScreen extends StatelessWidget {
                       horizontal: 16,
                     ),
                     children: [
+                      _AccentColorSection(
+                        selected: preferences.accentColor,
+                        onChanged: preferences.setAccentColor,
+                      ),
+                      const SizedBox(height: 24),
                       _BackgroundSection(
                         title: 'Notebook default',
                         settings: controller.defaultBackgroundSettingsForKind(
@@ -486,6 +492,124 @@ Future<void> _showOptimizationDialog(BuildContext context) {
       );
     },
   );
+}
+
+class _AccentColorSection extends StatelessWidget {
+  const _AccentColorSection({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final AppAccentColor selected;
+  final ValueChanged<AppAccentColor> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Accent color',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Pick the main color used for controls and highlights.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final accent in AppAccentColor.values)
+              _AccentColorOption(
+                accent: accent,
+                selected: accent == selected,
+                onTap: () => onChanged(accent),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AccentColorOption extends StatelessWidget {
+  const _AccentColorOption({
+    required this.accent,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppAccentColor accent;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${accent.label} accent color',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            width: 118,
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? colorScheme.primaryContainer
+                  : colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.outlineVariant,
+                width: selected ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: accent.color,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: colorScheme.outline),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    accent.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (selected) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.check_rounded,
+                    size: 17,
+                    color: colorScheme.primary,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _BackgroundSection extends StatelessWidget {

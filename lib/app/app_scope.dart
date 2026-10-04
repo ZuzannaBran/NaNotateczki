@@ -113,10 +113,21 @@ class _AppScopeState extends State<AppScope> {
             title: 'Notatek',
             theme: AppTheme.light(),
             home: const LibraryScreen(),
-            builder: (context, child) => _BackupStatusOverlay(
-              snapshotInProgress: backupService.snapshotInProgress,
-              child: child ?? const SizedBox.shrink(),
-            ),
+            builder: (context, child) {
+              return Consumer<AppPreferencesController>(
+                builder: (context, preferences, _) {
+                  return Theme(
+                    data: AppTheme.light(
+                      accentColor: preferences.accentColor,
+                    ),
+                    child: _BackupStatusOverlay(
+                      snapshotInProgress: backupService.snapshotInProgress,
+                      child: child ?? const SizedBox.shrink(),
+                    ),
+                  );
+                },
+              );
+            },
           ),
         );
       },

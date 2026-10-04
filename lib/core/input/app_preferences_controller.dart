@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../storage/text_storage.dart';
+import '../theme/app_colors.dart';
 
 enum DeviceInputMode { computer, tablet }
 
@@ -27,6 +28,7 @@ class AppPreferencesController extends ChangeNotifier {
   static const _fileName = 'app_prefs.json';
 
   DeviceInputMode deviceInputMode = _defaultDeviceInputMode();
+  AppAccentColor accentColor = AppAccentColor.classic;
 
   bool get shouldRequestSoftKeyboard {
     return deviceInputMode == DeviceInputMode.tablet;
@@ -42,11 +44,33 @@ class AppPreferencesController extends ChangeNotifier {
       if (decoded is! Map<String, dynamic>) {
         return;
       }
+
+      var changed = false;
       final modeIndex = decoded['deviceInputMode'];
       if (modeIndex is int &&
           modeIndex >= 0 &&
           modeIndex < DeviceInputMode.values.length) {
-        deviceInputMode = DeviceInputMode.values[modeIndex];
+        final loadedMode = DeviceInputMode.values[modeIndex];
+        if (loadedMode != deviceInputMode) {
+          deviceInputMode = loadedMode;
+          changed = true;
+        }
+      }
+
+      final accentValue = decoded['accentColor'];
+      final loadedAccent = switch (accentValue) {
+        final String name => _accentColorFromName(name),
+        final int index when index >= 0 &&
+            index < AppAccentColor.values.length =>
+          AppAccentColor.values[index],
+        _ => null,
+      };
+      if (loadedAccent != null && loadedAccent != accentColor) {
+        accentColor = loadedAccent;
+        changed = true;
+      }
+
+      if (changed) {
         notifyListeners();
       }
     } catch (e) {
@@ -63,11 +87,23 @@ class AppPreferencesController extends ChangeNotifier {
     await _save();
   }
 
+  Future<void> setAccentColor(AppAccentColor color) async {
+    if (accentColor == color) {
+      return;
+    }
+    accentColor = color;
+    notifyListeners();
+    await _save();
+  }
+
   Future<void> _save() async {
     try {
       await writeStoredText(
         _fileName,
-        jsonEncode({'deviceInputMode': deviceInputMode.index}),
+        jsonEncode({
+          'deviceInputMode': deviceInputMode.index,
+          'accentColor': accentColor.name,
+        }),
       );
     } catch (e) {
       debugPrint('AppPreferencesController._save failed: $e');
@@ -81,4 +117,13 @@ DeviceInputMode _defaultDeviceInputMode() {
     return DeviceInputMode.tablet;
   }
   return DeviceInputMode.computer;
+}
+
+AppAccentColor? _accentColorFromName(String name) {
+  for (final color in AppAccentColor.values) {
+    if (color.name == name) {
+      return color;
+    }
+  }
+  return null;
 }
