@@ -140,24 +140,20 @@ rysika i nie porzuca zmian po błędzie.
 
 ### Drift
 
-### `lib/data/drift/notes_database.dart` (345 linii)
+### `lib/data/drift/notes_database.dart` (337 linii)
 
 Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami. Start sprawdza
 `PRAGMA quick_check` i `PRAGMA foreign_key_check`; po potwierdzonej korupcji lub naruszeniu integralności natywna baza jest
 zachowywana jako plik `.corrupt_*`, a aplikacja
 otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
-- 9: `NotebookRows`; 21: `PageRows`;
-  34: `IndexTabRows`; 44: `TextBlockRows`;
-  61: `ImageBlockRows`; 84: `InkStrokeRows`.
-- 97: `DatabaseOpenResult`;
-  111: `DatabaseOpenStage`;
-  113: `DatabaseOpenException`;
-  147: `NotesDatabase`.
-- 154: `NotesDatabase.open`;
-  232: kontrola integralności;
-  256: `schemaVersion` (`1`);
-  259: `migration`.
+- 9: `NotebookRows`; 21: `PageRows`; 32: `TextBlockRows`;
+  49: `ImageBlockRows`; 72: `InkStrokeRows`.
+- 85: `DatabaseOpenResult`; 99: `DatabaseOpenStage`;
+  101: `DatabaseOpenException`; 143: `NotesDatabase`.
+- 150: `NotesDatabase.open`; 228: kontrola integralności;
+  322: `schemaVersion` (`2`); 325: `migration` — usuwa dane starego
+  mechanizmu zakładek podczas przejścia z v1.
 
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
   natywnego lub webowego połączenia.
@@ -233,9 +229,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/notebook_kind.dart` (12): notebook lub board
   oraz bezpieczny zapis indeksu.
   1: `NotebookKind`; 3: `NotebookKindValue`.
-- `lib/features/notebook/domain/note_page.dart` (71): zawartość strony i wiele
-  zakładek indeksujących.
-  7: `NotePage`; 53: `IndexTab`.
+- `lib/features/notebook/domain/note_page.dart` (40): zawartość strony.
+  5: `NotePage`.
 - `lib/features/notebook/domain/drawing_tool.dart` (43): enum narzędzi i
   klasyfikacja eraser/shape/ink.
   1: `DrawingTool`; 21: `DrawingToolX`.
@@ -252,7 +247,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2350 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2227 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. `NotebookRepositoryChange` rozróżnia pełną zmianę,
@@ -263,13 +258,13 @@ samowystarczalny i zachowuje obrazy inline.
 
 - 23: `DataIntegrityIncidentHandler`; 30: `NotebookRepositoryChange`;
   45: `RepositoryChangeHandler`; 55: `NotebookRepository`.
-- 81: `waitForPendingSaves`; 485: `saveNotebook`;
-  515: `saveNotebookPages`; 723: `updateNotebookMetadata`;
-  1097: `deleteNotebook`.
-- 1238: `encodeNotebookForLocalBackup`; 1241:
+- 81: `waitForPendingSaves`; 483: `saveNotebook`;
+  513: `saveNotebookPages`; 721: `updateNotebookMetadata`;
+  1095: `deleteNotebook`.
+- 1236: `encodeNotebookForLocalBackup`; 1239:
   `encodePageForLocalBackup`.
-- 2196: `_toolFromIndex`; 2204: `_toolToIndex` — muszą pozostać symetryczne.
-- 2249: `DataIntegrityProtectionException`.
+- 2079: `_toolFromIndex`; 2087: `_toolToIndex` — muszą pozostać symetryczne.
+- 2132: `DataIntegrityProtectionException`.
 
 ### `lib/features/notebook/presentation/notebook_screen.dart` (24 linie)
 
@@ -323,15 +318,15 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 
 ## 7. Stan edytora
 
-### `lib/features/editor/state/editor_actions.dart` (414 linii)
+### `lib/features/editor/state/editor_actions.dart` (401 linii)
 
 Akcje undo/redo; każda implementuje `apply(page)` i `revert(page)`.
 
 - 8: `EditorAction`.
-- 13–88: dodawanie tekstu/obrazu/ink, usuwanie stroke'ów i zakładki.
-- 101–255: update/delete/move tekstu i obrazu.
-- 275: `MoveSelectionAction`; 331: `DeleteSelectionAction`;
-  367: `PasteSelectionAction`; 403: `OffsetPosition`.
+- 13–87: dodawanie tekstu/obrazu/ink i usuwanie stroke'ów.
+- 88–242: update/delete/move tekstu i obrazu.
+- 262: `MoveSelectionAction`; 318: `DeleteSelectionAction`;
+  354: `PasteSelectionAction`; 390: `OffsetPosition`.
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
 
@@ -347,7 +342,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2785 linii)
+### `lib/features/editor/state/editor_controller.dart` (2681 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
@@ -355,25 +350,23 @@ preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
 czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
 zgodą na zamknięcie aplikacji.
 
-- 35: `LassoSelection`; 75: `EditorController`;
+- 36: `LassoSelection`; 75: `EditorController`;
   198: `flushPendingSaves`.
 - 266–324: layout i transformacje viewportu.
 - 341–477: operacje `*OnPage` używane przez canvasy/overlaye.
 - 486–870: narzędzia, aktywne elementy, lasso i preferencje.
-- 1140–1324: undo/redo, strony, bookmarki i index tabs.
-- 1351–1467: operacje tekstowe.
-- 1481–1750: import oraz clipboard.
-- 2182–2330: OCR, obrazy i ink; 2449: `supportsOcr`.
-- 2575: `_applyAction`; 2584: `_applyInkAction`;
-  2686: `_scheduleSave`; 2707: `_saveDirtyPages`; 2729: `_save`.
+- 1221: `undo`; 1234: `redo`; 1306: `toggleBookmark`;
+  1312: operacje tekstowe.
+- 2471: `_applyAction`; 2480: `_applyInkAction`;
+  2582: `_scheduleSave`; 2603: `_saveDirtyPages`; 2625: `_save`.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2733 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2310 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
-panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, zakładki, minimapa,
+panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, minimapa,
 skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma po 10 px wolnej przestrzeni po lewej i prawej stronie; poziomy
@@ -387,17 +380,13 @@ tylko pionowo.
 - 41: `_logicalPageWidth`; 84: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
 - 196–598: gesty pan/zoom i transformacje; 704: zakres widocznych stron.
-- 764–863: busy overlay, import/eksport/clipboard i index tabs.
-- 1227: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
+- 764–862: busy overlay, import/eksport i clipboard.
+- 982: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 1253: główny `build`; 1302: responsywna skala dopasowania;
-  1347: wspólna macierz `pageTransform`.
-- 1457–1488: tło/inactive `DocumentPageOverlay`, `DocumentDrawingCanvas`
-  i active `DocumentPageOverlay` we wspólnej przestrzeni transformacji.
-- 1622–1665: skróty klawiszowe; 1777: `_PageViewportClipper`.
-- 1879: `_PageFramePainter`; 1954: `_IndexTabsOverlay`;
-  2096: `_ProjectMiniMapOverlay`; 2448: `_ProjectMiniMapPainter`.
+- 1008: główny `build`; wspólna macierz `pageTransform` skaluje dokument.
+- 1505: `_PageViewportClipper`; 1580: `_PageFramePainter`;
+  1687: `_ProjectMiniMapOverlay`; 2039: `_ProjectMiniMapPainter`.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -424,17 +413,13 @@ błędów, integralności i wydajności.
 - `lib/features/editor/presentation/widgets/page_background_paint.dart` (123):
   render i preview tła. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (937):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (889):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu; tło paska używa jasnej neutralnej powierzchni #FBFBFB;
   ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
-  11: `EditorToolbar`;
-  215:
-  dialog tła;
-  350: selektor gumki;
-  416: selektor kształtu;
-  830: `_EraserIcon`.
+  10: `EditorToolbar`; 181: dialog tła; 316: selektor gumki;
+  382: selektor kształtu; 782: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (545):
   formatowanie aktywnego bloku Quill; pasek używa jasnej neutralnej powierzchni #FBFBFB.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.

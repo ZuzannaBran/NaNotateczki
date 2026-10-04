@@ -420,7 +420,6 @@ class NotebookRepository {
           imageBlocks: <ImageBlock>[],
           inkStrokes: <InkStroke>[],
           isBookmarked: false,
-          indexTabs: <IndexTab>[],
         ),
       ],
     );
@@ -446,7 +445,6 @@ class NotebookRepository {
           imageBlocks: <ImageBlock>[],
           inkStrokes: <InkStroke>[],
           isBookmarked: false,
-          indexTabs: <IndexTab>[],
         ),
       ],
     );
@@ -1306,11 +1304,6 @@ class NotebookRepository {
           'inkStrokes',
           'notebook[$notebookIndex].pages[$pageIndex]',
         );
-        _requireOptionalMapList(
-          page,
-          'indexTabs',
-          'notebook[$notebookIndex].pages[$pageIndex]',
-        );
 
         for (
           var strokeIndex = 0;
@@ -1445,13 +1438,6 @@ class NotebookRepository {
   Future<_PageReadResult> _readPage(PageRow row) async {
     var hadCorruptRows = false;
     void markCorrupt() => hadCorruptRows = true;
-    final tabs = await _readRowsSafely(
-      read: () => (database.select(
-        database.indexTabRows,
-      )..where((item) => item.pageUid.equals(row.uid))).get(),
-      source: 'NotebookRepository._readPage(${row.uid}, tabs)',
-      onError: markCorrupt,
-    );
     final textBlocks = await _readRowsSafely(
       read: () =>
           (database.select(database.textBlockRows)
@@ -1502,15 +1488,6 @@ class NotebookRepository {
           markCorrupt,
         ),
         isBookmarked: row.isBookmarked,
-        indexTabs: _indexTabsFromRows(
-          row,
-          _convertRowsSafely(
-            tabs,
-            _indexTabFromRow,
-            'NotebookRepository._readPage(${row.uid}, tab row)',
-            markCorrupt,
-          ),
-        ),
       ),
       hadCorruptRows: hadCorruptRows,
     );
@@ -1558,23 +1535,9 @@ class NotebookRepository {
     AppErrorLog.instance.record(error, stackTrace, source: source);
   }
 
-  List<IndexTab> _indexTabsFromRows(PageRow page, List<IndexTab> tabs) {
-    if (tabs.isNotEmpty || page.legacyIndexTabColorValue == null) {
-      return tabs;
-    }
-    return [
-      IndexTab(
-        id: _uuid.v4(),
-        color: Color(page.legacyIndexTabColorValue!),
-        position: page.legacyIndexTabPosition ?? 0.0,
-      ),
-    ];
-  }
-
   void _validateRecoveryBatch(List<Notebook> notebooks) {
     final notebookIds = <String>{};
     final pageIds = <String>{};
-    final tabIds = <String>{};
     final textIds = <String>{};
     final imageIds = <String>{};
     final strokeIds = <String>{};
@@ -1596,9 +1559,6 @@ class NotebookRepository {
       }
       for (final page in notebook.pages) {
         requireUnique(pageIds, page.id, 'page');
-        for (final tab in page.indexTabs) {
-          requireUnique(tabIds, tab.id, 'index tab');
-        }
         for (final block in page.textBlocks) {
           requireUnique(textIds, block.id, 'text block');
         }
@@ -1617,9 +1577,6 @@ class NotebookRepository {
       return false;
     }
     if ((await database.select(database.pageRows).get()).isNotEmpty) {
-      return false;
-    }
-    if ((await database.select(database.indexTabRows).get()).isNotEmpty) {
       return false;
     }
     if ((await database.select(database.textBlockRows).get()).isNotEmpty) {
@@ -1654,17 +1611,8 @@ class NotebookRepository {
             pageIndex: pageIndex,
             title: page.title,
             isBookmarked: page.isBookmarked,
-            legacyIndexTabColorValue: Value(
-              page.indexTabs.firstOrNull?.color.toARGB32(),
-            ),
-            legacyIndexTabPosition: Value(page.indexTabs.firstOrNull?.position),
           ),
         );
-    for (final tab in page.indexTabs) {
-      await database
-          .into(database.indexTabRows)
-          .insert(_indexTabToCompanion(page.id, tab));
-    }
     for (final entry in page.textBlocks.asMap().entries) {
       await database
           .into(database.textBlockRows)
@@ -1695,9 +1643,6 @@ class NotebookRepository {
   }
 
   Future<void> _deletePageChildren(String pageUid) async {
-    await (database.delete(
-      database.indexTabRows,
-    )..where((item) => item.pageUid.equals(pageUid))).go();
     await (database.delete(
       database.textBlockRows,
     )..where((item) => item.pageUid.equals(pageUid))).go();
@@ -1739,14 +1684,6 @@ class NotebookRepository {
                 stroke.copyWith(id: _uuid.v4()),
             ],
             isBookmarked: page.isBookmarked,
-            indexTabs: [
-              for (final tab in page.indexTabs)
-                IndexTab(
-                  id: _uuid.v4(),
-                  color: tab.color,
-                  position: tab.position,
-                ),
-            ],
           ),
       ],
     );
@@ -1755,23 +1692,6 @@ class NotebookRepository {
   String _buildRecoveredTitle(String title, String reason) {
     final trimmedTitle = title.trim().isEmpty ? 'Untitled' : title.trim();
     return '$trimmedTitle ($reason)';
-  }
-
-  IndexTab _indexTabFromRow(IndexTabRow row) {
-    return IndexTab(
-      id: row.uid,
-      color: Color(row.colorValue),
-      position: row.position,
-    );
-  }
-
-  IndexTabRowsCompanion _indexTabToCompanion(String pageUid, IndexTab tab) {
-    return IndexTabRowsCompanion.insert(
-      uid: tab.id,
-      pageUid: pageUid,
-      colorValue: tab.color.toARGB32(),
-      position: tab.position,
-    );
   }
 
   TextBlock _textFromRow(TextBlockRow row) {
@@ -1972,9 +1892,6 @@ class NotebookRepository {
       'id': page.id,
       'title': page.title,
       'isBookmarked': page.isBookmarked,
-      'indexTabColor': page.indexTabs.firstOrNull?.color.toARGB32(),
-      'indexTabPosition': page.indexTabs.firstOrNull?.position,
-      'indexTabs': page.indexTabs.map(_indexTabToJson).toList(),
       'textBlocks': page.textBlocks.map(_textToJson).toList(),
       'imageBlocks': page.imageBlocks
           .map(
@@ -2003,40 +1920,6 @@ class NotebookRepository {
           .map(_strokeFromJson)
           .toList(),
       isBookmarked: json['isBookmarked'] as bool? ?? false,
-      indexTabs: _indexTabsFromJson(json),
-    );
-  }
-
-  static Map<String, dynamic> _indexTabToJson(IndexTab tab) {
-    return {
-      'id': tab.id,
-      'color': tab.color.toARGB32(),
-      'position': tab.position,
-    };
-  }
-
-  List<IndexTab> _indexTabsFromJson(Map<String, dynamic> json) {
-    final tabs = (json['indexTabs'] as List<dynamic>? ?? <dynamic>[])
-        .whereType<Map<String, dynamic>>()
-        .map(_indexTabFromJson)
-        .toList();
-    if (tabs.isNotEmpty || json['indexTabColor'] == null) {
-      return tabs;
-    }
-    return [
-      IndexTab(
-        id: _uuid.v4(),
-        color: Color(json['indexTabColor'] as int),
-        position: (json['indexTabPosition'] as num?)?.toDouble() ?? 0.0,
-      ),
-    ];
-  }
-
-  IndexTab _indexTabFromJson(Map<String, dynamic> json) {
-    return IndexTab(
-      id: (json['id'] as String?) ?? _uuid.v4(),
-      color: Color(json['color'] as int),
-      position: (json['position'] as num).toDouble(),
     );
   }
 
@@ -2263,7 +2146,6 @@ class _NotebookContentSummary {
     required this.imageBlocks,
     required this.inkStrokes,
     required this.inkPoints,
-    required this.indexTabs,
   });
 
   factory _NotebookContentSummary.fromNotebook(Notebook notebook) {
@@ -2276,7 +2158,6 @@ class _NotebookContentSummary {
     var imageBlocks = 0;
     var inkStrokes = 0;
     var inkPoints = 0;
-    var indexTabs = 0;
     for (final page in pages) {
       textBlocks += page.textBlocks.length;
       textCharacters += page.textBlocks.fold<int>(
@@ -2289,7 +2170,6 @@ class _NotebookContentSummary {
         0,
         (sum, stroke) => sum + stroke.points.length,
       );
-      indexTabs += page.indexTabs.length;
     }
     return _NotebookContentSummary(
       pages: pages.length,
@@ -2298,7 +2178,6 @@ class _NotebookContentSummary {
       imageBlocks: imageBlocks,
       inkStrokes: inkStrokes,
       inkPoints: inkPoints,
-      indexTabs: indexTabs,
     );
   }
 
@@ -2308,7 +2187,6 @@ class _NotebookContentSummary {
   final int imageBlocks;
   final int inkStrokes;
   final int inkPoints;
-  final int indexTabs;
 
   int get contentItems => textBlocks + imageBlocks + inkStrokes;
 
@@ -2323,7 +2201,6 @@ class _NotebookContentSummary {
       'imageBlocks': imageBlocks,
       'inkStrokes': inkStrokes,
       'inkPoints': inkPoints,
-      'indexTabs': indexTabs,
       'contentItems': contentItems,
       'contentScore': contentScore,
     };

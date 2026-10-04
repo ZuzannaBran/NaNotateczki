@@ -85,7 +85,6 @@ Notebook _notebook(List<InkStroke> strokes) {
         imageBlocks: const [],
         inkStrokes: strokes,
         isBookmarked: false,
-        indexTabs: const [],
       ),
     ],
   );

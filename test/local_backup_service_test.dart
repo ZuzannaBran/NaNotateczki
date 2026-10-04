@@ -1234,7 +1234,6 @@ Notebook _notebook() {
           ),
         ],
         isBookmarked: false,
-        indexTabs: const [],
       ),
     ],
   );

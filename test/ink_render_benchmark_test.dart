@@ -172,7 +172,6 @@ Notebook _notebookFor(_BenchmarkScenario scenario) {
               _strokeFor(pageIndex, strokeIndex, scenario.pointsPerStroke),
         ),
         isBookmarked: false,
-        indexTabs: const [],
       ),
     ),
   );

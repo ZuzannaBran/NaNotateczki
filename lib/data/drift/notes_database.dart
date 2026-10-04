@@ -24,18 +24,6 @@ class PageRows extends Table {
   IntColumn get pageIndex => integer()();
   TextColumn get title => text()();
   BoolColumn get isBookmarked => boolean()();
-  IntColumn get legacyIndexTabColorValue => integer().nullable()();
-  RealColumn get legacyIndexTabPosition => real().nullable()();
-
-  @override
-  Set<Column<Object>> get primaryKey => {uid};
-}
-
-class IndexTabRows extends Table {
-  TextColumn get uid => text()();
-  TextColumn get pageUid => text().references(PageRows, #uid)();
-  IntColumn get colorValue => integer()();
-  RealColumn get position => real()();
 
   @override
   Set<Column<Object>> get primaryKey => {uid};
@@ -147,7 +135,6 @@ class DatabaseOpenException implements Exception {
   tables: [
     NotebookRows,
     PageRows,
-    IndexTabRows,
     TextBlockRows,
     ImageBlockRows,
     InkStrokeRows,
@@ -332,11 +319,17 @@ class NotesDatabase extends _$NotesDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2 && to >= 2) {
+        await m.deleteTable('index_tab_rows');
+        await m.alterTable(TableMigration(pageRows));
+      }
+    },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },

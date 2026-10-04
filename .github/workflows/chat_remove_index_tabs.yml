@@ -1,0 +1,91 @@
+name: Chat remove index tabs
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.event.head_commit.message == 'chat: usuń zakładki z aplikacji'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Regenerate Drift
+        run: |
+          rm -f lib/data/drift/notes_database.g.dart
+          dart run build_runner build --delete-conflicting-outputs
+
+      - name: Format changed Dart files
+        run: |
+          dart format \
+            lib/data/drift/notes_database.dart \
+            lib/data/backup/local_backup_service.dart \
+            lib/data/export/notebook_export_service.dart \
+            lib/features/notebook/domain/note_page.dart \
+            lib/features/notebook/data/notebook_repository.dart \
+            lib/features/editor/state/editor_actions.dart \
+            lib/features/editor/state/editor_controller.dart \
+            lib/features/editor/presentation/editor_screen.dart \
+            lib/features/editor/presentation/widgets/editor_toolbar.dart \
+            test/backup_eraser_flattening_test.dart \
+            test/editor_screen_responsive_layout_test.dart \
+            test/ink_render_benchmark_test.dart \
+            test/local_backup_service_test.dart \
+            test/notebook_repository_test.dart \
+            test/page_overlay_text_gestures_test.dart
+
+      - name: Ensure index-tab code is gone
+        run: |
+          if grep -RniE 'IndexTab|indexTabs|indexTab' lib test; then
+            echo 'Index-tab code still exists.'
+            exit 1
+          fi
+
+      - name: Analyze
+        run: dart analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Commit generated and formatted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/chat_remove_index_tabs.yml
+          git add \
+            .github/workflows/chat_remove_index_tabs.yml \
+            lib/data/drift/notes_database.dart \
+            lib/data/drift/notes_database.g.dart \
+            lib/data/backup/local_backup_service.dart \
+            lib/data/export/notebook_export_service.dart \
+            lib/features/notebook/domain/note_page.dart \
+            lib/features/notebook/data/notebook_repository.dart \
+            lib/features/editor/state/editor_actions.dart \
+            lib/features/editor/state/editor_controller.dart \
+            lib/features/editor/presentation/editor_screen.dart \
+            lib/features/editor/presentation/widgets/editor_toolbar.dart \
+            test/backup_eraser_flattening_test.dart \
+            test/editor_screen_responsive_layout_test.dart \
+            test/ink_render_benchmark_test.dart \
+            test/local_backup_service_test.dart \
+            test/notebook_repository_test.dart \
+            test/page_overlay_text_gestures_test.dart
+          git commit -m "chat: wygeneruj drift po usunięciu zakładek"
+          git push origin HEAD:dev

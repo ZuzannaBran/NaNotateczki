@@ -1630,7 +1630,6 @@ class LocalBackupService {
 
   void _validateSnapshotPages(Iterable<NotePage> pages) {
     final pageIds = <String>{};
-    final tabIds = <String>{};
     final textIds = <String>{};
     final imageIds = <String>{};
     final strokeIds = <String>{};
@@ -1645,9 +1644,6 @@ class LocalBackupService {
 
     for (final page in pages) {
       requireUnique(pageIds, page.id, 'page');
-      for (final tab in page.indexTabs) {
-        requireUnique(tabIds, tab.id, 'index tab');
-      }
       for (final block in page.textBlocks) {
         requireUnique(textIds, block.id, 'text block');
       }

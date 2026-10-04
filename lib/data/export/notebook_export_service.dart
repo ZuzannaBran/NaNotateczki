@@ -657,7 +657,6 @@ class NotebookExportService {
       imageBlocks: const [],
       inkStrokes: const [],
       isBookmarked: false,
-      indexTabs: const [],
     );
   }
 

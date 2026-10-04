@@ -119,7 +119,6 @@ void main() {
           imageBlocks: const [],
           inkStrokes: const [],
           isBookmarked: false,
-          indexTabs: const [],
         ),
       ],
     );
@@ -155,7 +154,6 @@ void main() {
           imageBlocks: const [],
           inkStrokes: const [],
           isBookmarked: false,
-          indexTabs: const [],
         ),
       ],
     );
@@ -195,7 +193,6 @@ void main() {
             imageBlocks: const [],
             inkStrokes: const [],
             isBookmarked: false,
-            indexTabs: const [],
           ),
         ],
       ),
@@ -259,7 +256,6 @@ void main() {
             imageBlocks: const [],
             inkStrokes: const [],
             isBookmarked: false,
-            indexTabs: const [],
           ),
         ],
       ),
@@ -288,7 +284,6 @@ void main() {
         imageBlocks: const [],
         inkStrokes: const [],
         isBookmarked: false,
-        indexTabs: const [],
       );
       final twoPages = notebook.copyWith(
         pages: [...notebook.pages, secondPage],
@@ -456,7 +451,6 @@ void main() {
           imageBlocks: const [],
           inkStrokes: const [],
           isBookmarked: false,
-          indexTabs: const [],
         ),
       ],
     );

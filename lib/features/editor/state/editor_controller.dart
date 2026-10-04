@@ -143,9 +143,6 @@ class EditorController extends ChangeNotifier {
   int? _activeTextEditPageIndex;
   TextBlock? _activeTextEditBefore;
   String? activeImageBlockId;
-  int? _indexTabDragPageIndex;
-  String? _indexTabDragId;
-  NotePage? _indexTabDragBefore;
   LassoSelection? lassoSelection;
   final ValueNotifier<Offset> lassoDragDelta = ValueNotifier(Offset.zero);
   _ElementClipboardItem? _elementClipboard;
@@ -1282,7 +1279,6 @@ class EditorController extends ChangeNotifier {
       imageBlocks: <ImageBlock>[],
       inkStrokes: <InkStroke>[],
       isBookmarked: false,
-      indexTabs: <IndexTab>[],
     );
   }
 
@@ -1311,125 +1307,6 @@ class EditorController extends ChangeNotifier {
     final page = currentPage.copyWith(isBookmarked: !currentPage.isBookmarked);
     _updatePage(page);
     _save();
-  }
-
-  void addIndexTab({required Color color, required double position}) {
-    final before = currentPage;
-    final clampedPosition = position.clamp(0.0, 1.0).toDouble();
-    final after = before.copyWith(
-      indexTabs: [
-        ...before.indexTabs,
-        IndexTab(id: _uuid.v4(), color: color, position: clampedPosition),
-      ],
-    );
-    _applyAction(UpdateIndexTabAction(before: before, after: after));
-    _save();
-  }
-
-  void updateIndexTab({
-    required String id,
-    required Color color,
-    required double position,
-  }) {
-    final before = currentPage;
-    if (!before.indexTabs.any((tab) => tab.id == id)) {
-      return;
-    }
-    final clampedPosition = position.clamp(0.0, 1.0).toDouble();
-    final after = before.copyWith(
-      indexTabs: before.indexTabs
-          .map(
-            (tab) => tab.id == id
-                ? tab.copyWith(color: color, position: clampedPosition)
-                : tab,
-          )
-          .toList(),
-    );
-    _applyAction(UpdateIndexTabAction(before: before, after: after));
-    _save();
-  }
-
-  void clearIndexTab(String id) {
-    final before = currentPage;
-    if (!before.indexTabs.any((tab) => tab.id == id)) {
-      return;
-    }
-    _applyAction(
-      UpdateIndexTabAction(before: before, after: before.withoutIndexTab(id)),
-    );
-    _save();
-  }
-
-  void beginIndexTabDrag({required int pageIndex, required String id}) {
-    if (pageIndex < 0 || pageIndex >= pages.length) {
-      return;
-    }
-    final page = pages[pageIndex];
-    if (!page.indexTabs.any((tab) => tab.id == id)) {
-      return;
-    }
-    _commitActiveTextEdit();
-    activeTextBlockId = null;
-    activeTextController = null;
-    activeImageBlockId = null;
-    lassoSelection = null;
-    currentPageIndex = pageIndex;
-    _indexTabDragPageIndex = pageIndex;
-    _indexTabDragId = id;
-    _indexTabDragBefore = page;
-    notifyListeners();
-  }
-
-  void updateIndexTabDrag({required String id, required double position}) {
-    final pageIndex = _indexTabDragPageIndex;
-    if (pageIndex == null || _indexTabDragId != id) {
-      return;
-    }
-    final clampedPosition = position.clamp(0.0, 1.0).toDouble();
-    final page = pages[pageIndex];
-    pages = [
-      for (var i = 0; i < pages.length; i++)
-        if (i == pageIndex)
-          page.copyWith(
-            indexTabs: page.indexTabs
-                .map(
-                  (tab) => tab.id == id
-                      ? tab.copyWith(position: clampedPosition)
-                      : tab,
-                )
-                .toList(),
-          )
-        else
-          pages[i],
-    ];
-    notifyListeners();
-  }
-
-  void commitIndexTabDrag() {
-    final pageIndex = _indexTabDragPageIndex;
-    final before = _indexTabDragBefore;
-    final id = _indexTabDragId;
-    _indexTabDragPageIndex = null;
-    _indexTabDragId = null;
-    _indexTabDragBefore = null;
-    if (pageIndex == null || before == null || id == null) {
-      return;
-    }
-    final after = pages[pageIndex];
-    final beforeTab = before.indexTabs.where((tab) => tab.id == id).firstOrNull;
-    final afterTab = after.indexTabs.where((tab) => tab.id == id).firstOrNull;
-    if (beforeTab == null || afterTab == null) {
-      notifyListeners();
-      return;
-    }
-    if ((beforeTab.position - afterTab.position).abs() < 0.001) {
-      notifyListeners();
-      return;
-    }
-    _undoActions.add(UpdateIndexTabAction(before: before, after: after));
-    _redoActions.clear();
-    _save();
-    notifyListeners();
   }
 
   void addTextBlock(Offset position) {
