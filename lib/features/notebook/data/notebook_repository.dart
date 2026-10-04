@@ -1075,6 +1075,17 @@ class NotebookRepository {
           'Backup notebook[$notebookIndex] is not a JSON object.',
         );
       }
+      final kind = notebook['kind'];
+      if (kind != null) {
+        if (kind is! num ||
+            kind.toInt() != kind ||
+            kind.toInt() < 0 ||
+            kind.toInt() >= NotebookKind.values.length) {
+          throw FormatException(
+            'Backup notebook[$notebookIndex] has an unknown kind.',
+          );
+        }
+      }
       final pages = notebook['pages'];
       if (pages is! List<dynamic>) {
         throw FormatException(
@@ -1114,6 +1125,18 @@ class NotebookRepository {
             strokeIndex < inkStrokes.length;
             strokeIndex++) {
           final stroke = inkStrokes[strokeIndex];
+          final tool = stroke['tool'];
+          if (tool != null) {
+            if (tool is! num ||
+                tool.toInt() != tool ||
+                tool.toInt() < 0 ||
+                tool.toInt() >= DrawingTool.values.length) {
+              throw FormatException(
+                'Backup notebook[$notebookIndex].pages[$pageIndex].'
+                'inkStrokes[$strokeIndex].tool is unknown.',
+              );
+            }
+          }
           final points = stroke['points'];
           if (points == null) {
             continue;
@@ -1214,7 +1237,7 @@ class NotebookRepository {
       notebook: Notebook(
         uid: row.uid,
         title: row.title,
-        kind: NotebookKindValue.fromIndex(row.kindIndex),
+        kind: _notebookKindFromStoredIndex(row.kindIndex),
         folder: row.folder,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
@@ -1640,7 +1663,7 @@ class NotebookRepository {
       points: _pointsFromJson(row.pointsJson),
       color: Color(row.colorValue),
       width: row.width,
-      tool: _toolFromIndex(row.toolIndex),
+      tool: _toolFromStoredIndex(row.toolIndex),
     );
   }
 
@@ -1677,10 +1700,15 @@ class NotebookRepository {
   List<InkPoint> _pointsFromJson(String value) {
     final decoded = jsonDecode(value);
     if (decoded is! List<dynamic>) {
-      return <InkPoint>[];
+      throw const FormatException('Stored ink points are not a JSON list.');
+    }
+    if (decoded.any((point) => point is! Map<String, dynamic>)) {
+      throw const FormatException(
+        'Stored ink points contain a malformed entry.',
+      );
     }
     return decoded
-        .whereType<Map<String, dynamic>>()
+        .cast<Map<String, dynamic>>()
         .map(
           (point) => InkPoint(
             dx: (point['dx'] as num).toDouble(),
@@ -1918,6 +1946,20 @@ class NotebookRepository {
           )
           .toList(),
     );
+  }
+
+  NotebookKind _notebookKindFromStoredIndex(int index) {
+    if (index < 0 || index >= NotebookKind.values.length) {
+      throw FormatException('Unknown stored notebook kind index: $index');
+    }
+    return NotebookKind.values[index];
+  }
+
+  DrawingTool _toolFromStoredIndex(int index) {
+    if (index < 0 || index >= DrawingTool.values.length) {
+      throw FormatException('Unknown stored drawing tool index: $index');
+    }
+    return DrawingTool.values[index];
   }
 
   DrawingTool _toolFromIndex(int index) {

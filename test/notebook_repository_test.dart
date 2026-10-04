@@ -639,6 +639,63 @@ void main() {
     expect(remaining, isNotNull);
   });
 
+  test('malformed but valid points JSON marks notebook as corrupt', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final readErrors = <Object>[];
+    final repository = NotebookRepository(
+      database,
+      readErrorHandler: (error, _, _) => readErrors.add(error),
+    );
+    final notebook = await repository.createNotebook();
+    await database.into(database.inkStrokeRows).insert(
+      InkStrokeRowsCompanion.insert(
+        uid: 'malformed-points',
+        pageUid: notebook.pages.single.id,
+        colorValue: 0xFF000000,
+        width: 2,
+        toolIndex: 0,
+        pointsJson: '[{"dx": 1, "dy": 2}, "broken"]',
+        sortIndex: 0,
+      ),
+    );
+
+    final fetched = await repository.fetchNotebooks();
+
+    expect(fetched, hasLength(1));
+    expect(fetched.single.pages.single.inkStrokes, isEmpty);
+    expect(repository.lastFetchSkippedCorruptRows, isTrue);
+    expect(repository.lastCorruptNotebookIds, [notebook.uid]);
+    expect(readErrors, isNotEmpty);
+  });
+
+  test('unknown stored drawing tool marks notebook as corrupt', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(
+      database,
+      readErrorHandler: (_, _, _) {},
+    );
+    final notebook = await repository.createNotebook();
+    await database.into(database.inkStrokeRows).insert(
+      InkStrokeRowsCompanion.insert(
+        uid: 'unknown-tool',
+        pageUid: notebook.pages.single.id,
+        colorValue: 0xFF000000,
+        width: 2,
+        toolIndex: 999,
+        pointsJson: '[{"dx": 1, "dy": 2, "pressure": 0.5}]',
+        sortIndex: 0,
+      ),
+    );
+
+    final fetched = await repository.fetchNotebooks();
+
+    expect(fetched, hasLength(1));
+    expect(fetched.single.pages.single.inkStrokes, isEmpty);
+    expect(repository.lastFetchSkippedCorruptRows, isTrue);
+  });
+
   test('corrupt stroke does not hide its notebook or page', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
