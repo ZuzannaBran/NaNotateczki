@@ -45,6 +45,7 @@ jobs:
             lib/features/editor/presentation/widgets/editor_toolbar.dart \
             test/backup_eraser_flattening_test.dart \
             test/editor_screen_responsive_layout_test.dart \
+            test/editor_save_flush_test.dart \
             test/ink_render_benchmark_test.dart \
             test/local_backup_service_test.dart \
             test/notebook_repository_test.dart \
@@ -82,6 +83,7 @@ jobs:
             lib/features/editor/presentation/widgets/editor_toolbar.dart \
             test/backup_eraser_flattening_test.dart \
             test/editor_screen_responsive_layout_test.dart \
+            test/editor_save_flush_test.dart \
             test/ink_render_benchmark_test.dart \
             test/local_backup_service_test.dart \
             test/notebook_repository_test.dart \

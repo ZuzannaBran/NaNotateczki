@@ -56,7 +56,6 @@ Notebook _notebook() {
         imageBlocks: const [],
         inkStrokes: const [],
         isBookmarked: false,
-        indexTabs: const [],
       ),
     ],
   );
