@@ -49,12 +49,12 @@ const _beigePalette = AppAccentPalette(
 
 class AppColors {
   // Warm beige UI palette.
-  static const background = Color(0xFFF5F0E5);
-  static const toolbar = Color(0xFFE8E0D2);
-  static const paper = Color(0xFFF5F0E5);
-  static const inkBlack = Color(0xFF1E1E1E);
+  static const background = Color(0xFFF1F0EC);
+  static const toolbar = Color(0xFFE4E2DD);
+  static const paper = Color(0xFFFAF9F6);
+  static const inkBlack = Color(0xFF2B2B29);
   static const shadow = Color(0x22000000);
-  static const divider = Color(0xFFD6C9B8);
+  static const divider = Color(0xFFCCC9C5);
 
   static const inkPalette = <Color>[
     inkBlack,
