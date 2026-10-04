@@ -93,23 +93,26 @@ class LibraryController extends ChangeNotifier {
       if (items.isEmpty &&
           (wasReset || freshFile) &&
           await backup.hasLatest()) {
-        autoRestoreCount = await backup.restoreFromLatest();
-        if (autoRestoreCount > 0) {
-          items = await repository.fetchNotebooks();
-          await _refreshCorruptRecoveryState();
+        final restore = await backup.restoreFromLatestDetailed();
+        autoRestoreCount = restore.restoredCount;
+        if (restore.succeeded) {
+          if (autoRestoreCount > 0) {
+            items = await repository.fetchNotebooks();
+            await _refreshCorruptRecoveryState();
+          }
           await repository.completeDatabaseRecovery();
         } else {
           AppErrorLog.instance.record(
-            'Database restore was attempted after startup reset, but no '
-            'documents were restored from the local backup.',
+            'Database restore was attempted after startup reset, but the '
+            'local backup could not be restored safely.',
             null,
-            source: 'LibraryController.loadItems(reset_restore_empty)',
+            source: 'LibraryController.loadItems(reset_restore_failed)',
           );
         }
-      } else if (items.isEmpty && (wasReset || freshFile)) {
+      } else if (items.isEmpty && wasReset) {
         AppErrorLog.instance.record(
-          'Database reset/fresh start detected, but no local backup snapshot '
-          'was available for restore.',
+          'Database recovery is pending, but no local backup snapshot was '
+          'available for automatic restore.',
           null,
           source: 'LibraryController.loadItems(reset_without_backup)',
         );

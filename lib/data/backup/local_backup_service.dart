@@ -492,21 +492,37 @@ class LocalBackupService {
   }
 
   Future<List<Notebook>> readLatest() async {
+    return (await _readLatestResult()).notebooks;
+  }
+
+  Future<_BackupReadResult> _readLatestResult() async {
     if (kIsWeb) {
-      final content = await readStoredText(_webBackupKey);
-      if (content == null) {
-        return <Notebook>[];
+      try {
+        final content = await readStoredText(_webBackupKey);
+        if (content == null) {
+          return const _BackupReadResult.notFound();
+        }
+        final decoded = jsonDecode(content);
+        if (decoded is! List<dynamic>) {
+          throw const BackupValidationException(
+            'Web backup root is not a JSON list.',
+          );
+        }
+        return _BackupReadResult.found(_decodeCompleteNotebookList(decoded));
+      } catch (e, st) {
+        AppErrorLog.instance.record(
+          e,
+          st,
+          source: 'LocalBackupService.readLatest(web)',
+        );
+        return const _BackupReadResult.notFound();
       }
-      final decoded = jsonDecode(content);
-      if (decoded is! List<dynamic>) {
-        return <Notebook>[];
-      }
-      return _decodeCompleteNotebookList(decoded);
     }
+
     try {
       final incremental = await _readIncrementalLatest();
       if (incremental != null) {
-        return incremental;
+        return _BackupReadResult.found(incremental);
       }
     } catch (e, st) {
       debugPrint('LocalBackupService.readLatest incremental failed: $e');
@@ -521,7 +537,7 @@ class LocalBackupService {
       try {
         final historical = await _readManifestSnapshot(manifest);
         if (historical != null) {
-          return historical;
+          return _BackupReadResult.found(historical);
         }
       } catch (e, st) {
         AppErrorLog.instance.record(
@@ -531,7 +547,12 @@ class LocalBackupService {
         );
       }
     }
-    return _readLegacyLatest();
+
+    final legacy = await _readLegacyLatest();
+    if (legacy != null) {
+      return _BackupReadResult.found(legacy);
+    }
+    return const _BackupReadResult.notFound();
   }
 
   Future<List<Notebook>?> _readIncrementalLatest() async {
@@ -618,26 +639,28 @@ class LocalBackupService {
     return notebooks;
   }
 
-  Future<List<Notebook>> _readLegacyLatest() async {
+  Future<List<Notebook>?> _readLegacyLatest() async {
     try {
       final file = await _file(_latest);
       if (!await file.exists()) {
-        return <Notebook>[];
+        return null;
       }
       final content = await file.readAsString();
       final decoded = jsonDecode(content);
       if (decoded is! List<dynamic>) {
-        return <Notebook>[];
+        throw const BackupValidationException(
+          'Legacy backup root is not a JSON list.',
+        );
       }
       return _decodeCompleteNotebookList(decoded);
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('LocalBackupService.readLegacyLatest failed: $e');
       AppErrorLog.instance.record(
         e,
-        null,
+        st,
         source: 'LocalBackupService.readLegacyLatest',
       );
-      return <Notebook>[];
+      return null;
     }
   }
 
@@ -650,12 +673,34 @@ class LocalBackupService {
   }
 
   Future<int> restoreFromLatest() async {
-    final notebooks = await readLatest();
-    if (notebooks.isEmpty) {
-      return 0;
+    return (await restoreFromLatestDetailed()).restoredCount;
+  }
+
+  Future<BackupRestoreReport> restoreFromLatestDetailed() async {
+    final read = await _readLatestResult();
+    if (!read.snapshotFound) {
+      return const BackupRestoreReport(
+        snapshotFound: false,
+        succeeded: false,
+        restoredCount: 0,
+      );
+    }
+    if (read.notebooks.isEmpty) {
+      return const BackupRestoreReport(
+        snapshotFound: true,
+        succeeded: true,
+        restoredCount: 0,
+      );
     }
     try {
-      return await repository.restoreNotebooksAtomically(notebooks);
+      final restored = await repository.restoreNotebooksAtomically(
+        read.notebooks,
+      );
+      return BackupRestoreReport(
+        snapshotFound: true,
+        succeeded: restored == read.notebooks.length,
+        restoredCount: restored,
+      );
     } catch (e, st) {
       debugPrint('LocalBackupService.restoreFromLatest failed: $e');
       AppErrorLog.instance.record(
@@ -663,7 +708,11 @@ class LocalBackupService {
         st,
         source: 'LocalBackupService.restoreFromLatest',
       );
-      return 0;
+      return const BackupRestoreReport(
+        snapshotFound: true,
+        succeeded: false,
+        restoredCount: 0,
+      );
     }
   }
 
@@ -1036,6 +1085,29 @@ _BackupWorkerResult _createBackupPayload(Notebook notebook) {
     jsonMs: jsonStopwatch.elapsedMilliseconds,
     missingImageIds: missingImageIds,
   );
+}
+
+class _BackupReadResult {
+  const _BackupReadResult.found(this.notebooks) : snapshotFound = true;
+
+  const _BackupReadResult.notFound()
+    : notebooks = const <Notebook>[],
+      snapshotFound = false;
+
+  final List<Notebook> notebooks;
+  final bool snapshotFound;
+}
+
+class BackupRestoreReport {
+  const BackupRestoreReport({
+    required this.snapshotFound,
+    required this.succeeded,
+    required this.restoredCount,
+  });
+
+  final bool snapshotFound;
+  final bool succeeded;
+  final int restoredCount;
 }
 
 class BackupSnapshotInterrupted implements Exception {

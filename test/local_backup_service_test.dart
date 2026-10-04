@@ -574,6 +574,49 @@ void main() {
     expect(await orphan.exists(), isFalse);
   });
 
+  test('empty valid snapshot is a successful restore', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+
+    await service.snapshot([]);
+    final report = await service.restoreFromLatestDetailed();
+
+    expect(report.snapshotFound, isTrue);
+    expect(report.succeeded, isTrue);
+    expect(report.restoredCount, 0);
+    expect(await repository.fetchNotebooks(), isEmpty);
+  });
+
+  test('invalid snapshot is not reported as a successful empty restore', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final backupDir = Directory('${directory.path}/local_backup');
+    await backupDir.create(recursive: true);
+    await File('${backupDir.path}/manifest.json').writeAsString(
+      '{"version":3,"notebooks":"broken"}',
+      flush: true,
+    );
+
+    final report = await service.restoreFromLatestDetailed();
+
+    expect(report.succeeded, isFalse);
+    expect(report.snapshotFound, isFalse);
+    expect(report.restoredCount, 0);
+  });
+
   test('snapshot stops when ink becomes active', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
