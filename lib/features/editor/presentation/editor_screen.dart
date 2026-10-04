@@ -1032,7 +1032,8 @@ class _EditorScreenState extends State<EditorScreen> {
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final showProjectOverview = constraints.maxWidth >
+              final showProjectOverview =
+                  constraints.maxWidth >
                   _overviewRight + _overviewSideGap + _rightMargin;
               final pageLeftBoundary = showProjectOverview
                   ? _overviewRight + _overviewSideGap
@@ -1509,12 +1510,7 @@ class _PageViewportClipper extends CustomClipper<Rect> {
 
   @override
   Rect getClip(Size size) {
-    return Rect.fromLTRB(
-      0,
-      -bleed,
-      size.width,
-      size.height + bleed,
-    );
+    return Rect.fromLTRB(0, -bleed, size.width, size.height + bleed);
   }
 
   @override
@@ -2153,7 +2149,8 @@ class _ProjectMiniMapPainter extends CustomPainter {
         canvas.drawRect(rect, imageBorder);
       }
 
-      final textPaint = Paint()..color = AppColors.inkBlack.withValues(alpha: 0.48);
+      final textPaint = Paint()
+        ..color = AppColors.inkBlack.withValues(alpha: 0.48);
       for (final block in page.textBlocks) {
         final topLeft = documentPointToMap(block.position + const Offset(0, 2));
         final lineWidth = (block.width * scaleX * 0.8)

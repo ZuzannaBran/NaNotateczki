@@ -36,5 +36,4 @@ class NotePage {
       isBookmarked: isBookmarked ?? this.isBookmarked,
     );
   }
-
 }

@@ -64,10 +64,7 @@ void main() {
       const Size(logicalPageWidth, logicalPageWidth * AppMetrics.a4HeightRatio),
     );
     expect(_documentLayoutSize(tester).width, logicalPageWidth);
-    expect(
-      _documentScale(tester),
-      closeTo((500 - 106 - 10 - 56) / 820, 0.001),
-    );
+    expect(_documentScale(tester), closeTo((500 - 106 - 10 - 56) / 820, 0.001));
     final narrowRightMargin = 500 - _documentTopRight(tester).dx;
     expect(narrowRightMargin, closeTo(wideRightMargin, 0.001));
     expect(_pageViewportSize(tester).width, closeTo(328.0, 0.001));
@@ -140,9 +137,7 @@ Size _documentLayoutSize(WidgetTester tester) {
 }
 
 Size _pageViewportSize(WidgetTester tester) {
-  return tester.getSize(
-    find.byKey(const ValueKey('notebook-page-viewport')),
-  );
+  return tester.getSize(find.byKey(const ValueKey('notebook-page-viewport')));
 }
 
 Offset _documentTopRight(WidgetTester tester) {
