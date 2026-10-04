@@ -89,7 +89,10 @@ void main() {
         .where((file) => file.path.endsWith('.json'))
         .toList();
     expect(historicalManifests, hasLength(1));
-    expect(await historicalManifests.single.readAsString(), contains(firstFile));
+    expect(
+      await historicalManifests.single.readAsString(),
+      contains(firstFile),
+    );
     expect(File('${manifest.path}.tmp').existsSync(), isFalse);
     expect(File('${manifest.path}.previous').existsSync(), isFalse);
   });
@@ -199,7 +202,9 @@ void main() {
     );
   });
 
-  test('snapshot never overwrites an unknown future manifest version', () async {
+  test(
+    'snapshot never overwrites an unknown future manifest version',
+    () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
     final database = NotesDatabase(NativeDatabase.memory());
@@ -751,7 +756,9 @@ void main() {
     expect(await repository.fetchNotebooks(), isEmpty);
   });
 
-  test('invalid snapshot is not reported as a successful empty restore', () async {
+  test(
+    'invalid snapshot is not reported as a successful empty restore',
+    () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
     final database = NotesDatabase(NativeDatabase.memory());
@@ -774,7 +781,9 @@ void main() {
     expect(report.restoredCount, 0);
   });
 
-  test('document restore stays successful if folder metadata write fails', () async {
+  test(
+    'document restore stays successful if folder metadata write fails',
+    () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
     final database = NotesDatabase(NativeDatabase.memory());

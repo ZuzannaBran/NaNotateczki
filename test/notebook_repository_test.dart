@@ -36,7 +36,9 @@ void main() {
     },
   );
 
-  test('saveRecoveredCopy remaps nested ids to avoid SQLite conflicts', () async {
+  test(
+    'saveRecoveredCopy remaps nested ids to avoid SQLite conflicts',
+    () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -88,7 +90,10 @@ void main() {
       ],
     );
 
-    await expectLater(repository.saveNotebook(conflicting), throwsA(isA<StateError>()));
+    await expectLater(
+      repository.saveNotebook(conflicting),
+      throwsA(isA<StateError>()),
+    );
 
     final savedFirst = await repository.getNotebook(first.uid);
     final savedSecond = await repository.getNotebook(second.uid);
@@ -203,7 +208,9 @@ void main() {
     );
   });
 
-  test('atomic import rolls back earlier writes on a later id conflict', () async {
+  test(
+    'atomic import rolls back earlier writes on a later id conflict',
+    () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
