@@ -161,6 +161,44 @@ void main() {
     expect(restored, isEmpty);
   });
 
+  test('manifest checksum detects a silently removed notebook entry', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    final first = _notebook();
+    final second = _distinctNotebook();
+
+    await service.snapshot([first, second]);
+    final newerSecond = second.copyWith(
+      title: 'Newer',
+      updatedAt: second.updatedAt.add(const Duration(seconds: 1)),
+    );
+    await service.snapshot([first, newerSecond]);
+
+    final manifest = File('${directory.path}/local_backup/manifest.json');
+    final decoded =
+        jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+    final entries = decoded['notebooks'] as List<dynamic>;
+    decoded['notebooks'] = [entries.last];
+    await manifest.writeAsString(jsonEncode(decoded), flush: true);
+
+    final restored = await service.readLatest();
+
+    expect(restored.map((item) => item.uid).toSet(), {
+      first.uid,
+      second.uid,
+    });
+    expect(
+      restored.singleWhere((item) => item.uid == second.uid).title,
+      second.title,
+    );
+  });
+
   test('version 2 FNV checksum remains recoverable', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));
