@@ -47,6 +47,12 @@ void main() {
 
     expect(controller.tool, DrawingTool.text);
     expect(controller.activeImageBlockId, isNull);
+
+    controller.addTextBlock(const Offset(30, 40));
+
+    expect(controller.tool, DrawingTool.edit);
+    expect(controller.activeTextBlockId, isNotNull);
+    expect(controller.activeImageBlockId, isNull);
   });
 }
 

@@ -342,15 +342,16 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2703 linii)
+### `lib/features/editor/state/editor_controller.dart` (2685 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
 `flushPendingSaves` commit'uje aktywną edycję tekstu, anuluje debounce,
 czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
-zgodą na zamknięcie aplikacji. Obrazy wklejane ze schowka są domyślnie
-nieaktywne, więc pozostają pod warstwą tuszu; wybór narzędzia ink lub tekstu
-także dezaktywuje aktywny obraz.
+zgodą na zamknięcie aplikacji. Nowo wstawiony lub wklejony tekst i obraz
+przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
+wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
+tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 - 36: `LassoSelection`; 75: `EditorController`;
   198: `flushPendingSaves`.
@@ -359,8 +360,8 @@ także dezaktywuje aktywny obraz.
 - 486–873: narzędzia, aktywne elementy, lasso i preferencje; 538: `setTool`.
 - 1224: `undo`; 1237: `redo`; 1309: `toggleBookmark`;
   1312: operacje tekstowe.
-- 2493: `_applyAction`; 2502: `_applyInkAction`;
-  2604: `_scheduleSave`; 2625: `_saveDirtyPages`; 2647: `_save`.
+- 2475: `_applyAction`; 2484: `_applyInkAction`;
+  2586: `_scheduleSave`; 2607: `_saveDirtyPages`; 2629: `_save`.
 
 ## 8. UI edytora
 
@@ -440,21 +441,22 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2500 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2529 linie)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
-i dokumentu. Obrazy są renderowane przed blokami tekstowymi, więc tekst
-pozostaje nad obrazami/PDF. W trybie tekstu obrazy ignorują hit-test i nie
+i dokumentu. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
+tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
+tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
 mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
 Operuje wyłącznie w logicznych współrzędnych strony/dokumentu; responsywną
 skalę nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki
 overlayu.
 
-- 27: `PageOverlay`; 165: `DocumentPageOverlay`.
-- 224: `_TextBlockWidget`; 247: `_TextBlockWidgetState`.
-- 1039: `_ImageBlockWidget`; 1060: `_ImageBlockWidgetState`.
-- 2116: `_editOcr`; 2190: `_OcrTextDialog`;
-  2289: `_LassoSelectionWidget`; 2443: `_LassoActionButton`.
+- 27: `PageOverlay`; 182: `DocumentPageOverlay`.
+- 241: `_TextBlockWidget`; 264: `_TextBlockWidgetState`.
+- 1056: `_ImageBlockWidget`; 1081: `_ImageBlockWidgetState`.
+- 2145: `_editOcr`; 2219: `_OcrTextDialog`;
+  2318: `_LassoSelectionWidget`; 2472: `_LassoActionButton`.
 
 ## 9. Board
 
@@ -489,8 +491,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
-- `test/editor_controller_layering_test.dart` (73): aktywne obrazy są
-  dezaktywowane po wyborze narzędzia ink lub tekstu.
+- `test/editor_controller_layering_test.dart` (79): aktywne obrazy są
+  dezaktywowane po wyborze narzędzia ink lub tekstu, a nowy tekst startuje
+  zaznaczony w trybie edit.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
@@ -501,7 +504,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
 - `test/page_overlay_text_gestures_test.dart` (128): tryb tekstu
-  ignoruje obrazy pod kursorem i nie zaznacza ich
+  ignoruje obrazy pod kursorem, a nowo dodany tekst przechodzi do edit
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 

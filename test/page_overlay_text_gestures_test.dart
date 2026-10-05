@@ -16,7 +16,7 @@ import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 void main() {
-  testWidgets('text tool ignores images, inserts once, and reopens', (
+  testWidgets('inserted text starts selected in edit mode and reopens', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(700, 900));
@@ -67,14 +67,14 @@ void main() {
     expect(controller.pages.single.textBlocks, hasLength(1));
     expect(controller.activeTextBlockId, isNotNull);
     expect(controller.activeImageBlockId, isNull);
-    expect(controller.tool, DrawingTool.text);
+    expect(controller.tool, DrawingTool.edit);
 
     await tester.tapAt(overlayTopLeft + const Offset(500, 700));
     await tester.pump();
 
     expect(controller.pages.single.textBlocks, hasLength(1));
     expect(controller.activeTextBlockId, isNull);
-    expect(controller.tool, DrawingTool.pen);
+    expect(controller.tool, DrawingTool.edit);
 
     final textPosition = overlayTopLeft + insertPosition + const Offset(40, 20);
     await tester.tapAt(textPosition);

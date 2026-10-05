@@ -1333,7 +1333,7 @@ class EditorController extends ChangeNotifier {
       width: 240,
     );
     _applyAction(AddTextAction(block));
-    setTool(DrawingTool.text);
+    setTool(DrawingTool.edit);
     setActiveTextBlock(block.id, null);
     _save();
   }
@@ -1362,7 +1362,7 @@ class EditorController extends ChangeNotifier {
       width: 260,
     );
     _applyAction(AddTextAction(block));
-    setTool(DrawingTool.text);
+    setTool(DrawingTool.edit);
     setActiveTextBlock(block.id, null);
     _save();
   }
@@ -1554,7 +1554,7 @@ class EditorController extends ChangeNotifier {
         _ensureInsertPageSelected(position);
         final pasted = block.copyWith(id: _uuid.v4(), position: position);
         _applyAction(AddTextAction(pasted));
-        setTool(DrawingTool.text);
+        setTool(DrawingTool.edit);
         setActiveTextBlock(pasted.id, null);
         _save();
         return null;
@@ -1562,7 +1562,7 @@ class EditorController extends ChangeNotifier {
         _ensureInsertPageSelected(position);
         final pasted = block.copyWith(id: _uuid.v4(), position: position);
         _applyAction(AddImageAction(pasted));
-        clearActiveImageBlock();
+        _activateInsertedImage(pasted.id);
         _save();
         return null;
       case _LassoElementClipboardItem(
@@ -1612,6 +1612,7 @@ class EditorController extends ChangeNotifier {
           ),
         );
 
+        setTool(DrawingTool.edit);
         lassoSelection = LassoSelection(
           pageIndex: targetPageIndex,
           bounds: bounds.shift(delta),
@@ -1746,22 +1747,12 @@ class EditorController extends ChangeNotifier {
   ) async {
     final pngBytes = await _readClipboardImageBytes(reader, Formats.png);
     if (pngBytes != null && pngBytes.isNotEmpty) {
-      await _addImageBlockFromBytes(
-        pngBytes,
-        position,
-        'png',
-        activate: false,
-      );
+      await _addImageBlockFromBytes(pngBytes, position, 'png');
       return true;
     }
     final jpegBytes = await _readClipboardImageBytes(reader, Formats.jpeg);
     if (jpegBytes != null && jpegBytes.isNotEmpty) {
-      await _addImageBlockFromBytes(
-        jpegBytes,
-        position,
-        'jpg',
-        activate: false,
-      );
+      await _addImageBlockFromBytes(jpegBytes, position, 'jpg');
       return true;
     }
     return false;
@@ -1830,9 +1821,8 @@ class EditorController extends ChangeNotifier {
   Future<String?> _addImageBlockFromBytes(
     Uint8List bytes,
     Offset position,
-    String extension, {
-    bool activate = true,
-  }) async {
+    String extension,
+  ) async {
     if (kIsWeb) {
       final size = await _imageSizeFromBytes(bytes);
       final initialSize = _initialImageBlockSize(size);
@@ -1849,11 +1839,7 @@ class EditorController extends ChangeNotifier {
         imageMime: 'image/$normalizedExtension',
       );
       _applyAction(AddImageAction(block));
-      if (activate) {
-        _activateInsertedImage(block.id);
-      } else {
-        clearActiveImageBlock();
-      }
+      _activateInsertedImage(block.id);
       _save();
       return null;
     }
@@ -1872,11 +1858,7 @@ class EditorController extends ChangeNotifier {
       imageMime: 'image/$extension',
     );
     _applyAction(AddImageAction(block));
-    if (activate) {
-      _activateInsertedImage(block.id);
-    } else {
-      clearActiveImageBlock();
-    }
+    _activateInsertedImage(block.id);
     _save();
     return null;
   }

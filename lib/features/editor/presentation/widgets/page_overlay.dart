@@ -105,20 +105,21 @@ class PageOverlay extends StatelessWidget {
                 },
               ),
             ),
-          for (final block in effectivePage.imageBlocks)
-            if ((block.id == activeImageId && renderActive) ||
-                (block.id != activeImageId && renderInactive))
+          if (renderInactive)
+            for (final block in effectivePage.imageBlocks)
               _ImageBlockWidget(
                 block: block,
                 pageIndex: effectivePageIndex,
                 worldOrigin: worldOrigin,
-                interactionEnabled: interactionEnabled,
+                interactionEnabled:
+                    interactionEnabled && block.id != activeImageId,
                 lassoDragDelta:
                     lassoSelection?.imageBlockIds.contains(block.id) == true
                     ? controller.lassoDragDelta
                     : null,
                 isLassoSelected:
                     lassoSelection?.imageBlockIds.contains(block.id) == true,
+                selectionEnabled: block.id != activeImageId,
               ),
           for (final block in effectivePage.textBlocks)
             if ((block.id == activeTextId && renderActive) ||
@@ -147,6 +148,22 @@ class PageOverlay extends StatelessWidget {
                   lassoDragDelta: null,
                   isLassoSelected: false,
                   doubleTapOnly: true,
+                ),
+          if (renderActive)
+            for (final block in effectivePage.imageBlocks)
+              if (block.id == activeImageId)
+                _ImageBlockWidget(
+                  block: block,
+                  pageIndex: effectivePageIndex,
+                  worldOrigin: worldOrigin,
+                  interactionEnabled: interactionEnabled,
+                  lassoDragDelta:
+                      lassoSelection?.imageBlockIds.contains(block.id) == true
+                      ? controller.lassoDragDelta
+                      : null,
+                  isLassoSelected:
+                      lassoSelection?.imageBlockIds.contains(block.id) == true,
+                  renderImage: false,
                 ),
           if (renderActive && lassoSelection != null)
             _LassoSelectionWidget(
@@ -1044,6 +1061,8 @@ class _ImageBlockWidget extends StatefulWidget {
     required this.interactionEnabled,
     required this.lassoDragDelta,
     required this.isLassoSelected,
+    this.renderImage = true,
+    this.selectionEnabled = true,
   });
 
   final ImageBlock block;
@@ -1052,6 +1071,8 @@ class _ImageBlockWidget extends StatefulWidget {
   final bool interactionEnabled;
   final ValueListenable<Offset>? lassoDragDelta;
   final bool isLassoSelected;
+  final bool renderImage;
+  final bool selectionEnabled;
 
   @override
   State<_ImageBlockWidget> createState() => _ImageBlockWidgetState();
@@ -1103,10 +1124,13 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
     final canTransform =
+        widget.selectionEnabled &&
         !controller.tool.isInk &&
         controller.tool != DrawingTool.text &&
         widget.interactionEnabled;
-    final isSelected = controller.activeImageBlockId == widget.block.id;
+    final isSelected =
+        widget.selectionEnabled &&
+        controller.activeImageBlockId == widget.block.id;
     final cropLeft = widget.block.cropLeft;
     final cropTop = widget.block.cropTop;
     final cropRight = widget.block.cropRight;
@@ -1223,23 +1247,27 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                           ]
                         : null,
                   ),
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: _imageChild(
-                          cropLeft: cropLeft,
-                          cropTop: cropTop,
-                          cropRight: cropRight,
-                          cropBottom: cropBottom,
-                          fullWidth: widget.block.width,
-                          fullHeight: widget.block.height,
-                          visibleWidth: visibleWidth,
-                          visibleHeight: visibleHeight,
-                          anchor: _anchorForDirection(_activeResizeDirection),
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: widget.renderImage
+                      ? Stack(
+                          children: [
+                            Positioned.fill(
+                              child: _imageChild(
+                                cropLeft: cropLeft,
+                                cropTop: cropTop,
+                                cropRight: cropRight,
+                                cropBottom: cropBottom,
+                                fullWidth: widget.block.width,
+                                fullHeight: widget.block.height,
+                                visibleWidth: visibleWidth,
+                                visibleHeight: visibleHeight,
+                                anchor: _anchorForDirection(
+                                  _activeResizeDirection,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : null,
                 ),
               ),
               if (isSelected && canTransform) ...[
@@ -1311,7 +1339,8 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     );
 
     final pointerChild = IgnorePointer(
-      ignoring: controller.tool == DrawingTool.text,
+      ignoring:
+          !widget.selectionEnabled || controller.tool == DrawingTool.text,
       child: child,
     );
 
