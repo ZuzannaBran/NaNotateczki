@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_box_transform/flutter_box_transform.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:provider/provider.dart';
@@ -266,29 +267,29 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   Offset? _startPosition;
   bool _dragFromFrame = false;
   Offset? _resizeStart;
-  double? _resizeGrabOffset;
   double? _startWidth;
   Offset? _fontScaleStart;
   double? _startFontSize;
   String? _startDeltaJson;
   TextBlock? _transformBefore;
+  final GlobalKey _textContentKey = GlobalKey();
+  double _frameHeight = 44.0;
+  bool _frameMeasureScheduled = false;
+
   static const double _minTextWidth = 72.0;
   static const double _maxTextWidth = 1200.0;
   static const double _minTextFontSize = 8.0;
   static const double _maxTextFontSize = 96.0;
-  static const double _cornerDotSize = 12.0;
-  static const double _cornerDotHitSize = 36.0;
-  static const double _edgeHandleHitWidth = 44.0;
-  static const double _edgeHandleWidth = 6.0;
-  static const double _edgeHandleHeight = 28.0;
+  static const double _transformHandleTapSize = 36.0;
+  static const double _cornerHandleSize = 12.0;
+  static const double _sideHandleWidth = 6.0;
+  static const double _sideHandleHeight = 28.0;
   static const double _actionButtonSize = 28.0;
-  static const double _actionGap = 8.0;
-  static const double _actionsTop = 42.0;
+  static const double _moveButtonGap = 8.0;
   static const Color _textFrameColor = Color(0xFF8E8E8E);
+
   bool _isMoveHovered = false;
   bool _isMoveDragging = false;
-  bool _isResizeHovered = false;
-  bool _isResizeDragging = false;
   late quill.QuillController _quillController;
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
@@ -321,6 +322,11 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     if (hasDeltaChange || hasTextChange) {
       _initQuill();
     }
+    if (oldWidget.block.width != widget.block.width ||
+        oldWidget.block.fontSize != widget.block.fontSize ||
+        oldWidget.block.deltaJson != widget.block.deltaJson) {
+      _scheduleFrameMeasure();
+    }
   }
 
   @override
@@ -341,6 +347,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     final canTransform = !controller.tool.isInk && widget.interactionEnabled;
     final canDoubleTapEdit = widget.interactionEnabled;
     _quillController.readOnly = !(isActive && canEdit);
+    _scheduleFrameMeasure();
 
     if (isActive &&
         controller.activeTextController != _quillController &&
@@ -354,12 +361,12 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       });
     }
 
-    final child = IgnorePointer(
+    final textChild = IgnorePointer(
       ignoring: !(canTransform || canDoubleTapEdit),
       child: Opacity(
         opacity: widget.doubleTapOnly ? 0.0 : 1.0,
         child: Builder(
-          builder: (context) {
+          builder: (blockContext) {
             return GestureDetector(
               onDoubleTap: canDoubleTapEdit
                   ? () => _activateTextEditing(controller)
@@ -382,7 +389,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                   : null,
               onPanStart: canTransform
                   ? (details) {
-                      final box = context.findRenderObject() as RenderBox?;
+                      final box =
+                          blockContext.findRenderObject() as RenderBox?;
                       final size = box?.size ?? Size.zero;
                       final local = details.localPosition;
                       _dragFromFrame = !isActive || _isOnFrame(local, size);
@@ -408,93 +416,61 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                       _endMove(controller);
                     }
                   : null,
-              child: SizedBox(
-                width: widget.block.width + _edgeHandleHitWidth / 2,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: isActive && canTransform
-                            ? _actionsTop + _actionButtonSize
-                            : 0,
+              child: NotificationListener<SizeChangedLayoutNotification>(
+                onNotification: (_) {
+                  _scheduleFrameMeasure();
+                  return false;
+                },
+                child: SizeChangedLayoutNotifier(
+                  child: Container(
+                    key: _textContentKey,
+                    width: widget.block.width,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.paper.withValues(
+                        alpha: isActive
+                            ? 0.92
+                            : widget.isLassoSelected
+                            ? 0.18
+                            : 0.0,
                       ),
-                      child: Container(
-                        width: widget.block.width,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.paper.withValues(
-                            alpha: isActive
-                                ? 0.92
-                                : widget.isLassoSelected
-                                ? 0.18
-                                : 0.0,
-                          ),
-                          borderRadius: BorderRadius.zero,
-                          border: Border.all(
-                            color: isActive
-                                ? _textFrameColor
-                                : widget.isLassoSelected
-                                ? _lassoAccentColor.withValues(alpha: 0.55)
-                                : Colors.transparent,
-                            width: isActive ? 1.6 : 1.2,
-                          ),
-                          boxShadow: widget.isLassoSelected
-                              ? [
-                                  BoxShadow(
-                                    color: _lassoAccentColor.withValues(
-                                      alpha: 0.18,
-                                    ),
-                                    blurRadius: 8,
-                                    spreadRadius: 1,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: quill.QuillEditor(
-                          controller: _quillController,
-                          focusNode: _focusNode,
-                          scrollController: _scrollController,
-                          config: quill.QuillEditorConfig(
-                            scrollable: false,
-                            padding: EdgeInsets.zero,
-                            autoFocus: false,
-                            expands: false,
-                            // ignore: experimental_member_use
-                            onKeyPressed: (event, node) =>
-                                _handleKeyPressed(event),
-                          ),
-                        ),
+                      borderRadius: BorderRadius.zero,
+                      border: Border.all(
+                        color: widget.isLassoSelected
+                            ? _lassoAccentColor.withValues(alpha: 0.55)
+                            : Colors.transparent,
+                        width: 1.2,
+                      ),
+                      boxShadow: widget.isLassoSelected
+                          ? [
+                              BoxShadow(
+                                color: _lassoAccentColor.withValues(
+                                  alpha: 0.18,
+                                ),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: quill.QuillEditor(
+                      controller: _quillController,
+                      focusNode: _focusNode,
+                      scrollController: _scrollController,
+                      config: quill.QuillEditorConfig(
+                        scrollable: false,
+                        padding: EdgeInsets.zero,
+                        autoFocus: false,
+                        expands: false,
+                        // ignore: experimental_member_use
+                        onKeyPressed: (event, node) =>
+                            _handleKeyPressed(event),
                       ),
                     ),
-                    if (isActive && canTransform) ...[
-                      Positioned(
-                        left: -_cornerDotHitSize / 2,
-                        top: -_cornerDotHitSize / 2,
-                        child: _cornerDot(controller),
-                      ),
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        bottom: _actionsTop + _actionButtonSize,
-                        child: _widthHandle(controller),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        left:
-                            (widget.block.width -
-                                (_actionButtonSize * 2 + _actionGap)) /
-                            2,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [_moveHandle(controller)],
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             );
@@ -505,25 +481,152 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 
     Widget positioned(Offset lassoDelta, Widget child) {
       final displayPosition = widget.block.position + lassoDelta;
-      return Positioned(
-        left: displayPosition.dx - widget.worldOrigin.dx,
-        top: displayPosition.dy - widget.worldOrigin.dy,
-        child: child,
+      final left = displayPosition.dx - widget.worldOrigin.dx;
+      final top = displayPosition.dy - widget.worldOrigin.dy;
+      if (!isActive || !canTransform || widget.doubleTapOnly) {
+        return Positioned(left: left, top: top, child: child);
+      }
+      return Positioned.fill(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(left: left, top: top, child: child),
+            _transformFrame(
+              controller: controller,
+              left: left,
+              top: top,
+            ),
+            Positioned(
+              left: left + (widget.block.width - _actionButtonSize) / 2,
+              top: top + _frameHeight + _moveButtonGap,
+              child: _moveHandle(controller),
+            ),
+          ],
+        ),
       );
     }
 
     final lassoDragDelta = widget.lassoDragDelta;
     if (lassoDragDelta == null) {
-      return positioned(Offset.zero, child);
+      return positioned(Offset.zero, textChild);
     }
 
     return ValueListenableBuilder<Offset>(
       valueListenable: lassoDragDelta,
-      child: child,
+      child: textChild,
       builder: (context, lassoDelta, child) {
         return positioned(lassoDelta, child!);
       },
     );
+  }
+
+  Widget _transformFrame({
+    required EditorController controller,
+    required double left,
+    required double top,
+  }) {
+    return TransformableBox(
+      rect: Rect.fromLTWH(left, top, widget.block.width, _frameHeight),
+      draggable: false,
+      allowContentFlipping: false,
+      allowFlippingWhileResizing: false,
+      handleTapSize: _transformHandleTapSize,
+      enabledHandles: const {
+        HandlePosition.topLeft,
+        HandlePosition.right,
+      },
+      visibleHandles: const {
+        HandlePosition.topLeft,
+        HandlePosition.right,
+      },
+      constraints: const BoxConstraints(
+        minWidth: _minTextWidth,
+        maxWidth: _maxTextWidth,
+        minHeight: 1,
+      ),
+      resizeModeResolver: () => ResizeMode.freeform,
+      cornerHandleBuilder: (context, handle) => _cornerHandle(),
+      sideHandleBuilder: (context, handle) => _sideHandle(),
+      onResizeStart: (handle, event) {
+        _startPackageResize(handle, event.globalPosition);
+      },
+      onResizeUpdate: (result, event) {
+        _updatePackageResize(
+          result.handle,
+          event.globalPosition,
+          controller,
+        );
+      },
+      onResizeEnd: (handle, event) {
+        _endTransform(controller);
+      },
+      onResizeCancel: (handle) {
+        _cancelTransform();
+      },
+      contentBuilder: (context, rect, flip) {
+        return IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border.all(color: _textFrameColor, width: 1.6),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _cornerHandle() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeUpLeftDownRight,
+      child: Container(
+        width: _cornerHandleSize,
+        height: _cornerHandleSize,
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          border: Border.all(color: _textFrameColor, width: 1.2),
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+
+  Widget _sideHandle() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      child: Container(
+        width: _sideHandleWidth,
+        height: _sideHandleHeight,
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          border: Border.all(color: _textFrameColor, width: 1.2),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+
+  void _scheduleFrameMeasure() {
+    if (_frameMeasureScheduled) {
+      return;
+    }
+    _frameMeasureScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _frameMeasureScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      final renderObject = _textContentKey.currentContext?.findRenderObject();
+      if (renderObject is! RenderBox) {
+        return;
+      }
+      final nextHeight = renderObject.size.height;
+      if ((nextHeight - _frameHeight).abs() <= 0.5) {
+        return;
+      }
+      setState(() {
+        _frameHeight = nextHeight;
+      });
+    });
   }
 
   bool _isOnFrame(Offset local, Size size) {
@@ -548,177 +651,38 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     requestSoftKeyboardForFocus(context, _focusNode);
   }
 
-  Widget _cornerDot(EditorController controller) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onPanStart: (details) {
-        _startFontScale(details.globalPosition);
-      },
-      onPanUpdate: (details) {
-        _updateFontScale(details.globalPosition, controller);
-      },
-      onPanEnd: (_) => _endTransform(controller),
-      onPanCancel: () {
-        _fontScaleStart = null;
-        _startFontSize = null;
-        _startDeltaJson = null;
-        _startWidth = null;
-        _transformBefore = null;
-      },
-      child: MouseRegion(
-        cursor: SystemMouseCursors.resizeUpLeftDownRight,
-        child: SizedBox.square(
-          dimension: _cornerDotHitSize,
-          child: Center(
-            child: Container(
-              width: _cornerDotSize,
-              height: _cornerDotSize,
-              decoration: BoxDecoration(
-                color: AppColors.paper,
-                border: Border.all(color: _textFrameColor, width: 1.2),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _moveHandle(EditorController controller) {
-    return _roundActionButton(
-      icon: Icons.open_with,
-      tooltip: 'Move',
-      isActive: _isMoveDragging || _isMoveHovered,
-      onEnter: () => setState(() => _isMoveHovered = true),
-      onExit: () => setState(() => _isMoveHovered = false),
-      onPanStart: (details) {
-        _dragFromFrame = true;
-        setState(() => _isMoveDragging = true);
-        _startMove(details.globalPosition);
-      },
-      onPanUpdate: (details) {
-        _updateMove(details.globalPosition, controller);
-      },
-      onPanEnd: (_) {
-        setState(() => _isMoveDragging = false);
-        _endMove(controller);
-      },
-      onPanCancel: () {
-        setState(() => _isMoveDragging = false);
-        _dragStart = null;
-        _startPosition = null;
-        _dragFromFrame = false;
-      },
-    );
-  }
-
-  Widget _roundActionButton({
-    required IconData icon,
-    required String tooltip,
-    required bool isActive,
-    required VoidCallback onEnter,
-    required VoidCallback onExit,
-    required GestureDragStartCallback onPanStart,
-    required GestureDragUpdateCallback onPanUpdate,
-    required GestureDragEndCallback onPanEnd,
-    required VoidCallback onPanCancel,
-  }) {
-    final handleColor = isActive ? AppColors.inkBlack : Colors.grey.shade600;
-    return Tooltip(
-      message: tooltip,
-      child: MouseRegion(
-        onEnter: (_) => onEnter(),
-        onExit: (_) => onExit(),
-        cursor: SystemMouseCursors.move,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanStart: onPanStart,
-          onPanUpdate: onPanUpdate,
-          onPanEnd: onPanEnd,
-          onPanCancel: onPanCancel,
-          child: Container(
-            width: _actionButtonSize,
-            height: _actionButtonSize,
-            decoration: BoxDecoration(
-              color: AppColors.paper.withValues(alpha: 0.96),
-              border: Border.all(color: Colors.grey.shade300),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 5,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Icon(icon, size: 15, color: handleColor),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _widthHandle(EditorController controller) {
-    final handleColor = (_isResizeDragging || _isResizeHovered)
-        ? AppColors.inkBlack
-        : _textFrameColor;
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onPanStart: (details) {
-        setState(() => _isResizeDragging = true);
-        _startResize(details.globalPosition, details.localPosition.dx);
-      },
-      onPanUpdate: (details) {
-        _updateResize(details.globalPosition, controller);
-      },
-      onPanEnd: (_) {
-        setState(() => _isResizeDragging = false);
-        _endTransform(controller);
-      },
-      onPanCancel: () {
-        setState(() => _isResizeDragging = false);
-        _resizeStart = null;
-        _resizeGrabOffset = null;
-        _startWidth = null;
-        _transformBefore = null;
-      },
-      child: MouseRegion(
-        cursor: SystemMouseCursors.resizeLeftRight,
-        onEnter: (_) => setState(() => _isResizeHovered = true),
-        onExit: (_) => setState(() => _isResizeHovered = false),
-        child: SizedBox(
-          width: _edgeHandleHitWidth,
-          child: Center(
-            child: Container(
-              width: _edgeHandleWidth,
-              height: _edgeHandleHeight,
-              decoration: BoxDecoration(
-                color: AppColors.paper,
-                border: Border.all(color: handleColor, width: 1.2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _startResize(Offset globalPosition, double handleLocalDx) {
-    _resizeStart = globalPosition;
-    _resizeGrabOffset = handleLocalDx - _edgeHandleHitWidth / 2;
-    _startWidth = widget.block.width;
-    _transformBefore = widget.block;
-  }
-
-  void _updateResize(Offset globalPosition, EditorController controller) {
-    if (_resizeStart == null || _startWidth == null) {
+  void _startPackageResize(HandlePosition handle, Offset globalPosition) {
+    if (handle == HandlePosition.topLeft) {
+      _startFontScale(globalPosition);
       return;
     }
-    final local = _globalToTextLocal(globalPosition);
-    final grabOffset = _resizeGrabOffset ?? 0.0;
-    final nextWidth = (local.dx - grabOffset).clamp(
+    if (handle == HandlePosition.right) {
+      _resizeStart = globalPosition;
+      _startWidth = widget.block.width;
+      _transformBefore = widget.block;
+    }
+  }
+
+  void _updatePackageResize(
+    HandlePosition handle,
+    Offset globalPosition,
+    EditorController controller,
+  ) {
+    if (handle == HandlePosition.topLeft) {
+      _updateFontScale(globalPosition, controller);
+      return;
+    }
+    if (handle != HandlePosition.right ||
+        _resizeStart == null ||
+        _startWidth == null) {
+      return;
+    }
+    final delta = _globalDeltaToLocalDelta(
+      context,
+      start: _resizeStart!,
+      end: globalPosition,
+    );
+    final nextWidth = (_startWidth! + delta.dx).clamp(
       _minTextWidth,
       _maxTextWidth,
     );
@@ -823,8 +787,11 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         controller.commitTextUpdateOnPage(widget.pageIndex, before, current);
       }
     }
+    _cancelTransform();
+  }
+
+  void _cancelTransform() {
     _resizeStart = null;
-    _resizeGrabOffset = null;
     _startWidth = null;
     _fontScaleStart = null;
     _startFontSize = null;
@@ -832,12 +799,78 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _transformBefore = null;
   }
 
-  Offset _globalToTextLocal(Offset globalPosition) {
-    final renderObject = context.findRenderObject();
-    if (renderObject is! RenderBox) {
-      return globalPosition;
-    }
-    return renderObject.globalToLocal(globalPosition);
+  Widget _moveHandle(EditorController controller) {
+    return _roundActionButton(
+      icon: Icons.open_with,
+      tooltip: 'Move',
+      isActive: _isMoveDragging || _isMoveHovered,
+      onEnter: () => setState(() => _isMoveHovered = true),
+      onExit: () => setState(() => _isMoveHovered = false),
+      onPanStart: (details) {
+        _dragFromFrame = true;
+        setState(() => _isMoveDragging = true);
+        _startMove(details.globalPosition);
+      },
+      onPanUpdate: (details) {
+        _updateMove(details.globalPosition, controller);
+      },
+      onPanEnd: (_) {
+        setState(() => _isMoveDragging = false);
+        _endMove(controller);
+      },
+      onPanCancel: () {
+        setState(() => _isMoveDragging = false);
+        _dragStart = null;
+        _startPosition = null;
+        _dragFromFrame = false;
+      },
+    );
+  }
+
+  Widget _roundActionButton({
+    required IconData icon,
+    required String tooltip,
+    required bool isActive,
+    required VoidCallback onEnter,
+    required VoidCallback onExit,
+    required GestureDragStartCallback onPanStart,
+    required GestureDragUpdateCallback onPanUpdate,
+    required GestureDragEndCallback onPanEnd,
+    required VoidCallback onPanCancel,
+  }) {
+    final handleColor = isActive ? AppColors.inkBlack : Colors.grey.shade600;
+    return Tooltip(
+      message: tooltip,
+      child: MouseRegion(
+        onEnter: (_) => onEnter(),
+        onExit: (_) => onExit(),
+        cursor: SystemMouseCursors.move,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: onPanStart,
+          onPanUpdate: onPanUpdate,
+          onPanEnd: onPanEnd,
+          onPanCancel: onPanCancel,
+          child: Container(
+            width: _actionButtonSize,
+            height: _actionButtonSize,
+            decoration: BoxDecoration(
+              color: AppColors.paper.withValues(alpha: 0.96),
+              border: Border.all(color: Colors.grey.shade300),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 5,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 15, color: handleColor),
+          ),
+        ),
+      ),
+    );
   }
 
   void _startMove(Offset globalPosition) {
@@ -1038,7 +1071,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 
   String _colorToHex(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
-    return '#${value.substring(2)}';
+    return '#' + value.substring(2);
   }
 
   int _countTrailingNewlines(String text) {
@@ -1052,7 +1085,6 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     return count;
   }
 }
-
 class _ImageBlockWidget extends StatefulWidget {
   const _ImageBlockWidget({
     required this.block,

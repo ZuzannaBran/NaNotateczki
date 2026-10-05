@@ -15,7 +15,8 @@ mapie. Każdy nowy plik w `lib/` musi dostać tu własny wpis.
 - Flutter / Dart `^3.11.1`, Material 3.
 - Stan: Provider + ChangeNotifier; bez Bloc/Riverpod.
 - Dane: Drift + SQLite; web używa SQLite WASM/IndexedDB.
-- Tekst: `flutter_quill`; obrazy/PDF: `image_picker`, `file_picker`, `pdfx`.
+- Tekst: `flutter_quill`; ramki transformacji: `flutter_box_transform`;
+  obrazy/PDF: `image_picker`, `file_picker`, `pdfx`.
 - OCR: `google_mlkit_text_recognition`, tylko Android/iOS.
 - Główny przepływ:
   `main` → `AppScope` → `LibraryController` → `EditorController` →
@@ -441,10 +442,12 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2529 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2561 linie)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
-i dokumentu. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
+i dokumentu. Aktywny blok tekstu używa `flutter_box_transform` do ramki
+i uchwytów resize, zachowując dotychczasowe reguły aktywacji, edycji, ruchu
+i undo. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
 tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
 tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
 mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
@@ -452,11 +455,11 @@ Operuje wyłącznie w logicznych współrzędnych strony/dokumentu; responsywną
 skalę nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki
 overlayu.
 
-- 27: `PageOverlay`; 182: `DocumentPageOverlay`.
-- 241: `_TextBlockWidget`; 264: `_TextBlockWidgetState`.
-- 1056: `_ImageBlockWidget`; 1081: `_ImageBlockWidgetState`.
-- 2145: `_editOcr`; 2219: `_OcrTextDialog`;
-  2318: `_LassoSelectionWidget`; 2472: `_LassoActionButton`.
+- 28: `PageOverlay`; 183: `DocumentPageOverlay`.
+- 242: `_TextBlockWidget`; 265: `_TextBlockWidgetState`.
+- 1088: `_ImageBlockWidget`; 1113: `_ImageBlockWidgetState`.
+- 2176: `_editOcr`; 2250: `_OcrTextDialog`;
+  2349: `_LassoSelectionWidget`; 2503: `_LassoActionButton`.
 
 ## 9. Board
 
@@ -503,8 +506,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (128): tryb tekstu
-  ignoruje obrazy pod kursorem, a nowo dodany tekst przechodzi do edit
+- `test/page_overlay_text_gestures_test.dart` (134): tryb tekstu
+  ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, a aktywna
+  ramka transformacji pojawia się i znika razem z zaznaczeniem
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 
