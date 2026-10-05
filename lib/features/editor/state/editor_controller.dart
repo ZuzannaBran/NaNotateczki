@@ -547,6 +547,9 @@ class EditorController extends ChangeNotifier {
     if (tool != DrawingTool.text) {
       clearActiveTextBlock();
     }
+    if (newTool.isInk) {
+      activeImageBlockId = null;
+    }
     lassoSelection = null;
     notifyListeners();
   }
@@ -1559,7 +1562,7 @@ class EditorController extends ChangeNotifier {
         _ensureInsertPageSelected(position);
         final pasted = block.copyWith(id: _uuid.v4(), position: position);
         _applyAction(AddImageAction(pasted));
-        _activateInsertedImage(pasted.id);
+        clearActiveImageBlock();
         _save();
         return null;
       case _LassoElementClipboardItem(
@@ -1743,12 +1746,22 @@ class EditorController extends ChangeNotifier {
   ) async {
     final pngBytes = await _readClipboardImageBytes(reader, Formats.png);
     if (pngBytes != null && pngBytes.isNotEmpty) {
-      await _addImageBlockFromBytes(pngBytes, position, 'png');
+      await _addImageBlockFromBytes(
+        pngBytes,
+        position,
+        'png',
+        activate: false,
+      );
       return true;
     }
     final jpegBytes = await _readClipboardImageBytes(reader, Formats.jpeg);
     if (jpegBytes != null && jpegBytes.isNotEmpty) {
-      await _addImageBlockFromBytes(jpegBytes, position, 'jpg');
+      await _addImageBlockFromBytes(
+        jpegBytes,
+        position,
+        'jpg',
+        activate: false,
+      );
       return true;
     }
     return false;
@@ -1817,8 +1830,9 @@ class EditorController extends ChangeNotifier {
   Future<String?> _addImageBlockFromBytes(
     Uint8List bytes,
     Offset position,
-    String extension,
-  ) async {
+    String extension, {
+    bool activate = true,
+  }) async {
     if (kIsWeb) {
       final size = await _imageSizeFromBytes(bytes);
       final initialSize = _initialImageBlockSize(size);
@@ -1835,7 +1849,11 @@ class EditorController extends ChangeNotifier {
         imageMime: 'image/$normalizedExtension',
       );
       _applyAction(AddImageAction(block));
-      _activateInsertedImage(block.id);
+      if (activate) {
+        _activateInsertedImage(block.id);
+      } else {
+        clearActiveImageBlock();
+      }
       _save();
       return null;
     }
@@ -1854,7 +1872,11 @@ class EditorController extends ChangeNotifier {
       imageMime: 'image/$extension',
     );
     _applyAction(AddImageAction(block));
-    _activateInsertedImage(block.id);
+    if (activate) {
+      _activateInsertedImage(block.id);
+    } else {
+      clearActiveImageBlock();
+    }
     _save();
     return null;
   }

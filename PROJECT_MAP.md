@@ -342,23 +342,25 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2681 linii)
+### `lib/features/editor/state/editor_controller.dart` (2703 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
 `flushPendingSaves` commit'uje aktywną edycję tekstu, anuluje debounce,
 czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
-zgodą na zamknięcie aplikacji.
+zgodą na zamknięcie aplikacji. Obrazy wklejane ze schowka są domyślnie
+nieaktywne, więc pozostają pod warstwą tuszu; wybór narzędzia ink także
+dezaktywuje aktywny obraz.
 
 - 36: `LassoSelection`; 75: `EditorController`;
   198: `flushPendingSaves`.
 - 266–324: layout i transformacje viewportu.
 - 341–477: operacje `*OnPage` używane przez canvasy/overlaye.
-- 486–870: narzędzia, aktywne elementy, lasso i preferencje.
-- 1221: `undo`; 1234: `redo`; 1306: `toggleBookmark`;
+- 486–873: narzędzia, aktywne elementy, lasso i preferencje; 538: `setTool`.
+- 1224: `undo`; 1237: `redo`; 1309: `toggleBookmark`;
   1312: operacje tekstowe.
-- 2471: `_applyAction`; 2480: `_applyInkAction`;
-  2582: `_scheduleSave`; 2603: `_saveDirtyPages`; 2625: `_save`.
+- 2493: `_applyAction`; 2502: `_applyInkAction`;
+  2604: `_scheduleSave`; 2625: `_saveDirtyPages`; 2647: `_save`.
 
 ## 8. UI edytora
 
@@ -484,6 +486,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
+- `test/editor_controller_layering_test.dart` (66): aktywne obrazy są
+  dezaktywowane po wyborze narzędzia ink, więc pozostają pod tuszem.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
