@@ -349,8 +349,8 @@ preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
 `flushPendingSaves` commit'uje aktywną edycję tekstu, anuluje debounce,
 czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
 zgodą na zamknięcie aplikacji. Obrazy wklejane ze schowka są domyślnie
-nieaktywne, więc pozostają pod warstwą tuszu; wybór narzędzia ink także
-dezaktywuje aktywny obraz.
+nieaktywne, więc pozostają pod warstwą tuszu; wybór narzędzia ink lub tekstu
+także dezaktywuje aktywny obraz.
 
 - 36: `LassoSelection`; 75: `EditorController`;
   198: `flushPendingSaves`.
@@ -440,18 +440,21 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2492 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2500 linie)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
-i dokumentu. Operuje wyłącznie w logicznych współrzędnych strony/dokumentu;
-responsywną skalę nadaje wspólny rodzic w `EditorScreen`, nie poszczególne
-bloki overlayu.
+i dokumentu. Obrazy są renderowane przed blokami tekstowymi, więc tekst
+pozostaje nad obrazami/PDF. W trybie tekstu obrazy ignorują hit-test i nie
+mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
+Operuje wyłącznie w logicznych współrzędnych strony/dokumentu; responsywną
+skalę nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki
+overlayu.
 
 - 27: `PageOverlay`; 165: `DocumentPageOverlay`.
 - 224: `_TextBlockWidget`; 247: `_TextBlockWidgetState`.
 - 1039: `_ImageBlockWidget`; 1060: `_ImageBlockWidgetState`.
-- 2108: `_editOcr`; 2182: `_OcrTextDialog`;
-  2281: `_LassoSelectionWidget`; 2435: `_LassoActionButton`.
+- 2116: `_editOcr`; 2190: `_OcrTextDialog`;
+  2289: `_LassoSelectionWidget`; 2443: `_LassoActionButton`.
 
 ## 9. Board
 
@@ -486,8 +489,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
-- `test/editor_controller_layering_test.dart` (66): aktywne obrazy są
-  dezaktywowane po wyborze narzędzia ink, więc pozostają pod tuszem.
+- `test/editor_controller_layering_test.dart` (73): aktywne obrazy są
+  dezaktywowane po wyborze narzędzia ink lub tekstu.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
@@ -497,7 +500,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (113)
+- `test/page_overlay_text_gestures_test.dart` (128): tryb tekstu
+  ignoruje obrazy pod kursorem i nie zaznacza ich
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 

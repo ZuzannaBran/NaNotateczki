@@ -547,7 +547,7 @@ class EditorController extends ChangeNotifier {
     if (tool != DrawingTool.text) {
       clearActiveTextBlock();
     }
-    if (newTool.isInk) {
+    if (newTool.isInk || newTool == DrawingTool.text) {
       activeImageBlockId = null;
     }
     lassoSelection = null;

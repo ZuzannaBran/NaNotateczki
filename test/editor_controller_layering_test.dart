@@ -14,7 +14,7 @@ import 'package:program/features/notebook/domain/notebook_kind.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('ink tool sends an active image behind the drawing layer', () {
+  test('ink and text tools send an active image behind content', () {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -39,6 +39,13 @@ void main() {
     controller.setTool(DrawingTool.pen);
 
     expect(controller.tool, DrawingTool.pen);
+    expect(controller.activeImageBlockId, isNull);
+
+    controller.setTool(DrawingTool.edit);
+    controller.setActiveImageBlock(image.id);
+    controller.setTool(DrawingTool.text);
+
+    expect(controller.tool, DrawingTool.text);
     expect(controller.activeImageBlockId, isNull);
   });
 }

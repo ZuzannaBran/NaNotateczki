@@ -105,6 +105,21 @@ class PageOverlay extends StatelessWidget {
                 },
               ),
             ),
+          for (final block in effectivePage.imageBlocks)
+            if ((block.id == activeImageId && renderActive) ||
+                (block.id != activeImageId && renderInactive))
+              _ImageBlockWidget(
+                block: block,
+                pageIndex: effectivePageIndex,
+                worldOrigin: worldOrigin,
+                interactionEnabled: interactionEnabled,
+                lassoDragDelta:
+                    lassoSelection?.imageBlockIds.contains(block.id) == true
+                    ? controller.lassoDragDelta
+                    : null,
+                isLassoSelected:
+                    lassoSelection?.imageBlockIds.contains(block.id) == true,
+              ),
           for (final block in effectivePage.textBlocks)
             if ((block.id == activeTextId && renderActive) ||
                 (block.id != activeTextId && renderInactive))
@@ -133,21 +148,6 @@ class PageOverlay extends StatelessWidget {
                   isLassoSelected: false,
                   doubleTapOnly: true,
                 ),
-          for (final block in effectivePage.imageBlocks)
-            if ((block.id == activeImageId && renderActive) ||
-                (block.id != activeImageId && renderInactive))
-              _ImageBlockWidget(
-                block: block,
-                pageIndex: effectivePageIndex,
-                worldOrigin: worldOrigin,
-                interactionEnabled: interactionEnabled,
-                lassoDragDelta:
-                    lassoSelection?.imageBlockIds.contains(block.id) == true
-                    ? controller.lassoDragDelta
-                    : null,
-                isLassoSelected:
-                    lassoSelection?.imageBlockIds.contains(block.id) == true,
-              ),
           if (renderActive && lassoSelection != null)
             _LassoSelectionWidget(
               selection: lassoSelection,
@@ -1102,7 +1102,10 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
-    final canTransform = !controller.tool.isInk && widget.interactionEnabled;
+    final canTransform =
+        !controller.tool.isInk &&
+        controller.tool != DrawingTool.text &&
+        widget.interactionEnabled;
     final isSelected = controller.activeImageBlockId == widget.block.id;
     final cropLeft = widget.block.cropLeft;
     final cropTop = widget.block.cropTop;
@@ -1307,6 +1310,11 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
       ),
     );
 
+    final pointerChild = IgnorePointer(
+      ignoring: controller.tool == DrawingTool.text,
+      child: child,
+    );
+
     Widget positioned(Offset lassoDelta, Widget child) {
       final displayPosition = (widget.block.position + lassoDelta).translate(
         widget.block.width * cropLeft,
@@ -1321,12 +1329,12 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
 
     final lassoDragDelta = widget.lassoDragDelta;
     if (lassoDragDelta == null) {
-      return positioned(Offset.zero, child);
+      return positioned(Offset.zero, pointerChild);
     }
 
     return ValueListenableBuilder<Offset>(
       valueListenable: lassoDragDelta,
-      child: child,
+      child: pointerChild,
       builder: (context, lassoDelta, child) {
         return positioned(lassoDelta, child!);
       },

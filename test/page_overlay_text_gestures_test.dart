@@ -10,12 +10,13 @@ import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
+import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 void main() {
-  testWidgets('text tool inserts once, exits, and reopens on double tap', (
+  testWidgets('text tool ignores images, inserts once, and reopens', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(700, 900));
@@ -51,7 +52,12 @@ void main() {
       ),
     );
 
+    controller.setTool(DrawingTool.edit);
+    controller.setActiveImageBlock('background-image');
+    expect(controller.activeImageBlockId, 'background-image');
+
     controller.setTool(DrawingTool.text);
+    expect(controller.activeImageBlockId, isNull);
     await tester.pump();
     final overlayTopLeft = tester.getTopLeft(find.byType(PageOverlay));
     const insertPosition = Offset(120, 160);
@@ -60,6 +66,7 @@ void main() {
 
     expect(controller.pages.single.textBlocks, hasLength(1));
     expect(controller.activeTextBlockId, isNotNull);
+    expect(controller.activeImageBlockId, isNull);
     expect(controller.tool, DrawingTool.text);
 
     await tester.tapAt(overlayTopLeft + const Offset(500, 700));
@@ -103,7 +110,16 @@ Notebook _notebook() {
         id: 'page-1',
         title: 'Canvas',
         textBlocks: const [],
-        imageBlocks: const [],
+        imageBlocks: [
+          ImageBlock(
+            id: 'background-image',
+            path: '',
+            ocrText: '',
+            position: const Offset(80, 120),
+            width: 220,
+            height: 140,
+          ),
+        ],
         inkStrokes: const [],
         isBookmarked: false,
       ),
