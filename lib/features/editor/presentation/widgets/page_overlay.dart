@@ -1339,8 +1339,7 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     );
 
     final pointerChild = IgnorePointer(
-      ignoring:
-          !widget.selectionEnabled || controller.tool == DrawingTool.text,
+      ignoring: !widget.selectionEnabled || controller.tool == DrawingTool.text,
       child: child,
     );
 
