@@ -491,7 +491,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
-- `test/editor_controller_layering_test.dart` (79): aktywne obrazy są
+- `test/editor_controller_layering_test.dart` (77): aktywne obrazy są
   dezaktywowane po wyborze narzędzia ink lub tekstu, a nowy tekst startuje
   zaznaczony w trybie edit.
 - `test/backup_eraser_flattening_test.dart` (109)
