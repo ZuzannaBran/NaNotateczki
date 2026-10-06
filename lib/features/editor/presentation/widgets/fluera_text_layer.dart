@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:fluera_canvas/fluera_canvas.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../../notebook/domain/drawing_tool.dart';
@@ -377,7 +376,7 @@ class _FlueraTextLayerState extends State<FlueraTextLayer> {
             text: text,
             fontSize: fontSize,
             color: element.color,
-            fontFamily: element.fontFamily,
+            fontFamily: element.fontFamily ?? 'Roboto',
             fontWeight: element.fontWeight,
             fontStyle: element.fontStyle,
             decoration: element.textDecoration,
@@ -546,7 +545,7 @@ class _FlueraTextLayerState extends State<FlueraTextLayer> {
 
   String _colorToHex(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
-    return '#' + value.substring(2);
+    return '#${value.substring(2)}';
   }
 
   double _normalizeAngle(double angle) {

@@ -429,12 +429,12 @@ błędów, integralności i wydajności.
   formatowanie aktywnego bloku Quill; pasek używa jasnej neutralnej powierzchni #FBFBFB.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
-- `lib/features/editor/presentation/widgets/fluera_text_layer.dart` (565):
+- `lib/features/editor/presentation/widgets/fluera_text_layer.dart` (564):
   eksperymentalny adapter Fluera dla aktywnego tekstu. Przejmuje zaznaczanie,
   drag/resize/rotate i edycję inline wyłącznie dla tekstu; wynik synchronizuje
   do `TextBlock` przez `EditorController`. Kamera Fluera pozostaje w skali
   1:1, a ink, obrazy/PDF i viewport nadal należą do istniejącego edytora.
-  19: `FlueraTextLayer`; 38: `_FlueraTextLayerState`.
+  18: `FlueraTextLayer`; 38: `_FlueraTextLayerState`.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
 
