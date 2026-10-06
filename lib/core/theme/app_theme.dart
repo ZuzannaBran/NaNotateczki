@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 class AppTheme {
-  static const defaultFontFamily = 'Georgia';
-
   static ThemeData light({
     AppAccentColor accentColor = AppAccentColor.softBubblegum,
   }) {
@@ -34,7 +32,7 @@ class AppTheme {
         );
 
     return ThemeData(
-      fontFamily: defaultFontFamily,
+      fontFamily: 'Georgia',
       fontFamilyFallback: const ['Times New Roman', 'Noto Serif', 'serif'],
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,

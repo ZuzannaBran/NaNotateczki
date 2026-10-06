@@ -1,9 +1,5 @@
-import 'dart:convert';
-
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:program/core/theme/app_theme.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -50,19 +46,11 @@ void main() {
     expect(controller.tool, DrawingTool.text);
     expect(controller.activeImageBlockId, isNull);
 
-    expect(controller.lastTextFontFamily, AppTheme.defaultFontFamily);
-
     controller.addTextBlock(const Offset(30, 40));
 
     expect(controller.tool, DrawingTool.edit);
     expect(controller.activeTextBlockId, isNotNull);
     expect(controller.activeImageBlockId, isNull);
-
-    final textBlock = controller.pages.single.textBlocks.single;
-    final delta = jsonDecode(textBlock.deltaJson!) as List<dynamic>;
-    final firstOperation = delta.first as Map<String, dynamic>;
-    final attributes = firstOperation['attributes'] as Map<String, dynamic>;
-    expect(attributes['font'], AppTheme.defaultFontFamily);
   });
 }
 

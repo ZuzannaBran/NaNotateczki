@@ -29,7 +29,6 @@ import '../../notebook/domain/text_block.dart';
 import '../../../core/input/ink_activity_tracker.dart';
 import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
-import '../../../core/theme/app_theme.dart';
 import 'editor_actions.dart';
 import 'input_mode.dart';
 import 'page_background.dart';
@@ -135,7 +134,7 @@ class EditorController extends ChangeNotifier {
   bool _fullSavePending = false;
   bool _isDisposed = false;
 
-  String? lastTextFontFamily = AppTheme.defaultFontFamily;
+  String? lastTextFontFamily;
   double lastTextFontSize = 18.0;
   Color lastTextColor = const Color(0xFF1E1E1E);
 

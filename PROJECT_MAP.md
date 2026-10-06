@@ -77,7 +77,7 @@ rysika i nie porzuca zmian po błędzie.
 - `lib/core/theme/app_colors.dart` (133): kolory akcentów oraz wspólna neutralna paleta beżów interfejsu: `#E6E6E6` dla tła, `#FBFBFB` dla toolbarów/panelu folderów i `#DBDBDB` dla separatorów. Bazowe kolory Cherry, Bubblegum, Lavender, Peach i Baby blue pozostają bez zmian. 3: `AppAccentColor`; 61: `AppAccentPalette`; 117: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (62): jasny Material 3 z ciemniejszym neutralnym tłem `#E6E6E6`, jasnym chromem `#FBFBFB` i separatorami `#DBDBDB`; `defaultFontFamily` jest wspólnym źródłem domyślnej czcionki tekstu (`Georgia`), a kolory przewodnie nadal sterują akcentami i zaznaczeniami. 5: `AppTheme`; 6: `defaultFontFamily`.
+- `lib/core/theme/app_theme.dart` (39): jasny Material 3 z ciemniejszym neutralnym tłem `#E6E6E6`, jasnym chromem `#FBFBFB` i separatorami `#DBDBDB`; kolory przewodnie nadal sterują akcentami i zaznaczeniami. 5: `AppTheme`.
 
 ### Wejście i preferencje
 
@@ -343,28 +343,26 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2687 linii)
+### `lib/features/editor/state/editor_controller.dart` (2685 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
-preferencje, viewport i zapis. Domyślna czcionka nowego tekstu pochodzi z
-`AppTheme.defaultFontFamily`; zapisany wybór użytkownika nadal ją nadpisuje.
-Rejestruje się w `AppSaveCoordinator`; `flushPendingSaves` commit'uje aktywną
-edycję tekstu, anuluje debounce, czeka na istniejące zapisy repozytorium i
-wymusza zapis dirty stron przed zgodą na zamknięcie aplikacji. Nowo wstawiony
-lub wklejony tekst i obraz przechodzą od razu do trybu `edit` i pozostają
-aktywne do transformacji; wklejone zaznaczenie zachowuje lasso w trybie
-`edit`. Obrazy pozostają pod tuszem i tekstem; wybór narzędzia ink lub tekstu
-dezaktywuje aktywny obraz.
+preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
+`flushPendingSaves` commit'uje aktywną edycję tekstu, anuluje debounce,
+czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
+zgodą na zamknięcie aplikacji. Nowo wstawiony lub wklejony tekst i obraz
+przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
+wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
+tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
-- 37: `LassoSelection`; 76: `EditorController`;
-  199: `flushPendingSaves`.
-- 258: layout i transformacje viewportu.
-- 340: operacje `*OnPage` używane przez canvasy/overlaye.
-- 539: narzędzia, aktywne elementy, lasso i preferencje; 539: `setTool`.
-- 1225: `undo`; 1238: `redo`; 1310: `toggleBookmark`;
-  1316: operacje tekstowe.
-- 2476: `_applyAction`; 2485: `_applyInkAction`;
-  2587: `_scheduleSave`; 2608: `_saveDirtyPages`; 2630: `_save`.
+- 36: `LassoSelection`; 75: `EditorController`;
+  198: `flushPendingSaves`.
+- 266–324: layout i transformacje viewportu.
+- 341–477: operacje `*OnPage` używane przez canvasy/overlaye.
+- 486–873: narzędzia, aktywne elementy, lasso i preferencje; 538: `setTool`.
+- 1224: `undo`; 1237: `redo`; 1309: `toggleBookmark`;
+  1312: operacje tekstowe.
+- 2475: `_applyAction`; 2484: `_applyInkAction`;
+  2586: `_scheduleSave`; 2607: `_saveDirtyPages`; 2629: `_save`.
 
 ## 8. UI edytora
 
@@ -426,11 +424,9 @@ błędów, integralności i wydajności.
   przedstawia zaznaczanie obszaru kursorem.
   10: `EditorToolbar`; 181: dialog tła; 316: selektor gumki;
   382: selektor kształtu; 782: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (607):
-  formatowanie aktywnego bloku Quill; lista fontów zawiera domyślny font
-  motywu; pasek używa jasnej neutralnej powierzchni #FBFBFB.
-  8: `TextEditToolbar`; 40: `build`;
-  518: formatowanie i listy.
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (545):
+  formatowanie aktywnego bloku Quill; pasek używa jasnej neutralnej powierzchni #FBFBFB.
+  7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
 
@@ -446,23 +442,24 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2475 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2561 linie)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu używa `flutter_box_transform` do ramki
-i gotowych uchwytów `DefaultCornerHandle` / `DefaultSideHandle` w palecie aplikacji. Ramka jest osadzona lokalnie względem rzeczywistego bloku tekstu, dzięki czemu nie zależy od rozmiaru viewportu ani strony; aktywny tekst nie dostaje dodatkowego tła. Przesuwanie działa przez obramowanie bez osobnego dolnego przycisku, z zachowaniem dotychczasowych reguł aktywacji, edycji i undo.
-Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed tuszem i
-tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy tylko
-ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie mogą
-przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu. Operuje
-wyłącznie w logicznych współrzędnych strony/dokumentu; responsywną skalę
-nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki overlayu.
+i uchwytów resize, zachowując dotychczasowe reguły aktywacji, edycji, ruchu
+i undo. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
+tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
+tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
+mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
+Operuje wyłącznie w logicznych współrzędnych strony/dokumentu; responsywną
+skalę nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki
+overlayu.
 
 - 28: `PageOverlay`; 183: `DocumentPageOverlay`.
 - 242: `_TextBlockWidget`; 265: `_TextBlockWidgetState`.
-- 1002: `_ImageBlockWidget`; 1027: `_ImageBlockWidgetState`.
-- 2090: `_editOcr`; 2164: `_OcrTextDialog`;
-  2263: `_LassoSelectionWidget`; 2417: `_LassoActionButton`.
+- 1088: `_ImageBlockWidget`; 1113: `_ImageBlockWidgetState`.
+- 2176: `_editOcr`; 2250: `_OcrTextDialog`;
+  2349: `_LassoSelectionWidget`; 2503: `_LassoActionButton`.
 
 ## 9. Board
 
@@ -497,9 +494,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
-- `test/editor_controller_layering_test.dart` (90): aktywne obrazy są
-  dezaktywowane po wyborze narzędzia ink lub tekstu, nowy tekst startuje
-  zaznaczony w trybie edit i dziedziczy domyślną czcionkę motywu.
+- `test/editor_controller_layering_test.dart` (77): aktywne obrazy są
+  dezaktywowane po wyborze narzędzia ink lub tekstu, a nowy tekst startuje
+  zaznaczony w trybie edit.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (24)
 - `test/library_controller_test.dart` (33)
@@ -509,10 +506,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (149): tryb tekstu
-  ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, aktywna
-  ramka transformacji pojawia się i znika razem z zaznaczeniem, pozostaje
-  lokalna względem bloku tekstu i nie ma osobnego dolnego uchwytu przesuwania
+- `test/page_overlay_text_gestures_test.dart` (134): tryb tekstu
+  ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, a aktywna
+  ramka transformacji pojawia się i znika razem z zaznaczeniem
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 

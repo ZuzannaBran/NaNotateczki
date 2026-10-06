@@ -281,12 +281,15 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   static const double _minTextFontSize = 8.0;
   static const double _maxTextFontSize = 96.0;
   static const double _transformHandleTapSize = 36.0;
-  static const double _transformFramePadding = _transformHandleTapSize;
-  static const double _cornerHandleSize = 10.0;
+  static const double _cornerHandleSize = 12.0;
   static const double _sideHandleWidth = 6.0;
-  static const double _sideHandleHeight = 22.0;
-  static const Color _textFrameColor = AppColors.divider;
+  static const double _sideHandleHeight = 28.0;
+  static const double _actionButtonSize = 28.0;
+  static const double _moveButtonGap = 8.0;
+  static const Color _textFrameColor = Color(0xFF8E8E8E);
 
+  bool _isMoveHovered = false;
+  bool _isMoveDragging = false;
   late quill.QuillController _quillController;
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
@@ -428,7 +431,11 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.paper.withValues(
-                        alpha: widget.isLassoSelected ? 0.18 : 0.0,
+                        alpha: isActive
+                            ? 0.92
+                            : widget.isLassoSelected
+                            ? 0.18
+                            : 0.0,
                       ),
                       borderRadius: BorderRadius.zero,
                       border: Border.all(
@@ -479,27 +486,22 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       if (!isActive || !canTransform || widget.doubleTapOnly) {
         return Positioned(left: left, top: top, child: child);
       }
-
-      final frameWidth = widget.block.width + (_transformFramePadding * 2);
-      final frameHeight = _frameHeight + (_transformFramePadding * 2);
-      return Positioned(
-        left: left - _transformFramePadding,
-        top: top - _transformFramePadding,
-        child: SizedBox(
-          key: ValueKey('text-transform-frame-${widget.block.id}'),
-          width: frameWidth,
-          height: frameHeight,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: _transformFramePadding,
-                top: _transformFramePadding,
-                child: child,
-              ),
-              _transformFrame(controller: controller),
-            ],
-          ),
+      return Positioned.fill(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(left: left, top: top, child: child),
+            _transformFrame(
+              controller: controller,
+              left: left,
+              top: top,
+            ),
+            Positioned(
+              left: left + (widget.block.width - _actionButtonSize) / 2,
+              top: top + _frameHeight + _moveButtonGap,
+              child: _moveHandle(controller),
+            ),
+          ],
         ),
       );
     }
@@ -518,19 +520,17 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     );
   }
 
-  Widget _transformFrame({required EditorController controller}) {
+  Widget _transformFrame({
+    required EditorController controller,
+    required double left,
+    required double top,
+  }) {
     return TransformableBox(
-      rect: Rect.fromLTWH(
-        _transformFramePadding,
-        _transformFramePadding,
-        widget.block.width,
-        _frameHeight,
-      ),
+      rect: Rect.fromLTWH(left, top, widget.block.width, _frameHeight),
       draggable: false,
       allowContentFlipping: false,
       allowFlippingWhileResizing: false,
       handleTapSize: _transformHandleTapSize,
-      handleAlignment: HandleAlignment.center,
       enabledHandles: const {
         HandlePosition.topLeft,
         HandlePosition.right,
@@ -545,26 +545,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         minHeight: 1,
       ),
       resizeModeResolver: () => ResizeMode.freeform,
-      cornerHandleBuilder: (context, handle) => DefaultCornerHandle(
-        handle: handle,
-        size: _cornerHandleSize,
-        decoration: BoxDecoration(
-          color: AppColors.paper,
-          border: Border.all(color: _textFrameColor),
-          shape: BoxShape.circle,
-        ),
-      ),
-      sideHandleBuilder: (context, handle) => DefaultSideHandle(
-        handle: handle,
-        length: _sideHandleHeight,
-        thickness: _sideHandleWidth,
-        decoration: ShapeDecoration(
-          color: AppColors.paper,
-          shape: StadiumBorder(
-            side: BorderSide(color: _textFrameColor),
-          ),
-        ),
-      ),
+      cornerHandleBuilder: (context, handle) => _cornerHandle(),
+      sideHandleBuilder: (context, handle) => _sideHandle(),
       onResizeStart: (handle, event) {
         _startPackageResize(handle, event.globalPosition);
       },
@@ -585,11 +567,41 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         return IgnorePointer(
           child: DecoratedBox(
             decoration: BoxDecoration(
-              border: Border.all(color: _textFrameColor),
+              border: Border.all(color: _textFrameColor, width: 1.6),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _cornerHandle() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeUpLeftDownRight,
+      child: Container(
+        width: _cornerHandleSize,
+        height: _cornerHandleSize,
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          border: Border.all(color: _textFrameColor, width: 1.2),
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+
+  Widget _sideHandle() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      child: Container(
+        width: _sideHandleWidth,
+        height: _sideHandleHeight,
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          border: Border.all(color: _textFrameColor, width: 1.2),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
     );
   }
 
@@ -785,6 +797,80 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _startFontSize = null;
     _startDeltaJson = null;
     _transformBefore = null;
+  }
+
+  Widget _moveHandle(EditorController controller) {
+    return _roundActionButton(
+      icon: Icons.open_with,
+      tooltip: 'Move',
+      isActive: _isMoveDragging || _isMoveHovered,
+      onEnter: () => setState(() => _isMoveHovered = true),
+      onExit: () => setState(() => _isMoveHovered = false),
+      onPanStart: (details) {
+        _dragFromFrame = true;
+        setState(() => _isMoveDragging = true);
+        _startMove(details.globalPosition);
+      },
+      onPanUpdate: (details) {
+        _updateMove(details.globalPosition, controller);
+      },
+      onPanEnd: (_) {
+        setState(() => _isMoveDragging = false);
+        _endMove(controller);
+      },
+      onPanCancel: () {
+        setState(() => _isMoveDragging = false);
+        _dragStart = null;
+        _startPosition = null;
+        _dragFromFrame = false;
+      },
+    );
+  }
+
+  Widget _roundActionButton({
+    required IconData icon,
+    required String tooltip,
+    required bool isActive,
+    required VoidCallback onEnter,
+    required VoidCallback onExit,
+    required GestureDragStartCallback onPanStart,
+    required GestureDragUpdateCallback onPanUpdate,
+    required GestureDragEndCallback onPanEnd,
+    required VoidCallback onPanCancel,
+  }) {
+    final handleColor = isActive ? AppColors.inkBlack : Colors.grey.shade600;
+    return Tooltip(
+      message: tooltip,
+      child: MouseRegion(
+        onEnter: (_) => onEnter(),
+        onExit: (_) => onExit(),
+        cursor: SystemMouseCursors.move,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: onPanStart,
+          onPanUpdate: onPanUpdate,
+          onPanEnd: onPanEnd,
+          onPanCancel: onPanCancel,
+          child: Container(
+            width: _actionButtonSize,
+            height: _actionButtonSize,
+            decoration: BoxDecoration(
+              color: AppColors.paper.withValues(alpha: 0.96),
+              border: Border.all(color: Colors.grey.shade300),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 5,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 15, color: handleColor),
+          ),
+        ),
+      ),
+    );
   }
 
   void _startMove(Offset globalPosition) {

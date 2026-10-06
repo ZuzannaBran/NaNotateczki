@@ -69,23 +69,8 @@ void main() {
     expect(controller.activeTextBlockId, isNotNull);
     expect(controller.activeImageBlockId, isNull);
     expect(controller.tool, DrawingTool.edit);
-    final textBlock = controller.pages.single.textBlocks.single;
-    expect(textBlock.position, insertPosition);
+    expect(controller.pages.single.textBlocks.single.position, insertPosition);
     expect(find.byType(TransformableBox), findsOneWidget);
-    expect(find.byIcon(Icons.open_with), findsNothing);
-
-    final transformBox = tester.widget<TransformableBox>(
-      find.byType(TransformableBox),
-    );
-    expect(transformBox.rect.left, 36);
-    expect(transformBox.rect.top, 36);
-    expect(transformBox.rect.width, textBlock.width);
-    final frameFinder = find.byKey(
-      ValueKey('text-transform-frame-${textBlock.id}'),
-    );
-    expect(frameFinder, findsOneWidget);
-    expect(tester.getSize(frameFinder).width, textBlock.width + 72);
-    expect(tester.getSize(frameFinder).width, lessThan(400));
 
     await tester.tapAt(overlayTopLeft + const Offset(500, 700));
     await tester.pump();
