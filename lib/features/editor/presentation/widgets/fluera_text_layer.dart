@@ -546,7 +546,7 @@ class _FlueraTextLayerState extends State<FlueraTextLayer> {
 
   String _colorToHex(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
-    return '#\${value.substring(2)}';
+    return '#' + value.substring(2);
   }
 
   double _normalizeAngle(double angle) {
