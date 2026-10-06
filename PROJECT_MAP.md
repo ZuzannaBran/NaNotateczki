@@ -343,7 +343,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2685 linii)
+### `lib/features/editor/state/editor_controller.dart` (2719 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
@@ -357,7 +357,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 - 36: `LassoSelection`; 75: `EditorController`;
   198: `flushPendingSaves`.
 - 266–324: layout i transformacje viewportu.
-- 341–477: operacje `*OnPage` używane przez canvasy/overlaye.
+- 341–510: operacje `*OnPage` używane przez canvasy/overlaye; `commitExternalTextBlockOnPage` commit'uje wynik webowego edytora jako `UpdateTextAction`.
 - 486–873: narzędzia, aktywne elementy, lasso i preferencje; 538: `setTool`.
 - 1224: `undo`; 1237: `redo`; 1309: `toggleBookmark`;
   1312: operacje tekstowe.
@@ -428,6 +428,13 @@ błędów, integralności i wydajności.
   formatowanie aktywnego bloku Quill; pasek używa jasnej neutralnej powierzchni #FBFBFB.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
+- `lib/features/editor/presentation/widgets/web_text_editor_layer.dart` (891):
+  eksperymentalna scena tekstowa oparta na DOM `contenteditable`,
+  `webview_plus` i Moveable. Montuje się tylko gdy tekst jest aktywny,
+  renderuje wszystkie teksty bieżącej strony w przezroczystej WebView i
+  zwraca drag/resize/scale/rotate oraz treść do `TextBlock` przez
+  `UpdateTextAction`. Ink i obrazy/PDF pozostają poza WebView.
+
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
 
 Dwa świadomie osobne canvasy ink, wspólna geometria, gumki, scratch erase,
@@ -442,18 +449,18 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2561 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2585 linie)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
-i dokumentu. Aktywny blok tekstu używa `flutter_box_transform` do ramki
-i uchwytów resize, zachowując dotychczasowe reguły aktywacji, edycji, ruchu
-i undo. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
-tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
-tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
-mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
-Operuje wyłącznie w logicznych współrzędnych strony/dokumentu; responsywną
-skalę nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki
-overlayu.
+i dokumentu. Gdy tekst jest aktywny w trybie edit/text, całą scenę tekstową
+bieżącej strony przejmuje przezroczysty `WebTextEditorLayer`: tekst jest
+natywnym DOM `contenteditable`, a Moveable odpowiada za drag, zmianę
+szerokości, skalowanie fontu i obrót. Po odznaczeniu wraca zwykłe renderowanie
+Flutter/Quill. Stary `flutter_box_transform` pozostaje jako fallback poza
+webowym trybem aktywnego tekstu. Piksele obrazów/PDF są zawsze renderowane w
+warstwie tła przed tuszem i tekstem. Operuje wyłącznie w logicznych
+współrzędnych strony/dokumentu; responsywną skalę nadaje wspólny rodzic w
+`EditorScreen`, nie poszczególne bloki overlayu.
 
 - 28: `PageOverlay`; 183: `DocumentPageOverlay`.
 - 242: `_TextBlockWidget`; 265: `_TextBlockWidgetState`.
@@ -508,7 +515,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/editor_screen_responsive_layout_test.dart` (196)
 - `test/page_overlay_text_gestures_test.dart` (134): tryb tekstu
   ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, a aktywna
-  ramka transformacji pojawia się i znika razem z zaznaczeniem
+  webowa scena tekstowa pojawia się i znika razem z zaznaczeniem
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 
