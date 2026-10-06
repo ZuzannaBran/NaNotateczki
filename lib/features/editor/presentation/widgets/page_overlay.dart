@@ -282,14 +282,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   static const double _maxTextFontSize = 96.0;
   static const double _transformHandleTapSize = 36.0;
   static const double _cornerHandleSize = 12.0;
-  static const double _sideHandleWidth = 6.0;
-  static const double _sideHandleHeight = 28.0;
-  static const double _actionButtonSize = 28.0;
-  static const double _moveButtonGap = 8.0;
-  static const Color _textFrameColor = Color(0xFF8E8E8E);
+  static const double _sideHandleWidth = 7.0;
+  static const double _sideHandleHeight = 26.0;
+  static const Color _textFrameColor = AppColors.divider;
 
-  bool _isMoveHovered = false;
-  bool _isMoveDragging = false;
   late quill.QuillController _quillController;
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
@@ -431,11 +427,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.paper.withValues(
-                        alpha: isActive
-                            ? 0.92
-                            : widget.isLassoSelected
-                            ? 0.18
-                            : 0.0,
+                        alpha: widget.isLassoSelected ? 0.18 : 0.0,
                       ),
                       borderRadius: BorderRadius.zero,
                       border: Border.all(
@@ -495,11 +487,6 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
               controller: controller,
               left: left,
               top: top,
-            ),
-            Positioned(
-              left: left + (widget.block.width - _actionButtonSize) / 2,
-              top: top + _frameHeight + _moveButtonGap,
-              child: _moveHandle(controller),
             ),
           ],
         ),
@@ -567,7 +554,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         return IgnorePointer(
           child: DecoratedBox(
             decoration: BoxDecoration(
-              border: Border.all(color: _textFrameColor, width: 1.6),
+              border: Border.all(color: _textFrameColor, width: 1.2),
             ),
           ),
         );
@@ -583,7 +570,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         height: _cornerHandleSize,
         decoration: BoxDecoration(
           color: AppColors.paper,
-          border: Border.all(color: _textFrameColor, width: 1.2),
+          border: Border.all(color: _textFrameColor),
           shape: BoxShape.circle,
         ),
       ),
@@ -598,8 +585,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         height: _sideHandleHeight,
         decoration: BoxDecoration(
           color: AppColors.paper,
-          border: Border.all(color: _textFrameColor, width: 1.2),
-          borderRadius: BorderRadius.circular(2),
+          border: Border.all(color: _textFrameColor),
+          borderRadius: BorderRadius.circular(_sideHandleWidth),
         ),
       ),
     );
@@ -797,80 +784,6 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _startFontSize = null;
     _startDeltaJson = null;
     _transformBefore = null;
-  }
-
-  Widget _moveHandle(EditorController controller) {
-    return _roundActionButton(
-      icon: Icons.open_with,
-      tooltip: 'Move',
-      isActive: _isMoveDragging || _isMoveHovered,
-      onEnter: () => setState(() => _isMoveHovered = true),
-      onExit: () => setState(() => _isMoveHovered = false),
-      onPanStart: (details) {
-        _dragFromFrame = true;
-        setState(() => _isMoveDragging = true);
-        _startMove(details.globalPosition);
-      },
-      onPanUpdate: (details) {
-        _updateMove(details.globalPosition, controller);
-      },
-      onPanEnd: (_) {
-        setState(() => _isMoveDragging = false);
-        _endMove(controller);
-      },
-      onPanCancel: () {
-        setState(() => _isMoveDragging = false);
-        _dragStart = null;
-        _startPosition = null;
-        _dragFromFrame = false;
-      },
-    );
-  }
-
-  Widget _roundActionButton({
-    required IconData icon,
-    required String tooltip,
-    required bool isActive,
-    required VoidCallback onEnter,
-    required VoidCallback onExit,
-    required GestureDragStartCallback onPanStart,
-    required GestureDragUpdateCallback onPanUpdate,
-    required GestureDragEndCallback onPanEnd,
-    required VoidCallback onPanCancel,
-  }) {
-    final handleColor = isActive ? AppColors.inkBlack : Colors.grey.shade600;
-    return Tooltip(
-      message: tooltip,
-      child: MouseRegion(
-        onEnter: (_) => onEnter(),
-        onExit: (_) => onExit(),
-        cursor: SystemMouseCursors.move,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanStart: onPanStart,
-          onPanUpdate: onPanUpdate,
-          onPanEnd: onPanEnd,
-          onPanCancel: onPanCancel,
-          child: Container(
-            width: _actionButtonSize,
-            height: _actionButtonSize,
-            decoration: BoxDecoration(
-              color: AppColors.paper.withValues(alpha: 0.96),
-              border: Border.all(color: Colors.grey.shade300),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 5,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Icon(icon, size: 15, color: handleColor),
-          ),
-        ),
-      ),
-    );
   }
 
   void _startMove(Offset globalPosition) {

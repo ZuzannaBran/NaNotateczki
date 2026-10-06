@@ -71,6 +71,7 @@ void main() {
     expect(controller.tool, DrawingTool.edit);
     expect(controller.pages.single.textBlocks.single.position, insertPosition);
     expect(find.byType(TransformableBox), findsOneWidget);
+    expect(find.byIcon(Icons.open_with), findsNothing);
 
     await tester.tapAt(overlayTopLeft + const Offset(500, 700));
     await tester.pump();

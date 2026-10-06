@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../state/editor_controller.dart';
 
 class TextEditToolbar extends StatelessWidget {
@@ -17,6 +18,7 @@ class TextEditToolbar extends StatelessWidget {
   final String? activeTextBlockId;
 
   static const List<String> _fontFamilies = [
+    AppTheme.defaultFontFamily,
     'Times New Roman',
     'Courier',
     'cursive',
