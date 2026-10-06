@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -42,7 +43,6 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
   static const double _minFontSize = 8;
   static const double _maxFontSize = 96;
 
-  WebviewPlusController? _webController;
   late final String _initialHtml = _buildHtml();
   bool _ready = false;
 
@@ -133,7 +133,6 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
   }
 
   void _onWebViewCreated(WebviewPlusController controller) {
-    _webController = controller;
     controller.addJavaScriptHandler(
       handlerName: 'editorEvent',
       callback: _handleEditorEvent,
@@ -189,9 +188,10 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
         }
         return const <String, dynamic>{'ok': true};
       case 'engineError':
+        final message =
+            event['message']?.toString() ?? 'unknown error';
         debugPrint(
-          'WebTextEditorLayer: Moveable failed to load: '
-          + (event['message']?.toString() ?? 'unknown error'),
+          'WebTextEditorLayer: Moveable failed to load: $message',
         );
         return const <String, dynamic>{'ok': true};
     }
@@ -202,7 +202,7 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
     try {
       final decoded = jsonDecode(message);
       if (decoded is Map) {
-        _handleEditorEvent(<dynamic>[decoded]);
+        unawaited(_handleEditorEvent(<dynamic>[decoded]));
       }
     } catch (_) {
       return;
@@ -413,22 +413,17 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
 
   String _quillColor(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
-    return '#' + value.substring(2);
+    return '#${value.substring(2)}';
   }
 
   String _cssColor(Color color) {
-    return 'rgba('
-        + color.r.toInt().toString()
-        + ','
-        + color.g.toInt().toString()
-        + ','
-        + color.b.toInt().toString()
-        + ','
-        + (color.a / 255).toStringAsFixed(4)
-        + ')';
+    final argb = color.toARGB32();
+    final alpha = ((argb >> 24) & 0xff) / 255;
+    final red = (argb >> 16) & 0xff;
+    final green = (argb >> 8) & 0xff;
+    final blue = argb & 0xff;
+    return 'rgba($red,$green,$blue,${alpha.toStringAsFixed(4)})';
   }
-
-  TextAlign get _unusedTextAlign => TextAlign.left;
 
   static const String _htmlTemplate = r'''<!doctype html>
 <html>
