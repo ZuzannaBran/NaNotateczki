@@ -1,7 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:fluera_canvas/fluera_canvas.dart';
+import 'package:flutter_box_transform/flutter_box_transform.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -70,23 +70,25 @@ void main() {
     expect(controller.activeImageBlockId, isNull);
     expect(controller.tool, DrawingTool.edit);
     expect(controller.pages.single.textBlocks.single.position, insertPosition);
-    expect(find.byType(FlueraCanvas), findsOneWidget);
+    expect(find.byType(TransformableBox), findsOneWidget);
 
     await tester.tapAt(overlayTopLeft + const Offset(500, 700));
-    await tester.pump(const Duration(milliseconds: 40));
+    await tester.pump();
 
     expect(controller.pages.single.textBlocks, hasLength(1));
     expect(controller.activeTextBlockId, isNull);
     expect(controller.tool, DrawingTool.edit);
-    expect(find.byType(FlueraCanvas), findsNothing);
+    expect(find.byType(TransformableBox), findsNothing);
 
     final textPosition = overlayTopLeft + insertPosition + const Offset(40, 20);
+    await tester.tapAt(textPosition);
+    await tester.pump(kDoubleTapMinTime);
     await tester.tapAt(textPosition);
     await tester.pump();
 
     expect(controller.activeTextBlockId, isNotNull);
-    expect(controller.tool, DrawingTool.edit);
-    expect(find.byType(FlueraCanvas), findsOneWidget);
+    expect(controller.tool, DrawingTool.text);
+    expect(find.byType(TransformableBox), findsOneWidget);
 
     await tester.pump(kDoubleTapTimeout);
     await tester.pumpWidget(const SizedBox.shrink());

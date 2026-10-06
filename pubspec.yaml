@@ -46,10 +46,6 @@ dependencies:
   uuid: ^4.5.1
   flutter_quill: ^11.5.0
   flutter_box_transform: ^0.4.7
-  fluera_canvas:
-    git:
-      url: https://github.com/Lorencoshametaj/fluera_canvas.git
-      ref: 63b93f16de01f45b2cac526da365b6796b86adc9
   vector_math: ^2.1.4
   sqlite3_flutter_libs: ^0.5.39
   sqlite3: ^3.3.3
