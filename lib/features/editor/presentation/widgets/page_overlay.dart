@@ -281,9 +281,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   static const double _minTextFontSize = 8.0;
   static const double _maxTextFontSize = 96.0;
   static const double _transformHandleTapSize = 36.0;
-  static const double _cornerHandleSize = 12.0;
-  static const double _sideHandleWidth = 7.0;
-  static const double _sideHandleHeight = 26.0;
+  static const double _transformFramePadding = _transformHandleTapSize;
+  static const double _cornerHandleSize = 10.0;
+  static const double _sideHandleWidth = 6.0;
+  static const double _sideHandleHeight = 22.0;
   static const Color _textFrameColor = AppColors.divider;
 
   late quill.QuillController _quillController;
@@ -478,17 +479,27 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       if (!isActive || !canTransform || widget.doubleTapOnly) {
         return Positioned(left: left, top: top, child: child);
       }
-      return Positioned.fill(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(left: left, top: top, child: child),
-            _transformFrame(
-              controller: controller,
-              left: left,
-              top: top,
-            ),
-          ],
+
+      final frameWidth = widget.block.width + (_transformFramePadding * 2);
+      final frameHeight = _frameHeight + (_transformFramePadding * 2);
+      return Positioned(
+        left: left - _transformFramePadding,
+        top: top - _transformFramePadding,
+        child: SizedBox(
+          key: ValueKey('text-transform-frame-${widget.block.id}'),
+          width: frameWidth,
+          height: frameHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: _transformFramePadding,
+                top: _transformFramePadding,
+                child: child,
+              ),
+              _transformFrame(controller: controller),
+            ],
+          ),
         ),
       );
     }
@@ -507,17 +518,19 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     );
   }
 
-  Widget _transformFrame({
-    required EditorController controller,
-    required double left,
-    required double top,
-  }) {
+  Widget _transformFrame({required EditorController controller}) {
     return TransformableBox(
-      rect: Rect.fromLTWH(left, top, widget.block.width, _frameHeight),
+      rect: Rect.fromLTWH(
+        _transformFramePadding,
+        _transformFramePadding,
+        widget.block.width,
+        _frameHeight,
+      ),
       draggable: false,
       allowContentFlipping: false,
       allowFlippingWhileResizing: false,
       handleTapSize: _transformHandleTapSize,
+      handleAlignment: HandleAlignment.center,
       enabledHandles: const {
         HandlePosition.topLeft,
         HandlePosition.right,
@@ -532,8 +545,26 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         minHeight: 1,
       ),
       resizeModeResolver: () => ResizeMode.freeform,
-      cornerHandleBuilder: (context, handle) => _cornerHandle(),
-      sideHandleBuilder: (context, handle) => _sideHandle(),
+      cornerHandleBuilder: (context, handle) => DefaultCornerHandle(
+        handle: handle,
+        size: _cornerHandleSize,
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          border: Border.all(color: _textFrameColor),
+          shape: BoxShape.circle,
+        ),
+      ),
+      sideHandleBuilder: (context, handle) => DefaultSideHandle(
+        handle: handle,
+        length: _sideHandleHeight,
+        thickness: _sideHandleWidth,
+        decoration: ShapeDecoration(
+          color: AppColors.paper,
+          shape: StadiumBorder(
+            side: BorderSide(color: _textFrameColor),
+          ),
+        ),
+      ),
       onResizeStart: (handle, event) {
         _startPackageResize(handle, event.globalPosition);
       },
@@ -554,41 +585,11 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         return IgnorePointer(
           child: DecoratedBox(
             decoration: BoxDecoration(
-              border: Border.all(color: _textFrameColor, width: 1.2),
+              border: Border.all(color: _textFrameColor),
             ),
           ),
         );
       },
-    );
-  }
-
-  Widget _cornerHandle() {
-    return MouseRegion(
-      cursor: SystemMouseCursors.resizeUpLeftDownRight,
-      child: Container(
-        width: _cornerHandleSize,
-        height: _cornerHandleSize,
-        decoration: BoxDecoration(
-          color: AppColors.paper,
-          border: Border.all(color: _textFrameColor),
-          shape: BoxShape.circle,
-        ),
-      ),
-    );
-  }
-
-  Widget _sideHandle() {
-    return MouseRegion(
-      cursor: SystemMouseCursors.resizeLeftRight,
-      child: Container(
-        width: _sideHandleWidth,
-        height: _sideHandleHeight,
-        decoration: BoxDecoration(
-          color: AppColors.paper,
-          border: Border.all(color: _textFrameColor),
-          borderRadius: BorderRadius.circular(_sideHandleWidth),
-        ),
-      ),
     );
   }
 

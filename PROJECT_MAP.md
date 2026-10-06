@@ -446,13 +446,11 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2474 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2475 linie)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu używa `flutter_box_transform` do ramki
-i subtelnych uchwytów resize w palecie aplikacji. Aktywny tekst nie dostaje
-dodatkowego tła; przesuwanie działa przez obramowanie bez osobnego dolnego
-przycisku, z zachowaniem dotychczasowych reguł aktywacji, edycji i undo.
+i gotowych uchwytów `DefaultCornerHandle` / `DefaultSideHandle` w palecie aplikacji. Ramka jest osadzona lokalnie względem rzeczywistego bloku tekstu, dzięki czemu nie zależy od rozmiaru viewportu ani strony; aktywny tekst nie dostaje dodatkowego tła. Przesuwanie działa przez obramowanie bez osobnego dolnego przycisku, z zachowaniem dotychczasowych reguł aktywacji, edycji i undo.
 Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed tuszem i
 tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy tylko
 ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie mogą
@@ -462,9 +460,9 @@ nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki overlayu.
 
 - 28: `PageOverlay`; 183: `DocumentPageOverlay`.
 - 242: `_TextBlockWidget`; 265: `_TextBlockWidgetState`.
-- 1001: `_ImageBlockWidget`; 1026: `_ImageBlockWidgetState`.
-- 2089: `_editOcr`; 2163: `_OcrTextDialog`;
-  2262: `_LassoSelectionWidget`; 2416: `_LassoActionButton`.
+- 1002: `_ImageBlockWidget`; 1027: `_ImageBlockWidgetState`.
+- 2090: `_editOcr`; 2164: `_OcrTextDialog`;
+  2263: `_LassoSelectionWidget`; 2417: `_LassoActionButton`.
 
 ## 9. Board
 
@@ -511,10 +509,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (135): tryb tekstu
+- `test/page_overlay_text_gestures_test.dart` (149): tryb tekstu
   ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, aktywna
-  ramka transformacji pojawia się i znika razem z zaznaczeniem, bez osobnego
-  dolnego uchwytu przesuwania
+  ramka transformacji pojawia się i znika razem z zaznaczeniem, pozostaje
+  lokalna względem bloku tekstu i nie ma osobnego dolnego uchwytu przesuwania
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 
