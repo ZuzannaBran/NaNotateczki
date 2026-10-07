@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
@@ -8,6 +7,10 @@ import 'package:flutter_box_transform/flutter_box_transform.dart';
 import '../interaction/object_transform_engine.dart';
 
 typedef ObjectResizeModeResolver = ResizeMode Function(HandlePosition handle);
+typedef ObjectConstraintsResolver = BoxConstraints Function(
+  HandlePosition handle,
+);
+typedef ObjectClampingRectResolver = Rect Function(HandlePosition handle);
 
 class ObjectTransformHudStyle {
   const ObjectTransformHudStyle({
@@ -43,6 +46,8 @@ class ObjectTransformHud<T> extends StatefulWidget {
     this.onCancel,
     this.resizeModeResolver,
     this.constraints = const BoxConstraints(),
+    this.constraintsResolver,
+    this.resizeClampingRectResolver,
     this.enabledHandles = const {...HandlePosition.values},
     this.draggable = true,
     this.rotatable = true,
@@ -64,6 +69,8 @@ class ObjectTransformHud<T> extends StatefulWidget {
   final ValueChanged<T>? onCancel;
   final ObjectResizeModeResolver? resizeModeResolver;
   final BoxConstraints constraints;
+  final ObjectConstraintsResolver? constraintsResolver;
+  final ObjectClampingRectResolver? resizeClampingRectResolver;
   final Set<HandlePosition> enabledHandles;
   final bool draggable;
   final bool rotatable;
@@ -359,7 +366,10 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       handle: handle,
       resizeMode:
           widget.resizeModeResolver?.call(handle) ?? ResizeMode.freeform,
-      constraints: widget.constraints,
+      constraints:
+          widget.constraintsResolver?.call(handle) ?? widget.constraints,
+      clampingRect:
+          widget.resizeClampingRectResolver?.call(handle) ?? Rect.largest,
     );
   }
 

@@ -437,15 +437,10 @@ błędów, integralności i wydajności.
   `DefaultCornerHandle`, `DefaultSideHandle` i `DefaultRotationHandle`
   z `flutter_box_transform`, ale własny silnik współrzędnych. Kolor, rozmiary,
   hit-area i grubość ramki są konfigurowalne przez `ObjectTransformHudStyle`.
-- `lib/features/editor/presentation/interaction/text_hud_engine.dart` (304):
-  czysty Dartowy reducer transformacji aktywnego tekstu inspirowany
-  `@grida/hud`: preview/commit dla move, zmiany szerokości, jednolitego
-  scale i rotacji. Nie zna Flutter widgetów, modelu strony ani historii.
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (810):
-  aktywny `TextBlock` renderowany przez Flutter `EditableText` oraz
-  własną ramkę/uchwyty. Gesty używają `TextHudEngine`; dopiero pointer-up
-  wykonuje pojedynczy `UpdateTextAction`. Nieaktywne teksty nadal używają
-  starego Quilla jako bezpieczny fallback.
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (507):
+  aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
+  move/resize/scale/rotate są delegowane do wspólnego `ObjectTransformHud`.
+  Nieaktywne teksty nadal używają starego Quilla jako bezpieczny fallback.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
 
@@ -461,13 +456,13 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2573 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2843 linie)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
-i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: własna ramka
-Flutter, `EditableText` i czysty reducer `TextHudEngine` z preview/commit dla
-move, width-resize, scale i rotate. Nieaktywne teksty zachowują stary Quill
-jako fallback; ink oraz obrazy/PDF pozostają poza HUD-em. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
+i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText` oraz wspólny `ObjectTransformHud` dla
+move, width-resize, scale i rotate. Nieaktywne teksty zachowują stary Quill jako fallback. Aktywne obrazy/PDF
+korzystają z tego samego `ObjectTransformHud`; rogi skalują, boki zachowują
+crop, a lasso/ink pozostają poza tym silnikiem. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
 tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
 tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
 mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
@@ -532,8 +527,6 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   blok przełącza się na `TextHudBlock` i `EditableText`
 - `test/object_transform_engine_test.dart` (76): wspólna geometria
   move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
-- `test/text_hud_engine_test.dart` (90): czysta geometria
-  preview dla move, width-resize na obrocie, corner-scale i snap rotacji
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 

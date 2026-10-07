@@ -2296,6 +2296,7 @@ class EditorController extends ChangeNotifier {
     if (before.position == after.position &&
         before.width == after.width &&
         before.height == after.height &&
+        before.rotation == after.rotation &&
         before.cropLeft == after.cropLeft &&
         before.cropTop == after.cropTop &&
         before.cropRight == after.cropRight &&

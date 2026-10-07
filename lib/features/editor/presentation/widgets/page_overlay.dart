@@ -20,6 +20,8 @@ import '../../../notebook/domain/image_block.dart';
 import '../../../notebook/domain/note_page.dart';
 import '../../../notebook/domain/text_block.dart';
 import 'text_hud_block.dart';
+import '../interaction/object_transform_engine.dart';
+import 'object_transform_hud.dart';
 import '../../state/editor_controller.dart';
 
 const Color _lassoAccentColor = Color(0xFF2E5AAC);
@@ -165,18 +167,13 @@ class PageOverlay extends StatelessWidget {
           if (renderActive)
             for (final block in effectivePage.imageBlocks)
               if (block.id == activeImageId)
-                _ImageBlockWidget(
+                _ActiveImageTransformHud(
+                  key: ValueKey('object-hud-image-${block.id}'),
+                  controller: controller,
                   block: block,
                   pageIndex: effectivePageIndex,
                   worldOrigin: worldOrigin,
                   interactionEnabled: interactionEnabled,
-                  lassoDragDelta:
-                      lassoSelection?.imageBlockIds.contains(block.id) == true
-                      ? controller.lassoDragDelta
-                      : null,
-                  isLassoSelected:
-                      lassoSelection?.imageBlockIds.contains(block.id) == true,
-                  renderImage: false,
                 ),
           if (renderActive && lassoSelection != null)
             _LassoSelectionWidget(
@@ -249,6 +246,294 @@ class DocumentPageOverlay extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ActiveImageTransformHud extends StatelessWidget {
+  const _ActiveImageTransformHud({
+    required this.controller,
+    required this.block,
+    required this.pageIndex,
+    required this.worldOrigin,
+    required this.interactionEnabled,
+    super.key,
+  });
+
+  final EditorController controller;
+  final ImageBlock block;
+  final int pageIndex;
+  final Offset worldOrigin;
+  final bool interactionEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleRect = _visibleImageRect(block, worldOrigin);
+    return ObjectTransformHud<ImageBlock>(
+      key: ValueKey('shared-image-hud-\${block.id}'),
+      data: block,
+      rect: visibleRect,
+      rotation: block.rotation,
+      interactive: interactionEnabled,
+      enabledHandles: const {...HandlePosition.values},
+      resizeModeResolver: (handle) {
+        return handle.isDiagonal ? ResizeMode.scale : ResizeMode.freeform;
+      },
+      constraintsResolver: (handle) {
+        if (handle.isDiagonal) {
+          final widthFactor = math.max(
+            0.08,
+            block.cropRight - block.cropLeft,
+          );
+          final heightFactor = math.max(
+            0.08,
+            block.cropBottom - block.cropTop,
+          );
+          return BoxConstraints(
+            minWidth: 80 * widthFactor,
+            maxWidth: 4096 * widthFactor,
+            minHeight: 60 * heightFactor,
+            maxHeight: 4096 * heightFactor,
+          );
+        }
+        return BoxConstraints(
+          minWidth: math.max(1, block.width * 0.08),
+          maxWidth: block.width,
+          minHeight: math.max(1, block.height * 0.08),
+          maxHeight: block.height,
+        );
+      },
+      resizeClampingRectResolver: (handle) {
+        if (handle.isDiagonal) {
+          return Rect.largest;
+        }
+        return Rect.fromLTWH(
+          block.position.dx - worldOrigin.dx,
+          block.position.dy - worldOrigin.dy,
+          block.width,
+          block.height,
+        );
+      },
+      onDoubleTap: () {
+        _editImageOcrForBlock(
+          context,
+          controller,
+          pageIndex,
+          block,
+        );
+      },
+      onSecondaryTapDown: (details) {
+        _showImageContextMenuForBlock(
+          context,
+          details.globalPosition,
+          controller,
+          pageIndex,
+          block,
+        );
+      },
+      onPreview: (before, preview) {
+        controller.updateImageBlockOnPage(
+          pageIndex,
+          _imageBlockFromTransform(
+            before,
+            preview,
+            worldOrigin,
+          ),
+        );
+      },
+      onCommit: (before, preview) {
+        final current = controller.findImageBlockById(before.id);
+        if (current == null) {
+          return;
+        }
+        if (preview.kind == ObjectTransformKind.move) {
+          controller.finalizeImageMoveOnPage(
+            pageIndex,
+            before.id,
+            before.position,
+            current.position,
+          );
+          return;
+        }
+        controller.commitImageResizeOnPage(
+          pageIndex,
+          before,
+          current,
+        );
+      },
+      onCancel: (before) {
+        controller.updateImageBlockOnPage(pageIndex, before);
+      },
+    );
+  }
+}
+
+Rect _visibleImageRect(ImageBlock block, Offset worldOrigin) {
+  final widthFactor = block.cropRight - block.cropLeft;
+  final heightFactor = block.cropBottom - block.cropTop;
+  return Rect.fromLTWH(
+    block.position.dx +
+        block.width * block.cropLeft -
+        worldOrigin.dx,
+    block.position.dy +
+        block.height * block.cropTop -
+        worldOrigin.dy,
+    block.width * widthFactor,
+    block.height * heightFactor,
+  );
+}
+
+ImageBlock _imageBlockFromTransform(
+  ImageBlock before,
+  ObjectTransformSnapshot preview,
+  Offset worldOrigin,
+) {
+  final initialVisible = _visibleImageRect(before, worldOrigin);
+  final nextWorldRect = preview.rect.shift(worldOrigin);
+
+  if (preview.kind == ObjectTransformKind.move ||
+      preview.kind == ObjectTransformKind.rotate) {
+    final initialWorldTopLeft =
+        initialVisible.topLeft + worldOrigin;
+    final delta = nextWorldRect.topLeft - initialWorldTopLeft;
+    return before.copyWith(
+      position: before.position + delta,
+      rotation: preview.rotation,
+    );
+  }
+
+  final handle = preview.handle;
+  if (handle == null) {
+    return before.copyWith(rotation: preview.rotation);
+  }
+
+  if (handle.isDiagonal) {
+    final widthFactor = math.max(
+      0.08,
+      before.cropRight - before.cropLeft,
+    );
+    final heightFactor = math.max(
+      0.08,
+      before.cropBottom - before.cropTop,
+    );
+    final nextWidth = nextWorldRect.width / widthFactor;
+    final nextHeight = nextWorldRect.height / heightFactor;
+    final nextPosition = nextWorldRect.topLeft -
+        Offset(
+          before.cropLeft * nextWidth,
+          before.cropTop * nextHeight,
+        );
+    return before.copyWith(
+      position: nextPosition,
+      width: nextWidth,
+      height: nextHeight,
+      rotation: preview.rotation,
+    );
+  }
+
+  var cropLeft = before.cropLeft;
+  var cropTop = before.cropTop;
+  var cropRight = before.cropRight;
+  var cropBottom = before.cropBottom;
+  const minVisible = 0.08;
+
+  if (handle == HandlePosition.left) {
+    cropLeft = ((nextWorldRect.left - before.position.dx) / before.width)
+        .clamp(0.0, cropRight - minVisible);
+  } else if (handle == HandlePosition.right) {
+    cropRight =
+        ((nextWorldRect.right - before.position.dx) / before.width)
+            .clamp(cropLeft + minVisible, 1.0);
+  } else if (handle == HandlePosition.top) {
+    cropTop = ((nextWorldRect.top - before.position.dy) / before.height)
+        .clamp(0.0, cropBottom - minVisible);
+  } else if (handle == HandlePosition.bottom) {
+    cropBottom =
+        ((nextWorldRect.bottom - before.position.dy) / before.height)
+            .clamp(cropTop + minVisible, 1.0);
+  }
+
+  return before.copyWith(
+    cropLeft: cropLeft,
+    cropTop: cropTop,
+    cropRight: cropRight,
+    cropBottom: cropBottom,
+    rotation: preview.rotation,
+  );
+}
+
+Future<void> _editImageOcrForBlock(
+  BuildContext context,
+  EditorController controller,
+  int pageIndex,
+  ImageBlock block,
+) async {
+  final updated = await showDialog<String>(
+    context: context,
+    builder: (_) => _OcrTextDialog(
+      controller: controller,
+      pageIndex: pageIndex,
+      block: block,
+    ),
+  );
+
+  if (updated == null || updated == block.ocrText) {
+    return;
+  }
+  controller.updateImageBlockOcrTextOnPage(
+    pageIndex,
+    block.id,
+    updated,
+  );
+}
+
+Future<void> _showImageContextMenuForBlock(
+  BuildContext context,
+  Offset globalPosition,
+  EditorController controller,
+  int pageIndex,
+  ImageBlock block,
+) async {
+  if (controller.currentPageIndex != pageIndex) {
+    controller.setCurrentPage(pageIndex);
+  }
+  controller.clearActiveTextBlock();
+  controller.setActiveImageBlock(block.id);
+
+  final overlay =
+      Overlay.of(context).context.findRenderObject() as RenderBox?;
+  if (overlay == null) {
+    return;
+  }
+
+  final choice = await showMenu<_ImageContextAction>(
+    context: context,
+    position: RelativeRect.fromLTRB(
+      globalPosition.dx,
+      globalPosition.dy,
+      overlay.size.width - globalPosition.dx,
+      overlay.size.height - globalPosition.dy,
+    ),
+    items: const [
+      PopupMenuItem(
+        value: _ImageContextAction.copy,
+        child: Text('Copy image'),
+      ),
+    ],
+  );
+
+  if (!context.mounted) {
+    return;
+  }
+  if (choice != _ImageContextAction.copy) {
+    return;
+  }
+
+  final message = await controller.copyActiveImageToClipboard();
+  if (!context.mounted || message == null) {
+    return;
+  }
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _TextBlockWidget extends StatefulWidget {
