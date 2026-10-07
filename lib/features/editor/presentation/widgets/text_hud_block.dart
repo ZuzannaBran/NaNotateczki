@@ -56,13 +56,10 @@ class _TextHudBlockState extends State<TextHudBlock> {
   void didUpdateWidget(covariant TextHudBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.block.id != widget.block.id ||
-        (!_focusNode.hasFocus &&
-            _textController.text != widget.block.text)) {
+        (!_focusNode.hasFocus && _textController.text != widget.block.text)) {
       _textController.value = TextEditingValue(
         text: widget.block.text,
-        selection: TextSelection.collapsed(
-          offset: widget.block.text.length,
-        ),
+        selection: TextSelection.collapsed(offset: widget.block.text.length),
       );
     }
   }
@@ -121,9 +118,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
               HandlePosition.bottomRight,
             },
             resizeModeResolver: (handle) {
-              return handle.isDiagonal
-                  ? ResizeMode.scale
-                  : ResizeMode.freeform;
+              return handle.isDiagonal ? ResizeMode.scale : ResizeMode.freeform;
             },
             constraints: const BoxConstraints(
               minWidth: _minTextWidth,
@@ -242,11 +237,9 @@ class _TextHudBlockState extends State<TextHudBlock> {
     _scheduleMetrics();
   }
 
-  void _previewTransform(
-    TextBlock before,
-    ObjectTransformSnapshot preview,
-  ) {
-    final scale = preview.kind == ObjectTransformKind.resize &&
+  void _previewTransform(TextBlock before, ObjectTransformSnapshot preview) {
+    final scale =
+        preview.kind == ObjectTransformKind.resize &&
             preview.handle?.isDiagonal == true &&
             before.width > 0
         ? preview.rect.width / before.width
@@ -254,8 +247,9 @@ class _TextHudBlockState extends State<TextHudBlock> {
     final nextFontSize = (before.fontSize * scale)
         .clamp(_minTextFontSize, _maxTextFontSize)
         .toDouble();
-    final double actualScale =
-        before.fontSize == 0 ? 1.0 : nextFontSize / before.fontSize;
+    final double actualScale = before.fontSize == 0
+        ? 1.0
+        : nextFontSize / before.fontSize;
     final nextDelta = (actualScale - 1).abs() <= 1e-6
         ? before.deltaJson
         : _scaledDeltaJson(
@@ -276,19 +270,12 @@ class _TextHudBlockState extends State<TextHudBlock> {
     );
   }
 
-  void _commitTransform(
-    TextBlock before,
-    ObjectTransformSnapshot preview,
-  ) {
+  void _commitTransform(TextBlock before, ObjectTransformSnapshot preview) {
     final current = widget.controller.findTextBlockById(before.id);
     if (current == null) {
       return;
     }
-    widget.controller.commitTextUpdateOnPage(
-      widget.pageIndex,
-      before,
-      current,
-    );
+    widget.controller.commitTextUpdateOnPage(widget.pageIndex, before, current);
   }
 
   void _cancelTransform(TextBlock before) {
@@ -495,10 +482,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
 }
 
 class _TextHudStyle {
-  const _TextHudStyle({
-    required this.textStyle,
-    required this.textAlign,
-  });
+  const _TextHudStyle({required this.textStyle, required this.textAlign});
 
   final TextStyle textStyle;
   final TextAlign textAlign;

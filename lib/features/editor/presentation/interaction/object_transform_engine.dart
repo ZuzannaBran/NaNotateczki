@@ -4,11 +4,7 @@ import 'dart:ui';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
 
-enum ObjectTransformKind {
-  move,
-  resize,
-  rotate,
-}
+enum ObjectTransformKind { move, resize, rotate }
 
 class ObjectTransformSnapshot {
   const ObjectTransformSnapshot({
@@ -97,10 +93,7 @@ class ObjectTransformEngine {
     );
   }
 
-  ObjectTransformSnapshot update(
-    Offset pointer, {
-    bool snapRotation = false,
-  }) {
+  ObjectTransformSnapshot update(Offset pointer, {bool snapRotation = false}) {
     final session = _session;
     if (session == null) {
       throw StateError('ObjectTransformEngine.update called without begin');

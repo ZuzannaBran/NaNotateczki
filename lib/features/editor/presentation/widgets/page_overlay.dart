@@ -311,12 +311,7 @@ class _ActiveImageTransformHud extends StatelessWidget {
         );
       },
       onDoubleTap: () {
-        _editImageOcrForBlock(
-          context,
-          controller,
-          pageIndex,
-          block,
-        );
+        _editImageOcrForBlock(context, controller, pageIndex, block);
       },
       onSecondaryTapDown: (details) {
         _showImageContextMenuForBlock(
@@ -330,11 +325,7 @@ class _ActiveImageTransformHud extends StatelessWidget {
       onPreview: (before, preview) {
         controller.updateImageBlockOnPage(
           pageIndex,
-          _imageBlockFromTransform(
-            before,
-            preview,
-            worldOrigin,
-          ),
+          _imageBlockFromTransform(before, preview, worldOrigin),
         );
       },
       onCommit: (before, preview) {
@@ -351,11 +342,7 @@ class _ActiveImageTransformHud extends StatelessWidget {
           );
           return;
         }
-        controller.commitImageResizeOnPage(
-          pageIndex,
-          before,
-          current,
-        );
+        controller.commitImageResizeOnPage(pageIndex, before, current);
       },
       onCancel: (before) {
         controller.updateImageBlockOnPage(pageIndex, before);
@@ -368,12 +355,8 @@ Rect _visibleImageRect(ImageBlock block, Offset worldOrigin) {
   final widthFactor = block.cropRight - block.cropLeft;
   final heightFactor = block.cropBottom - block.cropTop;
   return Rect.fromLTWH(
-    block.position.dx +
-        block.width * block.cropLeft -
-        worldOrigin.dx,
-    block.position.dy +
-        block.height * block.cropTop -
-        worldOrigin.dy,
+    block.position.dx + block.width * block.cropLeft - worldOrigin.dx,
+    block.position.dy + block.height * block.cropTop - worldOrigin.dy,
     block.width * widthFactor,
     block.height * heightFactor,
   );
@@ -389,8 +372,7 @@ ImageBlock _imageBlockFromTransform(
 
   if (preview.kind == ObjectTransformKind.move ||
       preview.kind == ObjectTransformKind.rotate) {
-    final initialWorldTopLeft =
-        initialVisible.topLeft + worldOrigin;
+    final initialWorldTopLeft = initialVisible.topLeft + worldOrigin;
     final delta = nextWorldRect.topLeft - initialWorldTopLeft;
     return before.copyWith(
       position: before.position + delta,
@@ -412,11 +394,9 @@ ImageBlock _imageBlockFromTransform(
         .toDouble();
     final nextWidth = nextWorldRect.width / widthFactor;
     final nextHeight = nextWorldRect.height / heightFactor;
-    final nextPosition = nextWorldRect.topLeft -
-        Offset(
-          before.cropLeft * nextWidth,
-          before.cropTop * nextHeight,
-        );
+    final nextPosition =
+        nextWorldRect.topLeft -
+        Offset(before.cropLeft * nextWidth, before.cropTop * nextHeight);
     return before.copyWith(
       position: nextPosition,
       width: nextWidth,
@@ -436,19 +416,17 @@ ImageBlock _imageBlockFromTransform(
         .clamp(0.0, cropRight - minVisible)
         .toDouble();
   } else if (handle == HandlePosition.right) {
-    cropRight =
-        ((nextWorldRect.right - before.position.dx) / before.width)
-            .clamp(cropLeft + minVisible, 1.0)
-            .toDouble();
+    cropRight = ((nextWorldRect.right - before.position.dx) / before.width)
+        .clamp(cropLeft + minVisible, 1.0)
+        .toDouble();
   } else if (handle == HandlePosition.top) {
     cropTop = ((nextWorldRect.top - before.position.dy) / before.height)
         .clamp(0.0, cropBottom - minVisible)
         .toDouble();
   } else if (handle == HandlePosition.bottom) {
-    cropBottom =
-        ((nextWorldRect.bottom - before.position.dy) / before.height)
-            .clamp(cropTop + minVisible, 1.0)
-            .toDouble();
+    cropBottom = ((nextWorldRect.bottom - before.position.dy) / before.height)
+        .clamp(cropTop + minVisible, 1.0)
+        .toDouble();
   }
 
   return before.copyWith(
@@ -478,11 +456,7 @@ Future<void> _editImageOcrForBlock(
   if (updated == null || updated == block.ocrText) {
     return;
   }
-  controller.updateImageBlockOcrTextOnPage(
-    pageIndex,
-    block.id,
-    updated,
-  );
+  controller.updateImageBlockOcrTextOnPage(pageIndex, block.id, updated);
 }
 
 Future<void> _showImageContextMenuForBlock(
@@ -498,8 +472,7 @@ Future<void> _showImageContextMenuForBlock(
   controller.clearActiveTextBlock();
   controller.setActiveImageBlock(block.id);
 
-  final overlay =
-      Overlay.of(context).context.findRenderObject() as RenderBox?;
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
   if (overlay == null) {
     return;
   }
@@ -513,10 +486,7 @@ Future<void> _showImageContextMenuForBlock(
       overlay.size.height - globalPosition.dy,
     ),
     items: const [
-      PopupMenuItem(
-        value: _ImageContextAction.copy,
-        child: Text('Copy image'),
-      ),
+      PopupMenuItem(value: _ImageContextAction.copy, child: Text('Copy image')),
     ],
   );
 
@@ -531,9 +501,7 @@ Future<void> _showImageContextMenuForBlock(
   if (!context.mounted || message == null) {
     return;
   }
-  ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _TextBlockWidget extends StatefulWidget {

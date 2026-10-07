@@ -10,11 +10,7 @@ void main() {
     final engine = ObjectTransformEngine();
     const rect = Rect.fromLTWH(20, 30, 200, 80);
 
-    engine.beginMove(
-      rect: rect,
-      rotation: 0,
-      pointer: const Offset(40, 50),
-    );
+    engine.beginMove(rect: rect, rotation: 0, pointer: const Offset(40, 50));
     final preview = engine.update(const Offset(70, 95));
 
     expect(preview.rect.topLeft, const Offset(50, 75));
@@ -62,11 +58,7 @@ void main() {
     final start = rect.topCenter;
     const target = Offset(190, -30);
 
-    engine.beginRotate(
-      rect: rect,
-      rotation: 0,
-      pointer: start,
-    );
+    engine.beginRotate(rect: rect, rotation: 0, pointer: start);
     final preview = engine.update(target, snapRotation: true);
     final degrees = preview.rotation * 180 / math.pi;
 

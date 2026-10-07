@@ -7,9 +7,8 @@ import 'package:flutter_box_transform/flutter_box_transform.dart';
 import '../interaction/object_transform_engine.dart';
 
 typedef ObjectResizeModeResolver = ResizeMode Function(HandlePosition handle);
-typedef ObjectConstraintsResolver = BoxConstraints Function(
-  HandlePosition handle,
-);
+typedef ObjectConstraintsResolver =
+    BoxConstraints Function(HandlePosition handle);
 typedef ObjectClampingRectResolver = Rect Function(HandlePosition handle);
 
 class ObjectTransformHudStyle {
@@ -98,7 +97,8 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   @override
   Widget build(BuildContext context) {
     _scheduleScreenScaleMeasure();
-    final effective = _preview ??
+    final effective =
+        _preview ??
         ObjectTransformSnapshot(
           kind: ObjectTransformKind.move,
           rect: widget.rect,
@@ -228,10 +228,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
         decoration: BoxDecoration(
           color: fillColor,
           shape: BoxShape.circle,
-          border: Border.all(
-            color: frameColor,
-            width: 1.2 / scale,
-          ),
+          border: Border.all(color: frameColor, width: 1.2 / scale),
         ),
       ),
     );
@@ -261,10 +258,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
         decoration: ShapeDecoration(
           color: fillColor,
           shape: StadiumBorder(
-            side: BorderSide(
-              color: frameColor,
-              width: 1.2 / scale,
-            ),
+            side: BorderSide(color: frameColor, width: 1.2 / scale),
           ),
         ),
       ),
@@ -278,14 +272,10 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     required Color fillColor,
     required double scale,
   }) {
-    final topCenter = _pointForHandle(
-      rect,
-      rotation,
-      HandlePosition.top,
-    );
+    final topCenter = _pointForHandle(rect, rotation, HandlePosition.top);
     final outward = _rotate(const Offset(0, -1), rotation);
-    final point = topCenter +
-        outward * (widget.style.rotationHandleOffset / scale);
+    final point =
+        topCenter + outward * (widget.style.rotationHandleOffset / scale);
     final hitSize = widget.style.handleHitSize / scale;
 
     return _positionedHandle(
@@ -306,10 +296,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
         decoration: BoxDecoration(
           color: fillColor,
           shape: BoxShape.circle,
-          border: Border.all(
-            color: frameColor,
-            width: 1.2 / scale,
-          ),
+          border: Border.all(color: frameColor, width: 1.2 / scale),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.12),
@@ -425,8 +412,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   }
 
   Offset _globalToLocal(Offset point) {
-    final renderObject =
-        _surfaceKey.currentContext?.findRenderObject();
+    final renderObject = _surfaceKey.currentContext?.findRenderObject();
     if (renderObject is RenderBox) {
       return renderObject.globalToLocal(point);
     }
@@ -443,8 +429,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       if (!mounted) {
         return;
       }
-      final renderObject =
-          _surfaceKey.currentContext?.findRenderObject();
+      final renderObject = _surfaceKey.currentContext?.findRenderObject();
       if (renderObject is! RenderBox) {
         return;
       }
@@ -464,11 +449,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     });
   }
 
-  Offset _pointForHandle(
-    Rect rect,
-    double rotation,
-    HandlePosition handle,
-  ) {
+  Offset _pointForHandle(Rect rect, double rotation, HandlePosition handle) {
     final point = switch (handle) {
       HandlePosition.topLeft => rect.topLeft,
       HandlePosition.top => rect.topCenter,
@@ -490,11 +471,9 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       HandlePosition.top ||
       HandlePosition.bottom => SystemMouseCursors.resizeUpDown,
       HandlePosition.topLeft ||
-      HandlePosition.bottomRight =>
-        SystemMouseCursors.resizeUpLeftDownRight,
+      HandlePosition.bottomRight => SystemMouseCursors.resizeUpLeftDownRight,
       HandlePosition.topRight ||
-      HandlePosition.bottomLeft =>
-        SystemMouseCursors.resizeUpRightDownLeft,
+      HandlePosition.bottomLeft => SystemMouseCursors.resizeUpRightDownLeft,
       HandlePosition.none => SystemMouseCursors.basic,
     };
   }
