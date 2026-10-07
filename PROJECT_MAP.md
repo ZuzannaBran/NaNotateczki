@@ -358,10 +358,10 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
   198: `flushPendingSaves`.
 - 266–324: layout i transformacje viewportu.
 - 341–477: operacje `*OnPage` używane przez canvasy/overlaye.
-- 486–877: narzędzia, aktywne elementy, lasso i preferencje; 538: `setTool`;
-  aktywna edycja tekstu może być jawnie commitowana przed transformacją ramki.
-- 1224: `undo`; 1237: `redo`; 1309: `toggleBookmark`;
-  1312: operacje tekstowe.
+- 486–878: narzędzia, aktywne elementy, lasso i preferencje; 538: `setTool`;
+  570: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
+- 1228: `undo`; 1241: `redo`; 1313: `toggleBookmark`;
+  1319: operacje tekstowe.
 - 2480: `_applyAction`; 2489: `_applyInkAction`;
   2591: `_scheduleSave`; 2612: `_saveDirtyPages`; 2634: `_save`.
 
@@ -444,7 +444,7 @@ błędów, integralności i wydajności.
   Kolor, rozmiary, hit-area
   i grubość ramki są konfigurowalne przez `ObjectTransformHudStyle`.
   14: `ObjectTransformHudStyle`; 38: `ObjectTransformHud`;
-  88: `_ObjectTransformHudState`; 489: `_ObjectTransformFramePainter`.
+  90: `_ObjectTransformHudState`; 494: `_ObjectTransformFramePainter`.
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (509):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale/rotate są delegowane do wspólnego `ObjectTransformHud`.
