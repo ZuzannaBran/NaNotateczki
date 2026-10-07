@@ -20,10 +20,10 @@ class ObjectTransformHudStyle {
     this.sideHandleThickness = 6,
     this.moveHandleWidth = 30,
     this.moveHandleHeight = 16,
-    this.moveHandleHitSize = 28,
+    this.moveHandleHitSize = 44,
     this.moveHandleOffset = 32,
     this.rotationHandleSize = 20,
-    this.handleHitSize = 32,
+    this.handleHitSize = 44,
     this.rotationHandleOffset = 30,
     this.frameWidth = 1.25,
   });
@@ -101,6 +101,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
 
   ObjectTransformSnapshot? _preview;
   T? _gestureData;
+  int? _activeHandlePointer;
   double _screenScale = 1;
   bool _scaleMeasureScheduled = false;
 
@@ -234,8 +235,8 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       point: point,
       hitSize: hitSize,
       cursor: SystemMouseCursors.grab,
-      onPanStart: (details) {
-        _beginMove(rect, rotation, details.globalPosition);
+      onPointerDown: (position) {
+        _beginMove(rect, rotation, position);
       },
       child: Container(
         key: const ValueKey('object-transform-move-handle'),
@@ -278,8 +279,8 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       point: point,
       hitSize: hitSize,
       cursor: _cursorForHandle(handle),
-      onPanStart: (details) {
-        _beginResize(handle, rect, rotation, details.globalPosition);
+      onPointerDown: (position) {
+        _beginResize(handle, rect, rotation, position);
       },
       child: DefaultCornerHandle(
         handle: handle,
@@ -307,8 +308,8 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       point: point,
       hitSize: hitSize,
       cursor: _cursorForHandle(handle),
-      onPanStart: (details) {
-        _beginResize(handle, rect, rotation, details.globalPosition);
+      onPointerDown: (position) {
+        _beginResize(handle, rect, rotation, position);
       },
       child: DefaultSideHandle(
         handle: handle,
@@ -341,13 +342,13 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       point: point,
       hitSize: hitSize,
       cursor: SystemMouseCursors.grab,
-      onPanStart: (details) {
+      onPointerDown: (position) {
         widget.onTransformStart?.call();
         _gestureData = widget.data;
         _engine.beginRotate(
           rect: rect,
           rotation: rotation,
-          pointer: _globalToLocal(details.globalPosition),
+          pointer: _globalToLocal(position),
         );
       },
       child: Container(
@@ -378,7 +379,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     required Offset point,
     required double hitSize,
     required MouseCursor cursor,
-    required GestureDragStartCallback onPanStart,
+    required ValueChanged<Offset> onPointerDown,
     required Widget child,
   }) {
     return Positioned(
@@ -388,16 +389,35 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       height: hitSize,
       child: MouseRegion(
         cursor: cursor,
-        child: GestureDetector(
+        child: Listener(
           behavior: HitTestBehavior.opaque,
-          onPanStart: onPanStart,
-          onPanUpdate: (details) {
-            _updatePreview(details.globalPosition);
+          onPointerDown: (event) {
+            if (_activeHandlePointer != null) {
+              return;
+            }
+            _activeHandlePointer = event.pointer;
+            onPointerDown(event.position);
           },
-          onPanEnd: (_) {
+          onPointerMove: (event) {
+            if (event.pointer != _activeHandlePointer) {
+              return;
+            }
+            _updatePreview(event.position);
+          },
+          onPointerUp: (event) {
+            if (event.pointer != _activeHandlePointer) {
+              return;
+            }
+            _activeHandlePointer = null;
             _commitGesture();
           },
-          onPanCancel: _cancelGesture,
+          onPointerCancel: (event) {
+            if (event.pointer != _activeHandlePointer) {
+              return;
+            }
+            _activeHandlePointer = null;
+            _cancelGesture();
+          },
           child: Center(child: child),
         ),
       ),

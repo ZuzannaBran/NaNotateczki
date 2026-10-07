@@ -127,7 +127,15 @@ void main() {
     expect(find.byType(EditableText), findsOneWidget);
 
     final widthBeforeResize = movedBlock.width;
-    await tester.drag(find.byType(DefaultSideHandle), const Offset(48, 0));
+    final sideHandle = find.byType(DefaultSideHandle);
+    final gesture = await tester.startGesture(tester.getCenter(sideHandle));
+    await gesture.moveBy(const Offset(4, 0));
+    await tester.pump();
+
+    final liveResizeBlock = controller.pages.single.textBlocks.single;
+    expect(liveResizeBlock.width, greaterThan(widthBeforeResize));
+
+    await gesture.up();
     await tester.pump();
 
     final resizedBlock = controller.pages.single.textBlocks.single;
