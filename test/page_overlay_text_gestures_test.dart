@@ -101,6 +101,7 @@ void main() {
     expect(find.byType(EditableText), findsOneWidget);
     expect(find.byType(DefaultCornerHandle), findsNWidgets(4));
     expect(find.byType(DefaultSideHandle), findsOneWidget);
+    expect(find.byIcon(Icons.rotate_right), findsNothing);
 
     await tester.enterText(find.byType(EditableText), 'Edited text');
     await tester.pump();

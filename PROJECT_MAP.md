@@ -447,8 +447,8 @@ błędów, integralności i wydajności.
   90: `_ObjectTransformHudState`; 494: `_ObjectTransformFramePainter`.
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (509):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
-  move/resize/scale/rotate są delegowane do wspólnego `ObjectTransformHud`.
-  Podczas edycji treści uchwyty resize/rotate pozostają aktywne, a środek
+  move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
+  jest wyłączony. Podczas edycji treści uchwyty resize pozostają aktywne, a środek
   ramki przepuszcza gesty do `EditableText`. Start transformacji zapisuje
   najnowszą treść i używa jej jako snapshotu resize, więc zmiana rozmiaru ani
   anulowanie gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
@@ -468,12 +468,12 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2820 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2821 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText` oraz wspólny `ObjectTransformHud` dla
-move, width-resize, scale i rotate. Nieaktywne teksty zachowują stary Quill jako fallback. Aktywne obrazy/PDF
-korzystają z tego samego `ObjectTransformHud`; rogi skalują, boki zachowują
+move, width-resize i scale. Nieaktywne teksty zachowują stary Quill jako fallback. Aktywne obrazy/PDF
+korzystają z tego samego `ObjectTransformHud`; obrót jest wyłączony, rogi skalują, boki zachowują
 crop, a lasso/ink pozostają poza tym silnikiem. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
 tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
 tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
@@ -536,10 +536,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (148): tryb tekstu
+- `test/page_overlay_text_gestures_test.dart` (149): tryb tekstu
   ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, aktywny
-  blok przełącza się na `TextHudBlock` i `EditableText`, a resize ramki
-  nie gubi świeżo wpisanej treści
+  blok przełącza się na `TextHudBlock` i `EditableText`, resize ramki
+  nie gubi świeżo wpisanej treści, a uchwyt obrotu nie jest renderowany
 - `test/object_transform_engine_test.dart` (68): wspólna geometria
   move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
 - `test/resizable_frame_test.dart` (33)
