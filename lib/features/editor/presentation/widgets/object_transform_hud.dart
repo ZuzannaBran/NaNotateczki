@@ -300,9 +300,9 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
           pointer: _globalToLocal(details.globalPosition),
         );
       },
-      child: DefaultRotationHandle(
-        size: widget.style.rotationHandleSize / scale,
-        iconColor: frameColor,
+      child: Container(
+        width: widget.style.rotationHandleSize / scale,
+        height: widget.style.rotationHandleSize / scale,
         decoration: BoxDecoration(
           color: fillColor,
           shape: BoxShape.circle,
@@ -317,6 +317,11 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
               offset: Offset(0, 1 / scale),
             ),
           ],
+        ),
+        child: Icon(
+          Icons.rotate_right,
+          color: frameColor,
+          size: widget.style.rotationHandleSize * 0.62 / scale,
         ),
       ),
     );

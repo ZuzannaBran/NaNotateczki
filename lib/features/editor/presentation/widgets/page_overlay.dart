@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -293,9 +294,9 @@ class _ActiveImageTransformHud extends StatelessWidget {
           );
         }
         return BoxConstraints(
-          minWidth: math.max(1, block.width * 0.08),
+          minWidth: math.max(1.0, block.width * 0.08).toDouble(),
           maxWidth: block.width,
-          minHeight: math.max(1, block.height * 0.08),
+          minHeight: math.max(1.0, block.height * 0.08).toDouble(),
           maxHeight: block.height,
         );
       },
@@ -1375,7 +1376,6 @@ class _ImageBlockWidget extends StatefulWidget {
     required this.interactionEnabled,
     required this.lassoDragDelta,
     required this.isLassoSelected,
-    this.renderImage = true,
     this.selectionEnabled = true,
   });
 
@@ -1385,7 +1385,6 @@ class _ImageBlockWidget extends StatefulWidget {
   final bool interactionEnabled;
   final ValueListenable<Offset>? lassoDragDelta;
   final bool isLassoSelected;
-  final bool renderImage;
   final bool selectionEnabled;
 
   @override
@@ -1561,27 +1560,25 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                           ]
                         : null,
                   ),
-                  child: widget.renderImage
-                      ? Stack(
-                          children: [
-                            Positioned.fill(
-                              child: _imageChild(
-                                cropLeft: cropLeft,
-                                cropTop: cropTop,
-                                cropRight: cropRight,
-                                cropBottom: cropBottom,
-                                fullWidth: widget.block.width,
-                                fullHeight: widget.block.height,
-                                visibleWidth: visibleWidth,
-                                visibleHeight: visibleHeight,
-                                anchor: _anchorForDirection(
-                                  _activeResizeDirection,
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      : null,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _imageChild(
+                          cropLeft: cropLeft,
+                          cropTop: cropTop,
+                          cropRight: cropRight,
+                          cropBottom: cropBottom,
+                          fullWidth: widget.block.width,
+                          fullHeight: widget.block.height,
+                          visibleWidth: visibleWidth,
+                          visibleHeight: visibleHeight,
+                          anchor: _anchorForDirection(
+                            _activeResizeDirection,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (isSelected && canTransform) ...[
