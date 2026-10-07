@@ -74,10 +74,10 @@ rysika i nie porzuca zmian po błędzie.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (133): kolory akcentów oraz wspólna neutralna paleta beżów interfejsu: `#E6E6E6` dla tła, `#FBFBFB` dla toolbarów/panelu folderów i `#DBDBDB` dla separatorów. Bazowe kolory Cherry, Bubblegum, Lavender, Peach i Baby blue pozostają bez zmian. 3: `AppAccentColor`; 61: `AppAccentPalette`; 117: `AppColors`.
+- `lib/core/theme/app_colors.dart` (57): wspólna ciepła paleta beżów interfejsu: `#F6F5F1` dla tła, `#E4E2DD` dla toolbarów/panelu folderów, `#FAF9F6` dla papieru i `#CFCCC5` dla separatorów. Dostępny motyw akcentu pozostaje beżowy. 3: `AppAccentColor`; 21: `AppAccentPalette`; 45: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (39): jasny Material 3 z ciemniejszym neutralnym tłem `#E6E6E6`, jasnym chromem `#FBFBFB` i separatorami `#DBDBDB`; kolory przewodnie nadal sterują akcentami i zaznaczeniami. 5: `AppTheme`.
+- `lib/core/theme/app_theme.dart` (49): jasny Material 3 korzystający z `AppColors.background` (`#F6F5F1`), ciemniejszego chromu `#E4E2DD` i separatorów `#CFCCC5`. 5: `AppTheme`.
 
 ### Wejście i preferencje
 
