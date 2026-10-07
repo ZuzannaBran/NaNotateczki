@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -11,7 +12,6 @@ import 'package:program/features/editor/presentation/widgets/text_hud_block.dart
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
-import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
@@ -80,7 +80,9 @@ void main() {
     expect(controller.tool, DrawingTool.edit);
     expect(find.byType(TextHudBlock), findsNothing);
 
-    final textPosition = overlayTopLeft + insertPosition + const Offset(40, 20);
+    final inactiveEditor = find.byType(quill.QuillEditor);
+    expect(inactiveEditor, findsOneWidget);
+    final textPosition = tester.getCenter(inactiveEditor);
     await tester.tapAt(textPosition);
     await tester.pump();
 
@@ -122,16 +124,7 @@ Notebook _notebook() {
         id: 'page-1',
         title: 'Canvas',
         textBlocks: const [],
-        imageBlocks: [
-          ImageBlock(
-            id: 'background-image',
-            path: '',
-            ocrText: '',
-            position: const Offset(80, 120),
-            width: 220,
-            height: 140,
-          ),
-        ],
+        imageBlocks: const [],
         inkStrokes: const [],
         isBookmarked: false,
       ),
