@@ -102,6 +102,18 @@ void main() {
     expect(find.byType(DefaultCornerHandle), findsNWidgets(4));
     expect(find.byType(DefaultSideHandle), findsOneWidget);
 
+    await tester.enterText(find.byType(EditableText), 'Edited text');
+    await tester.pump();
+    expect(controller.pages.single.textBlocks.single.text, 'Edited text');
+
+    final widthBeforeResize = controller.pages.single.textBlocks.single.width;
+    await tester.drag(find.byType(DefaultSideHandle), const Offset(48, 0));
+    await tester.pump();
+
+    final resizedBlock = controller.pages.single.textBlocks.single;
+    expect(resizedBlock.text, 'Edited text');
+    expect(resizedBlock.width, greaterThan(widthBeforeResize));
+
     await tester.pump(kDoubleTapTimeout);
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();

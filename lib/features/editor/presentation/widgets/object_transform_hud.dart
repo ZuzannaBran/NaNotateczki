@@ -53,6 +53,7 @@ class ObjectTransformHud<T> extends StatefulWidget {
     this.interactive = true,
     this.showFrame = true,
     this.showHandles = true,
+    this.onTransformStart,
     this.onTap,
     this.onDoubleTap,
     this.onSecondaryTapDown,
@@ -76,6 +77,7 @@ class ObjectTransformHud<T> extends StatefulWidget {
   final bool interactive;
   final bool showFrame;
   final bool showHandles;
+  final VoidCallback? onTransformStart;
   final VoidCallback? onTap;
   final VoidCallback? onDoubleTap;
   final GestureTapDownCallback? onSecondaryTapDown;
@@ -185,6 +187,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
           onDoubleTap: widget.onDoubleTap,
           onSecondaryTapDown: widget.onSecondaryTapDown,
           onPanStart: (details) {
+            widget.onTransformStart?.call();
             _gestureData = widget.data;
             _engine.beginMove(
               rect: rect,
@@ -283,6 +286,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       hitSize: hitSize,
       cursor: SystemMouseCursors.grab,
       onPanStart: (details) {
+        widget.onTransformStart?.call();
         _gestureData = widget.data;
         _engine.beginRotate(
           rect: rect,
@@ -350,6 +354,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     double rotation,
     Offset globalPosition,
   ) {
+    widget.onTransformStart?.call();
     _gestureData = widget.data;
     _engine.beginResize(
       rect: rect,

@@ -343,7 +343,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2685 linii)
+### `lib/features/editor/state/editor_controller.dart` (2690 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
@@ -358,11 +358,12 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
   198: `flushPendingSaves`.
 - 266–324: layout i transformacje viewportu.
 - 341–477: operacje `*OnPage` używane przez canvasy/overlaye.
-- 486–873: narzędzia, aktywne elementy, lasso i preferencje; 538: `setTool`.
+- 486–877: narzędzia, aktywne elementy, lasso i preferencje; 538: `setTool`;
+  aktywna edycja tekstu może być jawnie commitowana przed transformacją ramki.
 - 1224: `undo`; 1237: `redo`; 1309: `toggleBookmark`;
   1312: operacje tekstowe.
-- 2475: `_applyAction`; 2484: `_applyInkAction`;
-  2586: `_scheduleSave`; 2607: `_saveDirtyPages`; 2629: `_save`.
+- 2480: `_applyAction`; 2489: `_applyInkAction`;
+  2591: `_scheduleSave`; 2612: `_saveDirtyPages`; 2634: `_save`.
 
 ## 8. UI edytora
 
@@ -435,19 +436,23 @@ błędów, integralności i wydajności.
   czemu działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
   6: `ObjectTransformKind`; 8: `ObjectTransformSnapshot`;
   24: `ObjectTransformEngine`; 315: `_ObjectTransformSession`.
-- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (543):
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (548):
   wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
   `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform` oraz
-  własnego uchwytu rotacji i silnika współrzędnych. Kolor, rozmiary, hit-area
+  własnego uchwytu rotacji i silnika współrzędnych. Udostępnia callback startu
+  transformacji, żeby warstwa obiektu mogła zamknąć edycję treści przed resize.
+  Kolor, rozmiary, hit-area
   i grubość ramki są konfigurowalne przez `ObjectTransformHudStyle`.
   14: `ObjectTransformHudStyle`; 38: `ObjectTransformHud`;
   88: `_ObjectTransformHudState`; 489: `_ObjectTransformFramePainter`.
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (507):
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (509):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale/rotate są delegowane do wspólnego `ObjectTransformHud`.
   Podczas edycji treści uchwyty resize/rotate pozostają aktywne, a środek
-  ramki przepuszcza gesty do `EditableText`. Nieaktywne teksty nadal używają
-  starego Quilla jako bezpieczny fallback.
+  ramki przepuszcza gesty do `EditableText`. Start transformacji zapisuje
+  najnowszą treść i używa jej jako snapshotu resize, więc zmiana rozmiaru ani
+  anulowanie gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
+  używają starego Quilla jako bezpieczny fallback.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
 
@@ -531,9 +536,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (133): tryb tekstu
-  ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, a aktywny
-  blok przełącza się na `TextHudBlock` i `EditableText`
+- `test/page_overlay_text_gestures_test.dart` (148): tryb tekstu
+  ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, aktywny
+  blok przełącza się na `TextHudBlock` i `EditableText`, a resize ramki
+  nie gubi świeżo wpisanej treści
 - `test/object_transform_engine_test.dart` (68): wspólna geometria
   move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
 - `test/resizable_frame_test.dart` (33)

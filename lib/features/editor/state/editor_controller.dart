@@ -567,6 +567,10 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void commitActiveTextEdit() {
+    _commitActiveTextEdit();
+  }
+
   void clearActiveTextBlock() {
     _commitActiveTextEdit();
     activeTextBlockId = null;

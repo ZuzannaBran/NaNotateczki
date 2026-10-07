@@ -45,6 +45,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
   double _frameHeight = _frameMinHeight;
   bool _metricsScheduled = false;
   bool _focusRequestScheduled = false;
+  TextBlock? _transformBefore;
 
   @override
   void initState() {
@@ -127,6 +128,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
               maxHeight: 2400,
             ),
             onDoubleTap: _enterEditing,
+            onTransformStart: _beginTransform,
             onPreview: _previewTransform,
             onCommit: _commitTransform,
             onCancel: _cancelTransform,
@@ -237,30 +239,40 @@ class _TextHudBlockState extends State<TextHudBlock> {
     _scheduleMetrics();
   }
 
+  void _beginTransform() {
+    if (_transformBefore != null) {
+      return;
+    }
+    _transformBefore =
+        widget.controller.findTextBlockById(widget.block.id) ?? widget.block;
+    widget.controller.commitActiveTextEdit();
+  }
+
   void _previewTransform(TextBlock before, ObjectTransformSnapshot preview) {
+    final transformBefore = _transformBefore ?? before;
     final scale =
         preview.kind == ObjectTransformKind.resize &&
             preview.handle?.isDiagonal == true &&
-            before.width > 0
-        ? preview.rect.width / before.width
+            transformBefore.width > 0
+        ? preview.rect.width / transformBefore.width
         : 1.0;
-    final nextFontSize = (before.fontSize * scale)
+    final nextFontSize = (transformBefore.fontSize * scale)
         .clamp(_minTextFontSize, _maxTextFontSize)
         .toDouble();
-    final double actualScale = before.fontSize == 0
+    final double actualScale = transformBefore.fontSize == 0
         ? 1.0
-        : nextFontSize / before.fontSize;
+        : nextFontSize / transformBefore.fontSize;
     final nextDelta = (actualScale - 1).abs() <= 1e-6
-        ? before.deltaJson
+        ? transformBefore.deltaJson
         : _scaledDeltaJson(
-            before.deltaJson,
+            transformBefore.deltaJson,
             scale: actualScale,
-            fallbackSize: before.fontSize,
+            fallbackSize: transformBefore.fontSize,
           );
 
     widget.controller.updateTextBlockOnPage(
       widget.pageIndex,
-      before.copyWith(
+      transformBefore.copyWith(
         position: preview.rect.topLeft + widget.worldOrigin,
         width: preview.rect.width,
         fontSize: nextFontSize,
@@ -271,15 +283,23 @@ class _TextHudBlockState extends State<TextHudBlock> {
   }
 
   void _commitTransform(TextBlock before, ObjectTransformSnapshot preview) {
+    final transformBefore = _transformBefore ?? before;
+    _transformBefore = null;
     final current = widget.controller.findTextBlockById(before.id);
     if (current == null) {
       return;
     }
-    widget.controller.commitTextUpdateOnPage(widget.pageIndex, before, current);
+    widget.controller.commitTextUpdateOnPage(
+      widget.pageIndex,
+      transformBefore,
+      current,
+    );
   }
 
   void _cancelTransform(TextBlock before) {
-    widget.controller.updateTextBlockOnPage(widget.pageIndex, before);
+    final transformBefore = _transformBefore ?? before;
+    _transformBefore = null;
+    widget.controller.updateTextBlockOnPage(widget.pageIndex, transformBefore);
   }
 
   void _scheduleMetrics() {
