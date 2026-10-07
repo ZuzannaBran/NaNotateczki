@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/features/editor/presentation/widgets/object_transform_hud.dart';
 import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
 import 'package:program/features/editor/presentation/widgets/text_hud_block.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
@@ -18,6 +19,25 @@ import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 void main() {
+  test('transform handle hit area scales with frame size', () {
+    const style = ObjectTransformHudStyle();
+
+    final small = style.handleHitSizeForRect(
+      const Rect.fromLTWH(0, 0, 80, 40),
+    );
+    final medium = style.handleHitSizeForRect(
+      const Rect.fromLTWH(0, 0, 320, 120),
+    );
+    final large = style.handleHitSizeForRect(
+      const Rect.fromLTWH(0, 0, 900, 700),
+    );
+
+    expect(small, 32);
+    expect(medium, greaterThan(small));
+    expect(large, greaterThan(medium));
+    expect(large, 80);
+  });
+
   testWidgets('inserted text starts selected in edit mode and reopens', (
     tester,
   ) async {

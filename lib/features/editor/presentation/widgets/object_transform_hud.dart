@@ -20,10 +20,12 @@ class ObjectTransformHudStyle {
     this.sideHandleThickness = 6,
     this.moveHandleWidth = 30,
     this.moveHandleHeight = 16,
-    this.moveHandleHitSize = 44,
+    this.moveHandleHitSize = 32,
     this.moveHandleOffset = 32,
     this.rotationHandleSize = 20,
-    this.handleHitSize = 44,
+    this.handleHitSize = 32,
+    this.maxHandleHitSize = 80,
+    this.handleHitScale = 0.35,
     this.rotationHandleOffset = 30,
     this.frameWidth = 1.25,
   });
@@ -39,8 +41,19 @@ class ObjectTransformHudStyle {
   final double moveHandleOffset;
   final double rotationHandleSize;
   final double handleHitSize;
+  final double maxHandleHitSize;
+  final double handleHitScale;
   final double rotationHandleOffset;
   final double frameWidth;
+
+  double handleHitSizeForRect(Rect rect, {double? minimum}) {
+    final minHitSize = minimum ?? handleHitSize;
+    final area = math.max(0.0, rect.width * rect.height);
+    final linearSize = math.sqrt(area);
+    return (linearSize * handleHitScale)
+        .clamp(minHitSize, maxHandleHitSize)
+        .toDouble();
+  }
 }
 
 class ObjectTransformHud<T> extends StatefulWidget {
@@ -229,7 +242,12 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     final outward = _rotate(const Offset(0, -1), rotation);
     final point =
         topCenter + outward * (widget.style.moveHandleOffset / scale);
-    final hitSize = widget.style.moveHandleHitSize / scale;
+    final hitSize =
+        widget.style.handleHitSizeForRect(
+          rect,
+          minimum: widget.style.moveHandleHitSize,
+        ) /
+        scale;
 
     return _positionedHandle(
       point: point,
@@ -274,7 +292,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     required double scale,
   }) {
     final point = _pointForHandle(rect, rotation, handle);
-    final hitSize = widget.style.handleHitSize / scale;
+    final hitSize = widget.style.handleHitSizeForRect(rect) / scale;
     return _positionedHandle(
       point: point,
       hitSize: hitSize,
@@ -303,7 +321,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     required double scale,
   }) {
     final point = _pointForHandle(rect, rotation, handle);
-    final hitSize = widget.style.handleHitSize / scale;
+    final hitSize = widget.style.handleHitSizeForRect(rect) / scale;
     return _positionedHandle(
       point: point,
       hitSize: hitSize,
@@ -336,7 +354,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     final outward = _rotate(const Offset(0, -1), rotation);
     final point =
         topCenter + outward * (widget.style.rotationHandleOffset / scale);
-    final hitSize = widget.style.handleHitSize / scale;
+    final hitSize = widget.style.handleHitSizeForRect(rect) / scale;
 
     return _positionedHandle(
       point: point,

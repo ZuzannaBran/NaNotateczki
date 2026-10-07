@@ -436,19 +436,20 @@ błędów, integralności i wydajności.
   czemu działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
   6: `ObjectTransformKind`; 8: `ObjectTransformSnapshot`;
   24: `ObjectTransformEngine`; 315: `_ObjectTransformSession`.
-- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (634):
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (652):
   wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
   `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform`
   oraz wspólnego grabbera nad górną krawędzią do przesuwania obiektu.
   Grabber działa także wtedy, gdy środek ramki jest wyłączony z dragowania,
   np. podczas aktywnej edycji tekstu. Dedykowane uchwyty używają surowych
   pointer events zamiast rozpoznawania pan, więc reagują od pierwszego ruchu
-  bez systemowego touch slop; ich niewidzialny hit-area ma 44 px.
+  bez systemowego touch slop. Niewidzialny hit-area skaluje się liniowo z
+  rozmiarem ramki przez sqrt(width*height), z zakresem 32–80 px.
   Udostępnia callback startu transformacji, żeby warstwa obiektu mogła zamknąć
   edycję treści przed resize/move. Kolor, rozmiary i grubość ramki są
   konfigurowalne przez `ObjectTransformHudStyle`.
-  14: `ObjectTransformHudStyle`; 46: `ObjectTransformHud`;
-  98: `_ObjectTransformHudState`; 580: `_ObjectTransformFramePainter`.
+  14: `ObjectTransformHudStyle`; 56: `ObjectTransformHud`;
+  111: `_ObjectTransformHudState`; 598: `_ObjectTransformFramePainter`.
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (509):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
@@ -541,11 +542,11 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (176): tryb tekstu
-  ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, aktywny
-  blok przełącza się na `TextHudBlock` i `EditableText`, grabber przesuwa
-  ramkę także podczas pisania bez utraty treści, resize reaguje już na mały
-  ruch wskaźnika i nie gubi zmian, a uchwyt obrotu nie jest renderowany
+- `test/page_overlay_text_gestures_test.dart` (196): sprawdza
+  skalowanie hit-area uchwytów wraz z rozmiarem ramki; tryb tekstu ignoruje
+  obrazy pod kursorem, nowy tekst przechodzi do edit, aktywny blok przełącza
+  się na `TextHudBlock` i `EditableText`, grabber przesuwa ramkę podczas
+  pisania, a resize reaguje już na mały ruch i nie gubi zmian
 - `test/object_transform_engine_test.dart` (68): wspólna geometria
   move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
 - `test/resizable_frame_test.dart` (33)
