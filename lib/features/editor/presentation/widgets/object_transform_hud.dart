@@ -290,9 +290,9 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
           pointer: _globalToLocal(details.globalPosition),
         );
       },
-      child: DefaultRotationHandle(
-        size: widget.style.rotationHandleSize / scale,
-        iconColor: frameColor,
+      child: Container(
+        width: widget.style.rotationHandleSize / scale,
+        height: widget.style.rotationHandleSize / scale,
         decoration: BoxDecoration(
           color: fillColor,
           shape: BoxShape.circle,
@@ -304,6 +304,11 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
               offset: Offset(0, 1 / scale),
             ),
           ],
+        ),
+        child: Icon(
+          Icons.rotate_right,
+          color: frameColor,
+          size: widget.style.rotationHandleSize * 0.62 / scale,
         ),
       ),
     );
@@ -436,10 +441,12 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       final origin = renderObject.localToGlobal(Offset.zero);
       final xUnit = renderObject.localToGlobal(const Offset(1, 0));
       final yUnit = renderObject.localToGlobal(const Offset(0, 1));
-      final measured = math.max(
-        0.01,
-        ((xUnit - origin).distance + (yUnit - origin).distance) / 2,
-      );
+      final measured = math
+          .max(
+            0.01,
+            ((xUnit - origin).distance + (yUnit - origin).distance) / 2,
+          )
+          .toDouble();
       if ((measured - _screenScale).abs() <= 0.01) {
         return;
       }

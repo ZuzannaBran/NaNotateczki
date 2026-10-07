@@ -428,15 +428,20 @@ błędów, integralności i wydajności.
   formatowanie aktywnego bloku Quill; pasek używa jasnej neutralnej powierzchni #FBFBFB.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
-- `lib/features/editor/presentation/interaction/object_transform_engine.dart` (245):
-  wspólny silnik move/resize/rotate dla obiektów nie-ink. Przeliczone przez
-  hosta współrzędne logiczne przekazuje do czystego API `box_transform`, więc
-  działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
-- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (548):
+- `lib/features/editor/presentation/interaction/object_transform_engine.dart` (424):
+  wspólny silnik move/resize/rotate dla obiektów nie-ink. Używa typów
+  `HandlePosition` i `ResizeMode` z `flutter_box_transform`, ale po zmianach
+  API 0.4.7 sam liczy geometrię logiczną, clamp, skalowanie i obrót, dzięki
+  czemu działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
+  6: `ObjectTransformKind`; 8: `ObjectTransformSnapshot`;
+  24: `ObjectTransformEngine`; 315: `_ObjectTransformSession`.
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (543):
   wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
-  `DefaultCornerHandle`, `DefaultSideHandle` i `DefaultRotationHandle`
-  z `flutter_box_transform`, ale własny silnik współrzędnych. Kolor, rozmiary,
-  hit-area i grubość ramki są konfigurowalne przez `ObjectTransformHudStyle`.
+  `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform` oraz
+  własnego uchwytu rotacji i silnika współrzędnych. Kolor, rozmiary, hit-area
+  i grubość ramki są konfigurowalne przez `ObjectTransformHudStyle`.
+  14: `ObjectTransformHudStyle`; 38: `ObjectTransformHud`;
+  88: `_ObjectTransformHudState`; 489: `_ObjectTransformFramePainter`.
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (507):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale/rotate są delegowane do wspólnego `ObjectTransformHud`.
@@ -456,7 +461,7 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2843 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2820 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText` oraz wspólny `ObjectTransformHud` dla
@@ -468,14 +473,16 @@ tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
 mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
 Operuje wyłącznie w logicznych współrzędnych strony/dokumentu; responsywną
 skalę nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki
-overlayu.
+overlayu. Pojedyncze wskazanie nieaktywnego Quilla jest stosowane po oknie
+double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu na
+`TextHudBlock`.
 
-- 28: `PageOverlay`; 183: `DocumentPageOverlay`.
+- 32: `PageOverlay`; 193: `DocumentPageOverlay`.
 - aktywny tekst: `TextHudBlock`; fallback nieaktywnego tekstu:
   `_TextBlockWidget` / `_TextBlockWidgetState`.
-- 1088: `_ImageBlockWidget`; 1113: `_ImageBlockWidgetState`.
-- 2176: `_editOcr`; 2250: `_OcrTextDialog`;
-  2349: `_LassoSelectionWidget`; 2503: `_LassoActionButton`.
+- 1354: `_ImageBlockWidget`; 1377: `_ImageBlockWidgetState`.
+- 2436: `_editOcr`; 2510: `_OcrTextDialog`;
+  2609: `_LassoSelectionWidget`; 2763: `_LassoActionButton`.
 
 ## 9. Board
 
@@ -522,10 +529,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (141): tryb tekstu
+- `test/page_overlay_text_gestures_test.dart` (133): tryb tekstu
   ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, a aktywny
   blok przełącza się na `TextHudBlock` i `EditableText`
-- `test/object_transform_engine_test.dart` (76): wspólna geometria
+- `test/object_transform_engine_test.dart` (68): wspólna geometria
   move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)

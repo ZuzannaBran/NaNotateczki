@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -293,9 +294,9 @@ class _ActiveImageTransformHud extends StatelessWidget {
           );
         }
         return BoxConstraints(
-          minWidth: math.max(1, block.width * 0.08),
+          minWidth: math.max(1.0, block.width * 0.08).toDouble(),
           maxWidth: block.width,
-          minHeight: math.max(1, block.height * 0.08),
+          minHeight: math.max(1.0, block.height * 0.08).toDouble(),
           maxHeight: block.height,
         );
       },
@@ -559,6 +560,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   StreamSubscription<quill.DocChange>? _docSubscription;
+  Timer? _selectionTimer;
   String? _lastDeltaJson;
   late EditorController _editorController;
   bool _isNormalizing = false;
@@ -596,6 +598,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 
   @override
   void dispose() {
+    _selectionTimer?.cancel();
     _docSubscription?.cancel();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -628,116 +631,107 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 
     final textChild = IgnorePointer(
       ignoring: !(canTransform || canDoubleTapEdit),
-      child: Opacity(
-        opacity: widget.doubleTapOnly ? 0.0 : 1.0,
-        child: Builder(
-          builder: (blockContext) {
-            return GestureDetector(
-              onDoubleTap: canDoubleTapEdit
-                  ? () => _activateTextEditing(controller)
-                  : null,
-              onTapDown: canTransform
-                  ? (_) {
-                      if (controller.currentPageIndex != widget.pageIndex) {
-                        controller.setCurrentPage(widget.pageIndex);
+      child: Listener(
+        onPointerUp: canTransform
+            ? (_) => _scheduleTextSelection(controller, canEdit)
+            : null,
+        child: Opacity(
+          opacity: widget.doubleTapOnly ? 0.0 : 1.0,
+          child: Builder(
+            builder: (blockContext) {
+              return GestureDetector(
+                onDoubleTap: canDoubleTapEdit
+                    ? () => _activateTextEditing(controller)
+                    : null,
+                onPanStart: canTransform
+                    ? (details) {
+                        final box =
+                            blockContext.findRenderObject() as RenderBox?;
+                        final size = box?.size ?? Size.zero;
+                        final local = details.localPosition;
+                        _dragFromFrame = !isActive || _isOnFrame(local, size);
+                        if (!_dragFromFrame) {
+                          return;
+                        }
+                        _startMove(details.globalPosition);
                       }
-                      controller.markTextTap();
-                      controller.setActiveTextBlock(
-                        widget.block.id,
-                        canEdit ? _quillController : null,
-                      );
-                      if (canEdit) {
-                        _focusNode.requestFocus();
-                        requestSoftKeyboardForFocus(context, _focusNode);
+                    : null,
+                onPanUpdate: canTransform
+                    ? (details) {
+                        if (!_dragFromFrame) {
+                          return;
+                        }
+                        _updateMove(details.globalPosition, controller);
                       }
-                    }
-                  : null,
-              onPanStart: canTransform
-                  ? (details) {
-                      final box = blockContext.findRenderObject() as RenderBox?;
-                      final size = box?.size ?? Size.zero;
-                      final local = details.localPosition;
-                      _dragFromFrame = !isActive || _isOnFrame(local, size);
-                      if (!_dragFromFrame) {
-                        return;
+                    : null,
+                onPanEnd: canTransform
+                    ? (_) {
+                        if (!_dragFromFrame) {
+                          return;
+                        }
+                        _endMove(controller);
                       }
-                      _startMove(details.globalPosition);
-                    }
-                  : null,
-              onPanUpdate: canTransform
-                  ? (details) {
-                      if (!_dragFromFrame) {
-                        return;
-                      }
-                      _updateMove(details.globalPosition, controller);
-                    }
-                  : null,
-              onPanEnd: canTransform
-                  ? (_) {
-                      if (!_dragFromFrame) {
-                        return;
-                      }
-                      _endMove(controller);
-                    }
-                  : null,
-              child: NotificationListener<SizeChangedLayoutNotification>(
-                onNotification: (_) {
-                  _scheduleFrameMeasure();
-                  return false;
-                },
-                child: SizeChangedLayoutNotifier(
-                  child: Container(
-                    key: _textContentKey,
-                    width: widget.block.width,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.paper.withValues(
-                        alpha: isActive
-                            ? 0.92
-                            : widget.isLassoSelected
-                            ? 0.18
-                            : 0.0,
+                    : null,
+                child: NotificationListener<SizeChangedLayoutNotification>(
+                  onNotification: (_) {
+                    _scheduleFrameMeasure();
+                    return false;
+                  },
+                  child: SizeChangedLayoutNotifier(
+                    child: Container(
+                      key: _textContentKey,
+                      width: widget.block.width,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
                       ),
-                      borderRadius: BorderRadius.zero,
-                      border: Border.all(
-                        color: widget.isLassoSelected
-                            ? _lassoAccentColor.withValues(alpha: 0.55)
-                            : Colors.transparent,
-                        width: 1.2,
-                      ),
-                      boxShadow: widget.isLassoSelected
-                          ? [
-                              BoxShadow(
-                                color: _lassoAccentColor.withValues(
-                                  alpha: 0.18,
+                      decoration: BoxDecoration(
+                        color: AppColors.paper.withValues(
+                          alpha: isActive
+                              ? 0.92
+                              : widget.isLassoSelected
+                              ? 0.18
+                              : 0.0,
+                        ),
+                        borderRadius: BorderRadius.zero,
+                        border: Border.all(
+                          color: widget.isLassoSelected
+                              ? _lassoAccentColor.withValues(alpha: 0.55)
+                              : Colors.transparent,
+                          width: 1.2,
+                        ),
+                        boxShadow: widget.isLassoSelected
+                            ? [
+                                BoxShadow(
+                                  color: _lassoAccentColor.withValues(
+                                    alpha: 0.18,
+                                  ),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
                                 ),
-                                blurRadius: 8,
-                                spreadRadius: 1,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: quill.QuillEditor(
-                      controller: _quillController,
-                      focusNode: _focusNode,
-                      scrollController: _scrollController,
-                      config: quill.QuillEditorConfig(
-                        scrollable: false,
-                        padding: EdgeInsets.zero,
-                        autoFocus: false,
-                        expands: false,
-                        // ignore: experimental_member_use
-                        onKeyPressed: (event, node) => _handleKeyPressed(event),
+                              ]
+                            : null,
+                      ),
+                      child: quill.QuillEditor(
+                        controller: _quillController,
+                        focusNode: _focusNode,
+                        scrollController: _scrollController,
+                        config: quill.QuillEditorConfig(
+                          scrollable: false,
+                          padding: EdgeInsets.zero,
+                          autoFocus: false,
+                          expands: false,
+                          // ignore: experimental_member_use
+                          onKeyPressed: (event, node) =>
+                              _handleKeyPressed(event),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -888,6 +882,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   }
 
   void _activateTextEditing(EditorController controller) {
+    _selectionTimer?.cancel();
     if (controller.currentPageIndex != widget.pageIndex) {
       controller.setCurrentPage(widget.pageIndex);
     }
@@ -898,6 +893,27 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     controller.setActiveTextBlock(widget.block.id, _quillController);
     _focusNode.requestFocus();
     requestSoftKeyboardForFocus(context, _focusNode);
+  }
+
+  void _scheduleTextSelection(EditorController controller, bool canEdit) {
+    _selectionTimer?.cancel();
+    _selectionTimer = Timer(kDoubleTapTimeout, () {
+      if (!mounted) {
+        return;
+      }
+      if (controller.currentPageIndex != widget.pageIndex) {
+        controller.setCurrentPage(widget.pageIndex);
+      }
+      controller.markTextTap();
+      controller.setActiveTextBlock(
+        widget.block.id,
+        canEdit ? _quillController : null,
+      );
+      if (canEdit) {
+        _focusNode.requestFocus();
+        requestSoftKeyboardForFocus(context, _focusNode);
+      }
+    });
   }
 
   void _startPackageResize(HandlePosition handle, Offset globalPosition) {
@@ -1343,7 +1359,6 @@ class _ImageBlockWidget extends StatefulWidget {
     required this.interactionEnabled,
     required this.lassoDragDelta,
     required this.isLassoSelected,
-    this.renderImage = true,
     this.selectionEnabled = true,
   });
 
@@ -1353,7 +1368,6 @@ class _ImageBlockWidget extends StatefulWidget {
   final bool interactionEnabled;
   final ValueListenable<Offset>? lassoDragDelta;
   final bool isLassoSelected;
-  final bool renderImage;
   final bool selectionEnabled;
 
   @override
@@ -1529,27 +1543,23 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                           ]
                         : null,
                   ),
-                  child: widget.renderImage
-                      ? Stack(
-                          children: [
-                            Positioned.fill(
-                              child: _imageChild(
-                                cropLeft: cropLeft,
-                                cropTop: cropTop,
-                                cropRight: cropRight,
-                                cropBottom: cropBottom,
-                                fullWidth: widget.block.width,
-                                fullHeight: widget.block.height,
-                                visibleWidth: visibleWidth,
-                                visibleHeight: visibleHeight,
-                                anchor: _anchorForDirection(
-                                  _activeResizeDirection,
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      : null,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _imageChild(
+                          cropLeft: cropLeft,
+                          cropTop: cropTop,
+                          cropRight: cropRight,
+                          cropBottom: cropBottom,
+                          fullWidth: widget.block.width,
+                          fullHeight: widget.block.height,
+                          visibleWidth: visibleWidth,
+                          visibleHeight: visibleHeight,
+                          anchor: _anchorForDirection(_activeResizeDirection),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (isSelected && canTransform) ...[

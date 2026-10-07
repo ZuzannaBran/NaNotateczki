@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -8,7 +9,7 @@ import 'package:program/features/editor/presentation/interaction/object_transfor
 void main() {
   test('move works in logical coordinates', () {
     final engine = ObjectTransformEngine();
-    const rect = Rect.fromLTWH(20, 30, 200, 80);
+    final rect = Rect.fromLTWH(20, 30, 200, 80);
 
     engine.beginMove(rect: rect, rotation: 0, pointer: const Offset(40, 50));
     final preview = engine.update(const Offset(70, 95));
@@ -19,7 +20,7 @@ void main() {
 
   test('corner scale preserves aspect ratio', () {
     final engine = ObjectTransformEngine();
-    const rect = Rect.fromLTWH(10, 20, 200, 100);
+    final rect = Rect.fromLTWH(10, 20, 200, 100);
 
     engine.beginResize(
       rect: rect,
@@ -36,7 +37,7 @@ void main() {
 
   test('side resize changes only the driven axis', () {
     final engine = ObjectTransformEngine();
-    const rect = Rect.fromLTWH(10, 20, 200, 100);
+    final rect = Rect.fromLTWH(10, 20, 200, 100);
 
     engine.beginResize(
       rect: rect,
@@ -54,7 +55,7 @@ void main() {
 
   test('rotation can snap to fifteen degree increments', () {
     final engine = ObjectTransformEngine();
-    const rect = Rect.fromLTWH(0, 0, 200, 80);
+    final rect = Rect.fromLTWH(0, 0, 200, 80);
     final start = rect.topCenter;
     const target = Offset(190, -30);
 

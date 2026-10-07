@@ -84,7 +84,7 @@ void main() {
     expect(inactiveEditor, findsOneWidget);
     final textPosition = tester.getCenter(inactiveEditor);
     await tester.tapAt(textPosition);
-    await tester.pump();
+    await tester.pump(kDoubleTapTimeout + const Duration(milliseconds: 1));
 
     expect(controller.activeTextBlockId, isNotNull);
     expect(controller.tool, DrawingTool.edit);
