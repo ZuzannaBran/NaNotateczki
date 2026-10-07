@@ -310,7 +310,7 @@ class ObjectTransformEngine {
         handle.isDiagonal) {
       final widthScale = width / rect.width;
       final heightScale = height / rect.height;
-      final scale = math.max(widthScale, heightScale);
+      final scale = math.max(widthScale, heightScale).toDouble();
       width = session.constraints.constrainWidth(rect.width * scale);
       height = session.constraints.constrainHeight(rect.height * scale);
     }
@@ -413,16 +413,16 @@ Rect _clampResizeRect(
   var bottom = rect.bottom;
 
   if (handle.influencesLeft) {
-    left = math.max(left, bounds.left);
+    left = math.max(left, bounds.left).toDouble();
   }
   if (handle.influencesRight) {
-    right = math.min(right, bounds.right);
+    right = math.min(right, bounds.right).toDouble();
   }
   if (handle.influencesTop) {
-    top = math.max(top, bounds.top);
+    top = math.max(top, bounds.top).toDouble();
   }
   if (handle.influencesBottom) {
-    bottom = math.min(bottom, bounds.bottom);
+    bottom = math.min(bottom, bounds.bottom).toDouble();
   }
 
   if (right <= left || bottom <= top) {

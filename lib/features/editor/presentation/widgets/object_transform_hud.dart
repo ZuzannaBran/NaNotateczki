@@ -456,10 +456,12 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       final origin = renderObject.localToGlobal(Offset.zero);
       final xUnit = renderObject.localToGlobal(const Offset(1, 0));
       final yUnit = renderObject.localToGlobal(const Offset(0, 1));
-      final measured = math.max(
-        0.01,
-        ((xUnit - origin).distance + (yUnit - origin).distance) / 2,
-      );
+      final measured = math
+          .max(
+            0.01,
+            ((xUnit - origin).distance + (yUnit - origin).distance) / 2,
+          )
+          .toDouble();
       if ((measured - _screenScale).abs() <= 0.01) {
         return;
       }
