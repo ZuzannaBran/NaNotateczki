@@ -2,9 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:webview_plus/webview_plus.dart';
+import 'package:webview_all/webview_all.dart';
 
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/note_page.dart';
@@ -44,7 +43,29 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
   static const double _maxFontSize = 96;
 
   late final String _initialHtml = _buildHtml();
+  late final WebViewController _webViewController = WebViewController();
   bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_configureWebView());
+  }
+
+  Future<void> _configureWebView() async {
+    await _webViewController.setJavaScriptMode(JavaScriptMode.unrestricted);
+    try {
+      await _webViewController.setBackgroundColor(Colors.transparent);
+    } catch (_) {
+      // The HTML itself is transparent. Some platform implementations ignore
+      // an explicit WebView background color.
+    }
+    await _webViewController.addJavaScriptChannel(
+      'EditorBridge',
+      onMessageReceived: _onJavaScriptMessage,
+    );
+    await _webViewController.loadHtmlString(_initialHtml);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,32 +85,7 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
               ),
             ),
           Positioned.fill(
-            child: WebviewWidget(
-              initialData: WebviewInitialData(_initialHtml),
-              initialSettings: WebviewSettings(
-                javaScriptEnabled: true,
-                transparentBackground: true,
-                initialBackgroundColor: Colors.transparent,
-                supportZoom: false,
-                builtInZoomControls: false,
-                displayZoomControls: false,
-                hideNativeScrollbars: true,
-                disableLinkHoverPreview: true,
-                disablePrinting: true,
-                isInspectable: kDebugMode,
-                selectionTextColor: const Color(0x553A78FF),
-              ),
-              onWebViewCreated: _onWebViewCreated,
-              onMessageReceived: (_, message) {
-                _handleFallbackMessage(message);
-              },
-              onReceivedError: (_, url, code, description) {
-                debugPrint(
-                  'WebTextEditorLayer: webview error '
-                  '$code for $url: $description',
-                );
-              },
-            ),
+            child: WebViewWidget(controller: _webViewController),
           ),
         ],
       ),
@@ -132,18 +128,20 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
     );
   }
 
-  void _onWebViewCreated(WebviewPlusController controller) {
-    controller.addJavaScriptHandler(
-      handlerName: 'editorEvent',
-      callback: _handleEditorEvent,
-    );
+  void _onJavaScriptMessage(JavaScriptMessage message) {
+    try {
+      final decoded = jsonDecode(message.message);
+      if (decoded is Map) {
+        unawaited(
+          _handleEditorEvent(Map<String, dynamic>.from(decoded)),
+        );
+      }
+    } catch (_) {
+      return;
+    }
   }
 
-  Future<Map<String, dynamic>> _handleEditorEvent(List<dynamic> args) async {
-    if (args.isEmpty || args.first is! Map) {
-      return const <String, dynamic>{'ok': false};
-    }
-    final event = Map<String, dynamic>.from(args.first as Map);
+  Future<void> _handleEditorEvent(Map<String, dynamic> event) async {
     final type = event['type']?.toString();
 
     switch (type) {
@@ -153,14 +151,14 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
             _ready = true;
           });
         }
-        return const <String, dynamic>{'ok': true};
+        return;
       case 'select':
         final id = event['id']?.toString();
         if (id != null && widget.controller.findTextBlockById(id) != null) {
           widget.controller.markTextTap();
           widget.controller.setActiveTextBlock(id, null);
         }
-        return const <String, dynamic>{'ok': true};
+        return;
       case 'editStart':
         final id = event['id']?.toString();
         if (id != null && widget.controller.findTextBlockById(id) != null) {
@@ -170,43 +168,32 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
           }
           widget.controller.setActiveTextBlock(id, null);
         }
-        return const <String, dynamic>{'ok': true};
+        return;
       case 'commit':
         _commitEvent(event);
-        return const <String, dynamic>{'ok': true};
+        return;
       case 'delete':
         final id = event['id']?.toString();
         if (id != null && widget.controller.findTextBlockById(id) != null) {
           widget.controller.deleteTextBlockOnPage(widget.pageIndex, id);
         }
-        return const <String, dynamic>{'ok': true};
+        return;
       case 'deselect':
         if (widget.controller.tool == DrawingTool.text) {
           widget.controller.setTool(DrawingTool.edit);
         } else {
           widget.controller.clearActiveTextBlock();
         }
-        return const <String, dynamic>{'ok': true};
+        return;
       case 'engineError':
         final message =
             event['message']?.toString() ?? 'unknown error';
         debugPrint(
           'WebTextEditorLayer: Moveable failed to load: $message',
         );
-        return const <String, dynamic>{'ok': true};
+        return;
     }
-    return const <String, dynamic>{'ok': false};
-  }
-
-  void _handleFallbackMessage(String message) {
-    try {
-      final decoded = jsonDecode(message);
-      if (decoded is Map) {
-        unawaited(_handleEditorEvent(<dynamic>[decoded]));
-      }
-    } catch (_) {
-      return;
-    }
+    return;
   }
 
   void _commitEvent(Map<String, dynamic> event) {
@@ -513,11 +500,9 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
   let dragStart = null;
 
   function bridgeCall(payload) {
-    if (window.webview_plus && window.webview_plus.callHandler) {
-      return window.webview_plus.callHandler("editorEvent", payload);
-    }
-    if (window.WebviewPlusChannel && window.WebviewPlusChannel.postMessage) {
-      window.WebviewPlusChannel.postMessage(JSON.stringify(payload));
+    if (window.EditorBridge && window.EditorBridge.postMessage) {
+      window.EditorBridge.postMessage(JSON.stringify(payload));
+      return Promise.resolve({ok: true});
     }
     return Promise.resolve({ok: false});
   }
@@ -844,7 +829,7 @@ class _WebTextEditorLayerState extends State<WebTextEditorLayer> {
   });
 
   function announceReady() {
-    if (window.webview_plus && window.webview_plus.callHandler) {
+    if (window.EditorBridge && window.EditorBridge.postMessage) {
       bridgeCall({type: "ready"});
       return;
     }

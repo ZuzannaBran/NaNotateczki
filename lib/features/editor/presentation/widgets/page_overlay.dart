@@ -130,7 +130,7 @@ class PageOverlay extends StatelessWidget {
           if (useWebTextEditor && renderActive)
             Positioned.fill(
               child: WebTextEditorLayer(
-                key: ValueKey('web-text-editor-' + effectivePage.id),
+                key: ValueKey('web-text-editor-${effectivePage.id}'),
                 controller: controller,
                 page: effectivePage,
                 pageIndex: effectivePageIndex,
@@ -1095,7 +1095,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 
   String _colorToHex(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
-    return '#' + value.substring(2);
+    return '#${value.substring(2)}';
   }
 
   int _countTrailingNewlines(String text) {

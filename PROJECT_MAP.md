@@ -428,9 +428,9 @@ błędów, integralności i wydajności.
   formatowanie aktywnego bloku Quill; pasek używa jasnej neutralnej powierzchni #FBFBFB.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
-- `lib/features/editor/presentation/widgets/web_text_editor_layer.dart` (886):
+- `lib/features/editor/presentation/widgets/web_text_editor_layer.dart` (871):
   eksperymentalna scena tekstowa oparta na DOM `contenteditable`,
-  `webview_plus` i Moveable. Montuje się tylko gdy tekst jest aktywny,
+  `webview_all` i Moveable. Montuje się tylko gdy tekst jest aktywny,
   renderuje wszystkie teksty bieżącej strony w przezroczystej WebView i
   zwraca drag/resize/scale/rotate oraz treść do `TextBlock` przez
   `UpdateTextAction`. Ink i obrazy/PDF pozostają poza WebView.
