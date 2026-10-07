@@ -401,8 +401,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                   : null,
               onPanStart: canTransform
                   ? (details) {
-                      final box =
-                          blockContext.findRenderObject() as RenderBox?;
+                      final box = blockContext.findRenderObject() as RenderBox?;
                       final size = box?.size ?? Size.zero;
                       final local = details.localPosition;
                       _dragFromFrame = !isActive || _isOnFrame(local, size);
@@ -478,8 +477,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                         autoFocus: false,
                         expands: false,
                         // ignore: experimental_member_use
-                        onKeyPressed: (event, node) =>
-                            _handleKeyPressed(event),
+                        onKeyPressed: (event, node) => _handleKeyPressed(event),
                       ),
                     ),
                   ),
@@ -503,11 +501,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
           clipBehavior: Clip.none,
           children: [
             Positioned(left: left, top: top, child: child),
-            _transformFrame(
-              controller: controller,
-              left: left,
-              top: top,
-            ),
+            _transformFrame(controller: controller, left: left, top: top),
             Positioned(
               left: left + (widget.block.width - _actionButtonSize) / 2,
               top: top + _frameHeight + _moveButtonGap,
@@ -543,14 +537,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       allowContentFlipping: false,
       allowFlippingWhileResizing: false,
       handleTapSize: _transformHandleTapSize,
-      enabledHandles: const {
-        HandlePosition.topLeft,
-        HandlePosition.right,
-      },
-      visibleHandles: const {
-        HandlePosition.topLeft,
-        HandlePosition.right,
-      },
+      enabledHandles: const {HandlePosition.topLeft, HandlePosition.right},
+      visibleHandles: const {HandlePosition.topLeft, HandlePosition.right},
       constraints: const BoxConstraints(
         minWidth: _minTextWidth,
         maxWidth: _maxTextWidth,
@@ -563,11 +551,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         _startPackageResize(handle, event.globalPosition);
       },
       onResizeUpdate: (result, event) {
-        _updatePackageResize(
-          result.handle,
-          event.globalPosition,
-          controller,
-        );
+        _updatePackageResize(result.handle, event.globalPosition, controller);
       },
       onResizeEnd: (handle, event) {
         _endTransform(controller);
@@ -1097,6 +1081,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     return count;
   }
 }
+
 class _ImageBlockWidget extends StatefulWidget {
   const _ImageBlockWidget({
     required this.block,

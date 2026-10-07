@@ -64,9 +64,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
     if (oldWidget.block.id != widget.block.id) {
       _textController.value = TextEditingValue(
         text: widget.block.text,
-        selection: TextSelection.collapsed(
-          offset: widget.block.text.length,
-        ),
+        selection: TextSelection.collapsed(offset: widget.block.text.length),
       );
       _preview = null;
       _engine.cancel();
@@ -78,9 +76,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
         _textController.text != widget.block.text) {
       _textController.value = TextEditingValue(
         text: widget.block.text,
-        selection: TextSelection.collapsed(
-          offset: widget.block.text.length,
-        ),
+        selection: TextSelection.collapsed(offset: widget.block.text.length),
       );
     }
   }
@@ -163,16 +159,8 @@ class _TextHudBlockState extends State<TextHudBlock> {
                 accent,
                 handleFill,
               ),
-              _buildWidthHandle(
-                geometry.pointAt(1, 0.5),
-                accent,
-                handleFill,
-              ),
-              _buildRotationHandle(
-                geometry,
-                accent,
-                handleFill,
-              ),
+              _buildWidthHandle(geometry.pointAt(1, 0.5), accent, handleFill),
+              _buildRotationHandle(geometry, accent, handleFill),
             ],
           ],
         ),
@@ -195,10 +183,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
       onDoubleTap: !isEditing ? _enterEditing : null,
       onPanStart: !isEditing && widget.interactionEnabled
           ? (details) {
-              _beginGesture(
-                TextHudOperation.translate,
-                details.globalPosition,
-              );
+              _beginGesture(TextHudOperation.translate, details.globalPosition);
             }
           : null,
       onPanUpdate: !isEditing && widget.interactionEnabled
@@ -270,11 +255,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
     );
   }
 
-  Widget _buildWidthHandle(
-    Offset point,
-    Color border,
-    Color fill,
-  ) {
+  Widget _buildWidthHandle(Offset point, Color border, Color fill) {
     return _buildHandle(
       point: point,
       operation: TextHudOperation.resizeWidth,
@@ -294,8 +275,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
   ) {
     final topMiddle = geometry.pointAt(0.5, 0);
     final outward = -geometry.axisY;
-    final point =
-        topMiddle + outward * (_rotationStemPx / _screenScale);
+    final point = topMiddle + outward * (_rotationStemPx / _screenScale);
     return _buildHandle(
       point: point,
       operation: TextHudOperation.rotate,
@@ -344,10 +324,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
               height: visualHeight,
               decoration: BoxDecoration(
                 color: fill,
-                border: Border.all(
-                  color: border,
-                  width: 1.25 / _screenScale,
-                ),
+                border: Border.all(color: border, width: 1.25 / _screenScale),
                 borderRadius: circular
                     ? BorderRadius.circular(999)
                     : BorderRadius.circular(2 / _screenScale),
@@ -418,21 +395,14 @@ class _TextHudBlockState extends State<TextHudBlock> {
     _scheduleMetrics();
   }
 
-  void _beginGesture(
-    TextHudOperation operation,
-    Offset globalPosition,
-  ) {
+  void _beginGesture(TextHudOperation operation, Offset globalPosition) {
     final current = widget.controller.findTextBlockById(widget.block.id);
     if (current == null) {
       return;
     }
     final geometry = _geometryFor(current);
     _gestureBefore = current;
-    _engine.begin(
-      operation,
-      geometry,
-      _globalToLocal(globalPosition),
-    );
+    _engine.begin(operation, geometry, _globalToLocal(globalPosition));
     setState(() {
       _preview = geometry;
     });
@@ -485,11 +455,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
     setState(() {
       _preview = null;
     });
-    widget.controller.commitTextUpdateOnPage(
-      widget.pageIndex,
-      before,
-      after,
-    );
+    widget.controller.commitTextUpdateOnPage(widget.pageIndex, before, after);
   }
 
   void _cancelGesture() {
@@ -517,8 +483,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
   }
 
   Offset _globalToLocal(Offset point) {
-    final renderObject =
-        _surfaceKey.currentContext?.findRenderObject();
+    final renderObject = _surfaceKey.currentContext?.findRenderObject();
     if (renderObject is RenderBox) {
       return renderObject.globalToLocal(point);
     }
@@ -536,10 +501,8 @@ class _TextHudBlockState extends State<TextHudBlock> {
         return;
       }
 
-      final contentObject =
-          _contentKey.currentContext?.findRenderObject();
-      final surfaceObject =
-          _surfaceKey.currentContext?.findRenderObject();
+      final contentObject = _contentKey.currentContext?.findRenderObject();
+      final surfaceObject = _surfaceKey.currentContext?.findRenderObject();
       if (contentObject is! RenderBox || surfaceObject is! RenderBox) {
         return;
       }
@@ -550,15 +513,10 @@ class _TextHudBlockState extends State<TextHudBlock> {
       );
       final origin = surfaceObject.localToGlobal(Offset.zero);
       final oneUnit = surfaceObject.localToGlobal(const Offset(1, 0));
-      final measuredScale = math.max(
-        0.01,
-        (oneUnit - origin).distance,
-      );
+      final measuredScale = math.max(0.01, (oneUnit - origin).distance);
 
-      final heightChanged =
-          (measuredHeight - _frameHeight).abs() > 0.5;
-      final scaleChanged =
-          (measuredScale - _screenScale).abs() > 0.01;
+      final heightChanged = (measuredHeight - _frameHeight).abs() > 0.5;
+      final scaleChanged = (measuredScale - _screenScale).abs() > 0.01;
       if (!heightChanged && !scaleChanged) {
         return;
       }
@@ -589,10 +547,12 @@ class _TextHudBlockState extends State<TextHudBlock> {
         color: block.color,
         fontSize: fontSize,
         fontFamily: inline['font']?.toString(),
-        fontWeight:
-            inline['bold'] == true ? FontWeight.bold : FontWeight.normal,
-        fontStyle:
-            inline['italic'] == true ? FontStyle.italic : FontStyle.normal,
+        fontWeight: inline['bold'] == true
+            ? FontWeight.bold
+            : FontWeight.normal,
+        fontStyle: inline['italic'] == true
+            ? FontStyle.italic
+            : FontStyle.normal,
         decoration: decorations.isEmpty
             ? TextDecoration.none
             : TextDecoration.combine(decorations),
@@ -746,10 +706,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
 }
 
 class _TextHudStyle {
-  const _TextHudStyle({
-    required this.textStyle,
-    required this.textAlign,
-  });
+  const _TextHudStyle({required this.textStyle, required this.textAlign});
 
   final TextStyle textStyle;
   final TextAlign textAlign;
@@ -793,8 +750,7 @@ class _TextHudFramePainter extends CustomPainter {
       return;
     }
     final topMiddle = geometry.pointAt(0.5, 0);
-    final rotationPoint =
-        topMiddle - geometry.axisY * rotationStem;
+    final rotationPoint = topMiddle - geometry.axisY * rotationStem;
     canvas.drawLine(topMiddle, rotationPoint, paint);
   }
 

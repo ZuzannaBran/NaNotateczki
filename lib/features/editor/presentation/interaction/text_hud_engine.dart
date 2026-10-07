@@ -101,10 +101,7 @@ class TextHudEngine {
         pointer,
         shift: shift,
       ),
-      TextHudOperation.resizeWidth => _resizeWidth(
-        gesture.initial,
-        pointer,
-      ),
+      TextHudOperation.resizeWidth => _resizeWidth(gesture.initial, pointer),
       TextHudOperation.scaleNorthWest ||
       TextHudOperation.scaleNorthEast ||
       TextHudOperation.scaleSouthEast ||
@@ -153,20 +150,13 @@ class TextHudEngine {
     return initial.copyWith(position: initial.position + delta);
   }
 
-  TextHudGeometry _resizeWidth(
-    TextHudGeometry initial,
-    Offset pointer,
-  ) {
+  TextHudGeometry _resizeWidth(TextHudGeometry initial, Offset pointer) {
     final anchor = initial.pointAt(0, 0.5);
     final projected = _dot(pointer - anchor, initial.axisX);
     final nextWidth = projected.clamp(minWidth, maxWidth).toDouble();
     final center = anchor + initial.axisX * (nextWidth / 2);
-    final nextPosition =
-        center - Offset(nextWidth / 2, initial.height / 2);
-    return initial.copyWith(
-      position: nextPosition,
-      width: nextWidth,
-    );
+    final nextPosition = center - Offset(nextWidth / 2, initial.height / 2);
+    return initial.copyWith(position: nextPosition, width: nextWidth);
   }
 
   TextHudGeometry _scale(
@@ -198,8 +188,7 @@ class TextHudEngine {
     final nextHeight = initial.height * scale;
     final nextFontSize = initial.fontSize * scale;
     final center = anchor + baseVector * (scale / 2);
-    final nextPosition =
-        center - Offset(nextWidth / 2, nextHeight / 2);
+    final nextPosition = center - Offset(nextWidth / 2, nextHeight / 2);
 
     return initial.copyWith(
       position: nextPosition,
@@ -272,10 +261,7 @@ class _TextHudGesture {
 }
 
 class _ScalePoints {
-  const _ScalePoints({
-    required this.anchor,
-    required this.dragged,
-  });
+  const _ScalePoints({required this.anchor, required this.dragged});
 
   final Offset anchor;
   final Offset dragged;

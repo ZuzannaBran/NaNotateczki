@@ -40,10 +40,7 @@ void main() {
     final preview = engine.update(right + initial.axisX * 50);
 
     expect(preview.width, closeTo(250, 0.001));
-    expect(
-      (preview.pointAt(0, 0.5) - leftBefore).distance,
-      lessThan(0.001),
-    );
+    expect((preview.pointAt(0, 0.5) - leftBefore).distance, lessThan(0.001));
   });
 
   test('corner scale changes width, height and font size uniformly', () {
