@@ -268,7 +268,7 @@ class _ActiveImageTransformHud extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleRect = _visibleImageRect(block, worldOrigin);
     return ObjectTransformHud<ImageBlock>(
-      key: ValueKey('shared-image-hud-\${block.id}'),
+      key: ValueKey('shared-image-hud-${block.id}'),
       data: block,
       rect: visibleRect,
       rotation: block.rotation,
@@ -279,14 +279,12 @@ class _ActiveImageTransformHud extends StatelessWidget {
       },
       constraintsResolver: (handle) {
         if (handle.isDiagonal) {
-          final widthFactor = math.max(
-            0.08,
-            block.cropRight - block.cropLeft,
-          );
-          final heightFactor = math.max(
-            0.08,
-            block.cropBottom - block.cropTop,
-          );
+          final widthFactor = math
+              .max(0.08, block.cropRight - block.cropLeft)
+              .toDouble();
+          final heightFactor = math
+              .max(0.08, block.cropBottom - block.cropTop)
+              .toDouble();
           return BoxConstraints(
             minWidth: 80 * widthFactor,
             maxWidth: 4096 * widthFactor,
@@ -406,14 +404,12 @@ ImageBlock _imageBlockFromTransform(
   }
 
   if (handle.isDiagonal) {
-    final widthFactor = math.max(
-      0.08,
-      before.cropRight - before.cropLeft,
-    );
-    final heightFactor = math.max(
-      0.08,
-      before.cropBottom - before.cropTop,
-    );
+    final widthFactor = math
+        .max(0.08, before.cropRight - before.cropLeft)
+        .toDouble();
+    final heightFactor = math
+        .max(0.08, before.cropBottom - before.cropTop)
+        .toDouble();
     final nextWidth = nextWorldRect.width / widthFactor;
     final nextHeight = nextWorldRect.height / heightFactor;
     final nextPosition = nextWorldRect.topLeft -
@@ -437,18 +433,22 @@ ImageBlock _imageBlockFromTransform(
 
   if (handle == HandlePosition.left) {
     cropLeft = ((nextWorldRect.left - before.position.dx) / before.width)
-        .clamp(0.0, cropRight - minVisible);
+        .clamp(0.0, cropRight - minVisible)
+        .toDouble();
   } else if (handle == HandlePosition.right) {
     cropRight =
         ((nextWorldRect.right - before.position.dx) / before.width)
-            .clamp(cropLeft + minVisible, 1.0);
+            .clamp(cropLeft + minVisible, 1.0)
+            .toDouble();
   } else if (handle == HandlePosition.top) {
     cropTop = ((nextWorldRect.top - before.position.dy) / before.height)
-        .clamp(0.0, cropBottom - minVisible);
+        .clamp(0.0, cropBottom - minVisible)
+        .toDouble();
   } else if (handle == HandlePosition.bottom) {
     cropBottom =
         ((nextWorldRect.bottom - before.position.dy) / before.height)
-            .clamp(cropTop + minVisible, 1.0);
+            .clamp(cropTop + minVisible, 1.0)
+            .toDouble();
   }
 
   return before.copyWith(

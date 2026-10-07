@@ -105,7 +105,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
         children: [
           _buildContent(isEditing),
           ObjectTransformHud<TextBlock>(
-            key: ValueKey('object-hud-text-\${widget.block.id}'),
+            key: ValueKey('object-hud-text-${widget.block.id}'),
             data: widget.block,
             rect: rect,
             rotation: widget.block.rotation,
@@ -251,11 +251,10 @@ class _TextHudBlockState extends State<TextHudBlock> {
             before.width > 0
         ? preview.rect.width / before.width
         : 1.0;
-    final nextFontSize = (before.fontSize * scale).clamp(
-      _minTextFontSize,
-      _maxTextFontSize,
-    );
-    final actualScale =
+    final nextFontSize = (before.fontSize * scale)
+        .clamp(_minTextFontSize, _maxTextFontSize)
+        .toDouble();
+    final double actualScale =
         before.fontSize == 0 ? 1.0 : nextFontSize / before.fontSize;
     final nextDelta = (actualScale - 1).abs() <= 1e-6
         ? before.deltaJson
@@ -491,7 +490,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
 
   String _colorToHex(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
-    return '#\${value.substring(2)}';
+    return '#${value.substring(2)}';
   }
 }
 
