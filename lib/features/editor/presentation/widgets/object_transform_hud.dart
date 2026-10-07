@@ -18,6 +18,10 @@ class ObjectTransformHudStyle {
     this.cornerHandleSize = 10,
     this.sideHandleLength = 24,
     this.sideHandleThickness = 6,
+    this.moveHandleWidth = 30,
+    this.moveHandleHeight = 16,
+    this.moveHandleHitSize = 28,
+    this.moveHandleOffset = 32,
     this.rotationHandleSize = 20,
     this.handleHitSize = 32,
     this.rotationHandleOffset = 30,
@@ -29,6 +33,10 @@ class ObjectTransformHudStyle {
   final double cornerHandleSize;
   final double sideHandleLength;
   final double sideHandleThickness;
+  final double moveHandleWidth;
+  final double moveHandleHeight;
+  final double moveHandleHitSize;
+  final double moveHandleOffset;
   final double rotationHandleSize;
   final double handleHitSize;
   final double rotationHandleOffset;
@@ -137,6 +145,13 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
             if (widget.interactive && widget.draggable)
               _buildBodyGesture(rect, rotation),
             if (widget.interactive && widget.showHandles) ...[
+              _buildMoveHandle(
+                rect: rect,
+                rotation: rotation,
+                frameColor: frameColor,
+                fillColor: handleFill,
+                scale: scale,
+              ),
               for (final handle in HandlePosition.corners)
                 if (widget.enabledHandles.contains(handle))
                   _buildCornerHandle(
@@ -187,13 +202,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
           onDoubleTap: widget.onDoubleTap,
           onSecondaryTapDown: widget.onSecondaryTapDown,
           onPanStart: (details) {
-            widget.onTransformStart?.call();
-            _gestureData = widget.data;
-            _engine.beginMove(
-              rect: rect,
-              rotation: rotation,
-              pointer: _globalToLocal(details.globalPosition),
-            );
+            _beginMove(rect, rotation, details.globalPosition);
           },
           onPanUpdate: (details) {
             _updatePreview(details.globalPosition);
@@ -203,6 +212,53 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
           },
           onPanCancel: _cancelGesture,
           child: const SizedBox.expand(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMoveHandle({
+    required Rect rect,
+    required double rotation,
+    required Color frameColor,
+    required Color fillColor,
+    required double scale,
+  }) {
+    final topCenter = _pointForHandle(rect, rotation, HandlePosition.top);
+    final outward = _rotate(const Offset(0, -1), rotation);
+    final point =
+        topCenter + outward * (widget.style.moveHandleOffset / scale);
+    final hitSize = widget.style.moveHandleHitSize / scale;
+
+    return _positionedHandle(
+      point: point,
+      hitSize: hitSize,
+      cursor: SystemMouseCursors.grab,
+      onPanStart: (details) {
+        _beginMove(rect, rotation, details.globalPosition);
+      },
+      child: Container(
+        key: const ValueKey('object-transform-move-handle'),
+        width: widget.style.moveHandleWidth / scale,
+        height: widget.style.moveHandleHeight / scale,
+        decoration: BoxDecoration(
+          color: fillColor,
+          borderRadius: BorderRadius.circular(
+            widget.style.moveHandleHeight / (2 * scale),
+          ),
+          border: Border.all(color: frameColor, width: 1.2 / scale),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 2 / scale,
+              offset: Offset(0, 1 / scale),
+            ),
+          ],
+        ),
+        child: Icon(
+          Icons.drag_indicator,
+          color: frameColor,
+          size: 14 / scale,
         ),
       ),
     );
@@ -345,6 +401,16 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
           child: Center(child: child),
         ),
       ),
+    );
+  }
+
+  void _beginMove(Rect rect, double rotation, Offset globalPosition) {
+    widget.onTransformStart?.call();
+    _gestureData = widget.data;
+    _engine.beginMove(
+      rect: rect,
+      rotation: rotation,
+      pointer: _globalToLocal(globalPosition),
     );
   }
 

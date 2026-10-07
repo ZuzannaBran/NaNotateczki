@@ -436,20 +436,23 @@ błędów, integralności i wydajności.
   czemu działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
   6: `ObjectTransformKind`; 8: `ObjectTransformSnapshot`;
   24: `ObjectTransformEngine`; 315: `_ObjectTransformSession`.
-- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (548):
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (614):
   wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
-  `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform` oraz
-  własnego uchwytu rotacji i silnika współrzędnych. Udostępnia callback startu
-  transformacji, żeby warstwa obiektu mogła zamknąć edycję treści przed resize.
-  Kolor, rozmiary, hit-area
-  i grubość ramki są konfigurowalne przez `ObjectTransformHudStyle`.
-  14: `ObjectTransformHudStyle`; 38: `ObjectTransformHud`;
-  90: `_ObjectTransformHudState`; 494: `_ObjectTransformFramePainter`.
+  `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform`
+  oraz wspólnego grabbera nad górną krawędzią do przesuwania obiektu.
+  Grabber działa także wtedy, gdy środek ramki jest wyłączony z dragowania,
+  np. podczas aktywnej edycji tekstu. Udostępnia callback startu transformacji,
+  żeby warstwa obiektu mogła zamknąć edycję treści przed resize/move. Kolor,
+  rozmiary, hit-area i grubość ramki są konfigurowalne przez
+  `ObjectTransformHudStyle`.
+  14: `ObjectTransformHudStyle`; 42: `ObjectTransformHud`;
+  98: `_ObjectTransformHudState`; 560: `_ObjectTransformFramePainter`.
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (509):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
-  jest wyłączony. Podczas edycji treści uchwyty resize pozostają aktywne, a środek
-  ramki przepuszcza gesty do `EditableText`. Start transformacji zapisuje
+  jest wyłączony. Podczas edycji treści uchwyty resize i osobny grabber move
+  pozostają aktywne, a środek ramki przepuszcza gesty do `EditableText`.
+  Start transformacji zapisuje
   najnowszą treść i używa jej jako snapshotu resize, więc zmiana rozmiaru ani
   anulowanie gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
   używają starego Quilla jako bezpieczny fallback.
@@ -536,10 +539,11 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (149): tryb tekstu
+- `test/page_overlay_text_gestures_test.dart` (168): tryb tekstu
   ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, aktywny
-  blok przełącza się na `TextHudBlock` i `EditableText`, resize ramki
-  nie gubi świeżo wpisanej treści, a uchwyt obrotu nie jest renderowany
+  blok przełącza się na `TextHudBlock` i `EditableText`, grabber przesuwa
+  ramkę także podczas pisania bez utraty treści, resize nie gubi zmian,
+  a uchwyt obrotu nie jest renderowany
 - `test/object_transform_engine_test.dart` (68): wspólna geometria
   move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
 - `test/resizable_frame_test.dart` (33)

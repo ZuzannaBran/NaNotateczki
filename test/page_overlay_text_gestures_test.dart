@@ -101,13 +101,32 @@ void main() {
     expect(find.byType(EditableText), findsOneWidget);
     expect(find.byType(DefaultCornerHandle), findsNWidgets(4));
     expect(find.byType(DefaultSideHandle), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('object-transform-move-handle')),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.rotate_right), findsNothing);
 
     await tester.enterText(find.byType(EditableText), 'Edited text');
     await tester.pump();
     expect(controller.pages.single.textBlocks.single.text, 'Edited text');
 
-    final widthBeforeResize = controller.pages.single.textBlocks.single.width;
+    final positionBeforeMove =
+        controller.pages.single.textBlocks.single.position;
+    await tester.drag(
+      find.byKey(const ValueKey('object-transform-move-handle')),
+      const Offset(36, 24),
+    );
+    await tester.pump();
+
+    final movedBlock = controller.pages.single.textBlocks.single;
+    expect(movedBlock.text, 'Edited text');
+    expect(movedBlock.position.dx, greaterThan(positionBeforeMove.dx));
+    expect(movedBlock.position.dy, greaterThan(positionBeforeMove.dy));
+    expect(controller.tool, DrawingTool.text);
+    expect(find.byType(EditableText), findsOneWidget);
+
+    final widthBeforeResize = movedBlock.width;
     await tester.drag(find.byType(DefaultSideHandle), const Offset(48, 0));
     await tester.pump();
 
