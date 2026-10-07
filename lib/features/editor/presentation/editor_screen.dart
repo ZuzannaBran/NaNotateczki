@@ -121,6 +121,9 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _syncCurrentPageToViewport(EditorController controller) {
+    if (controller.isObjectTransformActive) {
+      return;
+    }
     // While zoomed-in navigation is active, keep the interaction page stable.
     // Auto-switching currentPage here can replace the active gesture target
     // with a preview card and make the editor feel frozen.
@@ -152,6 +155,9 @@ class _EditorScreenState extends State<EditorScreen> {
     required double fitToWidthScale,
     required Size viewportSize,
   }) {
+    if (context.read<EditorController>().isObjectTransformActive) {
+      return;
+    }
     if (docWorldSize.width <= 0 || docWorldSize.height <= 0) {
       return;
     }
@@ -200,6 +206,9 @@ class _EditorScreenState extends State<EditorScreen> {
     Size viewportSize,
   ) {
     final controller = context.read<EditorController>();
+    if (controller.isObjectTransformActive) {
+      return;
+    }
     if (controller.tool.isInk && _isStylusPointerKind(event.kind)) {
       _activeInkPointer = event.pointer;
       _pendingNavigationPointer = null;
@@ -245,6 +254,15 @@ class _EditorScreenState extends State<EditorScreen> {
     Size docWorldSize,
     Size viewportSize,
   ) {
+    final transformController = context.read<EditorController>();
+    if (transformController.isObjectTransformActive) {
+      if (event.pointer == _pendingNavigationPointer) {
+        _pendingNavigationPointer = null;
+        _pendingNavigationPosition = null;
+      }
+      _activePointers.remove(event.pointer);
+      return;
+    }
     if (event.pointer == _activeInkPointer) {
       return;
     }
@@ -398,7 +416,11 @@ class _EditorScreenState extends State<EditorScreen> {
     Size docWorldSize,
     Size viewportSize,
   ) {
-    context.read<EditorController>().startPinchToScaleActiveImage();
+    final controller = context.read<EditorController>();
+    if (controller.isObjectTransformActive) {
+      return;
+    }
+    controller.startPinchToScaleActiveImage();
     _panZoomSessionActive = true;
     _panZoomLastPan = Offset.zero;
     _panZoomLastScale = 1.0;
@@ -503,6 +525,9 @@ class _EditorScreenState extends State<EditorScreen> {
     required Size docWorldSize,
     required Size viewportSize,
   }) {
+    if (context.read<EditorController>().isObjectTransformActive) {
+      return;
+    }
     final currentZoom = _pageScale <= 0 ? 1.0 : _pageScale;
     final targetZoom = (currentZoom * scaleDelta)
         .clamp(_pageMinScale, _pageMaxScale)
@@ -1117,6 +1142,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         controller: _scrollController,
                         physics:
                             (controller.tool.isInk ||
+                                controller.isObjectTransformActive ||
                                 _isViewportNavigating ||
                                 _pageScale > 1.001)
                             ? const NeverScrollableScrollPhysics()

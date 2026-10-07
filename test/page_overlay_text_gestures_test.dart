@@ -149,6 +149,15 @@ void main() {
     final widthBeforeResize = movedBlock.width;
     final sideHandle = find.byType(DefaultSideHandle);
     final gesture = await tester.startGesture(tester.getCenter(sideHandle));
+    expect(controller.isObjectTransformActive, isTrue);
+
+    final viewPanBeforeResize = controller.viewPan;
+    final viewScaleBeforeResize = controller.viewScale;
+    controller.panBy(const Offset(100, 50));
+    controller.zoomBy(1.5, focalPoint: const Offset(200, 200));
+    expect(controller.viewPan, viewPanBeforeResize);
+    expect(controller.viewScale, viewScaleBeforeResize);
+
     await gesture.moveBy(const Offset(4, 0));
     await tester.pump();
 
@@ -157,6 +166,7 @@ void main() {
 
     await gesture.up();
     await tester.pump();
+    expect(controller.isObjectTransformActive, isFalse);
 
     final resizedBlock = controller.pages.single.textBlocks.single;
     expect(resizedBlock.text, 'Edited text');

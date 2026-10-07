@@ -129,6 +129,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
             ),
             onDoubleTap: _enterEditing,
             onTransformStart: _beginTransform,
+            onTransformEnd: widget.controller.endObjectTransform,
             onPreview: _previewTransform,
             onCommit: _commitTransform,
             onCancel: _cancelTransform,
@@ -243,6 +244,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
     if (_transformBefore != null) {
       return;
     }
+    widget.controller.beginObjectTransform();
     _transformBefore =
         widget.controller.findTextBlockById(widget.block.id) ?? widget.block;
     widget.controller.commitActiveTextEdit();

@@ -149,6 +149,7 @@ class EditorController extends ChangeNotifier {
   bool _suppressBackgroundTap = false;
   double viewScale = 1.0;
   Offset viewPan = Offset.zero;
+  bool _isObjectTransformActive = false;
   double _pageWidth = 0.0;
   double _pageHeight = 0.0;
   double _pageGap = 0.0;
@@ -158,6 +159,7 @@ class EditorController extends ChangeNotifier {
   bool get canUndo => _undoActions.isNotEmpty;
   bool get canRedo => _redoActions.isNotEmpty;
   bool get allowsFingerDrawing => pointerInputMode.allowsFingerDrawing;
+  bool get isObjectTransformActive => _isObjectTransformActive;
   PageBackgroundSettings get currentBackgroundSettings {
     return _localBackgrounds[notebook.uid] ??
         defaultBackgroundSettingsForKind(notebook.kind);
@@ -269,7 +271,26 @@ class EditorController extends ChangeNotifier {
     _pageGap = pageGap;
   }
 
+  void beginObjectTransform() {
+    if (_isObjectTransformActive) {
+      return;
+    }
+    _isObjectTransformActive = true;
+    notifyListeners();
+  }
+
+  void endObjectTransform() {
+    if (!_isObjectTransformActive) {
+      return;
+    }
+    _isObjectTransformActive = false;
+    notifyListeners();
+  }
+
   void setViewTransform({Offset? pan, double? scale}) {
+    if (_isObjectTransformActive) {
+      return;
+    }
     final targetScale = (scale ?? viewScale)
         .clamp(minViewScale, maxViewScale)
         .toDouble();

@@ -73,6 +73,9 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   void _onPointerDown(PointerDownEvent event, EditorController controller) {
+    if (controller.isObjectTransformActive) {
+      return;
+    }
     if (controller.tool.isInk && _isStylusPointerKind(event.kind)) {
       _activeInkPointer = event.pointer;
       _pendingNavigationPointer = null;
@@ -117,6 +120,14 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   void _onPointerMove(PointerMoveEvent event, EditorController controller) {
+    if (controller.isObjectTransformActive) {
+      if (event.pointer == _pendingNavigationPointer) {
+        _pendingNavigationPointer = null;
+        _pendingNavigationPosition = null;
+      }
+      _activePointers.remove(event.pointer);
+      return;
+    }
     if (event.pointer == _activeInkPointer) {
       return;
     }
@@ -254,6 +265,9 @@ class _BoardScreenState extends State<BoardScreen> {
     PointerPanZoomStartEvent event,
     EditorController controller,
   ) {
+    if (controller.isObjectTransformActive) {
+      return;
+    }
     controller.startPinchToScaleActiveImage();
     _panZoomSessionActive = true;
     _panZoomLastPan = Offset.zero;
@@ -325,6 +339,9 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   void _onPointerSignal(PointerSignalEvent event, EditorController controller) {
+    if (controller.isObjectTransformActive) {
+      return;
+    }
     if (event is! PointerScrollEvent) {
       return;
     }

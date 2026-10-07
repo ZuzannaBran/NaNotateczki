@@ -75,6 +75,7 @@ class ObjectTransformHud<T> extends StatefulWidget {
     this.showFrame = true,
     this.showHandles = true,
     this.onTransformStart,
+    this.onTransformEnd,
     this.onTap,
     this.onDoubleTap,
     this.onSecondaryTapDown,
@@ -99,6 +100,7 @@ class ObjectTransformHud<T> extends StatefulWidget {
   final bool showFrame;
   final bool showHandles;
   final VoidCallback? onTransformStart;
+  final VoidCallback? onTransformEnd;
   final VoidCallback? onTap;
   final VoidCallback? onDoubleTap;
   final GestureTapDownCallback? onSecondaryTapDown;
@@ -117,6 +119,14 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   int? _activeHandlePointer;
   double _screenScale = 1;
   bool _scaleMeasureScheduled = false;
+
+  @override
+  void dispose() {
+    if (_engine.isActive) {
+      widget.onTransformEnd?.call();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -501,6 +511,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     if (preview != null && data != null) {
       widget.onCommit(data, preview);
     }
+    widget.onTransformEnd?.call();
     if (mounted) {
       setState(() {
         _preview = null;
@@ -518,6 +529,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     if (data != null) {
       widget.onCancel?.call(data);
     }
+    widget.onTransformEnd?.call();
     if (mounted) {
       setState(() {
         _preview = null;

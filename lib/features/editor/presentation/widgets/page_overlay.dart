@@ -312,6 +312,8 @@ class _ActiveImageTransformHud extends StatelessWidget {
           block.height,
         );
       },
+      onTransformStart: controller.beginObjectTransform,
+      onTransformEnd: controller.endObjectTransform,
       onDoubleTap: () {
         _editImageOcrForBlock(context, controller, pageIndex, block);
       },
