@@ -445,7 +445,7 @@ błędów, integralności i wydajności.
   żeby warstwa obiektu mogła zamknąć edycję treści przed resize/move. Kolor,
   rozmiary, hit-area i grubość ramki są konfigurowalne przez
   `ObjectTransformHudStyle`.
-  14: `ObjectTransformHudStyle`; 42: `ObjectTransformHud`;
+  14: `ObjectTransformHudStyle`; 46: `ObjectTransformHud`;
   98: `_ObjectTransformHudState`; 560: `_ObjectTransformFramePainter`.
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (509):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
