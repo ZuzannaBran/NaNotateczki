@@ -44,7 +44,7 @@ dependencies:
   file_picker: ^8.0.6
   provider: ^6.1.2
   uuid: ^4.5.1
-  flutter_quill: ^11.5.0
+  flutter_quill: 11.5.1
   flutter_box_transform: ^0.4.7
   vector_math: ^2.1.4
   sqlite3_flutter_libs: ^0.5.39
