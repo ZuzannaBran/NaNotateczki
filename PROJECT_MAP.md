@@ -428,6 +428,15 @@ błędów, integralności i wydajności.
   formatowanie aktywnego bloku Quill; pasek używa jasnej neutralnej powierzchni #FBFBFB.
   7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
 
+- `lib/features/editor/presentation/interaction/object_transform_engine.dart` (245):
+  wspólny silnik move/resize/rotate dla obiektów nie-ink. Przeliczone przez
+  hosta współrzędne logiczne przekazuje do czystego API `box_transform`, więc
+  działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (548):
+  wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
+  `DefaultCornerHandle`, `DefaultSideHandle` i `DefaultRotationHandle`
+  z `flutter_box_transform`, ale własny silnik współrzędnych. Kolor, rozmiary,
+  hit-area i grubość ramki są konfigurowalne przez `ObjectTransformHudStyle`.
 - `lib/features/editor/presentation/interaction/text_hud_engine.dart` (304):
   czysty Dartowy reducer transformacji aktywnego tekstu inspirowany
   `@grida/hud`: preview/commit dla move, zmiany szerokości, jednolitego
@@ -521,6 +530,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/page_overlay_text_gestures_test.dart` (141): tryb tekstu
   ignoruje obrazy pod kursorem, nowy tekst przechodzi do edit, a aktywny
   blok przełącza się na `TextHudBlock` i `EditableText`
+- `test/object_transform_engine_test.dart` (76): wspólna geometria
+  move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
 - `test/text_hud_engine_test.dart` (90): czysta geometria
   preview dla move, width-resize na obrocie, corner-scale i snap rotacji
 - `test/resizable_frame_test.dart` (33)
