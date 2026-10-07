@@ -196,14 +196,15 @@ pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/backup_eraser_flattening.dart` (271 linii)
+### `lib/data/backup/backup_eraser_flattening.dart` (18 linii)
 
-Stosuje gumki do wcześniejszych stroke'ów przed backupem i usuwa stroke'i
-gumki z payloadu. Udostępnia też wariant per strona dla backupu v6.
+Warstwa zgodności backupu delegująca spłaszczenie starych masek gumki do
+wspólnego `InkEraserEngine`. Nowe edycje nie zapisują stroke'ów gumki.
 
-- 9: `flattenErasersForBackup`; 15: `flattenPageErasersForBackup`;
-  49: `_applyBrushEraser`;
-  72: `_applyAreaEraser`; 95: `_splitStroke`; 148–265: geometria.
+- 5:
+  `flattenErasersForBackup`;
+  11:
+  `flattenPageErasersForBackup`.
 
 ### `lib/data/export/notebook_export_service.dart` (679 linii)
 
@@ -241,6 +242,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/ink_spatial_index.dart` (125): cache'owany
   indeks siatkowy kandydatów do hit-testu.
   14: `inkSpatialIndexFor`; 24: `InkSpatialIndex`.
+- `lib/features/notebook/domain/ink_eraser_engine.dart` (424):
+  wspólny destrukcyjny silnik gumki dla boarda i notebooka. Punktowa/brush
+  oraz obszarowa gumka zwracają ID całych trafionych stroke'ów; stary zapis
+  masek gumki jest jednorazowo spłaszczany do zwykłego ink.
+  25: `InkEraserEngine`.
 - `lib/features/notebook/domain/text_block.dart` (45): blok Quill z pozycją,
   stylem, szerokością i rotacją.
   3: `TextBlock`.
@@ -319,12 +325,15 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 
 ## 7. Stan edytora
 
-### `lib/features/editor/state/editor_actions.dart` (401 linii)
+### `lib/features/editor/state/editor_actions.dart` (452 linii)
 
 Akcje undo/redo; każda implementuje `apply(page)` i `revert(page)`.
+Kasowanie gumką używa `DeleteInkStrokesAction`, która przechowuje tylko
+usunięte stroke'y i ich pierwotne indeksy zamiast pełnej kopii strony.
 
 - 8: `EditorAction`.
-- 13–87: dodawanie tekstu/obrazu/ink i usuwanie stroke'ów.
+- 13: dodawanie tekstu/obrazu/ink;
+  88: destrukcyjne usuwanie ink.
 - 88–242: update/delete/move tekstu i obrazu.
 - 262: `MoveSelectionAction`; 318: `DeleteSelectionAction`;
   354: `PasteSelectionAction`; 390: `OffsetPosition`.
@@ -343,10 +352,11 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2894 linii)
+### `lib/features/editor/state/editor_controller.dart` (2913 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
-preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
+preferencje, viewport i zapis. Przy otwarciu jednorazowo spłaszcza legacy
+stroke'y gumki i zapisuje oczyszczone strony. Rejestruje się w `AppSaveCoordinator`;
 `flushPendingSaves` commit'uje aktywną edycję tekstu, anuluje debounce,
 czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
 zgodą na zamknięcie aplikacji. Nowo wstawiony lub wklejony tekst i obraz
@@ -473,16 +483,21 @@ błędów, integralności i wydajności.
   gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
   używają starego Quilla jako bezpieczny fallback.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4362 linie)
 
-Dwa świadomie osobne canvasy ink, wspólna geometria, gumki, scratch erase,
-lasso, handoff aktywnej kreski i pomiary wydajności.
+Dwa świadomie osobne canvasy ink, wspólna geometria, scratch erase, lasso,
+handoff aktywnej kreski i pomiary wydajności. Oba delegują gumkę do jednego
+`InkEraserEngine`; brush/stroke/area kasują całe trafione stroke'y i nie
+zapisują masek gumki w `inkStrokes`.
 
 - 45: `_InkPerfLog`; 260–483: cache/LOD/geometria.
 - 584–873: częściowe wymazywanie i rozpoznanie scratch erase.
-- 886: `DrawingCanvas` (board, world = page).
-- 908: `DocumentDrawingCanvas` (notebook, world = document).
-- 1134–2424: `_DrawingCanvasState`; 2425–3911:
+- 887: `DrawingCanvas` (board, world = page).
+- 909:
+  `DocumentDrawingCanvas` (notebook, world = document).
+- 1135:
+  `_DrawingCanvasState`;
+  2440:
   `_DocumentDrawingCanvasState`.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
@@ -557,6 +572,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
+- `test/ink_eraser_engine_test.dart` (122): destrukcyjne kasowanie
+  całych stroke'ów, area hit-test, migracja legacy gumek i undo
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
 - `test/page_overlay_text_gestures_test.dart` (246): sprawdza blokowy

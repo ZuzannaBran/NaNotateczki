@@ -85,6 +85,56 @@ class RemoveInkStrokesAction extends EditorAction {
   }
 }
 
+class DeleteInkStrokesAction extends EditorAction {
+  DeleteInkStrokesAction._(this._removed);
+
+  factory DeleteInkStrokesAction.fromStrokes(
+    List<InkStroke> strokes,
+    Set<String> ids,
+  ) {
+    return DeleteInkStrokesAction._([
+      for (var index = 0; index < strokes.length; index++)
+        if (ids.contains(strokes[index].id))
+          _IndexedInkStroke(index: index, stroke: strokes[index]),
+    ]);
+  }
+
+  final List<_IndexedInkStroke> _removed;
+
+  bool get isEmpty => _removed.isEmpty;
+
+  @override
+  NotePage apply(NotePage page) {
+    final ids = _removed.map((item) => item.stroke.id).toSet();
+    return page.copyWith(
+      inkStrokes: page.inkStrokes
+          .where((stroke) => !ids.contains(stroke.id))
+          .toList(),
+    );
+  }
+
+  @override
+  NotePage revert(NotePage page) {
+    final restored = List<InkStroke>.from(page.inkStrokes);
+    final ordered = List<_IndexedInkStroke>.from(_removed)
+      ..sort((a, b) => a.index.compareTo(b.index));
+    for (final item in ordered) {
+      restored.insert(
+        item.index.clamp(0, restored.length).toInt(),
+        item.stroke,
+      );
+    }
+    return page.copyWith(inkStrokes: restored);
+  }
+}
+
+class _IndexedInkStroke {
+  const _IndexedInkStroke({required this.index, required this.stroke});
+
+  final int index;
+  final InkStroke stroke;
+}
+
 class UpdateTextAction extends EditorAction {
   UpdateTextAction({required this.before, required this.after});
 

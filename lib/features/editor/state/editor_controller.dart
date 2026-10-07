@@ -20,6 +20,7 @@ import 'package:super_clipboard/super_clipboard.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
+import '../../notebook/domain/ink_eraser_engine.dart';
 import '../../notebook/domain/ink_spatial_index.dart';
 import '../../notebook/domain/ink_stroke.dart';
 import '../../notebook/domain/notebook.dart';
@@ -78,13 +79,28 @@ class EditorController extends ChangeNotifier {
   static const Duration _inkSaveDebounceDelay = Duration(seconds: 2);
 
   EditorController({required this.repository, required this.notebook}) {
-    pages = notebook.pages;
+    final changedPageIds = <String>{};
+    final normalizedPages = <NotePage>[];
+    for (final page in notebook.pages) {
+      final result = InkEraserEngine.flattenLegacyErasers(page.inkStrokes);
+      if (result.changed) {
+        changedPageIds.add(page.id);
+        normalizedPages.add(page.copyWith(inkStrokes: result.strokes));
+      } else {
+        normalizedPages.add(page);
+      }
+    }
+    pages = normalizedPages;
     currentPageIndex = 0;
     AppSaveCoordinator.instance.register(
       this,
       hasPendingWork: () => _hasPendingSaveWork,
       flush: flushPendingSaves,
     );
+    if (changedPageIds.isNotEmpty) {
+      _dirtyPageIds.addAll(changedPageIds);
+      _armSaveTimer();
+    }
     _loadEditorPrefs();
   }
 
@@ -2384,12 +2400,14 @@ class EditorController extends ChangeNotifier {
     if (ids.isEmpty) {
       return;
     }
-    final before = List<InkStroke>.from(currentPage.inkStrokes);
-    final after = before.where((item) => !ids.contains(item.id)).toList();
-    if (after.length == before.length) {
+    final action = DeleteInkStrokesAction.fromStrokes(
+      currentPage.inkStrokes,
+      ids,
+    );
+    if (action.isEmpty) {
       return;
     }
-    _applyInkAction(RemoveInkStrokesAction(before: before, after: after));
+    _applyInkAction(action);
     _scheduleSave();
   }
 
