@@ -1046,10 +1046,7 @@ class _EditorScreenState extends State<EditorScreen> {
           onExportSelected: (format) => _handleExport(controller, format),
         ),
         if (activeTextBlock != null)
-          TextEditToolbar(
-            editorController: controller,
-            block: activeTextBlock,
-          ),
+          TextEditToolbar(editorController: controller, block: activeTextBlock),
         Divider(
           height: 1,
           thickness: 1,

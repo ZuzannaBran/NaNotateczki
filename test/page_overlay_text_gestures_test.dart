@@ -23,9 +23,7 @@ void main() {
   test('transform handle hit area scales with frame size', () {
     const style = ObjectTransformHudStyle();
 
-    final small = style.handleHitSizeForRect(
-      const Rect.fromLTWH(0, 0, 80, 40),
-    );
+    final small = style.handleHitSizeForRect(const Rect.fromLTWH(0, 0, 80, 40));
     final medium = style.handleHitSizeForRect(
       const Rect.fromLTWH(0, 0, 320, 120),
     );
@@ -55,10 +53,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TextEditToolbar(
-            editorController: controller,
-            block: block,
-          ),
+          body: TextEditToolbar(editorController: controller, block: block),
         ),
       ),
     );

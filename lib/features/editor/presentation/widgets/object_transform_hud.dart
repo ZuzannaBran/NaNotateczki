@@ -250,8 +250,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   }) {
     final topCenter = _pointForHandle(rect, rotation, HandlePosition.top);
     final outward = _rotate(const Offset(0, -1), rotation);
-    final point =
-        topCenter + outward * (widget.style.moveHandleOffset / scale);
+    final point = topCenter + outward * (widget.style.moveHandleOffset / scale);
     final hitSize =
         widget.style.handleHitSizeForRect(
           rect,
@@ -284,11 +283,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
             ),
           ],
         ),
-        child: Icon(
-          Icons.drag_indicator,
-          color: frameColor,
-          size: 14 / scale,
-        ),
+        child: Icon(Icons.drag_indicator, color: frameColor, size: 14 / scale),
       ),
     );
   }

@@ -585,10 +585,7 @@ class _BoardScreenState extends State<BoardScreen> {
           onExportSelected: (format) => _handleExport(controller, format),
         ),
         if (activeTextBlock != null)
-          TextEditToolbar(
-            editorController: controller,
-            block: activeTextBlock,
-          ),
+          TextEditToolbar(editorController: controller, block: activeTextBlock),
         Expanded(
           child: Container(
             margin: const EdgeInsets.all(16),
