@@ -51,7 +51,7 @@ dependencies:
   sqlite3: ^3.3.3
   super_clipboard: ^0.8.0
   web: ^1.1.1
-  webview_all: 1.4.4
+  webview_plus: 0.8.7
 
 dev_dependencies:
   flutter_test:

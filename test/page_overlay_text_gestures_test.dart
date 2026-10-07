@@ -1,7 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:webview_all/webview_all.dart';
+import 'package:webview_plus/webview_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -70,7 +70,7 @@ void main() {
     expect(controller.activeImageBlockId, isNull);
     expect(controller.tool, DrawingTool.edit);
     expect(controller.pages.single.textBlocks.single.position, insertPosition);
-    expect(find.byType(WebViewWidget), findsOneWidget);
+    expect(find.byType(WebviewWidget), findsOneWidget);
 
     await tester.tapAt(overlayTopLeft + const Offset(500, 700));
     await tester.pump();
@@ -78,7 +78,7 @@ void main() {
     expect(controller.pages.single.textBlocks, hasLength(1));
     expect(controller.activeTextBlockId, isNull);
     expect(controller.tool, DrawingTool.edit);
-    expect(find.byType(WebViewWidget), findsNothing);
+    expect(find.byType(WebviewWidget), findsNothing);
 
     final textPosition = overlayTopLeft + insertPosition + const Offset(40, 20);
     await tester.tapAt(textPosition);
@@ -88,7 +88,7 @@ void main() {
 
     expect(controller.activeTextBlockId, isNotNull);
     expect(controller.tool, DrawingTool.text);
-    expect(find.byType(WebViewWidget), findsOneWidget);
+    expect(find.byType(WebviewWidget), findsOneWidget);
 
     await tester.pump(kDoubleTapTimeout);
     await tester.pumpWidget(const SizedBox.shrink());
