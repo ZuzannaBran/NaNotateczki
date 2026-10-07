@@ -106,10 +106,10 @@ class _TextHudBlockState extends State<TextHudBlock> {
             data: widget.block,
             rect: rect,
             rotation: widget.block.rotation,
-            interactive: widget.interactionEnabled && !isEditing,
-            showHandles: !isEditing,
+            interactive: widget.interactionEnabled,
+            showHandles: true,
             draggable: !isEditing,
-            rotatable: !isEditing,
+            rotatable: true,
             enabledHandles: const {
               HandlePosition.topLeft,
               HandlePosition.topRight,

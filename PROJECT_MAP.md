@@ -445,7 +445,9 @@ błędów, integralności i wydajności.
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (507):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale/rotate są delegowane do wspólnego `ObjectTransformHud`.
-  Nieaktywne teksty nadal używają starego Quilla jako bezpieczny fallback.
+  Podczas edycji treści uchwyty resize/rotate pozostają aktywne, a środek
+  ramki przepuszcza gesty do `EditableText`. Nieaktywne teksty nadal używają
+  starego Quilla jako bezpieczny fallback.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
 

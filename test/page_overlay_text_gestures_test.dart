@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_box_transform/flutter_box_transform.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -98,6 +99,8 @@ void main() {
     expect(controller.activeTextBlockId, isNotNull);
     expect(controller.tool, DrawingTool.text);
     expect(find.byType(EditableText), findsOneWidget);
+    expect(find.byType(DefaultCornerHandle), findsNWidgets(4));
+    expect(find.byType(DefaultSideHandle), findsOneWidget);
 
     await tester.pump(kDoubleTapTimeout);
     await tester.pumpWidget(const SizedBox.shrink());
