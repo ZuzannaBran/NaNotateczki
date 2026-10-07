@@ -343,7 +343,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2690 linii)
+### `lib/features/editor/state/editor_controller.dart` (2711 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
@@ -353,21 +353,23 @@ zgodą na zamknięcie aplikacji. Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
 tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
+`isObjectTransformActive` blokuje zmianę viewportu na czas move/resize ramki.
 
 - 36: `LassoSelection`; 75: `EditorController`;
-  198: `flushPendingSaves`.
-- 266–324: layout i transformacje viewportu.
-- 341–477: operacje `*OnPage` używane przez canvasy/overlaye.
-- 486–878: narzędzia, aktywne elementy, lasso i preferencje; 538: `setTool`;
-  570: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- 1228: `undo`; 1241: `redo`; 1313: `toggleBookmark`;
-  1319: operacje tekstowe.
-- 2480: `_applyAction`; 2489: `_applyInkAction`;
-  2591: `_scheduleSave`; 2612: `_saveDirtyPages`; 2634: `_save`.
+  200: `flushPendingSaves`.
+- 259–332: layout i transformacje viewportu; 274: start blokady transformacji,
+  290: `setViewTransform`.
+- 362–498: operacje `*OnPage` używane przez canvasy/overlaye.
+- 507–899: narzędzia, aktywne elementy, lasso i preferencje; 559: `setTool`;
+  591: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
+- 1249: `undo`; 1262: `redo`; 1334: `toggleBookmark`;
+  1340: operacje tekstowe.
+- 2501: `_applyAction`; 2510: `_applyInkAction`;
+  2612: `_scheduleSave`; 2633: `_saveDirtyPages`; 2655: `_save`.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2307 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2333 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
@@ -376,22 +378,25 @@ skróty i import/eksport. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma po 10 px wolnej przestrzeni po lewej i prawej stronie; poziomy
 viewport strony zaczyna się przy x=116 i kończy 56 px przed prawą krawędzią.
-Zoom i pan działają wewnątrz tego pasa. Stronę można przesuwać poziomo
-dotykiem także wtedy, gdy jest węższa od viewportu; clamp pozwala jej dojść
-od lewej do prawej granicy pasa, ale nigdy wejść pod margines. Bleed pozostaje
-tylko pionowo.
+Zoom i pan działają wewnątrz tego pasa, ale podczas aktywnego move/resize
+obiektu viewport jest zamrożony: custom pan/zoom jest ignorowany, a pionowy
+`SingleChildScrollView` przechodzi na `NeverScrollableScrollPhysics`.
+Po zakończeniu transformacji normalna nawigacja wraca. Stronę można przesuwać
+poziomo dotykiem także wtedy, gdy jest węższa od viewportu; clamp pozwala jej
+dojść od lewej do prawej granicy pasa, ale nigdy wejść pod margines. Bleed
+pozostaje tylko pionowo.
 
 - 33: `EditorScreen`; 40: `_EditorScreenState`.
 - 41: `_logicalPageWidth`; 84: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
-- 196–598: gesty pan/zoom i transformacje; 704: zakres widocznych stron.
-- 764–862: busy overlay, import/eksport i clipboard.
-- 982: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
+- 203–624: gesty pan/zoom, blokada viewportu i transformacje.
+- 802–888: busy overlay, import/eksport i clipboard.
+- 1007: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 1008: główny `build`; wspólna macierz `pageTransform` skaluje dokument.
-- 1506: `_PageViewportClipper`; 1576: `_PageFramePainter`;
-  1683: `_ProjectMiniMapOverlay`; 2035: `_ProjectMiniMapPainter`.
+- 1033: główny `build`; wspólna macierz `pageTransform` skaluje dokument.
+- 1532: `_PageViewportClipper`; 1602: `_PageFramePainter`;
+  1709: `_ProjectMiniMapOverlay`; 2061: `_ProjectMiniMapPainter`.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -436,7 +441,7 @@ błędów, integralności i wydajności.
   czemu działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
   6: `ObjectTransformKind`; 8: `ObjectTransformSnapshot`;
   24: `ObjectTransformEngine`; 315: `_ObjectTransformSession`.
-- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (652):
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (664):
   wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
   `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform`
   oraz wspólnego grabbera nad górną krawędzią do przesuwania obiektu.
@@ -445,19 +450,20 @@ błędów, integralności i wydajności.
   pointer events zamiast rozpoznawania pan, więc reagują od pierwszego ruchu
   bez systemowego touch slop. Niewidzialny hit-area skaluje się liniowo z
   rozmiarem ramki przez sqrt(width*height), z zakresem 32–80 px.
-  Udostępnia callback startu transformacji, żeby warstwa obiektu mogła zamknąć
-  edycję treści przed resize/move. Kolor, rozmiary i grubość ramki są
+  Udostępnia callbacki startu i końca transformacji, dzięki którym warstwa
+  obiektu blokuje viewport dokładnie na czas move/resize; dispose aktywnego
+  HUD-u również zwalnia blokadę. Kolor, rozmiary i grubość ramki są
   konfigurowalne przez `ObjectTransformHudStyle`.
   14: `ObjectTransformHudStyle`; 59: `ObjectTransformHud`;
-  111: `_ObjectTransformHudState`; 598: `_ObjectTransformFramePainter`.
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (509):
+  113: `_ObjectTransformHudState`; 610: `_ObjectTransformFramePainter`.
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (511):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
   jest wyłączony. Podczas edycji treści uchwyty resize i osobny grabber move
   pozostają aktywne, a środek ramki przepuszcza gesty do `EditableText`.
-  Start transformacji zapisuje
-  najnowszą treść i używa jej jako snapshotu resize, więc zmiana rozmiaru ani
-  anulowanie gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
+  Start transformacji zapisuje najnowszą treść, włącza blokadę viewportu
+  i używa tej treści jako snapshotu resize, więc zmiana rozmiaru ani anulowanie
+  gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
   używają starego Quilla jako bezpieczny fallback.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4322 linie)
@@ -474,7 +480,7 @@ lasso, handoff aktywnej kreski i pomiary wydajności.
 - 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
   4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2821 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2823 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText` oraz wspólny `ObjectTransformHud` dla
@@ -493,22 +499,24 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 - 32: `PageOverlay`; 193: `DocumentPageOverlay`.
 - aktywny tekst: `TextHudBlock`; fallback nieaktywnego tekstu:
   `_TextBlockWidget` / `_TextBlockWidgetState`.
-- 1354: `_ImageBlockWidget`; 1377: `_ImageBlockWidgetState`.
-- 2436: `_editOcr`; 2510: `_OcrTextDialog`;
-  2609: `_LassoSelectionWidget`; 2763: `_LassoActionButton`.
+- 1357: `_ImageBlockWidget`; 1380: `_ImageBlockWidgetState`.
+- 2439: `_editOcr`; 2513: `_OcrTextDialog`;
+  2612: `_LassoSelectionWidget`; 2766: `_LassoActionButton`.
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (941 linii)
+### `lib/features/board/presentation/board_screen.dart` (960 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
-warstwami tła/canvasu/overlayu; pomocnicze panele UI dziedziczą aktywną paletę.
+warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
+ignoruje pointery nawigacyjne, trackpad i scroll, a kontroler blokuje zmianę
+`viewPan/viewScale`. Pomocnicze panele UI dziedziczą aktywną paletę.
 
 - 29: `BoardScreen`; 36: `_BoardScreenState`.
-- 57: `_buildBoardRect`; 75–360: obsługa pointerów i viewportu.
-- 403–446: import, eksport i busy overlay; 555: główny `build`.
-- 822: `_BoardPaintProbe`; 839: `_RenderBoardPaintProbe`;
-  878: `_BoardZoomControls`.
+- 57: `_buildBoardRect`; 75–379: obsługa pointerów i viewportu.
+- 420–463: import, eksport i busy overlay; 572: główny `build`.
+- 839: `_BoardPaintProbe`; 856: `_RenderBoardPaintProbe`;
+  895: `_BoardZoomControls`.
 
 ## 10. Platformy, web i testy
 
@@ -542,11 +550,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (196): sprawdza
-  skalowanie hit-area uchwytów wraz z rozmiarem ramki; tryb tekstu ignoruje
-  obrazy pod kursorem, nowy tekst przechodzi do edit, aktywny blok przełącza
-  się na `TextHudBlock` i `EditableText`, grabber przesuwa ramkę podczas
-  pisania, a resize reaguje już na mały ruch i nie gubi zmian
+- `test/page_overlay_text_gestures_test.dart` (206): sprawdza
+  skalowanie hit-area uchwytów, blokadę viewportu od pointer-down do pointer-up
+  oraz brak zmian pan/zoom kontrolera podczas resize; tryb tekstu ignoruje
+  obrazy pod kursorem, a resize reaguje już na mały ruch i nie gubi zmian
 - `test/object_transform_engine_test.dart` (68): wspólna geometria
   move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
 - `test/resizable_frame_test.dart` (33)
