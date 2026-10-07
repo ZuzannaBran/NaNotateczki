@@ -343,7 +343,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2711 linii)
+### `lib/features/editor/state/editor_controller.dart` (2894 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Rejestruje się w `AppSaveCoordinator`;
@@ -363,13 +363,14 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 - 507–899: narzędzia, aktywne elementy, lasso i preferencje; 559: `setTool`;
   591: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
 - 1249: `undo`; 1262: `redo`; 1334: `toggleBookmark`;
-  1340: operacje tekstowe.
-- 2501: `_applyAction`; 2510: `_applyInkAction`;
-  2612: `_scheduleSave`; 2633: `_saveDirtyPages`; 2655: `_save`.
+  1340: operacje tekstowe; 1410: `updateActiveTextStyle` — blokowe
+  formatowanie aktywnego tekstu, zapisywane jako `UpdateTextAction`.
+- 2684: `_applyAction`; 2693: `_applyInkAction`;
+  2795: `_scheduleSave`; 2816: `_saveDirtyPages`; 2838: `_save`.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2333 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2336 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
@@ -394,9 +395,11 @@ pozostaje tylko pionowo.
 - 1007: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 1033: główny `build`; wspólna macierz `pageTransform` skaluje dokument.
-- 1532: `_PageViewportClipper`; 1602: `_PageFramePainter`;
-  1709: `_ProjectMiniMapOverlay`; 2061: `_ProjectMiniMapPainter`.
+- 1033: główny `build`; pasek tekstu jest renderowany na podstawie
+  aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
+  macierz `pageTransform` skaluje dokument.
+- 1535: `_PageViewportClipper`; 1605: `_PageFramePainter`;
+  1712: `_ProjectMiniMapOverlay`; 2064: `_ProjectMiniMapPainter`.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -430,9 +433,13 @@ błędów, integralności i wydajności.
   przedstawia zaznaczanie obszaru kursorem.
   10: `EditorToolbar`; 181: dialog tła; 316: selektor gumki;
   382: selektor kształtu; 782: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (545):
-  formatowanie aktywnego bloku Quill; pasek używa jasnej neutralnej powierzchni #FBFBFB.
-  7: `TextEditToolbar`; 38: `build`; 458–533: formatowanie i listy.
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (565):
+  pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
+  `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
+  underline, strike, font, rozmiar, kolor, wyrównanie, reset stylu i usunięcie.
+  Listy oraz formatowanie tylko zaznaczonego fragmentu są celowo pominięte,
+  ponieważ obecny `EditableText` nie renderuje ich jako rich-text.
+  9: `TextEditToolbar`; 43: `build`.
 
 - `lib/features/editor/presentation/interaction/object_transform_engine.dart` (424):
   wspólny silnik move/resize/rotate dla obiektów nie-ink. Używa typów
@@ -505,18 +512,20 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (960 linii)
+### `lib/features/board/presentation/board_screen.dart` (963 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
 ignoruje pointery nawigacyjne, trackpad i scroll, a kontroler blokuje zmianę
-`viewPan/viewScale`. Pomocnicze panele UI dziedziczą aktywną paletę.
+`viewPan/viewScale`. Pasek tekstu, tak jak w notebooku, jest wiązany z
+aktywnym `TextBlock`, a nie ze starym `QuillController`. Pomocnicze panele
+UI dziedziczą aktywną paletę.
 
 - 29: `BoardScreen`; 36: `_BoardScreenState`.
 - 57: `_buildBoardRect`; 75–379: obsługa pointerów i viewportu.
 - 420–463: import, eksport i busy overlay; 572: główny `build`.
-- 839: `_BoardPaintProbe`; 856: `_RenderBoardPaintProbe`;
-  895: `_BoardZoomControls`.
+- 842: `_BoardPaintProbe`; 859: `_RenderBoardPaintProbe`;
+  898: `_BoardZoomControls`.
 
 ## 10. Platformy, web i testy
 
@@ -550,10 +559,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_spatial_index_test.dart` (49)
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (206): sprawdza
-  skalowanie hit-area uchwytów, blokadę viewportu od pointer-down do pointer-up
-  oraz brak zmian pan/zoom kontrolera podczas resize; tryb tekstu ignoruje
-  obrazy pod kursorem, a resize reaguje już na mały ruch i nie gubi zmian
+- `test/page_overlay_text_gestures_test.dart` (246): sprawdza blokowy
+  toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,
+  blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
+  tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
 - `test/object_transform_engine_test.dart` (68): wspólna geometria
   move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
 - `test/resizable_frame_test.dart` (33)

@@ -1,154 +1,144 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../notebook/domain/text_block.dart';
 import '../../state/editor_controller.dart';
 
 class TextEditToolbar extends StatelessWidget {
   const TextEditToolbar({
-    required this.controller,
     required this.editorController,
-    required this.activeTextBlockId,
+    required this.block,
     super.key,
   });
 
-  final quill.QuillController controller;
-  final EditorController editorController;
-  final String? activeTextBlockId;
-
+  static const String _themeFontKey = '__theme__';
   static const List<String> _fontFamilies = [
+    _themeFontKey,
     'Times New Roman',
-    'Courier',
-    'cursive',
-    'Serif Bold',
+    'Courier New',
     'Impact',
   ];
-
-  static const List<String> _fontSizes = [
-    '12',
-    '14',
-    '16',
-    '18',
-    '20',
-    '24',
-    '28',
+  static const List<int> _fontSizes = [
+    12,
+    14,
+    16,
+    18,
+    20,
+    24,
+    28,
+    32,
+    36,
+    48,
+    64,
+    72,
+    96,
   ];
+
+  final EditorController editorController;
+  final TextBlock block;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        final selectionStyle = controller.getSelectionStyle();
-        final isBold = selectionStyle.attributes.containsKey(
-          quill.Attribute.bold.key,
-        );
-        final isItalic = selectionStyle.attributes.containsKey(
-          quill.Attribute.italic.key,
-        );
-        final isUnderline = selectionStyle.attributes.containsKey(
-          quill.Attribute.underline.key,
-        );
-        final isStrike = selectionStyle.attributes.containsKey(
-          quill.Attribute.strikeThrough.key,
-        );
-        final currentList = selectionStyle.attributes['list']?.value
-            ?.toString();
-        final currentFont = selectionStyle
-            .attributes[quill.Attribute.font.key]
-            ?.value
-            ?.toString();
-        final currentSize = selectionStyle
-            .attributes[quill.Attribute.size.key]
-            ?.value
-            ?.toString();
-        final currentColor = selectionStyle
-            .attributes[quill.Attribute.color.key]
-            ?.value
-            ?.toString();
+    final inline = _firstInlineAttributes(block.deltaJson);
+    final paragraph = _firstParagraphAttributes(block.deltaJson);
+    final currentFont = inline['font']?.toString();
+    final currentAlign = paragraph['align']?.toString() ?? 'left';
+    final currentSize = block.fontSize.round();
 
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _styleButton(
-                  icon: Icons.format_bold,
-                  tooltip: 'Bold',
-                  isActive: isBold,
-                  onPressed: () => _applyFormat(quill.Attribute.bold, isBold),
-                ),
-                _styleButton(
-                  icon: Icons.format_italic,
-                  tooltip: 'Italic',
-                  isActive: isItalic,
-                  onPressed: () =>
-                      _applyFormat(quill.Attribute.italic, isItalic),
-                ),
-                _styleButton(
-                  icon: Icons.format_underline,
-                  tooltip: 'Underline',
-                  isActive: isUnderline,
-                  onPressed: () =>
-                      _applyFormat(quill.Attribute.underline, isUnderline),
-                ),
-                _styleButton(
-                  icon: Icons.strikethrough_s,
-                  tooltip: 'Strikethrough',
-                  isActive: isStrike,
-                  onPressed: () =>
-                      _applyFormat(quill.Attribute.strikeThrough, isStrike),
-                ),
-                const SizedBox(width: 8),
-                _fontDropdown(currentFont),
-                const SizedBox(width: 8),
-                _sizeDropdown(currentSize),
-                const SizedBox(width: 8),
-                _colorPicker(context, currentColor),
-                const SizedBox(width: 8),
-                _listButton(
-                  icon: Icons.format_list_bulleted,
-                  tooltip: 'Bullet list',
-                  value: 'bullet',
-                  currentList: currentList,
-                ),
-                _listButton(
-                  icon: Icons.format_list_numbered,
-                  tooltip: 'Numbered list',
-                  value: 'ordered',
-                  currentList: currentList,
-                ),
-                _listButton(
-                  icon: Icons.check_box_outlined,
-                  tooltip: 'Checklist',
-                  value: 'unchecked',
-                  currentList: currentList,
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.format_clear),
-                  tooltip: 'Clear formatting',
-                  onPressed: _clearInlineFormatting,
-                  iconSize: 20,
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Delete text',
-                  onPressed: activeTextBlockId == null
-                      ? null
-                      : () => editorController.deleteTextBlock(
-                          activeTextBlockId!,
-                        ),
-                ),
-              ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _styleButton(
+              icon: Icons.format_bold,
+              tooltip: 'Bold',
+              isActive: inline['bold'] == true,
+              onPressed: () => editorController.updateActiveTextStyle(
+                bold: inline['bold'] != true,
+              ),
             ),
-          ),
-        );
-      },
+            _styleButton(
+              icon: Icons.format_italic,
+              tooltip: 'Italic',
+              isActive: inline['italic'] == true,
+              onPressed: () => editorController.updateActiveTextStyle(
+                italic: inline['italic'] != true,
+              ),
+            ),
+            _styleButton(
+              icon: Icons.format_underline,
+              tooltip: 'Underline',
+              isActive: inline['underline'] == true,
+              onPressed: () => editorController.updateActiveTextStyle(
+                underline: inline['underline'] != true,
+              ),
+            ),
+            _styleButton(
+              icon: Icons.strikethrough_s,
+              tooltip: 'Strikethrough',
+              isActive: inline['strike'] == true,
+              onPressed: () => editorController.updateActiveTextStyle(
+                strike: inline['strike'] != true,
+              ),
+            ),
+            const SizedBox(width: 6),
+            _fontDropdown(currentFont),
+            const SizedBox(width: 8),
+            _sizeDropdown(currentSize),
+            const SizedBox(width: 8),
+            _colorPicker(context),
+            const SizedBox(width: 8),
+            _alignmentButton(
+              icon: Icons.format_align_left,
+              tooltip: 'Align left',
+              alignment: 'left',
+              current: currentAlign,
+            ),
+            _alignmentButton(
+              icon: Icons.format_align_center,
+              tooltip: 'Align center',
+              alignment: 'center',
+              current: currentAlign,
+            ),
+            _alignmentButton(
+              icon: Icons.format_align_right,
+              tooltip: 'Align right',
+              alignment: 'right',
+              current: currentAlign,
+            ),
+            _alignmentButton(
+              icon: Icons.format_align_justify,
+              tooltip: 'Justify',
+              alignment: 'justify',
+              current: currentAlign,
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.format_clear),
+              tooltip: 'Clear block formatting',
+              iconSize: 20,
+              onPressed: () => editorController.updateActiveTextStyle(
+                clearDecorations: true,
+                clearFontFamily: true,
+                alignment: 'left',
+              ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Delete text',
+              iconSize: 20,
+              onPressed: () => editorController.deleteTextBlock(block.id),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -167,106 +157,166 @@ class TextEditToolbar extends StatelessWidget {
     );
   }
 
-  Widget _listButton({
+  Widget _alignmentButton({
     required IconData icon,
     required String tooltip,
-    required String value,
-    required String? currentList,
+    required String alignment,
+    required String current,
   }) {
-    final isActive =
-        currentList == value ||
-        (value == 'unchecked' && currentList == 'checked');
-    return IconButton(
-      icon: Icon(icon),
+    return _styleButton(
+      icon: icon,
       tooltip: tooltip,
-      color: isActive ? AppColors.inkBlack : null,
+      isActive: current == alignment,
       onPressed: () {
-        final attribute = _listAttribute(value, unset: isActive);
-        if (attribute == null) {
-          return;
-        }
-        controller.formatSelection(attribute);
+        editorController.updateActiveTextStyle(alignment: alignment);
       },
-      iconSize: 20,
     );
   }
 
   Widget _fontDropdown(String? currentFont) {
-    final value = _fontFamilies.contains(currentFont) ? currentFont : null;
+    final values = <String>[..._fontFamilies];
+    if (currentFont != null && !values.contains(currentFont)) {
+      values.add(currentFont);
+    }
+    final value = currentFont ?? _themeFontKey;
+
     return DropdownButton<String>(
       value: value,
-      hint: const Text('Font'),
-      onChanged: (value) {
-        if (value == null) {
+      isDense: true,
+      onChanged: (next) {
+        if (next == null) {
           return;
         }
-        final attribute = quill.Attribute.fromKeyValue('font', value);
-        if (attribute == null) {
+        if (next == _themeFontKey) {
+          editorController.updateActiveTextStyle(clearFontFamily: true);
           return;
         }
-        _applyFormat(attribute, false);
+        editorController.updateActiveTextStyle(fontFamily: next);
       },
-      items: _fontFamilies
-          .map((font) => DropdownMenuItem(value: font, child: Text(font)))
+      items: values
+          .map(
+            (font) => DropdownMenuItem<String>(
+              value: font,
+              child: Text(
+                font == _themeFontKey ? 'Georgia' : font,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          )
           .toList(),
     );
   }
 
-  Widget _sizeDropdown(String? currentSize) {
-    final value = _fontSizes.contains(currentSize) ? currentSize : null;
-    return DropdownButton<String>(
-      value: value,
-      hint: const Text('Size'),
-      onChanged: (value) {
-        if (value == null) {
+  Widget _sizeDropdown(int currentSize) {
+    final values = <int>{..._fontSizes, currentSize}.toList()..sort();
+
+    return DropdownButton<int>(
+      value: currentSize,
+      isDense: true,
+      onChanged: (next) {
+        if (next == null) {
           return;
         }
-        final attribute = quill.Attribute.fromKeyValue('size', value);
-        if (attribute == null) {
-          return;
-        }
-        _applyFormat(attribute, false);
+        editorController.updateActiveTextStyle(fontSize: next.toDouble());
       },
-      items: _fontSizes
-          .map((size) => DropdownMenuItem(value: size, child: Text(size)))
+      items: values
+          .map(
+            (size) => DropdownMenuItem<int>(
+              value: size,
+              child: Text('$size', style: const TextStyle(fontSize: 13)),
+            ),
+          )
           .toList(),
     );
   }
 
-  Widget _colorPicker(BuildContext context, String? currentValue) {
-    return GestureDetector(
-      onTap: () async {
-        final base = _colorFromHex(currentValue) ?? AppColors.inkBlack;
-        final updated = await _pickColor(
-          context,
-          base,
-          editorController.recentColors,
-        );
-        if (updated == null) {
-          return;
-        }
-        final attribute = quill.Attribute.fromKeyValue(
-          'color',
-          _toHex(updated),
-        );
-        if (attribute == null) {
-          return;
-        }
-        _applyFormat(attribute, false);
-      },
-      child: Row(
-        children: [
-          Container(
-            width: 16,
-            height: 16,
+  Widget _colorPicker(BuildContext context) {
+    return Tooltip(
+      message: 'Text color',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () async {
+          final updated = await _pickColor(
+            context,
+            block.color,
+            editorController.recentColors,
+          );
+          if (updated != null) {
+            editorController.updateActiveTextStyle(color: updated);
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Container(
+            width: 18,
+            height: 18,
             decoration: BoxDecoration(
-              color: _colorFromHex(currentValue) ?? AppColors.inkBlack,
+              color: block.color,
               shape: BoxShape.circle,
+              border: Border.all(color: AppColors.divider),
             ),
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  Map<String, dynamic> _firstInlineAttributes(String? deltaJson) {
+    if (deltaJson == null || deltaJson.trim().isEmpty) {
+      return const <String, dynamic>{};
+    }
+    try {
+      final decoded = jsonDecode(deltaJson);
+      if (decoded is! List) {
+        return const <String, dynamic>{};
+      }
+      for (final raw in decoded) {
+        if (raw is! Map) {
+          continue;
+        }
+        final op = Map<String, dynamic>.from(raw);
+        final insert = op['insert'];
+        if (insert is! String || insert.replaceAll('\n', '').isEmpty) {
+          continue;
+        }
+        final attributes = op['attributes'];
+        return attributes is Map
+            ? Map<String, dynamic>.from(attributes)
+            : const <String, dynamic>{};
+      }
+    } catch (_) {
+      return const <String, dynamic>{};
+    }
+    return const <String, dynamic>{};
+  }
+
+  Map<String, dynamic> _firstParagraphAttributes(String? deltaJson) {
+    if (deltaJson == null || deltaJson.trim().isEmpty) {
+      return const <String, dynamic>{};
+    }
+    try {
+      final decoded = jsonDecode(deltaJson);
+      if (decoded is! List) {
+        return const <String, dynamic>{};
+      }
+      for (final raw in decoded) {
+        if (raw is! Map) {
+          continue;
+        }
+        final op = Map<String, dynamic>.from(raw);
+        final insert = op['insert'];
+        if (insert is! String || !insert.contains('\n')) {
+          continue;
+        }
+        final attributes = op['attributes'];
+        return attributes is Map
+            ? Map<String, dynamic>.from(attributes)
+            : const <String, dynamic>{};
+      }
+    } catch (_) {
+      return const <String, dynamic>{};
+    }
+    return const <String, dynamic>{};
   }
 
   String _toHex(Color color) {
@@ -511,94 +561,5 @@ class TextEditToolbar extends StatelessWidget {
       (g + (255 - g) * t).round(),
       (b + (255 - b) * t).round(),
     );
-  }
-
-  void _applyFormat(quill.Attribute attribute, bool isActive) {
-    final resolved = _resolveAttribute(attribute, isActive);
-    _storeLastTextStyle(attribute, resolved);
-    final selection = controller.selection;
-    if (!selection.isCollapsed) {
-      controller.formatSelection(resolved);
-      return;
-    }
-    final docLength = controller.document.length;
-    if (docLength == 0) {
-      return;
-    }
-    final end = (docLength - 1).clamp(0, docLength).toInt();
-    controller.updateSelection(
-      TextSelection(baseOffset: 0, extentOffset: end),
-      quill.ChangeSource.local,
-    );
-    controller.formatSelection(resolved);
-    controller.updateSelection(selection, quill.ChangeSource.local);
-  }
-
-  void _clearInlineFormatting() {
-    final selection = controller.selection;
-    final length = selection.isCollapsed
-        ? controller.document.length - 1
-        : selection.extentOffset - selection.baseOffset;
-    final start = selection.isCollapsed
-        ? 0
-        : selection.baseOffset < selection.extentOffset
-        ? selection.baseOffset
-        : selection.extentOffset;
-    if (length <= 0) {
-      return;
-    }
-    for (final key in const ['bold', 'italic', 'underline', 'strike']) {
-      final attribute = quill.Attribute.fromKeyValue(key, null);
-      if (attribute != null) {
-        controller.formatText(start, length, attribute);
-      }
-    }
-    final color = quill.Attribute.fromKeyValue('color', null);
-    final size = quill.Attribute.fromKeyValue('size', null);
-    final font = quill.Attribute.fromKeyValue('font', null);
-    if (color != null) controller.formatText(start, length, color);
-    if (size != null) controller.formatText(start, length, size);
-    if (font != null) controller.formatText(start, length, font);
-    controller.updateSelection(selection, quill.ChangeSource.local);
-  }
-
-  quill.Attribute _resolveAttribute(quill.Attribute attribute, bool isActive) {
-    if (!isActive) {
-      return attribute;
-    }
-    return quill.Attribute.fromKeyValue(attribute.key, null) ?? attribute;
-  }
-
-  void _storeLastTextStyle(quill.Attribute original, quill.Attribute resolved) {
-    if (original.key == quill.Attribute.font.key) {
-      editorController.setLastTextFontFamily(resolved.value?.toString());
-      return;
-    }
-    if (original.key == quill.Attribute.size.key) {
-      final parsed = double.tryParse(resolved.value?.toString() ?? '');
-      if (parsed != null) {
-        editorController.setLastTextFontSize(parsed);
-      }
-      return;
-    }
-    if (original.key == quill.Attribute.color.key) {
-      final color = _colorFromHex(resolved.value?.toString());
-      if (color != null) {
-        editorController.setLastTextColor(color);
-      }
-    }
-  }
-
-  quill.Attribute? _listAttribute(String value, {required bool unset}) {
-    final attribute = switch (value) {
-      'bullet' => quill.Attribute.ul,
-      'ordered' => quill.Attribute.ol,
-      'unchecked' => quill.Attribute.unchecked,
-      _ => null,
-    };
-    if (attribute == null) {
-      return null;
-    }
-    return unset ? quill.Attribute.clone(attribute, null) : attribute;
   }
 }

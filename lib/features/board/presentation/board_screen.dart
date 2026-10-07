@@ -572,6 +572,10 @@ class _BoardScreenState extends State<BoardScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
     final useWideTitleInset = MediaQuery.sizeOf(context).width >= 600;
+    final activeTextBlockId = controller.activeTextBlockId;
+    final activeTextBlock = activeTextBlockId == null
+        ? null
+        : controller.findTextBlockById(activeTextBlockId);
 
     final boardContent = Column(
       children: [
@@ -580,11 +584,10 @@ class _BoardScreenState extends State<BoardScreen> {
           onInsertPressed: () => _handleInsertFile(controller),
           onExportSelected: (format) => _handleExport(controller, format),
         ),
-        if (controller.activeTextController != null)
+        if (activeTextBlock != null)
           TextEditToolbar(
-            controller: controller.activeTextController!,
             editorController: controller,
-            activeTextBlockId: controller.activeTextBlockId,
+            block: activeTextBlock,
           ),
         Expanded(
           child: Container(

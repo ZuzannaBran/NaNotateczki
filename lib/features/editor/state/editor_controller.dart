@@ -1407,6 +1407,107 @@ class EditorController extends ChangeNotifier {
     _scheduleSave();
   }
 
+  void updateActiveTextStyle({
+    String? fontFamily,
+    bool clearFontFamily = false,
+    double? fontSize,
+    Color? color,
+    bool? bold,
+    bool? italic,
+    bool? underline,
+    bool? strike,
+    String? alignment,
+    bool clearDecorations = false,
+  }) {
+    final blockId = activeTextBlockId;
+    if (blockId == null) {
+      return;
+    }
+
+    _commitActiveTextEdit();
+    final pageIndex = _pageIndexContainingTextBlock(blockId);
+    if (pageIndex == null) {
+      return;
+    }
+    final before = pages[pageIndex].textBlocks
+        .where((item) => item.id == blockId)
+        .firstOrNull;
+    if (before == null) {
+      return;
+    }
+
+    final inline = _textInlineAttributes(before.deltaJson);
+    final paragraph = _textParagraphAttributes(before.deltaJson);
+
+    if (clearDecorations) {
+      inline.remove('bold');
+      inline.remove('italic');
+      inline.remove('underline');
+      inline.remove('strike');
+    }
+    if (clearFontFamily) {
+      inline.remove('font');
+    } else if (fontFamily != null) {
+      inline['font'] = fontFamily;
+    }
+
+    void setFlag(String key, bool? value) {
+      if (value == null) {
+        return;
+      }
+      if (value) {
+        inline[key] = true;
+      } else {
+        inline.remove(key);
+      }
+    }
+
+    setFlag('bold', bold);
+    setFlag('italic', italic);
+    setFlag('underline', underline);
+    setFlag('strike', strike);
+
+    final nextFontSize = fontSize ?? before.fontSize;
+    final nextColor = color ?? before.color;
+    inline['size'] = nextFontSize.round().toString();
+    inline['color'] = _colorToHex(nextColor);
+
+    if (alignment != null) {
+      if (alignment == 'left') {
+        paragraph.remove('align');
+      } else {
+        paragraph['align'] = alignment;
+      }
+    }
+
+    final after = before.copyWith(
+      fontSize: nextFontSize,
+      color: nextColor,
+      deltaJson: _buildTextDeltaJson(
+        before.text,
+        inline: inline,
+        paragraph: paragraph,
+      ),
+    );
+
+    commitTextUpdateOnPage(pageIndex, before, after);
+
+    if (clearFontFamily) {
+      setLastTextFontFamily(null);
+    } else if (fontFamily != null) {
+      setLastTextFontFamily(fontFamily);
+    }
+    if (fontSize != null) {
+      setLastTextFontSize(fontSize);
+    }
+    if (color != null) {
+      setLastTextColor(color);
+    }
+    if (activeTextBlockId == blockId) {
+      _beginTextEdit(blockId);
+    }
+  }
+
   void updateTextBlockPosition(String id, Offset position) {
     final updated = currentPage.textBlocks
         .map((item) => item.id == id ? item.copyWith(position: position) : item)
@@ -2404,6 +2505,88 @@ class EditorController extends ChangeNotifier {
       await imagesDir.create(recursive: true);
     }
     return imagesDir;
+  }
+
+  Map<String, dynamic> _textInlineAttributes(String? deltaJson) {
+    if (deltaJson == null || deltaJson.trim().isEmpty) {
+      return <String, dynamic>{};
+    }
+    try {
+      final decoded = jsonDecode(deltaJson);
+      if (decoded is! List) {
+        return <String, dynamic>{};
+      }
+      for (final raw in decoded) {
+        if (raw is! Map) {
+          continue;
+        }
+        final op = Map<String, dynamic>.from(raw);
+        final insert = op['insert'];
+        if (insert is! String || insert.replaceAll('\n', '').isEmpty) {
+          continue;
+        }
+        final attributes = op['attributes'];
+        return attributes is Map
+            ? Map<String, dynamic>.from(attributes)
+            : <String, dynamic>{};
+      }
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+    return <String, dynamic>{};
+  }
+
+  Map<String, dynamic> _textParagraphAttributes(String? deltaJson) {
+    if (deltaJson == null || deltaJson.trim().isEmpty) {
+      return <String, dynamic>{};
+    }
+    try {
+      final decoded = jsonDecode(deltaJson);
+      if (decoded is! List) {
+        return <String, dynamic>{};
+      }
+      for (final raw in decoded) {
+        if (raw is! Map) {
+          continue;
+        }
+        final op = Map<String, dynamic>.from(raw);
+        final insert = op['insert'];
+        if (insert is! String || !insert.contains('\n')) {
+          continue;
+        }
+        final attributes = op['attributes'];
+        return attributes is Map
+            ? Map<String, dynamic>.from(attributes)
+            : <String, dynamic>{};
+      }
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+    return <String, dynamic>{};
+  }
+
+  String _buildTextDeltaJson(
+    String text, {
+    required Map<String, dynamic> inline,
+    required Map<String, dynamic> paragraph,
+  }) {
+    final operations = <Map<String, dynamic>>[];
+    final lines = text.replaceAll('\r', '').split('\n');
+    for (final line in lines) {
+      if (line.isNotEmpty) {
+        operations.add(<String, dynamic>{
+          'insert': line,
+          if (inline.isNotEmpty)
+            'attributes': Map<String, dynamic>.from(inline),
+        });
+      }
+      operations.add(<String, dynamic>{
+        'insert': '\n',
+        if (paragraph.isNotEmpty)
+          'attributes': Map<String, dynamic>.from(paragraph),
+      });
+    }
+    return jsonEncode(operations);
   }
 
   String _colorToHex(Color color) {

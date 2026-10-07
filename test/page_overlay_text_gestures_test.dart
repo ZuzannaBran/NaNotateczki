@@ -10,6 +10,7 @@ import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/widgets/object_transform_hud.dart';
 import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
+import 'package:program/features/editor/presentation/widgets/text_edit_toolbar.dart';
 import 'package:program/features/editor/presentation/widgets/text_hud_block.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -36,6 +37,45 @@ void main() {
     expect(medium, greaterThan(small));
     expect(large, greaterThan(medium));
     expect(large, 80);
+  });
+
+  testWidgets('block text toolbar applies only supported formatting', (
+    tester,
+  ) async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: _notebook(),
+    );
+
+    controller.addTextBlock(const Offset(40, 50));
+    controller.setTool(DrawingTool.text);
+    final block = controller.pages.single.textBlocks.single;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TextEditToolbar(
+            editorController: controller,
+            block: block,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.format_bold), findsOneWidget);
+    expect(find.byIcon(Icons.format_list_bulleted), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.format_bold));
+    await tester.pump();
+
+    final formatted = controller.pages.single.textBlocks.single;
+    expect(formatted.deltaJson, contains('"bold":true'));
+    expect(controller.activeTextBlockId, block.id);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
   });
 
   testWidgets('inserted text starts selected in edit mode and reopens', (
