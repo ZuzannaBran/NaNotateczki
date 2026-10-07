@@ -19,7 +19,6 @@ import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/image_block.dart';
 import '../../../notebook/domain/note_page.dart';
 import '../../../notebook/domain/text_block.dart';
-import 'web_text_editor_layer.dart';
 import '../../state/editor_controller.dart';
 
 const Color _lassoAccentColor = Color(0xFF2E5AAC);
@@ -59,10 +58,6 @@ class PageOverlay extends StatelessWidget {
         controller.lassoSelection?.pageIndex == effectivePageIndex
         ? controller.lassoSelection
         : null;
-    final useWebTextEditor =
-        activeTextId != null &&
-        (tool == DrawingTool.edit || tool == DrawingTool.text) &&
-        effectivePage.textBlocks.any((block) => block.id == activeTextId);
     return IgnorePointer(
       ignoring: !interactionEnabled,
       child: Stack(
@@ -127,35 +122,23 @@ class PageOverlay extends StatelessWidget {
                     lassoSelection?.imageBlockIds.contains(block.id) == true,
                 selectionEnabled: block.id != activeImageId,
               ),
-          if (useWebTextEditor && renderActive)
-            Positioned.fill(
-              child: WebTextEditorLayer(
-                key: ValueKey('web-text-editor-${effectivePage.id}'),
-                controller: controller,
-                page: effectivePage,
+          for (final block in effectivePage.textBlocks)
+            if ((block.id == activeTextId && renderActive) ||
+                (block.id != activeTextId && renderInactive))
+              _TextBlockWidget(
+                block: block,
                 pageIndex: effectivePageIndex,
                 worldOrigin: worldOrigin,
                 interactionEnabled: interactionEnabled,
+                lassoDragDelta:
+                    lassoSelection?.textBlockIds.contains(block.id) == true
+                    ? controller.lassoDragDelta
+                    : null,
+                isLassoSelected:
+                    lassoSelection?.textBlockIds.contains(block.id) == true,
+                doubleTapOnly: false,
               ),
-            ),
-          if (!useWebTextEditor)
-            for (final block in effectivePage.textBlocks)
-              if ((block.id == activeTextId && renderActive) ||
-                  (block.id != activeTextId && renderInactive))
-                _TextBlockWidget(
-                  block: block,
-                  pageIndex: effectivePageIndex,
-                  worldOrigin: worldOrigin,
-                  interactionEnabled: interactionEnabled,
-                  lassoDragDelta:
-                      lassoSelection?.textBlockIds.contains(block.id) == true
-                      ? controller.lassoDragDelta
-                      : null,
-                  isLassoSelected:
-                      lassoSelection?.textBlockIds.contains(block.id) == true,
-                  doubleTapOnly: false,
-                ),
-          if (!useWebTextEditor && renderActive && tool.isInk)
+          if (renderActive && tool.isInk)
             for (final block in effectivePage.textBlocks)
               if (block.id != activeTextId)
                 _TextBlockWidget(
@@ -500,21 +483,14 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       final displayPosition = widget.block.position + lassoDelta;
       final left = displayPosition.dx - widget.worldOrigin.dx;
       final top = displayPosition.dy - widget.worldOrigin.dy;
-      final displayChild = widget.block.rotation == 0
-          ? child
-          : Transform.rotate(
-              angle: widget.block.rotation,
-              alignment: Alignment.topLeft,
-              child: child,
-            );
       if (!isActive || !canTransform || widget.doubleTapOnly) {
-        return Positioned(left: left, top: top, child: displayChild);
+        return Positioned(left: left, top: top, child: child);
       }
       return Positioned.fill(
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Positioned(left: left, top: top, child: displayChild),
+            Positioned(left: left, top: top, child: child),
             _transformFrame(
               controller: controller,
               left: left,
@@ -1095,7 +1071,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 
   String _colorToHex(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
-    return '#${value.substring(2)}';
+    return '#' + value.substring(2);
   }
 
   int _countTrailingNewlines(String text) {

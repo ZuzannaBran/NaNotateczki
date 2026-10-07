@@ -419,39 +419,6 @@ class EditorController extends ChangeNotifier {
     _replaceTextBlockOnCurrentPage(block, notify: true);
   }
 
-  void commitExternalTextBlockOnPage(
-    int pageIndex,
-    TextBlock block,
-  ) {
-    _ensurePageSelected(pageIndex);
-
-    TextBlock? before;
-    for (final item in currentPage.textBlocks) {
-      if (item.id == block.id) {
-        before = item;
-        break;
-      }
-    }
-    if (before == null ||
-        (before.text == block.text &&
-            before.deltaJson == block.deltaJson &&
-            before.position == block.position &&
-            before.fontSize == block.fontSize &&
-            before.color == block.color &&
-            before.width == block.width &&
-            before.rotation == block.rotation)) {
-      return;
-    }
-
-    final keepSelection = activeTextBlockId == block.id;
-    _discardActiveTextEdit();
-    _applyAction(UpdateTextAction(before: before, after: block));
-    if (keepSelection) {
-      _beginTextEdit(block.id);
-    }
-    _save();
-  }
-
   void deleteTextBlockOnPage(int pageIndex, String id) {
     _ensurePageSelected(pageIndex);
     deleteTextBlock(id);
