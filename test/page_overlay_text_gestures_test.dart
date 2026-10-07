@@ -1,13 +1,13 @@
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_box_transform/flutter_box_transform.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
+import 'package:program/features/editor/presentation/widgets/text_hud_block.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
@@ -70,7 +70,7 @@ void main() {
     expect(controller.activeImageBlockId, isNull);
     expect(controller.tool, DrawingTool.edit);
     expect(controller.pages.single.textBlocks.single.position, insertPosition);
-    expect(find.byType(TransformableBox), findsOneWidget);
+    expect(find.byType(TextHudBlock), findsOneWidget);
 
     await tester.tapAt(overlayTopLeft + const Offset(500, 700));
     await tester.pump();
@@ -78,9 +78,16 @@ void main() {
     expect(controller.pages.single.textBlocks, hasLength(1));
     expect(controller.activeTextBlockId, isNull);
     expect(controller.tool, DrawingTool.edit);
-    expect(find.byType(TransformableBox), findsNothing);
+    expect(find.byType(TextHudBlock), findsNothing);
 
     final textPosition = overlayTopLeft + insertPosition + const Offset(40, 20);
+    await tester.tapAt(textPosition);
+    await tester.pump();
+
+    expect(controller.activeTextBlockId, isNotNull);
+    expect(controller.tool, DrawingTool.edit);
+    expect(find.byType(TextHudBlock), findsOneWidget);
+
     await tester.tapAt(textPosition);
     await tester.pump(kDoubleTapMinTime);
     await tester.tapAt(textPosition);
@@ -88,7 +95,7 @@ void main() {
 
     expect(controller.activeTextBlockId, isNotNull);
     expect(controller.tool, DrawingTool.text);
-    expect(find.byType(TransformableBox), findsOneWidget);
+    expect(find.byType(EditableText), findsOneWidget);
 
     await tester.pump(kDoubleTapTimeout);
     await tester.pumpWidget(const SizedBox.shrink());

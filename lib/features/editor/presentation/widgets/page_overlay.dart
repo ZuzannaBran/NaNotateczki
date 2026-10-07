@@ -19,6 +19,7 @@ import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/image_block.dart';
 import '../../../notebook/domain/note_page.dart';
 import '../../../notebook/domain/text_block.dart';
+import 'text_hud_block.dart';
 import '../../state/editor_controller.dart';
 
 const Color _lassoAccentColor = Color(0xFF2E5AAC);
@@ -122,22 +123,33 @@ class PageOverlay extends StatelessWidget {
                     lassoSelection?.imageBlockIds.contains(block.id) == true,
                 selectionEnabled: block.id != activeImageId,
               ),
-          for (final block in effectivePage.textBlocks)
-            if ((block.id == activeTextId && renderActive) ||
-                (block.id != activeTextId && renderInactive))
-              _TextBlockWidget(
-                block: block,
-                pageIndex: effectivePageIndex,
-                worldOrigin: worldOrigin,
-                interactionEnabled: interactionEnabled,
-                lassoDragDelta:
-                    lassoSelection?.textBlockIds.contains(block.id) == true
-                    ? controller.lassoDragDelta
-                    : null,
-                isLassoSelected:
-                    lassoSelection?.textBlockIds.contains(block.id) == true,
-                doubleTapOnly: false,
-              ),
+          if (renderActive && activeTextId != null)
+            for (final block in effectivePage.textBlocks)
+              if (block.id == activeTextId)
+                TextHudBlock(
+                  key: ValueKey('text-hud-${block.id}'),
+                  controller: controller,
+                  block: block,
+                  pageIndex: effectivePageIndex,
+                  worldOrigin: worldOrigin,
+                  interactionEnabled: interactionEnabled,
+                ),
+          if (renderInactive)
+            for (final block in effectivePage.textBlocks)
+              if (block.id != activeTextId)
+                _TextBlockWidget(
+                  block: block,
+                  pageIndex: effectivePageIndex,
+                  worldOrigin: worldOrigin,
+                  interactionEnabled: interactionEnabled,
+                  lassoDragDelta:
+                      lassoSelection?.textBlockIds.contains(block.id) == true
+                      ? controller.lassoDragDelta
+                      : null,
+                  isLassoSelected:
+                      lassoSelection?.textBlockIds.contains(block.id) == true,
+                  doubleTapOnly: false,
+                ),
           if (renderActive && tool.isInk)
             for (final block in effectivePage.textBlocks)
               if (block.id != activeTextId)
