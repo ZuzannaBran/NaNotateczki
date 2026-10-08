@@ -106,7 +106,13 @@ void main() {
       () async {
     final db = NotesDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    final repository = NotebookRepository(db);
+    var guardedReductions = 0;
+    final repository = NotebookRepository(
+      db,
+      dataIntegrityIncidentHandler: (incident, before, attempted) async {
+        guardedReductions++;
+      },
+    );
     final notebook = _notebook();
     expect(await repository.saveNotebook(notebook), isTrue);
     final editor = EditorController(
@@ -134,6 +140,7 @@ void main() {
     await repository.waitForPendingSaves();
     final saved = await repository.getNotebook(notebook.uid);
     expect(saved?.pages.single.inkStrokes, isEmpty);
+    expect(guardedReductions, greaterThan(0));
   });
 
   test('object transform blocks viewport without shifting world coordinates',

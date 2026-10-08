@@ -289,11 +289,12 @@ Wybiera pusty stan albo właściwy `EditorScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (640 linii)
+### `lib/features/library/presentation/library_controller.dart` (663 linie)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
 Wybór dokumentu synchronizuje też aktywny folder, dzięki czemu drzewko
-biblioteki zaznacza folder i notatkę jednocześnie. Zapis samych folderów
+biblioteki zaznacza folder i notatkę jednocześnie. Asynchroniczny start
+nie powiadamia słuchaczy po usunięciu kontrolera. Zapis samych folderów
 zgłasza pusty zestaw zmian repozytorium, więc aktualizuje manifest bez
 oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
 tylko przy normalnym starcie istniejącej, zdrowej bazy.
@@ -628,6 +629,10 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `test/critical_editor_regressions_test.dart`: erase → lasso → save →
   reload, sekwencje undo/redo gumki i zamrożenie viewportu.
 - `test/cloud_sync_service_test.dart`: dodatkowe konflikty czasów i ID.
+- `test/cross_platform/eraser_stress_test.dart`: deterministyczne sekwencje
+  gumki z kontrolą unikalności i niepowracania raz usuniętych ID.
+- `test/library_controller_lifecycle_test.dart`: dispose podczas
+  asynchronicznego ładowania biblioteki.
 - `integration_test/app_smoke_test.dart`: start rzeczywistej aplikacji
   i inicjalizacja platformy bez utknięcia na ekranie ładowania.
 - `.github/workflows/cross_platform_tests.yml`: CI na Linux, Windows, macOS,

@@ -39,6 +39,8 @@ timing, filesystem and GPU behavior from physical hardware.
 ### Ink and erasers
 - Point/brush/scratch/area modes; fragment IDs; legacy eraser flattening;
   persistent storage, undo and restore (existing tests).
+- Seeded, repeatable stress sequences with ID uniqueness and never-resurrected
+  IDs after dozens of consecutive erase gestures.
 - Consecutive erasures of neighboring strokes; no resurrection when the second
   erasure crosses the earlier erasure region; repeat-erasure idempotence.
 - Spatial index rebuilt for a changed stroke collection.
@@ -60,6 +62,7 @@ timing, filesystem and GPU behavior from physical hardware.
 - Exit flush coordinator drains all dirty editors, skips clean/unregistered
   editors and propagates failures.
 - Exit-contact waiter handles two simultaneous contacts.
+- Library lifecycle: no notification after dispose while data is still loading.
 - Cloud merge: equal timestamps, older/newer conflicts, independent notebooks,
   duplicate IDs.
 - Background settings invalid-value normalization.
@@ -69,6 +72,8 @@ timing, filesystem and GPU behavior from physical hardware.
   `LibraryScreen`.
 - Same startup integration test runs in Chrome and on Android/iOS simulators.
 - Release builds validate compilation of every desktop/web platform.
+- Windows CI pins CMake 3.31 to accommodate the old pdfx/pdfium CMake project;
+  upgrading pdfx for current CMake still needs a separate compatibility review.
 
 ## Still required before declaring release-level cross-platform coverage
 
@@ -148,5 +153,9 @@ pass/fail result, exact Flutter/Dart/Xcode/Android versions, coverage report,
 hardware test results and unresolved regressions. Do not equate 100% line
 coverage with exhaustive functional coverage.
 
-Initial suite was authored via a GitHub connector, without a local Dart/Flutter
-runtime. The first Actions run is the compilation and runtime validation step.
+The test suite was authored via a GitHub connector, without a local Dart/Flutter
+runtime. Actual GitHub Actions results, not this plan, are the evidence for
+compilation and runtime validation. Initial CI uncovered a disposal race in
+LibraryController, legacy pdfx/pdfium Windows CMake incompatibility and a
+too-strict test assumption about spatial-index broadphase candidates. All
+three are tracked via committed changes; subsequent Actions must confirm them.

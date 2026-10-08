@@ -30,6 +30,7 @@ class LibraryController extends ChangeNotifier {
   int autoRestoreCount = 0;
   bool _bannerDismissed = false;
   bool isLoading = false;
+  bool _isDisposed = false;
   bool isSyncing = false;
   bool isLoadingSelectedItem = false;
   bool isRecoveringCorruptDocuments = false;
@@ -75,9 +76,21 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+
   Future<void> initialize() async {
     await _loadFolders();
+    if (_isDisposed) {
+      return;
+    }
     await loadItems();
+    if (_isDisposed) {
+      return;
+    }
     if (!wasReset && !freshFile && !repository.lastFetchSkippedCorruptRows) {
       await repository.cleanupOrphanedImages(items);
     }
@@ -85,6 +98,9 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> loadItems() async {
+    if (_isDisposed) {
+      return;
+    }
     isLoading = true;
     notifyListeners();
     try {
@@ -152,7 +168,9 @@ class LibraryController extends ChangeNotifier {
       );
     } finally {
       isLoading = false;
-      notifyListeners();
+      if (!_isDisposed) {
+        notifyListeners();
+      }
     }
   }
 
@@ -533,7 +551,11 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> _loadCloudPath() async {
-    cloudPath = await cloudSyncService.getCloudPath();
+    final loadedPath = await cloudSyncService.getCloudPath();
+    if (_isDisposed) {
+      return;
+    }
+    cloudPath = loadedPath;
     notifyListeners();
   }
 

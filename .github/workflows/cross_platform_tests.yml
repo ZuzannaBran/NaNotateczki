@@ -92,6 +92,11 @@ jobs:
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libsqlite3-dev libsecret-1-dev \
             xvfb poppler-utils zenity
+      - name: Pin CMake 3.31 for legacy pdfx/pdfium on Windows
+        if: matrix.platform == 'windows'
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.x'
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.6'

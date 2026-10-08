@@ -118,8 +118,8 @@ void main() {
       final after = original.where((item) => item.id != 'first').toList();
       final index = inkSpatialIndexFor(after);
       expect(
-        index.queryPoint(const Offset(50, 0), 4),
-        isEmpty,
+        index.queryPoint(const Offset(50, 0), 4).map((item) => item.id),
+        isNot(contains('first')),
       );
       expect(
         index.queryPoint(const Offset(50, 30), 4).single.id,
