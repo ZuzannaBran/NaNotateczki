@@ -536,20 +536,23 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (963 linii)
+### `lib/features/board/presentation/board_screen.dart` (865 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
 ignoruje pointery nawigacyjne, trackpad i scroll, a kontroler blokuje zmianę
-`viewPan/viewScale`. Pasek tekstu, tak jak w notebooku, jest wiązany z
-aktywnym `TextBlock`, a nie ze starym `QuillController`. Pomocnicze panele
-UI dziedziczą aktywną paletę.
+`viewPan/viewScale`. `BoardSceneBoundsResolver` zamraża prostokąt sceny
+podczas move/resize, aby zmiany `contentBounds` nie przesuwały lokalnego
+układu współrzędnych. Po zakończeniu gestu granice odświeżają się.
+Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
+`QuillController`. Pomocnicze panele UI dziedziczą aktywną paletę.
 
 - 29: `BoardScreen`; 36: `_BoardScreenState`.
-- 57: `_buildBoardRect`; 75–379: obsługa pointerów i viewportu.
+- 57: `_buildBoardRect`; 67–388: obsługa pointerów i viewportu.
+- 721: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
 - import/eksport i skróty delegują do `EditorCommands`; busy overlay pozostaje ekranowy; główny `build` buduje tylko geometrię boarda.
-- 842: `_BoardPaintProbe`; 859: `_RenderBoardPaintProbe`;
-  898: `_BoardZoomControls`.
+- 759: `_BoardPaintProbe`; 776: `_RenderBoardPaintProbe`;
+  799: `_BoardZoomControls`.
 
 ## 10. Platformy, web i testy
 
@@ -590,6 +593,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
+- `test/board_scene_bounds_test.dart`: stały układ współrzędnych boarda
+  podczas resize/move i odblokowanie granic po gestach.
 - `test/object_transform_engine_test.dart` (68): wspólna geometria
   move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
 - `test/resizable_frame_test.dart` (33)

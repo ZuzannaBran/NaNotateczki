@@ -39,6 +39,7 @@ class _BoardScreenState extends State<BoardScreen> {
   static const double _inkNavigationTouchSlop = 8.0;
 
   Offset _insertPosition = const Offset(120, 120);
+  final BoardSceneBoundsResolver _sceneBounds = BoardSceneBoundsResolver();
   final GlobalKey _boardKey = GlobalKey();
   bool _isViewportNavigating = false;
   bool _panZoomSessionActive = false;
@@ -54,20 +55,12 @@ class _BoardScreenState extends State<BoardScreen> {
   Offset _panZoomLastLocalPosition = Offset.zero;
 
   Rect _buildBoardRect(EditorController controller, Size viewportSize) {
-    final safeScale = controller.viewScale <= 0 ? 1.0 : controller.viewScale;
-    final visibleWorldRect = Rect.fromLTWH(
-      -controller.viewPan.dx / safeScale,
-      -controller.viewPan.dy / safeScale,
-      viewportSize.width / safeScale,
-      viewportSize.height / safeScale,
-    );
-    final contentRect = controller.contentBounds.inflate(700);
-    final activeRect = visibleWorldRect.inflate(500);
-    return Rect.fromLTRB(
-      math.min(contentRect.left, activeRect.left),
-      math.min(contentRect.top, activeRect.top),
-      math.max(contentRect.right, activeRect.right),
-      math.max(contentRect.bottom, activeRect.bottom),
+    return _sceneBounds.resolve(
+      contentBounds: controller.contentBounds,
+      viewPan: controller.viewPan,
+      viewScale: controller.viewScale,
+      viewportSize: viewportSize,
+      freeze: controller.isObjectTransformActive,
     );
   }
 
@@ -722,6 +715,44 @@ class _BoardScreenState extends State<BoardScreen> {
         ],
       ),
     );
+  }
+}
+
+/// Keeps the board's local coordinate origin stable while an object is
+/// being moved or resized. The scene can be recalculated between gestures.
+class BoardSceneBoundsResolver {
+  Rect? _lastRect;
+  Rect? _frozenRect;
+
+  Rect resolve({
+    required Rect contentBounds,
+    required Offset viewPan,
+    required double viewScale,
+    required Size viewportSize,
+    required bool freeze,
+  }) {
+    final safeScale = viewScale <= 0 ? 1.0 : viewScale;
+    final visibleWorldRect = Rect.fromLTWH(
+      -viewPan.dx / safeScale,
+      -viewPan.dy / safeScale,
+      viewportSize.width / safeScale,
+      viewportSize.height / safeScale,
+    );
+    final contentRect = contentBounds.inflate(700);
+    final activeRect = visibleWorldRect.inflate(500);
+    final resolved = Rect.fromLTRB(
+      math.min(contentRect.left, activeRect.left),
+      math.min(contentRect.top, activeRect.top),
+      math.max(contentRect.right, activeRect.right),
+      math.max(contentRect.bottom, activeRect.bottom),
+    );
+
+    if (freeze) {
+      return _frozenRect ??= _lastRect ?? resolved;
+    }
+    _frozenRect = null;
+    _lastRect = resolved;
+    return resolved;
   }
 }
 
