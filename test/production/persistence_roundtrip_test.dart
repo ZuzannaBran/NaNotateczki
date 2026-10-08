@@ -246,18 +246,21 @@ void main() {
 
   test('incremental backup to a fresh database restores rich content',
       () async {
+    final source = _fixture(uid: 'restore-target');
     final db = NotesDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
     final backup = LocalBackupService(
       _repository(db),
       documentsDirectory: () async => documentsDirectory,
     );
-    addTearDown(backup.dispose);
 
-    final source = _fixture(uid: 'restore-target');
-    final report = await backup.snapshot([source]);
-    expect(report.changedCount, 1);
-    expect((await backup.readLatest()), hasLength(1));
+    try {
+      final report = await backup.snapshot([source]);
+      expect(report.changedCount, 1);
+      expect((await backup.readLatest()), hasLength(1));
+    } finally {
+      await backup.dispose();
+      await db.close();
+    }
 
     final secondDb = NotesDatabase(NativeDatabase.memory());
     addTearDown(secondDb.close);
