@@ -489,7 +489,8 @@ błędów, integralności i wydajności.
 Dwa świadomie osobne canvasy ink, wspólna geometria, scratch erase, lasso,
 handoff aktywnej kreski i pomiary wydajności. Podczas rysowania
 pen/highlighter overlay stosuje ten sam LOD co zapisany tusz, żeby
-ograniczyć zmianę wyglądu po oderwaniu rysika. Oba delegują gumkę do jednego
+ograniczyć zmianę wyglądu po oderwaniu rysika. Ścieżki pióra i markera
+są wygładzane od trzeciego punktu, bez progu dużego przeskoku wejścia. Oba delegują gumkę do jednego
 `InkEraserEngine`; zwykła gumka destrukcyjnie wycina tylko przejechany
 fragment, a erase-stroke/area usuwają całe stroke'y. Żaden tryb nie zapisuje
 masek gumki w `inkStrokes`.
