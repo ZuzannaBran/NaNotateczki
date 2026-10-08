@@ -614,6 +614,27 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 
+
+Dodatkowe testy i automatyzacja wieloplatformowa:
+
+- `test/cross_platform/regression_test.dart`: powtarzalne wymazywanie,
+  brak powracających kresek, niezmienność migracji legacy, indeks przestrzenny,
+  cofnięcie/anulowanie transformacji oraz trwałe preferencje tła.
+- `test/cross_platform/save_and_exit_test.dart`: opróżnianie kolejki
+  edytorów, błędy flush i wiele aktywnych kontaktów rysika.
+- `test/cross_platform/object_transform_hit_zones_test.dart`: granica
+  niewidzialnych stref resize/move dla małych i dużych ramek, obsługa touch
+  i stylus oraz anulowanie gestu.
+- `test/critical_editor_regressions_test.dart`: erase → lasso → save →
+  reload, sekwencje undo/redo gumki i zamrożenie viewportu.
+- `test/cloud_sync_service_test.dart`: dodatkowe konflikty czasów i ID.
+- `integration_test/app_smoke_test.dart`: start rzeczywistej aplikacji
+  i inicjalizacja platformy bez utknięcia na ekranie ładowania.
+- `.github/workflows/cross_platform_tests.yml`: CI na Linux, Windows, macOS,
+  Chrome, Android i iOS; emulatory uruchamiane nocą lub ręcznie.
+- `docs/TEST_MATRIX.md`: plan testów, wymagania urządzeń i niedomknięte
+  scenariusze, których CI jeszcze nie pokrywa.
+
 ## 11. Krytyczne konwencje
 
 1. Zmiana `notes_database.dart` wymaga `dart run build_runner build`. Przy
