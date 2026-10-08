@@ -493,7 +493,9 @@ ograniczyć zmianę wyglądu po oderwaniu rysika. Ścieżki pióra i markera
 są wygładzane od trzeciego punktu, bez progu dużego przeskoku wejścia. Oba delegują gumkę do jednego
 `InkEraserEngine`; zwykła gumka destrukcyjnie wycina tylko przejechany
 fragment, a erase-stroke/area usuwają całe stroke'y. Żaden tryb nie zapisuje
-masek gumki w `inkStrokes`.
+masek gumki w `inkStrokes`. Notebookowe operacje zmieniające ink liczą wynik
+z bieżącego `EditorController.pageAt(...)`, a nie z potencjalnie starego
+`widget.pages`, żeby kolejne gumki i scratch erase nie odtwarzały starego ink.
 
 - 45: `_InkPerfLog`; 260–483: cache/LOD/geometria.
 - 584–873: częściowe wymazywanie i rozpoznanie scratch erase.

@@ -3067,7 +3067,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         ).map((point) => point.toOffset()).toList();
         _eraseStrokeIds.addAll(
           InkEraserEngine.areaHits(
-            strokes: widget.pages[pageIndex].inkStrokes,
+            strokes: controller.pageAt(pageIndex).inkStrokes,
             polygon: polygon,
           ),
         );
@@ -3177,7 +3177,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         ).map((point) => point.toOffset()).toList();
         _eraseStrokeIds.addAll(
           InkEraserEngine.areaHits(
-            strokes: widget.pages[pageIndex].inkStrokes,
+            strokes: controller.pageAt(pageIndex).inkStrokes,
             polygon: polygon,
           ),
         );
@@ -3288,7 +3288,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     if (!_isScratchEraseGesture(_currentPoints, pointerKind)) {
       return false;
     }
-    final strokes = widget.pages[pageIndex].inkStrokes;
+    final strokes = controller.pageAt(pageIndex).inkStrokes;
     final gesture = _toPageLocalPoints(_currentPoints, pageIndex);
     final intersectionRadius = _scratchEraseIntersectionRadius(
       controller.inkStrokeWidth,
@@ -3615,7 +3615,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         ? _effectiveStrokeWidth(tool, controller.inkStrokeWidth) / 2
         : _eraserStrokeRadius(controller.inkStrokeWidth);
     InkEraserEngine.collectPointHits(
-      strokes: widget.pages[pageIndex].inkStrokes,
+      strokes: controller.pageAt(pageIndex).inkStrokes,
       point: localOffset,
       radius: radius,
       into: _eraseStrokeIds,
@@ -3642,7 +3642,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       return;
     }
     final result = InkEraserEngine.eraseBrushParts(
-      strokes: widget.pages[pageIndex].inkStrokes,
+      strokes: controller.pageAt(pageIndex).inkStrokes,
       path: _toPageLocalPoints(
         _currentPoints,
         pageIndex,
