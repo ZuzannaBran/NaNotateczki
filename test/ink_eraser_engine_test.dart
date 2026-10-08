@@ -29,6 +29,37 @@ void main() {
     expect(ids, {'hit'});
   });
 
+  test('brush eraser splits a sparse stroke instead of deleting it whole', () {
+    final line = _stroke('line', const [
+      Offset(0, 0),
+      Offset(100, 0),
+    ]);
+    var nextId = 0;
+
+    final result = InkEraserEngine.eraseBrushParts(
+      strokes: [line],
+      path: const [
+        Offset(50, -10),
+        Offset(50, 10),
+      ],
+      radius: 4,
+      createId: () => 'part-${nextId++}',
+    );
+
+    expect(result.changed, isTrue);
+    expect(result.strokes, hasLength(2));
+    expect(
+      result.strokes.every((stroke) => stroke.tool == DrawingTool.pen),
+      isTrue,
+    );
+    expect(
+      result.strokes.expand((stroke) => stroke.points).any(
+        (point) => point.dx > 45 && point.dx < 55,
+      ),
+      isFalse,
+    );
+  });
+
   test('area eraser catches a stroke crossing the polygon', () {
     final crossing = _stroke('crossing', const [
       Offset(0, 0),

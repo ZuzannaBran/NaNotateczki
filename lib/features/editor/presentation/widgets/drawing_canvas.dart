@@ -1384,14 +1384,21 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       _notifyInkChanged();
       return;
     }
-    if (tool == DrawingTool.eraserStroke ||
-        tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserStroke) {
       _eraseStrokeIds.clear();
       _eraserPosition = offset;
       _eraserTrail
         ..clear()
         ..add(offset);
       _collectEraserHits(offset, page, controller, tool);
+      _notifyInkChanged();
+      return;
+    }
+    if (tool == DrawingTool.eraserBrush) {
+      _eraserPosition = offset;
+      _currentPoints
+        ..clear()
+        ..add(InkPoint.fromOffset(offset, pressure));
       _notifyInkChanged();
       return;
     }
@@ -1458,11 +1465,18 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         offset,
         tool,
       );
-      if (tool == DrawingTool.eraserStroke ||
-          tool == DrawingTool.eraserBrush) {
+      if (tool == DrawingTool.eraserStroke) {
         _eraserPosition = offset;
         _addEraserTrailPoint(offset);
         _collectEraserHits(offset, page, controller, tool);
+        _notifyInkChanged();
+        return;
+      }
+      if (tool == DrawingTool.eraserBrush) {
+        _eraserPosition = offset;
+        if (_shouldAddPoint(offset, tool)) {
+          _currentPoints.add(InkPoint.fromOffset(offset, event.pressure));
+        }
         _notifyInkChanged();
         return;
       }
@@ -1560,9 +1574,14 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       _resetCurrent();
       return;
     }
-    if (tool == DrawingTool.eraserStroke ||
-        tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserStroke) {
       _commitErasedIds(controller, pageIndex);
+      _eraserPosition = null;
+      _resetCurrent();
+      return;
+    }
+    if (tool == DrawingTool.eraserBrush) {
+      _commitBrushErase(controller, pageIndex);
       _eraserPosition = null;
       _resetCurrent();
       return;
@@ -1655,9 +1674,12 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       }
       return;
     }
-    if (tool == DrawingTool.eraserStroke ||
-        tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserStroke) {
       _commitErasedIds(controller, pageIndex);
+      return;
+    }
+    if (tool == DrawingTool.eraserBrush) {
+      _commitBrushErase(controller, pageIndex);
       return;
     }
     if (tool == DrawingTool.eraserArea) {
@@ -2060,6 +2082,34 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       controller.eraseInkStrokesById(_eraseStrokeIds);
     }
     _eraseStrokeIds.clear();
+  }
+
+  void _commitBrushErase(
+    EditorController controller,
+    int pageIndex,
+  ) {
+    if (_currentPoints.isEmpty) {
+      return;
+    }
+    final result = InkEraserEngine.eraseBrushParts(
+      strokes: _resolvedPage(controller).inkStrokes,
+      path: _currentPoints.map((point) => point.toOffset()).toList(),
+      radius:
+          _effectiveStrokeWidth(
+            DrawingTool.eraserBrush,
+            controller.inkStrokeWidth,
+          ) /
+          2,
+      createId: controller.createInkStrokeId,
+    );
+    if (!result.changed) {
+      return;
+    }
+    if (widget.pageIndex != null) {
+      controller.replaceInkStrokesOnPage(pageIndex, result.strokes);
+    } else {
+      controller.replaceInkStrokes(result.strokes);
+    }
   }
 
   NotePage _resolvedPage(EditorController controller) {
@@ -2768,8 +2818,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       _notifyInkChanged();
       return;
     }
-    if (tool == DrawingTool.eraserStroke ||
-        tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserStroke) {
       _eraseStrokeIds.clear();
       _eraserPosition = worldOffset;
       _eraserTrail
@@ -2781,6 +2830,14 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         controller,
         tool,
       );
+      _notifyInkChanged();
+      return;
+    }
+    if (tool == DrawingTool.eraserBrush) {
+      _eraserPosition = worldOffset;
+      _currentPoints
+        ..clear()
+        ..add(InkPoint.fromOffset(docOffset, pressure));
       _notifyInkChanged();
       return;
     }
@@ -2874,8 +2931,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         localOffset,
         tool,
       );
-      if (tool == DrawingTool.eraserStroke ||
-          tool == DrawingTool.eraserBrush) {
+      if (tool == DrawingTool.eraserStroke) {
         _eraserPosition = worldOffset;
         _addEraserTrailPoint(worldOffset);
         _collectEraserHits(
@@ -2884,6 +2940,16 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
           controller,
           tool,
         );
+        _notifyInkChanged();
+        return;
+      }
+      if (tool == DrawingTool.eraserBrush) {
+        _eraserPosition = worldOffset;
+        if (_shouldAddPoint(docOffset, tool)) {
+          _currentPoints.add(
+            InkPoint.fromOffset(docOffset, event.pressure),
+          );
+        }
         _notifyInkChanged();
         return;
       }
@@ -2988,9 +3054,14 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       _resetCurrent();
       return;
     }
-    if (tool == DrawingTool.eraserStroke ||
-        tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserStroke) {
       _commitErasedIdsOnPage(controller, pageIndex);
+      _eraserPosition = null;
+      _resetCurrent();
+      return;
+    }
+    if (tool == DrawingTool.eraserBrush) {
+      _commitBrushEraseOnPage(controller, pageIndex);
       _eraserPosition = null;
       _resetCurrent();
       return;
@@ -3097,9 +3168,12 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       }
       return;
     }
-    if (tool == DrawingTool.eraserStroke ||
-        tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserStroke) {
       _commitErasedIdsOnPage(controller, pageIndex);
+      return;
+    }
+    if (tool == DrawingTool.eraserBrush) {
+      _commitBrushEraseOnPage(controller, pageIndex);
       return;
     }
     if (tool == DrawingTool.eraserArea) {
@@ -3565,6 +3639,32 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     }
     controller.eraseInkStrokesByIdOnPage(pageIndex, _eraseStrokeIds);
     _eraseStrokeIds.clear();
+  }
+
+  void _commitBrushEraseOnPage(
+    EditorController controller,
+    int pageIndex,
+  ) {
+    if (_currentPoints.isEmpty) {
+      return;
+    }
+    final result = InkEraserEngine.eraseBrushParts(
+      strokes: widget.pages[pageIndex].inkStrokes,
+      path: _toPageLocalPoints(
+        _currentPoints,
+        pageIndex,
+      ).map((point) => point.toOffset()).toList(),
+      radius:
+          _effectiveStrokeWidth(
+            DrawingTool.eraserBrush,
+            controller.inkStrokeWidth,
+          ) /
+          2,
+      createId: controller.createInkStrokeId,
+    );
+    if (result.changed) {
+      controller.replaceInkStrokesOnPage(pageIndex, result.strokes);
+    }
   }
 
   bool _strokeHitTest(InkStroke stroke, Offset point, double radius) {
@@ -4078,8 +4178,7 @@ class _InkOverlayPainter extends CustomPainter {
     }
 
     if (drawActiveContent &&
-        (currentTool == DrawingTool.eraserStroke ||
-            currentTool == DrawingTool.eraserBrush) &&
+        currentTool == DrawingTool.eraserStroke &&
         eraserTrail.isNotEmpty) {
       _drawEraserTrail(canvas, size, eraserTrail, eraserRadius ?? 12.0);
     }

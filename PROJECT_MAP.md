@@ -242,11 +242,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/ink_spatial_index.dart` (125): cache'owany
   indeks siatkowy kandydatów do hit-testu.
   14: `inkSpatialIndexFor`; 24: `InkSpatialIndex`.
-- `lib/features/notebook/domain/ink_eraser_engine.dart` (424):
-  wspólny destrukcyjny silnik gumki dla boarda i notebooka. Punktowa/brush
-  oraz obszarowa gumka zwracają ID całych trafionych stroke'ów; stary zapis
-  masek gumki jest jednorazowo spłaszczany do zwykłego ink.
-  25: `InkEraserEngine`.
+- `lib/features/notebook/domain/ink_eraser_engine.dart` (549):
+  wspólny destrukcyjny silnik gumki dla boarda i notebooka. Zwykła gumka
+  wycina fragmenty stroke'a i zapisuje pozostałe części jako realny ink;
+  erase-stroke i area kasują całe trafione stroke'y. Stary zapis masek gumki
+  jest jednorazowo spłaszczany do zwykłego ink.
+  35: `InkEraserEngine`.
 - `lib/features/notebook/domain/text_block.dart` (45): blok Quill z pozycją,
   stylem, szerokością i rotacją.
   3: `TextBlock`.
@@ -483,12 +484,13 @@ błędów, integralności i wydajności.
   gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
   używają starego Quilla jako bezpieczny fallback.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4362 linie)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4461 linie)
 
 Dwa świadomie osobne canvasy ink, wspólna geometria, scratch erase, lasso,
 handoff aktywnej kreski i pomiary wydajności. Oba delegują gumkę do jednego
-`InkEraserEngine`; brush/stroke/area kasują całe trafione stroke'y i nie
-zapisują masek gumki w `inkStrokes`.
+`InkEraserEngine`; zwykła gumka destrukcyjnie wycina tylko przejechany
+fragment, a erase-stroke/area usuwają całe stroke'y. Żaden tryb nie zapisuje
+masek gumki w `inkStrokes`.
 
 - 45: `_InkPerfLog`; 260–483: cache/LOD/geometria.
 - 584–873: częściowe wymazywanie i rozpoznanie scratch erase.
@@ -572,8 +574,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
-- `test/ink_eraser_engine_test.dart` (122): destrukcyjne kasowanie
-  całych stroke'ów, area hit-test, migracja legacy gumek i undo
+- `test/ink_eraser_engine_test.dart` (150): zwykła gumka
+  dzieląca stroke na fragmenty, erase-stroke/area hit-test, migracja legacy
+  gumek i undo
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
 - `test/page_overlay_text_gestures_test.dart` (246): sprawdza blokowy

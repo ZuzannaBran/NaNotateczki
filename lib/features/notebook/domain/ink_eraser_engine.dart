@@ -18,6 +18,16 @@ class LegacyEraserFlattenResult {
   final bool changed;
 }
 
+class InkBrushEraseResult {
+  const InkBrushEraseResult({
+    required this.strokes,
+    required this.changed,
+  });
+
+  final List<InkStroke> strokes;
+  final bool changed;
+}
+
 /// Shared destructive eraser logic used by notebook and board canvases.
 ///
 /// New eraser gestures delete ink strokes from the model. Legacy eraser
@@ -47,6 +57,43 @@ class InkEraserEngine {
         into.add(stroke.id);
       }
     }
+  }
+
+  static InkBrushEraseResult eraseBrushParts({
+    required List<InkStroke> strokes,
+    required List<Offset> path,
+    required double radius,
+    required String Function() createId,
+  }) {
+    if (strokes.isEmpty || path.isEmpty || radius <= 0) {
+      return InkBrushEraseResult(strokes: strokes, changed: false);
+    }
+
+    final candidateIds = inkSpatialIndexFor(strokes)
+        .query(_pointsBounds(path).inflate(radius))
+        .map((stroke) => stroke.id)
+        .toSet();
+    final next = <InkStroke>[];
+    var changed = false;
+    for (final stroke in strokes) {
+      if (!candidateIds.contains(stroke.id) || !_canErase(stroke)) {
+        next.add(stroke);
+        continue;
+      }
+      final parts = _splitStrokeForBrush(
+        stroke,
+        path,
+        radius,
+        createId,
+      );
+      if (parts.length == 1 && identical(parts.single, stroke)) {
+        next.add(stroke);
+        continue;
+      }
+      changed = true;
+      next.addAll(parts);
+    }
+    return InkBrushEraseResult(strokes: next, changed: changed);
   }
 
   static Set<String> areaHits({
@@ -152,6 +199,84 @@ class InkEraserEngine {
       }
     }
     return false;
+  }
+
+  static List<InkStroke> _splitStrokeForBrush(
+    InkStroke stroke,
+    List<Offset> path,
+    double radius,
+    String Function() createId,
+  ) {
+    if (!_canErase(stroke) || stroke.points.isEmpty) {
+      return [stroke];
+    }
+
+    final eraseRadius = radius + stroke.width * 0.5;
+    final eraseRadiusSquared = eraseRadius * eraseRadius;
+    if (stroke.points.length == 1) {
+      return _distanceSquaredToPolyline(
+                stroke.points.first.toOffset(),
+                path,
+              ) <=
+              eraseRadiusSquared
+          ? <InkStroke>[]
+          : [stroke];
+    }
+
+    final sampleStep = max(1.0, min(3.0, eraseRadius * 0.5));
+    final sampled = <InkPoint>[stroke.points.first];
+    for (var index = 1; index < stroke.points.length; index++) {
+      final start = stroke.points[index - 1];
+      final end = stroke.points[index];
+      final startOffset = start.toOffset();
+      final endOffset = end.toOffset();
+      final distance = (endOffset - startOffset).distance;
+      final steps = max(1, min(1024, (distance / sampleStep).ceil()));
+      for (var step = 1; step <= steps; step++) {
+        final t = step / steps;
+        sampled.add(
+          InkPoint(
+            dx: start.dx + (end.dx - start.dx) * t,
+            dy: start.dy + (end.dy - start.dy) * t,
+            pressure:
+                start.pressure + (end.pressure - start.pressure) * t,
+          ),
+        );
+      }
+    }
+
+    final removed = [
+      for (final point in sampled)
+        _distanceSquaredToPolyline(point.toOffset(), path) <=
+            eraseRadiusSquared,
+    ];
+    if (!removed.contains(true)) {
+      return [stroke];
+    }
+
+    final parts = <InkStroke>[];
+    var run = <InkPoint>[];
+    void flushRun() {
+      if (run.length >= 2) {
+        parts.add(
+          stroke.copyWith(
+            id: createId(),
+            points: List<InkPoint>.from(run),
+          ),
+        );
+      }
+      run = <InkPoint>[];
+    }
+
+    for (var index = 0; index < sampled.length; index++) {
+      if (removed[index]) {
+        flushRun();
+      } else {
+        run.add(sampled[index]);
+      }
+    }
+    flushRun();
+    return parts;
   }
 
   static List<InkStroke> _applyLegacyBrush(
