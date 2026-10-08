@@ -1,6 +1,6 @@
 # NaNotateczki — platform testing and regression matrix
 
-Status: initial automated cross-platform suite. This document is a coverage
+Status: expanded release-oriented automated cross-platform suite. This document is a coverage
 inventory, not a claim of complete coverage or passing builds. Never describe
 a platform as tested until its actual Actions job succeeds.
 
@@ -10,8 +10,8 @@ a platform as tested until its actual Actions job succeeds.
   tests and coverage on Ubuntu; Chrome-compatible tests and web release build;
   actual desktop app smoke tests and release builds on Linux, Windows and macOS;
   Android debug APK build; unsigned iOS simulator build.
-- On pushes to `dev`: Android emulator and iOS simulator run the
-  launch-and-bootstrap integration tests too. PRs skip the expensive simulators.
+- On pushes to `dev`: Android emulator and iOS simulator run both
+  launch-and-bootstrap and isolated document lifecycle integration tests. PRs skip the expensive simulators.
 - The `schedule` and `workflow_dispatch` triggers are inactive until the
   workflow also exists on default branch `main` (GitHub Actions requirement).
   No file is committed to `main` by this change.
@@ -67,6 +67,10 @@ timing, filesystem and GPU behavior from physical hardware.
   editors and propagates failures.
 - Exit-contact waiter handles two simultaneous contacts.
 - Library lifecycle: no notification after dispose while data is still loading.
+- Production regression fixtures: SQLite and portable backup roundtrip of
+  styled Quill Delta, binary images, crop fields, bookmarks, multi-page ink;
+  page-scoped changes, independent concurrent saves and a backup restore
+  into a fresh isolated SQLite database.
 - Cloud merge: equal timestamps, older/newer conflicts, independent notebooks,
   duplicate IDs.
 - Background settings invalid-value normalization.
@@ -76,7 +80,12 @@ timing, filesystem and GPU behavior from physical hardware.
   `LibraryScreen`.
 - Same startup integration test runs in Chrome and on Android/iOS simulators
   on pushes to `dev`.
+- Production export renderer tests check actual in-memory PNG/PDF output,
+  dimensions, content differences and legacy eraser handling.
 - Release builds validate compilation of every desktop/web platform.
+- Isolated platform integration tests use an explicit opt-in Dart define,
+  create/rename/reload/delete a CI document and never run against a personal
+  notebook directory without that flag.
 - Windows runner uses modern CMake. The root `windows/CMakeLists.txt` sets
   `CMAKE_POLICY_VERSION_MINIMUM=3.5` for CMake 4 child processes invoked by
   legacy `pdfx/pdfium`. A runner test must confirm that this workaround builds
@@ -150,7 +159,8 @@ flutter build web --release
 
 GitHub Actions: `.github/workflows/cross_platform_tests.yml`. A local Linux
 integration run needs an active X display; headless CI uses `xvfb-run -a`.
-The browser end-to-end test needs ChromeDriver on port 4444. Mobile native
+The browser end-to-end test needs ChromeDriver on port 4444, with the
+matching Chrome for Testing binary passed through `--chrome-binary`. Mobile native
 integration tests must run with an emulator, simulator or real device connected.
 
 ## Evidence requirements
@@ -166,3 +176,11 @@ compilation and runtime validation. Initial CI uncovered a disposal race in
 LibraryController, legacy pdfx/pdfium Windows CMake incompatibility and a
 too-strict test assumption about spatial-index broadphase candidates. All
 three are tracked via committed changes; subsequent Actions must confirm them.
+
+CI discovery in run 37835178104: Windows/macOS/Linux and Android APK build passed.
+The iOS build failed at link time with `Pods_Runner not found`, browser
+bootstrap failed because ChromeDriver 155 launched Chrome 154 and Android
+emulator could not start Dart Development Service. These results describe
+that specific commit, not any later remediation. The committed iOS Podfile
+and explicit browser binary address two setup causes; they require CI
+validation. Emulator DDS remains a platform/tooling issue to investigate.

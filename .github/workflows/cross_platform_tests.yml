@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cross-platform-v2-${{ github.workflow }}-${{ github.ref }}
+  group: cross-platform-v3-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -55,6 +55,7 @@ jobs:
           channel: stable
           cache: true
       - uses: browser-actions/setup-chrome@v2
+        id: chrome
         with:
           chrome-version: stable
           install-chromedriver: true
@@ -71,7 +72,13 @@ jobs:
           chromedriver --port=4444 > /tmp/chromedriver.log 2>&1 &
           flutter drive -d web-server --browser-name chrome \
             --driver=test_driver/integration_test.dart \
-            --target=integration_test/app_smoke_test.dart
+            --target=integration_test/app_smoke_test.dart \
+            --chrome-binary="${{ steps.chrome.outputs.chrome-path }}"
+          flutter drive -d web-server --browser-name chrome \
+            --driver=test_driver/integration_test.dart \
+            --target=integration_test/document_lifecycle_test.dart \
+            --dart-define=NANOTATECZKI_ISOLATED_CI=true \
+            --chrome-binary="${{ steps.chrome.outputs.chrome-path }}"
 
   desktop:
     name: ${{ matrix.platform }} - desktop bootstrap and release
@@ -112,6 +119,21 @@ jobs:
       - name: Run actual macOS application
         if: matrix.platform == 'macos'
         run: flutter test integration_test/app_smoke_test.dart -d macos
+      - name: Isolated Linux document lifecycle
+        if: matrix.platform == 'linux'
+        run: |
+          xvfb-run -a flutter test integration_test/document_lifecycle_test.dart \
+            -d linux --dart-define=NANOTATECZKI_ISOLATED_CI=true
+      - name: Isolated Windows document lifecycle
+        if: matrix.platform == 'windows'
+        run: |
+          flutter test integration_test/document_lifecycle_test.dart \
+            -d windows --dart-define=NANOTATECZKI_ISOLATED_CI=true
+      - name: Isolated macOS document lifecycle
+        if: matrix.platform == 'macos'
+        run: |
+          flutter test integration_test/document_lifecycle_test.dart \
+            -d macos --dart-define=NANOTATECZKI_ISOLATED_CI=true
       - name: Build release application
         run: flutter build ${{ matrix.platform }} --release
 
@@ -170,7 +192,9 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
-          script: flutter test integration_test/app_smoke_test.dart -d emulator-5554
+          script: |
+            flutter test integration_test/app_smoke_test.dart -d emulator-5554
+            flutter test integration_test/document_lifecycle_test.dart -d emulator-5554 --dart-define=NANOTATECZKI_ISOLATED_CI=true
 
   ios-simulator:
     name: iOS - real simulator end-to-end
@@ -195,4 +219,6 @@ jobs:
           xcrun simctl bootstatus "$SIMULATOR_UDID" -b
           echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
       - name: Run app in iOS simulator
-        run: flutter test integration_test/app_smoke_test.dart -d "$SIMULATOR_UDID"
+        run: |
+          flutter test integration_test/app_smoke_test.dart -d "$SIMULATOR_UDID"
+          flutter test integration_test/document_lifecycle_test.dart -d "$SIMULATOR_UDID" --dart-define=NANOTATECZKI_ISOLATED_CI=true

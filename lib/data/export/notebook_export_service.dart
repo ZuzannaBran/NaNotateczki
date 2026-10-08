@@ -104,6 +104,58 @@ class NotebookExportService {
     String baseName,
     PageBackgroundSettings background,
   ) async {
+    final bytes = await _buildPdfBytes(
+      notebook,
+      pageSize,
+      pageGap,
+      background,
+    );
+    return _saveBytesAs(
+      dialogTitle: 'Save PDF export',
+      fileName: '$baseName.pdf',
+      extension: 'pdf',
+      bytes: bytes,
+    );
+  }
+
+  @visibleForTesting
+  static Future<List<Uint8List>> renderPngPagesForTest(
+    Notebook notebook, {
+    required Size pageSize,
+    double pageGap = 0.0,
+    PageBackgroundSettings background = const PageBackgroundSettings(),
+  }) async {
+    final normalized = InkEraserEngine.normalizeNotebook(notebook);
+    final pages = await _renderNotebook(
+      normalized,
+      pageSize,
+      pageGap,
+      background,
+    );
+    return [for (final page in pages) page.bytes];
+  }
+
+  @visibleForTesting
+  static Future<Uint8List> renderPdfBytesForTest(
+    Notebook notebook, {
+    required Size pageSize,
+    double pageGap = 0.0,
+    PageBackgroundSettings background = const PageBackgroundSettings(),
+  }) {
+    return _buildPdfBytes(
+      InkEraserEngine.normalizeNotebook(notebook),
+      pageSize,
+      pageGap,
+      background,
+    );
+  }
+
+  static Future<Uint8List> _buildPdfBytes(
+    Notebook notebook,
+    Size pageSize,
+    double pageGap,
+    PageBackgroundSettings background,
+  ) async {
     final pdf = pw.Document();
     final pages = await _renderNotebook(
       notebook,
@@ -121,14 +173,7 @@ class NotebookExportService {
         ),
       );
     }
-
-    final bytes = await pdf.save();
-    return _saveBytesAs(
-      dialogTitle: 'Save PDF export',
-      fileName: '$baseName.pdf',
-      extension: 'pdf',
-      bytes: bytes,
-    );
+    return pdf.save();
   }
 
   static Future<String?> _exportPng(

@@ -203,7 +203,7 @@ bezpośrednio do `InkEraserEngine`. Nie zawiera własnej geometrii gumki.
 
 - 5: `flattenErasersForBackup`; 9: `flattenPageErasersForBackup`.
 
-### `lib/data/export/notebook_export_service.dart` (676 linii)
+### `lib/data/export/notebook_export_service.dart` (ok. 730 linii)
 
 Renderuje notebook/board do PNG lub PDF i zapisuje przez systemowy dialog.
 Przed renderem normalizuje legacy gumki; zapisany renderer zna wyłącznie
@@ -211,7 +211,9 @@ zwykły ink i nie używa `BlendMode.clear`.
 
 - 25: `NotebookExportFormat`; 27: `NotebookExportFormatLabel`;
   38: `NotebookExportService`; 45: `exportController`;
-  62: `exportNotebook`; 671: `_RenderedPage`.
+  62: `exportNotebook`; publiczne metody `renderPngPagesForTest` i
+  `renderPdfBytesForTest` uruchamiają produkcyjny renderer bez systemowego
+  dialogu zapisu pliku.
 
 ### `lib/data/sync/cloud_sync_service.dart` (136 linii)
 
@@ -568,6 +570,9 @@ Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 
 ## 10. Platformy, web i testy
 
+- `ios/Podfile`: zależności CocoaPods dla pluginów bez obsługi SwiftPM;
+  deklaracja iOS 15 i targetów Runner/RunnerTests.
+
 - `windows/CMakeLists.txt`: zgodność generatora pdfx/pdfium z CMake 4; przed
   włączeniem pluginów ustawia `CMAKE_POLICY_VERSION_MINIMUM=3.5` dla
   potomnych procesów CMake, bez obniżania wersji dla reszty projektu.
@@ -638,6 +643,14 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   asynchronicznego ładowania biblioteki.
 - `integration_test/app_smoke_test.dart`: start rzeczywistej aplikacji
   i inicjalizacja platformy bez utknięcia na ekranie ładowania.
+- `integration_test/document_lifecycle_test.dart`: create/rename/read/delete
+  w rzeczywistej bazie danej platformy; działa wyłącznie z flagą
+  `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.
+- `test/production/persistence_roundtrip_test.dart`: rich text z Delta,
+  crop i bytes obrazów, dwie strony, dirty-page, równoległe zapisy, backup
+  i przywrócenie do nowego SQLite.
+- `test/production/export_render_test.dart`: produkcyjne PNG/PDF w pamięci,
+  liczba stron i rozmiar obrazu, treść oraz legacy gumka.
 - `.github/workflows/cross_platform_tests.yml`: CI na Linux, Windows, macOS,
   Chrome, Android i iOS; emulatory uruchamiane po pushu na `dev`.
   Harmonogram i manualny trigger wymagają też workflow na domyślnym `main`.

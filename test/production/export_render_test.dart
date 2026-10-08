@@ -1,0 +1,152 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:program/data/export/notebook_export_service.dart';
+import 'package:program/features/editor/state/page_background.dart';
+import 'package:program/features/notebook/domain/drawing_tool.dart';
+import 'package:program/features/notebook/domain/ink_stroke.dart';
+import 'package:program/features/notebook/domain/note_page.dart';
+import 'package:program/features/notebook/domain/notebook.dart';
+import 'package:program/features/notebook/domain/notebook_kind.dart';
+import 'package:program/features/notebook/domain/text_block.dart';
+
+const _pageSize = Size(80, 60);
+
+NotePage _page(String id, {bool draw = false, bool text = false}) {
+  return NotePage(
+    id: id,
+    title: id,
+    textBlocks: text
+        ? [
+            TextBlock(
+              id: '$id-text',
+              text: 'Visible export',
+              position: const Offset(3, 4),
+              fontSize: 12,
+              color: const Color(0xFF161616),
+              width: 72,
+            ),
+          ]
+        : const [],
+    imageBlocks: const [],
+    inkStrokes: draw
+        ? [
+            InkStroke(
+              id: '$id-stroke',
+              points: const [
+                InkPoint(dx: 3, dy: 40, pressure: 0.5),
+                InkPoint(dx: 65, dy: 40, pressure: 0.5),
+              ],
+              color: const Color(0xFF121212),
+              width: 4,
+              tool: DrawingTool.pen,
+            ),
+          ]
+        : const [],
+    isBookmarked: false,
+  );
+}
+
+Notebook _notebook(List<NotePage> pages) => Notebook(
+  uid: 'export-fixture',
+  title: 'Export fixture',
+  kind: NotebookKind.notebook,
+  folder: 'Tests',
+  createdAt: DateTime.utc(2026, 1, 1),
+  updatedAt: DateTime.utc(2026, 1, 1),
+  pages: pages,
+);
+
+void _verifyPng(Uint8List bytes) {
+  expect(
+    bytes.take(8).toList(),
+    [137, 80, 78, 71, 13, 10, 26, 10],
+  );
+  expect(bytes.length, greaterThan(70));
+  final header = ByteData.sublistView(bytes);
+  expect(header.getUint32(16), 160);
+  expect(header.getUint32(20), 120);
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('exported PNGs have valid signatures and expected dimensions',
+      (tester) async {
+    final pngs = await NotebookExportService.renderPngPagesForTest(
+      _notebook([_page('first'), _page('second', draw: true)]),
+      pageSize: _pageSize,
+    );
+    expect(pngs, hasLength(2));
+    for (final png in pngs) {
+      _verifyPng(png);
+    }
+    expect(pngs[0], isNot(equals(pngs[1])));
+  });
+
+  testWidgets('ink and formatted text are not lost during rendering',
+      (tester) async {
+    final blank = (await NotebookExportService.renderPngPagesForTest(
+      _notebook([_page('baseline')]),
+      pageSize: _pageSize,
+    )).single;
+    final ink = (await NotebookExportService.renderPngPagesForTest(
+      _notebook([_page('ink', draw: true)]),
+      pageSize: _pageSize,
+    )).single;
+    final withText = (await NotebookExportService.renderPngPagesForTest(
+      _notebook([_page('ink-text', draw: true, text: true)]),
+      pageSize: _pageSize,
+    )).single;
+
+    expect(ink, isNot(equals(blank)));
+    expect(withText, isNot(equals(ink)));
+  });
+
+  testWidgets('PDF export contains a valid document with two pages',
+      (tester) async {
+    final pdf = await NotebookExportService.renderPdfBytesForTest(
+      _notebook([
+        _page('first', draw: true),
+        _page('second', text: true),
+      ]),
+      pageSize: _pageSize,
+      background: const PageBackgroundSettings(
+        style: PageBackgroundStyle.grid,
+        spacing: 20,
+      ),
+    );
+
+    expect(latin1.decode(pdf.take(5).toList()), '%PDF-');
+    expect(latin1.decode(pdf.skip(pdf.length - 7).toList()),
+        contains('%%EOF'));
+    expect(pdf.length, greaterThan(600));
+  });
+
+  testWidgets('legacy erase masks are flattened before rendering',
+      (tester) async {
+    final legacy = _page('legacy', draw: true);
+    final erase = InkStroke(
+      id: 'legacy-eraser',
+      points: const [
+        InkPoint(dx: 35, dy: 25, pressure: 1),
+        InkPoint(dx: 35, dy: 55, pressure: 1),
+      ],
+      color: const Color(0xFFFFFFFF),
+      width: 12,
+      tool: DrawingTool.eraserBrush,
+    );
+    final original = legacy.copyWith(
+      inkStrokes: [...legacy.inkStrokes, erase],
+    );
+    final pages = await NotebookExportService.renderPngPagesForTest(
+      _notebook([original]),
+      pageSize: _pageSize,
+    );
+
+    expect(pages, hasLength(1));
+    _verifyPng(pages.single);
+  });
+}
