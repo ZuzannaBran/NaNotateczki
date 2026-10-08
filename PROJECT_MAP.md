@@ -572,6 +572,8 @@ Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 
 - `ios/Podfile`: zależności CocoaPods dla pluginów bez obsługi SwiftPM;
   deklaracja iOS 15 i targetów Runner/RunnerTests.
+- `ios/Flutter/Debug.xcconfig`, `Release.xcconfig`: dziedziczą config
+  Pods-Runner, aby linker znajdował framework CocoaPods podczas buildów.
 
 - `windows/CMakeLists.txt`: zgodność generatora pdfx/pdfium z CMake 4; przed
   włączeniem pluginów ustawia `CMAKE_POLICY_VERSION_MINIMUM=3.5` dla
