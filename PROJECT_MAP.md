@@ -653,16 +653,24 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `test/production/persistence_roundtrip_test.dart`: rich text z Delta,
   crop i bytes obrazów, dwie strony, dirty-page, równoległe zapisy, backup
   i przywrócenie do nowego SQLite; każdy test ma własny katalog dokumentów
-  i fake `PathProviderPlatform`, bez zapisu do danych użytkownika.
+  i fake `PathProviderPlatform`, bez zapisu do danych użytkownika. Test
+  restore zamyka źródłowy `NotesDatabase` przed otwarciem docelowego,
+  aby nie utrzymywać dwóch instancji Drift w tym samym isolate.
 - `test/production/export_render_test.dart`: produkcyjne PNG/PDF w pamięci,
   liczba stron i rozmiar obrazu, treść oraz legacy gumka; renderer działa
   w `tester.runAsync`, poza strefą `FakeAsync` testu widgetowego.
+  Dodatkowe regresje sprawdzają 12-stronicowy eksport PNG oraz PNG/PDF boarda.
 - `.github/workflows/cross_platform_tests.yml`: CI na Linux, Windows, macOS,
-  Chrome, Android i iOS; emulatory uruchamiane po pushu na `dev`.
+  Chrome, Android oraz symulatorach iPhone i iPad, na push `dev`.
   Eksport PNG/PDF jest osobnym jobem z własnym timeoutem; pozostałe testy
-  generują niezależny raport pokrycia. Windows lifecycle używa jednej linii
-  PowerShell, a iOS jawnie instaluje CocoaPods i weryfikuje workspace.
-  Harmonogram i manualny trigger wymagają też workflow na domyślnym `main`.
+  generują niezależny raport pokrycia z progiem początkowym 35%.
+  Nieblokujący job Wasm sprawdza kompilację `flutter build web --wasm`,
+  oddzielnie od działającego JS web. Android kompiluje APK Debug i Release,
+  a jego emulator czeka na ukończenie bootowania.
+  Windows lifecycle używa jednej linii PowerShell, a iOS jawnie instaluje
+  CocoaPods i weryfikuje workspace. Desktop Release uruchamia się również
+  po niepowodzeniu testu uruchomienia. Harmonogram i manualny trigger
+  wymagają workflow na domyślnym `main`.
 - `docs/TEST_MATRIX.md`: plan testów, wymagania urządzeń i niedomknięte
   scenariusze, których CI jeszcze nie pokrywa.
 
