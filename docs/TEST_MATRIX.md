@@ -250,6 +250,35 @@ manual/device-farm checks, not automatic green CI claims:
 A release decision requires successful platform jobs *and* recorded results
 for the manual cases relevant to the intended distribution targets.
 
+## Run 37845857438 — Android-only failures and remediation
+
+The 8 October 2026 workflow run on `7e5748ac` completed 10 of 12 jobs
+successfully: native tests (+133), export (+6), Chrome, WASM compilation,
+Linux/Windows/macOS, iOS build and both iPhone/iPad simulators.
+Native line coverage was 42.47% (6567/15463), above the 35% gate.
+Both Android failures require a fresh verification run:
+
+- Android Release failed in `:app:minifyReleaseWithR8` because
+  `google_mlkit_text_recognition` references four optional language
+  recognizer libraries missing from the dependency graph. The application
+  actually constructs only `TextRecognitionScript.latin`. The Release
+  ProGuard file now allows missing symbols only in the unused
+  `com.google.mlkit.vision.text.{chinese,devanagari,japanese,korean}`
+  packages; shrinking stays active and no unused OCR assets are added.
+- The Android emulator failed before running Flutter tests when the
+  emulator action executed an incomplete `for` block in separate
+  `/bin/sh` commands. Its `script` input now invokes a single
+  `.github/scripts/android_emulator_tests.sh` Bash process, which waits
+  for a boot-completed device before running both integration tests.
+
+Neither remediation is considered validated until the new workflow runs.
+The Android Release artifact currently uses debug signing in
+`android/app/build.gradle.kts`; a real distribution requires separate
+production signing and installation testing. Although WASM **compiled**
+successfully, browser execution of the WASM variant is not yet tested.
+The Gradle, AGP and Kotlin compatibility deprecations are future upgrade
+items, not the cause of either failure in this run.
+
 ## Dependency and CI tooling warnings (non-blocking as observed)
 
 - SwiftPM is enabled by default in Flutter 3.47.6, but currently pinned
