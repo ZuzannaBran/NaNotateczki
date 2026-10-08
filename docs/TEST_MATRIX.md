@@ -85,6 +85,9 @@ timing, filesystem and GPU behavior from physical hardware.
 - Production export renderer tests check actual in-memory PNG/PDF output,
   dimensions, content differences and legacy eraser handling. They run in
   `tester.runAsync` to keep engine image encoding outside widget FakeAsync.
+  Additional cases cover twelve PNG pages and board PNG/PDF rendering;
+  physical file-save dialogs, very large images and pixel-perfect output
+  remain separate acceptance scenarios.
 - Production SQLite and backup roundtrip tests mock `PathProviderPlatform`
   and use a fresh temporary documents directory for each case.
 - Release builds validate compilation of every desktop/web platform.
@@ -191,6 +194,61 @@ that specific commit, not any later remediation. The CI now disables SwiftPM
 generated workspace contains `Pods.xcodeproj`. An actual successful iOS build
 is still required before calling this issue fixed. Emulator DDS remains a
 platform/tooling issue to investigate.
+
+## Extended verification after the second CI audit
+
+**Confirmed harness correction:** The production restore test previously kept
+two independent Drift database instances open simultaneously in one isolate.
+Its source backup worker and database now close before the target database
+opens. This removes the test-created overlap; it does not certify that runtime
+code is immune to concurrent connection or filesystem problems. Production
+connection ownership must still be reviewed separately.
+
+**Coverage gate:** An earlier completed native suite (GitHub Actions run
+`37835178104`, artifact `flutter-coverage`) recorded 6436 hit lines out
+of 15454 instrumented lines (41.65%). Because the test selection has changed,
+the initial required threshold is conservatively set to **35%**. CI fails when
+`coverage/lcov.info` is missing, empty or falls below that floor. A successful
+new baseline should be used to ratchet the threshold upward; coverage alone
+cannot establish correctness.
+
+**WASM versus JS:** A successful `flutter build web --release` does not mean
+`flutter build web --wasm` works. The separate `wasm-audit` CI job attempts
+the WASM build without blocking the verified JavaScript target and records a
+warning plus compiler diagnostics on failure. Dependencies `pdfx` and
+`image` were implicated in the prior dry-run warning; they must be evaluated
+against an actual compiler dependency trace before dependency changes.
+Even a successful WASM build needs a dedicated WasmGC browser runtime test.
+
+**Platform build coverage:** Windows/macOS/Linux Release builds should execute
+even if an earlier desktop integration assertion failed; both Debug and Release
+Android APKs are compiled. On pushes to `dev`, iOS integration now targets
+both available iPhone and iPad simulators. Android integration waits for an
+`adb`-visible, boot-completed emulator before testing.
+
+**Low-priority runner diagnostics:** macOS may log
+`Failed to foreground app; open returned 1` despite a passing application
+test. Android emulator initial `adb` errors can be transient when the boot
+eventually succeeds. Treat recurrence as a runner issue until confirmed by
+actual user-facing foreground or device behavior. Keep logs for regression
+comparison; do not hide unsuccessful integration tests.
+
+**Unverified production acceptance scenarios:** These remain mandatory
+manual/device-farm checks, not automatic green CI claims:
+
+- Pen pressure/tilt, palm rejection, side-button, eraser and multi-touch on
+  Windows Ink, Linux tablet, Android S Pen and physical iPad Apple Pencil.
+- Forced process termination, full disk, interrupted backup/rename, recovery
+  from the last valid snapshot, and multiple documents saved concurrently.
+- Large real-world notebooks: memory growth, export completion, output
+  legibility/page order and document re-import on target OS versions.
+- Browser persistence and input in Firefox, Safari and Edge, including storage
+  restrictions, refresh and simultaneous tabs.
+- Signed iOS/Android release distribution, real-device background/resume and
+  OS-driven shutdown behavior.
+
+A release decision requires successful platform jobs *and* recorded results
+for the manual cases relevant to the intended distribution targets.
 
 ## Dependency and CI tooling warnings (non-blocking as observed)
 
