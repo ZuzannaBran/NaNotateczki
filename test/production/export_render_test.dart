@@ -70,14 +70,28 @@ void _verifyPng(Uint8List bytes) {
   expect(header.getUint32(20), 120);
 }
 
+Future<T> _render<T>(
+  WidgetTester tester,
+  Future<T> Function() render,
+) async {
+  final result = await tester.runAsync(render);
+  if (result == null) {
+    throw TestFailure('Production export rendering failed.');
+  }
+  return result;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('exported PNGs have valid signatures and expected dimensions',
       (tester) async {
-    final pngs = await NotebookExportService.renderPngPagesForTest(
-      _notebook([_page('first'), _page('second', draw: true)]),
-      pageSize: _pageSize,
+    final pngs = await _render(
+      tester,
+      () => NotebookExportService.renderPngPagesForTest(
+        _notebook([_page('first'), _page('second', draw: true)]),
+        pageSize: _pageSize,
+      ),
     );
     expect(pngs, hasLength(2));
     for (final png in pngs) {
@@ -88,34 +102,40 @@ void main() {
 
   testWidgets('ink and formatted text are not lost during rendering',
       (tester) async {
-    final blank = (await NotebookExportService.renderPngPagesForTest(
-      _notebook([_page('baseline')]),
-      pageSize: _pageSize,
-    )).single;
-    final ink = (await NotebookExportService.renderPngPagesForTest(
-      _notebook([_page('ink', draw: true)]),
-      pageSize: _pageSize,
-    )).single;
-    final withText = (await NotebookExportService.renderPngPagesForTest(
-      _notebook([_page('ink-text', draw: true, text: true)]),
-      pageSize: _pageSize,
-    )).single;
+    final rendered = await _render(tester, () async {
+      final blank = (await NotebookExportService.renderPngPagesForTest(
+        _notebook([_page('baseline')]),
+        pageSize: _pageSize,
+      )).single;
+      final ink = (await NotebookExportService.renderPngPagesForTest(
+        _notebook([_page('ink', draw: true)]),
+        pageSize: _pageSize,
+      )).single;
+      final withText = (await NotebookExportService.renderPngPagesForTest(
+        _notebook([_page('ink-text', draw: true, text: true)]),
+        pageSize: _pageSize,
+      )).single;
+      return [blank, ink, withText];
+    });
 
-    expect(ink, isNot(equals(blank)));
-    expect(withText, isNot(equals(ink)));
+    expect(rendered[1], isNot(equals(rendered[0])));
+    expect(rendered[2], isNot(equals(rendered[1])));
   });
 
   testWidgets('PDF export contains a valid document with two pages',
       (tester) async {
-    final pdf = await NotebookExportService.renderPdfBytesForTest(
-      _notebook([
-        _page('first', draw: true),
-        _page('second', text: true),
-      ]),
-      pageSize: _pageSize,
-      background: const PageBackgroundSettings(
-        style: PageBackgroundStyle.grid,
-        spacing: 20,
+    final pdf = await _render(
+      tester,
+      () => NotebookExportService.renderPdfBytesForTest(
+        _notebook([
+          _page('first', draw: true),
+          _page('second', text: true),
+        ]),
+        pageSize: _pageSize,
+        background: const PageBackgroundSettings(
+          style: PageBackgroundStyle.grid,
+          spacing: 20,
+        ),
       ),
     );
 
@@ -141,9 +161,12 @@ void main() {
     final original = legacy.copyWith(
       inkStrokes: [...legacy.inkStrokes, erase],
     );
-    final pages = await NotebookExportService.renderPngPagesForTest(
-      _notebook([original]),
-      pageSize: _pageSize,
+    final pages = await _render(
+      tester,
+      () => NotebookExportService.renderPngPagesForTest(
+        _notebook([original]),
+        pageSize: _pageSize,
+      ),
     );
 
     expect(pages, hasLength(1));
