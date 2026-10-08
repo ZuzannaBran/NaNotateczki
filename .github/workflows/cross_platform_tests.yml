@@ -43,6 +43,25 @@ jobs:
           )
           test "${#test_files[@]}" -gt 0
           flutter test "${test_files[@]}" --coverage --reporter expanded
+      - name: Enforce initial line coverage floor
+        shell: bash
+        env:
+          MIN_LINE_COVERAGE: '30'
+        run: |
+          test -s coverage/lcov.info
+          awk -F: -v minimum="$MIN_LINE_COVERAGE" '
+            /^LF:/ { lines += $2 }
+            /^LH:/ { covered += $2 }
+            END {
+              if (lines == 0) {
+                print "No instrumented lines in lcov.info"
+                exit 1
+              }
+              percentage = covered * 100 / lines
+              printf "Line coverage: %.2f%% (%d/%d); minimum: %.0f%%\n", percentage, covered, lines, minimum
+              if (percentage < minimum) exit 1
+            }
+          ' coverage/lcov.info
       - name: Publish coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -103,6 +122,33 @@ jobs:
             --dart-define=NANOTATECZKI_ISOLATED_CI=true \
             --chrome-binary="${{ steps.chrome.outputs.chrome-path }}"
 
+  wasm-audit:
+    name: WebAssembly compatibility audit (non-blocking)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Attempt WebAssembly release build
+        id: wasm
+        continue-on-error: true
+        run: flutter build web --wasm --release
+      - name: Report WebAssembly compatibility separately from JS web
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.wasm.outcome }}" = "success" ]; then
+            echo "WASM compilation succeeded; browser runtime is not verified." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::WASM compilation is not supported yet. See the build log for dependency import chains."
+            echo "WASM compilation failed; JS web validation remains independent." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   desktop:
     name: ${{ matrix.platform }} - desktop bootstrap and release
     runs-on: ${{ matrix.runner }}
@@ -156,6 +202,7 @@ jobs:
           flutter test integration_test/document_lifecycle_test.dart \
             -d macos --dart-define=NANOTATECZKI_ISOLATED_CI=true
       - name: Build release application
+        if: ${{ !cancelled() }}
         run: flutter build ${{ matrix.platform }} --release
 
   android-build:
@@ -171,6 +218,9 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build apk --debug
+      - name: Build production APK without signing for distribution
+        if: ${{ !cancelled() }}
+        run: flutter build apk --release
 
   ios-build:
     name: iOS simulator compilation (no signing)
@@ -223,14 +273,26 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
+            timeout 120 adb -s emulator-5554 wait-for-device
+            for attempt in $(seq 1 40); do
+              if [ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; then
+                break
+              fi
+              sleep 3
+            done
+            test "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" = "1"
             flutter test integration_test/app_smoke_test.dart -d emulator-5554
             flutter test integration_test/document_lifecycle_test.dart -d emulator-5554 --dart-define=NANOTATECZKI_ISOLATED_CI=true
 
   ios-simulator:
-    name: iOS - real simulator end-to-end
+    name: iOS - ${{ matrix.device }} simulator end-to-end
     if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [iPhone, iPad]
     steps:
       - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
@@ -252,7 +314,7 @@ jobs:
         shell: bash
         run: |
           SIMULATOR_UDID=$(xcrun simctl list devices available -j \
-            | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((v["udid"] for devices in d["devices"].values() for v in devices if "iPhone" in v["name"] and v["state"] == "Shutdown"), ""))')
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); device="${{ matrix.device }}"; print(next((v["udid"] for devices in d["devices"].values() for v in devices if device in v["name"] and v["state"] == "Shutdown"), ""))')
           test -n "$SIMULATOR_UDID"
           xcrun simctl boot "$SIMULATOR_UDID"
           xcrun simctl bootstatus "$SIMULATOR_UDID" -b
