@@ -668,9 +668,10 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   oddzielnie od działającego JS web. Android kompiluje APK Debug i Release,
   a jego emulator czeka na ukończenie bootowania.
   Windows lifecycle używa jednej linii PowerShell, a iOS jawnie instaluje
-  CocoaPods i weryfikuje workspace. Desktop Release uruchamia się również
-  po niepowodzeniu testu uruchomienia. Harmonogram i manualny trigger
-  wymagają workflow na domyślnym `main`.
+  CocoaPods i weryfikuje workspace; buduje zarówno symulator, jak i
+  niepodpisany wariant Release na urządzenie. Desktop Release uruchamia się
+  również po niepowodzeniu testu uruchomienia. Harmonogram i manualny
+  trigger wymagają workflow na domyślnym `main`.
 - `docs/TEST_MATRIX.md`: plan testów, wymagania urządzeń i niedomknięte
   scenariusze, których CI jeszcze nie pokrywa.
 
