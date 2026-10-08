@@ -1283,6 +1283,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
                             currentWidth: currentWidth,
                             currentTool: activeTool,
                             worldOrigin: widget.worldOrigin,
+                            lod: _staticInkLodForScale(widget.effectiveScale),
                             committedStrokes: _committedOverlayStrokes,
                             snapHintStart: _snapHintStart,
                             snapHintEnd: _snapHintEnd,
@@ -2664,6 +2665,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
                 currentWidth: currentWidth,
                 currentTool: activeTool,
                 worldOrigin: Offset(0, pageIndex * stride),
+                lod: _staticInkLodForScale(widget.effectiveScale),
                 committedStrokes: _committedOverlayStrokes,
                 committedPageId: widget.pages[pageIndex].id,
                 drawActiveContent: _activePageIndex == pageIndex,
@@ -4114,6 +4116,7 @@ class _InkOverlayPainter extends CustomPainter {
     required this.currentWidth,
     required this.currentTool,
     required this.worldOrigin,
+    required this.lod,
     required this.committedStrokes,
     this.committedPageId,
     this.drawActiveContent = true,
@@ -4130,6 +4133,7 @@ class _InkOverlayPainter extends CustomPainter {
   final double currentWidth;
   final DrawingTool currentTool;
   final Offset worldOrigin;
+  final _StaticInkLod lod;
   final List<_PendingCommittedStroke> committedStrokes;
   final String? committedPageId;
   final bool drawActiveContent;
@@ -4280,8 +4284,17 @@ class _InkOverlayPainter extends CustomPainter {
       paint.color = _toolColor(color, tool);
     }
 
+    final visiblePoints =
+        (tool == DrawingTool.pen || tool == DrawingTool.highlighter) &&
+                points.length >= 5 &&
+                lod != _StaticInkLod.full
+            ? _simplifyInkPoints(
+                points,
+                lod == _StaticInkLod.medium ? 1.0 : 2.5,
+              )
+            : points;
     final path = _buildInkPath(
-      points,
+      visiblePoints,
       tool,
       Offset.zero,
       worldOrigin,
