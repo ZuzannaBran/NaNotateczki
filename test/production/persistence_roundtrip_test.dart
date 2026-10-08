@@ -104,7 +104,13 @@ void _verifyContent(Notebook notebook, {required String uid}) {
   expect(first.imageBlocks.single.cropRight, 0.9);
   expect(first.imageBlocks.single.cropBottom, 0.85);
   expect(first.imageBlocks.single.ocrText, 'Recognized text');
-  expect(first.imageBlocks.single.bytes, [1, 3, 5, 7, 11, 13]);
+  final image = first.imageBlocks.single;
+  if (image.path.isEmpty) {
+    expect(image.bytes, [1, 3, 5, 7, 11, 13]);
+  } else {
+    expect(image.bytes, isNull);
+    expect(File(image.path).readAsBytesSync(), [1, 3, 5, 7, 11, 13]);
+  }
   expect(first.inkStrokes.single.points.last.pressure, 0.95);
   expect(first.inkStrokes.single.tool, DrawingTool.highlighter);
   expect(notebook.pages.last.inkStrokes.single.id, '$uid-stroke-2');
