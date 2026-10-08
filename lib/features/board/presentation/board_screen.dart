@@ -416,6 +416,19 @@ class _BoardScreenState extends State<BoardScreen> {
     return (viewportCenter - controller.viewPan) / safeScale;
   }
 
+  Future<T> _withBusyOverlay<T>(Future<T> Function() action) async {
+    if (mounted) {
+      setState(() => _isBusy = true);
+    }
+    try {
+      return await action();
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      }
+    }
+  }
+
   void _openSettings() {
     final controller = context.read<EditorController>();
     Navigator.of(context).push(
