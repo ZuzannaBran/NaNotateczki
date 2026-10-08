@@ -660,13 +660,22 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   liczba stron i rozmiar obrazu, treść oraz legacy gumka; renderer działa
   w `tester.runAsync`, poza strefą `FakeAsync` testu widgetowego.
   Dodatkowe regresje sprawdzają 12-stronicowy eksport PNG oraz PNG/PDF boarda.
+- `android/app/build.gradle.kts` i `android/app/proguard-rules.pro`:
+  Release uruchamia R8 z wyjątkami wyłącznie dla opcjonalnych modułów
+  ML Kit (Chinese/Devanagari/Japanese/Korean). OCR używa tylko
+  `TextRecognitionScript.latin`; nie dodawaj nieużywanych modeli
+  ani nie wyłączaj shrinkingu dla całej aplikacji.
+- `.github/scripts/android_emulator_tests.sh`: czeka na `adb` i
+  `sys.boot_completed`, następnie uruchamia obydwa testy integracyjne.
+  Runner emulatora wywołuje pojedynczą komendę Bash, zamiast interpretować
+  instrukcje pętli oddzielnie przez `/bin/sh`.
 - `.github/workflows/cross_platform_tests.yml`: CI na Linux, Windows, macOS,
   Chrome, Android oraz symulatorach iPhone i iPad, na push `dev`.
   Eksport PNG/PDF jest osobnym jobem z własnym timeoutem; pozostałe testy
   generują niezależny raport pokrycia z progiem początkowym 35%.
   Nieblokujący job Wasm sprawdza kompilację `flutter build web --wasm`,
   oddzielnie od działającego JS web. Android kompiluje APK Debug i Release,
-  a jego emulator czeka na ukończenie bootowania.
+  a jego emulator uruchamia dedykowany skrypt Bash.
   Windows lifecycle używa jednej linii PowerShell, a iOS jawnie instaluje
   CocoaPods i weryfikuje workspace; buduje zarówno symulator, jak i
   niepodpisany wariant Release na urządzenie. Desktop Release uruchamia się
