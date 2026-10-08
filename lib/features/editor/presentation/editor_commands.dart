@@ -5,9 +5,7 @@ import '../../../data/export/notebook_export_service.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../state/editor_controller.dart';
 
-typedef EditorBusyRunner = Future<T> Function<T>(
-  Future<T> Function() action,
-);
+typedef EditorBusyRunner = Future<T> Function<T>(Future<T> Function() action);
 
 class EditorCommands {
   const EditorCommands({
@@ -78,9 +76,9 @@ class EditorCommands {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

@@ -110,34 +110,38 @@ void main() {
       final notebook = await repository.createNotebook();
       final pageId = notebook.pages.single.id;
 
-      await database.into(database.inkStrokeRows).insert(
-        InkStrokeRowsCompanion.insert(
-          uid: 'legacy-line',
-          pageUid: pageId,
-          colorValue: const Color(0xFF000000).toARGB32(),
-          width: 2,
-          toolIndex: DrawingTool.pen.index,
-          pointsJson:
-              '[{"dx":0,"dy":0,"pressure":1},'
-              '{"dx":10,"dy":0,"pressure":1},'
-              '{"dx":20,"dy":0,"pressure":1},'
-              '{"dx":30,"dy":0,"pressure":1}]',
-          sortIndex: 0,
-        ),
-      );
-      await database.into(database.inkStrokeRows).insert(
-        InkStrokeRowsCompanion.insert(
-          uid: 'legacy-eraser',
-          pageUid: pageId,
-          colorValue: const Color(0xFFFFFFFF).toARGB32(),
-          width: 8,
-          toolIndex: DrawingTool.eraserBrush.index,
-          pointsJson:
-              '[{"dx":10,"dy":-5,"pressure":1},'
-              '{"dx":10,"dy":5,"pressure":1}]',
-          sortIndex: 1,
-        ),
-      );
+      await database
+          .into(database.inkStrokeRows)
+          .insert(
+            InkStrokeRowsCompanion.insert(
+              uid: 'legacy-line',
+              pageUid: pageId,
+              colorValue: const Color(0xFF000000).toARGB32(),
+              width: 2,
+              toolIndex: DrawingTool.pen.index,
+              pointsJson:
+                  '[{"dx":0,"dy":0,"pressure":1},'
+                  '{"dx":10,"dy":0,"pressure":1},'
+                  '{"dx":20,"dy":0,"pressure":1},'
+                  '{"dx":30,"dy":0,"pressure":1}]',
+              sortIndex: 0,
+            ),
+          );
+      await database
+          .into(database.inkStrokeRows)
+          .insert(
+            InkStrokeRowsCompanion.insert(
+              uid: 'legacy-eraser',
+              pageUid: pageId,
+              colorValue: const Color(0xFFFFFFFF).toARGB32(),
+              width: 8,
+              toolIndex: DrawingTool.eraserBrush.index,
+              pointsJson:
+                  '[{"dx":10,"dy":-5,"pressure":1},'
+                  '{"dx":10,"dy":5,"pressure":1}]',
+              sortIndex: 1,
+            ),
+          );
 
       final fetched = await repository.fetchNotebooks();
       expect(

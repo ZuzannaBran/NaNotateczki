@@ -9,14 +9,8 @@ import 'package:program/features/notebook/domain/note_page.dart';
 
 void main() {
   test('point eraser returns whole hit stroke', () {
-    final hit = _stroke('hit', const [
-      Offset(0, 0),
-      Offset(100, 0),
-    ]);
-    final miss = _stroke('miss', const [
-      Offset(0, 40),
-      Offset(100, 40),
-    ]);
+    final hit = _stroke('hit', const [Offset(0, 0), Offset(100, 0)]);
+    final miss = _stroke('miss', const [Offset(0, 40), Offset(100, 40)]);
     final ids = <String>{};
 
     InkEraserEngine.collectPointHits(
@@ -30,18 +24,12 @@ void main() {
   });
 
   test('brush eraser splits a sparse stroke instead of deleting it whole', () {
-    final line = _stroke('line', const [
-      Offset(0, 0),
-      Offset(100, 0),
-    ]);
+    final line = _stroke('line', const [Offset(0, 0), Offset(100, 0)]);
     var nextId = 0;
 
     final result = InkEraserEngine.eraseBrushParts(
       strokes: [line],
-      path: const [
-        Offset(50, -10),
-        Offset(50, 10),
-      ],
+      path: const [Offset(50, -10), Offset(50, 10)],
       radius: 4,
       createId: () => 'part-${nextId++}',
     );
@@ -53,9 +41,9 @@ void main() {
       isTrue,
     );
     expect(
-      result.strokes.expand((stroke) => stroke.points).any(
-        (point) => point.dx > 45 && point.dx < 55,
-      ),
+      result.strokes
+          .expand((stroke) => stroke.points)
+          .any((point) => point.dx > 45 && point.dx < 55),
       isFalse,
     );
   });
@@ -119,10 +107,10 @@ void main() {
   });
 
   test('legacy fragment ids do not collide with existing stroke ids', () {
-    final existing = _stroke(
-      'legacy-eraser_legacy_0',
-      const [Offset(100, 0), Offset(120, 0)],
-    );
+    final existing = _stroke('legacy-eraser_legacy_0', const [
+      Offset(100, 0),
+      Offset(120, 0),
+    ]);
     final line = _stroke('line', const [
       Offset(0, 0),
       Offset(20, 0),
@@ -152,10 +140,7 @@ void main() {
   });
 
   test('area eraser catches a stroke crossing the polygon', () {
-    final crossing = _stroke('crossing', const [
-      Offset(0, 0),
-      Offset(100, 0),
-    ]);
+    final crossing = _stroke('crossing', const [Offset(0, 0), Offset(100, 0)]);
 
     final ids = InkEraserEngine.areaHits(
       strokes: [crossing],
@@ -189,10 +174,7 @@ void main() {
       width: 8,
       tool: DrawingTool.eraserBrush,
     );
-    final laterInk = _stroke('later', const [
-      Offset(0, 30),
-      Offset(100, 30),
-    ]);
+    final laterInk = _stroke('later', const [Offset(0, 30), Offset(100, 30)]);
 
     final result = InkEraserEngine.flattenLegacyErasers([
       ink,
@@ -217,10 +199,7 @@ void main() {
       inkStrokes: [a, b, c],
       isBookmarked: false,
     );
-    final action = DeleteInkStrokesAction.fromStrokes(
-      page.inkStrokes,
-      {'b'},
-    );
+    final action = DeleteInkStrokesAction.fromStrokes(page.inkStrokes, {'b'});
 
     final erased = action.apply(page);
     final restored = action.revert(erased);
@@ -233,9 +212,7 @@ void main() {
 InkStroke _stroke(String id, List<Offset> points) {
   return InkStroke(
     id: id,
-    points: points
-        .map((point) => InkPoint.fromOffset(point, 1))
-        .toList(),
+    points: points.map((point) => InkPoint.fromOffset(point, 1)).toList(),
     color: const Color(0xFF000000),
     width: 2,
     tool: DrawingTool.pen,

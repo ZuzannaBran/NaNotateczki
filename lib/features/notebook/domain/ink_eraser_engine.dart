@@ -21,10 +21,7 @@ class LegacyEraserFlattenResult {
 }
 
 class InkBrushEraseResult {
-  const InkBrushEraseResult({
-    required this.strokes,
-    required this.changed,
-  });
+  const InkBrushEraseResult({required this.strokes, required this.changed});
 
   final List<InkStroke> strokes;
   final bool changed;
@@ -64,9 +61,7 @@ class InkEraserEngine {
       return;
     }
     final test = hitTest ?? _strokeTouchesCircle;
-    final candidates = inkSpatialIndexFor(
-      strokes,
-    ).queryPoint(point, radius);
+    final candidates = inkSpatialIndexFor(strokes).queryPoint(point, radius);
     for (final stroke in candidates) {
       if (into.contains(stroke.id) || !_canErase(stroke)) {
         continue;
@@ -98,12 +93,7 @@ class InkEraserEngine {
         next.add(stroke);
         continue;
       }
-      final parts = _splitStrokeForBrush(
-        stroke,
-        path,
-        radius,
-        createId,
-      );
+      final parts = _splitStrokeForBrush(stroke, path, radius, createId);
       if (parts.length == 1 && identical(parts.single, stroke)) {
         next.add(stroke);
         continue;
@@ -251,8 +241,7 @@ class InkEraserEngine {
     }
     final radiusSquared = radius * radius;
     if (points.length == 1) {
-      return (points.first.toOffset() - point).distanceSquared <=
-          radiusSquared;
+      return (points.first.toOffset() - point).distanceSquared <= radiusSquared;
     }
     for (var i = 0; i < points.length - 1; i++) {
       if (_distanceSquaredToSegment(
@@ -267,10 +256,7 @@ class InkEraserEngine {
     return false;
   }
 
-  static bool _strokeTouchesPolygon(
-    InkStroke stroke,
-    List<Offset> polygon,
-  ) {
+  static bool _strokeTouchesPolygon(InkStroke stroke, List<Offset> polygon) {
     final points = stroke.points;
     if (points.isEmpty) {
       return false;
@@ -303,10 +289,7 @@ class InkEraserEngine {
     final eraseRadius = radius + stroke.width * 0.5;
     final eraseRadiusSquared = eraseRadius * eraseRadius;
     if (stroke.points.length == 1) {
-      return _distanceSquaredToPolyline(
-                stroke.points.first.toOffset(),
-                path,
-              ) <=
+      return _distanceSquaredToPolyline(stroke.points.first.toOffset(), path) <=
               eraseRadiusSquared
           ? <InkStroke>[]
           : [stroke];
@@ -327,8 +310,7 @@ class InkEraserEngine {
           InkPoint(
             dx: start.dx + (end.dx - start.dx) * t,
             dy: start.dy + (end.dy - start.dy) * t,
-            pressure:
-                start.pressure + (end.pressure - start.pressure) * t,
+            pressure: start.pressure + (end.pressure - start.pressure) * t,
           ),
         );
       }
@@ -348,10 +330,7 @@ class InkEraserEngine {
     void flushRun() {
       if (run.length >= 2) {
         parts.add(
-          stroke.copyWith(
-            id: createId(),
-            points: List<InkPoint>.from(run),
-          ),
+          stroke.copyWith(id: createId(), points: List<InkPoint>.from(run)),
         );
       }
       run = <InkPoint>[];
@@ -383,8 +362,7 @@ class InkEraserEngine {
         ..._splitStroke(
           stroke,
           (point) =>
-              _distanceSquaredToPolyline(point, eraserPath) <=
-              radius * radius,
+              _distanceSquaredToPolyline(point, eraserPath) <= radius * radius,
           (a, b) =>
               _segmentDistanceSquaredToPolyline(a, b, eraserPath) <=
               radius * radius,
@@ -650,8 +628,7 @@ class InkEraserEngine {
       if (!crossesY) {
         continue;
       }
-      final x =
-          (b.dx - a.dx) * (point.dy - a.dy) / (b.dy - a.dy) + a.dx;
+      final x = (b.dx - a.dx) * (point.dy - a.dy) / (b.dy - a.dy) + a.dx;
       if (point.dx < x) {
         inside = !inside;
       }
@@ -674,12 +651,7 @@ class InkEraserEngine {
     return false;
   }
 
-  static bool _segmentsIntersect(
-    Offset a,
-    Offset b,
-    Offset c,
-    Offset d,
-  ) {
+  static bool _segmentsIntersect(Offset a, Offset b, Offset c, Offset d) {
     final o1 = _orientation(a, b, c);
     final o2 = _orientation(a, b, d);
     final o3 = _orientation(c, d, a);
@@ -700,9 +672,7 @@ class InkEraserEngine {
   }
 
   static int _orientation(Offset a, Offset b, Offset c) {
-    final value =
-        (b.dy - a.dy) * (c.dx - b.dx) -
-        (b.dx - a.dx) * (c.dy - b.dy);
+    final value = (b.dy - a.dy) * (c.dx - b.dx) - (b.dx - a.dx) * (c.dy - b.dy);
     if (value.abs() < 0.000001) {
       return 0;
     }

@@ -492,9 +492,7 @@ class NotebookRepository {
         }
       } else if (result.legacyEraserPageIds.isNotEmpty) {
         try {
-          await _persistLegacyEraserPages(
-            {uid: result.legacyEraserPageIds},
-          );
+          await _persistLegacyEraserPages({uid: result.legacyEraserPageIds});
         } catch (error, stackTrace) {
           AppErrorLog.instance.record(
             error,
@@ -527,8 +525,7 @@ class NotebookRepository {
         'Cannot save a notebook without pages.',
       );
     }
-    final previous =
-        _saveTails[normalizedNotebook.uid] ?? Future<void>.value();
+    final previous = _saveTails[normalizedNotebook.uid] ?? Future<void>.value();
     final requestStackTrace = StackTrace.current;
     final completion = Completer<void>();
     _saveTails[normalizedNotebook.uid] = completion.future;
@@ -541,10 +538,7 @@ class NotebookRepository {
       );
     } finally {
       completion.complete();
-      if (identical(
-        _saveTails[normalizedNotebook.uid],
-        completion.future,
-      )) {
+      if (identical(_saveTails[normalizedNotebook.uid], completion.future)) {
         _saveTails.remove(normalizedNotebook.uid);
       }
     }
@@ -562,8 +556,7 @@ class NotebookRepository {
         'Cannot save a notebook without pages.',
       );
     }
-    final previous =
-        _saveTails[normalizedNotebook.uid] ?? Future<void>.value();
+    final previous = _saveTails[normalizedNotebook.uid] ?? Future<void>.value();
     final requestStackTrace = StackTrace.current;
     final completion = Completer<void>();
     _saveTails[normalizedNotebook.uid] = completion.future;
@@ -576,10 +569,7 @@ class NotebookRepository {
       );
     } finally {
       completion.complete();
-      if (identical(
-        _saveTails[normalizedNotebook.uid],
-        completion.future,
-      )) {
+      if (identical(_saveTails[normalizedNotebook.uid], completion.future)) {
         _saveTails.remove(normalizedNotebook.uid);
       }
     }
@@ -1532,8 +1522,9 @@ class NotebookRepository {
       'NotebookRepository._readPage(${row.uid}, stroke row)',
       markCorrupt,
     );
-    final normalizedInk =
-        InkEraserEngine.flattenLegacyErasers(convertedStrokes);
+    final normalizedInk = InkEraserEngine.flattenLegacyErasers(
+      convertedStrokes,
+    );
     return _PageReadResult(
       page: NotePage(
         id: row.uid,
@@ -1574,8 +1565,7 @@ class NotebookRepository {
           continue;
         }
         final current = await _readNotebook(row);
-        if (current.hadCorruptRows ||
-            current.legacyEraserPageIds.isEmpty) {
+        if (current.hadCorruptRows || current.legacyEraserPageIds.isEmpty) {
           continue;
         }
         final pageIds = current.legacyEraserPageIds;
@@ -1593,13 +1583,15 @@ class NotebookRepository {
               database.inkStrokeRows,
             )..where((item) => item.pageUid.equals(pageId))).go();
             for (final strokeEntry in page.inkStrokes.asMap().entries) {
-              await database.into(database.inkStrokeRows).insert(
-                _strokeToCompanion(
-                  pageId,
-                  strokeEntry.value,
-                  strokeEntry.key,
-                ),
-              );
+              await database
+                  .into(database.inkStrokeRows)
+                  .insert(
+                    _strokeToCompanion(
+                      pageId,
+                      strokeEntry.value,
+                      strokeEntry.key,
+                    ),
+                  );
             }
           }
         });
@@ -1734,19 +1726,21 @@ class NotebookRepository {
           ),
         );
     for (final entry in normalizedPage.textBlocks.asMap().entries) {
-      await database.into(database.textBlockRows).insert(
-        _textToCompanion(normalizedPage.id, entry.value, entry.key),
-      );
+      await database
+          .into(database.textBlockRows)
+          .insert(_textToCompanion(normalizedPage.id, entry.value, entry.key));
     }
     for (final entry in normalizedPage.imageBlocks.asMap().entries) {
-      await database.into(database.imageBlockRows).insert(
-        _imageToCompanion(normalizedPage.id, entry.value, entry.key),
-      );
+      await database
+          .into(database.imageBlockRows)
+          .insert(_imageToCompanion(normalizedPage.id, entry.value, entry.key));
     }
     for (final entry in normalizedPage.inkStrokes.asMap().entries) {
-      await database.into(database.inkStrokeRows).insert(
-        _strokeToCompanion(normalizedPage.id, entry.value, entry.key),
-      );
+      await database
+          .into(database.inkStrokeRows)
+          .insert(
+            _strokeToCompanion(normalizedPage.id, entry.value, entry.key),
+          );
     }
   }
 
