@@ -429,6 +429,13 @@ class _BoardScreenState extends State<BoardScreen> {
     }
   }
 
+  EditorCommands _commands(EditorController controller) => EditorCommands(
+    context: context,
+    controller: controller,
+    insertPosition: () => _insertPosition,
+    runBusy: _withBusyOverlay,
+  );
+
   void _openSettings() {
     final controller = context.read<EditorController>();
     Navigator.of(context).push(
@@ -473,8 +480,8 @@ class _BoardScreenState extends State<BoardScreen> {
       ],
     );
 
-    if (choice == _BoardContextAction.paste) {
-      await _handlePaste(controller);
+    if (choice == _BoardContextAction.paste && mounted) {
+      await _commands(controller).paste();
     }
   }
 
@@ -502,12 +509,7 @@ class _BoardScreenState extends State<BoardScreen> {
         ? null
         : controller.findTextBlockById(activeTextBlockId);
 
-    final commands = EditorCommands(
-      context: context,
-      controller: controller,
-      insertPosition: () => _insertPosition,
-      runBusy: _withBusyOverlay,
-    );
+    final commands = _commands(controller);
 
     final boardContent = Column(
       children: [
@@ -762,22 +764,6 @@ class _RenderBoardPaintProbe extends RenderProxyBox {
 }
 
 enum _BoardContextAction { paste }
-
-class _PasteFromClipboardIntent extends Intent {
-  const _PasteFromClipboardIntent();
-}
-
-class _CopyElementIntent extends Intent {
-  const _CopyElementIntent();
-}
-
-class _CutElementIntent extends Intent {
-  const _CutElementIntent();
-}
-
-class _DeleteElementIntent extends Intent {
-  const _DeleteElementIntent();
-}
 
 class _BoardZoomControls extends StatelessWidget {
   const _BoardZoomControls({

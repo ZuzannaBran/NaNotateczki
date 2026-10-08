@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:ui' show PointerDeviceKind;
 
@@ -798,6 +799,13 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
+  EditorCommands _commands(EditorController controller) => EditorCommands(
+    context: context,
+    controller: controller,
+    insertPosition: () => _insertPosition,
+    runBusy: _withBusyOverlay,
+  );
+
   void _openSettings() {
     final controller = context.read<EditorController>();
     Navigator.of(context).push(
@@ -850,8 +858,8 @@ class _EditorScreenState extends State<EditorScreen> {
       ],
     );
 
-    if (choice == _CanvasContextAction.paste) {
-      await _handlePaste(controller);
+    if (choice == _CanvasContextAction.paste && mounted) {
+      await _commands(controller).paste();
     }
   }
 
@@ -963,12 +971,7 @@ class _EditorScreenState extends State<EditorScreen> {
         ? null
         : controller.findTextBlockById(activeTextBlockId);
 
-    final commands = EditorCommands(
-      context: context,
-      controller: controller,
-      insertPosition: () => _insertPosition,
-      runBusy: _withBusyOverlay,
-    );
+    final commands = _commands(controller);
 
     final editorContent = Column(
       children: [
@@ -1426,18 +1429,6 @@ class _PageViewportClipper extends CustomClipper<Rect> {
   bool shouldReclip(_PageViewportClipper oldClipper) {
     return oldClipper.bleed != bleed;
   }
-}
-
-class _CopyElementIntent extends Intent {
-  const _CopyElementIntent();
-}
-
-class _CutElementIntent extends Intent {
-  const _CutElementIntent();
-}
-
-class _DeleteElementIntent extends Intent {
-  const _DeleteElementIntent();
 }
 
 enum _CanvasContextAction { paste }
