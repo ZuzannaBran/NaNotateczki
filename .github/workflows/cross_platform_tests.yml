@@ -7,7 +7,7 @@ on:
     branches: [dev]
   workflow_dispatch:
   schedule:
-    - cron: '15 3 * * *'
+    - cron: '15 3 * * *' # Runs only after this workflow is on default branch
 
 permissions:
   contents: read
@@ -54,6 +54,10 @@ jobs:
           flutter-version: '3.47.6'
           channel: stable
           cache: true
+      - uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
+          install-chromedriver: true
       - run: flutter config --enable-web
       - run: flutter pub get
       - name: Browser-compatible regressions
@@ -146,7 +150,7 @@ jobs:
 
   android-emulator:
     name: Android - real emulator end-to-end
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     steps:
@@ -175,7 +179,7 @@ jobs:
 
   ios-simulator:
     name: iOS - real simulator end-to-end
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 70
     steps:

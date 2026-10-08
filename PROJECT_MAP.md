@@ -636,7 +636,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `integration_test/app_smoke_test.dart`: start rzeczywistej aplikacji
   i inicjalizacja platformy bez utknięcia na ekranie ładowania.
 - `.github/workflows/cross_platform_tests.yml`: CI na Linux, Windows, macOS,
-  Chrome, Android i iOS; emulatory uruchamiane nocą lub ręcznie.
+  Chrome, Android i iOS; emulatory uruchamiane po pushu na `dev`.
+  Harmonogram i manualny trigger wymagają też workflow na domyślnym `main`.
 - `docs/TEST_MATRIX.md`: plan testów, wymagania urządzeń i niedomknięte
   scenariusze, których CI jeszcze nie pokrywa.
 

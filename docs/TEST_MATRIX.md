@@ -10,9 +10,13 @@ a platform as tested until its actual Actions job succeeds.
   tests and coverage on Ubuntu; Chrome-compatible tests and web release build;
   actual desktop app smoke tests and release builds on Linux, Windows and macOS;
   Android debug APK build; unsigned iOS simulator build.
-- Nightly and manually (`workflow_dispatch`): Android emulator and iOS
-  simulator launch-and-bootstrap tests in addition to all the above.
-- Browser smoke test uses ChromeDriver and `flutter drive`; browser-compatible
+- On pushes to `dev`: Android emulator and iOS simulator run the
+  launch-and-bootstrap integration tests too. PRs skip the expensive simulators.
+- The `schedule` and `workflow_dispatch` triggers are inactive until the
+  workflow also exists on default branch `main` (GitHub Actions requirement).
+  No file is committed to `main` by this change.
+- Browser smoke test installs a Chrome/ChromeDriver matched pair and uses
+  `flutter drive`; browser-compatible
   Dart tests run under Chrome, **not** in the native Dart VM.
 - Real pen hardware, OS shutdown, device permissions, native pickers and
   camera/OCR workflows still require manual/device-farm tests.
@@ -70,7 +74,8 @@ timing, filesystem and GPU behavior from physical hardware.
 ### Platform
 - Each native desktop device starts real app storage/plugins and reaches
   `LibraryScreen`.
-- Same startup integration test runs in Chrome and on Android/iOS simulators.
+- Same startup integration test runs in Chrome and on Android/iOS simulators
+  on pushes to `dev`.
 - Release builds validate compilation of every desktop/web platform.
 - Windows CI pins CMake 3.31 to accommodate the old pdfx/pdfium CMake project;
   upgrading pdfx for current CMake still needs a separate compatibility review.
