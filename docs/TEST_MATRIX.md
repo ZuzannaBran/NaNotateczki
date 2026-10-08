@@ -7,7 +7,9 @@ a platform as tested until its actual Actions job succeeds.
 ## Execution policy
 
 - Every push or pull request against `dev`: format, analyze, native unit/widget
-  tests and coverage on Ubuntu; Chrome-compatible tests and web release build;
+  tests (excluding the PNG/PDF renderer) and coverage on Ubuntu; a separate
+  render job runs real PNG/PDF export tests with a two-minute per-test limit;
+  Chrome-compatible tests and web release build;
   actual desktop app smoke tests and release builds on Linux, Windows and macOS;
   Android debug APK build; unsigned iOS simulator build.
 - On pushes to `dev`: Android emulator and iOS simulator run both
@@ -81,7 +83,10 @@ timing, filesystem and GPU behavior from physical hardware.
 - Same startup integration test runs in Chrome and on Android/iOS simulators
   on pushes to `dev`.
 - Production export renderer tests check actual in-memory PNG/PDF output,
-  dimensions, content differences and legacy eraser handling.
+  dimensions, content differences and legacy eraser handling. They run in
+  `tester.runAsync` to keep engine image encoding outside widget FakeAsync.
+- Production SQLite and backup roundtrip tests mock `PathProviderPlatform`
+  and use a fresh temporary documents directory for each case.
 - Release builds validate compilation of every desktop/web platform.
 - Isolated platform integration tests use an explicit opt-in Dart define,
   create/rename/reload/delete a CI document and never run against a personal
@@ -151,7 +156,7 @@ timing, filesystem and GPU behavior from physical hardware.
 flutter pub get
 dart format --output=none --set-exit-if-changed lib test integration_test test_driver
 dart analyze
-flutter test test --coverage
+flutter test test --coverage # Full local suite (export tests may be slower)
 flutter test --platform chrome test/cross_platform
 flutter test integration_test/app_smoke_test.dart -d linux
 flutter build web --release
@@ -181,6 +186,23 @@ CI discovery in run 37835178104: Windows/macOS/Linux and Android APK build passe
 The iOS build failed at link time with `Pods_Runner not found`, browser
 bootstrap failed because ChromeDriver 155 launched Chrome 154 and Android
 emulator could not start Dart Development Service. These results describe
-that specific commit, not any later remediation. The committed iOS Podfile
-and explicit browser binary address two setup causes; they require CI
-validation. Emulator DDS remains a platform/tooling issue to investigate.
+that specific commit, not any later remediation. The CI now disables SwiftPM
+**only for iOS jobs**, runs `pod install` explicitly and checks that the
+generated workspace contains `Pods.xcodeproj`. An actual successful iOS build
+is still required before calling this issue fixed. Emulator DDS remains a
+platform/tooling issue to investigate.
+
+## Dependency and CI tooling warnings (non-blocking as observed)
+
+- SwiftPM is enabled by default in Flutter 3.47.6, but currently pinned
+  dependencies including `super_native_extensions` lack complete SwiftPM
+  support. iOS CI temporarily uses CocoaPods only; macOS keeps its previously
+  successful configuration. Revisit migration before removing CocoaPods.
+- On Windows, `super_native_extensions 0.8.24` emitted a PowerShell
+  `resolve_symlinks.ps1` `Get-Item` warning while the desktop build passed.
+  Consider `super_clipboard`/`super_native_extensions` 0.9.x only as a
+  separately tested dependency migration, not an unverified hotfix.
+- GitHub checkout moved to `actions/checkout@v5` to use Node 24 and avoid
+  the deprecated Node 20 runtime warning on hosted runners.
+- Render and persistence corrections are test-harness changes, not proof of
+  production bugs. Recheck their actual results in the next workflow run.
