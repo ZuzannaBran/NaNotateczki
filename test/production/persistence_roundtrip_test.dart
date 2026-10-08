@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -116,8 +117,35 @@ NotebookRepository _repository(NotesDatabase database) {
   );
 }
 
+class _TestPathProvider extends PathProviderPlatform {
+  _TestPathProvider(this.documentsPath);
+
+  final String documentsPath;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => documentsPath;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Directory documentsDirectory;
+  late PathProviderPlatform originalPathProvider;
+
+  setUp(() async {
+    documentsDirectory = await Directory.systemTemp.createTemp(
+      'nanotateczki-persistence-',
+    );
+    originalPathProvider = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _TestPathProvider(documentsDirectory.path);
+  });
+
+  tearDown(() async {
+    PathProviderPlatform.instance = originalPathProvider;
+    if (await documentsDirectory.exists()) {
+      await documentsDirectory.delete(recursive: true);
+    }
+  });
 
   test('SQLite read-after-write preserves rich content and binary media',
       () async {
@@ -212,13 +240,11 @@ void main() {
 
   test('incremental backup to a fresh database restores rich content',
       () async {
-    final temporary = await Directory.systemTemp.createTemp('release-backup-');
-    addTearDown(() => temporary.delete(recursive: true));
     final db = NotesDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     final backup = LocalBackupService(
       _repository(db),
-      documentsDirectory: () async => temporary,
+      documentsDirectory: () async => documentsDirectory,
     );
     addTearDown(backup.dispose);
 
@@ -231,7 +257,7 @@ void main() {
     addTearDown(secondDb.close);
     final restore = LocalBackupService(
       _repository(secondDb),
-      documentsDirectory: () async => temporary,
+      documentsDirectory: () async => documentsDirectory,
     );
     addTearDown(restore.dispose);
 
