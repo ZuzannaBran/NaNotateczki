@@ -975,16 +975,7 @@ bool _shouldSmoothStroke(List<InkPoint> points, DrawingTool tool) {
   if (tool != DrawingTool.pen && tool != DrawingTool.highlighter) {
     return false;
   }
-  if (points.length < 4 || _samePoint(points.first, points.last)) {
-    return false;
-  }
-  var longestSegmentSquared = 0.0;
-  for (var i = 0; i < points.length - 1; i++) {
-    final distanceSquared =
-        (points[i + 1].toOffset() - points[i].toOffset()).distanceSquared;
-    longestSegmentSquared = max(longestSegmentSquared, distanceSquared);
-  }
-  return longestSegmentSquared > 64.0;
+  return points.length >= 3 && !_samePoint(points.first, points.last);
 }
 
 bool _samePoint(InkPoint a, InkPoint b) {
