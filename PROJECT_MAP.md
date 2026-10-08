@@ -394,7 +394,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
 panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, minimapa,
-skróty i import/eksport. Strona zachowuje logiczną
+wspólne komendy edytora. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma po 10 px wolnej przestrzeni po lewej i prawej stronie; poziomy
 viewport strony zaczyna się przy x=116 i kończy 56 px przed prawą krawędzią.
@@ -547,7 +547,7 @@ UI dziedziczą aktywną paletę.
 
 - 29: `BoardScreen`; 36: `_BoardScreenState`.
 - 57: `_buildBoardRect`; 75–379: obsługa pointerów i viewportu.
-- 420–463: import, eksport i busy overlay; 572: główny `build`.
+- import/eksport i skróty delegują do `EditorCommands`; busy overlay pozostaje ekranowy; główny `build` buduje tylko geometrię boarda.
 - 842: `_BoardPaintProbe`; 859: `_RenderBoardPaintProbe`;
   898: `_BoardZoomControls`.
 

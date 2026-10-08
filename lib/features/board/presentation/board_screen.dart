@@ -10,12 +10,11 @@ import 'package:flutter/gestures.dart'
         PointerSignalEvent;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/diagnostics/board_scene_perf_tracker.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/export/notebook_export_service.dart';
+import '../../editor/presentation/editor_commands.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
 import '../../editor/presentation/widgets/busy_overlay.dart';
 import '../../editor/presentation/widgets/drawing_canvas.dart';
@@ -417,62 +416,6 @@ class _BoardScreenState extends State<BoardScreen> {
     return (viewportCenter - controller.viewPan) / safeScale;
   }
 
-  Future<void> _handleInsertFile(EditorController controller) async {
-    final message = await _withBusyOverlay(
-      () => controller.insertFromFilePicker(_insertPosition),
-    );
-    if (message != null && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-      return;
-    }
-    controller.setTool(DrawingTool.edit);
-  }
-
-  Future<void> _handleExport(
-    EditorController controller,
-    NotebookExportFormat format,
-  ) async {
-    try {
-      final path = await _withBusyOverlay(
-        () => NotebookExportService.exportController(controller, format),
-      );
-      if (!mounted) {
-        return;
-      }
-      if (path == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Export cancelled')));
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Exported to $path')));
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
-    }
-  }
-
-  Future<T> _withBusyOverlay<T>(Future<T> Function() action) async {
-    if (mounted) {
-      setState(() => _isBusy = true);
-    }
-    try {
-      return await action();
-    } finally {
-      if (mounted) {
-        setState(() => _isBusy = false);
-      }
-    }
-  }
-
   void _openSettings() {
     final controller = context.read<EditorController>();
     Navigator.of(context).push(
@@ -483,37 +426,6 @@ class _BoardScreenState extends State<BoardScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _handlePaste(EditorController controller) async {
-    final message = await controller.pasteElementOrClipboard(_insertPosition);
-    if (message != null && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    }
-  }
-
-  Future<void> _handleCopy(EditorController controller) async {
-    final message = await controller.copyActiveElementToClipboard();
-    if (message != null && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    }
-  }
-
-  Future<void> _handleCut(EditorController controller) async {
-    final message = await controller.cutActiveElementToClipboard();
-    if (message != null && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    }
-  }
-
-  void _handleDelete(EditorController controller) {
-    controller.deleteActiveElement();
   }
 
   Future<void> _showBoardContextMenu(
@@ -577,12 +489,19 @@ class _BoardScreenState extends State<BoardScreen> {
         ? null
         : controller.findTextBlockById(activeTextBlockId);
 
+    final commands = EditorCommands(
+      context: context,
+      controller: controller,
+      insertPosition: () => _insertPosition,
+      runBusy: _withBusyOverlay,
+    );
+
     final boardContent = Column(
       children: [
         EditorToolbar(
           controller: controller,
-          onInsertPressed: () => _handleInsertFile(controller),
-          onExportSelected: (format) => _handleExport(controller, format),
+          onInsertPressed: commands.insertFile,
+          onExportSelected: commands.export,
         ),
         if (activeTextBlock != null)
           TextEditToolbar(editorController: controller, block: activeTextBlock),
@@ -763,56 +682,11 @@ class _BoardScreenState extends State<BoardScreen> {
       ],
     );
 
-    final shortcutsEnabled = controller.activeTextController == null;
-    final content = shortcutsEnabled
-        ? Shortcuts(
-            shortcuts: const <ShortcutActivator, Intent>{
-              SingleActivator(LogicalKeyboardKey.keyV, control: true):
-                  _PasteFromClipboardIntent(),
-              SingleActivator(LogicalKeyboardKey.keyV, meta: true):
-                  _PasteFromClipboardIntent(),
-              SingleActivator(LogicalKeyboardKey.keyC, control: true):
-                  _CopyElementIntent(),
-              SingleActivator(LogicalKeyboardKey.keyC, meta: true):
-                  _CopyElementIntent(),
-              SingleActivator(LogicalKeyboardKey.keyX, control: true):
-                  _CutElementIntent(),
-              SingleActivator(LogicalKeyboardKey.keyX, meta: true):
-                  _CutElementIntent(),
-              SingleActivator(LogicalKeyboardKey.delete):
-                  _DeleteElementIntent(),
-            },
-            child: Actions(
-              actions: <Type, Action<Intent>>{
-                _PasteFromClipboardIntent: CallbackAction<Intent>(
-                  onInvoke: (_) {
-                    _handlePaste(controller);
-                    return null;
-                  },
-                ),
-                _CopyElementIntent: CallbackAction<Intent>(
-                  onInvoke: (_) {
-                    _handleCopy(controller);
-                    return null;
-                  },
-                ),
-                _CutElementIntent: CallbackAction<Intent>(
-                  onInvoke: (_) {
-                    _handleCut(controller);
-                    return null;
-                  },
-                ),
-                _DeleteElementIntent: CallbackAction<Intent>(
-                  onInvoke: (_) {
-                    _handleDelete(controller);
-                    return null;
-                  },
-                ),
-              },
-              child: Focus(autofocus: true, child: boardContent),
-            ),
-          )
-        : boardContent;
+    final content = EditorCommandShortcuts(
+      commands: commands,
+      enabled: controller.activeTextController == null,
+      child: boardContent,
+    );
 
     return Scaffold(
       appBar: AppBar(
