@@ -145,6 +145,27 @@ void main() {
     expect(pdf.length, greaterThan(600));
   });
 
+  testWidgets('multi-page PNG export preserves page count',
+      (tester) async {
+    final pages = [
+      for (var i = 0; i < 12; i++)
+        _page('page-$i', draw: i.isEven, text: i.isOdd),
+    ];
+    final images = await _render(
+      tester,
+      () => NotebookExportService.renderPngPagesForTest(
+        _notebook(pages),
+        pageSize: const Size(320, 420),
+      ),
+    );
+    expect(images, hasLength(12));
+    for (final image in images) {
+      final data = ByteData.sublistView(image);
+      expect(data.getUint32(16), 640);
+      expect(data.getUint32(20), 840);
+    }
+  });
+
   testWidgets('legacy erase masks are flattened before rendering',
       (tester) async {
     final legacy = _page('legacy', draw: true);
