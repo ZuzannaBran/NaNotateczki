@@ -496,14 +496,17 @@ błędów, integralności i wydajności.
   gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
   używają starego Quilla jako bezpieczny fallback.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4205 linie)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4163 linie)
 
 Dwa świadomie osobne canvasy ink, wspólna geometria rozpoznawania gestów,
 lasso, handoff aktywnej kreski i pomiary wydajności. Wszystkie modyfikacje
 gumki, włącznie ze scratch erase, delegują dane do jednego
 `InkEraserEngine`. Canvas nie ma już drugiego silnika cięcia, zapisanego
 `BlendMode.clear` ani martwego stanu kursora gumki. Tymczasowy podgląd
-brush/area istnieje tylko podczas aktywnego gestu. Notebookowe operacje
+brush/area istnieje tylko podczas aktywnego gestu. Lasso oraz gumka
+zakresowa mają wspólny podgląd przerywanego konturu przez `path_drawing`,
+bez zmiany danych wejściowych używanych przez selekcję i eraser.
+Notebookowe operacje
 zmieniające ink zawsze czytają bieżący stan z `EditorController.pageAt(...)`.
 Podczas rysowania pen/highlighter overlay stosuje ten sam LOD co zapisany
 tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
@@ -512,8 +515,12 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   deklaracjami canvasów, ale hit-test i cięcie są w `InkEraserEngine`.
 - 658: `DrawingCanvas`; 680: `DocumentDrawingCanvas`.
 - 897: `_DrawingCanvasState`; 2241: `_DocumentDrawingCanvasState`.
-- 3790: `_InkPainter`; 3846: `_InkOverlayPainter`;
-  4107: `_InkPageLayer`; 4153: `_PageInkPainter`.
+- 3790: `_InkPainter`; 3829: `_InkOverlayPainter`;
+  4065: `_InkPageLayer`; 4111: `_PageInkPainter`.
+
+- `lib/features/editor/presentation/widgets/selection_outline.dart`:
+  wspólny painter przerywanego konturu dla lassa i gumki zakresowej;
+  `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
 
 ### `lib/features/editor/presentation/widgets/page_overlay.dart` (2821 linii)
 
@@ -592,6 +599,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   erase-stroke/area hit-test, migracja legacy gumek, pojedyncze punkty,
   kolizje ID i undo
 - `test/ink_render_benchmark_test.dart` (220)
+- `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
+  brak mutacji źródła oraz zgodność rozmiaru segmentów z zoomem
 - `test/editor_screen_responsive_layout_test.dart` (196)
 - `test/page_overlay_text_gestures_test.dart` (317): sprawdza blokowy
   toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,

@@ -25,7 +25,7 @@ import '../interaction/object_transform_engine.dart';
 import 'object_transform_hud.dart';
 import '../../state/editor_controller.dart';
 
-const Color _lassoAccentColor = Color(0xFF2E5AAC);
+const Color _lassoAccentColor = AppColors.inkBlack;
 const double _lassoActionOutset = 56.0;
 const double _lassoActionBarMinWidth = 112.0;
 

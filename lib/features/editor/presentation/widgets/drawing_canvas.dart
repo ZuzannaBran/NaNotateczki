@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 
+import 'selection_outline.dart';
+
 import '../../../../core/diagnostics/board_scene_perf_tracker.dart';
 import '../../../../core/diagnostics/frame_timing_tracker.dart';
 import '../../../../core/diagnostics/optimization_log.dart';
@@ -32,7 +34,7 @@ const double _scratchEraseMinPathDensity = 4.0;
 const int _scratchEraseMinDirectionReversals = 3;
 const int _scratchEraseMinInkHits = 3;
 const Color _canvasBackgroundColor = AppColors.paper;
-const Color _lassoAccentColor = Color(0xFF2E5AAC);
+const Color _lassoAccentColor = AppColors.inkBlack;
 const Set<String> _emptyStrokeIdSet = <String>{};
 
 void _debugInkLog(String message) {
@@ -1043,6 +1045,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
                             currentTool: activeTool,
                             worldOrigin: widget.worldOrigin,
                             lod: _staticInkLodForScale(widget.effectiveScale),
+                            effectiveScale: widget.effectiveScale,
                             committedStrokes: _committedOverlayStrokes,
                             snapHintStart: _snapHintStart,
                             snapHintEnd: _snapHintEnd,
@@ -2410,6 +2413,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
                 currentTool: activeTool,
                 worldOrigin: Offset(0, pageIndex * stride),
                 lod: _staticInkLodForScale(widget.effectiveScale),
+                effectiveScale: widget.effectiveScale,
                 committedStrokes: _committedOverlayStrokes,
                 committedPageId: widget.pages[pageIndex].id,
                 drawActiveContent: _activePageIndex == pageIndex,
@@ -3832,6 +3836,7 @@ class _InkOverlayPainter extends CustomPainter {
     required this.currentTool,
     required this.worldOrigin,
     required this.lod,
+    required this.effectiveScale,
     required this.committedStrokes,
     this.committedPageId,
     this.drawActiveContent = true,
@@ -3848,6 +3853,7 @@ class _InkOverlayPainter extends CustomPainter {
   final DrawingTool currentTool;
   final Offset worldOrigin;
   final _StaticInkLod lod;
+  final double effectiveScale;
   final List<_PendingCommittedStroke> committedStrokes;
   final String? committedPageId;
   final bool drawActiveContent;
@@ -3976,10 +3982,34 @@ class _InkOverlayPainter extends CustomPainter {
         (tool == DrawingTool.eraserBrush && points.length < 2)) {
       return;
     }
-    if (tool == DrawingTool.eraserArea && points.length < 3) {
-      _drawEraserAreaStart(canvas, points, width);
+
+    if (tool == DrawingTool.lasso || tool == DrawingTool.eraserArea) {
+      if (points.length == 1) {
+        final marker = Path()
+          ..addOval(
+            Rect.fromCircle(
+              center: points.first.toOffset() - worldOrigin,
+              radius: max(5.0 / effectiveScale, width * 3.0),
+            ),
+          );
+        paintSelectionOutline(canvas, marker, scale: effectiveScale);
+        return;
+      }
+
+      final path = _buildInkPath(
+        points,
+        tool,
+        Offset.zero,
+        worldOrigin,
+        Offset.zero,
+      );
+      if (tool == DrawingTool.eraserArea && points.length >= 3) {
+        path.close();
+      }
+      paintSelectionOutline(canvas, path, scale: effectiveScale);
       return;
     }
+
     final paint = Paint()
       ..strokeCap = tool == DrawingTool.highlighter
           ? StrokeCap.square
@@ -3987,11 +4017,7 @@ class _InkOverlayPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
       ..strokeWidth = width;
-    if (tool == DrawingTool.eraserArea) {
-      paint
-        ..color = _canvasBackgroundColor.withValues(alpha: 0.32)
-        ..style = PaintingStyle.fill;
-    } else if (tool == DrawingTool.eraserBrush) {
+    if (tool == DrawingTool.eraserBrush) {
       paint.color = _canvasBackgroundColor;
     } else {
       paint.color = _toolColor(color, tool);
@@ -4010,55 +4036,10 @@ class _InkOverlayPainter extends CustomPainter {
       worldOrigin,
       Offset.zero,
     );
-    if (tool == DrawingTool.eraserArea) {
-      final closedPath = path..close();
-      canvas.drawPath(closedPath, paint);
-      final outlinePaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.35)
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = max(1.2, width);
-      canvas.drawPath(closedPath, outlinePaint);
-    } else {
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  void _drawEraserAreaStart(
-    Canvas canvas,
-    List<InkPoint> points,
-    double width,
-  ) {
-    final radius = max(5.0, width * 3.0);
-    final fillPaint = Paint()
-      ..color = _canvasBackgroundColor.withValues(alpha: 0.32)
-      ..style = PaintingStyle.fill;
-    final outlinePaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.35)
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = max(1.2, width);
-    final start = points.first.toOffset() - worldOrigin;
-    canvas.drawCircle(start, radius, fillPaint);
-    if (points.length == 1) {
-      canvas.drawCircle(start, radius, outlinePaint);
-      return;
-    }
-    final end = points.last.toOffset() - worldOrigin;
-    final path = Path()
-      ..moveTo(start.dx, start.dy)
-      ..lineTo(end.dx, end.dy);
-    canvas.drawPath(path, outlinePaint);
-    canvas.drawCircle(start, radius, outlinePaint);
-    canvas.drawCircle(end, radius, outlinePaint);
+    canvas.drawPath(path, paint);
   }
 
   Color _toolColor(Color base, DrawingTool tool) {
-    if (tool == DrawingTool.lasso) {
-      return _lassoAccentColor.withValues(alpha: 0.38);
-    }
     if (tool == DrawingTool.highlighter) {
       return base.withValues(alpha: 0.5);
     }
@@ -4071,6 +4052,7 @@ class _InkOverlayPainter extends CustomPainter {
         oldDelegate.currentWidth != currentWidth ||
         oldDelegate.currentTool != currentTool ||
         oldDelegate.worldOrigin != worldOrigin ||
+        oldDelegate.effectiveScale != effectiveScale ||
         oldDelegate.committedPageId != committedPageId ||
         oldDelegate.drawActiveContent != drawActiveContent ||
         oldDelegate.snapHintStart != snapHintStart ||
