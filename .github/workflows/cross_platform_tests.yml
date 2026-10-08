@@ -33,8 +33,16 @@ jobs:
         run: dart format --output=none lib test integration_test test_driver
       - name: Analyze source and tests
         run: dart analyze
-      - name: Execute the complete native test suite
-        run: flutter test test --coverage --reporter expanded
+      - name: Execute non-render native test suite
+        shell: bash
+        run: |
+          mapfile -d '' -t test_files < <(
+            find test -type f -name '*_test.dart' \
+              ! -path 'test/production/export_render_test.dart' \
+              -print0 | sort -z
+          )
+          test "${#test_files[@]}" -gt 0
+          flutter test "${test_files[@]}" --coverage --reporter expanded
       - name: Publish coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -42,6 +50,21 @@ jobs:
           name: flutter-coverage
           path: coverage/lcov.info
           if-no-files-found: ignore
+
+  export-render:
+    name: PNG/PDF production renderer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Verify real PNG and PDF rendering
+        run: flutter test test/production/export_render_test.dart --reporter expanded --timeout 2m
 
   web:
     name: Chrome, WASM/IndexedDB and web bootstrap
@@ -126,9 +149,7 @@ jobs:
             -d linux --dart-define=NANOTATECZKI_ISOLATED_CI=true
       - name: Isolated Windows document lifecycle
         if: matrix.platform == 'windows'
-        run: |
-          flutter test integration_test/document_lifecycle_test.dart \
-            -d windows --dart-define=NANOTATECZKI_ISOLATED_CI=true
+        run: flutter test integration_test/document_lifecycle_test.dart -d windows --dart-define=NANOTATECZKI_ISOLATED_CI=true
       - name: Isolated macOS document lifecycle
         if: matrix.platform == 'macos'
         run: |
@@ -162,7 +183,16 @@ jobs:
           flutter-version: '3.47.6'
           channel: stable
           cache: true
+      - name: Use CocoaPods for all iOS plugins
+        run: flutter config --no-enable-swift-package-manager
       - run: flutter pub get
+      - name: Install pods and validate Xcode workspace
+        shell: bash
+        run: |
+          cd ios
+          pod install
+          test -f "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+          grep -q "Pods.xcodeproj" Runner.xcworkspace/contents.xcworkspacedata
       - run: flutter build ios --simulator --no-codesign
 
   android-emulator:
@@ -208,7 +238,16 @@ jobs:
           flutter-version: '3.47.6'
           channel: stable
           cache: true
+      - name: Use CocoaPods for all iOS plugins
+        run: flutter config --no-enable-swift-package-manager
       - run: flutter pub get
+      - name: Install pods and validate Xcode workspace
+        shell: bash
+        run: |
+          cd ios
+          pod install
+          test -f "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+          grep -q "Pods.xcodeproj" Runner.xcworkspace/contents.xcworkspacedata
       - name: Boot an available iPhone simulator
         shell: bash
         run: |
