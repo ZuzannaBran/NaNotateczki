@@ -46,7 +46,7 @@ jobs:
       - name: Enforce initial line coverage floor
         shell: bash
         env:
-          MIN_LINE_COVERAGE: '30'
+          MIN_LINE_COVERAGE: '35'
         run: |
           test -s coverage/lcov.info
           awk -F: -v minimum="$MIN_LINE_COVERAGE" '
