@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/features/editor/presentation/widgets/selection_outline.dart';
 
