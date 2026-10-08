@@ -166,6 +166,26 @@ void main() {
     }
   });
 
+  testWidgets('board can render PNG and PDF', (tester) async {
+    final board = _notebook([
+      _page('board', draw: true, text: true),
+    ]).copyWith(kind: NotebookKind.board);
+    final results = await _render(tester, () async {
+      final png = (await NotebookExportService.renderPngPagesForTest(
+        board,
+        pageSize: _pageSize,
+      )).single;
+      final pdf = await NotebookExportService.renderPdfBytesForTest(
+        board,
+        pageSize: _pageSize,
+      );
+      return (png: png, pdf: pdf);
+    });
+
+    expect(results.png.length, greaterThan(70));
+    expect(latin1.decode(results.pdf.take(5).toList()), '%PDF-');
+  });
+
   testWidgets('legacy erase masks are flattened before rendering',
       (tester) async {
     final legacy = _page('legacy', draw: true);
