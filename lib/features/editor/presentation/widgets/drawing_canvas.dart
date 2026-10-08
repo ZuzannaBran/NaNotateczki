@@ -8,8 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 
-import 'selection_outline.dart';
-
 import '../../../../core/diagnostics/board_scene_perf_tracker.dart';
 import '../../../../core/diagnostics/frame_timing_tracker.dart';
 import '../../../../core/diagnostics/optimization_log.dart';
@@ -21,6 +19,7 @@ import '../../../notebook/domain/ink_eraser_engine.dart';
 import '../../../notebook/domain/ink_stroke.dart';
 import '../../../notebook/domain/note_page.dart';
 import '../../state/editor_controller.dart';
+import 'selection_outline.dart';
 
 const double _eraserBrushWidthScale = 2.0;
 const double _eraserStrokeMinRadius = 4.0;
