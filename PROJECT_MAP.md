@@ -571,7 +571,9 @@ Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 ## 10. Platformy, web i testy
 
 - `ios/Podfile`: zależności CocoaPods dla pluginów bez obsługi SwiftPM;
-  deklaracja iOS 15 i targetów Runner/RunnerTests.
+  deklaracja iOS 15 i targetów Runner/RunnerTests. W CI iOS wyłącza SwiftPM,
+  wykonuje `pod install` i sprawdza obecność Pods w `Runner.xcworkspace`;
+  wymaga potwierdzenia w buildzie symulatora.
 - `ios/Flutter/Debug.xcconfig`, `Release.xcconfig`: dziedziczą config
   Pods-Runner, aby linker znajdował framework CocoaPods podczas buildów.
 
@@ -650,11 +652,16 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.
 - `test/production/persistence_roundtrip_test.dart`: rich text z Delta,
   crop i bytes obrazów, dwie strony, dirty-page, równoległe zapisy, backup
-  i przywrócenie do nowego SQLite.
+  i przywrócenie do nowego SQLite; każdy test ma własny katalog dokumentów
+  i fake `PathProviderPlatform`, bez zapisu do danych użytkownika.
 - `test/production/export_render_test.dart`: produkcyjne PNG/PDF w pamięci,
-  liczba stron i rozmiar obrazu, treść oraz legacy gumka.
+  liczba stron i rozmiar obrazu, treść oraz legacy gumka; renderer działa
+  w `tester.runAsync`, poza strefą `FakeAsync` testu widgetowego.
 - `.github/workflows/cross_platform_tests.yml`: CI na Linux, Windows, macOS,
   Chrome, Android i iOS; emulatory uruchamiane po pushu na `dev`.
+  Eksport PNG/PDF jest osobnym jobem z własnym timeoutem; pozostałe testy
+  generują niezależny raport pokrycia. Windows lifecycle używa jednej linii
+  PowerShell, a iOS jawnie instaluje CocoaPods i weryfikuje workspace.
   Harmonogram i manualny trigger wymagają też workflow na domyślnym `main`.
 - `docs/TEST_MATRIX.md`: plan testów, wymagania urządzeń i niedomknięte
   scenariusze, których CI jeszcze nie pokrywa.
