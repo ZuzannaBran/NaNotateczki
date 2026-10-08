@@ -14,6 +14,7 @@ import '../../../core/error/app_error_log.dart';
 import '../../../data/drift/notes_database.dart';
 import '../domain/drawing_tool.dart';
 import '../domain/image_block.dart';
+import '../domain/ink_eraser_engine.dart';
 import '../domain/ink_stroke.dart';
 import '../domain/notebook.dart';
 import '../domain/notebook_kind.dart';
@@ -149,12 +150,15 @@ class NotebookRepository {
               .get();
       final notebooks = <Notebook>[];
       final corruptIds = <String>[];
+      final legacyPagesByNotebook = <String, Set<String>>{};
       for (final row in rows) {
         try {
           final result = await _readNotebook(row);
           notebooks.add(result.notebook);
           if (result.hadCorruptRows) {
             corruptIds.add(row.uid);
+          } else if (result.legacyEraserPageIds.isNotEmpty) {
+            legacyPagesByNotebook[row.uid] = result.legacyEraserPageIds;
           }
         } catch (e, st) {
           corruptIds.add(row.uid);
@@ -177,6 +181,17 @@ class NotebookRepository {
         _isNotebookCacheComplete = true;
       } else {
         _isNotebookCacheComplete = false;
+      }
+      if (legacyPagesByNotebook.isNotEmpty) {
+        try {
+          await _persistLegacyEraserPages(legacyPagesByNotebook);
+        } catch (error, stackTrace) {
+          AppErrorLog.instance.record(
+            error,
+            stackTrace,
+            source: 'NotebookRepository.legacyEraserMigration',
+          );
+        }
       }
       return notebooks;
     } catch (e, st) {
@@ -205,16 +220,20 @@ class NotebookRepository {
     if (notebooks.isEmpty) {
       return 0;
     }
-    _validateRecoveryBatch(notebooks);
+    final normalizedNotebooks = [
+      for (final notebook in notebooks)
+        InkEraserEngine.normalizeNotebook(notebook),
+    ];
+    _validateRecoveryBatch(normalizedNotebooks);
     if (!await _isDatabaseEmptyForRestore()) {
       throw StateError('Atomic recovery requires an empty database.');
     }
-    await _validateRecoveryImages(notebooks);
+    await _validateRecoveryImages(normalizedNotebooks);
 
     final persisted = <Notebook>[];
     final createdImagePaths = <String>[];
     try {
-      for (final notebook in notebooks) {
+      for (final notebook in normalizedNotebooks) {
         persisted.add(
           await _persistRecoveryImages(notebook, createdImagePaths),
         );
@@ -266,11 +285,15 @@ class NotebookRepository {
     if (notebooks.isEmpty) {
       return 0;
     }
-    _validateRecoveryBatch(notebooks);
+    final normalizedNotebooks = [
+      for (final notebook in notebooks)
+        InkEraserEngine.normalizeNotebook(notebook),
+    ];
+    _validateRecoveryBatch(normalizedNotebooks);
 
     final candidates = <Notebook>[];
     final requestStackTrace = StackTrace.current;
-    for (final notebook in notebooks) {
+    for (final notebook in normalizedNotebooks) {
       final existingRow = await (database.select(
         database.notebookRows,
       )..where((row) => row.uid.equals(notebook.uid))).getSingleOrNull();
@@ -467,6 +490,18 @@ class NotebookRepository {
         if (!_lastCorruptNotebookIds.contains(uid)) {
           _lastCorruptNotebookIds.add(uid);
         }
+      } else if (result.legacyEraserPageIds.isNotEmpty) {
+        try {
+          await _persistLegacyEraserPages(
+            {uid: result.legacyEraserPageIds},
+          );
+        } catch (error, stackTrace) {
+          AppErrorLog.instance.record(
+            error,
+            stackTrace,
+            source: 'NotebookRepository.legacyEraserMigration($uid)',
+          );
+        }
       }
       return result.notebook;
     } catch (e, st) {
@@ -484,28 +519,33 @@ class NotebookRepository {
     Notebook notebook, {
     bool preserveMetadata = false,
   }) async {
-    if (notebook.pages.isEmpty) {
+    final normalizedNotebook = InkEraserEngine.normalizeNotebook(notebook);
+    if (normalizedNotebook.pages.isEmpty) {
       throw ArgumentError.value(
-        notebook.uid,
+        normalizedNotebook.uid,
         'notebook.uid',
         'Cannot save a notebook without pages.',
       );
     }
-    final previous = _saveTails[notebook.uid] ?? Future<void>.value();
+    final previous =
+        _saveTails[normalizedNotebook.uid] ?? Future<void>.value();
     final requestStackTrace = StackTrace.current;
     final completion = Completer<void>();
-    _saveTails[notebook.uid] = completion.future;
+    _saveTails[normalizedNotebook.uid] = completion.future;
     try {
       await previous;
       return await _saveNotebookNow(
-        notebook,
+        normalizedNotebook,
         requestStackTrace,
         preserveMetadata: preserveMetadata,
       );
     } finally {
       completion.complete();
-      if (identical(_saveTails[notebook.uid], completion.future)) {
-        _saveTails.remove(notebook.uid);
+      if (identical(
+        _saveTails[normalizedNotebook.uid],
+        completion.future,
+      )) {
+        _saveTails.remove(normalizedNotebook.uid);
       }
     }
   }
@@ -514,24 +554,33 @@ class NotebookRepository {
     if (pageIds.isEmpty) {
       return true;
     }
-    if (notebook.pages.isEmpty) {
+    final normalizedNotebook = InkEraserEngine.normalizeNotebook(notebook);
+    if (normalizedNotebook.pages.isEmpty) {
       throw ArgumentError.value(
-        notebook.uid,
+        normalizedNotebook.uid,
         'notebook.uid',
         'Cannot save a notebook without pages.',
       );
     }
-    final previous = _saveTails[notebook.uid] ?? Future<void>.value();
+    final previous =
+        _saveTails[normalizedNotebook.uid] ?? Future<void>.value();
     final requestStackTrace = StackTrace.current;
     final completion = Completer<void>();
-    _saveTails[notebook.uid] = completion.future;
+    _saveTails[normalizedNotebook.uid] = completion.future;
     try {
       await previous;
-      return await _saveNotebookPagesNow(notebook, pageIds, requestStackTrace);
+      return await _saveNotebookPagesNow(
+        normalizedNotebook,
+        pageIds,
+        requestStackTrace,
+      );
     } finally {
       completion.complete();
-      if (identical(_saveTails[notebook.uid], completion.future)) {
-        _saveTails.remove(notebook.uid);
+      if (identical(
+        _saveTails[normalizedNotebook.uid],
+        completion.future,
+      )) {
+        _saveTails.remove(normalizedNotebook.uid);
       }
     }
   }
@@ -1231,18 +1280,25 @@ class NotebookRepository {
   }
 
   static Map<String, dynamic> encodeNotebook(Notebook notebook) =>
-      _notebookToJson(notebook);
+      _notebookToJson(InkEraserEngine.normalizeNotebook(notebook));
 
   static Map<String, dynamic> encodeNotebookForLocalBackup(Notebook notebook) =>
-      _notebookToJson(notebook, includeImageBytes: false);
+      _notebookToJson(
+        InkEraserEngine.normalizeNotebook(notebook),
+        includeImageBytes: false,
+      );
 
   static Map<String, dynamic> encodePageForLocalBackup(NotePage page) =>
-      _pageToJson(page, includeImageBytes: false);
+      _pageToJson(
+        InkEraserEngine.normalizePage(page),
+        includeImageBytes: false,
+      );
 
   List<Notebook> decodeNotebooks(List<dynamic> items) {
     return items
         .whereType<Map<String, dynamic>>()
         .map(_notebookFromJson)
+        .map(InkEraserEngine.normalizeNotebook)
         .toList();
   }
 
@@ -1407,11 +1463,15 @@ class NotebookRepository {
       onError: () => hadCorruptRows = true,
     );
     final pages = <NotePage>[];
+    final legacyEraserPageIds = <String>{};
     for (final pageRow in pageRows) {
       try {
         final result = await _readPage(pageRow);
         pages.add(result.page);
         hadCorruptRows = hadCorruptRows || result.hadCorruptRows;
+        if (result.hadLegacyErasers) {
+          legacyEraserPageIds.add(result.page.id);
+        }
       } catch (error, stackTrace) {
         hadCorruptRows = true;
         _recordReadError(
@@ -1432,6 +1492,7 @@ class NotebookRepository {
         pages: pages,
       ),
       hadCorruptRows: hadCorruptRows,
+      legacyEraserPageIds: legacyEraserPageIds,
     );
   }
 
@@ -1465,6 +1526,14 @@ class NotebookRepository {
       source: 'NotebookRepository._readPage(${row.uid}, strokes)',
       onError: markCorrupt,
     );
+    final convertedStrokes = _convertRowsSafely(
+      strokes,
+      _strokeFromRow,
+      'NotebookRepository._readPage(${row.uid}, stroke row)',
+      markCorrupt,
+    );
+    final normalizedInk =
+        InkEraserEngine.flattenLegacyErasers(convertedStrokes);
     return _PageReadResult(
       page: NotePage(
         id: row.uid,
@@ -1481,16 +1550,66 @@ class NotebookRepository {
           'NotebookRepository._readPage(${row.uid}, image row)',
           markCorrupt,
         ),
-        inkStrokes: _convertRowsSafely(
-          strokes,
-          _strokeFromRow,
-          'NotebookRepository._readPage(${row.uid}, stroke row)',
-          markCorrupt,
-        ),
+        inkStrokes: normalizedInk.strokes,
         isBookmarked: row.isBookmarked,
       ),
       hadCorruptRows: hadCorruptRows,
+      hadLegacyErasers: normalizedInk.changed,
     );
+  }
+
+  Future<void> _persistLegacyEraserPages(
+    Map<String, Set<String>> pageIdsByNotebook,
+  ) async {
+    for (final entry in pageIdsByNotebook.entries) {
+      final previous = _saveTails[entry.key] ?? Future<void>.value();
+      final completion = Completer<void>();
+      _saveTails[entry.key] = completion.future;
+      try {
+        await previous;
+        final row = await (database.select(
+          database.notebookRows,
+        )..where((item) => item.uid.equals(entry.key))).getSingleOrNull();
+        if (row == null) {
+          continue;
+        }
+        final current = await _readNotebook(row);
+        if (current.hadCorruptRows ||
+            current.legacyEraserPageIds.isEmpty) {
+          continue;
+        }
+        final pageIds = current.legacyEraserPageIds;
+        final pagesById = {
+          for (final page in current.notebook.pages)
+            if (pageIds.contains(page.id)) page.id: page,
+        };
+        await database.transaction(() async {
+          for (final pageId in pageIds) {
+            final page = pagesById[pageId];
+            if (page == null) {
+              continue;
+            }
+            await (database.delete(
+              database.inkStrokeRows,
+            )..where((item) => item.pageUid.equals(pageId))).go();
+            for (final strokeEntry in page.inkStrokes.asMap().entries) {
+              await database.into(database.inkStrokeRows).insert(
+                _strokeToCompanion(
+                  pageId,
+                  strokeEntry.value,
+                  strokeEntry.key,
+                ),
+              );
+            }
+          }
+        });
+      } finally {
+        completion.complete();
+        if (identical(_saveTails[entry.key], completion.future)) {
+          _saveTails.remove(entry.key);
+        }
+      }
+    }
   }
 
   Future<List<T>> _readRowsSafely<T>({
@@ -1593,12 +1712,13 @@ class NotebookRepository {
     NotePage page,
     int pageIndex,
   ) async {
+    final normalizedPage = InkEraserEngine.normalizePage(page);
     final existingPage = await (database.select(
       database.pageRows,
-    )..where((row) => row.uid.equals(page.id))).getSingleOrNull();
+    )..where((row) => row.uid.equals(normalizedPage.id))).getSingleOrNull();
     if (existingPage != null && existingPage.notebookUid != notebookUid) {
       throw StateError(
-        'Page id ${page.id} already belongs to notebook '
+        'Page id ${normalizedPage.id} already belongs to notebook '
         '${existingPage.notebookUid}.',
       );
     }
@@ -1606,27 +1726,27 @@ class NotebookRepository {
         .into(database.pageRows)
         .insertOnConflictUpdate(
           PageRowsCompanion.insert(
-            uid: page.id,
+            uid: normalizedPage.id,
             notebookUid: notebookUid,
             pageIndex: pageIndex,
-            title: page.title,
-            isBookmarked: page.isBookmarked,
+            title: normalizedPage.title,
+            isBookmarked: normalizedPage.isBookmarked,
           ),
         );
-    for (final entry in page.textBlocks.asMap().entries) {
-      await database
-          .into(database.textBlockRows)
-          .insert(_textToCompanion(page.id, entry.value, entry.key));
+    for (final entry in normalizedPage.textBlocks.asMap().entries) {
+      await database.into(database.textBlockRows).insert(
+        _textToCompanion(normalizedPage.id, entry.value, entry.key),
+      );
     }
-    for (final entry in page.imageBlocks.asMap().entries) {
-      await database
-          .into(database.imageBlockRows)
-          .insert(_imageToCompanion(page.id, entry.value, entry.key));
+    for (final entry in normalizedPage.imageBlocks.asMap().entries) {
+      await database.into(database.imageBlockRows).insert(
+        _imageToCompanion(normalizedPage.id, entry.value, entry.key),
+      );
     }
-    for (final entry in page.inkStrokes.asMap().entries) {
-      await database
-          .into(database.inkStrokeRows)
-          .insert(_strokeToCompanion(page.id, entry.value, entry.key));
+    for (final entry in normalizedPage.inkStrokes.asMap().entries) {
+      await database.into(database.inkStrokeRows).insert(
+        _strokeToCompanion(normalizedPage.id, entry.value, entry.key),
+      );
     }
   }
 
@@ -1803,6 +1923,9 @@ class NotebookRepository {
     InkStroke stroke,
     int sortIndex,
   ) {
+    if (stroke.tool.isEraser) {
+      throw StateError('Eraser strokes cannot be persisted.');
+    }
     return InkStrokeRowsCompanion.insert(
       uid: stroke.id,
       pageUid: pageUid,
@@ -2025,6 +2148,9 @@ class NotebookRepository {
   }
 
   static Map<String, dynamic> _strokeToJson(InkStroke stroke) {
+    if (stroke.tool.isEraser) {
+      throw StateError('Eraser strokes cannot be serialized.');
+    }
     return {
       'id': stroke.id,
       'color': stroke.color.toARGB32(),
@@ -2116,17 +2242,24 @@ class _NotebookReadResult {
   const _NotebookReadResult({
     required this.notebook,
     required this.hadCorruptRows,
+    required this.legacyEraserPageIds,
   });
 
   final Notebook notebook;
   final bool hadCorruptRows;
+  final Set<String> legacyEraserPageIds;
 }
 
 class _PageReadResult {
-  const _PageReadResult({required this.page, required this.hadCorruptRows});
+  const _PageReadResult({
+    required this.page,
+    required this.hadCorruptRows,
+    required this.hadLegacyErasers,
+  });
 
   final NotePage page;
   final bool hadCorruptRows;
+  final bool hadLegacyErasers;
 }
 
 class DataIntegrityProtectionException implements Exception {

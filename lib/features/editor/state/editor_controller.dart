@@ -20,7 +20,6 @@ import 'package:super_clipboard/super_clipboard.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
-import '../../notebook/domain/ink_eraser_engine.dart';
 import '../../notebook/domain/ink_spatial_index.dart';
 import '../../notebook/domain/ink_stroke.dart';
 import '../../notebook/domain/notebook.dart';
@@ -79,28 +78,13 @@ class EditorController extends ChangeNotifier {
   static const Duration _inkSaveDebounceDelay = Duration(seconds: 2);
 
   EditorController({required this.repository, required this.notebook}) {
-    final changedPageIds = <String>{};
-    final normalizedPages = <NotePage>[];
-    for (final page in notebook.pages) {
-      final result = InkEraserEngine.flattenLegacyErasers(page.inkStrokes);
-      if (result.changed) {
-        changedPageIds.add(page.id);
-        normalizedPages.add(page.copyWith(inkStrokes: result.strokes));
-      } else {
-        normalizedPages.add(page);
-      }
-    }
-    pages = normalizedPages;
+    pages = notebook.pages;
     currentPageIndex = 0;
     AppSaveCoordinator.instance.register(
       this,
       hasPendingWork: () => _hasPendingSaveWork,
       flush: flushPendingSaves,
     );
-    if (changedPageIds.isNotEmpty) {
-      _dirtyPageIds.addAll(changedPageIds);
-      _armSaveTimer();
-    }
     _loadEditorPrefs();
   }
 
@@ -2381,6 +2365,9 @@ class EditorController extends ChangeNotifier {
       return null;
     }
     final strokeTool = toolOverride ?? tool;
+    if (strokeTool.isEraser) {
+      throw StateError('Eraser tools cannot be persisted as ink strokes.');
+    }
     final baseWidth = strokeTool == DrawingTool.highlighter
         ? inkStrokeWidth * 8.0
         : inkStrokeWidth;

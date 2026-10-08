@@ -15,6 +15,7 @@ import '../../features/editor/state/editor_controller.dart';
 import '../../features/editor/state/page_background.dart';
 import '../../features/notebook/domain/drawing_tool.dart';
 import '../../features/notebook/domain/image_block.dart';
+import '../../features/notebook/domain/ink_eraser_engine.dart';
 import '../../features/notebook/domain/ink_stroke.dart';
 import '../../features/notebook/domain/notebook.dart';
 import '../../features/notebook/domain/notebook_kind.dart';
@@ -65,12 +66,25 @@ class NotebookExportService {
     double pageGap = 0.0,
     PageBackgroundSettings background = const PageBackgroundSettings(),
   }) async {
-    final baseName = _fileNameBase(notebook.title);
+    final normalizedNotebook = InkEraserEngine.normalizeNotebook(notebook);
+    final baseName = _fileNameBase(normalizedNotebook.title);
     switch (format) {
       case NotebookExportFormat.pdf:
-        return _exportPdf(notebook, pageSize, pageGap, baseName, background);
+        return _exportPdf(
+          normalizedNotebook,
+          pageSize,
+          pageGap,
+          baseName,
+          background,
+        );
       case NotebookExportFormat.png:
-        return _exportPng(notebook, pageSize, pageGap, baseName, background);
+        return _exportPng(
+          normalizedNotebook,
+          pageSize,
+          pageGap,
+          baseName,
+          background,
+        );
     }
   }
 
@@ -443,15 +457,13 @@ class NotebookExportService {
     Offset origin,
     Size size,
   ) {
-    canvas.saveLayer(Offset.zero & size, Paint());
     for (final stroke in strokes) {
       _paintStroke(canvas, stroke, origin);
     }
-    canvas.restore();
   }
 
   static void _paintStroke(Canvas canvas, InkStroke stroke, Offset origin) {
-    if (stroke.points.isEmpty) {
+    if (stroke.points.isEmpty || stroke.tool.isEraser) {
       return;
     }
     final paint = Paint()
@@ -460,26 +472,11 @@ class NotebookExportService {
           : StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke.width;
-    if (stroke.tool == DrawingTool.eraserArea) {
-      paint
-        ..color = Colors.transparent
-        ..blendMode = BlendMode.clear
-        ..style = PaintingStyle.fill;
-    } else if (stroke.tool == DrawingTool.eraserBrush) {
-      paint
-        ..color = Colors.transparent
-        ..blendMode = BlendMode.clear;
-    } else {
-      paint.color = _strokeColor(stroke.color, stroke.tool);
-    }
+      ..strokeWidth = stroke.width
+      ..color = _strokeColor(stroke.color, stroke.tool);
 
     final path = _buildInkPath(stroke.points, stroke.tool, origin);
-    if (stroke.tool == DrawingTool.eraserArea) {
-      canvas.drawPath(path..close(), paint);
-    } else {
-      canvas.drawPath(path, paint);
-    }
+    canvas.drawPath(path, paint);
   }
 
   static Path _buildInkPath(

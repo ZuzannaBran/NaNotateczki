@@ -196,23 +196,22 @@ pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/backup_eraser_flattening.dart` (18 linii)
+### `lib/data/backup/backup_eraser_flattening.dart` (12 linii)
 
-Warstwa zgodności backupu delegująca spłaszczenie starych masek gumki do
-wspólnego `InkEraserEngine`. Nowe edycje nie zapisują stroke'ów gumki.
+Cienki adapter zgodności dla backupu; deleguje normalizację starych masek
+bezpośrednio do `InkEraserEngine`. Nie zawiera własnej geometrii gumki.
 
-- 5:
-  `flattenErasersForBackup`;
-  11:
-  `flattenPageErasersForBackup`.
+- 5: `flattenErasersForBackup`; 9: `flattenPageErasersForBackup`.
 
-### `lib/data/export/notebook_export_service.dart` (679 linii)
+### `lib/data/export/notebook_export_service.dart` (676 linii)
 
 Renderuje notebook/board do PNG lub PDF i zapisuje przez systemowy dialog.
+Przed renderem normalizuje legacy gumki; zapisany renderer zna wyłącznie
+zwykły ink i nie używa `BlendMode.clear`.
 
-- 24: `NotebookExportFormat`; 26: `NotebookExportFormatLabel`;
-  37: `NotebookExportService`; 44: `exportController`;
-  61: `exportNotebook`; 674: `_RenderedPage`.
+- 25: `NotebookExportFormat`; 27: `NotebookExportFormatLabel`;
+  38: `NotebookExportService`; 45: `exportController`;
+  62: `exportNotebook`; 671: `_RenderedPage`.
 
 ### `lib/data/sync/cloud_sync_service.dart` (136 linii)
 
@@ -242,12 +241,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/ink_spatial_index.dart` (125): cache'owany
   indeks siatkowy kandydatów do hit-testu.
   14: `inkSpatialIndexFor`; 24: `InkSpatialIndex`.
-- `lib/features/notebook/domain/ink_eraser_engine.dart` (549):
-  wspólny destrukcyjny silnik gumki dla boarda i notebooka. Zwykła gumka
-  wycina fragmenty stroke'a i zapisuje pozostałe części jako realny ink;
-  erase-stroke i area kasują całe trafione stroke'y. Stary zapis masek gumki
-  jest jednorazowo spłaszczany do zwykłego ink.
-  35: `InkEraserEngine`.
+- `lib/features/notebook/domain/ink_eraser_engine.dart` (719):
+  jedyny silnik modyfikacji gumki dla boarda i notebooka. Obsługuje zwykłą
+  gumkę, erase-stroke, area oraz scratch erase. Legacy maski są tu wyłącznie
+  jednorazowo normalizowane do zwykłego ink; generator fragmentów unika
+  kolizji ID i obsługuje też pojedyncze punkty.
+  37: `InkEraserEngine`; 40: `normalizePage`; 45: `normalizeNotebook`;
+  117: `scratchInkHitCount`; 139: `eraseScratchParts`;
+  194: `flattenLegacyErasers`.
 - `lib/features/notebook/domain/text_block.dart` (45): blok Quill z pozycją,
   stylem, szerokością i rotacją.
   3: `TextBlock`.
@@ -255,24 +256,30 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2227 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2361 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
-podejrzaną utratą danych. `NotebookRepositoryChange` rozróżnia pełną zmianę,
-zmianę konkretnych page IDs i zmianę samych metadanych, dzięki czemu scheduler
-może uruchomić backup v6 tylko dla właściwych stron. Repozytorium udostępnia
-też oczekiwanie na wszystkie trwające zapisy per UID. Ręczny eksport pozostaje
-samowystarczalny i zachowuje obrazy inline.
+podejrzaną utratą danych. Jest też kanoniczną granicą migracji starego modelu
+gumki: odczyt normalizuje legacy maski, a zdrowe strony są fizycznie
+przepisywane w SQLite bez eraser-stroke'ów i bez zmiany metadanych notebooka.
+Migracja korzysta z tej samej kolejki per UID co zwykłe zapisy, więc nie
+ściga się z aktywnym save'em. Zapis, import, restore i JSON normalizują dane
+ponownie, a niskopoziomowa serializacja odrzuca próbę utrwalenia eraser-stroke.
+`NotebookRepositoryChange` rozróżnia pełną zmianę, zmianę konkretnych page IDs
+i zmianę samych metadanych, dzięki czemu scheduler może uruchomić backup v6
+tylko dla właściwych stron. Repozytorium udostępnia też oczekiwanie na
+wszystkie trwające zapisy per UID. Ręczny eksport pozostaje samowystarczalny
+i zachowuje obrazy inline.
 
 - 23: `DataIntegrityIncidentHandler`; 30: `NotebookRepositoryChange`;
   45: `RepositoryChangeHandler`; 55: `NotebookRepository`.
-- 81: `waitForPendingSaves`; 483: `saveNotebook`;
-  513: `saveNotebookPages`; 721: `updateNotebookMetadata`;
-  1095: `deleteNotebook`.
-- 1236: `encodeNotebookForLocalBackup`; 1239:
-  `encodePageForLocalBackup`.
-- 2079: `_toolFromIndex`; 2087: `_toolToIndex` — muszą pozostać symetryczne.
-- 2132: `DataIntegrityProtectionException`.
+- 81: `waitForPendingSaves`; 141: `fetchNotebooks`;
+  518: `saveNotebook`; zapis stron jest bezpośrednio dalej.
+- 1499: `_readPage`; 1561: `_persistLegacyEraserPages` — migracja masek,
+  po wejściu do kolejki ponownie czyta aktualny stan SQLite.
+- 1921: `_strokeToCompanion`; 2150: `_strokeToJson` — oba blokują
+  utrwalenie eraser-stroke.
+- `_toolFromIndex` i `_toolToIndex` muszą pozostać symetryczne.
 
 ### `lib/features/notebook/presentation/notebook_screen.dart` (24 linie)
 
@@ -353,11 +360,12 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2913 linii)
+### `lib/features/editor/state/editor_controller.dart` (2900 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
-preferencje, viewport i zapis. Przy otwarciu jednorazowo spłaszcza legacy
-stroke'y gumki i zapisuje oczyszczone strony. Rejestruje się w `AppSaveCoordinator`;
+preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
+`addInkStroke` odrzuca próbę zapisania narzędzia gumki jako stroke'a.
+Rejestruje się w `AppSaveCoordinator`;
 `flushPendingSaves` commit'uje aktywną edycję tekstu, anuluje debounce,
 czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
 zgodą na zamknięcie aplikacji. Nowo wstawiony lub wklejony tekst i obraz
@@ -366,7 +374,7 @@ wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
 tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 `isObjectTransformActive` blokuje zmianę viewportu na czas move/resize ramki.
 
-- 36: `LassoSelection`; 75: `EditorController`;
+- 36: `LassoSelection`; 75: `EditorController`; 2359: `addInkStroke`;
   200: `flushPendingSaves`.
 - 259–332: layout i transformacje viewportu; 274: start blokady transformacji,
   290: `setViewTransform`.
@@ -381,7 +389,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2336 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2317 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
@@ -410,7 +418,7 @@ pozostaje tylko pionowo.
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
 - 1535: `_PageViewportClipper`; 1605: `_PageFramePainter`;
-  1712: `_ProjectMiniMapOverlay`; 2064: `_ProjectMiniMapPainter`.
+  minimapa zaczyna się przy 2061 i renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -484,30 +492,24 @@ błędów, integralności i wydajności.
   gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
   używają starego Quilla jako bezpieczny fallback.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4461 linie)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4205 linie)
 
-Dwa świadomie osobne canvasy ink, wspólna geometria, scratch erase, lasso,
-handoff aktywnej kreski i pomiary wydajności. Podczas rysowania
-pen/highlighter overlay stosuje ten sam LOD co zapisany tusz, żeby
-ograniczyć zmianę wyglądu po oderwaniu rysika. Ścieżki pióra i markera
-są wygładzane od trzeciego punktu, bez progu dużego przeskoku wejścia. Oba delegują gumkę do jednego
-`InkEraserEngine`; zwykła gumka destrukcyjnie wycina tylko przejechany
-fragment, a erase-stroke/area usuwają całe stroke'y. Żaden tryb nie zapisuje
-masek gumki w `inkStrokes`. Notebookowe operacje zmieniające ink liczą wynik
-z bieżącego `EditorController.pageAt(...)`, a nie z potencjalnie starego
-`widget.pages`, żeby kolejne gumki i scratch erase nie odtwarzały starego ink.
+Dwa świadomie osobne canvasy ink, wspólna geometria rozpoznawania gestów,
+lasso, handoff aktywnej kreski i pomiary wydajności. Wszystkie modyfikacje
+gumki, włącznie ze scratch erase, delegują dane do jednego
+`InkEraserEngine`. Canvas nie ma już drugiego silnika cięcia, zapisanego
+`BlendMode.clear` ani martwego stanu kursora gumki. Tymczasowy podgląd
+brush/area istnieje tylko podczas aktywnego gestu. Notebookowe operacje
+zmieniające ink zawsze czytają bieżący stan z `EditorController.pageAt(...)`.
+Podczas rysowania pen/highlighter overlay stosuje ten sam LOD co zapisany
+tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
 
-- 45: `_InkPerfLog`; 260–483: cache/LOD/geometria.
-- 584–873: częściowe wymazywanie i rozpoznanie scratch erase.
-- 887: `DrawingCanvas` (board, world = page).
-- 909:
-  `DocumentDrawingCanvas` (notebook, world = document).
-- 1135:
-  `_DrawingCanvasState`;
-  2440:
-  `_DocumentDrawingCanvasState`.
-- 3912: `_InkPainter`; 3970: `_InkOverlayPainter`;
-  4223: `_InkPageLayer`; 4269: `_PageInkPainter`.
+- 45: `_InkPerfLog`; geometria rozpoznawania scratch pozostaje przed
+  deklaracjami canvasów, ale hit-test i cięcie są w `InkEraserEngine`.
+- 658: `DrawingCanvas`; 680: `DocumentDrawingCanvas`.
+- 897: `_DrawingCanvasState`; 2241: `_DocumentDrawingCanvasState`.
+- 3790: `_InkPainter`; 3846: `_InkOverlayPainter`;
+  4107: `_InkPageLayer`; 4153: `_PageInkPainter`.
 
 ### `lib/features/editor/presentation/widgets/page_overlay.dart` (2823 linii)
 
@@ -564,7 +566,7 @@ UI dziedziczą aktywną paletę.
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart` (1079): zapis, ochrona danych i
+- `test/notebook_repository_test.dart` (1141): zapis, migracja legacy gumek, ochrona danych i
   migracja v1→v2 usuwająca dane Index tab bez utraty stron.
 - `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
@@ -579,9 +581,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
-- `test/ink_eraser_engine_test.dart` (150): zwykła gumka
-  dzieląca stroke na fragmenty, erase-stroke/area hit-test, migracja legacy
-  gumek i undo
+- `test/ink_eraser_engine_test.dart` (244): zwykła gumka, scratch erase,
+  erase-stroke/area hit-test, migracja legacy gumek, pojedyncze punkty,
+  kolizje ID i undo
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
 - `test/page_overlay_text_gestures_test.dart` (246): sprawdza blokowy
@@ -622,6 +624,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
    (`poppler-utils`); pozostałe platformy używają `pdfx`.
 8. Obrazy natywne mają trwałe ścieżki; inline `bytes` są przeznaczone dla web
    lub migracji starych danych i są czyszczone po utrwaleniu pliku.
+9. `DrawingTool.eraser*` pozostają w enumie wyłącznie dla zgodności indeksów
+   i wyboru narzędzia. Eraser nie może być zapisanym `InkStroke`; runtime
+   kasuje destrukcyjnie, a legacy maski wolno interpretować tylko w
+   `InkEraserEngine` podczas normalizacji.
 
 ## 12. Komendy
 

@@ -3,15 +3,9 @@ import '../../features/notebook/domain/note_page.dart';
 import '../../features/notebook/domain/notebook.dart';
 
 Notebook flattenErasersForBackup(Notebook notebook) {
-  return notebook.copyWith(
-    pages: notebook.pages.map(flattenPageErasersForBackup).toList(),
-  );
+  return InkEraserEngine.normalizeNotebook(notebook);
 }
 
 NotePage flattenPageErasersForBackup(NotePage page) {
-  final result = InkEraserEngine.flattenLegacyErasers(page.inkStrokes);
-  if (!result.changed) {
-    return page;
-  }
-  return page.copyWith(inkStrokes: result.strokes);
+  return InkEraserEngine.normalizePage(page);
 }

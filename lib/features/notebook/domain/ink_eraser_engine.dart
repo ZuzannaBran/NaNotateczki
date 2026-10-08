@@ -4,6 +4,8 @@ import 'dart:ui';
 import 'drawing_tool.dart';
 import 'ink_spatial_index.dart';
 import 'ink_stroke.dart';
+import 'notebook.dart';
+import 'note_page.dart';
 
 typedef InkStrokeHitTest =
     bool Function(InkStroke stroke, Offset point, double radius);
@@ -34,6 +36,22 @@ class InkBrushEraseResult {
 /// strokes are supported only for one-time flattening of older documents.
 class InkEraserEngine {
   const InkEraserEngine._();
+
+  static NotePage normalizePage(NotePage page) {
+    final result = flattenLegacyErasers(page.inkStrokes);
+    return result.changed ? page.copyWith(inkStrokes: result.strokes) : page;
+  }
+
+  static Notebook normalizeNotebook(Notebook notebook) {
+    var changed = false;
+    final pages = <NotePage>[];
+    for (final page in notebook.pages) {
+      final normalized = normalizePage(page);
+      changed = changed || !identical(normalized, page);
+      pages.add(normalized);
+    }
+    return changed ? notebook.copyWith(pages: pages) : notebook;
+  }
 
   static void collectPointHits({
     required List<InkStroke> strokes,
@@ -96,6 +114,67 @@ class InkEraserEngine {
     return InkBrushEraseResult(strokes: next, changed: changed);
   }
 
+  static int scratchInkHitCount({
+    required List<InkStroke> strokes,
+    required List<InkPoint> gesture,
+    required double radius,
+  }) {
+    if (strokes.isEmpty || gesture.isEmpty || radius <= 0) {
+      return 0;
+    }
+    final gestureOffsets = gesture.map((point) => point.toOffset()).toList();
+    final candidates = inkSpatialIndexFor(
+      strokes,
+    ).query(_pointsBounds(gestureOffsets).inflate(radius));
+    var hits = 0;
+    for (final stroke in candidates) {
+      if (!_canErase(stroke) || stroke.points.length < 2) {
+        continue;
+      }
+      hits += _strokeGestureHitCount(stroke, gestureOffsets, radius);
+    }
+    return hits;
+  }
+
+  static InkBrushEraseResult eraseScratchParts({
+    required List<InkStroke> strokes,
+    required List<InkPoint> gesture,
+    required double radius,
+    required String Function() createId,
+  }) {
+    if (strokes.isEmpty || gesture.isEmpty || radius <= 0) {
+      return InkBrushEraseResult(strokes: strokes, changed: false);
+    }
+    final gestureOffsets = gesture.map((point) => point.toOffset()).toList();
+    final candidateIds = inkSpatialIndexFor(strokes)
+        .query(_pointsBounds(gestureOffsets).inflate(radius))
+        .map((stroke) => stroke.id)
+        .toSet();
+    final next = <InkStroke>[];
+    var changed = false;
+    for (final stroke in strokes) {
+      if (!candidateIds.contains(stroke.id) ||
+          !_canErase(stroke) ||
+          stroke.points.length < 2) {
+        next.add(stroke);
+        continue;
+      }
+      final parts = _splitStrokeAroundGesture(
+        stroke,
+        gestureOffsets,
+        radius,
+        createId,
+      );
+      if (parts == null) {
+        next.add(stroke);
+        continue;
+      }
+      changed = true;
+      next.addAll(parts);
+    }
+    return InkBrushEraseResult(strokes: next, changed: changed);
+  }
+
   static Set<String> areaHits({
     required List<InkStroke> strokes,
     required List<Offset> polygon,
@@ -120,13 +199,23 @@ class InkEraserEngine {
     }
 
     var fragmentIndex = 0;
+    final usedIds = strokes.map((stroke) => stroke.id).toSet();
+    String nextFragmentId(String eraserId) {
+      while (true) {
+        final candidate = '${eraserId}_legacy_${fragmentIndex++}';
+        if (usedIds.add(candidate)) {
+          return candidate;
+        }
+      }
+    }
+
     final flattened = <InkStroke>[];
     for (final stroke in strokes) {
       if (stroke.tool == DrawingTool.eraserBrush) {
         final next = _applyLegacyBrush(
           flattened,
           stroke,
-          () => '${stroke.id}_legacy_${fragmentIndex++}',
+          () => nextFragmentId(stroke.id),
         );
         flattened
           ..clear()
@@ -137,7 +226,7 @@ class InkEraserEngine {
         final next = _applyLegacyArea(
           flattened,
           stroke,
-          () => '${stroke.id}_legacy_${fragmentIndex++}',
+          () => nextFragmentId(stroke.id),
         );
         flattened
           ..clear()
@@ -333,8 +422,13 @@ class InkEraserEngine {
     bool Function(Offset a, Offset b) removeSegment,
     String Function() createId,
   ) {
-    if (!_canErase(stroke) || stroke.points.length < 2) {
+    if (!_canErase(stroke) || stroke.points.isEmpty) {
       return [stroke];
+    }
+    if (stroke.points.length == 1) {
+      return removePoint(stroke.points.single.toOffset())
+          ? <InkStroke>[]
+          : [stroke];
     }
     final points = stroke.points;
     final removed = List<bool>.filled(points.length, false);
@@ -371,6 +465,82 @@ class InkEraserEngine {
     }
     flushRun();
     return parts;
+  }
+
+  static List<InkStroke>? _splitStrokeAroundGesture(
+    InkStroke stroke,
+    List<Offset> gesture,
+    double radius,
+    String Function() createId,
+  ) {
+    final points = stroke.points;
+    final removed = List<bool>.filled(points.length, false);
+    final radiusSquared = radius * radius;
+    for (var index = 0; index < points.length; index++) {
+      if (_distanceSquaredToPolyline(points[index].toOffset(), gesture) <=
+          radiusSquared) {
+        removed[index] = true;
+      }
+    }
+    for (var index = 0; index < points.length - 1; index++) {
+      if (_segmentDistanceSquaredToPolyline(
+            points[index].toOffset(),
+            points[index + 1].toOffset(),
+            gesture,
+          ) <=
+          radiusSquared) {
+        removed[index] = true;
+        removed[index + 1] = true;
+      }
+    }
+    if (!removed.contains(true)) {
+      return null;
+    }
+
+    final parts = <InkStroke>[];
+    var run = <InkPoint>[];
+    void flushRun() {
+      if (run.length >= 2) {
+        parts.add(stroke.copyWith(id: createId(), points: List.of(run)));
+      }
+      run = <InkPoint>[];
+    }
+
+    for (var index = 0; index < points.length; index++) {
+      if (removed[index]) {
+        flushRun();
+      } else {
+        run.add(points[index]);
+      }
+    }
+    flushRun();
+    return parts;
+  }
+
+  static int _strokeGestureHitCount(
+    InkStroke stroke,
+    List<Offset> gesture,
+    double radius,
+  ) {
+    final radiusSquared = radius * radius;
+    var hits = 0;
+    for (final point in stroke.points) {
+      if (_distanceSquaredToPolyline(point.toOffset(), gesture) <=
+          radiusSquared) {
+        hits++;
+      }
+    }
+    for (var index = 0; index < stroke.points.length - 1; index++) {
+      if (_segmentDistanceSquaredToPolyline(
+            stroke.points[index].toOffset(),
+            stroke.points[index + 1].toOffset(),
+            gesture,
+          ) <=
+          radiusSquared) {
+        hits++;
+      }
+    }
+    return hits;
   }
 
   static bool _canErase(InkStroke stroke) {

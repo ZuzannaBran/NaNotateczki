@@ -101,6 +101,67 @@ void main() {
     expect(savedSecond?.pages.single.id, second.pages.single.id);
   });
 
+  test(
+    'fetch migrates stored legacy eraser masks out of the database',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final notebook = await repository.createNotebook();
+      final pageId = notebook.pages.single.id;
+
+      await database.into(database.inkStrokeRows).insert(
+        InkStrokeRowsCompanion.insert(
+          uid: 'legacy-line',
+          pageUid: pageId,
+          colorValue: const Color(0xFF000000).toARGB32(),
+          width: 2,
+          toolIndex: DrawingTool.pen.index,
+          pointsJson:
+              '[{"dx":0,"dy":0,"pressure":1},'
+              '{"dx":10,"dy":0,"pressure":1},'
+              '{"dx":20,"dy":0,"pressure":1},'
+              '{"dx":30,"dy":0,"pressure":1}]',
+          sortIndex: 0,
+        ),
+      );
+      await database.into(database.inkStrokeRows).insert(
+        InkStrokeRowsCompanion.insert(
+          uid: 'legacy-eraser',
+          pageUid: pageId,
+          colorValue: const Color(0xFFFFFFFF).toARGB32(),
+          width: 8,
+          toolIndex: DrawingTool.eraserBrush.index,
+          pointsJson:
+              '[{"dx":10,"dy":-5,"pressure":1},'
+              '{"dx":10,"dy":5,"pressure":1}]',
+          sortIndex: 1,
+        ),
+      );
+
+      final fetched = await repository.fetchNotebooks();
+      expect(
+        fetched.single.pages.single.inkStrokes.any(
+          (stroke) => stroke.tool.isEraser,
+        ),
+        isFalse,
+      );
+
+      final storedRows = await (database.select(
+        database.inkStrokeRows,
+      )..where((row) => row.pageUid.equals(pageId))).get();
+      expect(
+        storedRows.any(
+          (row) =>
+              row.toolIndex == DrawingTool.eraserBrush.index ||
+              row.toolIndex == DrawingTool.eraserStroke.index ||
+              row.toolIndex == DrawingTool.eraserArea.index,
+        ),
+        isFalse,
+      );
+    },
+  );
+
   test('portable backup detects checksum-preserving JSON corruption', () {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);

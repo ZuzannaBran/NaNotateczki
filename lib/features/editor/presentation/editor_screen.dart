@@ -2189,9 +2189,8 @@ class _ProjectMiniMapPainter extends CustomPainter {
         );
       }
 
-      canvas.saveLayer(pageRect, Paint());
       for (final stroke in page.inkStrokes) {
-        if (stroke.points.isEmpty) {
+        if (stroke.points.isEmpty || stroke.tool.isEraser) {
           continue;
         }
         final paint = Paint()
@@ -2202,20 +2201,9 @@ class _ProjectMiniMapPainter extends CustomPainter {
             0.38,
             1.45,
           );
-        if (stroke.tool == DrawingTool.eraserArea) {
-          paint
-            ..color = Colors.transparent
-            ..blendMode = BlendMode.clear
-            ..style = PaintingStyle.fill;
-        } else if (stroke.tool == DrawingTool.eraserBrush) {
-          paint
-            ..color = Colors.transparent
-            ..blendMode = BlendMode.clear;
-        } else {
-          paint.color = stroke.tool == DrawingTool.highlighter
-              ? stroke.color.withValues(alpha: 0.24)
-              : stroke.color.withValues(alpha: 0.88);
-        }
+        paint.color = stroke.tool == DrawingTool.highlighter
+            ? stroke.color.withValues(alpha: 0.24)
+            : stroke.color.withValues(alpha: 0.88);
 
         if (stroke.points.length == 1) {
           final point = pagePointToMap(stroke.points.first.toOffset());
@@ -2230,13 +2218,8 @@ class _ProjectMiniMapPainter extends CustomPainter {
           final point = pagePointToMap(stroke.points[j].toOffset());
           path.lineTo(point.dx, point.dy);
         }
-        if (stroke.tool == DrawingTool.eraserArea) {
-          canvas.drawPath(path..close(), paint);
-        } else {
-          canvas.drawPath(path, paint);
-        }
+        canvas.drawPath(path, paint);
       }
-      canvas.restore();
 
       canvas.restore();
     }
