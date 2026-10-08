@@ -77,8 +77,10 @@ timing, filesystem and GPU behavior from physical hardware.
 - Same startup integration test runs in Chrome and on Android/iOS simulators
   on pushes to `dev`.
 - Release builds validate compilation of every desktop/web platform.
-- Windows CI pins CMake 3.31 to accommodate the old pdfx/pdfium CMake project;
-  upgrading pdfx for current CMake still needs a separate compatibility review.
+- Windows runner uses modern CMake. The root `windows/CMakeLists.txt` sets
+  `CMAKE_POLICY_VERSION_MINIMUM=3.5` for CMake 4 child processes invoked by
+  legacy `pdfx/pdfium`. A runner test must confirm that this workaround builds
+  the application; an upstream pdfx update is the long-term fix.
 
 ## Still required before declaring release-level cross-platform coverage
 

@@ -568,6 +568,9 @@ Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 
 ## 10. Platformy, web i testy
 
+- `windows/CMakeLists.txt`: zgodność generatora pdfx/pdfium z CMake 4; przed
+  włączeniem pluginów ustawia `CMAKE_POLICY_VERSION_MINIMUM=3.5` dla
+  potomnych procesów CMake, bez obniżania wersji dla reszty projektu.
 - `linux/runner/my_application.cc` (301): GTK runner i kanał przycisku rysika.
   10: `_MyApplication`; 65–134: zdarzenia rysika;
   153: `my_application_activate`.

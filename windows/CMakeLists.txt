@@ -53,6 +53,13 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 add_subdirectory("runner")
 
 
+# Third-party pdfx/pdfium bootstrap still declares CMake compatibility below
+# 3.5. CMake 4 removes that compatibility mode. The environment variable
+# also propagates to CMake subprocesses launched by the plugin.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")
+  set(ENV{CMAKE_POLICY_VERSION_MINIMUM} "3.5")
+endif()
+
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
