@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/rendering.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
 
-enum ObjectTransformKind { move, resize, rotate }
+enum ObjectTransformKind { move, resize }
 
 class ObjectTransformSnapshot {
   const ObjectTransformSnapshot({
@@ -69,22 +69,7 @@ class ObjectTransformEngine {
     );
   }
 
-  void beginRotate({
-    required Rect rect,
-    required double rotation,
-    required Offset pointer,
-  }) {
-    _begin(
-      _ObjectTransformSession(
-        kind: ObjectTransformKind.rotate,
-        initialRect: rect,
-        initialRotation: rotation,
-        pointerStart: pointer,
-      ),
-    );
-  }
-
-  ObjectTransformSnapshot update(Offset pointer, {bool snapRotation = false}) {
+  ObjectTransformSnapshot update(Offset pointer) {
     final session = _session;
     if (session == null) {
       throw StateError('ObjectTransformEngine.update called without begin');
@@ -93,11 +78,6 @@ class ObjectTransformEngine {
     final preview = switch (session.kind) {
       ObjectTransformKind.move => _move(session, pointer),
       ObjectTransformKind.resize => _resize(session, pointer),
-      ObjectTransformKind.rotate => _rotate(
-        session,
-        pointer,
-        snapRotation: snapRotation,
-      ),
     };
     _lastPreview = preview;
     return preview;
@@ -279,37 +259,7 @@ class ObjectTransformEngine {
     return Rect.fromCenter(center: rect.center, width: width, height: height);
   }
 
-  ObjectTransformSnapshot _rotate(
-    _ObjectTransformSession session,
-    Offset pointer, {
-    required bool snapRotation,
-  }) {
-    final center = session.initialRect.center;
-    final startVector = session.pointerStart - center;
-    final currentVector = pointer - center;
-    if (startVector.distanceSquared <= 1e-9 ||
-        currentVector.distanceSquared <= 1e-9) {
-      return ObjectTransformSnapshot(
-        kind: ObjectTransformKind.rotate,
-        rect: session.initialRect,
-        rotation: session.initialRotation,
-      );
-    }
 
-    final startAngle = math.atan2(startVector.dy, startVector.dx);
-    final currentAngle = math.atan2(currentVector.dy, currentVector.dx);
-    var rotation = session.initialRotation + currentAngle - startAngle;
-    if (snapRotation) {
-      const snap = math.pi / 12;
-      rotation = (rotation / snap).round() * snap;
-    }
-
-    return ObjectTransformSnapshot(
-      kind: ObjectTransformKind.rotate,
-      rect: session.initialRect,
-      rotation: _normalizeAngle(rotation),
-    );
-  }
 }
 
 class _ObjectTransformSession {
@@ -412,13 +362,3 @@ Offset _rotate(Offset value, double angle) {
 }
 
 double _dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
-
-double _normalizeAngle(double angle) {
-  while (angle <= -math.pi) {
-    angle += math.pi * 2;
-  }
-  while (angle > math.pi) {
-    angle -= math.pi * 2;
-  }
-  return angle;
-}

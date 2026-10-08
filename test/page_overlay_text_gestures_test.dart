@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/features/editor/presentation/interaction/object_transform_engine.dart';
 import 'package:program/features/editor/presentation/widgets/object_transform_hud.dart';
 import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
 import 'package:program/features/editor/presentation/widgets/text_edit_toolbar.dart';
@@ -35,6 +36,81 @@ void main() {
     expect(medium, greaterThan(small));
     expect(large, greaterThan(medium));
     expect(large, 80);
+  });
+
+  testWidgets('top resize and move hit areas meet halfway for every size', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1150));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    for (final size in [
+      const Size(24, 24),
+      const Size(80, 40),
+      const Size(320, 120),
+      const Size(900, 700),
+    ]) {
+      ObjectTransformKind? lastKind;
+      final rect = Rect.fromLTWH(140, 200, size.width, size.height);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                ObjectTransformHud<int>(
+                  data: 1,
+                  rect: rect,
+                  rotation: 0,
+                  onPreview: (_, preview) => lastKind = preview.kind,
+                  onCommit: (_, _) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final topHandle = tester.getRect(
+        find.byKey(const ValueKey('object-transform-top-hit-zone')),
+      );
+      final moveHandle = tester.getRect(
+        find.byKey(const ValueKey('object-transform-move-hit-zone')),
+      );
+      final topLeft = tester.getRect(
+        find.byKey(const ValueKey('object-transform-topLeft-hit-zone')),
+      );
+      final topRight = tester.getRect(
+        find.byKey(const ValueKey('object-transform-topRight-hit-zone')),
+      );
+      final midpoint =
+          rect.top - const ObjectTransformHudStyle().moveHandleOffset / 2;
+      expect(moveHandle.bottom, closeTo(midpoint, 0.01));
+      expect(topHandle.top, closeTo(midpoint, 0.01));
+      expect(topLeft.top, closeTo(midpoint, 0.01));
+      expect(topRight.top, closeTo(midpoint, 0.01));
+      expect(moveHandle.bottom, lessThanOrEqualTo(topHandle.top));
+
+      final grab = await tester.startGesture(
+        Offset(rect.center.dx, midpoint - 2),
+      );
+      await grab.moveBy(const Offset(4, 0));
+      await tester.pump();
+      expect(lastKind, ObjectTransformKind.move);
+      await grab.up();
+      await tester.pump();
+
+      final resize = await tester.startGesture(
+        Offset(rect.center.dx, midpoint + 2),
+      );
+      await resize.moveBy(const Offset(0, -4));
+      await tester.pump();
+      expect(lastKind, ObjectTransformKind.resize);
+      await resize.up();
+      await tester.pump();
+    }
+
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('block text toolbar applies only supported formatting', (

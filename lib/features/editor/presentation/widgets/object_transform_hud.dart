@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
 
 import '../interaction/object_transform_engine.dart';
@@ -22,11 +21,9 @@ class ObjectTransformHudStyle {
     this.moveHandleHeight = 16,
     this.moveHandleHitSize = 32,
     this.moveHandleOffset = 32,
-    this.rotationHandleSize = 20,
     this.handleHitSize = 32,
     this.maxHandleHitSize = 80,
     this.handleHitScale = 0.35,
-    this.rotationHandleOffset = 30,
     this.frameWidth = 1.25,
   });
 
@@ -39,11 +36,9 @@ class ObjectTransformHudStyle {
   final double moveHandleHeight;
   final double moveHandleHitSize;
   final double moveHandleOffset;
-  final double rotationHandleSize;
   final double handleHitSize;
   final double maxHandleHitSize;
   final double handleHitScale;
-  final double rotationHandleOffset;
   final double frameWidth;
 
   double handleHitSizeForRect(Rect rect, {double? minimum}) {
@@ -70,7 +65,6 @@ class ObjectTransformHud<T> extends StatefulWidget {
     this.resizeClampingRectResolver,
     this.enabledHandles = const {...HandlePosition.values},
     this.draggable = true,
-    this.rotatable = true,
     this.interactive = true,
     this.showFrame = true,
     this.showHandles = true,
@@ -95,7 +89,6 @@ class ObjectTransformHud<T> extends StatefulWidget {
   final ObjectClampingRectResolver? resizeClampingRectResolver;
   final Set<HandlePosition> enabledHandles;
   final bool draggable;
-  final bool rotatable;
   final bool interactive;
   final bool showFrame;
   final bool showHandles;
@@ -196,14 +189,6 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
                     fillColor: handleFill,
                     scale: scale,
                   ),
-              if (widget.rotatable)
-                _buildRotationHandle(
-                  rect: rect,
-                  rotation: rotation,
-                  frameColor: frameColor,
-                  fillColor: handleFill,
-                  scale: scale,
-                ),
             ],
           ],
         ),
@@ -258,9 +243,19 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
         ) /
         scale;
 
+    final boundary =
+        topCenter.dy - widget.style.moveHandleOffset / (2 * scale);
+    final hitRect = Rect.fromLTRB(
+      point.dx - hitSize / 2,
+      math.min(point.dy - hitSize / 2, boundary - 1),
+      point.dx + hitSize / 2,
+      boundary,
+    );
+
     return _positionedHandle(
       point: point,
-      hitSize: hitSize,
+      hitRect: hitRect,
+      hitTestKey: const ValueKey('object-transform-move-hit-zone'),
       cursor: SystemMouseCursors.grab,
       onPointerDown: (position) {
         _beginMove(rect, rotation, position);
@@ -300,7 +295,15 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     final hitSize = widget.style.handleHitSizeForRect(rect) / scale;
     return _positionedHandle(
       point: point,
-      hitSize: hitSize,
+      hitRect: _resizeHitRect(
+        rect: rect,
+        rotation: rotation,
+        handle: handle,
+        point: point,
+        hitSize: hitSize,
+        scale: scale,
+      ),
+      hitTestKey: ValueKey('object-transform-${handle.name}-hit-zone'),
       cursor: _cursorForHandle(handle),
       onPointerDown: (position) {
         _beginResize(handle, rect, rotation, position);
@@ -329,7 +332,15 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     final hitSize = widget.style.handleHitSizeForRect(rect) / scale;
     return _positionedHandle(
       point: point,
-      hitSize: hitSize,
+      hitRect: _resizeHitRect(
+        rect: rect,
+        rotation: rotation,
+        handle: handle,
+        point: point,
+        hitSize: hitSize,
+        scale: scale,
+      ),
+      hitTestKey: ValueKey('object-transform-${handle.name}-hit-zone'),
       cursor: _cursorForHandle(handle),
       onPointerDown: (position) {
         _beginResize(handle, rect, rotation, position);
@@ -348,71 +359,48 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     );
   }
 
-  Widget _buildRotationHandle({
+  Rect _resizeHitRect({
     required Rect rect,
     required double rotation,
-    required Color frameColor,
-    required Color fillColor,
+    required HandlePosition handle,
+    required Offset point,
+    required double hitSize,
     required double scale,
   }) {
     final topCenter = _pointForHandle(rect, rotation, HandlePosition.top);
-    final outward = _rotate(const Offset(0, -1), rotation);
-    final point =
-        topCenter + outward * (widget.style.rotationHandleOffset / scale);
-    final hitSize = widget.style.handleHitSizeForRect(rect) / scale;
-
-    return _positionedHandle(
-      point: point,
-      hitSize: hitSize,
-      cursor: SystemMouseCursors.grab,
-      onPointerDown: (position) {
-        widget.onTransformStart?.call();
-        _gestureData = widget.data;
-        _engine.beginRotate(
-          rect: rect,
-          rotation: rotation,
-          pointer: _globalToLocal(position),
-        );
-      },
-      child: Container(
-        width: widget.style.rotationHandleSize / scale,
-        height: widget.style.rotationHandleSize / scale,
-        decoration: BoxDecoration(
-          color: fillColor,
-          shape: BoxShape.circle,
-          border: Border.all(color: frameColor, width: 1.2 / scale),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 2 / scale,
-              offset: Offset(0, 1 / scale),
-            ),
-          ],
-        ),
-        child: Icon(
-          Icons.rotate_right,
-          color: frameColor,
-          size: widget.style.rotationHandleSize * 0.62 / scale,
-        ),
-      ),
+    final boundary =
+        topCenter.dy - widget.style.moveHandleOffset / (2 * scale);
+    final top = switch (handle) {
+      HandlePosition.topLeft ||
+      HandlePosition.top ||
+      HandlePosition.topRight => boundary,
+      _ => math.max(point.dy - hitSize / 2, boundary),
+    };
+    return Rect.fromLTRB(
+      point.dx - hitSize / 2,
+      top,
+      point.dx + hitSize / 2,
+      math.max(point.dy + hitSize / 2, top + 1),
     );
   }
 
   Widget _positionedHandle({
     required Offset point,
-    required double hitSize,
+    required Rect hitRect,
+    required Key hitTestKey,
     required MouseCursor cursor,
     required ValueChanged<Offset> onPointerDown,
     required Widget child,
   }) {
     return Positioned(
-      left: point.dx - hitSize / 2,
-      top: point.dy - hitSize / 2,
-      width: hitSize,
-      height: hitSize,
+      left: hitRect.left,
+      top: hitRect.top,
+      width: hitRect.width,
+      height: hitRect.height,
       child: MouseRegion(
         cursor: cursor,
         child: Listener(
+          key: hitTestKey,
           behavior: HitTestBehavior.opaque,
           onPointerDown: (event) {
             if (_activeHandlePointer != null) {
@@ -441,7 +429,10 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
             _activeHandlePointer = null;
             _cancelGesture();
           },
-          child: Center(child: child),
+          child: Transform.translate(
+            offset: point - hitRect.center,
+            child: Center(child: child),
+          ),
         ),
       ),
     );
@@ -483,10 +474,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     if (!_engine.isActive) {
       return;
     }
-    final preview = _engine.update(
-      _globalToLocal(globalPosition),
-      snapRotation: HardwareKeyboard.instance.isShiftPressed,
-    );
+    final preview = _engine.update(_globalToLocal(globalPosition));
     setState(() {
       _preview = preview;
     });

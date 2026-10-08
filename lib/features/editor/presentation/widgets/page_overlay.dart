@@ -274,7 +274,6 @@ class _ActiveImageTransformHud extends StatelessWidget {
       rect: visibleRect,
       rotation: block.rotation,
       interactive: interactionEnabled,
-      rotatable: false,
       enabledHandles: const {...HandlePosition.values},
       resizeModeResolver: (handle) {
         return handle.isDiagonal ? ResizeMode.scale : ResizeMode.freeform;
@@ -374,8 +373,7 @@ ImageBlock _imageBlockFromTransform(
   final initialVisible = _visibleImageRect(before, worldOrigin);
   final nextWorldRect = preview.rect.shift(worldOrigin);
 
-  if (preview.kind == ObjectTransformKind.move ||
-      preview.kind == ObjectTransformKind.rotate) {
+  if (preview.kind == ObjectTransformKind.move) {
     final initialWorldTopLeft = initialVisible.topLeft + worldOrigin;
     final delta = nextWorldRect.topLeft - initialWorldTopLeft;
     return before.copyWith(

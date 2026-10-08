@@ -460,14 +460,14 @@ błędów, integralności i wydajności.
   ponieważ obecny `EditableText` nie renderuje ich jako rich-text.
   9: `TextEditToolbar`; 43: `build`.
 
-- `lib/features/editor/presentation/interaction/object_transform_engine.dart` (424):
-  wspólny silnik move/resize/rotate dla obiektów nie-ink. Używa typów
+- `lib/features/editor/presentation/interaction/object_transform_engine.dart` (364):
+  wspólny silnik move/resize dla obiektów nie-ink. Używa typów
   `HandlePosition` i `ResizeMode` z `flutter_box_transform`, ale po zmianach
-  API 0.4.7 sam liczy geometrię logiczną, clamp, skalowanie i obrót, dzięki
+  API 0.4.7 sam liczy geometrię logiczną, clamp i skalowanie, dzięki
   czemu działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
   6: `ObjectTransformKind`; 8: `ObjectTransformSnapshot`;
-  24: `ObjectTransformEngine`; 315: `_ObjectTransformSession`.
-- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (664):
+  24: `ObjectTransformEngine`; 265: `_ObjectTransformSession`.
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (647):
   wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
   `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform`
   oraz wspólnego grabbera nad górną krawędzią do przesuwania obiektu.
@@ -475,14 +475,18 @@ błędów, integralności i wydajności.
   np. podczas aktywnej edycji tekstu. Dedykowane uchwyty używają surowych
   pointer events zamiast rozpoznawania pan, więc reagują od pierwszego ruchu
   bez systemowego touch slop. Niewidzialny hit-area skaluje się liniowo z
-  rozmiarem ramki przez sqrt(width*height), z zakresem 32–80 px.
+  rozmiarem ramki przez sqrt(width*height), z zakresem 32–80 px. Górne
+  uchwyty resize oraz uchwyt move mają rozdzielone strefy dotyku dokładnie
+  w połowie odstępu między górną krawędzią a grabberem, niezależnie od
+  rozmiaru ramki. Interaktywny obrót i przycisk rotate są usunięte,
+  a zapisane historycznie kąty pozostają odczytywane.
   Udostępnia callbacki startu i końca transformacji, dzięki którym warstwa
   obiektu blokuje viewport dokładnie na czas move/resize; dispose aktywnego
   HUD-u również zwalnia blokadę. Kolor, rozmiary i grubość ramki są
   konfigurowalne przez `ObjectTransformHudStyle`.
-  14: `ObjectTransformHudStyle`; 59: `ObjectTransformHud`;
-  113: `_ObjectTransformHudState`; 610: `_ObjectTransformFramePainter`.
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (511):
+  13: `ObjectTransformHudStyle`; 54: `ObjectTransformHud`;
+  106: `_ObjectTransformHudState`; 593: `_ObjectTransformFramePainter`.
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (510):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
   jest wyłączony. Podczas edycji treści uchwyty resize i osobny grabber move
@@ -511,7 +515,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
 - 3790: `_InkPainter`; 3846: `_InkOverlayPainter`;
   4107: `_InkPageLayer`; 4153: `_PageInkPainter`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2823 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2821 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText` oraz wspólny `ObjectTransformHud` dla
@@ -589,14 +593,15 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   kolizje ID i undo
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/page_overlay_text_gestures_test.dart` (246): sprawdza blokowy
+- `test/page_overlay_text_gestures_test.dart` (317): sprawdza blokowy
   toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
+  dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
 - `test/board_scene_bounds_test.dart`: stały układ współrzędnych boarda
   podczas resize/move i odblokowanie granic po gestach.
-- `test/object_transform_engine_test.dart` (68): wspólna geometria
-  move, corner-scale, side-resize i snap rotacji dla globalnego HUD-u
+- `test/object_transform_engine_test.dart` (71): wspólna geometria
+  move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 

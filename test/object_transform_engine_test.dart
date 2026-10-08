@@ -53,16 +53,19 @@ void main() {
     expect(preview.rect.left, closeTo(10, 0.001));
   });
 
-  test('rotation can snap to fifteen degree increments', () {
+  test('moving a stored element preserves legacy rotation', () {
     final engine = ObjectTransformEngine();
-    final rect = Rect.fromLTWH(0, 0, 200, 80);
-    final start = rect.topCenter;
-    const target = Offset(190, -30);
+    final rect = Rect.fromLTWH(10, 20, 200, 80);
+    final rotation = math.pi / 6;
 
-    engine.beginRotate(rect: rect, rotation: 0, pointer: start);
-    final preview = engine.update(target, snapRotation: true);
-    final degrees = preview.rotation * 180 / math.pi;
+    engine.beginMove(
+      rect: rect,
+      rotation: rotation,
+      pointer: rect.center,
+    );
+    final preview = engine.update(rect.center + const Offset(20, 10));
 
-    expect(degrees / 15, closeTo((degrees / 15).roundToDouble(), 0.001));
+    expect(preview.kind, ObjectTransformKind.move);
+    expect(preview.rotation, rotation);
   });
 }
