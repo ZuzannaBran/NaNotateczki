@@ -86,7 +86,7 @@ jobs:
         run: flutter test test/production/export_render_test.dart --reporter expanded --timeout 2m
 
   web:
-    name: Chrome, WASM/IndexedDB and web bootstrap
+    name: Chrome, JavaScript/IndexedDB and web bootstrap
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -218,7 +218,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build apk --debug
-      - name: Build production APK without signing for distribution
+      - name: Compile Android Release APK (distribution signing not verified)
         if: ${{ !cancelled() }}
         run: flutter build apk --release
 
@@ -244,6 +244,9 @@ jobs:
           test -f "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
           grep -q "Pods.xcodeproj" Runner.xcworkspace/contents.xcworkspacedata
       - run: flutter build ios --simulator --no-codesign
+      - name: Compile unsigned iOS device Release
+        if: ${{ !cancelled() }}
+        run: flutter build ios --release --no-codesign
 
   android-emulator:
     name: Android - real emulator end-to-end
@@ -310,7 +313,7 @@ jobs:
           pod install
           test -f "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
           grep -q "Pods.xcodeproj" Runner.xcworkspace/contents.xcworkspacedata
-      - name: Boot an available iPhone simulator
+      - name: Boot an available simulator for the selected device
         shell: bash
         run: |
           SIMULATOR_UDID=$(xcrun simctl list devices available -j \
