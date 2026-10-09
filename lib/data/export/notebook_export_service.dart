@@ -44,8 +44,9 @@ class NotebookExportService {
 
   static Future<String?> exportController(
     EditorController controller,
-    NotebookExportFormat format,
-  ) {
+    NotebookExportFormat format, {
+    bool darkMode = false,
+  }) {
     final pageSize = controller.layoutPageSize == Size.zero
         ? _fallbackPageSize
         : controller.layoutPageSize;
@@ -56,6 +57,7 @@ class NotebookExportService {
       pageSize: pageSize,
       pageGap: controller.layoutPageGap,
       background: controller.currentBackgroundSettings,
+      darkMode: darkMode,
     );
   }
 
@@ -65,6 +67,7 @@ class NotebookExportService {
     required Size pageSize,
     double pageGap = 0.0,
     PageBackgroundSettings background = const PageBackgroundSettings(),
+    bool darkMode = false,
   }) async {
     final normalizedNotebook = InkEraserEngine.normalizeNotebook(notebook);
     final baseName = _fileNameBase(normalizedNotebook.title);
@@ -76,6 +79,7 @@ class NotebookExportService {
           pageGap,
           baseName,
           background,
+          darkMode,
         );
       case NotebookExportFormat.png:
         return _exportPng(
@@ -84,6 +88,7 @@ class NotebookExportService {
           pageGap,
           baseName,
           background,
+          darkMode,
         );
     }
   }
@@ -103,8 +108,15 @@ class NotebookExportService {
     double pageGap,
     String baseName,
     PageBackgroundSettings background,
+    bool darkMode,
   ) async {
-    final bytes = await _buildPdfBytes(notebook, pageSize, pageGap, background);
+    final bytes = await _buildPdfBytes(
+      notebook,
+      pageSize,
+      pageGap,
+      background,
+      darkMode,
+    );
     return _saveBytesAs(
       dialogTitle: 'Save PDF export',
       fileName: '$baseName.pdf',
@@ -119,6 +131,7 @@ class NotebookExportService {
     required Size pageSize,
     double pageGap = 0.0,
     PageBackgroundSettings background = const PageBackgroundSettings(),
+    bool darkMode = false,
   }) async {
     final normalized = InkEraserEngine.normalizeNotebook(notebook);
     final pages = await _renderNotebook(
@@ -126,6 +139,7 @@ class NotebookExportService {
       pageSize,
       pageGap,
       background,
+      darkMode,
     );
     return [for (final page in pages) page.bytes];
   }
@@ -136,12 +150,14 @@ class NotebookExportService {
     required Size pageSize,
     double pageGap = 0.0,
     PageBackgroundSettings background = const PageBackgroundSettings(),
+    bool darkMode = false,
   }) {
     return _buildPdfBytes(
       InkEraserEngine.normalizeNotebook(notebook),
       pageSize,
       pageGap,
       background,
+      darkMode,
     );
   }
 
@@ -150,6 +166,7 @@ class NotebookExportService {
     Size pageSize,
     double pageGap,
     PageBackgroundSettings background,
+    bool darkMode,
   ) async {
     final pdf = pw.Document();
     final pages = await _renderNotebook(
@@ -157,6 +174,7 @@ class NotebookExportService {
       pageSize,
       pageGap,
       background,
+      darkMode,
     );
     for (final page in pages) {
       pdf.addPage(
@@ -177,12 +195,14 @@ class NotebookExportService {
     double pageGap,
     String baseName,
     PageBackgroundSettings background,
+    bool darkMode,
   ) async {
     final pages = await _renderNotebook(
       notebook,
       pageSize,
       pageGap,
       background,
+      darkMode,
     );
     if (pages.length == 1) {
       return _saveBytesAs(
@@ -284,6 +304,7 @@ class NotebookExportService {
     Size pageSize,
     double pageGap,
     PageBackgroundSettings background,
+    bool darkMode,
   ) async {
     if (notebook.kind == NotebookKind.board) {
       final page = notebook.pages.isEmpty ? _emptyPage() : notebook.pages.first;
@@ -296,6 +317,7 @@ class NotebookExportService {
         safeBounds.size,
         origin: safeBounds.topLeft,
         background: background,
+        darkMode: darkMode,
       );
       return [_RenderedPage(bytes: bytes, size: safeBounds.size)];
     }
@@ -310,6 +332,7 @@ class NotebookExportService {
         origin: origin,
         strokeOrigin: Offset.zero,
         background: background,
+        darkMode: darkMode,
       );
       rendered.add(_RenderedPage(bytes: bytes, size: pageSize));
     }
@@ -318,6 +341,7 @@ class NotebookExportService {
         _emptyPage(),
         pageSize,
         background: background,
+        darkMode: darkMode,
       );
       rendered.add(_RenderedPage(bytes: bytes, size: pageSize));
     }
@@ -330,14 +354,20 @@ class NotebookExportService {
     Offset origin = Offset.zero,
     Offset? strokeOrigin,
     required PageBackgroundSettings background,
+    required bool darkMode,
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.scale(_pixelRatio);
-    _paintBackground(canvas, size, origin, background);
+    _paintBackground(canvas, size, origin, background, darkMode);
     await _paintImages(canvas, page.imageBlocks, origin);
-    _paintTextBlocks(canvas, page.textBlocks, origin);
-    _paintStrokes(canvas, page.inkStrokes, strokeOrigin ?? origin, size);
+    _paintTextBlocks(canvas, page.textBlocks, origin, darkMode);
+    _paintStrokes(
+      canvas,
+      page.inkStrokes,
+      strokeOrigin ?? origin,
+      darkMode,
+    );
     final picture = recorder.endRecording();
     final image = await picture.toImage(
       math.max(1, (size.width * _pixelRatio).ceil()),
@@ -357,8 +387,13 @@ class NotebookExportService {
     Size size,
     Offset origin,
     PageBackgroundSettings settings,
+    bool darkMode,
   ) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = AppColors.paper);
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..color = darkMode ? AppColors.darkPaper : AppColors.paper,
+    );
     if (settings.style == PageBackgroundStyle.blank) {
       return;
     }
@@ -368,7 +403,9 @@ class NotebookExportService {
       PageBackgroundSettings.maxSpacing,
     );
     final paint = Paint()
-      ..color = const Color(0xFFD2D6DC)
+      ..color = darkMode
+          ? AppColors.darkOutline.withValues(alpha: 0.55)
+          : const Color(0xFFD2D6DC)
       ..strokeWidth = 1.0;
 
     double firstLine(double offset) {
@@ -422,23 +459,33 @@ class NotebookExportService {
     Canvas canvas,
     List<TextBlock> blocks,
     Offset origin,
+    bool darkMode,
   ) {
     for (final block in blocks) {
       final painter = TextPainter(
-        text: TextSpan(children: _textSpans(block)),
+        text: TextSpan(children: _textSpans(block, darkMode)),
         textDirection: TextDirection.ltr,
       )..layout(maxWidth: block.width);
       painter.paint(canvas, block.position - origin + const Offset(6, 4));
     }
   }
 
-  static List<TextSpan> _textSpans(TextBlock block) {
+  static List<TextSpan> _textSpans(
+    TextBlock block,
+    bool darkMode,
+  ) {
     final decoded = _decodeDelta(block.deltaJson);
     if (decoded == null) {
       return [
         TextSpan(
           text: block.text,
-          style: TextStyle(color: block.color, fontSize: block.fontSize),
+          style: TextStyle(
+            color: AppColors.displayInkColor(
+              block.color,
+              darkMode: darkMode,
+            ),
+            fontSize: block.fontSize,
+          ),
         ),
       ];
     }
@@ -456,7 +503,10 @@ class NotebookExportService {
         TextSpan(
           text: insert,
           style: TextStyle(
-            color: _colorFromQuill(attrs['color']) ?? block.color,
+            color: AppColors.displayInkColor(
+              _colorFromQuill(attrs['color']) ?? block.color,
+              darkMode: darkMode,
+            ),
             fontSize: _fontSizeFromQuill(attrs['size']) ?? block.fontSize,
             fontWeight: attrs['bold'] == true ? FontWeight.bold : null,
             fontStyle: attrs['italic'] == true ? FontStyle.italic : null,
@@ -471,7 +521,13 @@ class NotebookExportService {
     return [
       TextSpan(
         text: block.text,
-        style: TextStyle(color: block.color, fontSize: block.fontSize),
+        style: TextStyle(
+            color: AppColors.displayInkColor(
+              block.color,
+              darkMode: darkMode,
+            ),
+            fontSize: block.fontSize,
+          ),
       ),
     ];
   }
@@ -495,14 +551,19 @@ class NotebookExportService {
     Canvas canvas,
     List<InkStroke> strokes,
     Offset origin,
-    Size size,
+    bool darkMode,
   ) {
     for (final stroke in strokes) {
-      _paintStroke(canvas, stroke, origin);
+      _paintStroke(canvas, stroke, origin, darkMode);
     }
   }
 
-  static void _paintStroke(Canvas canvas, InkStroke stroke, Offset origin) {
+  static void _paintStroke(
+    Canvas canvas,
+    InkStroke stroke,
+    Offset origin,
+    bool darkMode,
+  ) {
     if (stroke.points.isEmpty || stroke.tool.isEraser) {
       return;
     }
@@ -513,7 +574,10 @@ class NotebookExportService {
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke.width
-      ..color = _strokeColor(stroke.color, stroke.tool);
+      ..color = _strokeColor(
+        AppColors.displayInkColor(stroke.color, darkMode: darkMode),
+        stroke.tool,
+      );
 
     final path = _buildInkPath(stroke.points, stroke.tool, origin);
     canvas.drawPath(path, paint);
