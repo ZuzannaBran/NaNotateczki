@@ -90,7 +90,7 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 
 ### Wejście i preferencje
 
-- `lib/core/input/app_preferences_controller.dart` (156):
+- `lib/core/input/app_preferences_controller.dart` (190):
   tryb urządzenia, akcent i trwałe `darkMode` w `app_prefs.json`;
   brak klucza zachowuje tryb jasny;
   starsze Classic, Sakura i Mint są migrowane do nowego Bubblegum.
@@ -324,7 +324,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
 - 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1091 linii)
+### `lib/features/library/presentation/library_screen.dart` (1101 linii)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
@@ -409,7 +409,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2251 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2269 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
 toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
@@ -461,7 +461,7 @@ pozostaje tylko pionowo.
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (618 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (667 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
@@ -609,7 +609,7 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (885 linii)
+### `lib/features/board/presentation/board_screen.dart` (895 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -667,7 +667,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (326):
+- `test/library_screen_responsive_layout_test.dart` (384):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
@@ -682,7 +682,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
   brak mutacji źródła oraz zgodność rozmiaru segmentów z zoomem
-- `test/editor_screen_responsive_layout_test.dart` (346):
+- `test/editor_screen_responsive_layout_test.dart` (366):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
   poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
@@ -694,14 +694,14 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
-- `test/board_scene_bounds_test.dart` (153): stały układ współrzędnych
+- `test/board_scene_bounds_test.dart` (179): stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
   zachowanie viewportu po schowaniu narzędzi i kolor nagłówka.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (219): paleta dark, odwracanie jasności
+- `test/dark_mode_theme_test.dart` (233): paleta dark, odwracanie jasności
   wszystkich barw HSL, alfa, zachowanie odcieni i przełącznik Visual.
 
 
