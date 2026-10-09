@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
 
 enum StudyTechnique { custom, pomodoro, focus50, deep90 }
@@ -118,21 +119,22 @@ class StudySession {
       description: (json['description'] as String?) ?? '',
       scheduledAt: planned,
       minutes: ((json['minutes'] as num?)?.toInt() ?? 30)
-          .clamp(1, 1440),
+          .clamp(1, 1440).toInt(),
       technique: parseEnum(StudyTechnique.values, json['technique'],
           StudyTechnique.custom),
       status: parseEnum(StudyStatus.values, json['status'],
           StudyStatus.planned),
       phase: parseEnum(StudyPhase.values, json['phase'], StudyPhase.focus),
-      round: ((json['round'] as num?)?.toInt() ?? 1).clamp(1, 100),
+      round: ((json['round'] as num?)?.toInt() ?? 1)
+          .clamp(1, 100).toInt(),
       remainingSeconds:
           ((json['remainingSeconds'] as num?)?.toInt() ?? 0)
-              .clamp(0, 86400),
+              .clamp(0, 86400).toInt(),
       deadline: date(json['deadline']),
       startedAt: date(json['startedAt']),
       finishedAt: date(json['finishedAt']),
       productivity: json['productivity'] is num
-          ? (json['productivity'] as num).toInt().clamp(1, 5)
+          ? (json['productivity'] as num).toInt().clamp(1, 5).toInt()
           : null,
     );
   }
@@ -150,7 +152,13 @@ class StudyPlannerController extends ChangeNotifier {
   }) : _read = read,
        _write = write,
        _clock = clock ?? DateTime.now,
-       _autoTick = autoTick;
+       _autoTick = autoTick {
+    AppSaveCoordinator.instance.register(
+      this,
+      hasPendingWork: () => _pendingWrites > 0,
+      flush: flush,
+    );
+  }
 
   static const storageKey = 'study_planner.json';
   final StudyRead _read;
@@ -160,6 +168,8 @@ class StudyPlannerController extends ChangeNotifier {
   final List<StudySession> _sessions = [];
   Timer? _ticker;
   Future<void> _saveTail = Future<void>.value();
+  int _pendingWrites = 0;
+  bool _disposed = false;
   bool isLoaded = false;
   String? error;
   int noticeRevision = 0;
@@ -201,7 +211,7 @@ class StudyPlannerController extends ChangeNotifier {
                 _clock().millisecondsSinceEpoch) /
             1000)
         .ceil()
-        .clamp(0, 86400);
+        .clamp(0, 86400).toInt();
   }
 
   Future<void> load() async {
@@ -247,9 +257,12 @@ class StudyPlannerController extends ChangeNotifier {
       title: title.trim().isEmpty ? 'Study session' : title.trim(),
       description: description.trim(),
       scheduledAt: scheduledAt,
-      minutes: minutes.clamp(1, 1440),
+      minutes: minutes.clamp(1, 1440).toInt(),
       technique: technique,
     );
+    if (!isLoaded || error != null) {
+      throw StateError('Study planner storage is not available.');
+    }
     _sessions.add(session);
     _changed();
     return session;
@@ -270,7 +283,7 @@ class StudyPlannerController extends ChangeNotifier {
     session.title = title.trim().isEmpty ? 'Study session' : title.trim();
     session.description = description.trim();
     session.scheduledAt = scheduledAt;
-    session.minutes = minutes.clamp(1, 1440);
+    session.minutes = minutes.clamp(1, 1440).toInt();
     session.technique = technique;
     _changed();
   }
@@ -287,8 +300,9 @@ class StudyPlannerController extends ChangeNotifier {
 
   void delete(String id) {
     final session = _find(id);
-    if (session.status == StudyStatus.running) {
-      throw StateError('Stop the running session first.');
+    if (session.status == StudyStatus.running ||
+        session.status == StudyStatus.paused) {
+      throw StateError('Stop the active session first.');
     }
     _sessions.remove(session);
     _changed();
@@ -425,18 +439,23 @@ class StudyPlannerController extends ChangeNotifier {
       'version': 1,
       'sessions': _sessions.map((s) => s.toJson()).toList(),
     });
+    _pendingWrites++;
     _saveTail = _saveTail.then((_) => _write(storageKey, snapshot))
         .catchError((Object e) {
       error = 'Could not save study history: $e';
-      notifyListeners();
-    });
+      if (!_disposed) {
+        notifyListeners();
+      }
+    }).whenComplete(() => _pendingWrites--);
   }
 
   Future<void> flush() => _saveTail;
 
   @override
   void dispose() {
+    _disposed = true;
     _ticker?.cancel();
+    AppSaveCoordinator.instance.unregister(this);
     super.dispose();
   }
 }
