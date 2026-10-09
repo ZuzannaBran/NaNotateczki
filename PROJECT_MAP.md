@@ -397,16 +397,18 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2213 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2216 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
 toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
 canvasem, zamiast zajmować jego wysokość. `showToolbar` steruje
-widocznością nakładek. Pierwsza strona ma początkowy odstęp 72 px
-od paska narzędzi (plus bazowe 22 px); dodatkowy odstęp jest częścią
-przewijalnej zawartości, a nie granicą canvasa. Przewijanie i pan
-pozwalają ponownie wsunąć stronę pod toolbar. Granice widoczności
-stron oraz wybór aktywnej strony uwzględniają ten odstęp.
+widocznością nakładek. Początkowe 72 px odsunięcia strony realizuje
+`_pagePan` wewnątrz viewportu, zamiast dodatkowego paddingu przewijania.
+Viewport pozostaje 22 px od górnej krawędzi canvasa, więc strona nie jest
+ucinana przez pusty pas, gdy użytkownik wsuwa ją pod toolbar.
+Rozszerzony zakres pionowego pan pozwala również przesuwać stronę niżej.
+Granice widoczności i wybór aktywnej strony uwzględniają przesunięcie.
+`AppBar` ma wyłączoną zmianę wysokości cienia i tint podczas scrollowania.
 Minimapa i wskaźnik zoomu zachowują odstęp od widocznych pasków,
 a wysokość minimapy jest ograniczona dostępnej przestrzeni.
 Viewport obejmujący overview i strony notesu ma tło #E6E6E6;
@@ -431,11 +433,11 @@ pozostaje tylko pionowo.
 - 1007: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 974: główny `build`; pasek tekstu jest renderowany na podstawie
+- 975: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1441: `_PageViewportClipper`; 1499: `_PageFramePainter`;
-  minimapa zaczyna się przy 1606 i renderuje wyłącznie zwykły ink.
+- 1444: `_PageViewportClipper`; 1502: `_PageFramePainter`;
+  minimapa zaczyna się przy 1609 i renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -642,11 +644,11 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
   brak mutacji źródła oraz zgodność rozmiaru segmentów z zoomem
-- `test/editor_screen_responsive_layout_test.dart` (319):
-  pełna wysokość notebookowego canvasa pod pływającym toolbarem,
-  domyślne położenie strony pod narzędziami i możliwość przesunięcia
-  jej ponownie pod pasek, niezmienny viewport przy chowaniu paska,
-  minimapa na krótkim ekranie oraz interaktywność narzędzi
+- `test/editor_screen_responsive_layout_test.dart` (324):
+  pełna wysokość canvasa pod pływającym toolbarem, położenie strony
+  poniżej narzędzi przy nieprzesuniętej granicy viewportu, wsuwanie strony
+  pod pasek bez maskującego marginesu, stabilny kolor `AppBar`,
+  minimapa na krótkim ekranie i interaktywność narzędzi
 - `test/page_overlay_text_gestures_test.dart` (317): sprawdza blokowy
   toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
