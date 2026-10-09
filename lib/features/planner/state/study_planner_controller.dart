@@ -188,7 +188,9 @@ class StudyPlannerController extends ChangeNotifier {
 
   List<StudySession> get upcoming {
     final list = _sessions
-        .where((s) => s.status == StudyStatus.planned)
+        .where((s) => s.status == StudyStatus.planned &&
+            !s.scheduledAt.isBefore(DateTime(
+              _clock().year, _clock().month, _clock().day)))
         .toList();
     list.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
     return list;
