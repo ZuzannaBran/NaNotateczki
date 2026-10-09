@@ -326,9 +326,9 @@ a ich kierunki lewo/prawo odpowiadają zwijaniu bocznemu.
 Stan toolbaru pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
 
 - 16: `LibraryScreen`; 23: `_LibraryScreenState`;
-  544: `_LibraryTreePane`; 771: `_FolderTreeRow`;
-  881: `_LibraryTreeItemRow`; 972: `_LibraryWorkspace`;
-  1038: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
+  545: `_LibraryTreePane`; 772: `_FolderTreeRow`;
+  882: `_LibraryTreeItemRow`; 973: `_LibraryWorkspace`;
+  1039: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
