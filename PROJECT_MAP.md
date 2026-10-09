@@ -318,9 +318,9 @@ Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
-zwijać w całości i zmieniać jego szerokość. Pod strzałką panelu folderów
+zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. Pod strzałką panelu folderów
 jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka,
-a jego stan pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px, ten sam kolor co linia pod toolbarami i leży na prawej krawędzi, dzięki czemu linie stykają się.
+a jego stan pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
 
 - 16: `LibraryScreen`; 23: `_LibraryScreenState`;
   540: `_LibraryTreePane`; 767: `_FolderTreeRow`;
@@ -391,11 +391,11 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2194 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2186 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; wspólny
 zaokrąglony toolbar i pasek tekstowy są ukrywane flagą `showToolbar`;
-gdy widoczne, są oddzielone od notatek separatorem. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, minimapa,
+pod paskiem nie ma osobnego separatora. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, minimapa,
 wspólne komendy edytora. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma po 10 px wolnej przestrzeni po lewej i prawej stronie; poziomy
@@ -419,8 +419,8 @@ pozostaje tylko pionowo.
 - 968: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1422: `_PageViewportClipper`; 1480: `_PageFramePainter`;
-  minimapa zaczyna się przy 1587 i renderuje wyłącznie zwykły ink.
+- 1414: `_PageViewportClipper`; 1472: `_PageFramePainter`;
+  minimapa zaczyna się przy 1579 i renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -447,22 +447,24 @@ błędów, integralności i wydajności.
 - `lib/features/editor/presentation/widgets/page_background_paint.dart` (123):
   render i preview tła. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (899):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (898):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
-  jasna neutralna powierzchnia #FBFBFB w zaokrąglonej ramce z lewym
-  marginesem odsłaniającym strzałkę zwijania;
+  całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
+  ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
+  Symetryczny margines odsłania strzałkę zwijania;
   ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
-  10: `EditorToolbar`; 181: dialog tła; 316: selektor gumki;
-  382: selektor kształtu; 782: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (575):
+  10: `EditorToolbar`; 190: dialog tła; 325: selektor gumki;
+  391: selektor kształtu; 791: `_EraserIcon`.
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (580):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
   underline, strike, font, rozmiar, kolor, wyrównanie, reset stylu i usunięcie.
   Listy oraz formatowanie tylko zaznaczonego fragmentu są celowo pominięte,
   ponieważ obecny `EditableText` nie renderuje ich jako rich-text.
-  Pasek ma analogiczną zaokrągloną ramkę i wspólną widoczność.
+  Pasek używa takiej samej kapsułki: zwęża się do zawartości,
+  pozostaje wycentrowany i przewija poziomo na wąskich ekranach.
   9: `TextEditToolbar`; 43: `build`.
 
 - `lib/features/editor/presentation/interaction/object_transform_engine.dart` (362):
@@ -607,9 +609,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (188):
+- `test/library_screen_responsive_layout_test.dart` (267):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
-  boarda/notebooka z kontrolką umieszczoną pod strzałką panelu
+  boarda/notebooka z kontrolką pod strzałką panelu; dodatkowo regresja
+  wyśrodkowania, zwężania kapsułek oraz przewijania na wąskim ekranie
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
