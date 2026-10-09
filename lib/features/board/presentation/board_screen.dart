@@ -13,6 +13,7 @@ import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/diagnostics/board_scene_perf_tracker.dart';
+import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../editor/presentation/editor_commands.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
@@ -39,6 +40,11 @@ class _BoardScreenState extends State<BoardScreen> {
   static const double _trackpadPanSensitivity = 0.6;
   static const double _scrollPanSensitivity = 0.38;
   static const double _inkNavigationTouchSlop = 8.0;
+
+  double get _touchNavigationGain =>
+      context.read<AppPreferencesController?>()
+          ?.touchNavigationSensitivity ??
+      1.0;
 
   Offset _insertPosition = const Offset(120, 120);
   final BoardSceneBoundsResolver _sceneBounds = BoardSceneBoundsResolver();
@@ -135,7 +141,7 @@ class _BoardScreenState extends State<BoardScreen> {
       final pendingPosition = _pendingNavigationPosition;
       if (pendingPosition != null &&
           (event.localPosition - pendingPosition).distance >
-              _inkNavigationTouchSlop) {
+              _inkNavigationTouchSlop / _touchNavigationGain) {
         _pendingNavigationPointer = null;
         _pendingNavigationPosition = null;
       }
@@ -159,7 +165,9 @@ class _BoardScreenState extends State<BoardScreen> {
         _touchLastFocal = event.localPosition;
         _touchLastDistance = 1.0;
         if (panDelta != Offset.zero) {
-          controller.panBy(panDelta * _touchPanSensitivity);
+          controller.panBy(
+        panDelta * _touchPanSensitivity * _touchNavigationGain,
+      );
         }
         return;
       }
@@ -188,7 +196,9 @@ class _BoardScreenState extends State<BoardScreen> {
       controller.zoomBy(scaleDelta, focalPoint: focal);
     }
     if (panDelta != Offset.zero) {
-      controller.panBy(panDelta * _touchPanSensitivity);
+      controller.panBy(
+        panDelta * _touchPanSensitivity * _touchNavigationGain,
+      );
     }
   }
 
