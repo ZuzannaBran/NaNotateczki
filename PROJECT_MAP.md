@@ -664,7 +664,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
-- `test/board_scene_bounds_test.dart` (155): stały układ współrzędnych
+- `test/board_scene_bounds_test.dart` (153): stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
   zachowanie viewportu po schowaniu narzędzi i kolor nagłówka.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
