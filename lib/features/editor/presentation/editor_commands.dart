@@ -36,11 +36,12 @@ class EditorCommands {
 
   Future<void> export(NotebookExportFormat format) async {
     try {
+      final darkMode = Theme.of(context).brightness == Brightness.dark;
       final path = await runBusy(
         () => NotebookExportService.exportController(
           controller,
           format,
-          darkMode: Theme.of(context).brightness == Brightness.dark,
+          darkMode: darkMode,
         ),
       );
       if (!context.mounted) {
