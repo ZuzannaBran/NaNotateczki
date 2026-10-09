@@ -29,6 +29,8 @@ jobs:
         run: dart analyze
       - name: Verify planner button contrast
         run: flutter test test/study_planner_button_contrast_test.dart --reporter expanded
+      - name: Verify planner calendar weekday labels
+        run: flutter test test/study_planner_calendar_weekday_test.dart --reporter expanded --timeout=90s
       - name: Run study planner and library regressions
         run: |
           flutter test test/study_planner_controller_test.dart \
