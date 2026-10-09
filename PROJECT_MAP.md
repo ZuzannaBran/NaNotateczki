@@ -351,7 +351,8 @@ dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej
 krawędzi panelu, jego koloru i animacji 180 ms. Lewy bok menu jest prosty,
 zaokrąglone (promień 12 px) są wyłącznie prawe narożniki. Menu
 nachodzi na 12-pikselowy uchwyt zmiany szerokości (bez zmiany funkcji
-uchwytu poza menu), nie ma cienia ani linii na styku z panelem.
+uchwytu poza menu). Delikatny cień (elevation 4, alpha 0x44)
+odróżnia otwarte menu od tła, bez dodawania osobnego obramowania.
 Etykiety menu mają taką samą czcionkę i rozmiar 14 px jak nazwy dokumentów;
 opcje dodawania nie mają ikonek.
 
@@ -702,7 +703,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (574):
+- `test/library_screen_responsive_layout_test.dart` (576):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
@@ -712,7 +713,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   folderu, notebooka oraz boarda, a także menu dodawania (3 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
-  brak szczeliny i cienia na styku menu z panelem
+  brak szczeliny na styku menu z panelem i delikatny cień
 - `test/touch_navigation_sensitivity_test.dart` (83):
   granice czułości i porównanie dystansów scrolla przy gestach palcem.
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
