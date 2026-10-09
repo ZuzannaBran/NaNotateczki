@@ -555,7 +555,11 @@ class _CreateMenuButton extends StatelessWidget {
       width: 172,
       items: [
         for (final (value, icon, label) in [
-          (_CreateAction.folder, Icons.create_new_folder_outlined, 'New folder'),
+          (
+            _CreateAction.folder,
+            Icons.create_new_folder_outlined,
+            'New folder',
+          ),
           (_CreateAction.notebook, Icons.description_outlined, 'New notebook'),
           (_CreateAction.board, Icons.dashboard_outlined, 'New board'),
         ])
