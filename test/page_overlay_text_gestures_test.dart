@@ -313,7 +313,7 @@ void main() {
         'insert': 'Deep blue',
         'attributes': {'color': '#203E85'},
       },
-      {'insert': '\\n'},
+      {'insert': '\n'},
     ]);
     final block = TextBlock(
       id: 'legacy-colored-text',
