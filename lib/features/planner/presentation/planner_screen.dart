@@ -307,8 +307,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     ),
                   ),
                   if (!compact)
-                    IconButton.filledTonal(
-                      style: StudyActionStyles.icon,
+                    IconButton(
                       tooltip: 'Plan on this day',
                       icon: const Icon(Icons.add_rounded, size: 18),
                       visualDensity: VisualDensity.compact,
@@ -477,8 +476,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton.filledTonal(
-            style: StudyActionStyles.icon,
+          IconButton(
             tooltip: _history ? 'Calendar' : 'Study history',
             onPressed: () => setState(() => _history = !_history),
             icon: Icon(_history
@@ -486,8 +484,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 : Icons.history_rounded),
           ),
           if (narrow) ...[
-            IconButton.filledTonal(
-              style: StudyActionStyles.icon,
+            IconButton(
               tooltip: 'Smart session',
               onPressed: () => showStudySessionEditor(
                 context,
@@ -496,8 +493,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               ),
               icon: const Icon(Icons.auto_awesome_outlined),
             ),
-            IconButton.filledTonal(
-              style: StudyActionStyles.icon,
+            IconButton(
               tooltip: 'New session',
               onPressed: () => showStudySessionEditor(context),
               icon: const Icon(Icons.add_rounded),
@@ -542,8 +538,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      FilledButton.tonalIcon(
-                        style: StudyActionStyles.secondary,
+                      TextButton.icon(
                         onPressed: planner.active!.status == StudyStatus.running
                             ? planner.pause
                             : planner.resume,
@@ -552,8 +547,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         label: Text(planner.active!.status == StudyStatus.running
                             ? 'Pause' : 'Resume'),
                       ),
-                      IconButton.filledTonal(
-                        style: StudyActionStyles.icon,
+                      IconButton(
                         tooltip: 'Stop session',
                         onPressed: () {
                           planner.stop();
@@ -568,7 +562,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       const Expanded(
                         child: Text('A study session needs your review.'),
                       ),
-                      OutlinedButton(
+                      TextButton(
                         onPressed: () => showStudyRating(
                           context, planner.pendingReviews.first),
                         child: const Text('Rate productivity'),
@@ -588,19 +582,17 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     740.0, MediaQuery.sizeOf(context).width - 36),
                   child: Row(
                 children: [
-                  IconButton.filledTonal(
-                    style: StudyActionStyles.icon,
+                  IconButton(
                     tooltip: 'Previous',
                     icon: const Icon(Icons.chevron_left),
                     onPressed: () => _navigate(-1),
                   ),
-                  IconButton.filledTonal(
-                    style: StudyActionStyles.icon,
+                  IconButton(
                     tooltip: 'Next',
                     icon: const Icon(Icons.chevron_right),
                     onPressed: () => _navigate(1),
                   ),
-                  OutlinedButton(
+                  TextButton(
                     onPressed: () => setState(
                       () => _anchor = DateUtils.dateOnly(DateTime.now())),
                     child: const Text('Today'),
