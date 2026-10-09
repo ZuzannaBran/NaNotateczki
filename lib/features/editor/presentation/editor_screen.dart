@@ -23,6 +23,7 @@ import '../../notebook/domain/note_page.dart';
 import '../state/editor_controller.dart';
 import 'editor_commands.dart';
 import 'editor_settings_screen.dart';
+import 'interaction/notebook_overview_navigation.dart';
 import 'widgets/busy_overlay.dart';
 import 'widgets/drawing_canvas.dart';
 import 'widgets/editor_toolbar.dart';
@@ -136,10 +137,13 @@ class _EditorScreenState extends State<EditorScreen> {
     if (controller.pages.isEmpty) {
       return;
     }
-    final raw =
-        ((_scrollController.position.pixels + (_pageExtent * 0.45)) /
-                _pageExtent)
-            .floor();
+    final centerInDocument =
+        (_scrollController.position.pixels -
+            _topBottomPadding +
+            (_scrollController.position.viewportDimension * 0.45) -
+            _pagePan.dy) /
+        _effectivePageScale;
+    final raw = (centerInDocument / _pageExtent).floor();
     final target = raw.clamp(0, controller.pages.length - 1);
     if (target != controller.currentPageIndex) {
       controller.setCurrentPage(target);
@@ -148,6 +152,45 @@ class _EditorScreenState extends State<EditorScreen> {
 
   void _addPageBelow(EditorController controller) {
     controller.addPage();
+  }
+
+  void _navigateToOverviewPoint(
+    Offset documentPoint,
+    Size docWorldSize,
+    Size viewportSize,
+    EditorController controller,
+  ) {
+    if (controller.isObjectTransformActive ||
+        controller.pages.isEmpty ||
+        !_scrollController.hasClients) {
+      return;
+    }
+
+    final scrollPosition = _scrollController.position;
+    final target = NotebookOverviewNavigation.viewportTarget(
+      documentPoint: documentPoint,
+      viewportSize: viewportSize,
+      effectiveScale: _effectivePageScale,
+      maxScrollOffset: scrollPosition.maxScrollExtent,
+    );
+    final pan = _clampPagePan(
+      scale: _effectivePageScale,
+      pan: target.pan,
+      docWorldSize: docWorldSize,
+      viewportSize: viewportSize,
+    );
+
+    setState(() {
+      _pagePan = pan;
+    });
+    if ((scrollPosition.pixels - target.scrollOffset).abs() > 0.5) {
+      _scrollController.jumpTo(target.scrollOffset);
+    }
+
+    final pageIndex = (documentPoint.dy / _pageExtent)
+        .floor()
+        .clamp(0, controller.pages.length - 1);
+    controller.setCurrentPage(pageIndex);
   }
 
   void _syncPageTransformBounds({
@@ -1373,6 +1416,12 @@ class _EditorScreenState extends State<EditorScreen> {
                           pageGap: _pageGap,
                           panelHeight: minimapPanelHeight,
                           visibleDocumentRect: visibleDocumentRect,
+                          onNavigate: (documentPoint) => _navigateToOverviewPoint(
+                            documentPoint,
+                            docWorldSize,
+                            viewportSize,
+                            controller,
+                          ),
                         ),
                       ),
                   ],
@@ -1589,6 +1638,7 @@ class _ProjectMiniMapOverlay extends StatefulWidget {
     required this.pageGap,
     required this.panelHeight,
     required this.visibleDocumentRect,
+    required this.onNavigate,
     super.key,
   });
 
@@ -1599,6 +1649,7 @@ class _ProjectMiniMapOverlay extends StatefulWidget {
   final double pageGap;
   final double panelHeight;
   final Rect visibleDocumentRect;
+  final ValueChanged<Offset> onNavigate;
 
   @override
   State<_ProjectMiniMapOverlay> createState() => _ProjectMiniMapOverlayState();
@@ -1876,8 +1927,26 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                   physics: canScroll
                       ? const ClampingScrollPhysics()
                       : const NeverScrollableScrollPhysics(),
-                  child: RepaintBoundary(
-                    child: ValueListenableBuilder<int>(
+                  child: GestureDetector(
+                    key: const ValueKey('notebook-overview-tap-surface'),
+                    behavior: HitTestBehavior.opaque,
+                    onTapUp: (details) {
+                      if (widget.controller.isObjectTransformActive) {
+                        return;
+                      }
+                      final documentPoint =
+                          NotebookOverviewNavigation.documentPoint(
+                            mapPoint: details.localPosition,
+                            mapScale: mapScale,
+                            documentSize: Size(
+                              widget.pageWorldSize.width,
+                              _documentWorldHeight(),
+                            ),
+                          );
+                      widget.onNavigate(documentPoint);
+                    },
+                    child: RepaintBoundary(
+                      child: ValueListenableBuilder<int>(
                       valueListenable: widget.controller.inkRevision,
                       builder: (context, _, _) => CustomPaint(
                         size: Size(_minimapWidth, contentHeight),
@@ -1898,6 +1967,7 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                           ),
                         ),
                       ),
+                    ),
                     ),
                   ),
                 ),
