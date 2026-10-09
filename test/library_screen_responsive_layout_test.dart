@@ -193,15 +193,23 @@ void main() {
       expect(rect.top, closeTo(actionTop, 4));
       expect(rect.width, closeTo(130, 1));
       expect(rect.height, 36);
+      final menuMaterials = tester.widgetList<Material>(
+        find.ancestor(
+          of: menuEntries.first,
+          matching: find.byType(Material),
+        ),
+      );
       expect(
-        tester
-            .widgetList<Material>(
-              find.ancestor(
-                of: menuEntries.first,
-                matching: find.byType(Material),
-              ),
-            )
-            .any((material) => material.color == sidebarColor),
+        menuMaterials.any(
+          (material) =>
+              material.color == sidebarColor &&
+              material.shape is RoundedRectangleBorder &&
+              (material.shape! as RoundedRectangleBorder).borderRadius ==
+                  const BorderRadius.only(
+                    topRight: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+        ),
         isTrue,
       );
 
@@ -211,6 +219,52 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
     }
+
+    final addButton = find.byTooltip('Create');
+    expect(addButton, findsOneWidget);
+    final addButtonTop = tester.getTopLeft(addButton).dy;
+    await tester.tap(addButton);
+    await tester.pumpAndSettle();
+
+    final createEntries = find.byWidgetPredicate(
+      (widget) => widget is PopupMenuItem && widget.height == 36,
+    );
+    expect(createEntries, findsNWidgets(3));
+    expect(find.text('New folder'), findsOneWidget);
+    expect(find.text('New notebook'), findsOneWidget);
+    expect(find.text('New board'), findsOneWidget);
+    final createRect = tester.getRect(createEntries.first);
+    expect(createRect.left, closeTo(sidebarEdge, 1));
+    expect(createRect.top, closeTo(addButtonTop, 8));
+    expect(createRect.width, closeTo(172, 1));
+    expect(createRect.height, 36);
+
+    final createMaterials = tester.widgetList<Material>(
+      find.ancestor(
+        of: createEntries.first,
+        matching: find.byType(Material),
+      ),
+    );
+    expect(
+      createMaterials.any(
+        (material) =>
+            material.color == sidebarColor &&
+            material.shape is RoundedRectangleBorder &&
+            (material.shape! as RoundedRectangleBorder).borderRadius ==
+                const BorderRadius.only(
+                  topRight: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+      ),
+      isTrue,
+    );
+
+    await tester.tap(find.text('New folder'));
+    await tester.pumpAndSettle();
+    expect(find.text('New folder'), findsOneWidget);
+    expect(find.text('Folder name'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
