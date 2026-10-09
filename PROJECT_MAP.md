@@ -684,7 +684,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
   wyśrodkowanie, zwężanie kapsułek, wysokość, odstępy boczne
-  oraz przewijanie na wąskim ekranie
+  oraz przewijanie na wąskim ekranie; również aktualizacja mnożnika
+  przewijania plików bez restartu
+- `test/touch_navigation_sensitivity_test.dart` (83):
+  granice czułości i porównanie dystansów scrolla przy gestach palcem.
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
@@ -699,7 +702,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
-  minimapa na krótkim ekranie i interaktywność narzędzi
+  minimapa na krótkim ekranie, regulacja scrolla stron i interaktywność
+  narzędzi
 - `test/page_overlay_text_gestures_test.dart` (432): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
@@ -708,13 +712,15 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
 - `test/board_scene_bounds_test.dart` (179): stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
-  zachowanie viewportu po schowaniu narzędzi i kolor nagłówka.
+  zachowanie viewportu po schowaniu narzędzi, kolor nagłówka i porównanie
+  szybkości przesuwania palcem dla 0.5× i 2.0×.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
 - `test/dark_mode_theme_test.dart` (233): paleta dark, odwracanie jasności
-  wszystkich barw HSL, alfa, zachowanie odcieni i przełącznik Visual.
+  wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual
+  i podgląd suwaka czułości w System.
 
 
 Dodatkowe testy i automatyzacja wieloplatformowa:
@@ -739,12 +745,13 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `integration_test/document_lifecycle_test.dart`: create/rename/read/delete
   w rzeczywistej bazie danej platformy; działa wyłącznie z flagą
   `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.
-- `test/production/persistence_roundtrip_test.dart`: rich text z Delta,
+- `test/production/persistence_roundtrip_test.dart` (300): rich text z Delta,
   crop i bytes obrazów, dwie strony, dirty-page, równoległe zapisy, backup
   i przywrócenie do nowego SQLite; każdy test ma własny katalog dokumentów
   i fake `PathProviderPlatform`, bez zapisu do danych użytkownika. Test
   restore zamyka źródłowy `NotesDatabase` przed otwarciem docelowego,
   aby nie utrzymywać dwóch instancji Drift w tym samym isolate.
+  Weryfikuje również trwałość ustawienia czułości nawigacji.
 - `test/production/export_render_test.dart` (308): produkcyjne PNG/PDF
   w pamięci, liczba stron i rozmiar obrazu, treść oraz legacy gumka.
   Renderer działa w `tester.runAsync`, poza `FakeAsync` testu widgetowego.
