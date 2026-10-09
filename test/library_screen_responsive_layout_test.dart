@@ -160,6 +160,14 @@ void main() {
       const ValueKey('library-navigation-toggle'),
     );
     final toolbarToggle = find.byKey(const ValueKey('editor-toolbar-toggle'));
+    for (final toggle in [navigationToggle, toolbarToggle]) {
+      final material = tester.widget<Material>(toggle);
+      expect(material.elevation, 8);
+      expect(material.shadowColor, Colors.black54);
+      final shape = material.shape! as RoundedRectangleBorder;
+      expect(shape.side.width, 1);
+      expect(shape.side.color.a, closeTo(0.6, 0.01));
+    }
     expect(
       tester.getTopLeft(navigationToggle).dx,
       tester.getTopLeft(toolbarToggle).dx,
