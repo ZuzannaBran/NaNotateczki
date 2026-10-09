@@ -513,7 +513,9 @@ class _BoardScreenState extends State<BoardScreen> {
             key: const ValueKey('board-canvas-area'),
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             decoration: BoxDecoration(
-              color: AppColors.paper,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.darkPaper
+                  : AppColors.paper,
               borderRadius: BorderRadius.circular(16),
               boxShadow: const [
                 BoxShadow(
