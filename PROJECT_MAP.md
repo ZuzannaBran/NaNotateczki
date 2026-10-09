@@ -555,8 +555,8 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   deklaracjami canvasów, ale hit-test i cięcie są w `InkEraserEngine`.
 - 658: `DrawingCanvas`; 680: `DocumentDrawingCanvas`.
 - 897: `_DrawingCanvasState`; 2241: `_DocumentDrawingCanvasState`.
-- 3782: `_InkPainter`; 3842: `_InkOverlayPainter`;
-  4083: `_InkPageLayer`; 4133: `_PageInkPainter`.
+- 3783: `_InkPainter`; 3843: `_InkOverlayPainter`;
+  4088: `_InkPageLayer`; 4135: `_PageInkPainter`.
 
 - `lib/features/editor/presentation/widgets/selection_outline.dart` (32):
   wspólny painter przerywanego konturu dla lassa i gumki zakresowej;
