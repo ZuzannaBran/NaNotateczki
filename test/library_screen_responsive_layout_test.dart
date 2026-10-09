@@ -14,6 +14,7 @@ import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
+import 'package:program/features/planner/state/study_planner_controller.dart';
 
 void main() {
   testWidgets('library locks wide layout below editor margin breakpoint', (
@@ -261,6 +262,56 @@ void main() {
     }
 
     await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
+
+  testWidgets('study timer is anchored to the bottom of the folder sidebar', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    final planner = StudyPlannerController(
+      autoTick: false,
+      read: (_) async => null,
+      write: (_, _) async {},
+    );
+    await planner.load();
+    await controller.loadItems();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
+            ChangeNotifierProvider<StudyPlannerController>.value(value: planner),
+            Provider<NotebookRepository>.value(value: repository),
+          ],
+          child: const LibraryScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final timer = find.byKey(const ValueKey('study-timer-card'));
+    expect(timer, findsOneWidget);
+    expect(
+      tester.getBottomLeft(timer).dy,
+      closeTo(tester.getBottomLeft(find.byType(LibraryScreen)).dy, 1),
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await planner.flush();
+    planner.dispose();
     controller.dispose();
     await database.close();
   });
