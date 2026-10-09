@@ -687,7 +687,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.paper.withValues(
+                        color: (Theme.of(context).brightness == Brightness.dark
+                                ? AppColors.darkPaper
+                                : AppColors.paper)
+                            .withValues(
                           alpha: isActive
                               ? 0.92
                               : widget.isLassoSelected
@@ -826,7 +829,9 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         width: _cornerHandleSize,
         height: _cornerHandleSize,
         decoration: BoxDecoration(
-          color: AppColors.paper,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.darkPaper
+              : AppColors.paper,
           border: Border.all(color: _textFrameColor, width: 1.2),
           shape: BoxShape.circle,
         ),
@@ -841,7 +846,9 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         width: _sideHandleWidth,
         height: _sideHandleHeight,
         decoration: BoxDecoration(
-          color: AppColors.paper,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.darkPaper
+              : AppColors.paper,
           border: Border.all(color: _textFrameColor, width: 1.2),
           borderRadius: BorderRadius.circular(2),
         ),
@@ -1693,7 +1700,9 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
               width: _imageCornerDotSize,
               height: _imageCornerDotSize,
               decoration: BoxDecoration(
-                color: AppColors.paper,
+                color: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.darkPaper
+              : AppColors.paper,
                 border: Border.all(color: borderColor, width: 1.2),
                 shape: BoxShape.circle,
               ),
@@ -1772,7 +1781,9 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
                 ? _imageEdgeHandleShortSide
                 : _imageEdgeHandleLongSide,
             decoration: BoxDecoration(
-              color: AppColors.paper,
+              color: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.darkPaper
+              : AppColors.paper,
               border: Border.all(color: handleColor, width: 1.2),
               borderRadius: BorderRadius.circular(2),
             ),
@@ -2685,7 +2696,9 @@ class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
             top: 4,
             right: 4,
             child: Material(
-              color: AppColors.paper,
+              color: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.darkPaper
+              : AppColors.paper,
               elevation: 2,
               borderRadius: BorderRadius.circular(8),
               child: DecoratedBox(
