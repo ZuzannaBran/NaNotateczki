@@ -23,7 +23,7 @@ class PageBackgroundPaint extends StatelessWidget {
         painter: _PageBackgroundPainter(
           settings: settings,
           paperColor: Theme.of(context).brightness == Brightness.dark
-              ? AppColors.darkPaper
+              ? AppColors.darkCanvas
               : AppColors.paper,
           lineColor: Theme.of(
             context,
