@@ -336,8 +336,7 @@ class StudyTimerCard extends StatelessWidget {
                 child: Text('Study timer',
                     style: TextStyle(fontWeight: FontWeight.w600)),
               ),
-              IconButton.filledTonal(
-                style: StudyActionStyles.icon,
+              IconButton(
                 tooltip: 'Open planner',
                 visualDensity: VisualDensity.compact,
                 onPressed: () => openStudyPlanner(context),
@@ -370,8 +369,7 @@ class StudyTimerCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: FilledButton.tonalIcon(
-                    style: StudyActionStyles.secondary,
+                  child: OutlinedButton.icon(
                     onPressed: active.status == StudyStatus.running
                         ? planner.pause : planner.resume,
                     icon: Icon(active.status == StudyStatus.running
@@ -381,8 +379,7 @@ class StudyTimerCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  style: StudyActionStyles.icon,
+                IconButton.outlined(
                   tooltip: 'Stop session',
                   onPressed: () {
                     planner.stop();
@@ -446,8 +443,7 @@ class StudyTimerCard extends StatelessWidget {
                   ' · ${studyClock(item.scheduledAt)}',
                   style: const TextStyle(fontSize: 11),
                 ),
-                trailing: IconButton.filledTonal(
-                  style: StudyActionStyles.icon,
+                trailing: IconButton(
                   tooltip: 'Start scheduled session',
                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
                   onPressed: active == null
