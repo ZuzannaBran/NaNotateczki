@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:program/core/input/app_preferences_controller.dart';
+import 'package:program/core/theme/app_colors.dart';
+import 'package:program/core/theme/app_theme.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/interaction/object_transform_engine.dart';
 import 'package:program/features/editor/presentation/widgets/object_transform_hud.dart';
@@ -19,6 +23,7 @@ import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
+import 'package:program/features/notebook/domain/text_block.dart';
 
 void main() {
   test('transform handle hit area scales with frame size', () {
@@ -287,6 +292,116 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     preferences.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await database.close();
+  });
+
+  testWidgets('legacy rich text inverts without changing its saved delta', (
+    tester,
+  ) async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    const firstColor = Color(0xFFBBDCFB);
+    const secondColor = Color(0xFF203E85);
+    final deltaJson = jsonEncode([
+      {
+        'insert': 'Pale blue ',
+        'attributes': {'color': '#BBDCFB', 'bold': true},
+      },
+      {
+        'insert': 'Deep blue',
+        'attributes': {'color': '#203E85'},
+      },
+      {'insert': '\\n'},
+    ]);
+    final block = TextBlock(
+      id: 'legacy-colored-text',
+      text: 'Pale blue Deep blue',
+      position: const Offset(30, 40),
+      fontSize: 18,
+      color: firstColor,
+      width: 260,
+      deltaJson: deltaJson,
+    );
+    final notebook = _notebook();
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: notebook.copyWith(
+        pages: [
+          notebook.pages.single.copyWith(textBlocks: [block]),
+        ],
+      ),
+    );
+
+    Widget screen(bool darkMode) => MaterialApp(
+      theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+      home: ChangeNotifierProvider<EditorController>.value(
+        value: controller,
+        child: Scaffold(
+          body: SizedBox(
+            width: 600,
+            height: 360,
+            child: PageOverlay(
+              controller: controller,
+              renderBackground: false,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    String displayedColor(int index) {
+      final editor = tester.widget<quill.QuillEditor>(
+        find.byType(quill.QuillEditor).first,
+      );
+      final operation = editor.controller.document.toDelta().toJson()[index];
+      final attributes = operation['attributes'] as Map;
+      return attributes['color'] as String;
+    }
+
+    String hex(Color color) => '#${color.toARGB32().toRadixString(16)
+        .padLeft(8, '0').substring(2)}';
+
+    await tester.pumpWidget(screen(false));
+    await tester.pump();
+    expect(displayedColor(0).toLowerCase(), '#bbdcfb');
+    expect(displayedColor(1).toLowerCase(), '#203e85');
+
+    await tester.pumpWidget(screen(true));
+    await tester.pump();
+    expect(
+      displayedColor(0),
+      hex(AppColors.displayInkColor(firstColor, darkMode: true)),
+    );
+    expect(
+      displayedColor(1),
+      hex(AppColors.displayInkColor(secondColor, darkMode: true)),
+    );
+    expect(controller.pages.single.textBlocks.single.deltaJson, deltaJson);
+
+    controller.setTool(DrawingTool.text);
+    controller.setActiveTextBlock(block.id, null);
+    await tester.pump();
+    expect(find.byType(TextHudBlock), findsOneWidget);
+    final activeText = tester.widget<EditableText>(
+      find.byType(EditableText).first,
+    );
+    expect(
+      activeText.style.color,
+      AppColors.displayInkColor(firstColor, darkMode: true),
+    );
+
+    controller.clearActiveTextBlock();
+    controller.setTool(DrawingTool.edit);
+    await tester.pumpWidget(screen(false));
+    await tester.pump();
+    expect(displayedColor(0).toLowerCase(), '#bbdcfb');
+    expect(displayedColor(1).toLowerCase(), '#203e85');
+    expect(controller.pages.single.textBlocks.single.deltaJson, deltaJson);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
