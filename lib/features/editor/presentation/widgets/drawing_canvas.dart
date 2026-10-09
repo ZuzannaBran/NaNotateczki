@@ -4039,7 +4039,7 @@ class _InkOverlayPainter extends CustomPainter {
       ..strokeWidth = width;
     if (tool == DrawingTool.eraserBrush) {
       paint.color = darkMode
-          ? AppColors.darkPaper
+          ? AppColors.darkCanvas
           : _canvasBackgroundColor;
     } else {
       paint.color = _toolColor(color, tool);
