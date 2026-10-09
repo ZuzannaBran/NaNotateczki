@@ -95,7 +95,9 @@ void main() {
     );
     await restored.load();
     expect(restored.active, isNull);
-    expect(restored.pendingReviews.single.title, 'Biology');
+    expect(restored.pendingReviews, isEmpty);
+    expect(restored.history.single.title, 'Biology');
+    expect(restored.history.single.productivity, isNull);
     await restored.flush();
     restored.dispose();
   });
@@ -142,6 +144,59 @@ void main() {
     expect(planner.start(second.id), isTrue);
     planner.rate(first.id, 5);
     expect(planner.history.single.title, 'First');
+  });
+
+  test('dismissed rating is saved in history without further prompts',
+      () async {
+    await planner.load();
+    final item = planner.create(title: 'Unrated', scheduledAt: now);
+    expect(planner.start(item.id), isTrue);
+    expect(planner.stop(), isTrue);
+    expect(planner.pendingReviews.single.id, item.id);
+
+    planner.skipRating(item.id);
+    planner.skipRating(item.id);
+    expect(planner.pendingReviews, isEmpty);
+    expect(planner.history.single.productivity, isNull);
+    expect(planner.history.single.status, StudyStatus.completed);
+
+    await planner.flush();
+    final restored = StudyPlannerController(
+      autoTick: false,
+      clock: () => now,
+      read: (key) async => storage[key],
+      write: (key, value) async { storage[key] = value; },
+    );
+    await restored.load();
+    expect(restored.pendingReviews, isEmpty);
+    expect(restored.history.single.title, 'Unrated');
+    expect(restored.history.single.productivity, isNull);
+    await restored.flush();
+    restored.dispose();
+  });
+
+  test('unrated legacy reviews become history when loaded', () async {
+    await planner.load();
+    final item = planner.create(title: 'Legacy', scheduledAt: now);
+    planner.start(item.id);
+    planner.stop();
+    await planner.flush();
+
+    final restored = StudyPlannerController(
+      autoTick: false,
+      clock: () => now,
+      read: (key) async => storage[key],
+      write: (key, value) async { storage[key] = value; },
+    );
+    await restored.load();
+    expect(restored.pendingReviews, isEmpty);
+    expect(restored.history.single.id, item.id);
+    expect(restored.history.single.productivity, isNull);
+    await restored.flush();
+    final saved = jsonDecode(storage[StudyPlannerController.storageKey]!)
+        as Map<String, dynamic>;
+    expect((saved['sessions'] as List).single['status'], 'completed');
+    restored.dispose();
   });
 
   test('unreadable history blocks destructive replacement', () async {
