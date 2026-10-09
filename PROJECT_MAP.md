@@ -55,7 +55,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (629 linii)
+### `lib/app/app_scope.dart` (633 linie)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -66,7 +66,7 @@ edytora → opróżnienie kolejki SQLite → końcowy backup i dopiero potem ż�
 obowiązkowego zamknięcia. Zwykły backup nie wyświetla wskaźnika
 postępu, ale podczas zamykania blokujący spinner nadal chroni zapis.
 Scheduler w trybie exit nie czeka na idle rysika i nie porzuca zmian
-po błędzie.
+po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 
 - 24: `AppScope`; 31: `_AppScopeState`; 73: `didRequestAppExit`.
 - 226: `_ExitGuardOverlay`; 252: `_FinishingExitOverlay`;
@@ -77,15 +77,20 @@ po błędzie.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (133): kolory akcentów oraz wspólna neutralna paleta beżów interfejsu: `#E6E6E6` dla tła, `#FBFBFB` dla toolbarów/panelu folderów i `#DBDBDB` dla separatorów. Bazowe kolory Cherry, Bubblegum, Lavender, Peach i Baby blue pozostają bez zmian. 3: `AppAccentColor`; 61: `AppAccentPalette`; 117: `AppColors`.
+- `lib/core/theme/app_colors.dart` (91): jasna paleta oraz tryb ciemny:
+  tło #2D2E2B, panele #3A3B39, aktywne #4A4B48, kartka #5A5B57,
+  tekst #EEECE6. `displayInkColor` przelicza wyłącznie wyświetlane
+  szarości bez modyfikowania zapisanych kresek. 50: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (39): jasny Material 3 z ciemniejszym neutralnym tłem `#E6E6E6`, jasnym chromem `#FBFBFB` i separatorami `#DBDBDB`; kolory przewodnie nadal sterują akcentami i zaznaczeniami. 5: `AppTheme`.
+- `lib/core/theme/app_theme.dart` (113): `AppTheme.light` i `AppTheme.dark`
+  z kontrastowymi kontrolkami i nagłówkami. 5: `AppTheme`.
 
 ### Wejście i preferencje
 
-- `lib/core/input/app_preferences_controller.dart` (139):
-  globalny tryb urządzenia i kolor akcentu zapisane w `app_prefs.json`;
+- `lib/core/input/app_preferences_controller.dart` (156):
+  tryb urządzenia, akcent i trwałe `darkMode` w `app_prefs.json`;
+  brak klucza zachowuje tryb jasny;
   starsze Classic, Sakura i Mint są migrowane do nowego Bubblegum.
   Dotychczasowy zapis `bubblegum` zachowuje stary wybór jako Cherry.
   8: `DeviceInputMode`;
@@ -397,7 +402,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2231 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2251 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
 toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
@@ -444,9 +449,9 @@ pozostaje tylko pionowo.
 - 1459: `_PageViewportClipper`; 1517: `_PageFramePainter`;
   minimapa zaczyna się przy 1624 i renderuje wyłącznie zwykły ink.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (567 linii)
 
-Ustawienia wejścia, kompaktowego wyboru koloru akcentu, tła oraz podgląd logów
+Ustawienia wejścia, przełącznik ciemnego motywu w Visual, tła i podgląd logów
 błędów, integralności i wydajności.
 
 - 16:
@@ -466,16 +471,17 @@ błędów, integralności i wydajności.
 
 - `lib/features/editor/presentation/widgets/busy_overlay.dart` (18): blokujący
   spinner długiej operacji. 3: `BusyOverlay`.
-- `lib/features/editor/presentation/widgets/page_background_paint.dart` (123):
-  render i preview tła. 6: `PageBackgroundPaint`;
+- `lib/features/editor/presentation/widgets/page_background_paint.dart` (131):
+  render tła i kratki w bieżącym trybie wizualnym. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (898):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (926):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
   Zewnętrzne marginesy wynoszą po 52 px, wewnętrzne boczne po 22 px,
   a pionowy padding 3 px; przycisk zwijania pozostaje dostępny;
-  ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
+  ikony pobierają kontrast z motywu, próbki szarości pokazują ich
+  aktualny kolor wyświetlania, a styl pozostaje lekki i obrysowy.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
   10: `EditorToolbar`; 190: dialog tła; 325: selektor gumki;
@@ -518,7 +524,7 @@ błędów, integralności i wydajności.
   konfigurowalne przez `ObjectTransformHudStyle`.
   13: `ObjectTransformHudStyle`; 54: `ObjectTransformHud`;
   106: `_ObjectTransformHudState`; 591: `_ObjectTransformFramePainter`.
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (510):
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (514):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
   jest wyłączony. Podczas edycji treści uchwyty resize i osobny grabber move
@@ -528,7 +534,7 @@ błędów, integralności i wydajności.
   gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
   używają starego Quilla jako bezpieczny fallback.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4163 linie)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4188 linii)
 
 Dwa świadomie osobne canvasy ink, wspólna geometria rozpoznawania gestów,
 lasso, handoff aktywnej kreski i pomiary wydajności. Wszystkie modyfikacje
@@ -540,22 +546,24 @@ zakresowa mają wspólny podgląd przerywanego konturu przez `path_drawing`,
 bez zmiany danych wejściowych używanych przez selekcję i eraser.
 Notebookowe operacje
 zmieniające ink zawsze czytają bieżący stan z `EditorController.pageAt(...)`.
-Podczas rysowania pen/highlighter overlay stosuje ten sam LOD co zapisany
+Statyczne i aktywne kreski oraz podgląd zapisu renderują kontrastowe
+szarości w trybie ciemnym bez zmian modelu. Podczas rysowania
+pen/highlighter overlay stosuje ten sam LOD co zapisany
 tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
 
 - 45: `_InkPerfLog`; geometria rozpoznawania scratch pozostaje przed
   deklaracjami canvasów, ale hit-test i cięcie są w `InkEraserEngine`.
 - 658: `DrawingCanvas`; 680: `DocumentDrawingCanvas`.
 - 897: `_DrawingCanvasState`; 2241: `_DocumentDrawingCanvasState`.
-- 3790: `_InkPainter`; 3829: `_InkOverlayPainter`;
-  4065: `_InkPageLayer`; 4111: `_PageInkPainter`.
+- 3782: `_InkPainter`; 3842: `_InkOverlayPainter`;
+  4083: `_InkPageLayer`; 4133: `_PageInkPainter`.
 
 - `lib/features/editor/presentation/widgets/selection_outline.dart` (32):
   wspólny painter przerywanego konturu dla lassa i gumki zakresowej;
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2821 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2834 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText` oraz wspólny `ObjectTransformHud` dla
@@ -671,6 +679,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
+- `test/dark_mode_theme_test.dart` (108): paleta dark, kontrast szarości,
+  domyślny tryb jasny i przełącznik Visual.
 
 
 Dodatkowe testy i automatyzacja wieloplatformowa:
