@@ -2,11 +2,10 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-
-import '../../../../core/theme/app_colors.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
 
 import '../../../../core/input/soft_keyboard.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/text_block.dart';
 import '../../state/editor_controller.dart';
