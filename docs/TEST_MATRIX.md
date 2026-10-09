@@ -353,3 +353,15 @@ items, not the cause of either failure in this run.
 - Added `critical_editor_regressions_test.dart` to the isolated native
   documents fixture after CI showed `MissingPluginException` in its tests.
   The existing erase/lasso/save/undo regression scenarios remain unchanged.
+
+## Gradle 9 / AGP 9 compatibility staging (9 October 2026)
+
+- Upgrade Gradle 8.14 to 9.1.0 and Android Gradle Plugin 8.11.1 to 9.0.1,
+  matching the minimums announced by Flutter 3.47.6 and AGP 9.0.
+- Explicitly enable Flutter's temporary backwards-compatible behavior:
+  `android.newDsl=false` and `android.builtInKotlin=false`. Native
+  third-party plugins still using the legacy Kotlin Gradle Plugin require
+  this until they migrate. These flags are transitional, not permanent.
+- Android Debug, Release (including R8/ML Kit), emulator smoke test, and
+  document lifecycle must pass before adopting AGP 9 as the stable baseline.
+  If the migration fails, restore the last green toolchain in a revert commit.

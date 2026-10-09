@@ -681,6 +681,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   liczba stron i rozmiar obrazu, treść oraz legacy gumka; renderer działa
   w `tester.runAsync`, poza strefą `FakeAsync` testu widgetowego.
   Dodatkowe regresje sprawdzają 12-stronicowy eksport PNG oraz PNG/PDF boarda.
+- Android toolchain: Gradle 9.1.0 + Android Gradle Plugin 9.0.1; Flutter 3.47
+  tymczasowo korzysta z `android.newDsl=false` i
+  `android.builtInKotlin=false`, dopóki zależności nie przejdą na AGP 9.
 - `android/app/build.gradle.kts` i `android/app/proguard-rules.pro`:
   Release wymaga prywatnego `android/key.properties` poza CI i jawnym trybem
   debug-signing; konfiguracja odrzuca niepełne klucze i brak keystore.

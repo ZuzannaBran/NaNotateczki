@@ -27,4 +27,19 @@ void main() {
     expect(buildScript, contains('compilerOptions {'));
     expect(buildScript, contains('jvmTarget.set(JvmTarget.JVM_17)'));
   });
+  test('AGP 9 and Gradle 9 are paired with Flutter legacy flags', () {
+    final settings = File('android/settings.gradle.kts').readAsStringSync();
+    final wrapper = File(
+      'android/gradle/wrapper/gradle-wrapper.properties',
+    ).readAsStringSync();
+    final properties = File('android/gradle.properties').readAsStringSync();
+
+    expect(
+      settings,
+      contains('id("com.android.application") version "9.0.1"'),
+    );
+    expect(wrapper, contains('gradle-9.1.0-all.zip'));
+    expect(properties, contains('android.newDsl=false'));
+    expect(properties, contains('android.builtInKotlin=false'));
+  });
 }
