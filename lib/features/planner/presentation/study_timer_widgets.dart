@@ -19,6 +19,13 @@ String studyDuration(int seconds) {
   return '${minutes.toString().padLeft(2, '0')}:${remainder.toString().padLeft(2, '0')}';
 }
 
+String studyRatingStars(int? rating) {
+  if (rating == null) {
+    return 'Not rated';
+  }
+  return List.generate(5, (index) => index < rating ? '★' : '☆').join();
+}
+
 void openStudyPlanner(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (_) => const PlannerScreen()),
@@ -46,47 +53,63 @@ Future<void> showStudySessionEditor(
 }
 
 Future<void> showStudyRating(BuildContext context, StudySession session) async {
-  await showDialog<void>(
+  final planner = context.read<StudyPlannerController>();
+  var hovered = 0;
+  final score = await showDialog<int>(
     context: context,
     builder: (dialogContext) => StudyActionTheme(
       child: AlertDialog(
         title: const Text('Rate your productivity'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(session.title),
-          const SizedBox(height: 12),
-          const Text('How productive was this session?'),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            children: [
-              for (var score = 1; score <= 5; score++)
-                ActionChip(
-                  key: ValueKey('productivity-$score'),
-                  label: Text('$score'),
-                  onPressed: () {
-                    context.read<StudyPlannerController>().rate(
-                      session.id, score,
-                    );
-                    Navigator.pop(dialogContext);
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text('1 = low  ·  5 = excellent'),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Rate later'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(session.title),
+            const SizedBox(height: 12),
+            const Text('How productive was this session?'),
+            const SizedBox(height: 12),
+            StatefulBuilder(
+              builder: (context, setDialogState) => Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var value = 1; value <= 5; value++)
+                    IconButton(
+                      key: ValueKey('productivity-$value'),
+                      tooltip: '$value ${value == 1 ? 'star' : 'stars'}',
+                      onHover: (isHovering) {
+                        setDialogState(() {
+                          hovered = isHovering ? value : 0;
+                        });
+                      },
+                      onPressed: () => Navigator.pop(dialogContext, value),
+                      icon: Icon(
+                        value <= hovered
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Skip rating'),
+          ),
+        ],
       ),
     ),
   );
+  if (!context.mounted) {
+    return;
+  }
+  if (score == null) {
+    planner.skipRating(session.id);
+  } else {
+    planner.rate(session.id, score);
+  }
 }
 
 class _StudySessionDialog extends StatefulWidget {
@@ -310,7 +333,6 @@ class StudyTimerCard extends StatelessWidget {
     }
     final active = planner.active;
     final next = planner.upcoming.take(2).toList();
-    final reviews = planner.pendingReviews;
     final colors = Theme.of(context).colorScheme;
     return StudyActionTheme(
       child: Container(
@@ -382,10 +404,8 @@ class StudyTimerCard extends StatelessWidget {
                 IconButton.outlined(
                   tooltip: 'Stop session',
                   onPressed: () {
-                    planner.stop();
-                    final pending = planner.pendingReviews;
-                    if (pending.isNotEmpty) {
-                      showStudyRating(context, pending.last);
+                    if (planner.stop()) {
+                      showStudyRating(context, active);
                     }
                   },
                   icon: const Icon(Icons.stop_rounded),
@@ -451,14 +471,6 @@ class StudyTimerCard extends StatelessWidget {
                       : null,
                 ),
               ),
-          ],
-          if (reviews.isNotEmpty) ...[
-            const Divider(height: 14),
-            OutlinedButton.icon(
-              onPressed: () => showStudyRating(context, reviews.first),
-              icon: const Icon(Icons.star_border_rounded, size: 18),
-              label: Text('Rate ${reviews.length} session(s)'),
-            ),
           ],
           if (planner.error != null)
             Text(planner.error!,
