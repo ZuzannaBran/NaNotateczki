@@ -36,9 +36,6 @@ void main() {
 
     expect(lock, contains('irondash_engine_context:'));
     expect(wrapper, contains('gradle-8.14-all.zip'));
-    expect(
-      settings,
-      contains('id("com.android.application") version "8.11.1"'),
-    );
+    expect(settings, contains('id("com.android.application") version "8.11.1"'));
   });
 }
