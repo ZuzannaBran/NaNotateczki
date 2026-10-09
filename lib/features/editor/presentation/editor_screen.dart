@@ -59,6 +59,7 @@ class _EditorScreenState extends State<EditorScreen> {
   static const Duration _touchContextMenuDelay = Duration(seconds: 1);
 
   final ScrollController _scrollController = ScrollController();
+  bool _ignoreOverviewScrollEnd = false;
   final GlobalKey _canvasKey = GlobalKey();
   double _pageExtent = 0;
   bool _isViewportNavigating = false;
@@ -114,8 +115,16 @@ class _EditorScreenState extends State<EditorScreen> {
       return false;
     }
 
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _ignoreOverviewScrollEnd = false;
+    }
     if (notification is ScrollEndNotification) {
-      _syncCurrentPageToViewport(controller);
+      if (_ignoreOverviewScrollEnd) {
+        _ignoreOverviewScrollEnd = false;
+      } else {
+        _syncCurrentPageToViewport(controller);
+      }
     }
 
     return false;
@@ -172,6 +181,7 @@ class _EditorScreenState extends State<EditorScreen> {
       viewportSize: viewportSize,
       effectiveScale: _effectivePageScale,
       maxScrollOffset: scrollPosition.maxScrollExtent,
+      topPadding: _topBottomPadding,
     );
     final pan = _clampPagePan(
       scale: _effectivePageScale,
@@ -184,6 +194,7 @@ class _EditorScreenState extends State<EditorScreen> {
       _pagePan = pan;
     });
     if ((scrollPosition.pixels - target.scrollOffset).abs() > 0.5) {
+      _ignoreOverviewScrollEnd = true;
       _scrollController.jumpTo(target.scrollOffset);
     }
 
@@ -1117,6 +1128,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       onNotification: (notification) =>
                           _onPagesScroll(notification, controller),
                       child: SingleChildScrollView(
+                        key: const ValueKey('notebook-document-scroll'),
                         controller: _scrollController,
                         physics:
                             (controller.tool.isInk ||
@@ -1663,6 +1675,8 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
   final ScrollController _minimapScrollController = ScrollController();
   final Map<String, _MiniMapImageCacheEntry> _minimapImages = {};
   final Set<String> _loadingMinimapImageIds = {};
+  int? _overviewTapPointer;
+  Offset? _overviewTapStart;
 
   @override
   void initState() {
@@ -1921,31 +1935,67 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
           child: SizedBox(
             width: _minimapWidth,
             height: panelHeight,
-            child: Stack(
-              children: [
-                SingleChildScrollView(
-                  controller: _minimapScrollController,
+            child: Listener(
+              key: const ValueKey('notebook-overview-tap-surface'),
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (event) {
+                if (_overviewTapPointer != null) {
+                  _overviewTapStart = null;
+                  return;
+                }
+                _overviewTapPointer = event.pointer;
+                _overviewTapStart = event.localPosition;
+              },
+              onPointerMove: (event) {
+                final start = _overviewTapStart;
+                if (event.pointer == _overviewTapPointer &&
+                    start != null &&
+                    (event.localPosition - start).distance > 8.0) {
+                  _overviewTapStart = null;
+                }
+              },
+              onPointerCancel: (event) {
+                if (event.pointer == _overviewTapPointer) {
+                  _overviewTapPointer = null;
+                  _overviewTapStart = null;
+                }
+              },
+              onPointerUp: (event) {
+                if (event.pointer != _overviewTapPointer) {
+                  return;
+                }
+                final start = _overviewTapStart;
+                _overviewTapPointer = null;
+                _overviewTapStart = null;
+                if (start == null ||
+                    (event.localPosition - start).distance > 8.0 ||
+                    widget.controller.isObjectTransformActive) {
+                  return;
+                }
+                final mapScrollOffset =
+                    _minimapScrollController.hasClients
+                    ? _minimapScrollController.offset
+                    : 0.0;
+                widget.onNavigate(
+                  NotebookOverviewNavigation.documentPoint(
+                    mapPoint: event.localPosition,
+                    mapScale: mapScale,
+                    mapScrollOffset: mapScrollOffset,
+                    documentSize: Size(
+                      widget.pageWorldSize.width,
+                      _documentWorldHeight(),
+                    ),
+                  ),
+                );
+              },
+              child: Stack(
+                children: [
+                  SingleChildScrollView(
+                    key: const ValueKey('notebook-overview-scroll'),
+                    controller: _minimapScrollController,
                   physics: canScroll
                       ? const ClampingScrollPhysics()
                       : const NeverScrollableScrollPhysics(),
-                  child: GestureDetector(
-                    key: const ValueKey('notebook-overview-tap-surface'),
-                    behavior: HitTestBehavior.opaque,
-                    onTapUp: (details) {
-                      if (widget.controller.isObjectTransformActive) {
-                        return;
-                      }
-                      final documentPoint =
-                          NotebookOverviewNavigation.documentPoint(
-                            mapPoint: details.localPosition,
-                            mapScale: mapScale,
-                            documentSize: Size(
-                              widget.pageWorldSize.width,
-                              _documentWorldHeight(),
-                            ),
-                          );
-                      widget.onNavigate(documentPoint);
-                    },
                     child: RepaintBoundary(
                       child: ValueListenableBuilder<int>(
                         valueListenable: widget.controller.inkRevision,
@@ -1970,7 +2020,6 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                         ),
                       ),
                     ),
-                  ),
                 ),
                 Positioned.fill(
                   child: IgnorePointer(
@@ -1993,8 +2042,8 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                       },
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
