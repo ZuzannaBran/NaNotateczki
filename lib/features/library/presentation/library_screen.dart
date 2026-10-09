@@ -45,12 +45,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final planner = context.read<StudyPlannerController>();
+    final planner = context.read<StudyPlannerController?>();
     if (!identical(_studyPlanner, planner)) {
       _studyPlanner?.removeListener(_onStudyNotice);
       _studyPlanner = planner;
       _lastStudyNotice = planner.noticeRevision;
-      planner.addListener(_onStudyNotice);
+      planner?.addListener(_onStudyNotice);
     }
   }
 
