@@ -103,7 +103,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               ],
               if (session.productivity != null) ...[
                 const SizedBox(height: 10),
-                Text('Productivity: ${session.productivity}/5'),
+                Text('Productivity: ${studyRatingStars(session.productivity)}'),
               ],
               if (session.status == StudyStatus.review) ...[
                 const SizedBox(height: 10),
@@ -219,7 +219,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 const SizedBox(height: 3),
                 Text(
                   done
-                      ? 'Done · ${session.productivity}/5'
+                      ? 'Done · ${studyRatingStars(session.productivity)}'
                       : reviewing
                       ? 'Rate productivity'
                       : session.status == StudyStatus.planned &&
@@ -452,7 +452,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
             '${session.scheduledAt.day}/${session.scheduledAt.month}/'
             '${session.scheduledAt.year} · '
             '${session.totalFocusMinutes} min · '
-            '${session.productivity == null ? 'Rate now' : '${session.productivity}/5'}',
+            '${studyRatingStars(session.productivity)}',
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => _sessionOptions(session),
@@ -550,10 +550,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       IconButton(
                         tooltip: 'Stop session',
                         onPressed: () {
-                          planner.stop();
-                          if (planner.pendingReviews.isNotEmpty) {
-                            showStudyRating(
-                              context, planner.pendingReviews.last);
+                          final session = planner.active;
+                          if (session != null && planner.stop()) {
+                            showStudyRating(context, session);
                           }
                         },
                         icon: const Icon(Icons.stop_rounded),
