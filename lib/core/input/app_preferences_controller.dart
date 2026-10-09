@@ -7,6 +7,8 @@ import '../theme/app_colors.dart';
 
 enum DeviceInputMode { computer, tablet }
 
+enum ToolbarPlacement { top, left, right }
+
 extension DeviceInputModeX on DeviceInputMode {
   String get label {
     return switch (this) {
@@ -30,6 +32,8 @@ class AppPreferencesController extends ChangeNotifier {
   DeviceInputMode deviceInputMode = _defaultDeviceInputMode();
   AppAccentColor accentColor = AppAccentColor.softBubblegum;
   bool darkMode = false;
+  ToolbarPlacement boardToolbarPlacement = ToolbarPlacement.top;
+  ToolbarPlacement notebookToolbarPlacement = ToolbarPlacement.top;
 
   bool get shouldRequestSoftKeyboard {
     return deviceInputMode == DeviceInputMode.tablet;
@@ -61,6 +65,24 @@ class AppPreferencesController extends ChangeNotifier {
       final storedDarkMode = decoded['darkMode'];
       if (storedDarkMode is bool && storedDarkMode != darkMode) {
         darkMode = storedDarkMode;
+        changed = true;
+      }
+
+      final savedBoardPlacement = _toolbarPlacementFromName(
+        decoded['boardToolbarPlacement'],
+      );
+      if (savedBoardPlacement != null &&
+          savedBoardPlacement != boardToolbarPlacement) {
+        boardToolbarPlacement = savedBoardPlacement;
+        changed = true;
+      }
+      final savedNotebookPlacement = _toolbarPlacementFromName(
+        decoded['notebookToolbarPlacement'],
+      );
+      if (savedNotebookPlacement != null &&
+          savedNotebookPlacement != ToolbarPlacement.left &&
+          savedNotebookPlacement != notebookToolbarPlacement) {
+        notebookToolbarPlacement = savedNotebookPlacement;
         changed = true;
       }
 
@@ -113,6 +135,25 @@ class AppPreferencesController extends ChangeNotifier {
     await _save();
   }
 
+  Future<void> setBoardToolbarPlacement(ToolbarPlacement placement) async {
+    if (boardToolbarPlacement == placement) {
+      return;
+    }
+    boardToolbarPlacement = placement;
+    notifyListeners();
+    await _save();
+  }
+
+  Future<void> setNotebookToolbarPlacement(ToolbarPlacement placement) async {
+    if (placement == ToolbarPlacement.left ||
+        notebookToolbarPlacement == placement) {
+      return;
+    }
+    notebookToolbarPlacement = placement;
+    notifyListeners();
+    await _save();
+  }
+
   Future<void> setAccentColor(AppAccentColor color) async {
     if (accentColor == color) {
       return;
@@ -130,6 +171,8 @@ class AppPreferencesController extends ChangeNotifier {
           'deviceInputMode': deviceInputMode.index,
           'accentColor': accentColor.name,
           'darkMode': darkMode,
+          'boardToolbarPlacement': boardToolbarPlacement.name,
+          'notebookToolbarPlacement': notebookToolbarPlacement.name,
         }),
       );
     } catch (e) {
@@ -150,6 +193,18 @@ AppAccentColor? _accentColorFromName(String name) {
   for (final color in AppAccentColor.values) {
     if (color.name == name) {
       return color;
+    }
+  }
+  return null;
+}
+
+ToolbarPlacement? _toolbarPlacementFromName(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  for (final placement in ToolbarPlacement.values) {
+    if (placement.name == value) {
+      return placement;
     }
   }
   return null;
