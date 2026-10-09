@@ -49,7 +49,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     if (!identical(_studyPlanner, planner)) {
       _studyPlanner?.removeListener(_onStudyNotice);
       _studyPlanner = planner;
-      _lastStudyNotice = planner.noticeRevision;
+      _lastStudyNotice = planner?.noticeRevision ?? 0;
       planner?.addListener(_onStudyNotice);
     }
   }
