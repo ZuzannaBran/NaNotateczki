@@ -266,7 +266,10 @@ class TextEditToolbar extends StatelessWidget {
             width: 18,
             height: 18,
             decoration: BoxDecoration(
-              color: block.color,
+              color: AppColors.displayInkColor(
+                block.color,
+                darkMode: Theme.of(context).brightness == Brightness.dark,
+              ),
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.divider),
             ),
