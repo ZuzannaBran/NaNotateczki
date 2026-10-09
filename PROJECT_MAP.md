@@ -476,11 +476,10 @@ Notebook (Top/Right); ustawienia są trwałe i zmieniają aktywny
 dokument bez konieczności ponownego uruchamiania. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
 
-- 16: `EditorSettingsScreen`; 266: `_ToolbarPlacementSetting`;
-  327: `_appearanceButtonStyle`; 357: `_showErrorsDialog`;
-  439: `_showDataIntegrityDialog`;
-  526: `_showOptimizationDialog`;
-  612: `_AccentColorSection`; 694: `_BackgroundSection`.
+- 16: `EditorSettingsScreen`; 295: `_ToolbarPlacementSetting`;
+  353: `_appearanceButtonStyle`; 385: `_showErrorsDialog`;
+  467: `_showDataIntegrityDialog`;
+  554: `_showOptimizationDialog`; 640: `_BackgroundSection`.
 
 ### Widgety edytora
 
@@ -503,8 +502,8 @@ obsługują ustawienia tła i podgląd logów diagnostycznych.
   aktualny kolor wyświetlania, a styl pozostaje lekki i obrysowy.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
-  10: `EditorToolbar`; 190: dialog tła; 344: selektor gumki;
-  412: selektor kształtu; 819: `_EraserIcon`.
+  10: `EditorToolbar`; 230: dialog tła; 376: selektor gumki;
+  444: selektor kształtu; 851: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (614):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
@@ -711,7 +710,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (259): paleta dark, odwracanie jasności
+- `test/dark_mode_theme_test.dart` (263): paleta dark, odwracanie jasności
   wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual
   i niezależny wybór pozycji pasków.
 
