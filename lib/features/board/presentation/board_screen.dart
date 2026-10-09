@@ -166,8 +166,8 @@ class _BoardScreenState extends State<BoardScreen> {
         _touchLastDistance = 1.0;
         if (panDelta != Offset.zero) {
           controller.panBy(
-        panDelta * _touchPanSensitivity * _touchNavigationGain,
-      );
+            panDelta * _touchPanSensitivity * _touchNavigationGain,
+          );
         }
         return;
       }
