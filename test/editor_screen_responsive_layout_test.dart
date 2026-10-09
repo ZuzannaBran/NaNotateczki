@@ -14,6 +14,7 @@ import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
+import 'package:program/features/notebook/domain/drawing_tool.dart';
 
 void main() {
   testWidgets('page stays clear of overview and inside right boundary', (
@@ -113,6 +114,80 @@ void main() {
     await firstFinger.up();
     await secondFinger.up();
     await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    preferences.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await database.close();
+  });
+
+  testWidgets('floating toolbar overlays full-height notebook canvas', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: _notebook(),
+    );
+
+    Widget app({required bool showToolbar}) {
+      return MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
+          ],
+          child: EditorScreen(showToolbar: showToolbar),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(app(showToolbar: true));
+    await tester.pump();
+
+    const canvasKey = ValueKey('notebook-canvas-area');
+    const toolbarKey = ValueKey('editor-toolbar-panel');
+    const viewportKey = ValueKey('notebook-page-viewport');
+    const overviewKey = ValueKey('notebook-project-overview');
+    final canvas = find.byKey(canvasKey);
+    final toolbar = find.byKey(toolbarKey);
+    final overview = find.byKey(overviewKey);
+    final canvasRect = tester.getRect(canvas);
+    final toolbarRect = tester.getRect(toolbar);
+
+    expect(canvasRect.top, closeTo(tester.getBottomLeft(find.byType(AppBar)).dy, 0.01));
+    expect(canvasRect.bottom, closeTo(900, 0.01));
+    expect(toolbarRect.top, greaterThanOrEqualTo(canvasRect.top));
+    expect(toolbarRect.bottom, lessThan(canvasRect.bottom));
+    expect(
+      tester.getTopLeft(find.byKey(viewportKey)).dy,
+      closeTo(canvasRect.top + 22, 0.01),
+    );
+    expect(tester.getTopLeft(overview).dy, closeTo(canvasRect.top + 82, 0.01));
+
+    await tester.tap(find.byTooltip('Highlighter'));
+    await tester.pump();
+    expect(controller.tool, DrawingTool.highlighter);
+
+    await tester.pumpWidget(app(showToolbar: false));
+    await tester.pump();
+
+    expect(find.byKey(toolbarKey), findsNothing);
+    expect(tester.getRect(canvas), canvasRect);
+    expect(tester.getTopLeft(overview).dy, closeTo(canvasRect.top + 10, 0.01));
+    expect(
+      tester.getTopLeft(find.byKey(viewportKey)).dy,
+      closeTo(canvasRect.top + 22, 0.01),
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
