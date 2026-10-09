@@ -5,11 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../editor/presentation/widgets/editor_toolbar.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
+import '../../planner/presentation/study_timer_widgets.dart';
 import 'library_controller.dart';
 
 /// Finds the most frequently used ink/text color in a folder.
@@ -44,7 +46,7 @@ Color dominantFolderColor(Iterable<Notebook> notebooks) {
 
 IconData folderCoverIcon(FolderCoverShape shape) {
   return switch (shape) {
-    FolderCoverShape.folder => Icons.folder_rounded,
+    FolderCoverShape.folder => Icons.folder_outlined,
     FolderCoverShape.star => Icons.star_rounded,
     FolderCoverShape.heart => Icons.favorite_rounded,
     FolderCoverShape.flower => Icons.local_florist_rounded,
@@ -64,6 +66,8 @@ class LibraryCatalog extends StatelessWidget {
     required this.onDeleteFolder,
     required this.onRenameItem,
     required this.onDeleteItem,
+    required this.onSettings,
+    this.showCompactTimer = false,
     super.key,
   });
 
@@ -77,6 +81,8 @@ class LibraryCatalog extends StatelessWidget {
   final ValueChanged<String> onDeleteFolder;
   final ValueChanged<Notebook> onRenameItem;
   final ValueChanged<Notebook> onDeleteItem;
+  final VoidCallback onSettings;
+  final bool showCompactTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -87,110 +93,114 @@ class LibraryCatalog extends StatelessWidget {
         : controller.items
               .where((item) => item.folder == activeFolder)
               .toList();
-    final scheme = Theme.of(context).colorScheme;
+    final useWideTitleInset = MediaQuery.sizeOf(context).width >= 600;
 
-    return ColoredBox(
-      color: AppColors.background,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(32, 24, 28, 18),
-            child: Row(
-              children: [
-                if (activeFolder != null) ...[
-                  IconButton(
-                    key: const ValueKey('catalog-back'),
-                    tooltip: 'Back to projects',
-                    onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: Text(
-                    activeFolder ?? 'Library',
-                    key: const ValueKey('catalog-title'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontFamily: 'Georgia',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                if (activeFolder != null)
-                  IconButton(
-                    tooltip: 'Edit folder cover',
-                    onPressed: () => onEditFolder(activeFolder),
-                    icon: const Icon(Icons.palette_outlined),
-                  ),
-              ],
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        titleSpacing: useWideTitleInset ? 44 : null,
+        title: Text(
+          activeFolder ?? 'Library',
+          key: const ValueKey('catalog-title'),
+          style: const TextStyle(fontSize: 18),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          if (showCompactTimer) const CompactStudyTimer(),
+          if (activeFolder != null)
+            IconButton(
+              tooltip: 'Edit folder cover',
+              icon: const Icon(Icons.palette_outlined),
+              onPressed: () => onEditFolder(activeFolder),
             ),
-          ),
-          Divider(height: 1, color: scheme.outlineVariant),
-          Expanded(
-            child: controller.isLoading && controller.items.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : activeFolder == null && folders.isEmpty
-                ? const _CatalogEmptyState(
-                    icon: Icons.folder_open_outlined,
-                    title: 'No folders yet',
-                    subtitle: 'Create a folder using the Projects menu.',
-                  )
-                : activeFolder != null && notes.isEmpty
-                ? const _CatalogEmptyState(
-                    icon: Icons.note_add_outlined,
-                    title: 'This folder is empty',
-                    subtitle: 'Add a notebook or board using the + menu.',
-                  )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      return GridView.builder(
-                        key: ValueKey(
-                          activeFolder == null
-                              ? 'catalog-folders'
-                              : 'catalog-items:$activeFolder',
-                        ),
-                        padding: const EdgeInsets.all(30),
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 224,
-                              mainAxisExtent: 263,
-                              mainAxisSpacing: 24,
-                              crossAxisSpacing: 24,
-                            ),
-                        itemCount: activeFolder == null
-                            ? folders.length
-                            : notes.length,
-                        itemBuilder: (context, index) {
-                          if (activeFolder == null) {
-                            final name = folders[index];
-                            final contents = controller.items
-                                .where((item) => item.folder == name);
-                            return _FolderTile(
-                              name: name,
-                              contents: contents,
-                              cover: controller.folderCoverFor(name),
-                              onTap: () => onFolderTap(name),
-                              onEdit: () => onEditFolder(name),
-                              onRename: () => onRenameFolder(name),
-                              onDelete: () => onDeleteFolder(name),
-                            );
-                          }
-                          final item = notes[index];
-                          return _DocumentTile(
-                            item: item,
-                            onTap: () => onOpenItem(item),
-                            onRename: () => onRenameItem(item),
-                            onDelete: () => onDeleteItem(item),
-                          );
-                        },
-                      );
-                    },
-                  ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: onSettings,
           ),
         ],
+      ),
+      body: ColoredBox(
+        color: AppColors.background,
+        child: Column(
+          children: [
+            if (activeFolder != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(30, 8, 30, 0),
+                  child: TextButton.icon(
+                    key: const ValueKey('catalog-back'),
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                    label: const Text('All projects'),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: controller.isLoading && controller.items.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : activeFolder == null && folders.isEmpty
+                  ? const _CatalogEmptyState(
+                      icon: Icons.folder_open_outlined,
+                      title: 'No folders yet',
+                      subtitle: 'Create a folder using the Projects menu.',
+                    )
+                  : activeFolder != null && notes.isEmpty
+                  ? const _CatalogEmptyState(
+                      icon: Icons.note_add_outlined,
+                      title: 'This folder is empty',
+                      subtitle: 'Add a notebook or board using the + menu.',
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        return GridView.builder(
+                          key: ValueKey(
+                            activeFolder == null
+                                ? 'catalog-folders'
+                                : 'catalog-items:$activeFolder',
+                          ),
+                          padding: const EdgeInsets.all(30),
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 224,
+                                mainAxisExtent: 263,
+                                mainAxisSpacing: 24,
+                                crossAxisSpacing: 24,
+                              ),
+                          itemCount: activeFolder == null
+                              ? folders.length
+                              : notes.length,
+                          itemBuilder: (context, index) {
+                            if (activeFolder == null) {
+                              final name = folders[index];
+                              final contents = controller.items
+                                  .where((item) => item.folder == name);
+                              return _FolderTile(
+                                name: name,
+                                contents: contents,
+                                cover: controller.folderCoverFor(name),
+                                onTap: () => onFolderTap(name),
+                                onEdit: () => onEditFolder(name),
+                                onRename: () => onRenameFolder(name),
+                                onDelete: () => onDeleteFolder(name),
+                              );
+                            }
+                            final item = notes[index];
+                            return _DocumentTile(
+                              item: item,
+                              onTap: () => onOpenItem(item),
+                              onRename: () => onRenameItem(item),
+                              onDelete: () => onDeleteItem(item),
+                            );
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -348,20 +358,6 @@ class _CatalogTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(16),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: child,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 7),
         Row(
           children: [
             Expanded(
@@ -384,6 +380,20 @@ class _CatalogTile extends StatelessWidget {
               itemBuilder: (_) => actions,
             ),
           ],
+        ),
+        const SizedBox(height: 7),
+        Expanded(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: child,
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -639,6 +649,22 @@ Future<void> showFolderCoverEditor(
                       ),
                     ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                key: const ValueKey('cover-advanced-color'),
+                onPressed: () async {
+                  final picked = await EditorToolbar.pickColor(
+                    context,
+                    iconColor ?? AppColors.inkBlack,
+                    const <Color>[],
+                  );
+                  if (picked != null && context.mounted) {
+                    update(() => iconColor = picked);
+                  }
+                },
+                icon: const Icon(Icons.tune_rounded),
+                label: const Text('Custom color / HEX'),
               ),
               TextButton(
                 onPressed: () => update(() => iconColor = null),

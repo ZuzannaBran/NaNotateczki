@@ -317,12 +317,14 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 507: `selectFolder`; 618: `_loadFolders`; 656: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1326 linii)
+### `lib/features/library/presentation/library_screen.dart` (1355 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
 wraca do katalogów, kliknięcie folderu otwiera siatkę podglądów dokumentów,
-a wybór dokumentu uruchamia dotychczasowy edytor. Powrót z edytora
+a wybór dokumentu uruchamia dotychczasowy edytor. Widok katalogów
+używa nagłówka AppBar zgodnego z notatnikiem i ma dostęp do ustawień.
+Powrót z edytora
 wymusza flush niezapisanych zmian przed ponownym wczytaniem miniatur. Sidebar nadal rozwija
 i zwija foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
@@ -336,24 +338,28 @@ zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. U
 jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka,
 a jego stan pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
 
-- 20: `LibraryScreen`; 27: `_LibraryScreenState`;
-  732: `_LibraryTreePane`; 991: `_FolderTreeRow`;
-  1109: `_LibraryTreeItemRow`; 1200: `_LibraryWorkspace`;
+- 21: `LibraryScreen`; 28: `_LibraryScreenState`;
+  419: `_openCatalogSettings`; 761: `_LibraryTreePane`;
+  1020: `_FolderTreeRow`; 1138: `_LibraryTreeItemRow`;
+  1229: `_LibraryWorkspace`;
   strzałki folderów i toolbaru pozostają w lewym obszarze.
 
-### `lib/features/library/presentation/library_catalog.dart` (670 linii)
+### `lib/features/library/presentation/library_catalog.dart` (696 linii)
 
 Kafelkowa strona główna folderów oraz siatka podglądów zawartości folderu.
 Okładka ma automatycznie rozjaśniony dominujący kolor ink/tekstu we wszystkich
 stronach dokumentów folderu; kształt i kolor ikony można zmieniać w dialogu.
+Domyślna okładka używa takiej samej obrysowanej ikony folderu jak sidebar.
+Dialog pozwala również wybrać dowolny kolor przez wspólny selektor notebooka
+z HEX i suwakami RGB/B-W. Nazwa i menu kafelka znajdują się nad miniaturą.
 Notatki mają pionowy podgląd pierwszej strony (820×1160), boardy kwadratowy
 podgląd dopasowany do granic obiektów z pierwszej strony. Miniatury rysują
 ink, tekst oraz dostępne obrazy bez uruchamiania edytora.
 
-- 16: `dominantFolderColor`; 55: `LibraryCatalog`;
-  227: `_FolderTile`; 289: `_DocumentTile`; 393: `_DocumentPreview`;
-  473: `_boardPreviewBounds`; 511: `_PagePreviewPainter`;
-  579: `showFolderCoverEditor`.
+- 18: `dominantFolderColor`; 57: `LibraryCatalog`;
+  237: `_FolderTile`; 299: `_DocumentTile`; 339: `_CatalogTile`;
+  403: `_DocumentPreview`; 483: `_boardPreviewBounds`;
+  521: `_PagePreviewPainter`; 589: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -519,7 +525,8 @@ błędów, integralności i wydajności.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
   10: `EditorToolbar`; 190: dialog tła; 325: selektor gumki;
-  391: selektor kształtu; 791: `_EraserIcon`.
+  391: selektor kształtu; 552: publiczny statyczny `pickColor` współdzielony
+  z okładkami katalogu; 792: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (580):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
@@ -673,7 +680,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
 - `test/library_catalog_test.dart`: kolor dominujący, serializacja okładek,
-  start katalogu, siatka notatek/boardów, edycja okładki i powrót z edytora
+  start katalogu, pozycje menu i tytułów nad podglądem, zgodny AppBar,
+  siatka notatek/boardów, RGB/HEX okładki i powrót z edytora
 - `test/library_screen_responsive_layout_test.dart` (267):
   szeroki układ, drzewo folderów, wyrównanie timera do dolnej krawędzi
   panelu i przełączanie widoczności toolbaru

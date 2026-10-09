@@ -111,8 +111,27 @@ void main() {
 
     expect(find.byKey(const ValueKey('catalog-folders')), findsOneWidget);
     expect(find.byType(EditorToolbar), findsNothing);
+    expect(folderCoverIcon(FolderCoverShape.folder), Icons.folder_outlined);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('catalog-folder:Physics')));
+    final catalogHeader = find.ancestor(
+      of: find.byKey(const ValueKey('catalog-title')),
+      matching: find.byType(AppBar),
+    );
+    expect(catalogHeader, findsOneWidget);
+    expect(tester.widget<AppBar>(catalogHeader).titleSpacing, 44);
+    expect(tester.getSize(catalogHeader).height, 56);
+
+    final folderTile = find.byKey(const ValueKey('catalog-folder:Physics'));
+    final folderMenu = find.descendant(
+      of: folderTile,
+      matching: find.byTooltip('Actions for Physics'),
+    );
+    expect(
+      tester.getTopLeft(folderMenu).dy,
+      lessThan(tester.getTopLeft(folderTile).dy + 70),
+    );
+    await tester.tap(folderTile);
     await tester.pumpAndSettle();
 
     expect(
@@ -122,6 +141,15 @@ void main() {
     expect(
       find.byKey(ValueKey('catalog-document:${board.uid}')),
       findsOneWidget,
+    );
+    final noteTile = find.byKey(ValueKey('catalog-document:${note.uid}'));
+    final itemMenu = find.descendant(
+      of: noteTile,
+      matching: find.byTooltip('Actions for ${note.title}'),
+    );
+    expect(
+      tester.getTopLeft(itemMenu).dy,
+      lessThan(tester.getTopLeft(noteTile).dy + 70),
     );
 
     final noteRatio = find.descendant(
@@ -143,13 +171,22 @@ void main() {
         ValueKey('cover-color:${const Color(0xFF2E7D32).toARGB32()}'),
       ),
     );
+    await tester.tap(find.byKey(const ValueKey('cover-advanced-color')));
+    await tester.pumpAndSettle();
+    expect(find.text('Pick color'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(Slider), findsNWidgets(4));
+    await tester.enterText(find.byType(TextField).last, '#2B3C4D');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
     expect(controller.folderCoverFor('Physics').shape, FolderCoverShape.heart);
     expect(
       controller.folderCoverFor('Physics').iconColor,
-      const Color(0xFF2E7D32),
+      const Color(0xFF2B3C4D),
     );
 
     await tester.tap(find.byKey(ValueKey('catalog-document:${note.uid}')));

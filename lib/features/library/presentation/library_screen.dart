@@ -7,6 +7,7 @@ import '../../../core/input/soft_keyboard.dart';
 import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../board/presentation/board_screen.dart';
+import '../../editor/presentation/editor_settings_screen.dart';
 import '../../editor/state/editor_controller.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
@@ -268,6 +269,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             child: _showCatalog
                                 ? LibraryCatalog(
                                     controller: controller,
+                                    showCompactTimer: !_showLeftNavigation,
+                                    onSettings: _openCatalogSettings,
                                     folder: controller.folderNames.contains(
                                       _catalogFolder,
                                     )
@@ -411,6 +414,32 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _catalogFolder = item.folder;
     });
     controller.selectItem(item.uid);
+  }
+
+  void _openCatalogSettings() {
+    final library = context.read<LibraryController>();
+    final notebook = library.selectedItem() ??
+        (library.items.isEmpty ? null : library.items.first);
+    if (notebook == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Create a notebook or board to open settings.'),
+        ),
+      );
+      return;
+    }
+    final repository = context.read<NotebookRepository>();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChangeNotifierProvider(
+          create: (_) => EditorController(
+            repository: repository,
+            notebook: notebook,
+          ),
+          child: const EditorSettingsScreen(),
+        ),
+      ),
+    );
   }
 
   void _toggleLeftNavigation() {
