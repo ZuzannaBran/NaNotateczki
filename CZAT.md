@@ -45,6 +45,18 @@ skróconej listy testów. Nie opisuj oczywistych helperów ani każdej metody.
 
 ## 4. Styl i weryfikacja
 
+### Obowiązkowy test regresyjny przy każdej naprawie błędu
+
+- Każda naprawa błędu **musi** obejmować dodanie nowego testu regresyjnego
+  albo rozszerzenie istniejącego testu tak, aby odtwarzał naprawiany przypadek
+  i wykrywał jego ponowne wystąpienie. Nie kończ naprawy na samej zmianie kodu.
+- O ile to możliwe, potwierdź, że test nie przechodzi przed poprawką,
+  a po poprawce przechodzi. Uruchom również właściwe testy powiązanych
+  funkcji; test dołącz do odpowiedniego zestawu unit/widget/integration/CI.
+- Jeżeli automatyzacja wymaga niedostępnego sprzętu lub systemu, opisz
+  ograniczenie i dodaj powtarzalny scenariusz testu ręcznego do dokumentacji
+  testów. Nie przedstawiaj go jako zaliczonego testu automatycznego.
+
 - Stosuj standardowy styl Darta, linie do 80 znaków i posortowane importy:
   `dart:` → `package:` → względne.
 - Używaj klamer w instrukcjach sterujących, `UpperCamelCase` dla typów,
