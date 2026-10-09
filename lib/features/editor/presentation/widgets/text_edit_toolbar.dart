@@ -51,90 +51,109 @@ class TextEditToolbar extends StatelessWidget {
 
     final vertical = axis == Axis.vertical;
     final tools = <Widget>[
-            _styleButton(
-              icon: Icons.format_bold,
-              tooltip: 'Bold',
-              isActive: inline['bold'] == true,
-              onPressed: () => editorController.updateActiveTextStyle(
-                bold: inline['bold'] != true,
-              ),
-            ),
-            _styleButton(
-              icon: Icons.format_italic,
-              tooltip: 'Italic',
-              isActive: inline['italic'] == true,
-              onPressed: () => editorController.updateActiveTextStyle(
-                italic: inline['italic'] != true,
-              ),
-            ),
-            _styleButton(
-              icon: Icons.format_underline,
-              tooltip: 'Underline',
-              isActive: inline['underline'] == true,
-              onPressed: () => editorController.updateActiveTextStyle(
-                underline: inline['underline'] != true,
-              ),
-            ),
-            _styleButton(
-              icon: Icons.strikethrough_s,
-              tooltip: 'Strikethrough',
-              isActive: inline['strike'] == true,
-              onPressed: () => editorController.updateActiveTextStyle(
-                strike: inline['strike'] != true,
-              ),
-            ),
-            SizedBox(width: vertical ? 0 : 6, height: vertical ? 6 : 0),
-            vertical
-                    ? SizedBox(width: 128, child: _fontDropdown(currentFont))
-                    : _fontDropdown(currentFont),
-            SizedBox(width: vertical ? 0 : 8, height: vertical ? 8 : 0),
-            _sizeDropdown(currentSize),
-            SizedBox(width: vertical ? 0 : 8, height: vertical ? 8 : 0),
-            _colorPicker(context),
-            SizedBox(width: vertical ? 0 : 8, height: vertical ? 8 : 0),
-            _alignmentButton(
-              icon: Icons.format_align_left,
-              tooltip: 'Align left',
-              alignment: 'left',
-              current: currentAlign,
-            ),
-            _alignmentButton(
-              icon: Icons.format_align_center,
-              tooltip: 'Align center',
-              alignment: 'center',
-              current: currentAlign,
-            ),
-            _alignmentButton(
-              icon: Icons.format_align_right,
-              tooltip: 'Align right',
-              alignment: 'right',
-              current: currentAlign,
-            ),
-            _alignmentButton(
-              icon: Icons.format_align_justify,
-              tooltip: 'Justify',
-              alignment: 'justify',
-              current: currentAlign,
-            ),
-            SizedBox(width: vertical ? 0 : 8, height: vertical ? 8 : 0),
-            IconButton(
-              icon: const Icon(Icons.format_clear),
-              tooltip: 'Clear block formatting',
-              iconSize: 20,
-              onPressed: () => editorController.updateActiveTextStyle(
-                clearDecorations: true,
-                clearFontFamily: true,
-                alignment: 'left',
-              ),
-            ),
-            SizedBox(width: vertical ? 0 : 4, height: vertical ? 4 : 0),
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete text',
-              iconSize: 20,
-              onPressed: () => editorController.deleteTextBlock(block.id),
-            ),
-      
+      _styleButton(
+        icon: Icons.format_bold,
+        tooltip: 'Bold',
+        isActive: inline['bold'] == true,
+        onPressed: () => editorController.updateActiveTextStyle(
+          bold: inline['bold'] != true,
+        ),
+      ),
+      _styleButton(
+        icon: Icons.format_italic,
+        tooltip: 'Italic',
+        isActive: inline['italic'] == true,
+        onPressed: () => editorController.updateActiveTextStyle(
+          italic: inline['italic'] != true,
+        ),
+      ),
+      _styleButton(
+        icon: Icons.format_underline,
+        tooltip: 'Underline',
+        isActive: inline['underline'] == true,
+        onPressed: () => editorController.updateActiveTextStyle(
+          underline: inline['underline'] != true,
+        ),
+      ),
+      _styleButton(
+        icon: Icons.strikethrough_s,
+        tooltip: 'Strikethrough',
+        isActive: inline['strike'] == true,
+        onPressed: () => editorController.updateActiveTextStyle(
+          strike: inline['strike'] != true,
+        ),
+      ),
+      SizedBox(
+        width: vertical ? 0 : 6,
+        height: vertical ? 6 : 0,
+      ),
+      if (vertical)
+        SizedBox(width: 128, child: _fontDropdown(currentFont))
+      else
+        _fontDropdown(currentFont),
+      SizedBox(
+        width: vertical ? 0 : 8,
+        height: vertical ? 8 : 0,
+      ),
+      _sizeDropdown(currentSize),
+      SizedBox(
+        width: vertical ? 0 : 8,
+        height: vertical ? 8 : 0,
+      ),
+      _colorPicker(context),
+      SizedBox(
+        width: vertical ? 0 : 8,
+        height: vertical ? 8 : 0,
+      ),
+      _alignmentButton(
+        icon: Icons.format_align_left,
+        tooltip: 'Align left',
+        alignment: 'left',
+        current: currentAlign,
+      ),
+      _alignmentButton(
+        icon: Icons.format_align_center,
+        tooltip: 'Align center',
+        alignment: 'center',
+        current: currentAlign,
+      ),
+      _alignmentButton(
+        icon: Icons.format_align_right,
+        tooltip: 'Align right',
+        alignment: 'right',
+        current: currentAlign,
+      ),
+      _alignmentButton(
+        icon: Icons.format_align_justify,
+        tooltip: 'Justify',
+        alignment: 'justify',
+        current: currentAlign,
+      ),
+      SizedBox(
+        width: vertical ? 0 : 8,
+        height: vertical ? 8 : 0,
+      ),
+      IconButton(
+        icon: const Icon(Icons.format_clear),
+        tooltip: 'Clear block formatting',
+        iconSize: 20,
+        onPressed: () => editorController.updateActiveTextStyle(
+          clearDecorations: true,
+          clearFontFamily: true,
+          alignment: 'left',
+        ),
+      ),
+      SizedBox(
+        width: vertical ? 0 : 4,
+        height: vertical ? 4 : 0,
+      ),
+      IconButton(
+        icon: const Icon(Icons.delete_outline),
+        tooltip: 'Delete text',
+        iconSize: 20,
+        onPressed: () => editorController.deleteTextBlock(block.id),
+      ),
+
     ];
     return Padding(
       padding: vertical
@@ -209,6 +228,7 @@ class TextEditToolbar extends StatelessWidget {
     return DropdownButton<String>(
       value: value,
       isDense: true,
+      isExpanded: axis == Axis.vertical,
       onChanged: (next) {
         if (next == null) {
           return;
