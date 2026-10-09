@@ -149,6 +149,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final treeFontSize = tester.widget<Text>(find.text('Menu notebook')).style!.fontSize;
+    expect(treeFontSize, 14);
     final sidebarEdge = tester
             .getTopLeft(
               find.byKey(const ValueKey('library-navigation-toggle')),
@@ -188,6 +190,12 @@ void main() {
       expect(menuEntries, findsNWidgets(2));
       expect(find.text('Rename'), findsOneWidget);
       expect(find.text('Delete'), findsOneWidget);
+      for (final label in ['Rename', 'Delete']) {
+        expect(
+          tester.widget<Text>(find.text(label)).style?.fontSize,
+          treeFontSize,
+        );
+      }
       final rect = tester.getRect(menuEntries.first);
       expect(rect.left, closeTo(sidebarEdge, 1));
       expect(rect.top, closeTo(actionTop, 4));
@@ -233,10 +241,20 @@ void main() {
     expect(find.text('New folder'), findsOneWidget);
     expect(find.text('New notebook'), findsOneWidget);
     expect(find.text('New board'), findsOneWidget);
+    expect(
+      find.descendant(of: createEntries, matching: find.byType(Icon)),
+      findsNothing,
+    );
+    for (final label in ['New folder', 'New notebook', 'New board']) {
+      expect(
+        tester.widget<Text>(find.text(label)).style?.fontSize,
+        treeFontSize,
+      );
+    }
     final createRect = tester.getRect(createEntries.first);
     expect(createRect.left, closeTo(sidebarEdge, 1));
     expect(createRect.top, closeTo(addButtonTop, 8));
-    expect(createRect.width, closeTo(172, 1));
+    expect(createRect.width, closeTo(150, 1));
     expect(createRect.height, 36);
 
     final createMaterials = tester.widgetList<Material>(
