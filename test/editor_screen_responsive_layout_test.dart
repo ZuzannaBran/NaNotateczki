@@ -171,16 +171,20 @@ void main() {
     expect(canvasRect.bottom, closeTo(900, 0.01));
     expect(toolbarRect.top, greaterThanOrEqualTo(canvasRect.top));
     expect(toolbarRect.bottom, lessThan(canvasRect.bottom));
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(appBar.scrolledUnderElevation, 0);
+    expect(appBar.surfaceTintColor, Colors.transparent);
     final viewport = find.byKey(viewportKey);
     final page = find.byKey(const ValueKey('notebook-document-transform'));
     expect(
       tester.getTopLeft(viewport).dy,
-      closeTo(canvasRect.top + 94, 0.01),
+      closeTo(canvasRect.top + 22, 0.01),
     );
     expect(
       tester.getTopLeft(page).dy,
-      greaterThan(toolbarRect.bottom),
+      closeTo(canvasRect.top + 94, 0.01),
     );
+    expect(tester.getTopLeft(page).dy, greaterThan(toolbarRect.bottom));
     expect(
       tester.getTopLeft(overview).dy,
       closeTo(canvasRect.top + 82, 0.01),
@@ -206,9 +210,10 @@ void main() {
     await tester.pump();
     await secondFinger.moveBy(const Offset(0, -170));
     await tester.pump();
+    expect(tester.getTopLeft(page).dy, lessThan(toolbarRect.bottom));
     expect(
-      tester.getTopLeft(page).dy,
-      lessThan(toolbarRect.bottom),
+      tester.getTopLeft(viewport).dy,
+      closeTo(canvasRect.top + 22, 0.01),
     );
     await firstFinger.up();
     await secondFinger.up();
