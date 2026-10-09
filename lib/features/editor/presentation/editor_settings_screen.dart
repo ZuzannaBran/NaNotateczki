@@ -6,6 +6,7 @@ import '../../../core/diagnostics/data_integrity_log.dart';
 import '../../../core/diagnostics/optimization_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../state/editor_controller.dart';
 import '../state/input_mode.dart';
@@ -197,17 +198,35 @@ class EditorSettingsScreen extends StatelessWidget {
                       horizontal: 16,
                     ),
                     children: [
-                      SwitchListTile(
-                        key: const ValueKey('visual-dark-mode-toggle'),
+                      ListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 8,
                         ),
-                        title: const Text('Dark mode'),
+                        title: const Text('Appearance'),
                         subtitle: const Text(
-                          'Use a dark interface and contrasting grayscale ink.',
+                          'Light or dark interface with contrasting ink.',
                         ),
-                        value: preferences.darkMode,
-                        onChanged: preferences.setDarkMode,
+                        trailing: SegmentedButton<bool>(
+                          key: const ValueKey('visual-dark-mode-toggle'),
+                          showSelectedIcon: false,
+                          segments: const [
+                            ButtonSegment(
+                              value: false,
+                              icon: Icon(Icons.light_mode_outlined, size: 18),
+                              label: Text('Light'),
+                            ),
+                            ButtonSegment(
+                              value: true,
+                              icon: Icon(Icons.dark_mode_outlined, size: 18),
+                              label: Text('Dark'),
+                            ),
+                          ],
+                          selected: {preferences.darkMode},
+                          style: _appearanceButtonStyle(context),
+                          onSelectionChanged: (selection) {
+                            preferences.setDarkMode(selection.single);
+                          },
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _BackgroundSection(
@@ -244,6 +263,39 @@ class EditorSettingsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+ButtonStyle _appearanceButtonStyle(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final foreground = isDark ? AppColors.darkText : AppColors.inkBlack;
+  final selectedBackground = isDark
+      ? AppColors.darkText
+      : AppColors.inkBlack;
+  final unselectedBackground = isDark
+      ? AppColors.darkToolbar
+      : AppColors.toolbar;
+  final selectedForeground = isDark
+      ? AppColors.darkBackground
+      : AppColors.darkText;
+
+  return ButtonStyle(
+    backgroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.selected)
+          ? selectedBackground
+          : unselectedBackground,
+    ),
+    foregroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.selected)
+          ? selectedForeground
+          : foreground,
+    ),
+    side: WidgetStateProperty.all(
+      BorderSide(color: foreground.withValues(alpha: 0.75), width: 1.2),
+    ),
+    padding: WidgetStateProperty.all(
+      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    ),
+  );
 }
 
 Future<void> _showErrorsDialog(BuildContext context) {
