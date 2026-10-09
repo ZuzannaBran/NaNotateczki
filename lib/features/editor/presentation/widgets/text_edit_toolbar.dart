@@ -47,106 +47,111 @@ class TextEditToolbar extends StatelessWidget {
     final currentAlign = paragraph['align']?.toString() ?? 'left';
     final currentSize = block.fontSize.round();
 
-    return Container(
-      key: const ValueKey('text-toolbar-panel'),
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(44, 0, 12, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Theme.of(
-            context,
-          ).colorScheme.outlineVariant.withValues(alpha: 0.45),
-        ),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _styleButton(
-              icon: Icons.format_bold,
-              tooltip: 'Bold',
-              isActive: inline['bold'] == true,
-              onPressed: () => editorController.updateActiveTextStyle(
-                bold: inline['bold'] != true,
-              ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(44, 0, 44, 8),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Container(
+          key: const ValueKey('text-toolbar-panel'),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.outlineVariant.withValues(alpha: 0.45),
             ),
-            _styleButton(
-              icon: Icons.format_italic,
-              tooltip: 'Italic',
-              isActive: inline['italic'] == true,
-              onPressed: () => editorController.updateActiveTextStyle(
-                italic: inline['italic'] != true,
-              ),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _styleButton(
+                  icon: Icons.format_bold,
+                  tooltip: 'Bold',
+                  isActive: inline['bold'] == true,
+                  onPressed: () => editorController.updateActiveTextStyle(
+                    bold: inline['bold'] != true,
+                  ),
+                ),
+                _styleButton(
+                  icon: Icons.format_italic,
+                  tooltip: 'Italic',
+                  isActive: inline['italic'] == true,
+                  onPressed: () => editorController.updateActiveTextStyle(
+                    italic: inline['italic'] != true,
+                  ),
+                ),
+                _styleButton(
+                  icon: Icons.format_underline,
+                  tooltip: 'Underline',
+                  isActive: inline['underline'] == true,
+                  onPressed: () => editorController.updateActiveTextStyle(
+                    underline: inline['underline'] != true,
+                  ),
+                ),
+                _styleButton(
+                  icon: Icons.strikethrough_s,
+                  tooltip: 'Strikethrough',
+                  isActive: inline['strike'] == true,
+                  onPressed: () => editorController.updateActiveTextStyle(
+                    strike: inline['strike'] != true,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _fontDropdown(currentFont),
+                const SizedBox(width: 8),
+                _sizeDropdown(currentSize),
+                const SizedBox(width: 8),
+                _colorPicker(context),
+                const SizedBox(width: 8),
+                _alignmentButton(
+                  icon: Icons.format_align_left,
+                  tooltip: 'Align left',
+                  alignment: 'left',
+                  current: currentAlign,
+                ),
+                _alignmentButton(
+                  icon: Icons.format_align_center,
+                  tooltip: 'Align center',
+                  alignment: 'center',
+                  current: currentAlign,
+                ),
+                _alignmentButton(
+                  icon: Icons.format_align_right,
+                  tooltip: 'Align right',
+                  alignment: 'right',
+                  current: currentAlign,
+                ),
+                _alignmentButton(
+                  icon: Icons.format_align_justify,
+                  tooltip: 'Justify',
+                  alignment: 'justify',
+                  current: currentAlign,
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.format_clear),
+                  tooltip: 'Clear block formatting',
+                  iconSize: 20,
+                  onPressed: () => editorController.updateActiveTextStyle(
+                    clearDecorations: true,
+                    clearFontFamily: true,
+                    alignment: 'left',
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Delete text',
+                  iconSize: 20,
+                  onPressed: () => editorController.deleteTextBlock(block.id),
+                ),
+              ],
             ),
-            _styleButton(
-              icon: Icons.format_underline,
-              tooltip: 'Underline',
-              isActive: inline['underline'] == true,
-              onPressed: () => editorController.updateActiveTextStyle(
-                underline: inline['underline'] != true,
-              ),
-            ),
-            _styleButton(
-              icon: Icons.strikethrough_s,
-              tooltip: 'Strikethrough',
-              isActive: inline['strike'] == true,
-              onPressed: () => editorController.updateActiveTextStyle(
-                strike: inline['strike'] != true,
-              ),
-            ),
-            const SizedBox(width: 6),
-            _fontDropdown(currentFont),
-            const SizedBox(width: 8),
-            _sizeDropdown(currentSize),
-            const SizedBox(width: 8),
-            _colorPicker(context),
-            const SizedBox(width: 8),
-            _alignmentButton(
-              icon: Icons.format_align_left,
-              tooltip: 'Align left',
-              alignment: 'left',
-              current: currentAlign,
-            ),
-            _alignmentButton(
-              icon: Icons.format_align_center,
-              tooltip: 'Align center',
-              alignment: 'center',
-              current: currentAlign,
-            ),
-            _alignmentButton(
-              icon: Icons.format_align_right,
-              tooltip: 'Align right',
-              alignment: 'right',
-              current: currentAlign,
-            ),
-            _alignmentButton(
-              icon: Icons.format_align_justify,
-              tooltip: 'Justify',
-              alignment: 'justify',
-              current: currentAlign,
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.format_clear),
-              tooltip: 'Clear block formatting',
-              iconSize: 20,
-              onPressed: () => editorController.updateActiveTextStyle(
-                clearDecorations: true,
-                clearFontFamily: true,
-                alignment: 'left',
-              ),
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete text',
-              iconSize: 20,
-              onPressed: () => editorController.deleteTextBlock(block.id),
-            ),
-          ],
+          ),
         ),
       ),
     );
