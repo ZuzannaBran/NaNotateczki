@@ -962,7 +962,7 @@ class _TreeRowActions extends StatelessWidget {
     final rowBox = rowContext.findRenderObject() as RenderBox?;
     final overlayBox =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (paneBox == null || rowBox == null) {
+    if (paneBox == null || rowBox == null || overlayBox == null) {
       return;
     }
 
