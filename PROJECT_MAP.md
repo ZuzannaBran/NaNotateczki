@@ -91,13 +91,19 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 ### Wejście i preferencje
 
 - `lib/core/input/app_preferences_controller.dart` (190):
-  tryb urządzenia, akcent i trwałe `darkMode` w `app_prefs.json`;
-  brak klucza zachowuje tryb jasny;
+  tryb urządzenia, akcent, `darkMode` i czułość dotyku
+  `touchNavigationSensitivity` (0.5–2.0; domyślnie 1.0) w `app_prefs.json`.
+  Podgląd suwaka działa bez ciągłego zapisu na dysk, a puszczenie
+  suwaka utrwala ustawienie; brak klucza zachowuje dotychczasowe 1.0;
   starsze Classic, Sakura i Mint są migrowane do nowego Bubblegum.
   Dotychczasowy zapis `bubblegum` zachowuje stary wybór jako Cherry.
   8: `DeviceInputMode`;
   27:
   `AppPreferencesController`.
+- `lib/core/input/touch_navigation_scroll_physics.dart` (28):
+  mnożnik dystansu scrolla i próg startu drag listy plików i stron,
+  bez ingerencji w rysowanie czy transformację obiektów.
+  4: `TouchNavigationScrollPhysics`.
 - `lib/core/input/ink_activity_tracker.dart` (61): globalnie śledzi kontakt
   rysika i okres wyciszenia używany przez zapis/backup; exit guard może czekać
   na zakończenie aktywnego kontaktu przed flushowaniem edytora.
