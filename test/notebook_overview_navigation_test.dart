@@ -39,6 +39,15 @@ void main() {
       ),
       const Offset(0, 2800),
     );
+    expect(
+      NotebookOverviewNavigation.documentPoint(
+        mapPoint: const Offset(42, 140),
+        mapScale: mapScale,
+        mapScrollOffset: 100,
+        documentSize: docSize,
+      ),
+      Offset(410, 240 / mapScale),
+    );
   });
 
   test('minimap navigation centers the tapped point without changing zoom', () {
@@ -50,12 +59,14 @@ void main() {
       viewportSize: viewport,
       effectiveScale: scale,
       maxScrollOffset: 2200,
+      topPadding: 22,
     );
 
     expect(target.scrollOffset, 2200);
     final centeredWorldPoint = Offset(
       (viewport.width / 2 - target.pan.dx) / scale,
-      (target.scrollOffset + viewport.height / 2 - target.pan.dy) / scale,
+      (target.scrollOffset - 22 + viewport.height / 2 - target.pan.dy) /
+          scale,
     );
     expect(centeredWorldPoint.dx, closeTo(clickedPoint.dx, 0.0001));
     expect(centeredWorldPoint.dy, closeTo(clickedPoint.dy, 0.0001));
@@ -103,19 +114,16 @@ void main() {
       (pageHeight * 1.5 + pageGap) * mapScale,
     );
     await tester.tapAt(mapTopLeft + secondPageCenter);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(controller.currentPageIndex, 1);
     final pageScroll = tester.widget<SingleChildScrollView>(
-      find.ancestor(
-        of: find.byKey(const ValueKey('notebook-page-viewport')),
-        matching: find.byType(SingleChildScrollView),
-      ).first,
+      find.byKey(const ValueKey('notebook-document-scroll')),
     );
     expect(pageScroll.controller!.offset, greaterThan(50));
 
     await tester.tapAt(mapTopLeft + Offset(42, pageHeight * mapScale * 0.25));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(controller.currentPageIndex, 0);
     expect(pageScroll.controller!.offset, closeTo(0, 0.5));
 
@@ -126,7 +134,7 @@ void main() {
       (pageHeight * 2.5 + pageGap * 2) * mapScale,
     );
     await tester.tapAt(mapTopLeft + thirdPageCenter);
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(controller.currentPageIndex, 0);
     controller.endObjectTransform();
 
@@ -138,9 +146,81 @@ void main() {
     );
     await database.close();
   });
+
+  testWidgets('overview navigates using its own scroll offset', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: _notebookWithPages(12),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
+          ],
+          child: const EditorScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final overviewFinder = find.byKey(
+      const ValueKey('notebook-overview-tap-surface'),
+    );
+    final minimapScroll = tester.widget<SingleChildScrollView>(
+      find.byKey(const ValueKey('notebook-overview-scroll')),
+    );
+    await tester.drag(overviewFinder, const Offset(0, -280));
+    await tester.pumpAndSettle();
+    final overviewOffset = minimapScroll.controller!.offset;
+    expect(overviewOffset, greaterThan(50));
+
+    const tapPoint = Offset(42, 200);
+    const mapScale = 84 / 820;
+    const pageHeight = 820 * AppMetrics.a4HeightRatio;
+    const pageGap = 26.0;
+    final expectedPage = (((overviewOffset + tapPoint.dy) / mapScale) /
+            (pageHeight + pageGap))
+        .floor()
+        .clamp(0, controller.pages.length - 1);
+
+    await tester.tapAt(tester.getTopLeft(overviewFinder) + tapPoint);
+    await tester.pumpAndSettle();
+    expect(controller.currentPageIndex, expectedPage);
+    expect(
+      tester
+          .widget<SingleChildScrollView>(
+            find.byKey(const ValueKey('notebook-document-scroll')),
+          )
+          .controller!
+          .offset,
+      greaterThan(100),
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    preferences.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await database.close();
+  });
 }
 
-Notebook _notebookWithThreePages() {
+Notebook _notebookWithThreePages() => _notebookWithPages(3);
+
+Notebook _notebookWithPages(int count) {
   final now = DateTime(2026);
   return Notebook(
     uid: 'overview-navigation',
@@ -150,7 +230,7 @@ Notebook _notebookWithThreePages() {
     createdAt: now,
     updatedAt: now,
     pages: List.generate(
-      3,
+      count,
       (index) => NotePage(
         id: 'page-${index + 1}',
         title: 'Page ${index + 1}',
