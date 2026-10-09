@@ -15,8 +15,8 @@ void main() {
     final major = int.parse(match!.group(1)!);
     final minor = int.parse(match.group(2)!);
     final patch = int.parse(match.group(3)!);
-    final supported = major > 2 ||
-        (major == 2 && (minor > 3 || (minor == 3 && patch >= 20)));
+    final supported =
+        major > 2 || (major == 2 && (minor > 3 || (minor == 3 && patch >= 20)));
 
     expect(supported, isTrue, reason: 'Minimum supported version: 2.3.20.');
   });
