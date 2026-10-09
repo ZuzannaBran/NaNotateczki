@@ -71,7 +71,7 @@ po błędzie.
 - 24: `AppScope`; 31: `_AppScopeState`; 73: `didRequestAppExit`.
 - 226: `_ExitGuardOverlay`; 252: `_FinishingExitOverlay`;
   360: `_BackupScheduler`;
-  606: `flushForExit`.
+  556: `flushForExit`.
 
 ## 3. Core
 
@@ -391,7 +391,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2193 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2194 linie)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; wspólny
 zaokrąglony toolbar i pasek tekstowy są ukrywane flagą `showToolbar`;
@@ -419,8 +419,8 @@ pozostaje tylko pionowo.
 - 968: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1535: `_PageViewportClipper`; 1605: `_PageFramePainter`;
-  minimapa zaczyna się przy 2061 i renderuje wyłącznie zwykły ink.
+- 1422: `_PageViewportClipper`; 1480: `_PageFramePainter`;
+  minimapa zaczyna się przy 1587 i renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -607,7 +607,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (183):
+- `test/library_screen_responsive_layout_test.dart` (188):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką umieszczoną pod strzałką panelu
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
