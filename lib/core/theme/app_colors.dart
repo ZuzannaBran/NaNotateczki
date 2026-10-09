@@ -52,6 +52,7 @@ class AppColors {
   static const darkToolbar = Color(0xFF3A3B39);
   static const darkActive = Color(0xFF4A4B48);
   static const darkPaper = Color(0xFF5A5B57);
+  static const darkCanvas = Color(0xFF50514D);
   static const darkText = Color(0xFFEEECE6);
   static const darkOutline = Color(0xFF73746F);
 
