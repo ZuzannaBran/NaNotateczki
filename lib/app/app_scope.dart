@@ -207,7 +207,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               return Consumer<AppPreferencesController>(
                 builder: (context, preferences, _) {
                   return Theme(
-                    data: AppTheme.light(accentColor: preferences.accentColor),
+                    data: preferences.darkMode
+                        ? AppTheme.dark()
+                        : AppTheme.light(
+                            accentColor: preferences.accentColor,
+                          ),
                     child: _ExitGuardOverlay(
                       finishingExit: _finishingExit,
                       child: child ?? const SizedBox.shrink(),
