@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
+import 'package:program/features/editor/presentation/widgets/editor_toolbar.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -104,6 +106,78 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
+    await database.close();
+  });
+
+  testWidgets('toolbar toggle hides tools on board and notebook', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final board = await repository.createBoard();
+    final notebook = await repository.createNotebook();
+    final preferences = AppPreferencesController();
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await controller.loadItems();
+    await controller.selectItem(board.uid);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            Provider<NotebookRepository>.value(value: repository),
+          ],
+          child: const LibraryScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('NaNotateczki Projects'), findsOneWidget);
+    expect(find.byType(EditorToolbar), findsOneWidget);
+    final panel = tester.widget<Container>(
+      find.byKey(const ValueKey('editor-toolbar-panel')),
+    );
+    expect(
+      (panel.decoration as BoxDecoration).borderRadius,
+      BorderRadius.circular(14),
+    );
+    final navigationToggle = find.byKey(
+      const ValueKey('library-navigation-toggle'),
+    );
+    final toolbarToggle = find.byKey(const ValueKey('editor-toolbar-toggle'));
+    expect(
+      tester.getTopLeft(toolbarToggle).dy,
+      greaterThan(tester.getBottomLeft(navigationToggle).dy),
+    );
+
+    await tester.tap(find.byTooltip('Hide toolbar'));
+    await tester.pump();
+    expect(find.byType(EditorToolbar), findsNothing);
+    expect(find.byTooltip('Show toolbar'), findsOneWidget);
+
+    await controller.selectItem(notebook.uid);
+    await tester.pump();
+    expect(find.byType(EditorToolbar), findsNothing);
+
+    await tester.tap(find.byTooltip('Show toolbar'));
+    await tester.pump();
+    expect(find.byType(EditorToolbar), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    preferences.dispose();
     await database.close();
   });
 }
