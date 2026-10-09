@@ -174,6 +174,7 @@ class StudyPlannerController extends ChangeNotifier {
   String? error;
   int noticeRevision = 0;
   String? notice;
+  bool noticeRequiresReviewPrompt = false;
 
   List<StudySession> get sessions => List.unmodifiable(_sessions);
   StudySession? get active {
@@ -415,7 +416,7 @@ class StudyPlannerController extends ChangeNotifier {
         current.finishedAt = boundary;
         current.remainingSeconds = 0;
         current.deadline = null;
-        _announce("Great job! Time's up.");
+        _announce("Great job! Time's up.", promptReview: true);
       }
       changed = true;
     }
@@ -426,7 +427,8 @@ class StudyPlannerController extends ChangeNotifier {
     }
   }
 
-  void _announce(String message) {
+  void _announce(String message, {bool promptReview = false}) {
+    noticeRequiresReviewPrompt = promptReview;
     notice = message;
     noticeRevision++;
     notifyListeners();
