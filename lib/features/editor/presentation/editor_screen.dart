@@ -1208,10 +1208,10 @@ class _EditorScreenState extends State<EditorScreen> {
                                                           decoration: BoxDecoration(
                                                             color:
                                                                 Theme.of(context)
-                                                                            .brightness ==
-                                                                        Brightness.dark
-                                                                    ? AppColors.darkPaper
-                                                                    : AppColors.paper,
+                                                                        .brightness ==
+                                                                    Brightness.dark
+                                                                ? AppColors.darkPaper
+                                                                : AppColors.paper,
                                                             boxShadow: const [
                                                               BoxShadow(
                                                                 color: AppColors
