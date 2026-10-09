@@ -446,7 +446,7 @@ pozostaje tylko pionowo.
 - 980: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1459: `_PageViewportClipper`; 1517: `_PageFramePainter`;
+- 1463: `_PageViewportClipper`; 1521: `_PageFramePainter`;
   minimapa zaczyna się przy 1624 i renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (567 linii)
@@ -484,8 +484,8 @@ błędów, integralności i wydajności.
   aktualny kolor wyświetlania, a styl pozostaje lekki i obrysowy.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
-  10: `EditorToolbar`; 190: dialog tła; 325: selektor gumki;
-  391: selektor kształtu; 791: `_EraserIcon`.
+  10: `EditorToolbar`; 190: dialog tła; 344: selektor gumki;
+  412: selektor kształtu; 819: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (580):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
@@ -679,7 +679,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (108): paleta dark, kontrast szarości,
+- `test/dark_mode_theme_test.dart` (115): paleta dark, kontrast szarości,
   domyślny tryb jasny i przełącznik Visual.
 
 
