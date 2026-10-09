@@ -409,7 +409,7 @@ class StudyTimerCard extends StatelessWidget {
                 label: const Text('Start session'),
               ),
               TextButton.icon(
-                onPressed: planner.isLoaded
+                onPressed: planner.isLoaded && planner.error == null
                     ? () => showStudySessionEditor(
                         context,
                         technique: StudyTechnique.pomodoro,
