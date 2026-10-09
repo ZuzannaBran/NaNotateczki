@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:program/core/input/app_preferences_controller.dart';
+import 'package:program/core/input/touch_navigation_scroll_physics.dart';
 import 'package:program/core/theme/app_metrics.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/editor_screen.dart';
@@ -240,6 +241,25 @@ void main() {
     await firstFinger.up();
     await secondFinger.up();
     await tester.pump();
+
+    controller.setTool(DrawingTool.edit);
+    preferences.previewTouchNavigationSensitivity(1.8);
+    await tester.pump();
+    final pageScrollViews = tester.widgetList<SingleChildScrollView>(
+      find.descendant(
+        of: canvas,
+        matching: find.byType(SingleChildScrollView),
+      ),
+    );
+    expect(
+      pageScrollViews.any(
+        (view) =>
+            view.physics is TouchNavigationScrollPhysics &&
+            (view.physics! as TouchNavigationScrollPhysics).sensitivity ==
+                1.8,
+      ),
+      isTrue,
+    );
 
     await tester.binding.setSurfaceSize(const Size(1200, 420));
     await tester.pump();
