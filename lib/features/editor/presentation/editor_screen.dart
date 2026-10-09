@@ -2026,9 +2026,10 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                       child: AnimatedBuilder(
                         animation: _minimapScrollController,
                         builder: (context, child) {
-                          final scrollOffset = _minimapScrollController.hasClients
-                              ? _minimapScrollController.offset
-                              : 0.0;
+                          final scrollOffset =
+                              _minimapScrollController.hasClients
+                                  ? _minimapScrollController.offset
+                                  : 0.0;
                           final rect = indicatorRectInContent
                               .shift(Offset(0, -scrollOffset))
                               .intersect(
