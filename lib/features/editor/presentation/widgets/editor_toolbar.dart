@@ -12,14 +12,12 @@ class EditorToolbar extends StatelessWidget {
     required this.controller,
     required this.onInsertPressed,
     required this.onExportSelected,
-    this.axis = Axis.horizontal,
     super.key,
   });
 
   final EditorController controller;
   final VoidCallback onInsertPressed;
   final ValueChanged<NotebookExportFormat> onExportSelected;
-  final Axis axis;
 
   @override
   Widget build(BuildContext context) {
@@ -30,152 +28,122 @@ class EditorToolbar extends StatelessWidget {
             controller.activeTextBlockId != null ||
             controller.activeImageBlockId != null ||
             (controller.lassoSelection?.isEmpty == false);
-        final vertical = axis == Axis.vertical;
-        final tools = <Widget>[
-          _toolButton(
-            context: context,
-            icon: Icons.brush_outlined,
-            label: 'Pen',
-            tool: DrawingTool.pen,
-          ),
-          _toolButton(
-            context: context,
-            icon: Icons.edit_outlined,
-            label: 'Highlighter',
-            tool: DrawingTool.highlighter,
-          ),
-          _eraserSelector(context),
-          _shapeSelector(context),
-          _toolButton(
-            context: context,
-            icon: Icons.text_fields,
-            label: 'Text',
-            tool: DrawingTool.text,
-          ),
-          _toolButton(
-            context: context,
-            icon: Icons.highlight_alt_outlined,
-            label: 'Lasso / Select',
-            tool: DrawingTool.lasso,
-          ),
-          _toolButton(
-            context: context,
-            icon: Icons.open_with,
-            label: 'Move',
-            tool: DrawingTool.edit,
-          ),
-          _actionButton(
-            context: context,
-            icon: Icons.delete_outline,
-            label: 'Delete',
-            isActive: false,
-            onPressed: canDelete
-                ? controller.deleteActiveElement
-                : null,
-          ),
-          _actionButton(
-            context: context,
-            icon: Icons.add_circle_outline,
-            label: 'Insert',
-            isActive: false,
-            onPressed: onInsertPressed,
-          ),
-          _backgroundButton(context),
-          SizedBox(
-            width: vertical ? 0 : 12,
-            height: vertical ? 8 : 0,
-          ),
-          for (var i = 0; i < controller.quickColors.length; i++)
-            _colorDot(
-              context,
-              color: controller.quickColors[i],
-              selected:
-                  controller.inkColor == controller.quickColors[i],
-              onSelect: () =>
-                  controller.setColor(controller.quickColors[i]),
-              onEdit: (color) => controller.setQuickColor(i, color),
-            ),
-          if (vertical)
-            RotatedBox(
-              quarterTurns: 3,
-              child: SizedBox(
-                width: 140,
-                child: Slider(
-                  value: controller.inkStrokeWidth,
-                  min: 1.0,
-                  max: 12.0,
-                  onChanged: controller.setStrokeWidth,
-                ),
-              ),
-            )
-          else
-            SizedBox(
-              width: 140,
-              child: Slider(
-                value: controller.inkStrokeWidth,
-                min: 1.0,
-                max: 12.0,
-                onChanged: controller.setStrokeWidth,
-              ),
-            ),
-          SizedBox(
-            width: vertical ? 0 : 12,
-            height: vertical ? 8 : 0,
-          ),
-          ValueListenableBuilder<int>(
-            valueListenable: controller.historyRevision,
-            builder: (context, _, _) => Flex(
-              direction: axis,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.undo, size: 20),
-                  onPressed: controller.canUndo
-                      ? controller.undo
-                      : null,
-                  tooltip: 'Undo',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.redo, size: 20),
-                  onPressed: controller.canRedo
-                      ? controller.redo
-                      : null,
-                  tooltip: 'Redo',
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: vertical ? 0 : 8,
-            height: vertical ? 8 : 0,
-          ),
-          _exportButton(),
-        ];
         return Padding(
-          padding: vertical
-              ? const EdgeInsets.symmetric(horizontal: 6, vertical: 8)
-              : const EdgeInsets.fromLTRB(52, 8, 52, 8),
+          padding: const EdgeInsets.fromLTRB(52, 8, 52, 8),
           child: Align(
-            alignment: vertical ? Alignment.center : Alignment.topCenter,
+            alignment: Alignment.topCenter,
             child: Container(
               key: const ValueKey('editor-toolbar-panel'),
-              padding: vertical
-                  ? const EdgeInsets.symmetric(horizontal: 6, vertical: 18)
-                  : const EdgeInsets.symmetric(horizontal: 22, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 3),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: Theme.of(context)
-                      .colorScheme.outlineVariant.withValues(alpha: 0.45),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.45),
                 ),
               ),
               child: SingleChildScrollView(
-                scrollDirection: axis,
-                child: Flex(
-                  direction: axis,
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: tools,
+                  children: [
+                    _toolButton(
+                      context: context,
+                      icon: Icons.brush_outlined,
+                      label: 'Pen',
+                      tool: DrawingTool.pen,
+                    ),
+                    _toolButton(
+                      context: context,
+                      icon: Icons.edit_outlined,
+                      label: 'Highlighter',
+                      tool: DrawingTool.highlighter,
+                    ),
+                    _eraserSelector(context),
+                    _shapeSelector(context),
+                    _toolButton(
+                      context: context,
+                      icon: Icons.text_fields,
+                      label: 'Text',
+                      tool: DrawingTool.text,
+                    ),
+                    _toolButton(
+                      context: context,
+                      icon: Icons.highlight_alt_outlined,
+                      label: 'Lasso / Select',
+                      tool: DrawingTool.lasso,
+                    ),
+                    _toolButton(
+                      context: context,
+                      icon: Icons.open_with,
+                      label: 'Move',
+                      tool: DrawingTool.edit,
+                    ),
+                    _actionButton(
+                      context: context,
+                      icon: Icons.delete_outline,
+                      label: 'Delete',
+                      isActive: false,
+                      onPressed: canDelete
+                          ? controller.deleteActiveElement
+                          : null,
+                    ),
+                    _actionButton(
+                      context: context,
+                      icon: Icons.add_circle_outline,
+                      label: 'Insert',
+                      isActive: false,
+                      onPressed: onInsertPressed,
+                    ),
+                    _backgroundButton(context),
+                    const SizedBox(width: 12),
+                    for (var i = 0; i < controller.quickColors.length; i++)
+                      _colorDot(
+                        context,
+                        color: controller.quickColors[i],
+                        selected:
+                            controller.inkColor == controller.quickColors[i],
+                        onSelect: () =>
+                            controller.setColor(controller.quickColors[i]),
+                        onEdit: (color) => controller.setQuickColor(i, color),
+                      ),
+                    SizedBox(
+                      width: 140,
+                      child: Slider(
+                        value: controller.inkStrokeWidth,
+                        min: 1.0,
+                        max: 12.0,
+                        onChanged: controller.setStrokeWidth,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ValueListenableBuilder<int>(
+                      valueListenable: controller.historyRevision,
+                      builder: (context, _, _) => Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.undo, size: 20),
+                            onPressed: controller.canUndo
+                                ? controller.undo
+                                : null,
+                            tooltip: 'Undo',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.redo, size: 20),
+                            onPressed: controller.canRedo
+                                ? controller.redo
+                                : null,
+                            tooltip: 'Redo',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _exportButton(),
+                  ],
                 ),
               ),
             ),

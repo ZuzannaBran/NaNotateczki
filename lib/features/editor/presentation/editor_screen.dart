@@ -15,7 +15,6 @@ import 'package:flutter/gestures.dart'
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../notebook/domain/drawing_tool.dart';
@@ -89,11 +88,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
   double get _effectivePageScale => _pageScale * _responsivePageScale;
 
-  double get _firstPageInset => widget.showToolbar &&
-          context.read<AppPreferencesController>().notebookToolbarPlacement ==
-              ToolbarPlacement.top
-      ? _mainToolbarClearance
-      : 0.0;
+  double get _firstPageInset =>
+      widget.showToolbar ? _mainToolbarClearance : 0.0;
 
   @override
   void initState() {
@@ -983,9 +979,6 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
-    final placement = context.watch<AppPreferencesController>()
-        .notebookToolbarPlacement;
-    final verticalToolbar = placement != ToolbarPlacement.top;
     final useWideTitleInset = MediaQuery.sizeOf(context).width >= 600;
     final activeTextBlockId = controller.activeTextBlockId;
     final activeTextBlock = activeTextBlockId == null
@@ -993,7 +986,7 @@ class _EditorScreenState extends State<EditorScreen> {
         : controller.findTextBlockById(activeTextBlockId);
 
     final commands = _commands(controller);
-    final toolbarOffset = widget.showToolbar && !verticalToolbar
+    final toolbarOffset = widget.showToolbar
         ? _mainToolbarClearance +
               (activeTextBlock == null ? 0.0 : 62.0)
         : 0.0;
@@ -1410,7 +1403,7 @@ class _EditorScreenState extends State<EditorScreen> {
             },
           ),
         ),
-        if (widget.showToolbar && !verticalToolbar)
+        if (widget.showToolbar)
           Positioned(
             top: 0,
             left: 0,
@@ -1429,31 +1422,6 @@ class _EditorScreenState extends State<EditorScreen> {
                     block: activeTextBlock,
                   ),
               ],
-            ),
-          ),
-        if (widget.showToolbar && verticalToolbar)
-          Positioned(
-            top: 8,
-            bottom: 8,
-            right: 0,
-            width: 120,
-            child: EditorToolbar(
-              controller: controller,
-              axis: Axis.vertical,
-              onInsertPressed: commands.insertFile,
-              onExportSelected: commands.export,
-            ),
-          ),
-        if (widget.showToolbar && verticalToolbar && activeTextBlock != null)
-          Positioned(
-            top: 8,
-            bottom: 8,
-            right: 124,
-            width: 152,
-            child: TextEditToolbar(
-              editorController: controller,
-              block: activeTextBlock,
-              axis: Axis.vertical,
             ),
           ),
       ],

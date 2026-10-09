@@ -136,35 +136,6 @@ void main() {
     await tester.pump();
     expect(controller.tool, DrawingTool.highlighter);
 
-    for (final (placement, onLeft) in [
-      (ToolbarPlacement.left, true),
-      (ToolbarPlacement.right, false),
-    ]) {
-      await preferences.setBoardToolbarPlacement(placement);
-      await tester.pump();
-      expect(tester.getRect(canvas), canvasRect);
-      final panel = tester.getRect(toolbar);
-      if (onLeft) {
-        expect(panel.right, lessThanOrEqualTo(120));
-      } else {
-        expect(panel.left, greaterThanOrEqualTo(1200 - 120));
-      }
-      final scroll = find.descendant(
-        of: toolbar,
-        matching: find.byType(Scrollable),
-      );
-      expect(
-        tester.widget<Scrollable>(scroll).axisDirection,
-        AxisDirection.down,
-      );
-      expect(
-        tester.state<ScrollableState>(scroll).position.maxScrollExtent,
-        greaterThan(0),
-      );
-    }
-    await preferences.setBoardToolbarPlacement(ToolbarPlacement.top);
-    await tester.pump();
-
     await tester.pumpWidget(app(showToolbar: false));
     await tester.pump();
     expect(toolbar, findsNothing);

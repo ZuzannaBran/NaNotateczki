@@ -228,34 +228,7 @@ class EditorSettingsScreen extends StatelessWidget {
                           },
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      _ToolbarPlacementSetting(
-                        key: const ValueKey('visual-board-toolbar-placement'),
-                        title: 'Board toolbar',
-                        subtitle: 'Choose where board tools are displayed.',
-                        options: const [
-                          ToolbarPlacement.top,
-                          ToolbarPlacement.left,
-                          ToolbarPlacement.right,
-                        ],
-                        selected: preferences.boardToolbarPlacement,
-                        onChanged: preferences.setBoardToolbarPlacement,
-                      ),
                       const SizedBox(height: 12),
-                      _ToolbarPlacementSetting(
-                        key: const ValueKey(
-                          'visual-notebook-toolbar-placement',
-                        ),
-                        title: 'Notebook toolbar',
-                        subtitle: 'Choose where notebook tools are displayed.',
-                        options: const [
-                          ToolbarPlacement.top,
-                          ToolbarPlacement.right,
-                        ],
-                        selected: preferences.notebookToolbarPlacement,
-                        onChanged: preferences.setNotebookToolbarPlacement,
-                      ),
-                      const SizedBox(height: 20),
                       _BackgroundSection(
                         title: 'Notebook default',
                         settings: controller.defaultBackgroundSettingsForKind(
@@ -287,64 +260,6 @@ class EditorSettingsScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ToolbarPlacementSetting extends StatelessWidget {
-  const _ToolbarPlacementSetting({
-    required this.title,
-    required this.subtitle,
-    required this.options,
-    required this.selected,
-    required this.onChanged,
-    super.key,
-  });
-
-  final String title;
-  final String subtitle;
-  final List<ToolbarPlacement> options;
-  final ToolbarPlacement selected;
-  final ValueChanged<ToolbarPlacement> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 4),
-          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 8),
-          SegmentedButton<ToolbarPlacement>(
-            showSelectedIcon: false,
-            segments: [
-              for (final placement in options)
-                ButtonSegment(
-                  value: placement,
-                  icon: Icon(
-                    switch (placement) {
-                      ToolbarPlacement.top => Icons.vertical_align_top,
-                      ToolbarPlacement.left => Icons.align_horizontal_left,
-                      ToolbarPlacement.right => Icons.align_horizontal_right,
-                    },
-                    size: 18,
-                  ),
-                  label: Text(switch (placement) {
-                    ToolbarPlacement.top => 'Top',
-                    ToolbarPlacement.left => 'Left',
-                    ToolbarPlacement.right => 'Right',
-                  }),
-                ),
-            ],
-            selected: {selected},
-            style: _appearanceButtonStyle(context),
-            onSelectionChanged: (values) => onChanged(values.single),
-          ),
-        ],
       ),
     );
   }

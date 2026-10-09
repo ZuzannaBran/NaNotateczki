@@ -116,8 +116,6 @@ void main() {
       ),
     );
     final preferences = AppPreferencesController();
-    expect(preferences.boardToolbarPlacement, ToolbarPlacement.top);
-    expect(preferences.notebookToolbarPlacement, ToolbarPlacement.top);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -141,48 +139,6 @@ void main() {
 
     await tester.tap(find.text('Visual'));
     await tester.pumpAndSettle();
-
-    final boardFinder = find.byKey(
-      const ValueKey('visual-board-toolbar-placement'),
-    );
-    final notebookFinder = find.byKey(
-      const ValueKey('visual-notebook-toolbar-placement'),
-    );
-    final boardControl = find.descendant(
-      of: boardFinder,
-      matching: find.byType(SegmentedButton<ToolbarPlacement>),
-    );
-    final notebookControl = find.descendant(
-      of: notebookFinder,
-      matching: find.byType(SegmentedButton<ToolbarPlacement>),
-    );
-    expect(
-      tester.widget<SegmentedButton<ToolbarPlacement>>(boardControl).selected,
-      {ToolbarPlacement.top},
-    );
-    expect(
-      tester.widget<SegmentedButton<ToolbarPlacement>>(notebookControl).segments
-          .map((segment) => segment.value),
-      [ToolbarPlacement.top, ToolbarPlacement.right],
-    );
-    await tester.tap(
-      find.descendant(of: boardFinder, matching: find.text('Left')),
-    );
-    await tester.pump();
-    expect(preferences.boardToolbarPlacement, ToolbarPlacement.left);
-    await tester.tap(
-      find.descendant(of: boardFinder, matching: find.text('Right')),
-    );
-    await tester.pump();
-    expect(preferences.boardToolbarPlacement, ToolbarPlacement.right);
-    await tester.tap(
-      find.descendant(of: notebookFinder, matching: find.text('Right')),
-    );
-    await tester.pump();
-    expect(preferences.notebookToolbarPlacement, ToolbarPlacement.right);
-    await preferences.setNotebookToolbarPlacement(ToolbarPlacement.left);
-    expect(preferences.notebookToolbarPlacement, ToolbarPlacement.right);
-
     final switchFinder = find.byKey(
       const ValueKey('visual-dark-mode-toggle'),
     );

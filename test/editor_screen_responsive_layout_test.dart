@@ -250,34 +250,6 @@ void main() {
 
     await tester.binding.setSurfaceSize(const Size(1200, 900));
     await tester.pump();
-
-    await preferences.setNotebookToolbarPlacement(ToolbarPlacement.right);
-    await tester.pump();
-    expect(tester.getRect(canvas), canvasRect);
-    final sideToolbar = tester.getRect(toolbar);
-    expect(sideToolbar.left, greaterThanOrEqualTo(1200 - 120));
-    expect(
-      tester.widget<Scrollable>(
-        find.descendant(
-          of: toolbar,
-          matching: find.byType(Scrollable),
-        ),
-      ).axisDirection,
-      AxisDirection.down,
-    );
-    expect(
-      tester.state<ScrollableState>(
-        find.descendant(
-          of: toolbar,
-          matching: find.byType(Scrollable),
-        ),
-      ).position.maxScrollExtent,
-      greaterThan(0),
-    );
-    await tester.tap(find.byTooltip('Pen'));
-    await tester.pump();
-    expect(controller.tool, DrawingTool.pen);
-
     await tester.pumpWidget(app(showToolbar: false));
     await tester.pump();
 

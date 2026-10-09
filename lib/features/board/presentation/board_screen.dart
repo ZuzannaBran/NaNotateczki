@@ -13,7 +13,6 @@ import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/diagnostics/board_scene_perf_tracker.dart';
-import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../editor/presentation/editor_commands.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
@@ -499,9 +498,6 @@ class _BoardScreenState extends State<BoardScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
-    final placement = context.watch<AppPreferencesController>()
-        .boardToolbarPlacement;
-    final verticalToolbar = placement != ToolbarPlacement.top;
     final useWideTitleInset = MediaQuery.sizeOf(context).width >= 600;
     final activeTextBlockId = controller.activeTextBlockId;
     final activeTextBlock = activeTextBlockId == null
@@ -689,7 +685,7 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
         ),
-        if (widget.showToolbar && !verticalToolbar)
+        if (widget.showToolbar)
           Positioned(
             top: 0,
             left: 0,
@@ -708,33 +704,6 @@ class _BoardScreenState extends State<BoardScreen> {
                     block: activeTextBlock,
                   ),
               ],
-            ),
-          ),
-        if (widget.showToolbar && verticalToolbar)
-          Positioned(
-            top: 8,
-            bottom: 8,
-            left: placement == ToolbarPlacement.left ? 0 : null,
-            right: placement == ToolbarPlacement.right ? 0 : null,
-            width: 120,
-            child: EditorToolbar(
-              controller: controller,
-              axis: Axis.vertical,
-              onInsertPressed: commands.insertFile,
-              onExportSelected: commands.export,
-            ),
-          ),
-        if (widget.showToolbar && verticalToolbar && activeTextBlock != null)
-          Positioned(
-            top: 8,
-            bottom: 8,
-            left: placement == ToolbarPlacement.left ? 124 : null,
-            right: placement == ToolbarPlacement.right ? 124 : null,
-            width: 152,
-            child: TextEditToolbar(
-              editorController: controller,
-              block: activeTextBlock,
-              axis: Axis.vertical,
             ),
           ),
       ],

@@ -90,15 +90,14 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 
 ### Wejście i preferencje
 
-- `lib/core/input/app_preferences_controller.dart` (211):
-  tryb urządzenia, akcent, `darkMode`, `boardToolbarPlacement` i
-  `notebookToolbarPlacement` w `app_prefs.json`. Domyślnie pasek jest
-  na górze; board obsługuje Top/Left/Right, notebook Top/Right.
-  Nieznane wartości i zabronione Left dla notebooka są ignorowane;
+- `lib/core/input/app_preferences_controller.dart` (156):
+  tryb urządzenia, akcent i trwałe `darkMode` w `app_prefs.json`;
+  brak klucza zachowuje tryb jasny;
   starsze Classic, Sakura i Mint są migrowane do nowego Bubblegum.
   Dotychczasowy zapis `bubblegum` zachowuje stary wybór jako Cherry.
-  8: `DeviceInputMode`; 10: `ToolbarPlacement`;
-  29: `AppPreferencesController`.
+  8: `DeviceInputMode`;
+  27:
+  `AppPreferencesController`.
 - `lib/core/input/ink_activity_tracker.dart` (61): globalnie śledzi kontakt
   rysika i okres wyciszenia używany przez zapis/backup; exit guard może czekać
   na zakończenie aktywnego kontaktu przed flushowaniem edytora.
@@ -410,15 +409,12 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2283 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2251 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
 toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
-canvasem, zamiast zajmować jego wysokość. Toolbar notebooka może być
-poziomo na górze lub pionowo po prawej stronie, zgodnie z ustawieniem
-`notebookToolbarPlacement`; pionowy pasek ma własne przewijanie.
-`showToolbar` steruje widocznością. Początkowe 72 px odsunięcia strony
-w trybie Top realizuje
+canvasem, zamiast zajmować jego wysokość. `showToolbar` steruje
+widocznością nakładek. Początkowe 72 px odsunięcia strony realizuje
 `_pagePan` wewnątrz viewportu, zamiast dodatkowego paddingu przewijania.
 Viewport pozostaje 22 px od górnej krawędzi canvasa, więc strona nie jest
 ucinana przez pusty pas, gdy użytkownik wsuwa ją pod toolbar.
@@ -446,40 +442,45 @@ poziomo dotykiem także wtedy, gdy jest węższa od viewportu; clamp pozwala jej
 dojść od lewej do prawej granicy pasa, ale nigdy wejść pod margines. Bleed
 pozostaje tylko pionowo.
 
-- 34: `EditorScreen`; 43: `_EditorScreenState`.
-- 44: `_logicalPageWidth`; 92: `_effectivePageScale` — skala okna pomnożona
+- 33: `EditorScreen`; 42: `_EditorScreenState`.
+- 43: `_logicalPageWidth`; 91: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
 - 209–630: gesty pan/zoom, blokada viewportu i transformacje.
 - 802–888: busy overlay, import/eksport i clipboard.
 - 1007: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 984: główny `build`; pasek tekstu jest renderowany na podstawie
+- 980: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1495: `_PageViewportClipper`; 1553: `_PageFramePainter`;
-  minimapa zaczyna się przy 1656 i renderuje wyłącznie zwykły ink.
+- 1463: `_PageViewportClipper`; 1521: `_PageFramePainter`;
+  minimapa zaczyna się przy 1624 i renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_commands.dart` (170 linii)
 
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (703 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (618 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
 oraz `darkActive`/`darkToolbar` w ciemnym. Zaznaczona opcja ma
-mocniejszą ramkę, bez czarnego lub białego tła. Dodatkowo dwa
-niezależne selektory położenia narzędzi: Board (Top/Left/Right),
-Notebook (Top/Right); ustawienia są trwałe i zmieniają aktywny
-dokument bez konieczności ponownego uruchamiania. Pozostałe sekcje
+mocniejszą ramkę, bez czarnego lub białego tła. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
 
-- 16: `EditorSettingsScreen`; 295: `_ToolbarPlacementSetting`;
-  353: `_appearanceButtonStyle`; 385: `_showErrorsDialog`;
-  467: `_showDataIntegrityDialog`;
-  554: `_showOptimizationDialog`; 640: `_BackgroundSection`.
+- 16:
+  `EditorSettingsScreen`;
+  242:
+  `_showErrorsDialog`;
+  324:
+  `_showDataIntegrityDialog`;
+  411:
+  `_showOptimizationDialog`;
+  497:
+  `_AccentColorSection`;
+  609:
+  `_BackgroundSection`.
 
 ### Widgety edytora
 
@@ -489,22 +490,19 @@ obsługują ustawienia tła i podgląd logów diagnostycznych.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (958):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (926):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
-  Tryb pionowy zachowuje orientację ikon, układa je w kolumnie, obraca
-  jedynie suwak grubości i umożliwia przewijanie na krótkich ekranach.
-  Zewnętrzne marginesy w trybie Top wynoszą po 52 px,
-  wewnętrzne boczne po 22 px, a pionowy padding 3 px.
-  Pasek pionowy zajmuje pas 120 px przy krawędzi canvasa;
+  Zewnętrzne marginesy wynoszą po 52 px, wewnętrzne boczne po 22 px,
+  a pionowy padding 3 px; przycisk zwijania pozostaje dostępny;
   ikony pobierają kontrast z motywu, próbki szarości pokazują ich
   aktualny kolor wyświetlania, a styl pozostaje lekki i obrysowy.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
-  10: `EditorToolbar`; 230: dialog tła; 376: selektor gumki;
-  444: selektor kształtu; 851: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (614):
+  10: `EditorToolbar`; 190: dialog tła; 344: selektor gumki;
+  412: selektor kształtu; 819: `_EraserIcon`.
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (583):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
   underline, strike, font, rozmiar, kolor, wyrównanie, reset stylu i usunięcie.
@@ -513,10 +511,8 @@ obsługują ustawienia tła i podgląd logów diagnostycznych.
   Pasek używa takiej samej kapsułki: zwęża się do zawartości,
   pozostaje wycentrowany i przewija poziomo na wąskich ekranach.
   Ma 52 px zewnętrznego i 22 px wewnętrznego marginesu bocznego
-  oraz 2 px pionowego paddingu. W trybie pionowym kontrolki
-  są w przewijanej kolumnie obok głównego paska, z dropdownem czcionki
-  o ograniczonej szerokości.
-  9: `TextEditToolbar`; 45: `build`.
+  oraz 2 px pionowego paddingu.
+  9: `TextEditToolbar`; 43: `build`.
 
 - `lib/features/editor/presentation/interaction/object_transform_engine.dart` (362):
   wspólny silnik move/resize dla obiektów nie-ink. Używa typów
@@ -613,7 +609,7 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (916 linii)
+### `lib/features/board/presentation/board_screen.dart` (885 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -624,8 +620,6 @@ układu współrzędnych. Po zakończeniu gestu granice odświeżają się.
 Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 `QuillController`. Główny toolbar i pasek tekstu respektują `showToolbar`
 i unoszą się na nakładce nad canvasem, zamiast zmniejszać jego wysokość.
-`boardToolbarPlacement` umożliwia pasek poziomy na górze albo pionowy
-po lewej/prawej, z oddzielną przewijaną kolumną edycji tekstu.
 Board ma stały boczny odstęp 16 px, ale nie ma marginesu u góry,
 więc zawartość można swobodnie przesuwać za toolbar. Nagłówek ma
 wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
@@ -633,9 +627,9 @@ wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 - 28: `BoardScreen`; 37: `_BoardScreenState`.
 - 59: `_buildBoardRect`; 67–388: obsługa pointerów i viewportu.
 - 499: główny `build`; import/eksport i skróty przez `EditorCommands`.
-- 775: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
-- 811: `_BoardPaintProbe`; 828: `_RenderBoardPaintProbe`;
-  851: `_BoardZoomControls`.
+- 742: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
+- 778: `_BoardPaintProbe`; 795: `_RenderBoardPaintProbe`;
+  818: `_BoardZoomControls`.
 
 ## 10. Platformy, web i testy
 
@@ -673,13 +667,12 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (408):
+- `test/library_screen_responsive_layout_test.dart` (326):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
   wyśrodkowanie, zwężanie kapsułek, wysokość, odstępy boczne
-  przewijanie poziome i pionowe, działanie narzędzi w kolumnach
-  oraz pasek tekstowy w orientacji pionowej
+  oraz przewijanie na wąskim ekranie
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
@@ -689,30 +682,27 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
   brak mutacji źródła oraz zgodność rozmiaru segmentów z zoomem
-- `test/editor_screen_responsive_layout_test.dart` (374):
+- `test/editor_screen_responsive_layout_test.dart` (346):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
   poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
-  minimapa na krótkim ekranie, pionowy pasek po prawej stronie
-  i interaktywność narzędzi
+  minimapa na krótkim ekranie i interaktywność narzędzi
 - `test/page_overlay_text_gestures_test.dart` (432): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
-- `test/board_scene_bounds_test.dart` (182): stały układ współrzędnych
+- `test/board_scene_bounds_test.dart` (153): stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
-  zachowanie viewportu po schowaniu narzędzi i kolor nagłówka,
-  a także pasek pionowy po lewej i prawej stronie.
+  zachowanie viewportu po schowaniu narzędzi i kolor nagłówka.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (263): paleta dark, odwracanie jasności
-  wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual
-  i niezależny wybór pozycji pasków.
+- `test/dark_mode_theme_test.dart` (219): paleta dark, odwracanie jasności
+  wszystkich barw HSL, alfa, zachowanie odcieni i przełącznik Visual.
 
 
 Dodatkowe testy i automatyzacja wieloplatformowa:
