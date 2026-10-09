@@ -262,7 +262,14 @@ void main() {
     await tester.tap(find.text('New folder'));
     await tester.pumpAndSettle();
     expect(find.text('New folder'), findsOneWidget);
-    expect(find.text('Folder name'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText == 'Folder name',
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
