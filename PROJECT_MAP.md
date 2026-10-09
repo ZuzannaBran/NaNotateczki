@@ -724,7 +724,7 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   i fake `PathProviderPlatform`, bez zapisu do danych użytkownika. Test
   restore zamyka źródłowy `NotesDatabase` przed otwarciem docelowego,
   aby nie utrzymywać dwóch instancji Drift w tym samym isolate.
-- `test/production/export_render_test.dart` (307): produkcyjne PNG/PDF
+- `test/production/export_render_test.dart` (308): produkcyjne PNG/PDF
   w pamięci, liczba stron i rozmiar obrazu, treść oraz legacy gumka.
   Renderer działa w `tester.runAsync`, poza `FakeAsync` testu widgetowego.
   Regresje obejmują 12 stron, eksport boarda i piksele tej samej zapisanej
