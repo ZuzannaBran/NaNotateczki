@@ -416,7 +416,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2269 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2384 linie)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
 toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
@@ -449,21 +449,28 @@ nawigacji; zoom i gesty narzędzi pozostają bez zmian.
 Po zakończeniu transformacji normalna nawigacja wraca. Stronę można przesuwać
 poziomo dotykiem także wtedy, gdy jest węższa od viewportu; clamp pozwala jej
 dojść od lewej do prawej granicy pasa, ale nigdy wejść pod margines. Bleed
-pozostaje tylko pionowo.
+pozostaje tylko pionowo. Overview przyjmuje kliknięcia poprzez Listener
+na obszarze widocznym niezależnie od gestów scrolla minimapy; przenosi
+widok do wskazanego fragmentu notatnika przy aktualnym powiększeniu
+z uwzględnieniem scrolla minimapy, paddingu, pan i granic przesunięć.
+Gest przeciągnięcia nadal przewija samą minimapę, a blokada transformacji
+obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 
 - 33: `EditorScreen`; 42: `_EditorScreenState`.
 - 43: `_logicalPageWidth`; 91: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
-- 209–630: gesty pan/zoom, blokada viewportu i transformacje.
+- 144: synchronizacja strony; 175: nawigacja do klikniętego obszaru.
+- 268–682: gesty pan/zoom, blokada viewportu i transformacje.
 - 802–888: busy overlay, import/eksport i clipboard.
 - 1007: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 980: główny `build`; pasek tekstu jest renderowany na podstawie
+- 1036: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1463: `_PageViewportClipper`; 1521: `_PageFramePainter`;
-  minimapa zaczyna się przy 1624 i renderuje wyłącznie zwykły ink.
+- 1532: `_PageViewportClipper`; 1590: `_PageFramePainter`;
+  1697: `_ProjectMiniMapOverlay`; 1991: Listener kliknięć minimapy;
+  2114: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_commands.dart` (170 linii)
 
@@ -491,6 +498,12 @@ obsługują ustawienia tła i podgląd logów diagnostycznych.
   `_AccentColorSection`;
   609:
   `_BackgroundSection`.
+
+### `lib/features/editor/presentation/interaction/notebook_overview_navigation.dart` (59 linii)
+
+`NotebookOverviewNavigation` (5) mapuje lokalny punkt oraz scroll minimapy
+na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
+`NotebookOverviewTarget` (50) przechowuje wynik nawigacji.
 
 ### Widgety edytora
 
@@ -697,6 +710,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
   brak mutacji źródła oraz zgodność rozmiaru segmentów z zoomem
+- `test/notebook_overview_navigation_test.dart`: kliknięcia widocznej minimapy,
+  przełączanie strony, scroll minimapy bez nawigacji, wybór po przewinięciu,
+  blokada transformacji, mapowanie współrzędnych i zachowanie skali.
 - `test/editor_screen_responsive_layout_test.dart` (366):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
   poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
