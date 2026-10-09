@@ -312,7 +312,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
 - 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1085 linii)
+### `lib/features/library/presentation/library_screen.dart` (1091 linii)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
@@ -323,6 +323,8 @@ jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka.
 Obie strzałki są pionowo wyśrodkowane we własnych obszarach (nagłówek
 58 px i toolbar 72 px), przypięte do prawej krawędzi panelu,
 a ich kierunki lewo/prawo odpowiadają zwijaniu bocznemu.
+Oba przyciski mają mocniejszy cień (elevation 8, black54)
+i cienki obrys dla kontrastu z tłem.
 Stan toolbaru pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
 
 - 16: `LibraryScreen`; 23: `_LibraryScreenState`;
@@ -615,10 +617,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (315):
+- `test/library_screen_responsive_layout_test.dart` (323):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
-  centrowania strzałek i prawidłowego kierunku zwijania bocznego;
+  centrowania strzałek, cienia/obrysu i kierunku zwijania bocznego;
   wyśrodkowanie, zwężanie kapsułek, wysokość, odstępy boczne
   oraz przewijanie na wąskim ekranie
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
