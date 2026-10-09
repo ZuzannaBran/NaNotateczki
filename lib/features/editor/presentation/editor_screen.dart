@@ -31,7 +31,9 @@ import 'widgets/page_overlay.dart';
 import 'widgets/text_edit_toolbar.dart';
 
 class EditorScreen extends StatefulWidget {
-  const EditorScreen({super.key});
+  const EditorScreen({super.key, this.showToolbar = true});
+
+  final bool showToolbar;
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -975,12 +977,13 @@ class _EditorScreenState extends State<EditorScreen> {
 
     final editorContent = Column(
       children: [
-        EditorToolbar(
-          controller: controller,
-          onInsertPressed: commands.insertFile,
-          onExportSelected: commands.export,
-        ),
-        if (activeTextBlock != null)
+        if (widget.showToolbar)
+          EditorToolbar(
+            controller: controller,
+            onInsertPressed: commands.insertFile,
+            onExportSelected: commands.export,
+          ),
+        if (widget.showToolbar && activeTextBlock != null)
           TextEditToolbar(editorController: controller, block: activeTextBlock),
         Divider(
           height: 1,
