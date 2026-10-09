@@ -150,17 +150,25 @@ void main() {
       lightControl.style!.backgroundColor!.resolve({
         WidgetState.selected,
       }),
-      AppColors.inkBlack,
+      AppColors.divider,
+    );
+    expect(
+      lightControl.style!.backgroundColor!.resolve({}),
+      AppColors.toolbar,
     );
     expect(
       lightControl.style!.foregroundColor!.resolve({
         WidgetState.selected,
       }),
-      AppColors.darkText,
+      AppColors.inkBlack,
     );
     expect(
-      lightControl.style!.side!.resolve({})!.width,
-      greaterThanOrEqualTo(1),
+      lightControl.style!.foregroundColor!.resolve({}),
+      AppColors.inkBlack,
+    );
+    expect(
+      lightControl.style!.side!.resolve({WidgetState.selected})!.width,
+      greaterThan(lightControl.style!.side!.resolve({})!.width),
     );
 
     await tester.tap(find.text('Dark'));
@@ -174,13 +182,25 @@ void main() {
       darkControl.style!.backgroundColor!.resolve({
         WidgetState.selected,
       }),
-      AppColors.darkText,
+      AppColors.darkActive,
+    );
+    expect(
+      darkControl.style!.backgroundColor!.resolve({}),
+      AppColors.darkToolbar,
     );
     expect(
       darkControl.style!.foregroundColor!.resolve({
         WidgetState.selected,
       }),
-      AppColors.darkBackground,
+      AppColors.darkText,
+    );
+    expect(
+      darkControl.style!.foregroundColor!.resolve({}),
+      AppColors.darkText,
+    );
+    expect(
+      darkControl.style!.side!.resolve({WidgetState.selected})!.width,
+      greaterThan(darkControl.style!.side!.resolve({})!.width),
     );
 
     await tester.tap(find.text('Light'));
