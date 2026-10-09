@@ -26,7 +26,9 @@ import '../../editor/state/editor_controller.dart';
 import '../../notebook/domain/drawing_tool.dart';
 
 class BoardScreen extends StatefulWidget {
-  const BoardScreen({super.key});
+  const BoardScreen({super.key, this.showToolbar = true});
+
+  final bool showToolbar;
 
   @override
   State<BoardScreen> createState() => _BoardScreenState();
@@ -506,12 +508,13 @@ class _BoardScreenState extends State<BoardScreen> {
 
     final boardContent = Column(
       children: [
-        EditorToolbar(
-          controller: controller,
-          onInsertPressed: commands.insertFile,
-          onExportSelected: commands.export,
-        ),
-        if (activeTextBlock != null)
+        if (widget.showToolbar)
+          EditorToolbar(
+            controller: controller,
+            onInsertPressed: commands.insertFile,
+            onExportSelected: commands.export,
+          ),
+        if (widget.showToolbar && activeTextBlock != null)
           TextEditToolbar(editorController: controller, block: activeTextBlock),
         Expanded(
           child: Container(
