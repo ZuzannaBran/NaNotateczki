@@ -397,7 +397,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2218 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2231 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
 toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
@@ -409,7 +409,10 @@ ucinana przez pusty pas, gdy użytkownik wsuwa ją pod toolbar.
 Rozszerzony zakres pionowego pan pozwala również przesuwać stronę niżej.
 Granice widoczności i wybór aktywnej strony uwzględniają przesunięcie.
 Wysokość klipu i przewijanej zawartości rośnie wraz z dodatnim `_pagePan.dy`,
-aby dolna część ostatniej strony nie została ucięta.
+aby dolna część ostatniej strony nie została ucięta. Strona jest domyślnie
+centrowana poziomo wewnątrz obszaru między minimapą i prawym marginesem;
+po ręcznym przesunięciu lub zoomie jej pozycja X nie jest resetowana
+przy przebudowie widoku.
 `AppBar` ma wyłączoną zmianę wysokości cienia i tint podczas scrollowania.
 Minimapa i wskaźnik zoomu zachowują odstęp od widocznych pasków,
 a wysokość minimapy jest ograniczona dostępnej przestrzeni.
@@ -427,19 +430,19 @@ poziomo dotykiem także wtedy, gdy jest węższa od viewportu; clamp pozwala jej
 dojść od lewej do prawej granicy pasa, ale nigdy wejść pod margines. Bleed
 pozostaje tylko pionowo.
 
-- 33: `EditorScreen`; 40: `_EditorScreenState`.
-- 41: `_logicalPageWidth`; 90: `_effectivePageScale` — skala okna pomnożona
+- 33: `EditorScreen`; 42: `_EditorScreenState`.
+- 43: `_logicalPageWidth`; 91: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
 - 209–630: gesty pan/zoom, blokada viewportu i transformacje.
 - 802–888: busy overlay, import/eksport i clipboard.
 - 1007: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 975: główny `build`; pasek tekstu jest renderowany na podstawie
+- 980: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1446: `_PageViewportClipper`; 1504: `_PageFramePainter`;
-  minimapa zaczyna się przy 1611 i renderuje wyłącznie zwykły ink.
+- 1459: `_PageViewportClipper`; 1517: `_PageFramePainter`;
+  minimapa zaczyna się przy 1624 i renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -577,7 +580,7 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (867 linii)
+### `lib/features/board/presentation/board_screen.dart` (883 linie)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -586,14 +589,18 @@ ignoruje pointery nawigacyjne, trackpad i scroll, a kontroler blokuje zmianę
 podczas move/resize, aby zmiany `contentBounds` nie przesuwały lokalnego
 układu współrzędnych. Po zakończeniu gestu granice odświeżają się.
 Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
-`QuillController`. Główny toolbar i pasek tekstu respektują `showToolbar`. Pomocnicze panele UI dziedziczą aktywną paletę.
+`QuillController`. Główny toolbar i pasek tekstu respektują `showToolbar`
+i unoszą się na nakładce nad canvasem, zamiast zmniejszać jego wysokość.
+Board ma stały boczny odstęp 16 px, ale nie ma marginesu u góry,
+więc zawartość można swobodnie przesuwać za toolbar. Nagłówek ma
+wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 
-- 29: `BoardScreen`; 36: `_BoardScreenState`.
-- 57: `_buildBoardRect`; 67–388: obsługa pointerów i viewportu.
-- 726: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
-- import/eksport i skróty delegują do `EditorCommands`; busy overlay pozostaje ekranowy; główny `build` buduje tylko geometrię boarda.
-- 762: `_BoardPaintProbe`; 779: `_RenderBoardPaintProbe`;
-  802: `_BoardZoomControls`.
+- 28: `BoardScreen`; 37: `_BoardScreenState`.
+- 59: `_buildBoardRect`; 67–388: obsługa pointerów i viewportu.
+- 499: główny `build`; import/eksport i skróty przez `EditorCommands`.
+- 742: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
+- 778: `_BoardPaintProbe`; 795: `_RenderBoardPaintProbe`;
+  818: `_BoardZoomControls`.
 
 ## 10. Platformy, web i testy
 
@@ -646,19 +653,20 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
   brak mutacji źródła oraz zgodność rozmiaru segmentów z zoomem
-- `test/editor_screen_responsive_layout_test.dart` (340):
+- `test/editor_screen_responsive_layout_test.dart` (346):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
-  poniżej narzędzi przy nieprzesuniętej granicy viewportu, wsuwanie strony
-  pod pasek bez maskującego marginesu, rozszerzenie dolnej granicy klipu
-  przy przesuwaniu w dół, stabilny kolor `AppBar`, minimapa na krótkim
-  ekranie i interaktywność narzędzi
+  poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
+  pan, wsuwanie strony pod pasek bez maskującego marginesu,
+  rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
+  minimapa na krótkim ekranie i interaktywność narzędzi
 - `test/page_overlay_text_gestures_test.dart` (317): sprawdza blokowy
   toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
-- `test/board_scene_bounds_test.dart`: stały układ współrzędnych boarda
-  podczas resize/move i odblokowanie granic po gestach.
+- `test/board_scene_bounds_test.dart` (155): stały układ współrzędnych
+  boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
+  zachowanie viewportu po schowaniu narzędzi i kolor nagłówka.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
