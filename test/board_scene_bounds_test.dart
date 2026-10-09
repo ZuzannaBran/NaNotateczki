@@ -136,6 +136,32 @@ void main() {
     await tester.pump();
     expect(controller.tool, DrawingTool.highlighter);
 
+    Future<double> panByTouch(double sensitivity, int pointer) async {
+      preferences.previewTouchNavigationSensitivity(sensitivity);
+      controller.setViewTransform(scale: 1, pan: Offset.zero);
+      await tester.pump();
+
+      final first = await tester.createGesture(pointer: pointer);
+      final second = await tester.createGesture(pointer: pointer + 1);
+      await first.down(const Offset(450, 350));
+      await second.down(const Offset(550, 350));
+      await tester.pump();
+      await first.moveBy(const Offset(40, 0));
+      await tester.pump();
+      await second.moveBy(const Offset(40, 0));
+      await tester.pump();
+      final translation = controller.viewPan.dx;
+      await first.up();
+      await second.up();
+      await tester.pump();
+      return translation;
+    }
+
+    final slowPan = await panByTouch(0.5, 31);
+    final fastPan = await panByTouch(2.0, 41);
+    expect(slowPan, greaterThan(0));
+    expect(fastPan, greaterThan(slowPan));
+
     await tester.pumpWidget(app(showToolbar: false));
     await tester.pump();
     expect(toolbar, findsNothing);
