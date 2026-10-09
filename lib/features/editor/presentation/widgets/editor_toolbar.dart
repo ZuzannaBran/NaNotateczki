@@ -29,9 +29,19 @@ class EditorToolbar extends StatelessWidget {
             controller.activeImageBlockId != null ||
             (controller.lassoSelection?.isEmpty == false);
         return Container(
+          key: const ValueKey('editor-toolbar-panel'),
           width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(44, 8, 12, 8),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.outlineVariant.withValues(alpha: 0.45),
+            ),
+          ),
           child: Row(
             children: [
               Expanded(
