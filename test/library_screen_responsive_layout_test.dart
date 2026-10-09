@@ -154,12 +154,14 @@ void main() {
         .style!
         .fontSize;
     expect(treeFontSize, 14);
-    final sidebarEdge = tester
+    const resizeHandleWidth = 12.0;
+    final folderPaneEdge = tester
             .getTopLeft(
               find.byKey(const ValueKey('library-navigation-toggle')),
             )
             .dx +
-        1;
+        1 -
+        resizeHandleWidth;
     final sidebarColor = Theme.of(
       tester.element(find.text('Projects')),
     ).colorScheme.surfaceContainerLowest;
@@ -200,7 +202,7 @@ void main() {
         );
       }
       final rect = tester.getRect(menuEntries.first);
-      expect(rect.left, closeTo(sidebarEdge, 1));
+      expect(rect.left, closeTo(folderPaneEdge, 1));
       expect(rect.top, closeTo(actionTop, 4));
       expect(rect.width, closeTo(130, 1));
       expect(rect.height, 36);
@@ -214,6 +216,7 @@ void main() {
         menuMaterials.any(
           (material) =>
               material.color == sidebarColor &&
+              material.elevation == 0 &&
               material.shape is RoundedRectangleBorder &&
               (material.shape! as RoundedRectangleBorder).borderRadius ==
                   const BorderRadius.only(
@@ -255,7 +258,7 @@ void main() {
       );
     }
     final createRect = tester.getRect(createEntries.first);
-    expect(createRect.left, closeTo(sidebarEdge, 1));
+    expect(createRect.left, closeTo(folderPaneEdge, 1));
     expect(createRect.top, closeTo(addButtonTop, 8));
     expect(createRect.width, closeTo(150, 1));
     expect(createRect.height, 36);
@@ -270,6 +273,7 @@ void main() {
       createMaterials.any(
         (material) =>
             material.color == sidebarColor &&
+            material.elevation == 0 &&
             material.shape is RoundedRectangleBorder &&
             (material.shape! as RoundedRectangleBorder).borderRadius ==
                 const BorderRadius.only(
