@@ -29,6 +29,7 @@ class AppPreferencesController extends ChangeNotifier {
 
   DeviceInputMode deviceInputMode = _defaultDeviceInputMode();
   AppAccentColor accentColor = AppAccentColor.softBubblegum;
+  bool darkMode = false;
 
   bool get shouldRequestSoftKeyboard {
     return deviceInputMode == DeviceInputMode.tablet;
@@ -55,6 +56,12 @@ class AppPreferencesController extends ChangeNotifier {
           deviceInputMode = loadedMode;
           changed = true;
         }
+      }
+
+      final storedDarkMode = decoded['darkMode'];
+      if (storedDarkMode is bool && storedDarkMode != darkMode) {
+        darkMode = storedDarkMode;
+        changed = true;
       }
 
       final accentValue = decoded['accentColor'];
@@ -97,6 +104,15 @@ class AppPreferencesController extends ChangeNotifier {
     await _save();
   }
 
+  Future<void> setDarkMode(bool enabled) async {
+    if (darkMode == enabled) {
+      return;
+    }
+    darkMode = enabled;
+    notifyListeners();
+    await _save();
+  }
+
   Future<void> setAccentColor(AppAccentColor color) async {
     if (accentColor == color) {
       return;
@@ -113,6 +129,7 @@ class AppPreferencesController extends ChangeNotifier {
         jsonEncode({
           'deviceInputMode': deviceInputMode.index,
           'accentColor': accentColor.name,
+          'darkMode': darkMode,
         }),
       );
     } catch (e) {
