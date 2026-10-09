@@ -341,3 +341,11 @@ items, not the cause of either failure in this run.
 - CI coverage artifacts use `actions/upload-artifact@v6`, which runs on
   Node.js 24 and replaces the deprecated Node 20 action. The upload step
   remains a GitHub Actions runtime check; no local Flutter runtime was used.
+
+## Kotlin 2.3.20 Gradle DSL regression (9 October 2026)
+
+- Kotlin 2.3.20 rejects legacy `android.kotlinOptions.jvmTarget`.
+  `android/app/build.gradle.kts` now applies typed `kotlin.compilerOptions`
+  with `JvmTarget.JVM_17`. The `android_build_toolchain_test.dart` regression
+  verifies both the required Kotlin version and the compiler options DSL.
+  Android Debug, Release and emulator CI builds remain the acceptance tests.

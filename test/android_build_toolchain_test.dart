@@ -20,4 +20,11 @@ void main() {
 
     expect(supported, isTrue, reason: 'Minimum supported version: 2.3.20.');
   });
+  test('Android Kotlin uses typed JVM 17 compiler options', () {
+    final buildScript = File('android/app/build.gradle.kts').readAsStringSync();
+
+    expect(buildScript, isNot(contains('kotlinOptions {')));
+    expect(buildScript, contains('compilerOptions {'));
+    expect(buildScript, contains('jvmTarget.set(JvmTarget.JVM_17)'));
+  });
 }
