@@ -113,6 +113,110 @@ void main() {
     await database.close();
   });
 
+  testWidgets('folder, notebook and board menus open beside the sidebar', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook(
+      title: 'Menu notebook',
+      folder: 'Menu folder',
+    );
+    final board = await repository.createBoard(
+      title: 'Menu board',
+      folder: 'Menu folder',
+    );
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await controller.loadItems();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
+            Provider<NotebookRepository>.value(value: repository),
+          ],
+          child: const LibraryScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final sidebarEdge = tester
+            .getTopLeft(
+              find.byKey(const ValueKey('library-navigation-toggle')),
+            )
+            .dx +
+        1;
+    final sidebarColor = Theme.of(
+      tester.element(find.text('Projects')),
+    ).colorScheme.surfaceContainerLowest;
+    final cases = [
+      (find.byTooltip('Folder actions'), 'Rename folder'),
+      (
+        find.descendant(
+          of: find.byKey(ValueKey('library-tree-item:${notebook.uid}')),
+          matching: find.byTooltip('Item actions'),
+        ),
+        'Rename item',
+      ),
+      (
+        find.descendant(
+          of: find.byKey(ValueKey('library-tree-item:${board.uid}')),
+          matching: find.byTooltip('Item actions'),
+        ),
+        'Rename item',
+      ),
+    ];
+
+    for (final (actions, dialogTitle) in cases) {
+      expect(actions, findsOneWidget);
+      final actionTop = tester.getTopLeft(actions).dy;
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+
+      final menuEntries = find.byWidgetPredicate(
+        (widget) => widget is PopupMenuItem && widget.height == 36,
+      );
+      expect(menuEntries, findsNWidgets(2));
+      expect(find.text('Rename'), findsOneWidget);
+      expect(find.text('Delete'), findsOneWidget);
+      final rect = tester.getRect(menuEntries.first);
+      expect(rect.left, closeTo(sidebarEdge, 1));
+      expect(rect.top, closeTo(actionTop, 4));
+      expect(rect.width, closeTo(130, 1));
+      expect(rect.height, 36);
+      expect(
+        tester
+            .widgetList<Material>(
+              find.ancestor(
+                of: menuEntries.first,
+                matching: find.byType(Material),
+              ),
+            )
+            .any((material) => material.color == sidebarColor),
+        isTrue,
+      );
+
+      await tester.tap(find.text('Rename'));
+      await tester.pumpAndSettle();
+      expect(find.text(dialogTitle), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+    }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
+
   testWidgets('toolbar toggle hides tools on board and notebook', (
     tester,
   ) async {
