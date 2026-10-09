@@ -1,0 +1,37 @@
+name: Study planner - dev_planer validation
+
+on:
+  push:
+    branches: [dev_planer]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: planner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  planner-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze all Dart sources
+        run: dart analyze
+      - name: Run study planner and library regressions
+        run: |
+          flutter test test/study_planner_controller_test.dart \
+            test/study_planner_widget_test.dart \
+            test/library_screen_responsive_layout_test.dart \
+            --reporter expanded
+      - name: Compile web application
+        run: flutter build web --release
