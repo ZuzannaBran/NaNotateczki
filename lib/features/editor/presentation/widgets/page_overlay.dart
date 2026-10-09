@@ -558,6 +558,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   bool _isMoveHovered = false;
   bool _isMoveDragging = false;
   late quill.QuillController _quillController;
+  quill.QuillController? _darkDisplayController;
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   StreamSubscription<quill.DocChange>? _docSubscription;
@@ -589,6 +590,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         oldWidget.block.text != widget.block.text;
     if (hasDeltaChange || hasTextChange) {
       _initQuill();
+    } else if (oldWidget.block.color != widget.block.color) {
+      _clearDarkDisplayController();
     }
     if (oldWidget.block.width != widget.block.width ||
         oldWidget.block.fontSize != widget.block.fontSize ||
@@ -601,6 +604,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   void dispose() {
     _selectionTimer?.cancel();
     _docSubscription?.cancel();
+    _clearDarkDisplayController();
     _scrollController.dispose();
     _focusNode.dispose();
     _quillController.dispose();
@@ -615,6 +619,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         controller.tool == DrawingTool.text && widget.interactionEnabled;
     final canTransform = !controller.tool.isInk && widget.interactionEnabled;
     final canDoubleTapEdit = widget.interactionEnabled;
+    final darkMode = Theme.of(context).brightness == Brightness.dark;
     _quillController.readOnly = !(isActive && canEdit);
     _scheduleFrameMeasure();
 
@@ -688,7 +693,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                       ),
                       decoration: BoxDecoration(
                         color: (Theme.of(context).brightness == Brightness.dark
-                                ? AppColors.darkPaper
+                                ? AppColors.darkCanvas
                                 : AppColors.paper)
                             .withValues(
                           alpha: isActive
@@ -717,7 +722,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                             : null,
                       ),
                       child: quill.QuillEditor(
-                        controller: _quillController,
+                        controller: darkMode && !isActive
+                            ? (_darkDisplayController ??=
+                                  _createDarkDisplayController())
+                            : _quillController,
                         focusNode: _focusNode,
                         scrollController: _scrollController,
                         config: quill.QuillEditorConfig(
@@ -1269,6 +1277,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   }
 
   void _initQuill() {
+    _clearDarkDisplayController();
     final doc = _documentFromBlock(widget.block);
     final selectionOffset = doc.length > 0 ? doc.length - 1 : 0;
     _quillController = quill.QuillController(
@@ -1317,6 +1326,55 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         deltaJson: deltaJson,
       );
     });
+  }
+
+  void _clearDarkDisplayController() {
+    _darkDisplayController?.dispose();
+    _darkDisplayController = null;
+  }
+
+  quill.QuillController _createDarkDisplayController() {
+    final operations = _quillController.document.toDelta().toJson();
+    final displayOperations = <Map<String, dynamic>>[];
+    for (final original in operations) {
+      final operation = Map<String, dynamic>.from(original);
+      final content = operation['insert'];
+      if (content is String && content.trim().isNotEmpty) {
+        final rawAttributes = operation['attributes'];
+        final attributes = rawAttributes is Map
+            ? Map<String, dynamic>.from(rawAttributes)
+            : <String, dynamic>{};
+        final rawColor = attributes['color'];
+        final color = rawColor is String
+            ? _parseQuillColor(rawColor) ?? widget.block.color
+            : widget.block.color;
+        attributes['color'] = _colorToHex(
+          AppColors.displayInkColor(color, darkMode: true),
+        );
+        operation['attributes'] = attributes;
+      }
+      displayOperations.add(operation);
+    }
+    final document = quill.Document.fromJson(displayOperations);
+    return quill.QuillController(
+      document: document,
+      selection: const TextSelection.collapsed(offset: 0),
+    )..readOnly = true;
+  }
+
+  Color? _parseQuillColor(String value) {
+    if (!value.startsWith('#')) {
+      return null;
+    }
+    final hex = value.substring(1);
+    if (hex.length != 6 && hex.length != 8) {
+      return null;
+    }
+    final parsed = int.tryParse(
+      hex.length == 6 ? 'ff$hex' : hex,
+      radix: 16,
+    );
+    return parsed == null ? null : Color(parsed);
   }
 
   quill.Document _documentFromBlock(TextBlock block) {
