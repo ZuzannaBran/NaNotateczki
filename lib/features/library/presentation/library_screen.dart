@@ -34,6 +34,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   static const double _resizeHandleWidth = 12;
 
   bool _showLeftNavigation = true;
+  bool _showEditorToolbar = true;
   double _navigationPaneWidth = 320;
   bool _isShowingCorruptRecoveryDialog = false;
 
@@ -193,7 +194,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 : const SizedBox.shrink(),
                           ),
                           Expanded(
-                            child: _LibraryWorkspace(item: selectedItem),
+                            child: _LibraryWorkspace(
+                              item: selectedItem,
+                              showToolbar: _showEditorToolbar,
+                            ),
                           ),
                         ],
                       ),
@@ -203,6 +207,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         child: _LeftZoneToggleTab(
                           expanded: _showLeftNavigation,
                           onPressed: _toggleLeftNavigation,
+                        ),
+                      ),
+                      Positioned(
+                        left: math.max(0.0, leftZoneWidth - 1),
+                        top: 50,
+                        child: _LeftZoneToggleTab(
+                          expanded: _showEditorToolbar,
+                          toolbar: true,
+                          onPressed: () {
+                            setState(() {
+                              _showEditorToolbar = !_showEditorToolbar;
+                            });
+                          },
                         ),
                       ),
                     ],
@@ -558,7 +575,8 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Projects',
+                      'NaNotateczki Projects',
+                      overflow: TextOverflow.ellipsis,
                       style: _sidebarTextStyle.copyWith(
                         color: colorScheme.onSurface,
                         fontSize: 18,
@@ -948,9 +966,13 @@ class _LibraryTreeItemRow extends StatelessWidget {
 }
 
 class _LibraryWorkspace extends StatelessWidget {
-  const _LibraryWorkspace({required this.item});
+  const _LibraryWorkspace({
+    required this.item,
+    required this.showToolbar,
+  });
 
   final Notebook? item;
+  final bool showToolbar;
 
   @override
   Widget build(BuildContext context) {
@@ -970,7 +992,9 @@ class _LibraryWorkspace extends StatelessWidget {
     return ChangeNotifierProvider(
       key: ValueKey(item!.uid),
       create: (_) => EditorController(repository: repository, notebook: item!),
-      child: isBoard ? const BoardScreen() : const NotebookScreen(),
+      child: isBoard
+          ? BoardScreen(showToolbar: showToolbar)
+          : NotebookScreen(showToolbar: showToolbar),
     );
   }
 }
@@ -1008,15 +1032,23 @@ class _PaneResizeHandle extends StatelessWidget {
 }
 
 class _LeftZoneToggleTab extends StatelessWidget {
-  const _LeftZoneToggleTab({required this.expanded, required this.onPressed});
+  const _LeftZoneToggleTab({
+    required this.expanded,
+    required this.onPressed,
+    this.toolbar = false,
+  });
 
   final bool expanded;
   final VoidCallback onPressed;
+  final bool toolbar;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
+      key: ValueKey(
+        toolbar ? 'editor-toolbar-toggle' : 'library-navigation-toggle',
+      ),
       color: theme.colorScheme.surface,
       elevation: 3,
       shadowColor: Colors.black26,
@@ -1030,12 +1062,21 @@ class _LeftZoneToggleTab extends StatelessWidget {
           bottomRight: Radius.circular(12),
         ),
         onTap: onPressed,
-        child: SizedBox(
-          width: 32,
-          height: 44,
-          child: Icon(
-            expanded ? Icons.chevron_left : Icons.chevron_right,
-            size: 20,
+        child: Tooltip(
+          message: toolbar
+              ? (expanded ? 'Hide toolbar' : 'Show toolbar')
+              : (expanded ? 'Hide projects' : 'Show projects'),
+          child: SizedBox(
+            width: 32,
+            height: 44,
+            child: Icon(
+              toolbar
+                  ? (expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded)
+                  : (expanded ? Icons.chevron_left : Icons.chevron_right),
+              size: 20,
+            ),
           ),
         ),
       ),
