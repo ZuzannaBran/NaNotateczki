@@ -208,8 +208,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                 builder: (context, preferences, _) {
                   return Theme(
                     data: AppTheme.light(accentColor: preferences.accentColor),
-                    child: _BackupStatusOverlay(
-                      snapshotInProgress: backupService.snapshotInProgress,
+                    child: _ExitGuardOverlay(
                       finishingExit: _finishingExit,
                       child: child ?? const SizedBox.shrink(),
                     ),
@@ -224,14 +223,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   }
 }
 
-class _BackupStatusOverlay extends StatelessWidget {
-  const _BackupStatusOverlay({
-    required this.snapshotInProgress,
+class _ExitGuardOverlay extends StatelessWidget {
+  const _ExitGuardOverlay({
     required this.finishingExit,
     required this.child,
   });
 
-  final ValueListenable<bool> snapshotInProgress;
   final ValueListenable<bool> finishingExit;
   final Widget child;
 
@@ -244,54 +241,7 @@ class _BackupStatusOverlay extends StatelessWidget {
           children: [
             child,
             if (isFinishingExit)
-              const Positioned.fill(child: _FinishingExitOverlay())
-            else
-              ValueListenableBuilder<bool>(
-                valueListenable: snapshotInProgress,
-                builder: (context, isSaving, _) {
-                  if (!isSaving) {
-                    return const SizedBox.shrink();
-                  }
-                  return Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 24,
-                    child: SafeArea(
-                      child: IgnorePointer(
-                        child: Center(
-                          child: Card(
-                            elevation: 6,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'Saving local backup...',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodyMedium,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+              const Positioned.fill(child: _FinishingExitOverlay()),
           ],
         );
       },
