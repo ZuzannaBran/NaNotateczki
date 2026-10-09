@@ -290,7 +290,7 @@ void main() {
     });
 
     expect(rendered.lightBackground, AppColors.paper);
-    expect(rendered.darkBackground, AppColors.darkPaper);
+    expect(rendered.darkBackground, AppColors.darkCanvas);
     final colors = [black, paleBlue, deepPink];
     for (var i = 0; i < colors.length; i++) {
       expect(rendered.lightInk[i], colors[i]);
