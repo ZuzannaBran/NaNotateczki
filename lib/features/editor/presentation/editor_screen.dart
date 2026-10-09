@@ -1927,6 +1927,8 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                       builder: (context, _, _) => CustomPaint(
                         size: Size(_minimapWidth, contentHeight),
                         painter: _ProjectMiniMapPainter(
+                          darkMode:
+                              Theme.of(context).brightness == Brightness.dark,
                           pages: widget.controller.pages,
                           currentPageIndex: widget.currentPageIndex,
                           pageWorldSize: widget.pageWorldSize,
@@ -1979,6 +1981,7 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
 
 class _ProjectMiniMapPainter extends CustomPainter {
   _ProjectMiniMapPainter({
+    required this.darkMode,
     required this.pages,
     required this.currentPageIndex,
     required this.pageWorldSize,
@@ -1992,6 +1995,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
   });
 
   final List<NotePage> pages;
+  final bool darkMode;
   final int currentPageIndex;
   final Size pageWorldSize;
   final double pageGap;
@@ -2009,11 +2013,12 @@ class _ProjectMiniMapPainter extends CustomPainter {
       panelRect,
       Radius.circular(cornerRadius),
     );
-    final background = Paint()..color = AppColors.background;
+    final background = Paint()
+      ..color = darkMode ? AppColors.darkBackground : AppColors.background;
     canvas.drawRRect(panelRRect, background);
 
     final border = Paint()
-      ..color = AppColors.divider
+      ..color = darkMode ? AppColors.darkOutline : AppColors.divider
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     canvas.drawRRect(panelRRect.deflate(0.5), border);
@@ -2034,11 +2039,13 @@ class _ProjectMiniMapPainter extends CustomPainter {
       final pageRect = Rect.fromLTWH(0, pageTop, size.width, pageHeight);
       final isCurrentPage = i == currentPageIndex;
 
-      final pageFill = Paint()..color = AppColors.paper;
+      final pageFill = Paint()
+        ..color = darkMode ? AppColors.darkPaper : AppColors.paper;
       final pageBorder = Paint()
         ..color = isCurrentPage
-            ? AppColors.inkBlack.withValues(alpha: 0.22)
-            : AppColors.divider
+            ? (darkMode ? AppColors.darkText : AppColors.inkBlack)
+                .withValues(alpha: 0.22)
+            : (darkMode ? AppColors.darkOutline : AppColors.divider)
         ..style = PaintingStyle.stroke
         ..strokeWidth = isCurrentPage ? 0.7 : 0.6;
       canvas.drawRect(pageRect, pageFill);
@@ -2046,7 +2053,8 @@ class _ProjectMiniMapPainter extends CustomPainter {
       _paintPageBackground(canvas, pageRect, scaleX, scaleY);
 
       if (pageGap > 0 && i < pages.length - 1) {
-        final separator = Paint()..color = AppColors.toolbar;
+        final separator = Paint()
+          ..color = darkMode ? AppColors.darkToolbar : AppColors.toolbar;
         final sepTop = (pageTopWorld + pageWorldSize.height) * scaleY;
         final sepHeight = (pageGap * scaleY).clamp(0.5, 3.0).toDouble();
         canvas.drawRect(
@@ -2063,9 +2071,10 @@ class _ProjectMiniMapPainter extends CustomPainter {
       canvas.save();
       canvas.clipRect(pageRect);
 
-      final imageFill = Paint()..color = AppColors.toolbar;
+      final imageFill = Paint()
+        ..color = darkMode ? AppColors.darkToolbar : AppColors.toolbar;
       final imageBorder = Paint()
-        ..color = AppColors.divider
+        ..color = darkMode ? AppColors.darkOutline : AppColors.divider
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.55;
       for (final block in page.imageBlocks) {
@@ -2095,7 +2104,8 @@ class _ProjectMiniMapPainter extends CustomPainter {
       }
 
       final textPaint = Paint()
-        ..color = AppColors.inkBlack.withValues(alpha: 0.48);
+        ..color = (darkMode ? AppColors.darkText : AppColors.inkBlack)
+            .withValues(alpha: 0.48);
       for (final block in page.textBlocks) {
         final topLeft = documentPointToMap(block.position + const Offset(0, 2));
         final lineWidth = (block.width * scaleX * 0.8)
@@ -2120,9 +2130,13 @@ class _ProjectMiniMapPainter extends CustomPainter {
             0.38,
             1.45,
           );
+        final displayColor = AppColors.displayInkColor(
+          stroke.color,
+          darkMode: darkMode,
+        );
         paint.color = stroke.tool == DrawingTool.highlighter
-            ? stroke.color.withValues(alpha: 0.24)
-            : stroke.color.withValues(alpha: 0.88);
+            ? displayColor.withValues(alpha: 0.24)
+            : displayColor.withValues(alpha: 0.88);
 
         if (stroke.points.length == 1) {
           final point = pagePointToMap(stroke.points.first.toOffset());
@@ -2146,7 +2160,8 @@ class _ProjectMiniMapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ProjectMiniMapPainter oldDelegate) {
-    return oldDelegate.pages != pages ||
+    return oldDelegate.darkMode != darkMode ||
+        oldDelegate.pages != pages ||
         oldDelegate.currentPageIndex != currentPageIndex ||
         oldDelegate.pageWorldSize != pageWorldSize ||
         oldDelegate.pageGap != pageGap ||
@@ -2169,7 +2184,8 @@ class _ProjectMiniMapPainter extends CustomPainter {
     }
     final spacing = backgroundSpacing.clamp(16.0, 64.0);
     final paint = Paint()
-      ..color = AppColors.divider.withValues(alpha: 0.55)
+      ..color = (darkMode ? AppColors.darkOutline : AppColors.divider)
+          .withValues(alpha: 0.55)
       ..strokeWidth = 0.5;
 
     for (var y = spacing * scaleY; y < pageRect.height; y += spacing * scaleY) {
