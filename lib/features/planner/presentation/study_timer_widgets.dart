@@ -1,3 +1,5 @@
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -298,7 +300,10 @@ class StudyTimerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final planner = context.watch<StudyPlannerController>();
+    final planner = context.watch<StudyPlannerController?>();
+    if (planner == null) {
+      return const SizedBox.shrink();
+    }
     final active = planner.active;
     final next = planner.upcoming.take(2).toList();
     final reviews = planner.pendingReviews;
@@ -396,7 +401,7 @@ class StudyTimerCard extends StatelessWidget {
             runSpacing: 4,
             children: [
               TextButton.icon(
-                onPressed: planner.isLoaded
+                onPressed: planner.isLoaded && planner.error == null
                     ? () => showStudySessionEditor(
                         context, startAfterSave: true)
                     : null,
@@ -463,7 +468,10 @@ class CompactStudyTimer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final planner = context.watch<StudyPlannerController>();
+    final planner = context.watch<StudyPlannerController?>();
+    if (planner == null) {
+      return const SizedBox.shrink();
+    }
     final active = planner.active;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
