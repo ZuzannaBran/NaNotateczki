@@ -78,6 +78,7 @@ class _EditorScreenState extends State<EditorScreen> {
   double _pageScale = 1.0;
   double _responsivePageScale = 1.0;
   Offset _pagePan = Offset.zero;
+  bool _hasUserAdjustedHorizontalPan = false;
   double _pageMinScale = 1.0;
   double _pageMaxScale = 1.0;
   Offset _insertPosition = const Offset(120, 120);
@@ -542,6 +543,10 @@ class _EditorScreenState extends State<EditorScreen> {
         .toDouble();
     final currentScale = currentZoom * _responsivePageScale;
     final targetScale = targetZoom * _responsivePageScale;
+    if (panDelta.dx.abs() > 0.01 ||
+        (targetScale - currentScale).abs() > 0.0001) {
+      _hasUserAdjustedHorizontalPan = true;
+    }
 
     var desiredPan = _pagePan;
     if ((targetScale - currentScale).abs() > 0.0001) {
@@ -1019,6 +1024,14 @@ class _EditorScreenState extends State<EditorScreen> {
                   .toDouble();
               _responsivePageScale = fitToWidthScale;
               final effectivePageScale = _effectivePageScale;
+              if (!_hasUserAdjustedHorizontalPan &&
+                  !controller.isObjectTransformActive) {
+                final scaledPageWidth = docWorldSize.width * effectivePageScale;
+                _pagePan = Offset(
+                  (maxPageWidth - scaledPageWidth) / 2,
+                  _pagePan.dy,
+                );
+              }
               final clipScale = fitToWidthScale;
               final clipSize = Size(
                 docWorldSize.width * clipScale,
