@@ -37,7 +37,11 @@ class EditorCommands {
   Future<void> export(NotebookExportFormat format) async {
     try {
       final path = await runBusy(
-        () => NotebookExportService.exportController(controller, format),
+        () => NotebookExportService.exportController(
+          controller,
+          format,
+          darkMode: Theme.of(context).brightness == Brightness.dark,
+        ),
       );
       if (!context.mounted) {
         return;
