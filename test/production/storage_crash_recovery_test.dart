@@ -83,12 +83,12 @@ void main() {
       final blocker = File('${documents.path}/not-a-directory');
       await blocker.writeAsString('occupied');
       PathProviderPlatform.instance = _DocumentsPathProvider(blocker.path);
-  
+
       await expectLater(
         writeStoredText('app_prefs.json', 'must not commit'),
         throwsA(isA<FileSystemException>()),
       );
-  
+
       PathProviderPlatform.instance = _DocumentsPathProvider(documents.path);
       expect(await readStoredText('app_prefs.json'), 'last good');
       await writeStoredText('app_prefs.json', 'retry succeeded');
