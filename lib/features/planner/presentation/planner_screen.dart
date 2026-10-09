@@ -81,8 +81,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final planner = context.read<StudyPlannerController>();
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(session.title),
+      builder: (dialogContext) => StudyActionTheme(
+        child: AlertDialog(
+          title: Text(session.title),
         content: SizedBox(
           width: 340,
           child: Column(
@@ -153,6 +154,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
             child: const Text('Close'),
           ),
         ],
+        ),
       ),
     );
   }
@@ -160,8 +162,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
   Future<void> _confirmDelete(StudySession session) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete this session?'),
+      builder: (dialogContext) => StudyActionTheme(
+        child: AlertDialog(
+          title: const Text('Delete this session?'),
         content: Text('Delete "${session.title}" and its history?'),
         actions: [
           TextButton(
@@ -173,6 +176,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
             child: const Text('Delete'),
           ),
         ],
+        ),
       ),
     );
     if (confirmed == true && mounted) {
