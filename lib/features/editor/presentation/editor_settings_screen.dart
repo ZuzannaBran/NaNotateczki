@@ -94,6 +94,56 @@ class EditorSettingsScreen extends StatelessWidget {
                           },
                         ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Touch navigation sensitivity'),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Controls how quickly touch gestures move '
+                              'through files and pages.',
+                            ),
+                            Row(
+                              children: [
+                                const Text('0.5×'),
+                                Expanded(
+                                  child: Slider(
+                                    key: const ValueKey(
+                                      'touch-navigation-sensitivity',
+                                    ),
+                                    min: 0.5,
+                                    max: 2.0,
+                                    divisions: 15,
+                                    value: preferences
+                                        .touchNavigationSensitivity,
+                                    label: '${preferences.'
+                                        'touchNavigationSensitivity'
+                                        '.toStringAsFixed(1)}×',
+                                    onChanged: preferences
+                                        .previewTouchNavigationSensitivity,
+                                    onChangeEnd: preferences
+                                        .setTouchNavigationSensitivity,
+                                  ),
+                                ),
+                                const Text('2.0×'),
+                                SizedBox(
+                                  width: 48,
+                                  child: Text(
+                                    '${preferences.touchNavigationSensitivity'
+                                    '.toStringAsFixed(1)}×',
+                                    textAlign: TextAlign.end,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 8,
