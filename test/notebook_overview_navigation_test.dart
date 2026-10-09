@@ -7,7 +7,8 @@ import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/theme/app_metrics.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/editor_screen.dart';
-import 'package:program/features/editor/presentation/interaction/notebook_overview_navigation.dart';
+import 'package:program/features/editor/presentation/interaction/'
+    'notebook_overview_navigation.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
