@@ -197,6 +197,19 @@ class EditorSettingsScreen extends StatelessWidget {
                       horizontal: 16,
                     ),
                     children: [
+                      SwitchListTile(
+                        key: const ValueKey('visual-dark-mode-toggle'),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                        ),
+                        title: const Text('Dark mode'),
+                        subtitle: const Text(
+                          'Use a dark interface and contrasting grayscale ink.',
+                        ),
+                        value: preferences.darkMode,
+                        onChanged: preferences.setDarkMode,
+                      ),
+                      const SizedBox(height: 12),
                       _BackgroundSection(
                         title: 'Notebook default',
                         settings: controller.defaultBackgroundSettingsForKind(
