@@ -972,10 +972,7 @@ Future<T?> _showSidebarMenu<T>({
   }
 
   final panelEdge = paneBox.localToGlobal(
-    Offset(
-      paneBox.size.width + _LibraryScreenState._resizeHandleWidth,
-      0,
-    ),
+    Offset(paneBox.size.width, 0),
     ancestor: overlayBox,
   ).dx;
   final anchorTop = anchorBox.localToGlobal(
@@ -996,7 +993,7 @@ Future<T?> _showSidebarMenu<T>({
     menuPadding: const EdgeInsets.symmetric(vertical: 3),
     color: Theme.of(context).colorScheme.surfaceContainerLowest,
     surfaceTintColor: Colors.transparent,
-    elevation: 5,
+    elevation: 0,
     shape: _sidebarMenuShape,
     popUpAnimationStyle: const AnimationStyle(
       curve: Curves.easeOutCubic,
