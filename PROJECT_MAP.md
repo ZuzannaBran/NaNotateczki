@@ -77,10 +77,12 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (91): jasna paleta oraz tryb ciemny:
+- `lib/core/theme/app_colors.dart` (85): jasna paleta oraz tryb ciemny:
   tło #2D2E2B, panele #3A3B39, aktywne #4A4B48, kartka #5A5B57,
-  tekst #EEECE6. `displayInkColor` przelicza wyłącznie wyświetlane
-  szarości bez modyfikowania zapisanych kresek. 50: `AppColors`.
+  tekst #EEECE6. `displayInkColor` odwraca jasność HSL wszystkich odcieni,
+  zachowując hue, saturację i alpha (czerń↔biel, jasny błękit↔ciemny).
+  Transformacja działa przy wyświetlaniu i eksporcie aktualnego motywu,
+  bez modyfikowania zapisanych kresek. 50: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
 - `lib/core/theme/app_theme.dart` (113): `AppTheme.light` i `AppTheme.dark`
@@ -211,11 +213,16 @@ bezpośrednio do `InkEraserEngine`. Nie zawiera własnej geometrii gumki.
 
 - 5: `flattenErasersForBackup`; 9: `flattenPageErasersForBackup`.
 
-### `lib/data/export/notebook_export_service.dart` (715 linii)
+### `lib/data/export/notebook_export_service.dart` (779 linii)
 
 Renderuje notebook/board do PNG lub PDF i zapisuje przez systemowy dialog.
-Przed renderem normalizuje legacy gumki; zapisany renderer zna wyłącznie
-zwykły ink i nie używa `BlendMode.clear`.
+Eksport wywołany z edytora używa aktywnego motywu: jasnego albo ciemnego.
+W dark mode tło kartki, siatka, tekst i wszystkie kolory tuszu są
+odpowiednio renderowane; warianty PDF i PNG współdzielą ten sam renderer.
+Publiczne metody testowe przyjmują `darkMode` (domyślnie false).
+Obrazy pozostają bez zmian, a oryginalne kolory w danych są zachowane.
+Przed renderem normalizuje legacy gumki; renderer zna wyłącznie zwykły
+ink i nie używa `BlendMode.clear`.
 
 - 25: `NotebookExportFormat`; 27: `NotebookExportFormatLabel`;
   38: `NotebookExportService`; 45: `exportController`;
@@ -449,6 +456,11 @@ pozostaje tylko pionowo.
 - 1463: `_PageViewportClipper`; 1521: `_PageFramePainter`;
   minimapa zaczyna się przy 1624 i renderuje wyłącznie zwykły ink.
 
+### `lib/features/editor/presentation/editor_commands.dart` (170 linii)
+
+Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
+przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
+
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (619 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual z
@@ -680,8 +692,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (163): paleta dark, kontrast szarości,
-  domyślny tryb jasny, widoczność i przełączanie `Light` / `Dark` w Visual.
+- `test/dark_mode_theme_test.dart` (198): paleta dark, odwracanie jasności
+  wszystkich barw HSL, alfa, zachowanie odcieni i przełącznik Visual.
 
 
 Dodatkowe testy i automatyzacja wieloplatformowa:
@@ -712,10 +724,11 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   i fake `PathProviderPlatform`, bez zapisu do danych użytkownika. Test
   restore zamyka źródłowy `NotesDatabase` przed otwarciem docelowego,
   aby nie utrzymywać dwóch instancji Drift w tym samym isolate.
-- `test/production/export_render_test.dart`: produkcyjne PNG/PDF w pamięci,
-  liczba stron i rozmiar obrazu, treść oraz legacy gumka; renderer działa
-  w `tester.runAsync`, poza strefą `FakeAsync` testu widgetowego.
-  Dodatkowe regresje sprawdzają 12-stronicowy eksport PNG oraz PNG/PDF boarda.
+- `test/production/export_render_test.dart` (307): produkcyjne PNG/PDF
+  w pamięci, liczba stron i rozmiar obrazu, treść oraz legacy gumka.
+  Renderer działa w `tester.runAsync`, poza `FakeAsync` testu widgetowego.
+  Regresje obejmują 12 stron, eksport boarda i piksele tej samej zapisanej
+  notatki w trybie jasnym i ciemnym, łącznie z oboma wariantami PDF.
 - `android/app/build.gradle.kts` i `android/app/proguard-rules.pro`:
   Release uruchamia R8 z wyjątkami wyłącznie dla opcjonalnych modułów
   ML Kit (Chinese/Devanagari/Japanese/Korean). OCR używa tylko
