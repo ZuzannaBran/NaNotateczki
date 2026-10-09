@@ -45,6 +45,7 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _leftMargin = 56;
   static const double _rightMargin = 56;
   static const double _topBottomPadding = 22;
+  static const double _mainToolbarClearance = 72;
   static const double _addPageButtonGap = 10;
   static const double _addPageFooterHeight = 56;
   static const double _pageViewportBleed = 20;
@@ -85,6 +86,9 @@ class _EditorScreenState extends State<EditorScreen> {
   Offset? _touchContextMenuStart;
 
   double get _effectivePageScale => _pageScale * _responsivePageScale;
+
+  double get _firstPageInset =>
+      widget.showToolbar ? _mainToolbarClearance : 0.0;
 
   @override
   void initState() {
@@ -139,7 +143,9 @@ class _EditorScreenState extends State<EditorScreen> {
       return;
     }
     final raw =
-        ((_scrollController.position.pixels + (_pageExtent * 0.45)) /
+        ((_scrollController.position.pixels -
+                    _firstPageInset +
+                    (_pageExtent * 0.45)) /
                 _pageExtent)
             .floor();
     final target = raw.clamp(0, controller.pages.length - 1);
@@ -644,9 +650,9 @@ class _EditorScreenState extends State<EditorScreen> {
     var clipBottom = viewportSize.height;
     if (_scrollController.hasClients) {
       final metrics = _scrollController.position;
-      clipTop = metrics.pixels - _topBottomPadding;
-      clipBottom =
-          metrics.pixels + metrics.viewportDimension - _topBottomPadding;
+      final topPadding = _topBottomPadding + _firstPageInset;
+      clipTop = metrics.pixels - topPadding;
+      clipBottom = metrics.pixels + metrics.viewportDimension - topPadding;
     }
 
     final worldLeft = ((-_pagePan.dx) / safeScale).clamp(
@@ -975,7 +981,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
     final commands = _commands(controller);
     final toolbarOffset = widget.showToolbar
-        ? 72.0 + (activeTextBlock == null ? 0.0 : 62.0)
+        ? _mainToolbarClearance +
+              (activeTextBlock == null ? 0.0 : 62.0)
         : 0.0;
 
     final editorContent = Stack(
@@ -1077,9 +1084,9 @@ class _EditorScreenState extends State<EditorScreen> {
                                 _pageScale > 1.001)
                             ? const NeverScrollableScrollPhysics()
                             : const ClampingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(
+                        padding: EdgeInsets.fromLTRB(
                           _leftMargin,
-                          _topBottomPadding,
+                          _topBottomPadding + _firstPageInset,
                           _rightMargin,
                           _topBottomPadding,
                         ),
