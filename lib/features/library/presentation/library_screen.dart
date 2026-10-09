@@ -534,9 +534,7 @@ class _NameInputDialogState extends State<_NameInputDialog> {
   }
 }
 
-enum _FolderAction { rename, delete }
-
-enum _ItemAction { rename, delete }
+enum _TreeRowAction { rename, delete }
 
 const TextStyle _sidebarTextStyle = TextStyle(
   fontSize: 14,
@@ -854,31 +852,12 @@ class _FolderTreeRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                PopupMenuButton<_FolderAction>(
+                _TreeRowActions(
+                  rowContext: context,
                   tooltip: 'Folder actions',
-                  icon: Icon(
-                    Icons.more_horiz_rounded,
-                    size: 18,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  padding: EdgeInsets.zero,
-                  onSelected: (action) {
-                    if (action == _FolderAction.rename) {
-                      onRename();
-                    } else {
-                      onDelete();
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: _FolderAction.rename,
-                      child: Text('Rename'),
-                    ),
-                    PopupMenuItem(
-                      value: _FolderAction.delete,
-                      child: Text('Delete'),
-                    ),
-                  ],
+                  iconSize: 18,
+                  onRename: onRename,
+                  onDelete: onDelete,
                 ),
               ],
             ),
@@ -945,37 +924,128 @@ class _LibraryTreeItemRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                PopupMenuButton<_ItemAction>(
+                _TreeRowActions(
+                  rowContext: context,
                   tooltip: 'Item actions',
-                  icon: Icon(
-                    Icons.more_horiz_rounded,
-                    size: 17,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  padding: EdgeInsets.zero,
-                  onSelected: (action) {
-                    if (action == _ItemAction.rename) {
-                      onRename();
-                    } else {
-                      onDelete();
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: _ItemAction.rename,
-                      child: Text('Rename'),
-                    ),
-                    PopupMenuItem(
-                      value: _ItemAction.delete,
-                      child: Text('Delete'),
-                    ),
-                  ],
+                  iconSize: 17,
+                  onRename: onRename,
+                  onDelete: onDelete,
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TreeRowActions extends StatelessWidget {
+  const _TreeRowActions({
+    required this.rowContext,
+    required this.tooltip,
+    required this.iconSize,
+    required this.onRename,
+    required this.onDelete,
+  });
+
+  final BuildContext rowContext;
+  final String tooltip;
+  final double iconSize;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
+
+  Future<void> _showActions(BuildContext context) async {
+    final paneState = rowContext
+        .findAncestorStateOfType<_LibraryTreePaneState>();
+    final paneBox = paneState?.context.findRenderObject() as RenderBox?;
+    final rowBox = rowContext.findRenderObject() as RenderBox?;
+    final overlayBox =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (paneBox == null || rowBox == null) {
+      return;
+    }
+
+    final panelEdge = paneBox.localToGlobal(
+      Offset(
+        paneBox.size.width + _LibraryScreenState._resizeHandleWidth,
+        0,
+      ),
+      ancestor: overlayBox,
+    ).dx;
+    final rowTop = rowBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    ).dy;
+    final left = panelEdge.clamp(0.0, overlayBox.size.width);
+    final top = rowTop.clamp(0.0, overlayBox.size.height);
+    final colorScheme = Theme.of(context).colorScheme;
+    final action = await showMenu<_TreeRowAction>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        left,
+        top,
+        overlayBox.size.width - left,
+        overlayBox.size.height - top,
+      ),
+      constraints: const BoxConstraints.tightFor(width: 130),
+      menuPadding: const EdgeInsets.symmetric(vertical: 3),
+      color: colorScheme.surfaceContainerLowest,
+      surfaceTintColor: Colors.transparent,
+      elevation: 5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(9),
+      ),
+      popUpAnimationStyle: const AnimationStyle(
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+        duration: Duration(milliseconds: 180),
+        reverseDuration: Duration(milliseconds: 120),
+      ),
+      items: [
+        for (final (value, label) in [
+          (_TreeRowAction.rename, 'Rename'),
+          (_TreeRowAction.delete, 'Delete'),
+        ])
+          PopupMenuItem<_TreeRowAction>(
+            value: value,
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              label,
+              style: _sidebarTextStyle.copyWith(
+                color: colorScheme.onSurface,
+                fontSize: 13,
+              ),
+            ),
+          ),
+      ],
+    );
+    if (!context.mounted) {
+      return;
+    }
+    switch (action) {
+      case _TreeRowAction.rename:
+        onRename();
+      case _TreeRowAction.delete:
+        onDelete();
+      case null:
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 40, height: 36),
+      iconSize: iconSize,
+      icon: Icon(
+        Icons.more_horiz_rounded,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      onPressed: () => _showActions(context),
     );
   }
 }
