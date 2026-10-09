@@ -184,6 +184,15 @@ void main() {
     await tester.pump();
     expect(controller.tool, DrawingTool.highlighter);
 
+    await tester.binding.setSurfaceSize(const Size(1200, 420));
+    await tester.pump();
+    expect(
+      tester.getBottomRight(overview).dy,
+      lessThanOrEqualTo(tester.getBottomRight(canvas).dy),
+    );
+
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    await tester.pump();
     await tester.pumpWidget(app(showToolbar: false));
     await tester.pump();
 
