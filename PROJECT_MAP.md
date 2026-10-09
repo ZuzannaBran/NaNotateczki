@@ -449,10 +449,11 @@ pozostaje tylko pionowo.
 - 1463: `_PageViewportClipper`; 1521: `_PageFramePainter`;
   minimapa zaczyna się przy 1624 i renderuje wyłącznie zwykły ink.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (567 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (619 linii)
 
-Ustawienia wejścia, przełącznik ciemnego motywu w Visual, tła i podgląd logów
-błędów, integralności i wydajności.
+Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual z
+wyraźnym obramowaniem oraz kontrastowym zaznaczeniem opcji w obu motywach,
+ustawienia tła i podgląd logów błędów, integralności i wydajności.
 
 - 16:
   `EditorSettingsScreen`;
@@ -679,8 +680,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (115): paleta dark, kontrast szarości,
-  domyślny tryb jasny i przełącznik Visual.
+- `test/dark_mode_theme_test.dart` (163): paleta dark, kontrast szarości,
+  domyślny tryb jasny, widoczność i przełączanie `Light` / `Dark` w Visual.
 
 
 Dodatkowe testy i automatyzacja wieloplatformowa:
