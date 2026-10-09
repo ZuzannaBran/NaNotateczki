@@ -231,9 +231,22 @@ void main() {
 
     final mainPanel = find.byKey(const ValueKey('editor-toolbar-panel'));
     final textPanel = find.byKey(const ValueKey('text-toolbar-panel'));
+    final mainContainer = tester.widget<Container>(mainPanel);
+    final textContainer = tester.widget<Container>(textPanel);
+    expect(
+      mainContainer.padding,
+      const EdgeInsets.symmetric(horizontal: 22, vertical: 3),
+    );
+    expect(
+      textContainer.padding,
+      const EdgeInsets.symmetric(horizontal: 22, vertical: 2),
+    );
+    expect(tester.getSize(mainPanel).height, lessThan(66));
+    expect(tester.getSize(textPanel).height, lessThan(60));
+
     for (final panel in [mainPanel, textPanel]) {
       final rect = tester.getRect(panel);
-      expect(rect.width, lessThan(1600 - 88));
+      expect(rect.width, lessThan(1600 - 104));
       expect(rect.center.dx, closeTo(800, 0.01));
       expect(
         (tester.widget<Container>(panel).decoration as BoxDecoration)
@@ -247,7 +260,7 @@ void main() {
 
     for (final panel in [mainPanel, textPanel]) {
       final rect = tester.getRect(panel);
-      expect(rect.width, closeTo(560 - 88, 0.01));
+      expect(rect.width, closeTo(560 - 104, 0.01));
       expect(rect.center.dx, closeTo(280, 0.01));
       final scroller = find.descendant(
         of: panel,
