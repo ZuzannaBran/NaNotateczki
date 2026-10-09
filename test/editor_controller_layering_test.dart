@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -9,16 +11,22 @@ import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
+import 'support/native_test_documents.dart';
+
 void main() {
+  useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('ink and text tools send an active image behind content', () {
+  test('ink and text tools send an active image behind content', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
     final image = ImageBlock(
       id: 'image',
       path: '',
+      bytes: Uint8List.fromList([1, 2, 3, 4]),
+      imageExt: 'png',
+      imageMime: 'image/png',
       ocrText: '',
       position: Offset.zero,
       width: 120,
@@ -51,6 +59,12 @@ void main() {
     expect(controller.tool, DrawingTool.edit);
     expect(controller.activeTextBlockId, isNotNull);
     expect(controller.activeImageBlockId, isNull);
+
+    await controller.flushPendingSaves();
+    final persisted = await repository.getNotebook(_notebook(image).uid);
+    expect(persisted, isNotNull);
+    expect(persisted!.pages.single.imageBlocks, hasLength(1));
+    expect(persisted.pages.single.textBlocks, hasLength(1));
   });
 }
 

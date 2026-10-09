@@ -321,3 +321,17 @@ items, not the cause of either failure in this run.
   Such test-injected failures do not simulate abrupt machine power removal,
   directory durability (`fsync`) or disk hardware faults. Hardware recovery
   tests remain release acceptance criteria.
+
+## CI warning and DDS diagnostic follow-up (9 October 2026)
+
+- Selected native Dart test suites use suite-scoped mocked documents paths
+  to isolate `path_provider` logging and preferences. Editor layering checks
+  valid inline image persistence and flushes before closing SQLite.
+- Android integration tests retry only once when the Flutter runner reports
+  `Failed to start Dart Development Service`. A shell regression verifies
+  that unrelated test assertion failures are never retried or accepted and
+  persistent DDS startup failures still fail CI. The underlying Flutter tool
+  issue remains external.
+- Android Gradle Plugin 9 migration requires built-in Kotlin compatibility
+  and a cross-platform check of native plugins. Version changes are deferred
+  until the diagnostic suite is confirmed by actual GitHub Actions results.

@@ -14,7 +14,10 @@ import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
+import 'support/native_test_documents.dart';
+
 void main() {
+  useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('unchanged notebook reuses its incremental backup', () async {

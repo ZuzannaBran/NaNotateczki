@@ -600,9 +600,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
-- `test/editor_controller_layering_test.dart` (77): aktywne obrazy są
+- `test/editor_controller_layering_test.dart`: aktywne obrazy są
   dezaktywowane po wyborze narzędzia ink lub tekstu, a nowy tekst startuje
-  zaznaczony w trybie edit.
+  zaznaczony w trybie edit; obraz ma dane inline, a przed zamknięciem
+  testowej bazy następuje rzeczywisty zapis.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
@@ -652,6 +653,13 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `integration_test/document_lifecycle_test.dart`: create/rename/read/delete
   w rzeczywistej bazie danej platformy; działa wyłącznie z flagą
   `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.
+- `test/support/native_test_documents.dart`: katalog testowy i natywny
+  adapter PathProvider zapobiegają błędom pluginu przy logowaniu i preferencjach
+  w testach; nie przekierowują danych użytkownika.
+- `.github/scripts/flutter_integration_retry.sh` i
+  `.github/scripts/test_flutter_integration_retry.sh`: ponowny start testu
+  Android wyłącznie po błędzie inicjalizacji DDS; osobny test regresji
+  pilnuje, żeby asercje i powtarzające się awarie pozostały blokujące.
 - `test/production/storage_crash_recovery_test.dart`: atomiczne pliki
   ustawień: częściowe zapisy `.tmp`, odzyskiwanie `.previous`, błąd I/O
   i ponowny zapis oraz równoległe write'y jednego klucza.

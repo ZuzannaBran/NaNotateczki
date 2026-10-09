@@ -33,6 +33,8 @@ jobs:
         run: dart format --output=none lib test integration_test test_driver
       - name: Analyze source and tests
         run: dart analyze
+      - name: Verify DDS startup retry handles only infrastructure failures
+        run: bash .github/scripts/test_flutter_integration_retry.sh
       - name: Execute non-render native test suite
         shell: bash
         run: |

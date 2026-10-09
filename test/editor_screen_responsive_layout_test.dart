@@ -15,7 +15,10 @@ import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
+import 'support/native_test_documents.dart';
+
 void main() {
+  useIsolatedNativeTestDocuments();
   testWidgets('page stays clear of overview and inside right boundary', (
     tester,
   ) async {

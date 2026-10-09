@@ -31,7 +31,10 @@ Notebook _fixture(String title, int revision) {
   );
 }
 
+import '../support/native_test_documents.dart';
+
 void main() {
+  useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory documents;
