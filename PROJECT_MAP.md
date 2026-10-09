@@ -397,7 +397,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2216 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2218 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
 toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
@@ -408,6 +408,8 @@ Viewport pozostaje 22 px od górnej krawędzi canvasa, więc strona nie jest
 ucinana przez pusty pas, gdy użytkownik wsuwa ją pod toolbar.
 Rozszerzony zakres pionowego pan pozwala również przesuwać stronę niżej.
 Granice widoczności i wybór aktywnej strony uwzględniają przesunięcie.
+Wysokość klipu i przewijanej zawartości rośnie wraz z dodatnim `_pagePan.dy`,
+aby dolna część ostatniej strony nie została ucięta.
 `AppBar` ma wyłączoną zmianę wysokości cienia i tint podczas scrollowania.
 Minimapa i wskaźnik zoomu zachowują odstęp od widocznych pasków,
 a wysokość minimapy jest ograniczona dostępnej przestrzeni.
@@ -436,8 +438,8 @@ pozostaje tylko pionowo.
 - 975: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1444: `_PageViewportClipper`; 1502: `_PageFramePainter`;
-  minimapa zaczyna się przy 1609 i renderuje wyłącznie zwykły ink.
+- 1446: `_PageViewportClipper`; 1504: `_PageFramePainter`;
+  minimapa zaczyna się przy 1611 i renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -644,11 +646,12 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
   brak mutacji źródła oraz zgodność rozmiaru segmentów z zoomem
-- `test/editor_screen_responsive_layout_test.dart` (324):
+- `test/editor_screen_responsive_layout_test.dart` (340):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
   poniżej narzędzi przy nieprzesuniętej granicy viewportu, wsuwanie strony
-  pod pasek bez maskującego marginesu, stabilny kolor `AppBar`,
-  minimapa na krótkim ekranie i interaktywność narzędzi
+  pod pasek bez maskującego marginesu, rozszerzenie dolnej granicy klipu
+  przy przesuwaniu w dół, stabilny kolor `AppBar`, minimapa na krótkim
+  ekranie i interaktywność narzędzi
 - `test/page_overlay_text_gestures_test.dart` (317): sprawdza blokowy
   toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
