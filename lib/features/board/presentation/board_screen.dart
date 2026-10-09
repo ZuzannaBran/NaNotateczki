@@ -506,19 +506,12 @@ class _BoardScreenState extends State<BoardScreen> {
 
     final commands = _commands(controller);
 
-    final boardContent = Column(
+    final boardContent = Stack(
       children: [
-        if (widget.showToolbar)
-          EditorToolbar(
-            controller: controller,
-            onInsertPressed: commands.insertFile,
-            onExportSelected: commands.export,
-          ),
-        if (widget.showToolbar && activeTextBlock != null)
-          TextEditToolbar(editorController: controller, block: activeTextBlock),
-        Expanded(
+        Positioned.fill(
           child: Container(
-            margin: const EdgeInsets.all(16),
+            key: const ValueKey('board-canvas-area'),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             decoration: BoxDecoration(
               color: AppColors.paper,
               borderRadius: BorderRadius.circular(16),
@@ -690,6 +683,27 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
         ),
+        if (widget.showToolbar)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                EditorToolbar(
+                  controller: controller,
+                  onInsertPressed: commands.insertFile,
+                  onExportSelected: commands.export,
+                ),
+                if (activeTextBlock != null)
+                  TextEditToolbar(
+                    editorController: controller,
+                    block: activeTextBlock,
+                  ),
+              ],
+            ),
+          ),
       ],
     );
 
@@ -701,6 +715,8 @@ class _BoardScreenState extends State<BoardScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         titleSpacing: useWideTitleInset ? 44 : null,
         title: Text(controller.notebook.title),
         actions: [
