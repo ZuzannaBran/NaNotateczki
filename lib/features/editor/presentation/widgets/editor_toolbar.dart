@@ -50,33 +50,39 @@ class EditorToolbar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _toolButton(
+                      context: context,
                       icon: Icons.brush_outlined,
                       label: 'Pen',
                       tool: DrawingTool.pen,
                     ),
                     _toolButton(
+                      context: context,
                       icon: Icons.edit_outlined,
                       label: 'Highlighter',
                       tool: DrawingTool.highlighter,
                     ),
-                    _eraserSelector(),
-                    _shapeSelector(),
+                    _eraserSelector(context),
+                    _shapeSelector(context),
                     _toolButton(
+                      context: context,
                       icon: Icons.text_fields,
                       label: 'Text',
                       tool: DrawingTool.text,
                     ),
                     _toolButton(
+                      context: context,
                       icon: Icons.highlight_alt_outlined,
                       label: 'Lasso / Select',
                       tool: DrawingTool.lasso,
                     ),
                     _toolButton(
+                      context: context,
                       icon: Icons.open_with,
                       label: 'Move',
                       tool: DrawingTool.edit,
                     ),
                     _actionButton(
+                      context: context,
                       icon: Icons.delete_outline,
                       label: 'Delete',
                       isActive: false,
@@ -85,6 +91,7 @@ class EditorToolbar extends StatelessWidget {
                           : null,
                     ),
                     _actionButton(
+                      context: context,
                       icon: Icons.add_circle_outline,
                       label: 'Insert',
                       isActive: false,
@@ -180,6 +187,7 @@ class EditorToolbar extends StatelessWidget {
       PageBackgroundStyle.lines => Icons.density_medium,
     };
     return _actionButton(
+      context: context,
       icon: icon,
       label: 'Background',
       isActive: false,
@@ -265,6 +273,7 @@ class EditorToolbar extends StatelessWidget {
   }
 
   Widget _actionButton({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required bool isActive,
@@ -276,15 +285,16 @@ class EditorToolbar extends StatelessWidget {
         icon: Icon(icon, size: 20),
         tooltip: label,
         color: isActive
-            ? AppColors.inkBlack
-            : AppColors.inkBlack.withValues(alpha: 0.72),
-        style: _toolHighlightStyle(isActive),
+            ? Theme.of(context).colorScheme.onSurface
+            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+        style: _toolHighlightStyle(context, isActive),
         onPressed: onPressed,
       ),
     );
   }
 
   Widget _toolButton({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required DrawingTool tool,
@@ -297,24 +307,27 @@ class EditorToolbar extends StatelessWidget {
         icon: Icon(icon, size: 20),
         tooltip: label,
         color: selected
-            ? AppColors.inkBlack
-            : AppColors.inkBlack.withValues(alpha: 0.72),
-        style: _toolHighlightStyle(selected),
+            ? Theme.of(context).colorScheme.onSurface
+            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+        style: _toolHighlightStyle(context, selected),
         onPressed: onPressed ?? () => controller.setTool(tool),
       ),
     );
   }
 
-  ButtonStyle _toolHighlightStyle(bool selected) {
+  ButtonStyle _toolHighlightStyle(
+    BuildContext context,
+    bool selected,
+  ) {
     return ButtonStyle(
       backgroundColor: WidgetStateProperty.resolveWith((states) {
         if (selected) {
-          return AppColors.inkBlack.withValues(alpha: 0.07);
+          return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07);
         }
         return null;
       }),
       overlayColor: WidgetStateProperty.all(
-        AppColors.inkBlack.withValues(alpha: 0.05),
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
       ),
       shape: WidgetStateProperty.all(
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -322,7 +335,7 @@ class EditorToolbar extends StatelessWidget {
     );
   }
 
-  Widget _eraserSelector() {
+  Widget _eraserSelector(BuildContext context) {
     final activeTool = controller.tool.isEraser
         ? controller.tool
         : controller.lastEraserTool;
@@ -339,9 +352,9 @@ class EditorToolbar extends StatelessWidget {
             ),
             tooltip: _eraserLabel(activeTool),
             color: isSelected
-                ? AppColors.inkBlack
-                : AppColors.inkBlack.withValues(alpha: 0.72),
-            style: _toolHighlightStyle(isSelected),
+                ? Theme.of(context).colorScheme.onSurface
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+            style: _toolHighlightStyle(context, isSelected),
             onPressed: () => controller.setTool(activeTool),
           ),
           _selectorMenuButton(
@@ -388,7 +401,7 @@ class EditorToolbar extends StatelessWidget {
     );
   }
 
-  Widget _shapeSelector() {
+  Widget _shapeSelector(BuildContext context) {
     final activeTool = controller.tool.isShape
         ? controller.tool
         : controller.lastShapeTool;
@@ -402,9 +415,9 @@ class EditorToolbar extends StatelessWidget {
             icon: Icon(_shapeIcon(activeTool), size: 20),
             tooltip: _shapeLabel(activeTool),
             color: isSelected
-                ? AppColors.inkBlack
-                : AppColors.inkBlack.withValues(alpha: 0.72),
-            style: _toolHighlightStyle(isSelected),
+                ? Theme.of(context).colorScheme.onSurface
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+            style: _toolHighlightStyle(context, isSelected),
             onPressed: () => controller.setTool(activeTool),
           ),
           _selectorMenuButton(
@@ -538,9 +551,14 @@ class EditorToolbar extends StatelessWidget {
         height: 24,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: color,
+          color: AppColors.displayInkColor(
+            color,
+            darkMode: Theme.of(context).brightness == Brightness.dark,
+          ),
           border: Border.all(
-            color: selected ? AppColors.inkBlack : Colors.transparent,
+            color: selected
+                ? Theme.of(context).colorScheme.onSurface
+                : Colors.transparent,
             width: 2,
           ),
         ),
@@ -599,7 +617,7 @@ class EditorToolbar extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: preview,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.divider),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -689,7 +707,7 @@ class EditorToolbar extends StatelessWidget {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: color,
-                                border: Border.all(color: AppColors.divider),
+                                border: Border.all(color: Theme.of(context).dividerColor),
                               ),
                             ),
                           ),
