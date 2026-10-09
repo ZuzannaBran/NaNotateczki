@@ -1993,9 +1993,9 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                   SingleChildScrollView(
                     key: const ValueKey('notebook-overview-scroll'),
                     controller: _minimapScrollController,
-                  physics: canScroll
-                      ? const ClampingScrollPhysics()
-                      : const NeverScrollableScrollPhysics(),
+                    physics: canScroll
+                        ? const ClampingScrollPhysics()
+                        : const NeverScrollableScrollPhysics(),
                     child: RepaintBoundary(
                       child: ValueListenableBuilder<int>(
                         valueListenable: widget.controller.inkRevision,
@@ -2020,8 +2020,8 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                         ),
                       ),
                     ),
-                ),
-                Positioned.fill(
+                  ),
+                  Positioned.fill(
                   child: IgnorePointer(
                     child: AnimatedBuilder(
                       animation: _minimapScrollController,
@@ -2041,6 +2041,7 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                         );
                       },
                     ),
+                  ),
                   ),
                 ],
               ),
