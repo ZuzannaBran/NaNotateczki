@@ -220,6 +220,7 @@ class StudyPlannerController extends ChangeNotifier {
   Future<void> load() async {
     try {
       final value = await _read(storageKey);
+      var recoveredReviews = false;
       if (value != null) {
         final decoded = jsonDecode(value) as Map<String, dynamic>;
         final entries = decoded['sessions'] as List<dynamic>;
@@ -232,10 +233,20 @@ class StudyPlannerController extends ChangeNotifier {
                 s.status == StudyStatus.paused)
             .toList();
         for (final duplicate in running.skip(1)) {
-          duplicate.status = StudyStatus.review;
+          duplicate.status = StudyStatus.completed;
           duplicate.finishedAt = _clock();
           duplicate.deadline = null;
+          recoveredReviews = true;
         }
+        for (final session in _sessions) {
+          if (session.status == StudyStatus.review) {
+            session.status = StudyStatus.completed;
+            recoveredReviews = true;
+          }
+        }
+      }
+      if (recoveredReviews) {
+        _changed();
       }
     } catch (failure) {
       error = 'Study history could not be loaded: $failure';
@@ -383,6 +394,15 @@ class StudyPlannerController extends ChangeNotifier {
       return;
     }
     session.productivity = score;
+    session.status = StudyStatus.completed;
+    _changed();
+  }
+
+  void skipRating(String id) {
+    final session = _find(id);
+    if (session.status != StudyStatus.review) {
+      return;
+    }
     session.status = StudyStatus.completed;
     _changed();
   }
