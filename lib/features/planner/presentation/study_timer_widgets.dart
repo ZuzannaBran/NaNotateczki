@@ -1,5 +1,3 @@
-import 'dart:ui' show FontFeature;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -223,7 +221,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<StudyTechnique>(
-                value: _technique,
+                initialValue: _technique,
                 decoration: const InputDecoration(labelText: 'Study technique'),
                 items: [
                   for (final method in StudyTechnique.values)
