@@ -450,7 +450,7 @@ błędów, integralności i wydajności.
 
 Przelicza pozycję klikniętą na minimapie na współrzędne dokumentu i wyznacza
 przewinięcie oraz pan niezbędne do wyśrodkowania punktu z zachowaniem zoomu.
-4: `NotebookOverviewNavigation`; 39: `NotebookOverviewTarget`.
+5: `NotebookOverviewNavigation`; 40: `NotebookOverviewTarget`.
 
 ### Widgety edytora
 
