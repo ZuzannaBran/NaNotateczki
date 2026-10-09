@@ -137,6 +137,20 @@ void main() {
       ),
     );
 
+    final navigationSlider = find.byKey(
+      const ValueKey('touch-navigation-sensitivity'),
+    );
+    expect(navigationSlider, findsOneWidget);
+    final initialSlider = tester.widget<Slider>(navigationSlider);
+    expect(initialSlider.value, 1.0);
+    expect(initialSlider.min, 0.5);
+    expect(initialSlider.max, 2.0);
+    initialSlider.onChanged!(1.6);
+    await tester.pump();
+    expect(preferences.touchNavigationSensitivity, 1.6);
+    expect(tester.widget<Slider>(navigationSlider).value, 1.6);
+    expect(find.text('1.6×'), findsOneWidget);
+
     await tester.tap(find.text('Visual'));
     await tester.pumpAndSettle();
     final switchFinder = find.byKey(
