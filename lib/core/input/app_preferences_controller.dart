@@ -30,6 +30,7 @@ class AppPreferencesController extends ChangeNotifier {
   DeviceInputMode deviceInputMode = _defaultDeviceInputMode();
   AppAccentColor accentColor = AppAccentColor.softBubblegum;
   bool darkMode = false;
+  double touchNavigationSensitivity = 1.0;
 
   bool get shouldRequestSoftKeyboard {
     return deviceInputMode == DeviceInputMode.tablet;
@@ -62,6 +63,18 @@ class AppPreferencesController extends ChangeNotifier {
       if (storedDarkMode is bool && storedDarkMode != darkMode) {
         darkMode = storedDarkMode;
         changed = true;
+      }
+
+      final savedSensitivity = decoded['touchNavigationSensitivity'];
+      if (savedSensitivity is num &&
+          savedSensitivity.isFinite &&
+          savedSensitivity >= 0.5 &&
+          savedSensitivity <= 2.0) {
+        final normalized = savedSensitivity.toDouble();
+        if (normalized != touchNavigationSensitivity) {
+          touchNavigationSensitivity = normalized;
+          changed = true;
+        }
       }
 
       final accentValue = decoded['accentColor'];
@@ -113,6 +126,26 @@ class AppPreferencesController extends ChangeNotifier {
     await _save();
   }
 
+  void previewTouchNavigationSensitivity(double value) {
+    if (!value.isFinite) {
+      return;
+    }
+    final normalized = value.clamp(0.5, 2.0).toDouble();
+    if (touchNavigationSensitivity == normalized) {
+      return;
+    }
+    touchNavigationSensitivity = normalized;
+    notifyListeners();
+  }
+
+  Future<void> setTouchNavigationSensitivity(double value) async {
+    if (!value.isFinite) {
+      return;
+    }
+    previewTouchNavigationSensitivity(value);
+    await _save();
+  }
+
   Future<void> setAccentColor(AppAccentColor color) async {
     if (accentColor == color) {
       return;
@@ -130,6 +163,7 @@ class AppPreferencesController extends ChangeNotifier {
           'deviceInputMode': deviceInputMode.index,
           'accentColor': accentColor.name,
           'darkMode': darkMode,
+          'touchNavigationSensitivity': touchNavigationSensitivity,
         }),
       );
     } catch (e) {
