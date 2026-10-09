@@ -48,7 +48,7 @@ void main() {
     expect(find.text('Mon'), findsWidgets);
     await tester.tap(find.text('Today').last);
     await tester.pumpAndSettle();
-    expect(find.text('Calculus', findRichText: true), findsWidgets);
+    expect(find.textContaining('Calculus'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
