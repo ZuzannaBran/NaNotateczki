@@ -20,6 +20,7 @@ import '../../../core/theme/app_metrics.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/note_page.dart';
+import '../../planner/presentation/study_timer_widgets.dart';
 import '../state/editor_controller.dart';
 import 'editor_commands.dart';
 import 'editor_settings_screen.dart';
@@ -31,9 +32,14 @@ import 'widgets/page_overlay.dart';
 import 'widgets/text_edit_toolbar.dart';
 
 class EditorScreen extends StatefulWidget {
-  const EditorScreen({super.key, this.showToolbar = true});
+  const EditorScreen({
+    super.key,
+    this.showToolbar = true,
+    this.showCompactTimer = false,
+  });
 
   final bool showToolbar;
+  final bool showCompactTimer;
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -1394,6 +1400,7 @@ class _EditorScreenState extends State<EditorScreen> {
           style: const TextStyle(fontSize: 18),
         ),
         actions: [
+          if (widget.showCompactTimer) const CompactStudyTimer(),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',
