@@ -37,6 +37,7 @@ lib/
     ├── library/                 foldery i lista dokumentów
     ├── notebook/                domena, repozytorium, ekran notebooka
     ├── editor/                  stan i UI edytora
+    ├── planner/                 sesje nauki i kalendarz
     └── board/                   ekran nieskończonej tablicy
 ```
 
@@ -68,7 +69,9 @@ postępu, ale podczas zamykania blokujący spinner nadal chroni zapis.
 Scheduler w trybie exit nie czeka na idle rysika i nie porzuca zmian
 po błędzie.
 
-- 24: `AppScope`; 31: `_AppScopeState`; 73: `didRequestAppExit`.
+- Dostarcza również singleton `StudyPlannerController` (Provider),
+  niezależny od migracji bazy notatek.
+- 25: `AppScope`; 32: `_AppScopeState`; 74: `didRequestAppExit`.
 - 226: `_ExitGuardOverlay`; 252: `_FinishingExitOverlay`;
   360: `_BackupScheduler`;
   556: `flushForExit`.
@@ -318,7 +321,10 @@ Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
-zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. Pod strzałką panelu folderów
+zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. U dołu panelu jest `StudyTimerCard`,
+  pokazujący aktywną sesję, nadchodzący plan i oceny. Po zwinięciu panelu
+  `CompactStudyTimer` wyświetla się obok Settings w AppBar notebooka/boarda.
+  Pod strzałką panelu folderów
 jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka,
 a jego stan pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
 
@@ -332,6 +338,25 @@ a jego stan pozostaje zachowany przy przełączaniu dokumentów. Pionowy separat
 Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 
 - 8: `LibraryItemCard`; 110: `_ItemKindIcon`.
+
+## 6a. Planer nauki (bez migracji SQLite)
+
+- `lib/features/planner/state/study_planner_controller.dart`:
+  `StudySession`, `StudyTechnique`, `StudyStatus`, `StudyPlannerController`.
+  Jeden stan Provider + ChangeNotifier, trwały `study_planner.json` przez
+  cross-platform `text_storage`. Timery liczone względem deadline,
+  odtwarzanie po restarcie, Pomodoro 25/5, Focus 50/10, Deep 90/20,
+  kolejka ocen 1–5 i zapis chroniony przez `AppSaveCoordinator`.
+  Stop/koniec nie wpisuje sesji do historii przed oceną. Powiadomienia
+  tylko wewnątrz działającej aplikacji.
+- `lib/features/planner/presentation/study_timer_widgets.dart`:
+  `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i oceny sesji.
+- `lib/features/planner/presentation/planner_screen.dart`:
+  `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
+  tworzenie, edycja, usuwanie i historia.
+- `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
+  timerów, Pomodoro, ranking i ochrona uszkodzonych danych.
+- `test/study_planner_widget_test.dart`: kalendarz i start–pause–stop–rating.
 
 ## 7. Stan edytora
 
