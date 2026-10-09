@@ -28,119 +28,118 @@ class EditorToolbar extends StatelessWidget {
             controller.activeTextBlockId != null ||
             controller.activeImageBlockId != null ||
             (controller.lassoSelection?.isEmpty == false);
-        return Container(
-          key: const ValueKey('editor-toolbar-panel'),
-          width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(44, 8, 12, 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.outlineVariant.withValues(alpha: 0.45),
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _toolButton(
-                        icon: Icons.brush_outlined,
-                        label: 'Pen',
-                        tool: DrawingTool.pen,
-                      ),
-                      _toolButton(
-                        icon: Icons.edit_outlined,
-                        label: 'Highlighter',
-                        tool: DrawingTool.highlighter,
-                      ),
-                      _eraserSelector(),
-                      _shapeSelector(),
-                      _toolButton(
-                        icon: Icons.text_fields,
-                        label: 'Text',
-                        tool: DrawingTool.text,
-                      ),
-                      _toolButton(
-                        icon: Icons.highlight_alt_outlined,
-                        label: 'Lasso / Select',
-                        tool: DrawingTool.lasso,
-                      ),
-                      _toolButton(
-                        icon: Icons.open_with,
-                        label: 'Move',
-                        tool: DrawingTool.edit,
-                      ),
-                      _actionButton(
-                        icon: Icons.delete_outline,
-                        label: 'Delete',
-                        isActive: false,
-                        onPressed: canDelete
-                            ? controller.deleteActiveElement
-                            : null,
-                      ),
-                      _actionButton(
-                        icon: Icons.add_circle_outline,
-                        label: 'Insert',
-                        isActive: false,
-                        onPressed: onInsertPressed,
-                      ),
-                      _backgroundButton(context),
-                      const SizedBox(width: 12),
-                      for (var i = 0; i < controller.quickColors.length; i++)
-                        _colorDot(
-                          context,
-                          color: controller.quickColors[i],
-                          selected:
-                              controller.inkColor == controller.quickColors[i],
-                          onSelect: () =>
-                              controller.setColor(controller.quickColors[i]),
-                          onEdit: (color) => controller.setQuickColor(i, color),
-                        ),
-                      SizedBox(
-                        width: 140,
-                        child: Slider(
-                          value: controller.inkStrokeWidth,
-                          min: 1.0,
-                          max: 12.0,
-                          onChanged: controller.setStrokeWidth,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ValueListenableBuilder<int>(
-                        valueListenable: controller.historyRevision,
-                        builder: (context, _, _) => Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.undo, size: 20),
-                              onPressed: controller.canUndo
-                                  ? controller.undo
-                                  : null,
-                              tooltip: 'Undo',
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.redo, size: 20),
-                              onPressed: controller.canRedo
-                                  ? controller.redo
-                                  : null,
-                              tooltip: 'Redo',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(44, 8, 44, 8),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Container(
+              key: const ValueKey('editor-toolbar-panel'),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.45),
                 ),
               ),
-              const SizedBox(width: 8),
-              _exportButton(),
-            ],
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _toolButton(
+                      icon: Icons.brush_outlined,
+                      label: 'Pen',
+                      tool: DrawingTool.pen,
+                    ),
+                    _toolButton(
+                      icon: Icons.edit_outlined,
+                      label: 'Highlighter',
+                      tool: DrawingTool.highlighter,
+                    ),
+                    _eraserSelector(),
+                    _shapeSelector(),
+                    _toolButton(
+                      icon: Icons.text_fields,
+                      label: 'Text',
+                      tool: DrawingTool.text,
+                    ),
+                    _toolButton(
+                      icon: Icons.highlight_alt_outlined,
+                      label: 'Lasso / Select',
+                      tool: DrawingTool.lasso,
+                    ),
+                    _toolButton(
+                      icon: Icons.open_with,
+                      label: 'Move',
+                      tool: DrawingTool.edit,
+                    ),
+                    _actionButton(
+                      icon: Icons.delete_outline,
+                      label: 'Delete',
+                      isActive: false,
+                      onPressed: canDelete
+                          ? controller.deleteActiveElement
+                          : null,
+                    ),
+                    _actionButton(
+                      icon: Icons.add_circle_outline,
+                      label: 'Insert',
+                      isActive: false,
+                      onPressed: onInsertPressed,
+                    ),
+                    _backgroundButton(context),
+                    const SizedBox(width: 12),
+                    for (var i = 0; i < controller.quickColors.length; i++)
+                      _colorDot(
+                        context,
+                        color: controller.quickColors[i],
+                        selected:
+                            controller.inkColor == controller.quickColors[i],
+                        onSelect: () =>
+                            controller.setColor(controller.quickColors[i]),
+                        onEdit: (color) => controller.setQuickColor(i, color),
+                      ),
+                    SizedBox(
+                      width: 140,
+                      child: Slider(
+                        value: controller.inkStrokeWidth,
+                        min: 1.0,
+                        max: 12.0,
+                        onChanged: controller.setStrokeWidth,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ValueListenableBuilder<int>(
+                      valueListenable: controller.historyRevision,
+                      builder: (context, _, _) => Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.undo, size: 20),
+                            onPressed: controller.canUndo
+                                ? controller.undo
+                                : null,
+                            tooltip: 'Undo',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.redo, size: 20),
+                            onPressed: controller.canRedo
+                                ? controller.redo
+                                : null,
+                            tooltip: 'Redo',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _exportButton(),
+                  ],
+                ),
+              ),
+            ),
           ),
         );
       },
