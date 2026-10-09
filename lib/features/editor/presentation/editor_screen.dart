@@ -2022,26 +2022,31 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                     ),
                   ),
                   Positioned.fill(
-                  child: IgnorePointer(
-                    child: AnimatedBuilder(
-                      animation: _minimapScrollController,
-                      builder: (context, child) {
-                        final scrollOffset = _minimapScrollController.hasClients
-                            ? _minimapScrollController.offset
-                            : 0.0;
-                        final rect = indicatorRectInContent
-                            .shift(Offset(0, -scrollOffset))
-                            .intersect(
-                              Rect.fromLTWH(0, 0, _minimapWidth, panelHeight),
-                            );
-                        return CustomPaint(
-                          painter: _MiniMapViewportOverlayPainter(
-                            indicatorRect: rect,
-                          ),
-                        );
-                      },
+                    child: IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: _minimapScrollController,
+                        builder: (context, child) {
+                          final scrollOffset = _minimapScrollController.hasClients
+                              ? _minimapScrollController.offset
+                              : 0.0;
+                          final rect = indicatorRectInContent
+                              .shift(Offset(0, -scrollOffset))
+                              .intersect(
+                                Rect.fromLTWH(
+                                  0,
+                                  0,
+                                  _minimapWidth,
+                                  panelHeight,
+                                ),
+                              );
+                          return CustomPaint(
+                            painter: _MiniMapViewportOverlayPainter(
+                              indicatorRect: rect,
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
                   ),
                 ],
               ),
