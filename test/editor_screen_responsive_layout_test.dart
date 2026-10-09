@@ -13,8 +13,8 @@ import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
-import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
+import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 void main() {
   testWidgets('page stays clear of overview and inside right boundary', (
@@ -164,7 +164,10 @@ void main() {
     final canvasRect = tester.getRect(canvas);
     final toolbarRect = tester.getRect(toolbar);
 
-    expect(canvasRect.top, closeTo(tester.getBottomLeft(find.byType(AppBar)).dy, 0.01));
+    expect(
+      canvasRect.top,
+      closeTo(tester.getBottomLeft(find.byType(AppBar)).dy, 0.01),
+    );
     expect(canvasRect.bottom, closeTo(900, 0.01));
     expect(toolbarRect.top, greaterThanOrEqualTo(canvasRect.top));
     expect(toolbarRect.bottom, lessThan(canvasRect.bottom));
@@ -172,7 +175,10 @@ void main() {
       tester.getTopLeft(find.byKey(viewportKey)).dy,
       closeTo(canvasRect.top + 22, 0.01),
     );
-    expect(tester.getTopLeft(overview).dy, closeTo(canvasRect.top + 82, 0.01));
+    expect(
+      tester.getTopLeft(overview).dy,
+      closeTo(canvasRect.top + 82, 0.01),
+    );
 
     await tester.tap(find.byTooltip('Highlighter'));
     await tester.pump();
@@ -183,7 +189,10 @@ void main() {
 
     expect(find.byKey(toolbarKey), findsNothing);
     expect(tester.getRect(canvas), canvasRect);
-    expect(tester.getTopLeft(overview).dy, closeTo(canvasRect.top + 10, 0.01));
+    expect(
+      tester.getTopLeft(overview).dy,
+      closeTo(canvasRect.top + 10, 0.01),
+    );
     expect(
       tester.getTopLeft(find.byKey(viewportKey)).dy,
       closeTo(canvasRect.top + 22, 0.01),
