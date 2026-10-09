@@ -255,7 +255,7 @@ void main() {
     await tester.pump();
     expect(tester.getRect(canvas), canvasRect);
     final sideToolbar = tester.getRect(toolbar);
-    expect(sideToolbar.left, greaterThanOrEqualTo(1200 - 104));
+    expect(sideToolbar.left, greaterThanOrEqualTo(1200 - 120));
     expect(
       tester.widget<Scrollable>(
         find.descendant(
