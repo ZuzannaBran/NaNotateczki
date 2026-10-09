@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -151,6 +152,30 @@ void main() {
     if (await documentsDirectory.exists()) {
       await documentsDirectory.delete(recursive: true);
     }
+  });
+
+  test('board and notebook toolbar placements persist after reload', () async {
+    final original = AppPreferencesController();
+    expect(original.boardToolbarPlacement, ToolbarPlacement.top);
+    expect(original.notebookToolbarPlacement, ToolbarPlacement.top);
+    await original.setBoardToolbarPlacement(ToolbarPlacement.left);
+    await original.setNotebookToolbarPlacement(ToolbarPlacement.right);
+    original.dispose();
+
+    final loaded = AppPreferencesController();
+    await loaded.load();
+    expect(loaded.boardToolbarPlacement, ToolbarPlacement.left);
+    expect(loaded.notebookToolbarPlacement, ToolbarPlacement.right);
+    await loaded.setBoardToolbarPlacement(ToolbarPlacement.right);
+    await loaded.setNotebookToolbarPlacement(ToolbarPlacement.left);
+    expect(loaded.notebookToolbarPlacement, ToolbarPlacement.right);
+    loaded.dispose();
+
+    final restored = AppPreferencesController();
+    await restored.load();
+    expect(restored.boardToolbarPlacement, ToolbarPlacement.right);
+    expect(restored.notebookToolbarPlacement, ToolbarPlacement.right);
+    restored.dispose();
   });
 
   test(
