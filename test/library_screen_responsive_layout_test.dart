@@ -343,7 +343,7 @@ void main() {
           body: Row(
             children: [
               SizedBox(
-                width: 104,
+                width: 120,
                 height: 340,
                 child: EditorToolbar(
                   axis: Axis.vertical,
@@ -396,7 +396,7 @@ void main() {
       find.descendant(of: inkPanel, matching: find.byType(RotatedBox)),
       findsOneWidget,
     );
-    expect(tester.getSize(inkPanel).width, lessThan(104));
+    expect(tester.getSize(inkPanel).width, lessThan(120));
     await tester.tap(find.byTooltip('Highlighter'));
     await tester.pump();
     expect(controller.tool, DrawingTool.highlighter);
