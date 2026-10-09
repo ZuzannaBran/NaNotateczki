@@ -451,7 +451,8 @@ błędów, integralności i wydajności.
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
-  Symetryczny margines odsłania strzałkę zwijania;
+  Zewnętrzne marginesy wynoszą po 52 px, wewnętrzne boczne po 22 px,
+  a pionowy padding 3 px; przycisk zwijania pozostaje dostępny;
   ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
@@ -465,6 +466,8 @@ błędów, integralności i wydajności.
   ponieważ obecny `EditableText` nie renderuje ich jako rich-text.
   Pasek używa takiej samej kapsułki: zwęża się do zawartości,
   pozostaje wycentrowany i przewija poziomo na wąskich ekranach.
+  Ma 52 px zewnętrznego i 22 px wewnętrznego marginesu bocznego
+  oraz 2 px pionowego paddingu.
   9: `TextEditToolbar`; 43: `build`.
 
 - `lib/features/editor/presentation/interaction/object_transform_engine.dart` (362):
@@ -612,7 +615,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/library_screen_responsive_layout_test.dart` (267):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; dodatkowo regresja
-  wyśrodkowania, zwężania kapsułek oraz przewijania na wąskim ekranie
+  wyśrodkowania, zwężania kapsułek, wysokości, odstępów bocznych
+  oraz przewijania na wąskim ekranie
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
