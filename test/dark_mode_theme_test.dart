@@ -26,26 +26,61 @@ void main() {
     expect(AppTheme.light().brightness, Brightness.light);
   });
 
-  test('grayscale ink is adapted only when dark mode is enabled', () {
-    const black = Color(0xFF202020);
+  test('all ink colors invert lightness without changing hue', () {
+    const black = Color(0xFF000000);
     const white = Color(0xFFFFFFFF);
-    const blue = Color(0xFF2E5AAC);
-    expect(AppColors.displayInkColor(black, darkMode: false), black);
+    const lightBlue = Color(0xFFBBDCFB);
+    const darkBlue = Color(0xFF203E85);
+    const lightPink = Color(0xFFFFC1CC);
+    const translucent = Color(0x8078A8E0);
+
     expect(
       AppColors.displayInkColor(black, darkMode: true),
-      AppColors.darkText,
+      Colors.white,
     );
     expect(
       AppColors.displayInkColor(white, darkMode: true),
-      AppColors.darkBackground,
+      Colors.black,
     );
-    expect(AppColors.displayInkColor(blue, darkMode: true), blue);
-    expect(
-      AppColors.displayInkColor(
-        const Color(0xFF1E2A40),
+    for (final original in [
+      lightBlue,
+      darkBlue,
+      lightPink,
+      translucent,
+      const Color(0xFF1E2A40),
+      const Color(0xFF202020),
+      const Color(0xFF2E5AAC),
+    ]) {
+      expect(
+        AppColors.displayInkColor(original, darkMode: false),
+        original,
+      );
+      final transformed = AppColors.displayInkColor(
+        original,
         darkMode: true,
-      ),
-      AppColors.darkText,
+      );
+      final sourceHsl = HSLColor.fromColor(original);
+      final targetHsl = HSLColor.fromColor(transformed);
+      expect(
+        targetHsl.lightness,
+        closeTo(1 - sourceHsl.lightness, 0.005),
+      );
+      if (sourceHsl.saturation > 0.01) {
+        expect(targetHsl.hue, closeTo(sourceHsl.hue, 0.5));
+      }
+      expect(transformed.a, closeTo(original.a, 0.001));
+    }
+    expect(
+      HSLColor.fromColor(
+        AppColors.displayInkColor(lightBlue, darkMode: true),
+      ).lightness,
+      lessThan(HSLColor.fromColor(lightBlue).lightness),
+    );
+    expect(
+      HSLColor.fromColor(
+        AppColors.displayInkColor(darkBlue, darkMode: true),
+      ).lightness,
+      greaterThan(HSLColor.fromColor(darkBlue).lightness),
     );
   });
 
