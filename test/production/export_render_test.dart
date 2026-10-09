@@ -225,6 +225,7 @@ void main() {
     expect(pages, hasLength(1));
     _verifyPng(pages.single);
   });
+
   testWidgets('saved ink and paper match the export theme', (tester) async {
     const black = Color(0xFF101010);
     const paleBlue = Color(0xFFBBDCFB);
@@ -302,6 +303,6 @@ void main() {
     expect(latin1.decode(rendered.pdfLight.take(5).toList()), '%PDF-');
     expect(latin1.decode(rendered.pdfDark.take(5).toList()), '%PDF-');
     expect(rendered.pdfDark, isNot(equals(rendered.pdfLight)));
+    expect(notebook.pages.first.inkStrokes.map((stroke) => stroke.color), colors);
   });
-
 }
