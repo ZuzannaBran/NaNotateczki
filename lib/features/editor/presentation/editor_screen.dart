@@ -974,18 +974,13 @@ class _EditorScreenState extends State<EditorScreen> {
         : controller.findTextBlockById(activeTextBlockId);
 
     final commands = _commands(controller);
+    final toolbarOffset = widget.showToolbar
+        ? 72.0 + (activeTextBlock == null ? 0.0 : 62.0)
+        : 0.0;
 
-    final editorContent = Column(
+    final editorContent = Stack(
       children: [
-        if (widget.showToolbar)
-          EditorToolbar(
-            controller: controller,
-            onInsertPressed: commands.insertFile,
-            onExportSelected: commands.export,
-          ),
-        if (widget.showToolbar && activeTextBlock != null)
-          TextEditToolbar(editorController: controller, block: activeTextBlock),
-        Expanded(
+        Positioned.fill(
           child: LayoutBuilder(
             builder: (context, constraints) {
               final showProjectOverview =
@@ -1063,6 +1058,7 @@ class _EditorScreenState extends State<EditorScreen> {
               )..setTranslationRaw(_pagePan.dx, _pagePan.dy, 0.0);
 
               return Container(
+                key: const ValueKey('notebook-canvas-area'),
                 color: AppColors.background,
                 child: Stack(
                   children: [
@@ -1350,7 +1346,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       ),
                     ),
                     Positioned(
-                      top: 10,
+                      top: 10 + toolbarOffset,
                       right: 12,
                       child: IgnorePointer(
                         child: _ZoomPercentBadge(zoomPercent: zoomPercent),
@@ -1358,7 +1354,7 @@ class _EditorScreenState extends State<EditorScreen> {
                     ),
                     if (showProjectOverview)
                       Positioned(
-                        top: 10,
+                        top: 10 + toolbarOffset,
                         left: 10,
                         child: _ProjectMiniMapOverlay(
                           key: const ValueKey('notebook-project-overview'),
@@ -1377,6 +1373,27 @@ class _EditorScreenState extends State<EditorScreen> {
             },
           ),
         ),
+        if (widget.showToolbar)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                EditorToolbar(
+                  controller: controller,
+                  onInsertPressed: commands.insertFile,
+                  onExportSelected: commands.export,
+                ),
+                if (activeTextBlock != null)
+                  TextEditToolbar(
+                    editorController: controller,
+                    block: activeTextBlock,
+                  ),
+              ],
+            ),
+          ),
       ],
     );
 
