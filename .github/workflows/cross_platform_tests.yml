@@ -29,8 +29,11 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Inspect formatting
-        run: dart format --output=none lib test integration_test test_driver
+      - name: Inspect formatting and show the exact patch
+        shell: bash
+        run: |
+          dart format lib test integration_test test_driver
+          git diff --exit-code -- lib test integration_test test_driver
       - name: Analyze source and tests
         run: dart analyze
       - name: Verify DDS startup retry handles only infrastructure failures
