@@ -707,8 +707,11 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
           ),
           SizedBox(
             height: math.min(360, MediaQuery.sizeOf(context).height * 0.42),
-            child: const SingleChildScrollView(
-              child: StudyTimerCard(),
+            child: const Align(
+              alignment: Alignment.bottomCenter,
+              child: SingleChildScrollView(
+                child: StudyTimerCard(),
+              ),
             ),
           ),
         ],
