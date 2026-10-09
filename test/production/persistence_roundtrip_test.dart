@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -151,6 +152,24 @@ void main() {
     if (await documentsDirectory.exists()) {
       await documentsDirectory.delete(recursive: true);
     }
+  });
+
+  test('touch navigation sensitivity survives a fresh startup', () async {
+    final original = AppPreferencesController();
+    expect(original.touchNavigationSensitivity, 1.0);
+    await original.setTouchNavigationSensitivity(1.8);
+    original.dispose();
+
+    final reloaded = AppPreferencesController();
+    await reloaded.load();
+    expect(reloaded.touchNavigationSensitivity, 1.8);
+    await reloaded.setTouchNavigationSensitivity(0.5);
+    reloaded.dispose();
+
+    final latest = AppPreferencesController();
+    await latest.load();
+    expect(latest.touchNavigationSensitivity, 0.5);
+    latest.dispose();
   });
 
   test(
