@@ -50,7 +50,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
             _anchor.year, _anchor.month, _anchor.day + 7 * direction),
         CalendarMode.month =>
           DateTime(_anchor.year, _anchor.month + direction,
-              _anchor.day.clamp(1, 28)),
+              _anchor.day.clamp(1, 28).toInt()),
       };
     });
   }
@@ -571,7 +571,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 scrollDirection: Axis.horizontal,
                 child: SizedBox(
                   width: math.max(
-                    740, MediaQuery.sizeOf(context).width - 36),
+                    740.0, MediaQuery.sizeOf(context).width - 36),
                   child: Row(
                 children: [
                   IconButton(
