@@ -1349,7 +1349,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       ),
                     ),
                     Positioned(
-                      top: 10 + toolbarOffset,
+                      top: 10.0 + toolbarOffset,
                       right: 12,
                       child: IgnorePointer(
                         child: _ZoomPercentBadge(zoomPercent: zoomPercent),
@@ -1357,7 +1357,7 @@ class _EditorScreenState extends State<EditorScreen> {
                     ),
                     if (showProjectOverview)
                       Positioned(
-                        top: 10 + toolbarOffset,
+                        top: 10.0 + toolbarOffset,
                         left: 10,
                         child: _ProjectMiniMapOverlay(
                           key: const ValueKey('notebook-project-overview'),
