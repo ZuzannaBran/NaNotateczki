@@ -1,0 +1,2190 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'dart:ui' show PointerDeviceKind;
+
+import 'package:flutter/gestures.dart'
+    show
+        PointerPanZoomEndEvent,
+        PointerPanZoomStartEvent,
+        PointerPanZoomUpdateEvent,
+        PointerScrollEvent,
+        PointerSignalEvent;
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
+import '../../notebook/domain/drawing_tool.dart';
+import '../../notebook/domain/image_block.dart';
+import '../../notebook/domain/note_page.dart';
+import '../state/editor_controller.dart';
+import 'editor_commands.dart';
+import 'editor_settings_screen.dart';
+import 'widgets/busy_overlay.dart';
+import 'widgets/drawing_canvas.dart';
+import 'widgets/editor_toolbar.dart';
+import 'widgets/page_background_paint.dart';
+import 'widgets/page_overlay.dart';
+import 'widgets/text_edit_toolbar.dart';
+
+class EditorScreen extends StatefulWidget {
+  const EditorScreen({super.key});
+
+  @override
+  State<EditorScreen> createState() => _EditorScreenState();
+}
+
+class _EditorScreenState extends State<EditorScreen> {
+  static const double _logicalPageWidth = 820;
+  static const double _pageGap = 26;
+  static const double _leftMargin = 56;
+  static const double _rightMargin = 56;
+  static const double _topBottomPadding = 22;
+  static const double _addPageButtonGap = 10;
+  static const double _addPageFooterHeight = 56;
+  static const double _pageViewportBleed = 20;
+  static const double _minPageScaleFactor = 0.25;
+  static const double _maxPageScaleFloor = 1.8;
+  static const double _postFitZoomFactor = 2.0;
+  static const double _touchPanSensitivity = 0.55;
+  static const double _trackpadPanSensitivity = 0.6;
+  static const double _scrollPanSensitivity = 0.38;
+  static const double _inkNavigationTouchSlop = 8.0;
+  static const double _overviewSideGap = 10.0;
+  static const double _overviewRight = 106.0;
+  static const Duration _touchContextMenuDelay = Duration(seconds: 1);
+
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _canvasKey = GlobalKey();
+  double _pageExtent = 0;
+  bool _isViewportNavigating = false;
+  bool _panZoomSessionActive = false;
+  final Map<int, Offset> _activePointers = <int, Offset>{};
+  int? _activeInkPointer;
+  int? _pendingNavigationPointer;
+  Offset? _pendingNavigationPosition;
+  bool _isBusy = false;
+  Offset _touchLastFocal = Offset.zero;
+  double _touchLastDistance = 1.0;
+  Offset _panZoomLastPan = Offset.zero;
+  double _panZoomLastScale = 1.0;
+  Offset _panZoomLastLocalPosition = Offset.zero;
+  double _pageScale = 1.0;
+  double _responsivePageScale = 1.0;
+  Offset _pagePan = Offset.zero;
+  double _pageMinScale = 1.0;
+  double _pageMaxScale = 1.0;
+  Offset _insertPosition = const Offset(120, 120);
+  Timer? _touchContextMenuTimer;
+  int? _touchContextMenuPointer;
+  Offset? _touchContextMenuStart;
+
+  double get _effectivePageScale => _pageScale * _responsivePageScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    _cancelTouchContextMenu();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
+  }
+
+  bool _onPagesScroll(
+    ScrollNotification notification,
+    EditorController controller,
+  ) {
+    if (notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+
+    if (notification is ScrollEndNotification) {
+      _syncCurrentPageToViewport(controller);
+    }
+
+    return false;
+  }
+
+  void _syncCurrentPageToViewport(EditorController controller) {
+    if (controller.isObjectTransformActive) {
+      return;
+    }
+    // While zoomed-in navigation is active, keep the interaction page stable.
+    // Auto-switching currentPage here can replace the active gesture target
+    // with a preview card and make the editor feel frozen.
+    if (_pageScale > 1.001 || _isViewportNavigating || _panZoomSessionActive) {
+      return;
+    }
+    if (!_scrollController.hasClients || _pageExtent <= 0) {
+      return;
+    }
+    if (controller.pages.isEmpty) {
+      return;
+    }
+    final raw =
+        ((_scrollController.position.pixels + (_pageExtent * 0.45)) /
+                _pageExtent)
+            .floor();
+    final target = raw.clamp(0, controller.pages.length - 1);
+    if (target != controller.currentPageIndex) {
+      controller.setCurrentPage(target);
+    }
+  }
+
+  void _addPageBelow(EditorController controller) {
+    controller.addPage();
+  }
+
+  void _syncPageTransformBounds({
+    required Size docWorldSize,
+    required double fitToWidthScale,
+    required Size viewportSize,
+  }) {
+    if (context.read<EditorController>().isObjectTransformActive) {
+      return;
+    }
+    if (docWorldSize.width <= 0 || docWorldSize.height <= 0) {
+      return;
+    }
+    _pageMinScale = _minPageScaleFactor;
+    final widthBasedLimit = fitToWidthScale * _postFitZoomFactor;
+    _pageMaxScale = math
+        .max(_maxPageScaleFloor, widthBasedLimit)
+        .clamp(1.0, 3.0)
+        .toDouble();
+    final clampedScale = _pageScale
+        .clamp(_pageMinScale, _pageMaxScale)
+        .toDouble();
+    final clampedPan = _clampPagePan(
+      scale: clampedScale * _responsivePageScale,
+      pan: _pagePan,
+      docWorldSize: docWorldSize,
+      viewportSize: viewportSize,
+    );
+    if (clampedScale == _pageScale && clampedPan == _pagePan) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _pageScale = clampedScale;
+        _pagePan = clampedPan;
+      });
+    });
+  }
+
+  bool _isNavigationPointerKind(PointerDeviceKind kind) {
+    return kind != PointerDeviceKind.stylus &&
+        kind != PointerDeviceKind.invertedStylus;
+  }
+
+  bool _isStylusPointerKind(PointerDeviceKind kind) {
+    return kind == PointerDeviceKind.stylus ||
+        kind == PointerDeviceKind.invertedStylus;
+  }
+
+  void _onPointerDown(
+    PointerDownEvent event,
+    Size docWorldSize,
+    Size viewportSize,
+  ) {
+    final controller = context.read<EditorController>();
+    if (controller.isObjectTransformActive) {
+      return;
+    }
+    if (controller.tool.isInk && _isStylusPointerKind(event.kind)) {
+      _activeInkPointer = event.pointer;
+      _pendingNavigationPointer = null;
+      _pendingNavigationPosition = null;
+      return;
+    }
+    if (controller.tool.isInk &&
+        event.kind == PointerDeviceKind.touch &&
+        _activeInkPointer != null) {
+      return;
+    }
+    if (!_isNavigationPointerKind(event.kind)) {
+      return;
+    }
+    if (controller.tool.isInk && event.kind == PointerDeviceKind.touch) {
+      if (!controller.allowsFingerDrawing) {
+        _activePointers[event.pointer] = event.localPosition;
+        _startViewportNavigation(docWorldSize, viewportSize);
+        return;
+      }
+      if (_pendingNavigationPointer == null && _activePointers.isEmpty) {
+        _pendingNavigationPointer = event.pointer;
+        _pendingNavigationPosition = event.localPosition;
+        return;
+      }
+      final pendingPointer = _pendingNavigationPointer;
+      final pendingPosition = _pendingNavigationPosition;
+      if (pendingPointer != null && pendingPosition != null) {
+        _activePointers[pendingPointer] = pendingPosition;
+        _pendingNavigationPointer = null;
+        _pendingNavigationPosition = null;
+      }
+    }
+    _activePointers[event.pointer] = event.localPosition;
+    if (_activePointers.length < 2) {
+      return;
+    }
+    _startViewportNavigation(docWorldSize, viewportSize);
+  }
+
+  void _onPointerMove(
+    PointerMoveEvent event,
+    Size docWorldSize,
+    Size viewportSize,
+  ) {
+    final transformController = context.read<EditorController>();
+    if (transformController.isObjectTransformActive) {
+      if (event.pointer == _pendingNavigationPointer) {
+        _pendingNavigationPointer = null;
+        _pendingNavigationPosition = null;
+      }
+      _activePointers.remove(event.pointer);
+      return;
+    }
+    if (event.pointer == _activeInkPointer) {
+      return;
+    }
+    if (event.kind == PointerDeviceKind.touch && _activeInkPointer != null) {
+      return;
+    }
+    if (!_isNavigationPointerKind(event.kind)) {
+      return;
+    }
+    if (event.pointer == _pendingNavigationPointer) {
+      final pendingPosition = _pendingNavigationPosition;
+      if (pendingPosition != null &&
+          (event.localPosition - pendingPosition).distance >
+              _inkNavigationTouchSlop) {
+        _activePointers[event.pointer] = event.localPosition;
+        _pendingNavigationPointer = null;
+        _pendingNavigationPosition = null;
+        if (_activePointers.length >= 2) {
+          _startViewportNavigation(docWorldSize, viewportSize);
+        }
+      }
+      return;
+    }
+    if (!_activePointers.containsKey(event.pointer)) {
+      return;
+    }
+    _activePointers[event.pointer] = event.localPosition;
+    if (!_isViewportNavigating) {
+      if (_activePointers.length >= 2) {
+        _startViewportNavigation(docWorldSize, viewportSize);
+      }
+      return;
+    }
+    if (_activePointers.length < 2) {
+      final controller = context.read<EditorController>();
+      if (event.kind == PointerDeviceKind.touch &&
+          !controller.allowsFingerDrawing &&
+          _activePointers.length == 1) {
+        final panDelta = event.localPosition - _touchLastFocal;
+        _touchLastFocal = event.localPosition;
+        _touchLastDistance = 1.0;
+        _applyPageTransform(
+          scaleDelta: 1.0,
+          panDelta: panDelta * _touchPanSensitivity,
+          focalPoint: event.localPosition,
+          docWorldSize: docWorldSize,
+          viewportSize: viewportSize,
+        );
+        return;
+      }
+      _stopViewportNavigation();
+      return;
+    }
+    final pointers = _activePointers.values.take(2).toList(growable: false);
+    final focal = _midpoint(pointers[0], pointers[1]);
+    final distance = _distanceBetween(pointers[0], pointers[1]);
+    final previousDistance = _touchLastDistance <= 0 ? 1.0 : _touchLastDistance;
+    final scaleDelta = (distance / previousDistance)
+        .clamp(0.25, 4.0)
+        .toDouble();
+    final panDelta = focal - _touchLastFocal;
+    _touchLastFocal = focal;
+    _touchLastDistance = math.max(0.001, distance);
+
+    final controller = context.read<EditorController>();
+    if (controller.isPinchToScaleImageActive) {
+      final safeScale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
+      controller.updatePinchToScaleActiveImage(
+        scaleDelta,
+        panDelta * _touchPanSensitivity / safeScale,
+      );
+      return;
+    }
+
+    _applyPageTransform(
+      scaleDelta: scaleDelta,
+      panDelta: panDelta * _touchPanSensitivity,
+      focalPoint: focal,
+      docWorldSize: docWorldSize,
+      viewportSize: viewportSize,
+    );
+  }
+
+  void _onPointerUpOrCancel(PointerEvent event) {
+    if (event.pointer == _activeInkPointer) {
+      _activeInkPointer = null;
+      return;
+    }
+    if (event.pointer == _pendingNavigationPointer) {
+      _pendingNavigationPointer = null;
+      _pendingNavigationPosition = null;
+      return;
+    }
+    final removed = _activePointers.remove(event.pointer) != null;
+    if (!removed) {
+      return;
+    }
+    if (_activePointers.length >= 2) {
+      return;
+    }
+    final controller = context.read<EditorController>();
+    if (_isViewportNavigating &&
+        !_panZoomSessionActive &&
+        _activePointers.length == 1 &&
+        !controller.allowsFingerDrawing) {
+      _touchLastFocal = _activePointers.values.first;
+      _touchLastDistance = 1.0;
+      return;
+    }
+    if (_isViewportNavigating && !_panZoomSessionActive) {
+      _stopViewportNavigation();
+      if (mounted) {
+        _syncCurrentPageToViewport(controller);
+      }
+    }
+  }
+
+  void _startViewportNavigation(Size docWorldSize, Size viewportSize) {
+    final pointers = _activePointers.values.take(2).toList(growable: false);
+    if (pointers.isEmpty) {
+      return;
+    }
+    if (pointers.length >= 2) {
+      context.read<EditorController>().startPinchToScaleActiveImage();
+      _touchLastFocal = _midpoint(pointers[0], pointers[1]);
+      _touchLastDistance = math.max(
+        0.001,
+        _distanceBetween(pointers[0], pointers[1]),
+      );
+    } else {
+      _touchLastFocal = pointers[0];
+      _touchLastDistance = 1.0;
+    }
+    final clampedPan = _clampPagePan(
+      scale: _effectivePageScale,
+      pan: _pagePan,
+      docWorldSize: docWorldSize,
+      viewportSize: viewportSize,
+    );
+    if (_isViewportNavigating && clampedPan == _pagePan) {
+      return;
+    }
+    setState(() {
+      _isViewportNavigating = true;
+      _pagePan = clampedPan;
+    });
+  }
+
+  void _onPointerPanZoomStart(
+    PointerPanZoomStartEvent event,
+    Size docWorldSize,
+    Size viewportSize,
+  ) {
+    final controller = context.read<EditorController>();
+    if (controller.isObjectTransformActive) {
+      return;
+    }
+    controller.startPinchToScaleActiveImage();
+    _panZoomSessionActive = true;
+    _panZoomLastPan = Offset.zero;
+    _panZoomLastScale = 1.0;
+    _panZoomLastLocalPosition = event.localPosition;
+    final clampedPan = _clampPagePan(
+      scale: _effectivePageScale,
+      pan: _pagePan,
+      docWorldSize: docWorldSize,
+      viewportSize: viewportSize,
+    );
+    if (_isViewportNavigating && clampedPan == _pagePan) {
+      return;
+    }
+    setState(() {
+      _isViewportNavigating = true;
+      _pagePan = clampedPan;
+    });
+  }
+
+  void _onPointerPanZoomUpdate(
+    PointerPanZoomUpdateEvent event,
+    Size docWorldSize,
+    Size viewportSize,
+  ) {
+    if (!_panZoomSessionActive) {
+      return;
+    }
+    final fallbackPanDelta = event.pan - _panZoomLastPan;
+    final focalDelta = event.localPosition - _panZoomLastLocalPosition;
+    final panDelta = event.panDelta != Offset.zero
+        ? event.panDelta
+        : (fallbackPanDelta != Offset.zero ? fallbackPanDelta : focalDelta);
+    final previousGestureScale = _panZoomLastScale == 0
+        ? 1.0
+        : _panZoomLastScale;
+    final scaleDelta = (event.scale / previousGestureScale)
+        .clamp(0.25, 4.0)
+        .toDouble();
+    _panZoomLastPan = event.pan;
+    _panZoomLastScale = event.scale;
+    _panZoomLastLocalPosition = event.localPosition;
+
+    final controller = context.read<EditorController>();
+    if (controller.isPinchToScaleImageActive) {
+      final safeScale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
+      controller.updatePinchToScaleActiveImage(
+        scaleDelta,
+        panDelta * _trackpadPanSensitivity / safeScale,
+      );
+      return;
+    }
+
+    _applyPageTransform(
+      scaleDelta: scaleDelta,
+      panDelta: panDelta * _trackpadPanSensitivity,
+      focalPoint: event.localPosition,
+      docWorldSize: docWorldSize,
+      viewportSize: viewportSize,
+    );
+  }
+
+  void _onPointerPanZoomEnd(PointerPanZoomEndEvent event) {
+    _panZoomSessionActive = false;
+    context.read<EditorController>().endPinchToScaleActiveImage();
+    if (_activePointers.length >= 2) {
+      return;
+    }
+    _stopViewportNavigation();
+    if (mounted) {
+      _syncCurrentPageToViewport(context.read<EditorController>());
+    }
+  }
+
+  void _onPointerSignal(
+    PointerSignalEvent event,
+    Size docWorldSize,
+    Size viewportSize,
+  ) {
+    if (event is! PointerScrollEvent) {
+      return;
+    }
+    if (!_isNavigationPointerKind(event.kind)) {
+      return;
+    }
+    if (event.scrollDelta == Offset.zero) {
+      return;
+    }
+    // Linux trackpads often emit scroll signals for two-finger panning.
+    _applyPageTransform(
+      scaleDelta: 1.0,
+      panDelta: -event.scrollDelta * _scrollPanSensitivity,
+      focalPoint: event.localPosition,
+      docWorldSize: docWorldSize,
+      viewportSize: viewportSize,
+    );
+  }
+
+  void _applyPageTransform({
+    required double scaleDelta,
+    required Offset panDelta,
+    required Offset focalPoint,
+    required Size docWorldSize,
+    required Size viewportSize,
+  }) {
+    if (context.read<EditorController>().isObjectTransformActive) {
+      return;
+    }
+    final currentZoom = _pageScale <= 0 ? 1.0 : _pageScale;
+    final targetZoom = (currentZoom * scaleDelta)
+        .clamp(_pageMinScale, _pageMaxScale)
+        .toDouble();
+    final currentScale = currentZoom * _responsivePageScale;
+    final targetScale = targetZoom * _responsivePageScale;
+
+    var desiredPan = _pagePan;
+    if ((targetScale - currentScale).abs() > 0.0001) {
+      final worldAtFocal = (focalPoint - _pagePan) / currentScale;
+      desiredPan = focalPoint - (worldAtFocal * targetScale);
+    }
+    if (panDelta != Offset.zero) {
+      desiredPan += panDelta;
+    }
+    final clampedPan = _clampPagePan(
+      scale: targetScale,
+      pan: desiredPan,
+      docWorldSize: docWorldSize,
+      viewportSize: viewportSize,
+    );
+
+    final overflow = desiredPan - clampedPan;
+    if (overflow.dy.abs() > 0.01 && _scrollController.hasClients) {
+      final position = _scrollController.position;
+      final targetOffset = (position.pixels - overflow.dy)
+          .clamp(0.0, position.maxScrollExtent)
+          .toDouble();
+      if ((targetOffset - position.pixels).abs() > 0.5) {
+        _scrollController.jumpTo(targetOffset);
+      }
+    }
+
+    if (targetZoom == _pageScale && clampedPan == _pagePan) {
+      return;
+    }
+
+    setState(() {
+      _pageScale = targetZoom;
+      _pagePan = clampedPan;
+    });
+  }
+
+  Offset _clampPagePan({
+    required double scale,
+    required Offset pan,
+    required Size docWorldSize,
+    required Size viewportSize,
+  }) {
+    final contentWidth = docWorldSize.width * scale;
+    final contentHeight = docWorldSize.height * scale;
+
+    late final double minX;
+    late final double maxX;
+    if (contentWidth <= viewportSize.width) {
+      minX = 0.0;
+      maxX = viewportSize.width - contentWidth;
+    } else {
+      minX = viewportSize.width - contentWidth;
+      maxX = 0.0;
+    }
+
+    late final double minY;
+    late final double maxY;
+    if (contentHeight <= viewportSize.height) {
+      final centeredY = (viewportSize.height - contentHeight) / 2;
+      minY = centeredY;
+      maxY = centeredY;
+    } else {
+      minY = viewportSize.height - contentHeight;
+      maxY = 0.0;
+    }
+
+    final clampedX = pan.dx.clamp(minX, maxX).toDouble();
+    final clampedY = pan.dy.clamp(minY, maxY).toDouble();
+    return Offset(clampedX, clampedY);
+  }
+
+  void _stopViewportNavigation() {
+    context.read<EditorController>().endPinchToScaleActiveImage();
+    if (!_isViewportNavigating) {
+      return;
+    }
+    setState(() {
+      _isViewportNavigating = false;
+    });
+  }
+
+  Offset _midpoint(Offset a, Offset b) {
+    return Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
+  }
+
+  double _distanceBetween(Offset a, Offset b) {
+    return (a - b).distance;
+  }
+
+  double _documentHeight({required double pageHeight, required int pageCount}) {
+    if (pageCount <= 0) {
+      return pageHeight;
+    }
+    return (pageCount * pageHeight) + (math.max(0, pageCount - 1) * _pageGap);
+  }
+
+  Rect _visibleDocumentRect({
+    required Size docWorldSize,
+    required Size viewportSize,
+  }) {
+    final docHeight = docWorldSize.height;
+    final safeScale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
+
+    var clipTop = 0.0;
+    var clipBottom = viewportSize.height;
+    if (_scrollController.hasClients) {
+      final metrics = _scrollController.position;
+      clipTop = metrics.pixels - _topBottomPadding;
+      clipBottom =
+          metrics.pixels + metrics.viewportDimension - _topBottomPadding;
+    }
+
+    final worldLeft = ((-_pagePan.dx) / safeScale).clamp(
+      0.0,
+      docWorldSize.width,
+    );
+    final worldRight = ((viewportSize.width - _pagePan.dx) / safeScale).clamp(
+      0.0,
+      docWorldSize.width,
+    );
+    final worldTop = ((clipTop - _pagePan.dy) / safeScale).clamp(
+      0.0,
+      docHeight,
+    );
+    final worldBottom = ((clipBottom - _pagePan.dy) / safeScale).clamp(
+      0.0,
+      docHeight,
+    );
+
+    final width = math.max(1.0, worldRight - worldLeft);
+    final height = math.max(1.0, worldBottom - worldTop);
+
+    return Rect.fromLTWH(worldLeft, worldTop, width, height);
+  }
+
+  _BoundaryVisibility _pageBoundaryVisibilityInDocument({
+    required Rect visibleDocumentRect,
+    required Size pageWorldSize,
+    required int pageIndex,
+  }) {
+    const edgeThreshold = 1.0;
+    final pageTop = pageIndex * (pageWorldSize.height + _pageGap);
+    final pageBottom = pageTop + pageWorldSize.height;
+    final pageRect = Rect.fromLTWH(
+      0,
+      pageTop,
+      pageWorldSize.width,
+      pageWorldSize.height,
+    );
+
+    if (!pageRect.overlaps(visibleDocumentRect)) {
+      return const _BoundaryVisibility(
+        left: false,
+        top: false,
+        right: false,
+        bottom: false,
+      );
+    }
+
+    final pageFullyVisible =
+        visibleDocumentRect.left <= pageRect.left + edgeThreshold &&
+        visibleDocumentRect.top <= pageRect.top + edgeThreshold &&
+        visibleDocumentRect.right >= pageRect.right - edgeThreshold &&
+        visibleDocumentRect.bottom >= pageRect.bottom - edgeThreshold;
+    if (pageFullyVisible) {
+      return const _BoundaryVisibility(
+        left: true,
+        top: true,
+        right: true,
+        bottom: true,
+      );
+    }
+
+    final touchesLeft = visibleDocumentRect.left <= edgeThreshold;
+    final touchesRight =
+        visibleDocumentRect.right >= pageWorldSize.width - edgeThreshold;
+    final touchesTop =
+        visibleDocumentRect.top <= pageTop + edgeThreshold &&
+        visibleDocumentRect.bottom >= pageTop - edgeThreshold;
+    final touchesBottom =
+        visibleDocumentRect.bottom >= pageBottom - edgeThreshold &&
+        visibleDocumentRect.top <= pageBottom + edgeThreshold;
+
+    return _BoundaryVisibility(
+      left: touchesLeft,
+      top: touchesTop,
+      right: touchesRight,
+      bottom: touchesBottom,
+    );
+  }
+
+  _PageRenderRange _visiblePageRange({
+    required Rect visibleDocumentRect,
+    required Size pageWorldSize,
+    required int pageCount,
+    required int currentPageIndex,
+  }) {
+    if (pageCount <= 0) {
+      return const _PageRenderRange(0, 0);
+    }
+
+    final extent = pageWorldSize.height + _pageGap;
+    if (extent <= 0) {
+      return _PageRenderRange(0, pageCount);
+    }
+
+    final firstVisible = (visibleDocumentRect.top / extent)
+        .floor()
+        .clamp(0, pageCount - 1)
+        .toInt();
+    final lastVisible = (visibleDocumentRect.bottom / extent)
+        .floor()
+        .clamp(firstVisible, pageCount - 1)
+        .toInt();
+    final start = math.max(0, firstVisible - 1);
+    final end = math.min(pageCount, lastVisible + 2);
+
+    return _PageRenderRange(start, end);
+  }
+
+  Offset _insertPositionForViewport({
+    required Rect visibleDocumentRect,
+    required Size pageWorldSize,
+    required int pageCount,
+  }) {
+    if (pageCount <= 0) {
+      return Offset(pageWorldSize.width * 0.5, pageWorldSize.height * 0.5);
+    }
+    final extent = _pageExtent == 0 ? pageWorldSize.height : _pageExtent;
+    final visibleCenterY = visibleDocumentRect.center.dy.clamp(
+      0.0,
+      math.max(0.0, (pageCount * extent) - _pageGap),
+    );
+    final pageIndex = (visibleCenterY / extent).floor().clamp(0, pageCount - 1);
+    final pageTop = pageIndex.toDouble() * (_pageExtent == 0 ? 1 : _pageExtent);
+    final pageRect = Rect.fromLTWH(
+      0,
+      pageTop,
+      pageWorldSize.width,
+      pageWorldSize.height,
+    );
+    final safeRect = visibleDocumentRect.intersect(pageRect);
+    if (safeRect.isEmpty) {
+      return Offset(
+        pageWorldSize.width * 0.5,
+        pageTop + pageWorldSize.height * 0.5,
+      );
+    }
+    return safeRect.center;
+  }
+
+  Future<T> _withBusyOverlay<T>(Future<T> Function() action) async {
+    if (mounted) {
+      setState(() => _isBusy = true);
+    }
+    try {
+      return await action();
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      }
+    }
+  }
+
+  EditorCommands _commands(EditorController controller) => EditorCommands(
+    context: context,
+    controller: controller,
+    insertPosition: () => _insertPosition,
+    runBusy: _withBusyOverlay,
+  );
+
+  void _openSettings() {
+    final controller = context.read<EditorController>();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => ChangeNotifierProvider.value(
+          value: controller,
+          child: const EditorSettingsScreen(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCanvasContextMenu(
+    Offset globalPosition,
+    EditorController controller,
+    Size pageWorldSize,
+    int pageCount,
+  ) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) {
+      return;
+    }
+    final targetPosition = _contextMenuInsertPosition(
+      globalPosition: globalPosition,
+      pageWorldSize: pageWorldSize,
+      pageCount: pageCount,
+    );
+    if (targetPosition != null) {
+      _insertPosition = targetPosition;
+      if (_pageExtent > 0 && controller.pages.isNotEmpty) {
+        final pageIndex = (_insertPosition.dy / _pageExtent).floor().clamp(
+          0,
+          controller.pages.length - 1,
+        );
+        controller.setCurrentPage(pageIndex);
+      }
+    }
+
+    final choice = await showMenu<_CanvasContextAction>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        overlay.size.width - globalPosition.dx,
+        overlay.size.height - globalPosition.dy,
+      ),
+      items: const [
+        PopupMenuItem(value: _CanvasContextAction.paste, child: Text('Paste')),
+      ],
+    );
+
+    if (choice == _CanvasContextAction.paste && mounted) {
+      await _commands(controller).paste();
+    }
+  }
+
+  Offset? _contextMenuInsertPosition({
+    required Offset globalPosition,
+    required Size pageWorldSize,
+    required int pageCount,
+  }) {
+    final renderBox =
+        _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      return null;
+    }
+    final local = renderBox.globalToLocal(globalPosition);
+    final scale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
+    final world = (local - _pagePan) / scale;
+    if (pageCount <= 0) {
+      return Offset(
+        world.dx.clamp(0.0, pageWorldSize.width),
+        world.dy.clamp(0.0, pageWorldSize.height),
+      );
+    }
+    final extent = _pageExtent <= 0 ? pageWorldSize.height : _pageExtent;
+    final pageIndex = (world.dy / extent).floor().clamp(0, pageCount - 1);
+    final pageTop = pageIndex * extent;
+    return Offset(
+      world.dx.clamp(0.0, pageWorldSize.width),
+      pageTop + (world.dy - pageTop).clamp(0.0, pageWorldSize.height),
+    );
+  }
+
+  void _startTouchContextMenuTimer(
+    PointerDownEvent event,
+    EditorController controller,
+    Size pageWorldSize,
+    int pageCount,
+  ) {
+    _cancelTouchContextMenu();
+    if (event.kind != PointerDeviceKind.touch) {
+      return;
+    }
+    _touchContextMenuPointer = event.pointer;
+    _touchContextMenuStart = event.position;
+    _touchContextMenuTimer = Timer(_touchContextMenuDelay, () {
+      if (!mounted || _touchContextMenuPointer != event.pointer) {
+        return;
+      }
+      _showCanvasContextMenu(
+        event.position,
+        controller,
+        pageWorldSize,
+        pageCount,
+      );
+      _cancelTouchContextMenu();
+    });
+  }
+
+  void _updateTouchContextMenuTimer(PointerMoveEvent event) {
+    if (event.pointer != _touchContextMenuPointer) {
+      return;
+    }
+    final start = _touchContextMenuStart;
+    if (start == null) {
+      return;
+    }
+    if ((event.position - start).distance > _inkNavigationTouchSlop) {
+      _cancelTouchContextMenu();
+    }
+  }
+
+  void _cancelTouchContextMenu() {
+    _touchContextMenuTimer?.cancel();
+    _touchContextMenuTimer = null;
+    _touchContextMenuPointer = null;
+    _touchContextMenuStart = null;
+  }
+
+  Widget _buildTransformedDocumentLayer({
+    Key? transformKey,
+    required Matrix4 transform,
+    required Size worldSize,
+    required Widget child,
+  }) {
+    return OverflowBox(
+      alignment: Alignment.topLeft,
+      minWidth: worldSize.width,
+      maxWidth: worldSize.width,
+      minHeight: worldSize.height,
+      maxHeight: worldSize.height,
+      child: Transform(
+        key: transformKey,
+        alignment: Alignment.topLeft,
+        transform: transform,
+        child: SizedBox(
+          width: worldSize.width,
+          height: worldSize.height,
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<EditorController>();
+    final useWideTitleInset = MediaQuery.sizeOf(context).width >= 600;
+    final activeTextBlockId = controller.activeTextBlockId;
+    final activeTextBlock = activeTextBlockId == null
+        ? null
+        : controller.findTextBlockById(activeTextBlockId);
+
+    final commands = _commands(controller);
+
+    final editorContent = Column(
+      children: [
+        EditorToolbar(
+          controller: controller,
+          onInsertPressed: commands.insertFile,
+          onExportSelected: commands.export,
+        ),
+        if (activeTextBlock != null)
+          TextEditToolbar(editorController: controller, block: activeTextBlock),
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: Theme.of(
+            context,
+          ).colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final showProjectOverview =
+                  constraints.maxWidth >
+                  _overviewRight + _overviewSideGap + _rightMargin;
+              final pageLeftBoundary = showProjectOverview
+                  ? _overviewRight + _overviewSideGap
+                  : _leftMargin;
+              final maxPageWidth = math.max(
+                1.0,
+                constraints.maxWidth - pageLeftBoundary - _rightMargin,
+              );
+              const pageWidth = _logicalPageWidth;
+              final pageHeight = pageWidth * AppMetrics.a4HeightRatio;
+              final pageWorldSize = Size(pageWidth, pageHeight);
+              controller.updatePageLayout(
+                pageWidth: pageWorldSize.width,
+                pageHeight: pageWorldSize.height,
+                pageGap: _pageGap,
+              );
+              final docHeight = _documentHeight(
+                pageHeight: pageWorldSize.height,
+                pageCount: controller.pages.length,
+              );
+              final docWorldSize = Size(pageWorldSize.width, docHeight);
+              final fitToWidthScale = (maxPageWidth / pageWidth)
+                  .clamp(0.01, 1.0)
+                  .toDouble();
+              _responsivePageScale = fitToWidthScale;
+              final effectivePageScale = _effectivePageScale;
+              final clipScale = fitToWidthScale;
+              final clipSize = Size(
+                docWorldSize.width * clipScale,
+                docWorldSize.height * clipScale,
+              );
+              final viewportSize = Size(
+                maxPageWidth,
+                math.max(1.0, constraints.maxHeight - (_topBottomPadding * 2)),
+              );
+              final documentContentSize = Size(
+                viewportSize.width,
+                clipSize.height + (_addPageFooterHeight * clipScale),
+              );
+              final zoomPercent = (effectivePageScale * 100).round();
+              final visibleDocumentRect = _visibleDocumentRect(
+                docWorldSize: docWorldSize,
+                viewportSize: viewportSize,
+              );
+              final visiblePageRange = _visiblePageRange(
+                visibleDocumentRect: visibleDocumentRect,
+                pageWorldSize: pageWorldSize,
+                pageCount: controller.pages.length,
+                currentPageIndex: controller.currentPageIndex,
+              );
+              final insertPosition = _insertPositionForViewport(
+                visibleDocumentRect: visibleDocumentRect,
+                pageWorldSize: pageWorldSize,
+                pageCount: controller.pages.length,
+              );
+              _insertPosition = insertPosition;
+              final minimapPanelHeight = math.min(
+                pageWorldSize.height * 0.5,
+                math.max(180.0, constraints.maxHeight - 24),
+              );
+              _pageExtent = pageWorldSize.height + _pageGap;
+              _syncPageTransformBounds(
+                docWorldSize: docWorldSize,
+                fitToWidthScale: fitToWidthScale,
+                viewportSize: viewportSize,
+              );
+              final pageTransform = Matrix4.diagonal3Values(
+                effectivePageScale,
+                effectivePageScale,
+                1.0,
+              )..setTranslationRaw(_pagePan.dx, _pagePan.dy, 0.0);
+
+              return Container(
+                color: AppColors.background,
+                child: Stack(
+                  children: [
+                    NotificationListener<ScrollNotification>(
+                      onNotification: (notification) =>
+                          _onPagesScroll(notification, controller),
+                      child: SingleChildScrollView(
+                        controller: _scrollController,
+                        physics:
+                            (controller.tool.isInk ||
+                                controller.isObjectTransformActive ||
+                                _isViewportNavigating ||
+                                _pageScale > 1.001)
+                            ? const NeverScrollableScrollPhysics()
+                            : const ClampingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(
+                          _leftMargin,
+                          _topBottomPadding,
+                          _rightMargin,
+                          _topBottomPadding,
+                        ),
+                        child: Align(
+                          alignment: Alignment.topRight,
+                          child: SizedBox(
+                            width: documentContentSize.width,
+                            height: documentContentSize.height,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                SizedBox(
+                                  key: const ValueKey('notebook-page-viewport'),
+                                  width: viewportSize.width,
+                                  height: clipSize.height,
+                                  child: ClipRect(
+                                    clipper: const _PageViewportClipper(
+                                      _pageViewportBleed,
+                                    ),
+                                    child: GestureDetector(
+                                      onSecondaryTapDown: (details) =>
+                                          _showCanvasContextMenu(
+                                            details.globalPosition,
+                                            controller,
+                                            pageWorldSize,
+                                            controller.pages.length,
+                                          ),
+                                      child: Listener(
+                                        key: _canvasKey,
+                                        behavior: HitTestBehavior.translucent,
+                                        onPointerDown: (event) {
+                                          _startTouchContextMenuTimer(
+                                            event,
+                                            controller,
+                                            pageWorldSize,
+                                            controller.pages.length,
+                                          );
+                                          _onPointerDown(
+                                            event,
+                                            docWorldSize,
+                                            viewportSize,
+                                          );
+                                        },
+                                        onPointerMove: (event) {
+                                          _updateTouchContextMenuTimer(event);
+                                          _onPointerMove(
+                                            event,
+                                            docWorldSize,
+                                            viewportSize,
+                                          );
+                                        },
+                                        onPointerUp: (event) {
+                                          _cancelTouchContextMenu();
+                                          _onPointerUpOrCancel(event);
+                                        },
+                                        onPointerCancel: (event) {
+                                          _cancelTouchContextMenu();
+                                          _onPointerUpOrCancel(event);
+                                        },
+                                        onPointerPanZoomStart: (event) =>
+                                            _onPointerPanZoomStart(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            ),
+                                        onPointerPanZoomUpdate: (event) =>
+                                            _onPointerPanZoomUpdate(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            ),
+                                        onPointerPanZoomEnd:
+                                            _onPointerPanZoomEnd,
+                                        onPointerSignal: (event) =>
+                                            _onPointerSignal(
+                                              event,
+                                              docWorldSize,
+                                              viewportSize,
+                                            ),
+                                        child: _buildTransformedDocumentLayer(
+                                          transformKey: const ValueKey(
+                                            'notebook-document-transform',
+                                          ),
+                                          transform: pageTransform,
+                                          worldSize: docWorldSize,
+                                          child: Stack(
+                                            children: [
+                                              for (
+                                                var i = visiblePageRange.start;
+                                                i < visiblePageRange.end;
+                                                i++
+                                              )
+                                                Positioned(
+                                                  left: 0,
+                                                  top: i * _pageExtent,
+                                                  width: pageWorldSize.width,
+                                                  height: pageWorldSize.height,
+                                                  child: IgnorePointer(
+                                                    child: Stack(
+                                                      fit: StackFit.expand,
+                                                      children: [
+                                                        DecoratedBox(
+                                                          decoration: BoxDecoration(
+                                                            color:
+                                                                AppColors.paper,
+                                                            boxShadow: const [
+                                                              BoxShadow(
+                                                                color: AppColors
+                                                                    .shadow,
+                                                                blurRadius: 14,
+                                                                offset: Offset(
+                                                                  0,
+                                                                  6,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        PageBackgroundPaint(
+                                                          settings: controller
+                                                              .currentBackgroundSettings,
+                                                        ),
+                                                        Builder(
+                                                          builder: (context) {
+                                                            final visibility =
+                                                                _pageBoundaryVisibilityInDocument(
+                                                                  visibleDocumentRect:
+                                                                      visibleDocumentRect,
+                                                                  pageWorldSize:
+                                                                      pageWorldSize,
+                                                                  pageIndex: i,
+                                                                );
+                                                            return CustomPaint(
+                                                              painter: _PageFramePainter(
+                                                                showLeft:
+                                                                    visibility
+                                                                        .left,
+                                                                showTop:
+                                                                    visibility
+                                                                        .top,
+                                                                showRight:
+                                                                    visibility
+                                                                        .right,
+                                                                showBottom:
+                                                                    visibility
+                                                                        .bottom,
+                                                                highlightColor:
+                                                                    Theme.of(
+                                                                          context,
+                                                                        )
+                                                                        .colorScheme
+                                                                        .primary
+                                                                        .withValues(
+                                                                          alpha:
+                                                                              0.75,
+                                                                        ),
+                                                              ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              DocumentPageOverlay(
+                                                controller: controller,
+                                                interactionEnabled:
+                                                    !_isViewportNavigating,
+                                                worldOrigin: Offset.zero,
+                                                pages: controller.pages,
+                                                pageSize: pageWorldSize,
+                                                pageGap: _pageGap,
+                                                firstPageIndex:
+                                                    visiblePageRange.start,
+                                                lastPageIndex:
+                                                    visiblePageRange.end,
+                                                renderBackground: true,
+                                                renderInactive: true,
+                                                renderActive: false,
+                                              ),
+                                              DocumentDrawingCanvas(
+                                                allowMultiTouch: false,
+                                                effectiveScale:
+                                                    effectivePageScale,
+                                                interactionEnabled:
+                                                    !_isViewportNavigating,
+                                                worldOrigin: Offset.zero,
+                                                pages: controller.pages,
+                                                pageSize: pageWorldSize,
+                                                pageGap: _pageGap,
+                                                firstPageIndex:
+                                                    visiblePageRange.start,
+                                                lastPageIndex:
+                                                    visiblePageRange.end,
+                                              ),
+                                              DocumentPageOverlay(
+                                                controller: controller,
+                                                interactionEnabled:
+                                                    !_isViewportNavigating,
+                                                worldOrigin: Offset.zero,
+                                                pages: controller.pages,
+                                                pageSize: pageWorldSize,
+                                                pageGap: _pageGap,
+                                                firstPageIndex:
+                                                    visiblePageRange.start,
+                                                lastPageIndex:
+                                                    visiblePageRange.end,
+                                                renderBackground: false,
+                                                renderInactive: false,
+                                                renderActive: true,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                _buildTransformedDocumentLayer(
+                                  transform: pageTransform,
+                                  worldSize: Size(
+                                    docWorldSize.width,
+                                    docWorldSize.height + _addPageFooterHeight,
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      Positioned(
+                                        top:
+                                            docWorldSize.height +
+                                            _addPageButtonGap,
+                                        left: 0,
+                                        width: docWorldSize.width,
+                                        child: Center(
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              FilledButton.icon(
+                                                onPressed: () =>
+                                                    _addPageBelow(controller),
+                                                icon: const Icon(Icons.add),
+                                                label: const Text('Add page'),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              OutlinedButton.icon(
+                                                onPressed:
+                                                    controller.pages.length > 1
+                                                    ? controller.deleteLastPage
+                                                    : null,
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                ),
+                                                label: const Text(
+                                                  'Delete page',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 12,
+                      child: IgnorePointer(
+                        child: _ZoomPercentBadge(zoomPercent: zoomPercent),
+                      ),
+                    ),
+                    if (showProjectOverview)
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: _ProjectMiniMapOverlay(
+                          key: const ValueKey('notebook-project-overview'),
+                          controller: controller,
+                          pages: controller.pages,
+                          currentPageIndex: controller.currentPageIndex,
+                          pageWorldSize: pageWorldSize,
+                          pageGap: _pageGap,
+                          panelHeight: minimapPanelHeight,
+                          visibleDocumentRect: visibleDocumentRect,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+
+    final content = EditorCommandShortcuts(
+      commands: commands,
+      enabled: controller.activeTextController == null,
+      child: editorContent,
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: useWideTitleInset ? 44 : null,
+        title: Text(
+          controller.notebook.title,
+          style: const TextStyle(fontSize: 18),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: _openSettings,
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          Positioned.fill(child: content),
+          if (_isBusy) const Positioned.fill(child: BusyOverlay()),
+        ],
+      ),
+    );
+  }
+}
+
+class _PageViewportClipper extends CustomClipper<Rect> {
+  const _PageViewportClipper(this.bleed);
+
+  final double bleed;
+
+  @override
+  Rect getClip(Size size) {
+    return Rect.fromLTRB(0, -bleed, size.width, size.height + bleed);
+  }
+
+  @override
+  bool shouldReclip(_PageViewportClipper oldClipper) {
+    return oldClipper.bleed != bleed;
+  }
+}
+
+enum _CanvasContextAction { paste }
+
+class _BoundaryVisibility {
+  const _BoundaryVisibility({
+    required this.left,
+    required this.top,
+    required this.right,
+    required this.bottom,
+  });
+
+  final bool left;
+  final bool top;
+  final bool right;
+  final bool bottom;
+
+  bool get any => left || top || right || bottom;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is _BoundaryVisibility &&
+        other.left == left &&
+        other.top == top &&
+        other.right == right &&
+        other.bottom == bottom;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(left, top, right, bottom);
+  }
+}
+
+class _PageRenderRange {
+  const _PageRenderRange(this.start, this.end);
+
+  final int start;
+  final int end;
+}
+
+class _PageFramePainter extends CustomPainter {
+  _PageFramePainter({
+    required this.showLeft,
+    required this.showTop,
+    required this.showRight,
+    required this.showBottom,
+    required this.highlightColor,
+  });
+
+  final bool showLeft;
+  final bool showTop;
+  final bool showRight;
+  final bool showBottom;
+  final Color highlightColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const highlightStroke = 1.8;
+
+    if (!(showLeft || showTop || showRight || showBottom)) {
+      return;
+    }
+
+    final edgePaint = Paint()
+      ..color = highlightColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = highlightStroke
+      ..strokeCap = StrokeCap.round;
+    final inset = highlightStroke / 2;
+    final leftX = inset;
+    final topY = inset;
+    final rightX = size.width - inset;
+    final bottomY = size.height - inset;
+    const capInset = 0.0;
+
+    if (showTop) {
+      canvas.drawLine(
+        Offset(leftX + capInset, topY),
+        Offset(rightX - capInset, topY),
+        edgePaint,
+      );
+    }
+    if (showBottom) {
+      canvas.drawLine(
+        Offset(leftX + capInset, bottomY),
+        Offset(rightX - capInset, bottomY),
+        edgePaint,
+      );
+    }
+    if (showLeft) {
+      canvas.drawLine(
+        Offset(leftX, topY + capInset),
+        Offset(leftX, bottomY - capInset),
+        edgePaint,
+      );
+    }
+    if (showRight) {
+      canvas.drawLine(
+        Offset(rightX, topY + capInset),
+        Offset(rightX, bottomY - capInset),
+        edgePaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PageFramePainter oldDelegate) {
+    return oldDelegate.showLeft != showLeft ||
+        oldDelegate.showTop != showTop ||
+        oldDelegate.showRight != showRight ||
+        oldDelegate.showBottom != showBottom ||
+        oldDelegate.highlightColor != highlightColor;
+  }
+}
+
+class _ZoomPercentBadge extends StatelessWidget {
+  const _ZoomPercentBadge({required this.zoomPercent});
+
+  final int zoomPercent;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerLow.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          '$zoomPercent%',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectMiniMapOverlay extends StatefulWidget {
+  const _ProjectMiniMapOverlay({
+    required this.controller,
+    required this.pages,
+    required this.currentPageIndex,
+    required this.pageWorldSize,
+    required this.pageGap,
+    required this.panelHeight,
+    required this.visibleDocumentRect,
+    super.key,
+  });
+
+  final EditorController controller;
+  final List<NotePage> pages;
+  final int currentPageIndex;
+  final Size pageWorldSize;
+  final double pageGap;
+  final double panelHeight;
+  final Rect visibleDocumentRect;
+
+  @override
+  State<_ProjectMiniMapOverlay> createState() => _ProjectMiniMapOverlayState();
+}
+
+class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
+  static const double _minimapWidth = 84.0;
+  static const int _minimapImageDecodeWidth = 128;
+
+  final ScrollController _minimapScrollController = ScrollController();
+  final Map<String, _MiniMapImageCacheEntry> _minimapImages = {};
+  final Set<String> _loadingMinimapImageIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncMinimapToViewport();
+      _precacheMinimapImages();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProjectMiniMapOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_minimapScrollController.hasClients) {
+        _precacheMinimapImages();
+        return;
+      }
+      final max = _minimapScrollController.position.maxScrollExtent;
+      if (_minimapScrollController.offset > max) {
+        _minimapScrollController.jumpTo(max);
+      }
+      _syncMinimapToViewport();
+      _precacheMinimapImages();
+    });
+  }
+
+  void _precacheMinimapImages() {
+    final pageRange = _minimapImagePageRange();
+    final activeIds = <String>{};
+    for (var i = pageRange.start; i < pageRange.end; i++) {
+      final page = widget.pages[i];
+      for (final block in page.imageBlocks) {
+        activeIds.add(block.id);
+        final cacheKey = _minimapImageCacheKey(block);
+        final cached = _minimapImages[block.id];
+        if (cached != null && cached.cacheKey == cacheKey) {
+          continue;
+        }
+        if (_loadingMinimapImageIds.contains(block.id)) {
+          continue;
+        }
+        _loadMinimapImage(block, cacheKey);
+      }
+    }
+
+    final obsoleteIds = _minimapImages.keys
+        .where((id) => !activeIds.contains(id))
+        .toList();
+    for (final id in obsoleteIds) {
+      _minimapImages.remove(id)?.image.dispose();
+    }
+  }
+
+  Future<void> _loadMinimapImage(ImageBlock block, String cacheKey) async {
+    _loadingMinimapImageIds.add(block.id);
+    ui.Image? image;
+    try {
+      image = await _decodeMinimapImage(block);
+      if (!mounted) {
+        return;
+      }
+      if (!_shouldCacheMinimapImage(block.id)) {
+        return;
+      }
+      final currentKey = _currentMinimapImageCacheKey(block.id);
+      if (image == null || currentKey != cacheKey) {
+        return;
+      }
+      _minimapImages.remove(block.id)?.image.dispose();
+      _minimapImages[block.id] = _MiniMapImageCacheEntry(
+        cacheKey: cacheKey,
+        image: image,
+      );
+      image = null;
+      setState(() {});
+    } catch (error) {
+      debugPrint('_ProjectMiniMapOverlay: failed to decode image: $error');
+    } finally {
+      image?.dispose();
+      _loadingMinimapImageIds.remove(block.id);
+    }
+  }
+
+  String? _currentMinimapImageCacheKey(String id) {
+    final pageRange = _minimapImagePageRange();
+    for (var i = pageRange.start; i < pageRange.end; i++) {
+      final page = widget.pages[i];
+      for (final block in page.imageBlocks) {
+        if (block.id == id) {
+          return _minimapImageCacheKey(block);
+        }
+      }
+    }
+    return null;
+  }
+
+  bool _shouldCacheMinimapImage(String id) {
+    return _currentMinimapImageCacheKey(id) != null;
+  }
+
+  _PageRenderRange _minimapImagePageRange() {
+    if (widget.pages.isEmpty) {
+      return const _PageRenderRange(0, 0);
+    }
+
+    final extent = widget.pageWorldSize.height + widget.pageGap;
+    if (extent <= 0) {
+      return _PageRenderRange(0, widget.pages.length);
+    }
+
+    final firstVisible = (widget.visibleDocumentRect.top / extent)
+        .floor()
+        .clamp(0, widget.pages.length - 1)
+        .toInt();
+    final lastVisible = (widget.visibleDocumentRect.bottom / extent)
+        .floor()
+        .clamp(firstVisible, widget.pages.length - 1)
+        .toInt();
+    final start = math.max(0, firstVisible - 2);
+    final end = math.min(widget.pages.length, lastVisible + 5);
+
+    return _PageRenderRange(start, end);
+  }
+
+  String _minimapImageCacheKey(ImageBlock block) {
+    return [
+      block.id,
+      block.path,
+      block.bytes?.lengthInBytes ?? 0,
+      block.imageExt ?? '',
+      block.imageMime ?? '',
+    ].join('|');
+  }
+
+  Future<ui.Image?> _decodeMinimapImage(ImageBlock block) async {
+    Uint8List? bytes = block.bytes;
+    if ((bytes == null || bytes.isEmpty) && block.path.isNotEmpty) {
+      final file = File(block.path);
+      if (await file.exists()) {
+        bytes = await file.readAsBytes();
+      }
+    }
+    if (bytes == null || bytes.isEmpty) {
+      return null;
+    }
+
+    final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+    final descriptor = await ui.ImageDescriptor.encoded(buffer);
+    final codec = await descriptor.instantiateCodec(
+      targetWidth: _minimapImageDecodeWidth,
+    );
+    final frame = await codec.getNextFrame();
+    buffer.dispose();
+    descriptor.dispose();
+    codec.dispose();
+    return frame.image;
+  }
+
+  void _syncMinimapToViewport() {
+    if (!mounted || !_minimapScrollController.hasClients) {
+      return;
+    }
+    final worldWidth = math.max(1.0, widget.pageWorldSize.width);
+    final mapScale = _minimapWidth / worldWidth;
+    final panelHeight = _visiblePanelHeight(mapScale);
+
+    final indicatorTop = widget.visibleDocumentRect.top * mapScale;
+    final indicatorBottom = widget.visibleDocumentRect.bottom * mapScale;
+    final viewTop = _minimapScrollController.offset;
+    final viewBottom = viewTop + panelHeight;
+    final margin = panelHeight * 0.18;
+
+    double? target;
+    if (indicatorTop < viewTop + margin) {
+      target = indicatorTop - margin;
+    } else if (indicatorBottom > viewBottom - margin) {
+      target = indicatorBottom - panelHeight + margin;
+    }
+
+    if (target == null) {
+      return;
+    }
+
+    final clamped = target
+        .clamp(0.0, _minimapScrollController.position.maxScrollExtent)
+        .toDouble();
+    if ((clamped - _minimapScrollController.offset).abs() < 1.0) {
+      return;
+    }
+    _minimapScrollController.jumpTo(clamped);
+  }
+
+  double _visiblePanelHeight(double mapScale) {
+    return math.min(widget.panelHeight, _contentHeight(mapScale));
+  }
+
+  double _contentHeight(double mapScale) {
+    return math.max(1.0, _documentWorldHeight() * mapScale);
+  }
+
+  double _documentWorldHeight() {
+    return math.max(
+      1.0,
+      (widget.pages.length * widget.pageWorldSize.height) +
+          (math.max(0, widget.pages.length - 1) * widget.pageGap),
+    );
+  }
+
+  @override
+  void dispose() {
+    _minimapScrollController.dispose();
+    for (final cached in _minimapImages.values) {
+      cached.image.dispose();
+    }
+    _minimapImages.clear();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const outerRadius = 10.0;
+    const minimapPadding = 6.0;
+    const innerRadius = outerRadius - minimapPadding;
+    final worldWidth = math.max(1.0, widget.pageWorldSize.width);
+    final mapScale = _minimapWidth / worldWidth;
+    final contentHeight = _contentHeight(mapScale);
+    final panelHeight = _visiblePanelHeight(mapScale);
+    final canScroll = contentHeight > panelHeight + 0.5;
+    final backgroundSettings = widget.controller.currentBackgroundSettings;
+    final indicatorRectInContent = Rect.fromLTWH(
+      widget.visibleDocumentRect.left * mapScale,
+      widget.visibleDocumentRect.top * mapScale,
+      widget.visibleDocumentRect.width * mapScale,
+      math.max(3.0, widget.visibleDocumentRect.height * mapScale),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerLow.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(outerRadius),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(minimapPadding),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(innerRadius),
+          child: SizedBox(
+            width: _minimapWidth,
+            height: panelHeight,
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  controller: _minimapScrollController,
+                  physics: canScroll
+                      ? const ClampingScrollPhysics()
+                      : const NeverScrollableScrollPhysics(),
+                  child: RepaintBoundary(
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: widget.controller.inkRevision,
+                      builder: (context, _, _) => CustomPaint(
+                        size: Size(_minimapWidth, contentHeight),
+                        painter: _ProjectMiniMapPainter(
+                          pages: widget.controller.pages,
+                          currentPageIndex: widget.currentPageIndex,
+                          pageWorldSize: widget.pageWorldSize,
+                          pageGap: widget.pageGap,
+                          mapScale: mapScale,
+                          cornerRadius: innerRadius,
+                          showBackgroundLines:
+                              backgroundSettings.style.index > 0,
+                          showBackgroundColumns:
+                              backgroundSettings.style.index == 1,
+                          backgroundSpacing: backgroundSettings.spacing,
+                          images: _minimapImages.map(
+                            (id, cached) => MapEntry(id, cached.image),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _minimapScrollController,
+                      builder: (context, child) {
+                        final scrollOffset = _minimapScrollController.hasClients
+                            ? _minimapScrollController.offset
+                            : 0.0;
+                        final rect = indicatorRectInContent
+                            .shift(Offset(0, -scrollOffset))
+                            .intersect(
+                              Rect.fromLTWH(0, 0, _minimapWidth, panelHeight),
+                            );
+                        return CustomPaint(
+                          painter: _MiniMapViewportOverlayPainter(
+                            indicatorRect: rect,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectMiniMapPainter extends CustomPainter {
+  _ProjectMiniMapPainter({
+    required this.pages,
+    required this.currentPageIndex,
+    required this.pageWorldSize,
+    required this.pageGap,
+    required this.mapScale,
+    required this.cornerRadius,
+    required this.showBackgroundLines,
+    required this.showBackgroundColumns,
+    required this.backgroundSpacing,
+    required this.images,
+  });
+
+  final List<NotePage> pages;
+  final int currentPageIndex;
+  final Size pageWorldSize;
+  final double pageGap;
+  final double mapScale;
+  final double cornerRadius;
+  final bool showBackgroundLines;
+  final bool showBackgroundColumns;
+  final double backgroundSpacing;
+  final Map<String, ui.Image> images;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final panelRect = Offset.zero & size;
+    final panelRRect = RRect.fromRectAndRadius(
+      panelRect,
+      Radius.circular(cornerRadius),
+    );
+    final background = Paint()..color = AppColors.background;
+    canvas.drawRRect(panelRRect, background);
+
+    final border = Paint()
+      ..color = AppColors.divider
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawRRect(panelRRect.deflate(0.5), border);
+
+    if (pages.isEmpty) {
+      return;
+    }
+
+    final worldWidth = math.max(1.0, pageWorldSize.width);
+    final scaleX = size.width / worldWidth;
+    final scaleY = mapScale;
+
+    for (var i = 0; i < pages.length; i++) {
+      final page = pages[i];
+      final pageTopWorld = i * (pageWorldSize.height + pageGap);
+      final pageTop = pageTopWorld * scaleY;
+      final pageHeight = pageWorldSize.height * scaleY;
+      final pageRect = Rect.fromLTWH(0, pageTop, size.width, pageHeight);
+      final isCurrentPage = i == currentPageIndex;
+
+      final pageFill = Paint()..color = AppColors.paper;
+      final pageBorder = Paint()
+        ..color = isCurrentPage
+            ? AppColors.inkBlack.withValues(alpha: 0.22)
+            : AppColors.divider
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = isCurrentPage ? 0.7 : 0.6;
+      canvas.drawRect(pageRect, pageFill);
+      canvas.drawRect(pageRect.deflate(0.3), pageBorder);
+      _paintPageBackground(canvas, pageRect, scaleX, scaleY);
+
+      if (pageGap > 0 && i < pages.length - 1) {
+        final separator = Paint()..color = AppColors.toolbar;
+        final sepTop = (pageTopWorld + pageWorldSize.height) * scaleY;
+        final sepHeight = (pageGap * scaleY).clamp(0.5, 3.0).toDouble();
+        canvas.drawRect(
+          Rect.fromLTWH(0, sepTop, size.width, sepHeight),
+          separator,
+        );
+      }
+
+      Offset pagePointToMap(Offset point) =>
+          Offset(point.dx * scaleX, (pageTopWorld + point.dy) * scaleY);
+      Offset documentPointToMap(Offset point) =>
+          Offset(point.dx * scaleX, point.dy * scaleY);
+
+      canvas.save();
+      canvas.clipRect(pageRect);
+
+      final imageFill = Paint()..color = AppColors.toolbar;
+      final imageBorder = Paint()
+        ..color = AppColors.divider
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.55;
+      for (final block in page.imageBlocks) {
+        final image = images[block.id];
+        final rect = _imageRect(block, scaleX, scaleY);
+        if (image == null) {
+          canvas.drawRect(rect, imageFill);
+        } else {
+          final crop = Rect.fromLTRB(
+            block.cropLeft.clamp(0.0, 1.0) * image.width,
+            block.cropTop.clamp(0.0, 1.0) * image.height,
+            block.cropRight.clamp(0.0, 1.0) * image.width,
+            block.cropBottom.clamp(0.0, 1.0) * image.height,
+          );
+          if (block.rotation == 0) {
+            canvas.drawImageRect(image, crop, rect, Paint());
+          } else {
+            canvas.save();
+            canvas.translate(rect.center.dx, rect.center.dy);
+            canvas.rotate(block.rotation);
+            canvas.translate(-rect.center.dx, -rect.center.dy);
+            canvas.drawImageRect(image, crop, rect, Paint());
+            canvas.restore();
+          }
+        }
+        canvas.drawRect(rect, imageBorder);
+      }
+
+      final textPaint = Paint()
+        ..color = AppColors.inkBlack.withValues(alpha: 0.48);
+      for (final block in page.textBlocks) {
+        final topLeft = documentPointToMap(block.position + const Offset(0, 2));
+        final lineWidth = (block.width * scaleX * 0.8)
+            .clamp(6.0, size.width * 0.84)
+            .toDouble();
+        final lineHeight = math.max(1.0, block.fontSize * scaleY * 0.18);
+        canvas.drawRect(
+          Rect.fromLTWH(topLeft.dx, topLeft.dy, lineWidth, lineHeight),
+          textPaint,
+        );
+      }
+
+      for (final stroke in page.inkStrokes) {
+        if (stroke.points.isEmpty || stroke.tool.isEraser) {
+          continue;
+        }
+        final paint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..strokeWidth = (stroke.width * ((scaleX + scaleY) / 2)).clamp(
+            0.38,
+            1.45,
+          );
+        paint.color = stroke.tool == DrawingTool.highlighter
+            ? stroke.color.withValues(alpha: 0.24)
+            : stroke.color.withValues(alpha: 0.88);
+
+        if (stroke.points.length == 1) {
+          final point = pagePointToMap(stroke.points.first.toOffset());
+          canvas.drawCircle(point, paint.strokeWidth / 2, paint);
+          continue;
+        }
+
+        final path = Path();
+        final first = pagePointToMap(stroke.points.first.toOffset());
+        path.moveTo(first.dx, first.dy);
+        for (var j = 1; j < stroke.points.length; j++) {
+          final point = pagePointToMap(stroke.points[j].toOffset());
+          path.lineTo(point.dx, point.dy);
+        }
+        canvas.drawPath(path, paint);
+      }
+
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProjectMiniMapPainter oldDelegate) {
+    return oldDelegate.pages != pages ||
+        oldDelegate.currentPageIndex != currentPageIndex ||
+        oldDelegate.pageWorldSize != pageWorldSize ||
+        oldDelegate.pageGap != pageGap ||
+        oldDelegate.mapScale != mapScale ||
+        oldDelegate.cornerRadius != cornerRadius ||
+        oldDelegate.showBackgroundLines != showBackgroundLines ||
+        oldDelegate.showBackgroundColumns != showBackgroundColumns ||
+        oldDelegate.backgroundSpacing != backgroundSpacing ||
+        oldDelegate.images != images;
+  }
+
+  void _paintPageBackground(
+    Canvas canvas,
+    Rect pageRect,
+    double scaleX,
+    double scaleY,
+  ) {
+    if (!showBackgroundLines) {
+      return;
+    }
+    final spacing = backgroundSpacing.clamp(16.0, 64.0);
+    final paint = Paint()
+      ..color = AppColors.divider.withValues(alpha: 0.55)
+      ..strokeWidth = 0.5;
+
+    for (var y = spacing * scaleY; y < pageRect.height; y += spacing * scaleY) {
+      canvas.drawLine(
+        Offset(pageRect.left, pageRect.top + y),
+        Offset(pageRect.right, pageRect.top + y),
+        paint,
+      );
+    }
+    if (!showBackgroundColumns) {
+      return;
+    }
+    for (var x = spacing * scaleX; x < pageRect.width; x += spacing * scaleX) {
+      canvas.drawLine(
+        Offset(pageRect.left + x, pageRect.top),
+        Offset(pageRect.left + x, pageRect.bottom),
+        paint,
+      );
+    }
+  }
+
+  Rect _imageRect(ImageBlock block, double scaleX, double scaleY) {
+    final visibleWidth =
+        block.width * (block.cropRight - block.cropLeft).clamp(0.08, 1.0);
+    final visibleHeight =
+        block.height * (block.cropBottom - block.cropTop).clamp(0.08, 1.0);
+    return Rect.fromLTWH(
+      (block.position.dx + block.width * block.cropLeft) * scaleX,
+      (block.position.dy + block.height * block.cropTop) * scaleY,
+      visibleWidth * scaleX,
+      visibleHeight * scaleY,
+    );
+  }
+}
+
+class _MiniMapImageCacheEntry {
+  const _MiniMapImageCacheEntry({required this.cacheKey, required this.image});
+
+  final String cacheKey;
+  final ui.Image image;
+}
+
+class _MiniMapViewportOverlayPainter extends CustomPainter {
+  _MiniMapViewportOverlayPainter({required this.indicatorRect});
+
+  final Rect indicatorRect;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (indicatorRect.isEmpty) {
+      return;
+    }
+    final fill = Paint()
+      ..color = const Color(0xFF2B2B2A).withValues(alpha: 0.26)
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(indicatorRect, fill);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniMapViewportOverlayPainter oldDelegate) {
+    return oldDelegate.indicatorRect != indicatorRect;
+  }
+}
