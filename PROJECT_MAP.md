@@ -698,7 +698,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (542):
+- `test/library_screen_responsive_layout_test.dart` (549):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
