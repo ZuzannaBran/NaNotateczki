@@ -552,33 +552,20 @@ class _CreateMenuButton extends StatelessWidget {
     final selection = await _showSidebarMenu<_CreateAction>(
       context: context,
       anchorContext: context,
-      width: 172,
+      width: 150,
       items: [
-        for (final (value, icon, label) in [
-          (
-            _CreateAction.folder,
-            Icons.create_new_folder_outlined,
-            'New folder',
-          ),
-          (_CreateAction.notebook, Icons.description_outlined, 'New notebook'),
-          (_CreateAction.board, Icons.dashboard_outlined, 'New board'),
+        for (final (value, label) in [
+          (_CreateAction.folder, 'New folder'),
+          (_CreateAction.notebook, 'New notebook'),
+          (_CreateAction.board, 'New board'),
         ])
           PopupMenuItem<_CreateAction>(
             value: value,
             height: 36,
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                Icon(icon, size: 18, color: colors.onSurfaceVariant),
-                const SizedBox(width: 10),
-                Text(
-                  label,
-                  style: _sidebarTextStyle.copyWith(
-                    color: colors.onSurface,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
+            child: Text(
+              label,
+              style: _sidebarTextStyle.copyWith(color: colors.onSurface),
             ),
           ),
       ],
@@ -1055,7 +1042,6 @@ class _TreeRowActions extends StatelessWidget {
               label,
               style: _sidebarTextStyle.copyWith(
                 color: colorScheme.onSurface,
-                fontSize: 13,
               ),
             ),
           ),
