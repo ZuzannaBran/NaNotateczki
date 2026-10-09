@@ -575,7 +575,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                 children: [
                   Expanded(
                     child: Text(
-                      'NaNotateczki Projects',
+                      'Projects',
                       overflow: TextOverflow.ellipsis,
                       style: _sidebarTextStyle.copyWith(
                         color: colorScheme.onSurface,
