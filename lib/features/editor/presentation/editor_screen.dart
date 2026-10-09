@@ -1436,7 +1436,7 @@ class _EditorScreenState extends State<EditorScreen> {
             top: 8,
             bottom: 8,
             right: 0,
-            width: 104,
+            width: 120,
             child: EditorToolbar(
               controller: controller,
               axis: Axis.vertical,
@@ -1448,7 +1448,7 @@ class _EditorScreenState extends State<EditorScreen> {
           Positioned(
             top: 8,
             bottom: 8,
-            right: 108,
+            right: 124,
             width: 152,
             child: TextEditToolbar(
               editorController: controller,
