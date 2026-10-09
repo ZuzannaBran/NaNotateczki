@@ -6,6 +6,7 @@ class NotebookOverviewNavigation {
   static Offset documentPoint({
     required Offset mapPoint,
     required double mapScale,
+    double mapScrollOffset = 0,
     required Size documentSize,
   }) {
     if (mapScale <= 0) {
@@ -13,7 +14,9 @@ class NotebookOverviewNavigation {
     }
     return Offset(
       (mapPoint.dx / mapScale).clamp(0.0, documentSize.width).toDouble(),
-      (mapPoint.dy / mapScale).clamp(0.0, documentSize.height).toDouble(),
+      ((mapPoint.dy + mapScrollOffset) / mapScale)
+          .clamp(0.0, documentSize.height)
+          .toDouble(),
     );
   }
 
@@ -22,15 +25,19 @@ class NotebookOverviewNavigation {
     required Size viewportSize,
     required double effectiveScale,
     required double maxScrollOffset,
+    double topPadding = 0,
   }) {
     final scrollOffset =
-        (documentPoint.dy * effectiveScale - viewportSize.height / 2)
+        (documentPoint.dy * effectiveScale +
+                topPadding -
+                viewportSize.height / 2)
             .clamp(0.0, math.max(0.0, maxScrollOffset))
             .toDouble();
     final pan = Offset(
       viewportSize.width / 2 - documentPoint.dx * effectiveScale,
       scrollOffset +
           viewportSize.height / 2 -
+          topPadding -
           documentPoint.dy * effectiveScale,
     );
     return NotebookOverviewTarget(scrollOffset: scrollOffset, pan: pan);
