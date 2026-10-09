@@ -11,9 +11,9 @@ import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/editor_screen.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
-import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 void main() {
@@ -52,6 +52,7 @@ void main() {
     );
     expect(_documentLayoutSize(tester).width, logicalPageWidth);
     expect(_documentScale(tester), closeTo(1.0, 0.001));
+    expect(_documentTranslationX(tester), closeTo(4.0, 0.001));
     final wideViewportRightMargin =
         1000 -
         tester
@@ -77,6 +78,7 @@ void main() {
     final narrowRightMargin = 500 - _documentTopRight(tester).dx;
     expect(narrowRightMargin, closeTo(wideViewportRightMargin, 0.001));
     expect(_pageViewportSize(tester).width, closeTo(328.0, 0.001));
+    expect(_documentTranslationX(tester), closeTo(0.0, 0.001));
     _expectOverviewSideGapsEqual(tester);
     expect(find.text('Widen the window to edit this notebook.'), findsNothing);
 
@@ -85,7 +87,7 @@ void main() {
 
     expect(_documentScale(tester), closeTo(1.0, 0.001));
     expect(_pageViewportSize(tester).width, closeTo(928.0, 0.001));
-    expect(_documentTranslationX(tester), closeTo(0.0, 0.001));
+    expect(_documentTranslationX(tester), closeTo(54.0, 0.001));
 
     final viewportCenter = tester.getCenter(
       find.byKey(const ValueKey('notebook-page-viewport')),
@@ -108,12 +110,16 @@ void main() {
     await tester.pump();
 
     final translatedX = _documentTranslationX(tester);
-    expect(translatedX, greaterThan(0.0));
+    expect(translatedX, greaterThan(54.0));
     expect(translatedX, lessThanOrEqualTo(108.0));
 
     await firstFinger.up();
     await secondFinger.up();
     await tester.pump();
+
+    controller.setTool(DrawingTool.highlighter);
+    await tester.pump();
+    expect(_documentTranslationX(tester), closeTo(translatedX, 0.001));
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
