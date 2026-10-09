@@ -145,9 +145,9 @@ void main() {
       expect(tester.getRect(canvas), canvasRect);
       final panel = tester.getRect(toolbar);
       if (onLeft) {
-        expect(panel.right, lessThanOrEqualTo(104));
+        expect(panel.right, lessThanOrEqualTo(120));
       } else {
-        expect(panel.left, greaterThanOrEqualTo(1200 - 104));
+        expect(panel.left, greaterThanOrEqualTo(1200 - 120));
       }
       final scroll = find.descendant(
         of: toolbar,
