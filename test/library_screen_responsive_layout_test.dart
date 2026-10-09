@@ -161,6 +161,7 @@ void main() {
     );
     final toolbarToggle = find.byKey(const ValueKey('editor-toolbar-toggle'));
     for (final toggle in [navigationToggle, toolbarToggle]) {
+      expect(tester.getSize(toggle), const Size(24, 44));
       final material = tester.widget<Material>(toggle);
       expect(material.elevation, 8);
       expect(material.shadowColor, Colors.black54);
@@ -188,6 +189,8 @@ void main() {
     expect(find.byTooltip('Hide toolbar'), findsOneWidget);
     expect(tester.getTopLeft(navigationToggle).dx, 0);
     expect(tester.getTopLeft(toolbarToggle).dx, 0);
+    expect(tester.getSize(navigationToggle).width, 24);
+    expect(tester.getSize(toolbarToggle).width, 24);
     expect(tester.getCenter(navigationToggle).dy, closeTo(29, 0.01));
     expect(tester.getCenter(toolbarToggle).dy, closeTo(92, 0.01));
     expect(
