@@ -76,8 +76,9 @@ void main() {
     );
   });
 
-  test('failed filesystem write does not destroy last good settings',
-      () async {
+  test(
+    'failed filesystem write does not destroy last good settings',
+    () async {
     await writeStoredText('app_prefs.json', 'last good');
     final blocker = File('${documents.path}/not-a-directory');
     await blocker.writeAsString('occupied');
@@ -92,5 +93,6 @@ void main() {
     expect(await readStoredText('app_prefs.json'), 'last good');
     await writeStoredText('app_prefs.json', 'retry succeeded');
     expect(await readStoredText('app_prefs.json'), 'retry succeeded');
-  });
+    },
+  );
 }
