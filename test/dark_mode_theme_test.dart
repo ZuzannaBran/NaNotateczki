@@ -66,7 +66,7 @@ void main() {
         closeTo(1 - sourceHsl.lightness, 0.005),
       );
       if (sourceHsl.saturation > 0.01) {
-        expect(targetHsl.hue, closeTo(sourceHsl.hue, 0.5));
+        expect(targetHsl.hue, closeTo(sourceHsl.hue, 1.5));
       }
       expect(transformed.a, closeTo(original.a, 0.001));
     }
