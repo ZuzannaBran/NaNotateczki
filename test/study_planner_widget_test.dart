@@ -81,9 +81,112 @@ void main() {
     await tester.tap(find.byTooltip('Stop session'));
     await tester.pumpAndSettle();
     expect(find.text('Rate your productivity'), findsOneWidget);
+    expect(find.byIcon(Icons.star_border_rounded), findsNWidgets(5));
+    expect(find.text('5'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('productivity-5')));
     await tester.pumpAndSettle();
     expect(planner.history.single.productivity, 5);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('skipping a rating never leaves a sidebar reminder', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final item = planner.create(
+      title: 'Unrated session',
+      scheduledAt: DateTime.now(),
+    );
+    planner.start(item.id);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(
+          home: Scaffold(body: StudyTimerCard()),
+        ),
+      ),
+    );
+    await tester.tap(find.byTooltip('Stop session'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rate your productivity'), findsOneWidget);
+
+    await tester.tap(find.text('Skip rating'));
+    await tester.pumpAndSettle();
+    expect(planner.pendingReviews, isEmpty);
+    expect(planner.history.single.id, item.id);
+    expect(planner.history.single.productivity, isNull);
+    expect(find.textContaining('Rate'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('closing the rating dialog also finishes without rating', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final item = planner.create(
+      title: 'Dismissed session',
+      scheduledAt: DateTime.now(),
+    );
+    planner.start(item.id);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(
+          home: Scaffold(body: StudyTimerCard()),
+        ),
+      ),
+    );
+    await tester.tap(find.byTooltip('Stop session'));
+    await tester.pumpAndSettle();
+
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(planner.pendingReviews, isEmpty);
+    expect(planner.history.single.id, item.id);
+    expect(planner.history.single.productivity, isNull);
+    expect(find.text('Rate your productivity'), findsNothing);
+  });
+
+  testWidgets('history shows star counts and never null over five', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final rated = planner.create(
+      title: 'Rated study',
+      scheduledAt: DateTime.now(),
+    );
+    planner.start(rated.id);
+    planner.stop();
+    planner.rate(rated.id, 3);
+
+    final unrated = planner.create(
+      title: 'Skipped study',
+      scheduledAt: DateTime.now(),
+    );
+    planner.start(unrated.id);
+    planner.stop();
+    planner.skipRating(unrated.id);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: PlannerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Study history'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('★★★☆☆'), findsWidgets);
+    expect(find.textContaining('Not rated'), findsWidgets);
+    expect(find.textContaining('null/5'), findsNothing);
+    expect(find.textContaining('Rate now'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
