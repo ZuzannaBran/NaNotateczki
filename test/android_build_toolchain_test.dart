@@ -32,10 +32,10 @@ void main() {
     final wrapper = File(
       'android/gradle/wrapper/gradle-wrapper.properties',
     ).readAsStringSync();
-    final settings = File('android/settings.gradle.kts').readAsStringSync();
+    final config = File('android/settings.gradle.kts').readAsStringSync();
 
     expect(lock, contains('irondash_engine_context:'));
     expect(wrapper, contains('gradle-8.14-all.zip'));
-    expect(settings, contains('id("com.android.application") version "8.11.1"'));
+    expect(config, contains('id("com.android.application") version "8.11.1"'));
   });
 }
