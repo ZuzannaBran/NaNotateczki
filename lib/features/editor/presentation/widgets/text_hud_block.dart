@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../../../../core/theme/app_colors.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
 
 import '../../../../core/input/soft_keyboard.dart';
@@ -341,7 +343,10 @@ class _TextHudBlockState extends State<TextHudBlock> {
 
     return _TextHudStyle(
       textStyle: TextStyle(
-        color: block.color,
+        color: AppColors.displayInkColor(
+          block.color,
+          darkMode: Theme.of(context).brightness == Brightness.dark,
+        ),
         fontSize: fontSize,
         fontFamily: inline['font']?.toString(),
         fontWeight: inline['bold'] == true
