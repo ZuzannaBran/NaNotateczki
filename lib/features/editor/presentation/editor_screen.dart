@@ -93,6 +93,7 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   void initState() {
     super.initState();
+    _pagePan = Offset(0, _firstPageInset);
     _scrollController.addListener(_handleScroll);
   }
 
@@ -142,12 +143,11 @@ class _EditorScreenState extends State<EditorScreen> {
     if (controller.pages.isEmpty) {
       return;
     }
-    final raw =
-        ((_scrollController.position.pixels -
-                    _firstPageInset +
-                    (_pageExtent * 0.45)) /
-                _pageExtent)
-            .floor();
+    final scrollWorldOffset =
+        (_scrollController.position.pixels - _pagePan.dy) /
+        math.max(_effectivePageScale, 0.001);
+    final raw = ((scrollWorldOffset + (_pageExtent * 0.45)) / _pageExtent)
+        .floor();
     final target = raw.clamp(0, controller.pages.length - 1);
     if (target != controller.currentPageIndex) {
       controller.setCurrentPage(target);
@@ -598,15 +598,16 @@ class _EditorScreenState extends State<EditorScreen> {
       maxX = 0.0;
     }
 
+    final downwardPanLimit =
+        _firstPageInset + math.min(160.0, viewportSize.height * 0.25);
     late final double minY;
     late final double maxY;
     if (contentHeight <= viewportSize.height) {
-      final centeredY = (viewportSize.height - contentHeight) / 2;
-      minY = centeredY;
-      maxY = centeredY;
+      minY = 0.0;
+      maxY = math.max(downwardPanLimit, viewportSize.height - contentHeight);
     } else {
       minY = viewportSize.height - contentHeight;
-      maxY = 0.0;
+      maxY = downwardPanLimit;
     }
 
     final clampedX = pan.dx.clamp(minX, maxX).toDouble();
@@ -650,9 +651,9 @@ class _EditorScreenState extends State<EditorScreen> {
     var clipBottom = viewportSize.height;
     if (_scrollController.hasClients) {
       final metrics = _scrollController.position;
-      final topPadding = _topBottomPadding + _firstPageInset;
-      clipTop = metrics.pixels - topPadding;
-      clipBottom = metrics.pixels + metrics.viewportDimension - topPadding;
+      clipTop = metrics.pixels - _topBottomPadding;
+      clipBottom =
+          metrics.pixels + metrics.viewportDimension - _topBottomPadding;
     }
 
     final worldLeft = ((-_pagePan.dx) / safeScale).clamp(
@@ -1084,9 +1085,9 @@ class _EditorScreenState extends State<EditorScreen> {
                                 _pageScale > 1.001)
                             ? const NeverScrollableScrollPhysics()
                             : const ClampingScrollPhysics(),
-                        padding: EdgeInsets.fromLTRB(
+                        padding: const EdgeInsets.fromLTRB(
                           _leftMargin,
-                          _topBottomPadding + _firstPageInset,
+                          _topBottomPadding,
                           _rightMargin,
                           _topBottomPadding,
                         ),
@@ -1415,6 +1416,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         titleSpacing: useWideTitleInset ? 44 : null,
         title: Text(
           controller.notebook.title,
