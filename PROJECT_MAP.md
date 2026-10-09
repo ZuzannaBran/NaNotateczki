@@ -333,6 +333,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 ### `lib/features/library/presentation/library_screen.dart` (1101 linii)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
+lista folderów i plików wykorzystuje ustawioną czułość dotyku.
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
@@ -443,6 +444,8 @@ viewport strony zaczyna się przy x=116 i kończy 56 px przed prawą krawędzią
 Zoom i pan działają wewnątrz tego pasa, ale podczas aktywnego move/resize
 obiektu viewport jest zamrożony: custom pan/zoom jest ignorowany, a pionowy
 `SingleChildScrollView` przechodzi na `NeverScrollableScrollPhysics`.
+Gesty pan palcem oraz przewijanie stron i minimapy respektują czułość
+nawigacji; zoom i gesty narzędzi pozostają bez zmian.
 Po zakończeniu transformacji normalna nawigacja wraca. Stronę można przesuwać
 poziomo dotykiem także wtedy, gdy jest węższa od viewportu; clamp pozwala jej
 dojść od lewej do prawej granicy pasa, ale nigdy wejść pod margines. Bleed
@@ -472,7 +475,8 @@ przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
 oraz `darkActive`/`darkToolbar` w ciemnym. Zaznaczona opcja ma
-mocniejszą ramkę, bez czarnego lub białego tła. Pozostałe sekcje
+mocniejszą ramkę, bez czarnego lub białego tła. Zakładka System
+ma suwak czułości nawigacji 0.5×–2.0×. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
 
 - 16:
@@ -626,6 +630,8 @@ układu współrzędnych. Po zakończeniu gestu granice odświeżają się.
 Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 `QuillController`. Główny toolbar i pasek tekstu respektują `showToolbar`
 i unoszą się na nakładce nad canvasem, zamiast zmniejszać jego wysokość.
+Pan dotykowy boarda ma regulowaną czułość i próg gestu; rysik,
+zoom i transformacje obiektów są niezależne od tego ustawienia.
 Board ma stały boczny odstęp 16 px, ale nie ma marginesu u góry,
 więc zawartość można swobodnie przesuwać za toolbar. Nagłówek ma
 wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
