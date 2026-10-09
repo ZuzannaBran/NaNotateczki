@@ -380,6 +380,14 @@ void main() {
     );
     expect(controller.pages.single.textBlocks.single.deltaJson, deltaJson);
 
+    await tester.pumpWidget(screen(false));
+    await tester.pump();
+    expect(displayedColor(0).toLowerCase(), '#bbdcfb');
+    expect(displayedColor(1).toLowerCase(), '#203e85');
+    expect(controller.pages.single.textBlocks.single.deltaJson, deltaJson);
+
+    await tester.pumpWidget(screen(true));
+    await tester.pump();
     controller.setTool(DrawingTool.text);
     controller.setActiveTextBlock(block.id, null);
     await tester.pump();
@@ -391,14 +399,6 @@ void main() {
       activeText.style.color,
       AppColors.displayInkColor(firstColor, darkMode: true),
     );
-
-    controller.clearActiveTextBlock();
-    controller.setTool(DrawingTool.edit);
-    await tester.pumpWidget(screen(false));
-    await tester.pump();
-    expect(displayedColor(0).toLowerCase(), '#bbdcfb');
-    expect(displayedColor(1).toLowerCase(), '#203e85');
-    expect(controller.pages.single.textBlocks.single.deltaJson, deltaJson);
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
