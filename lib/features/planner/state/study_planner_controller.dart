@@ -256,6 +256,15 @@ class StudyPlannerController extends ChangeNotifier {
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) => tick());
     }
     tick();
+    final interruptedReviews = _sessions.where(
+      (session) => session.status == StudyStatus.review,
+    );
+    if (interruptedReviews.isNotEmpty) {
+      for (final session in interruptedReviews) {
+        session.status = StudyStatus.completed;
+      }
+      _changed();
+    }
     notifyListeners();
   }
 
