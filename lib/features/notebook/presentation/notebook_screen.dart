@@ -6,9 +6,14 @@ import '../../editor/presentation/editor_screen.dart';
 import '../../editor/state/editor_controller.dart';
 
 class NotebookScreen extends StatelessWidget {
-  const NotebookScreen({super.key, this.showToolbar = true});
+  const NotebookScreen({
+    super.key,
+    this.showToolbar = true,
+    this.showCompactTimer = false,
+  });
 
   final bool showToolbar;
+  final bool showCompactTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +26,9 @@ class NotebookScreen extends StatelessWidget {
       );
     }
 
-    return EditorScreen(showToolbar: showToolbar);
+    return EditorScreen(
+      showToolbar: showToolbar,
+      showCompactTimer: showCompactTimer,
+    );
   }
 }
