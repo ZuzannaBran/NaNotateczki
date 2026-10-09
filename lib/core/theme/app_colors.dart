@@ -59,17 +59,11 @@ class AppColors {
     if (!darkMode) {
       return color;
     }
-    final channels = [color.r, color.g, color.b];
-    final range = channels.reduce((a, b) => a > b ? a : b) -
-        channels.reduce((a, b) => a < b ? a : b);
-    if (range > 0.20) {
-      return color;
-    }
-    final value = (color.r + color.g + color.b) / 3;
-    final inverted = value < 0.5
-        ? darkText
-        : Color.lerp(darkBackground, Colors.white, 1 - value)!;
-    return inverted.withValues(alpha: color.a);
+    final hsl = HSLColor.fromColor(color);
+    return hsl
+        .withLightness(1 - hsl.lightness)
+        .toColor()
+        .withValues(alpha: color.a);
   }
 
   // Warm beige UI palette.
