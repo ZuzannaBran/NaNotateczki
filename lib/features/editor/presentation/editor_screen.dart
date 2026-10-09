@@ -1085,7 +1085,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
               return Container(
                 key: const ValueKey('notebook-canvas-area'),
-                color: AppColors.background,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 child: Stack(
                   children: [
                     NotificationListener<ScrollNotification>(
@@ -1207,7 +1207,11 @@ class _EditorScreenState extends State<EditorScreen> {
                                                         DecoratedBox(
                                                           decoration: BoxDecoration(
                                                             color:
-                                                                AppColors.paper,
+                                                                Theme.of(context)
+                                                                            .brightness ==
+                                                                        Brightness.dark
+                                                                    ? AppColors.darkPaper
+                                                                    : AppColors.paper,
                                                             boxShadow: const [
                                                               BoxShadow(
                                                                 color: AppColors
