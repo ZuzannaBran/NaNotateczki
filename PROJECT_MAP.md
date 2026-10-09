@@ -322,6 +322,7 @@ rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
 zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. U dołu panelu jest `StudyTimerCard`,
+  wyrównany do dolnej krawędzi i przewijany przy większej zawartości,
   pokazujący aktywną sesję, nadchodzący plan i oceny. Po zwinięciu panelu
   `CompactStudyTimer` wyświetla się obok Settings w AppBar notebooka/boarda.
   Pod strzałką panelu folderów
@@ -641,7 +642,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
 - `test/library_screen_responsive_layout_test.dart` (267):
-  szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
+  szeroki układ, drzewo folderów, wyrównanie timera do dolnej krawędzi
+  panelu i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; dodatkowo regresja
   wyśrodkowania, zwężania kapsułek oraz przewijania na wąskim ekranie
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
