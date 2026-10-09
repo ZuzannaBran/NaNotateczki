@@ -162,6 +162,11 @@ void main() {
       greaterThan(tester.getBottomLeft(navigationToggle).dy),
     );
 
+    await tester.tap(find.byTooltip('Hide projects'));
+    await tester.pump();
+    expect(find.byTooltip('Show projects'), findsOneWidget);
+    expect(find.byTooltip('Hide toolbar'), findsOneWidget);
+
     await tester.tap(find.byTooltip('Hide toolbar'));
     await tester.pump();
     expect(find.byType(EditorToolbar), findsNothing);
