@@ -32,6 +32,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
   static const double _navigationPaneMinWidth = 240;
   static const double _navigationPaneMaxWidth = 420;
   static const double _resizeHandleWidth = 12;
+  static const double _navigationHeaderHeight = 58;
+  static const double _editorToolbarAreaHeight = 72;
+  static const double _toggleTabHeight = 44;
 
   bool _showLeftNavigation = true;
   bool _showEditorToolbar = true;
@@ -203,7 +206,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
                       Positioned(
                         left: math.max(0.0, leftZoneWidth - 1),
-                        top: 0,
+                        top:
+                            (_navigationHeaderHeight - _toggleTabHeight) / 2,
                         child: _LeftZoneToggleTab(
                           expanded: _showLeftNavigation,
                           onPressed: _toggleLeftNavigation,
@@ -211,7 +215,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
                       Positioned(
                         left: math.max(0.0, leftZoneWidth - 1),
-                        top: 50,
+                        top: kToolbarHeight +
+                            (_editorToolbarAreaHeight - _toggleTabHeight) / 2,
                         child: _LeftZoneToggleTab(
                           expanded: _showEditorToolbar,
                           toolbar: true,
@@ -568,7 +573,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
       child: Column(
         children: [
           SizedBox(
-            height: 58,
+            height: _LibraryScreenState._navigationHeaderHeight,
             child: Padding(
               padding: const EdgeInsets.only(left: 14, right: 8),
               child: Row(
@@ -1068,13 +1073,9 @@ class _LeftZoneToggleTab extends StatelessWidget {
               : (expanded ? 'Hide projects' : 'Show projects'),
           child: SizedBox(
             width: 32,
-            height: 44,
+            height: _LibraryScreenState._toggleTabHeight,
             child: Icon(
-              toolbar
-                  ? (expanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded)
-                  : (expanded ? Icons.chevron_left : Icons.chevron_right),
+              expanded ? Icons.chevron_left : Icons.chevron_right,
               size: 20,
             ),
           ),
