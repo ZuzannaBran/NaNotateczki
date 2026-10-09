@@ -149,7 +149,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final treeFontSize = tester.widget<Text>(find.text('Menu notebook')).style!.fontSize;
+    final treeFontSize = tester
+        .widget<Text>(find.text('Menu notebook'))
+        .style!
+        .fontSize;
     expect(treeFontSize, 14);
     final sidebarEdge = tester
             .getTopLeft(
