@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:program/core/theme/app_colors.dart';
 import 'package:program/data/export/notebook_export_service.dart';
 import 'package:program/features/editor/state/page_background.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
@@ -65,6 +66,26 @@ void _verifyPng(Uint8List bytes) {
   final header = ByteData.sublistView(bytes);
   expect(header.getUint32(16), 160);
   expect(header.getUint32(20), 120);
+}
+
+Future<Color> _pixel(Uint8List png, int x, int y) async {
+  final codec = await instantiateImageCodec(png);
+  final frame = await codec.getNextFrame();
+  final image = frame.image;
+  final data = await image.toByteData(format: ImageByteFormat.rawRgba);
+  if (data == null) {
+    throw StateError('Cannot decode PNG pixels.');
+  }
+  final offset = (y * image.width + x) * 4;
+  final color = Color.fromARGB(
+    data.getUint8(offset + 3),
+    data.getUint8(offset),
+    data.getUint8(offset + 1),
+    data.getUint8(offset + 2),
+  );
+  image.dispose();
+  codec.dispose();
+  return color;
 }
 
 Future<T> _render<T>(WidgetTester tester, Future<T> Function() render) async {
@@ -204,4 +225,83 @@ void main() {
     expect(pages, hasLength(1));
     _verifyPng(pages.single);
   });
+  testWidgets('saved ink and paper match the export theme', (tester) async {
+    const black = Color(0xFF101010);
+    const paleBlue = Color(0xFFBBDCFB);
+    const deepPink = Color(0xFF8F214D);
+    final page = _page('previously-saved').copyWith(
+      inkStrokes: [
+        for (final (i, color) in [
+          black,
+          paleBlue,
+          deepPink,
+        ].indexed)
+          InkStroke(
+            id: 'saved-color-$i',
+            points: [
+              InkPoint(dx: 5, dy: 15.0 + 15 * i, pressure: 1),
+              InkPoint(dx: 65, dy: 15.0 + 15 * i, pressure: 1),
+            ],
+            color: color,
+            width: 4,
+            tool: DrawingTool.pen,
+          ),
+      ],
+    );
+    final notebook = _notebook([page]);
+    final rendered = await _render(tester, () async {
+      final light = (await NotebookExportService.renderPngPagesForTest(
+        notebook,
+        pageSize: _pageSize,
+        darkMode: false,
+      )).single;
+      final dark = (await NotebookExportService.renderPngPagesForTest(
+        notebook,
+        pageSize: _pageSize,
+        darkMode: true,
+      )).single;
+      final pdfLight = await NotebookExportService.renderPdfBytesForTest(
+        notebook,
+        pageSize: _pageSize,
+        darkMode: false,
+      );
+      final pdfDark = await NotebookExportService.renderPdfBytesForTest(
+        notebook,
+        pageSize: _pageSize,
+        darkMode: true,
+      );
+      return (
+        lightBackground: await _pixel(light, 148, 8),
+        darkBackground: await _pixel(dark, 148, 8),
+        lightInk: [
+          for (final y in [15, 30, 45])
+            await _pixel(light, 60, y * 2),
+        ],
+        darkInk: [
+          for (final y in [15, 30, 45])
+            await _pixel(dark, 60, y * 2),
+        ],
+        lightPng: light,
+        darkPng: dark,
+        pdfLight: pdfLight,
+        pdfDark: pdfDark,
+      );
+    });
+
+    expect(rendered.lightBackground, AppColors.paper);
+    expect(rendered.darkBackground, AppColors.darkPaper);
+    final colors = [black, paleBlue, deepPink];
+    for (var i = 0; i < colors.length; i++) {
+      expect(rendered.lightInk[i], colors[i]);
+      expect(
+        rendered.darkInk[i],
+        AppColors.displayInkColor(colors[i], darkMode: true),
+      );
+    }
+    expect(rendered.darkPng, isNot(equals(rendered.lightPng)));
+    expect(latin1.decode(rendered.pdfLight.take(5).toList()), '%PDF-');
+    expect(latin1.decode(rendered.pdfDark.take(5).toList()), '%PDF-');
+    expect(rendered.pdfDark, isNot(equals(rendered.pdfLight)));
+  });
+
 }
