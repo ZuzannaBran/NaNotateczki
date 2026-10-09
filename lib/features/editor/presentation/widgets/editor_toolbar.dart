@@ -286,7 +286,9 @@ class EditorToolbar extends StatelessWidget {
         tooltip: label,
         color: isActive
             ? Theme.of(context).colorScheme.onSurface
-            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+            : Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.72),
         style: _toolHighlightStyle(context, isActive),
         onPressed: onPressed,
       ),
@@ -308,7 +310,9 @@ class EditorToolbar extends StatelessWidget {
         tooltip: label,
         color: selected
             ? Theme.of(context).colorScheme.onSurface
-            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+            : Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.72),
         style: _toolHighlightStyle(context, selected),
         onPressed: onPressed ?? () => controller.setTool(tool),
       ),
@@ -322,7 +326,9 @@ class EditorToolbar extends StatelessWidget {
     return ButtonStyle(
       backgroundColor: WidgetStateProperty.resolveWith((states) {
         if (selected) {
-          return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07);
+          return Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.07);
         }
         return null;
       }),
@@ -353,7 +359,9 @@ class EditorToolbar extends StatelessWidget {
             tooltip: _eraserLabel(activeTool),
             color: isSelected
                 ? Theme.of(context).colorScheme.onSurface
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+                : Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.72),
             style: _toolHighlightStyle(context, isSelected),
             onPressed: () => controller.setTool(activeTool),
           ),
@@ -416,7 +424,9 @@ class EditorToolbar extends StatelessWidget {
             tooltip: _shapeLabel(activeTool),
             color: isSelected
                 ? Theme.of(context).colorScheme.onSurface
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+                : Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.72),
             style: _toolHighlightStyle(context, isSelected),
             onPressed: () => controller.setTool(activeTool),
           ),
