@@ -77,9 +77,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (85): jasna paleta oraz tryb ciemny:
-  tło #2D2E2B, panele #3A3B39, aktywne #4A4B48, kartka #5A5B57,
-  tekst #EEECE6. `displayInkColor` odwraca jasność HSL wszystkich odcieni,
+- `lib/core/theme/app_colors.dart` (86): jasna paleta oraz tryb ciemny:
+  tło #2D2E2B, panele #3A3B39, aktywne #4A4B48, kartka/panele #5A5B57,
+  ciemniejszy canvas notatek #50514D, tekst #EEECE6. `displayInkColor` odwraca jasność HSL wszystkich odcieni,
   zachowując hue, saturację i alpha (czerń↔biel, jasny błękit↔ciemny).
   Transformacja działa przy wyświetlaniu i eksporcie aktualnego motywu,
   bez modyfikowania zapisanych kresek. 50: `AppColors`.
@@ -217,8 +217,8 @@ bezpośrednio do `InkEraserEngine`. Nie zawiera własnej geometrii gumki.
 
 Renderuje notebook/board do PNG lub PDF i zapisuje przez systemowy dialog.
 Eksport wywołany z edytora używa aktywnego motywu: jasnego albo ciemnego.
-W dark mode tło kartki, siatka, tekst i wszystkie kolory tuszu są
-odpowiednio renderowane; warianty PDF i PNG współdzielą ten sam renderer.
+W dark mode tło kartki (#50514D), siatka, tekst i wszystkie kolory tuszu
+są odpowiednio renderowane; warianty PDF i PNG współdzielą ten sam renderer.
 Publiczne metody testowe przyjmują `darkMode` (domyślnie false).
 Obrazy pozostają bez zmian, a oryginalne kolory w danych są zachowane.
 Przed renderem normalizuje legacy gumki; renderer zna wyłącznie zwykły
@@ -485,7 +485,8 @@ ustawienia tła i podgląd logów błędów, integralności i wydajności.
 - `lib/features/editor/presentation/widgets/busy_overlay.dart` (18): blokujący
   spinner długiej operacji. 3: `BusyOverlay`.
 - `lib/features/editor/presentation/widgets/page_background_paint.dart` (131):
-  render tła i kratki w bieżącym trybie wizualnym. 6: `PageBackgroundPaint`;
+  render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
+  kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
 - `lib/features/editor/presentation/widgets/editor_toolbar.dart` (926):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
@@ -499,7 +500,7 @@ ustawienia tła i podgląd logów błędów, integralności i wydajności.
   przedstawia zaznaczanie obszaru kursorem.
   10: `EditorToolbar`; 190: dialog tła; 344: selektor gumki;
   412: selektor kształtu; 819: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (580):
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (583):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
   underline, strike, font, rozmiar, kolor, wyrównanie, reset stylu i usunięcie.
@@ -537,15 +538,17 @@ ustawienia tła i podgląd logów błędów, integralności i wydajności.
   konfigurowalne przez `ObjectTransformHudStyle`.
   13: `ObjectTransformHudStyle`; 54: `ObjectTransformHud`;
   106: `_ObjectTransformHudState`; 591: `_ObjectTransformFramePainter`.
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (514):
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (533):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
   jest wyłączony. Podczas edycji treści uchwyty resize i osobny grabber move
   pozostają aktywne, a środek ramki przepuszcza gesty do `EditableText`.
   Start transformacji zapisuje najnowszą treść, włącza blokadę viewportu
   i używa tej treści jako snapshotu resize, więc zmiana rozmiaru ani anulowanie
-  gestu nie przywracają starszego tekstu. Nieaktywne teksty nadal
-  używają starego Quilla jako bezpieczny fallback.
+  gestu nie przywracają starszego tekstu. Kolor aktywnego tekstu jest
+  wyznaczany z pierwszego formatowanego fragmentu Delta (lub bloku),
+  a jego jasność odwracana w dark mode. Nieaktywne teksty używają
+  starego Quilla jako fallback.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4190 linii)
 
@@ -576,11 +579,14 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2834 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2892 linie)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
-i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText` oraz wspólny `ObjectTransformHud` dla
-move, width-resize i scale. Nieaktywne teksty zachowują stary Quill jako fallback. Aktywne obrazy/PDF
+i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
+oraz wspólny `ObjectTransformHud` dla move/resize/scale. Nieaktywne teksty
+korzystają z Quilla; w dark mode dostają osobną, wyłącznie odczytową kopię
+Delta z odwróconymi kolorami wszystkich fragmentów tekstu. Oryginalny
+`QuillController` i zapisane Delta pozostają bez zmian. Aktywne obrazy/PDF
 korzystają z tego samego `ObjectTransformHud`; obrót jest wyłączony, rogi skalują, boki zachowują
 crop, a lasso/ink pozostają poza tym silnikiem. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
 tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
@@ -595,13 +601,13 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 - 32: `PageOverlay`; 193: `DocumentPageOverlay`.
 - aktywny tekst: `TextHudBlock`; fallback nieaktywnego tekstu:
   `_TextBlockWidget` / `_TextBlockWidgetState`.
-- 1357: `_ImageBlockWidget`; 1380: `_ImageBlockWidgetState`.
+- 1420: `_ImageBlockWidget`; 1443: `_ImageBlockWidgetState`.
 - 2439: `_editOcr`; 2513: `_OcrTextDialog`;
   2612: `_LassoSelectionWidget`; 2766: `_LassoActionButton`.
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (883 linie)
+### `lib/features/board/presentation/board_screen.dart` (885 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -680,8 +686,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
   minimapa na krótkim ekranie i interaktywność narzędzi
-- `test/page_overlay_text_gestures_test.dart` (317): sprawdza blokowy
-  toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,
+- `test/page_overlay_text_gestures_test.dart` (432): blokowy toolbar
+  tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
+  w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
@@ -692,7 +699,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (198): paleta dark, odwracanie jasności
+- `test/dark_mode_theme_test.dart` (199): paleta dark, odwracanie jasności
   wszystkich barw HSL, alfa, zachowanie odcieni i przełącznik Visual.
 
 
