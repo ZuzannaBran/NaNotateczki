@@ -22,6 +22,9 @@ class PageBackgroundPaint extends StatelessWidget {
       child: CustomPaint(
         painter: _PageBackgroundPainter(
           settings: settings,
+          paperColor: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.darkPaper
+              : AppColors.paper,
           lineColor: Theme.of(
             context,
           ).colorScheme.outlineVariant.withValues(alpha: 0.55),
@@ -48,7 +51,9 @@ class PageBackgroundPreview extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.paper,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.darkPaper
+            : AppColors.paper,
         border: Border.all(color: Theme.of(context).dividerColor),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -65,16 +70,18 @@ class _PageBackgroundPainter extends CustomPainter {
   const _PageBackgroundPainter({
     required this.settings,
     required this.lineColor,
+    required this.paperColor,
     required this.origin,
   });
 
   final PageBackgroundSettings settings;
   final Color lineColor;
+  final Color paperColor;
   final Offset origin;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paperPaint = Paint()..color = AppColors.paper;
+    final paperPaint = Paint()..color = paperColor;
     canvas.drawRect(Offset.zero & size, paperPaint);
     if (settings.style == PageBackgroundStyle.blank) {
       return;
@@ -118,6 +125,7 @@ class _PageBackgroundPainter extends CustomPainter {
     return settings.style != oldDelegate.settings.style ||
         settings.spacing != oldDelegate.settings.spacing ||
         lineColor != oldDelegate.lineColor ||
+        paperColor != oldDelegate.paperColor ||
         origin != oldDelegate.origin;
   }
 }
