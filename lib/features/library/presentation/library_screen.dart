@@ -993,7 +993,8 @@ Future<T?> _showSidebarMenu<T>({
     menuPadding: const EdgeInsets.symmetric(vertical: 3),
     color: Theme.of(context).colorScheme.surfaceContainerLowest,
     surfaceTintColor: Colors.transparent,
-    elevation: 0,
+    elevation: 4,
+    shadowColor: const Color(0x44000000),
     shape: _sidebarMenuShape,
     popUpAnimationStyle: const AnimationStyle(
       curve: Curves.easeOutCubic,
