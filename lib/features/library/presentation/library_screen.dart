@@ -977,8 +977,8 @@ class _TreeRowActions extends StatelessWidget {
       Offset.zero,
       ancestor: overlayBox,
     ).dy;
-    final left = panelEdge.clamp(0.0, overlayBox.size.width);
-    final top = rowTop.clamp(0.0, overlayBox.size.height);
+    final left = panelEdge.clamp(0.0, overlayBox.size.width).toDouble();
+    final top = rowTop.clamp(0.0, overlayBox.size.height).toDouble();
     final colorScheme = Theme.of(context).colorScheme;
     final action = await showMenu<_TreeRowAction>(
       context: context,
@@ -1027,10 +1027,12 @@ class _TreeRowActions extends StatelessWidget {
     switch (action) {
       case _TreeRowAction.rename:
         onRename();
+        return;
       case _TreeRowAction.delete:
         onDelete();
+        return;
       case null:
-        break;
+        return;
     }
   }
 
