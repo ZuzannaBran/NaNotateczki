@@ -323,7 +323,8 @@ i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
 zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. U dołu panelu jest `StudyTimerCard`,
   wyrównany do dolnej krawędzi i przewijany przy większej zawartości,
-  pokazujący aktywną sesję, nadchodzący plan i oceny. Po zwinięciu panelu
+  pokazujący aktywną sesję i nadchodzący plan (bez przypomnień o
+  ocenach). Po zwinięciu panelu
   `CompactStudyTimer` wyświetla się obok Settings w AppBar notebooka/boarda.
   Pod strzałką panelu folderów
 jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka,
@@ -347,11 +348,15 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Jeden stan Provider + ChangeNotifier, trwały `study_planner.json` przez
   cross-platform `text_storage`. Timery liczone względem deadline,
   odtwarzanie po restarcie, Pomodoro 25/5, Focus 50/10, Deep 90/20,
-  kolejka ocen 1–5 i zapis chroniony przez `AppSaveCoordinator`.
-  Stop/koniec nie wpisuje sesji do historii przed oceną. Powiadomienia
-  tylko wewnątrz działającej aplikacji.
+  jednorazowa ocena 1–5 gwiazdek i zapis chroniony przez
+  `AppSaveCoordinator`. Pominięta ocena zamyka sesję i zapisuje ją
+  bez oceny w historii (także po ponownym uruchomieniu); starsze sesje
+  pozostawione w stanie review są przenoszone do historii bez ponagleń.
+  Powiadomienia tylko wewnątrz działającej aplikacji.
 - `lib/features/planner/presentation/study_timer_widgets.dart`:
-  `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i oceny sesji.
+  `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
+  sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
+  pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
 - `lib/features/planner/presentation/study_action_theme.dart`:
   `StudyActionTheme`, `StudyActionStyles`; czytelny, ale subtelny beż
   tylko dla wyróżnianych akcji; pozostałe przyciski i ikony bez ciemnego
@@ -361,8 +366,10 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
   tworzenie, edycja, usuwanie i historia.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
-  timerów, Pomodoro, ranking i ochrona uszkodzonych danych.
-- `test/study_planner_widget_test.dart`: kalendarz i start–pause–stop–rating.
+  timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
+  i ochrona uszkodzonych danych.
+- `test/study_planner_widget_test.dart`: kalendarz, timer, wybór gwiazdek,
+  pominięcie i zamknięcie oceny, historia oceniona i bez oceny.
 - `test/study_planner_button_contrast_test.dart`: regresja widoczności
   aktywnych przycisków i wyraźnych stanów wybranego widoku kalendarza.
 
