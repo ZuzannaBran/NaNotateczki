@@ -1932,7 +1932,12 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                 SingleChildScrollView(
                   controller: _minimapScrollController,
                   physics: canScroll
-                      ? const ClampingScrollPhysics()
+                      ? TouchNavigationScrollPhysics(
+                          sensitivity: context
+                                  .watch<AppPreferencesController?>()
+                                  ?.touchNavigationSensitivity ??
+                              1.0,
+                        )
                       : const NeverScrollableScrollPhysics(),
                   child: RepaintBoundary(
                     child: ValueListenableBuilder<int>(
