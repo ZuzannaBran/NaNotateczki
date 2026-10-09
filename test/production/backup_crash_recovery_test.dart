@@ -9,6 +9,8 @@ import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
+import '../support/native_test_documents.dart';
+
 Notebook _fixture(String title, int revision) {
   final created = DateTime.utc(2026, 1, 1);
   return Notebook(
@@ -30,8 +32,6 @@ Notebook _fixture(String title, int revision) {
     ],
   );
 }
-
-import '../support/native_test_documents.dart';
 
 void main() {
   useIsolatedNativeTestDocuments();
