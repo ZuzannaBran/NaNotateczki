@@ -32,6 +32,6 @@ jobs:
           flutter test test/study_planner_controller_test.dart \
             test/study_planner_widget_test.dart \
             test/library_screen_responsive_layout_test.dart \
-            --reporter expanded
+            --reporter expanded --concurrency=1 --timeout=90s
       - name: Compile web application
         run: flutter build web --release
