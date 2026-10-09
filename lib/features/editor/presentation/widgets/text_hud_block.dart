@@ -335,6 +335,10 @@ class _TextHudBlockState extends State<TextHudBlock> {
     final inline = _firstInlineAttributes(block.deltaJson);
     final paragraph = _firstParagraphAttributes(block.deltaJson);
     final align = paragraph['align']?.toString();
+    final rawInlineColor = inline['color'];
+    final textColor = rawInlineColor is String
+        ? _parseColor(rawInlineColor) ?? block.color
+        : block.color;
     final decorations = <TextDecoration>[
       if (inline['underline'] == true) TextDecoration.underline,
       if (inline['strike'] == true) TextDecoration.lineThrough,
@@ -343,7 +347,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
     return _TextHudStyle(
       textStyle: TextStyle(
         color: AppColors.displayInkColor(
-          block.color,
+          textColor,
           darkMode: Theme.of(context).brightness == Brightness.dark,
         ),
         fontSize: fontSize,
@@ -498,6 +502,21 @@ class _TextHudBlockState extends State<TextHudBlock> {
     } catch (_) {
       return deltaJson;
     }
+  }
+
+  Color? _parseColor(String value) {
+    if (!value.startsWith('#')) {
+      return null;
+    }
+    final hex = value.substring(1);
+    if (hex.length != 6 && hex.length != 8) {
+      return null;
+    }
+    final parsed = int.tryParse(
+      hex.length == 6 ? 'ff$hex' : hex,
+      radix: 16,
+    );
+    return parsed == null ? null : Color(parsed);
   }
 
   String _colorToHex(Color color) {
