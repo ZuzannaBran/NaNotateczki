@@ -643,6 +643,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   i stylus oraz anulowanie gestu.
 - `test/critical_editor_regressions_test.dart`: erase → lasso → save →
   reload, sekwencje undo/redo gumki i zamrożenie viewportu.
+  Testy używają izolowanego natywnego katalogu dla preferencji i logów błędów,
+  aby regresje nie generowały `MissingPluginException`.
 - `test/cloud_sync_service_test.dart`: dodatkowe konflikty czasów i ID.
 - `test/cross_platform/eraser_stress_test.dart`: deterministyczne sekwencje
   gumki z kontrolą unikalności i niepowracania raz usuniętych ID.

@@ -349,3 +349,7 @@ items, not the cause of either failure in this run.
   with `JvmTarget.JVM_17`. The `android_build_toolchain_test.dart` regression
   verifies both the required Kotlin version and the compiler options DSL.
   Android Debug, Release and emulator CI builds remain the acceptance tests.
+
+- Added `critical_editor_regressions_test.dart` to the isolated native
+  documents fixture after CI showed `MissingPluginException` in its tests.
+  The existing erase/lasso/save/undo regression scenarios remain unchanged.
