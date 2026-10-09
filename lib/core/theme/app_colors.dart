@@ -62,7 +62,7 @@ class AppColors {
     final channels = [color.r, color.g, color.b];
     final range = channels.reduce((a, b) => a > b ? a : b) -
         channels.reduce((a, b) => a < b ? a : b);
-    if (range > 0.10) {
+    if (range > 0.20) {
       return color;
     }
     final value = (color.r + color.g + color.b) / 3;
