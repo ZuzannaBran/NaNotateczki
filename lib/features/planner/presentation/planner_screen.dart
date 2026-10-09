@@ -19,7 +19,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
   bool _history = false;
 
   DateTime _monday(DateTime date) =>
-      DateUtils.dateOnly(date).subtract(Duration(days: date.weekday - 1));
+      DateTime(date.year, date.month, date.day - (date.weekday - 1));
 
   DateTime _firstDay() => switch (_mode) {
     CalendarMode.today => DateUtils.dateOnly(_anchor),
@@ -35,14 +35,17 @@ class _PlannerScreenState extends State<PlannerScreen> {
       CalendarMode.week => 7,
       CalendarMode.month => 42,
     };
-    return List.generate(count, (i) => first.add(Duration(days: i)));
+    return List.generate(count, (i) =>
+        DateTime(first.year, first.month, first.day + i));
   }
 
   void _navigate(int direction) {
     setState(() {
       _anchor = switch (_mode) {
-        CalendarMode.today => _anchor.add(Duration(days: direction)),
-        CalendarMode.week => _anchor.add(Duration(days: 7 * direction)),
+        CalendarMode.today => DateTime(
+            _anchor.year, _anchor.month, _anchor.day + direction),
+        CalendarMode.week => DateTime(
+            _anchor.year, _anchor.month, _anchor.day + 7 * direction),
         CalendarMode.month =>
           DateTime(_anchor.year, _anchor.month + direction,
               _anchor.day.clamp(1, 28)),
