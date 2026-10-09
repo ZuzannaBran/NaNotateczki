@@ -171,9 +171,15 @@ void main() {
     expect(canvasRect.bottom, closeTo(900, 0.01));
     expect(toolbarRect.top, greaterThanOrEqualTo(canvasRect.top));
     expect(toolbarRect.bottom, lessThan(canvasRect.bottom));
+    final viewport = find.byKey(viewportKey);
+    final page = find.byKey(const ValueKey('notebook-document-transform'));
     expect(
-      tester.getTopLeft(find.byKey(viewportKey)).dy,
-      closeTo(canvasRect.top + 22, 0.01),
+      tester.getTopLeft(viewport).dy,
+      closeTo(canvasRect.top + 94, 0.01),
+    );
+    expect(
+      tester.getTopLeft(page).dy,
+      greaterThan(toolbarRect.bottom),
     );
     expect(
       tester.getTopLeft(overview).dy,
@@ -183,6 +189,30 @@ void main() {
     await tester.tap(find.byTooltip('Highlighter'));
     await tester.pump();
     expect(controller.tool, DrawingTool.highlighter);
+
+    final panStart = tester.getTopLeft(viewport) + const Offset(160, 230);
+    final firstFinger = await tester.createGesture(
+      kind: PointerDeviceKind.touch,
+      pointer: 21,
+    );
+    final secondFinger = await tester.createGesture(
+      kind: PointerDeviceKind.touch,
+      pointer: 22,
+    );
+    await firstFinger.down(panStart);
+    await secondFinger.down(panStart + const Offset(100, 0));
+    await tester.pump();
+    await firstFinger.moveBy(const Offset(0, -170));
+    await tester.pump();
+    await secondFinger.moveBy(const Offset(0, -170));
+    await tester.pump();
+    expect(
+      tester.getTopLeft(page).dy,
+      lessThan(toolbarRect.bottom),
+    );
+    await firstFinger.up();
+    await secondFinger.up();
+    await tester.pump();
 
     await tester.binding.setSurfaceSize(const Size(1200, 420));
     await tester.pump();
