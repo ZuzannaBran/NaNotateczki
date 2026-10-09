@@ -1210,7 +1210,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                                                 Theme.of(context)
                                                                         .brightness ==
                                                                     Brightness.dark
-                                                                ? AppColors.darkPaper
+                                                                ? AppColors.darkCanvas
                                                                 : AppColors.paper,
                                                             boxShadow: const [
                                                               BoxShadow(
@@ -2040,7 +2040,7 @@ class _ProjectMiniMapPainter extends CustomPainter {
       final isCurrentPage = i == currentPageIndex;
 
       final pageFill = Paint()
-        ..color = darkMode ? AppColors.darkPaper : AppColors.paper;
+        ..color = darkMode ? AppColors.darkCanvas : AppColors.paper;
       final pageBorder = Paint()
         ..color = isCurrentPage
             ? (darkMode ? AppColors.darkText : AppColors.inkBlack)
