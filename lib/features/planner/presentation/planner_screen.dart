@@ -74,6 +74,23 @@ class _PlannerScreenState extends State<PlannerScreen> {
     'August', 'September', 'October', 'November', 'December',
   ][month - 1];
 
+  String _weekdayName(int weekday, {bool short = false}) {
+    const days = [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+      'Friday', 'Saturday', 'Sunday',
+    ];
+    final name = days[weekday - DateTime.monday];
+    return short ? name.substring(0, 3) : name;
+  }
+
+  String _dayLabel(DateTime date) {
+    if (_mode == CalendarMode.today) {
+      return '${_weekdayName(date.weekday)} ${date.day} '
+          '${_monthName(date.month)}';
+    }
+    return '${_weekdayName(date.weekday, short: true)} ${date.day}';
+  }
+
   bool _isSameDate(DateTime a, DateTime b) => a.year == b.year &&
       a.month == b.month && a.day == b.day;
 
@@ -297,7 +314,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      '${day.day} ${_mode == CalendarMode.today ? _monthName(day.month) : ''}',
+                      _dayLabel(day),
+                      key: ValueKey(
+                        'planner-day-label-${day.year}-${day.month}-${day.day}',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: compact ? 12 : 15,
                         fontWeight: today ? FontWeight.bold : FontWeight.w500,
