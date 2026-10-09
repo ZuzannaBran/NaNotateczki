@@ -1043,7 +1043,10 @@ class _EditorScreenState extends State<EditorScreen> {
               _insertPosition = insertPosition;
               final minimapPanelHeight = math.min(
                 pageWorldSize.height * 0.5,
-                math.max(180.0, constraints.maxHeight - 24),
+                math.max(
+                  180.0,
+                  constraints.maxHeight - toolbarOffset - 24,
+                ),
               );
               _pageExtent = pageWorldSize.height + _pageGap;
               _syncPageTransformBounds(
