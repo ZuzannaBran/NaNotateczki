@@ -575,8 +575,9 @@ Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
   deklaracja iOS 15 i targetów Runner/RunnerTests. W CI iOS wyłącza SwiftPM,
   wykonuje `pod install` i sprawdza obecność Pods w `Runner.xcworkspace`;
   wymaga potwierdzenia w buildzie symulatora.
-- `ios/Flutter/Debug.xcconfig`, `Release.xcconfig`: dziedziczą config
-  Pods-Runner, aby linker znajdował framework CocoaPods podczas buildów.
+- `ios/Flutter/Debug.xcconfig`, `Release.xcconfig`, `Profile.xcconfig`:
+  każdy tryb Xcode dziedziczy odpowiadający mu config Pods-Runner;
+  profil nie dziedziczy już przypadkowo ustawień Release.
 
 - `windows/CMakeLists.txt`: zgodność generatora pdfx/pdfium z CMake 4; przed
   włączeniem pluginów ustawia `CMAKE_POLICY_VERSION_MINIMUM=3.5` dla
@@ -651,6 +652,12 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `integration_test/document_lifecycle_test.dart`: create/rename/read/delete
   w rzeczywistej bazie danej platformy; działa wyłącznie z flagą
   `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.
+- `test/production/storage_crash_recovery_test.dart`: atomiczne pliki
+  ustawień: częściowe zapisy `.tmp`, odzyskiwanie `.previous`, błąd I/O
+  i ponowny zapis oraz równoległe write'y jednego klucza.
+- `test/production/backup_crash_recovery_test.dart`: symulacje awarii
+  między rename manifestu, błędu dostępu do katalogu stron i przerwania
+  backupu z zachowaniem starego kompletnego snapshotu.
 - `test/production/persistence_roundtrip_test.dart`: rich text z Delta,
   crop i bytes obrazów, dwie strony, dirty-page, równoległe zapisy, backup
   i przywrócenie do nowego SQLite; każdy test ma własny katalog dokumentów
@@ -662,6 +669,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   w `tester.runAsync`, poza strefą `FakeAsync` testu widgetowego.
   Dodatkowe regresje sprawdzają 12-stronicowy eksport PNG oraz PNG/PDF boarda.
 - `android/app/build.gradle.kts` i `android/app/proguard-rules.pro`:
+  Release wymaga prywatnego `android/key.properties` poza CI i jawnym trybem
+  debug-signing; konfiguracja odrzuca niepełne klucze i brak keystore.
   Release uruchamia R8 z wyjątkami wyłącznie dla opcjonalnych modułów
   ML Kit (Chinese/Devanagari/Japanese/Korean). OCR używa tylko
   `TextRecognitionScript.latin`; nie dodawaj nieużywanych modeli

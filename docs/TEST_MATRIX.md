@@ -102,6 +102,10 @@ timing, filesystem and GPU behavior from physical hardware.
 ## Still required before declaring release-level cross-platform coverage
 
 **P0 data integrity and power loss**
+- Automated atomic-write interruption coverage: the test harness simulates
+  `.previous`/`.tmp` crash windows, failed filesystem writes, backup worker
+  cancellation and recovery/retry. These are controlled filesystem faults,
+  **not** proof against physical power loss or hardware write-cache failure.
 - Platform-specific filesystem fault injection: full disk, permissions,
   interrupted fsync, locked database, process killed between write/rename.
 - Race tests: concurrent editor saves, undo/save, ink activity while backup
@@ -293,3 +297,27 @@ items, not the cause of either failure in this run.
   the deprecated Node 20 runtime warning on hosted runners.
 - Render and persistence corrections are test-harness changes, not proof of
   production bugs. Recheck their actual results in the next workflow run.
+
+## Release signing and crash-safety follow-up (9 October 2026)
+
+- Android local publishable Release builds now read private
+  `android/key.properties`: `storeFile`, `storePassword`, `keyAlias`,
+  `keyPassword`. `storeFile` is relative to the `android/` directory or
+  absolute; the keystore and properties are gitignored. Invalid or incomplete
+  credentials fail early. Non-CI Release builds without signing credentials
+  are rejected. The only debug-signed Release exceptions are CI jobs or an
+  explicit developer opt-in `NANOTATECZKI_ALLOW_DEBUG_RELEASE_SIGNING=true`;
+  neither is suitable for distribution. The default application id is still
+  `com.example.program` and must be selected before publishing, with a
+  deliberate plan for compatibility with existing installs.
+- iOS Xcode Profile now inherits `Pods-Runner.profile.xcconfig` through
+  `ios/Flutter/Profile.xcconfig` instead of incorrectly using Release pods
+  configuration. App Store signing still needs a developer team,
+  certificates and provisioning profiles; CI simulator builds do not supply
+  real distribution signing.
+- New tests `storage_crash_recovery_test.dart` and
+  `backup_crash_recovery_test.dart` cover recovery from staged atomic file
+  replacements, stale temporary files, filesystem errors and backup retry.
+  Such test-injected failures do not simulate abrupt machine power removal,
+  directory durability (`fsync`) or disk hardware faults. Hardware recovery
+  tests remain release acceptance criteria.
