@@ -3,6 +3,60 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 class AppTheme {
+  static ThemeData dark() {
+    const foreground = AppColors.darkText;
+    const background = AppColors.darkBackground;
+    const surface = AppColors.darkToolbar;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AppColors.darkActive,
+      brightness: Brightness.dark,
+    ).copyWith(
+      primary: foreground,
+      onPrimary: background,
+      primaryContainer: AppColors.darkActive,
+      onPrimaryContainer: foreground,
+      secondary: foreground,
+      onSecondary: background,
+      secondaryContainer: AppColors.darkActive,
+      onSecondaryContainer: foreground,
+      surface: background,
+      onSurface: foreground,
+      surfaceContainerLowest: surface,
+      surfaceContainerLow: surface,
+      surfaceContainer: AppColors.darkActive,
+      surfaceContainerHigh: AppColors.darkActive,
+      surfaceContainerHighest: AppColors.darkPaper,
+      outline: AppColors.darkOutline,
+      outlineVariant: AppColors.darkOutline,
+    );
+    return ThemeData(
+      brightness: Brightness.dark,
+      fontFamily: 'Georgia',
+      fontFamilyFallback: const ['Times New Roman', 'Noto Serif', 'serif'],
+      colorScheme: scheme,
+      scaffoldBackgroundColor: background,
+      cardColor: AppColors.darkPaper,
+      canvasColor: surface,
+      dividerColor: AppColors.darkOutline,
+      useMaterial3: true,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: surface,
+        foregroundColor: foreground,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
+      sliderTheme: const SliderThemeData(
+        activeTrackColor: foreground,
+        inactiveTrackColor: AppColors.darkActive,
+        thumbColor: foreground,
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: foreground,
+        linearTrackColor: AppColors.darkActive,
+      ),
+    );
+  }
+
   static ThemeData light({
     AppAccentColor accentColor = AppAccentColor.softBubblegum,
   }) {
