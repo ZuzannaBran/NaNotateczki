@@ -55,7 +55,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (679 linii)
+### `lib/app/app_scope.dart` (629 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -63,11 +63,14 @@ anulowalne żądanie zamknięcia aplikacji: gdy rysik ma aktywny kontakt,
 edytor, repozytorium lub backup ma pracę w toku, odrzuca pierwsze wyjście,
 pokazuje blokujący spinner, czeka na zakończenie stroke'a, wymusza zapis
 edytora → opróżnienie kolejki SQLite → końcowy backup i dopiero potem żąda
-obowiązkowego zamknięcia. Scheduler w trybie exit nie czeka na idle
-rysika i nie porzuca zmian po błędzie.
+obowiązkowego zamknięcia. Zwykły backup nie wyświetla wskaźnika
+postępu, ale podczas zamykania blokujący spinner nadal chroni zapis.
+Scheduler w trybie exit nie czeka na idle rysika i nie porzuca zmian
+po błędzie.
 
 - 24: `AppScope`; 31: `_AppScopeState`; 73: `didRequestAppExit`.
-- 302: `_FinishingExitOverlay`; 410: `_BackupScheduler`;
+- 226: `_ExitGuardOverlay`; 252: `_FinishingExitOverlay`;
+  360: `_BackupScheduler`;
   606: `flushForExit`.
 
 ## 3. Core
@@ -283,9 +286,10 @@ i zachowuje obrazy inline.
   utrwalenie eraser-stroke.
 - `_toolFromIndex` i `_toolToIndex` muszą pozostać symetryczne.
 
-### `lib/features/notebook/presentation/notebook_screen.dart` (24 linie)
+### `lib/features/notebook/presentation/notebook_screen.dart` (26 linii)
 
-Wybiera pusty stan albo właściwy `EditorScreen`.
+Wybiera pusty stan albo właściwy `EditorScreen`; przekazuje flagę
+widoczności wspólnego paska narzędzi.
 
 - 8: `NotebookScreen`.
 
@@ -308,25 +312,20 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
 - 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1045 linie)
+### `lib/features/library/presentation/library_screen.dart` (1085 linii)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
-zwijać w całości i zmieniać jego szerokość. Pionowy separator uchwytu ma 1 px, ten sam kolor co linia pod toolbarami i leży na prawej krawędzi, dzięki czemu linie stykają się.
+zwijać w całości i zmieniać jego szerokość. Pod strzałką panelu folderów
+jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka,
+a jego stan pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px, ten sam kolor co linia pod toolbarami i leży na prawej krawędzi, dzięki czemu linie stykają się.
 
-- 16: `LibraryScreen`;
-  23:
-  `_LibraryScreenState`;
-  523:
-  `_LibraryTreePane`;
-  749:
-  `_FolderTreeRow`;
-  859:
-  `_LibraryTreeItemRow`;
-  949:
-  `_LibraryWorkspace`.
+- 16: `LibraryScreen`; 23: `_LibraryScreenState`;
+  540: `_LibraryTreePane`; 767: `_FolderTreeRow`;
+  877: `_LibraryTreeItemRow`; 968: `_LibraryWorkspace`;
+  1034: `_LeftZoneToggleTab` — strzałki folderów i toolbaru.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -392,11 +391,11 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2317 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2193 linie)
 
-Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
-kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
-panel folderów. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, minimapa,
+Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; wspólny
+zaokrąglony toolbar i pasek tekstowy są ukrywane flagą `showToolbar`;
+gdy widoczne, są oddzielone od notatek separatorem. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, minimapa,
 wspólne komendy edytora. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma po 10 px wolnej przestrzeni po lewej i prawej stronie; poziomy
@@ -417,7 +416,7 @@ pozostaje tylko pionowo.
 - 1007: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 1033: główny `build`; pasek tekstu jest renderowany na podstawie
+- 968: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
 - 1535: `_PageViewportClipper`; 1605: `_PageFramePainter`;
@@ -448,19 +447,22 @@ błędów, integralności i wydajności.
 - `lib/features/editor/presentation/widgets/page_background_paint.dart` (123):
   render i preview tła. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (889):
-  główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu; tło paska używa jasnej neutralnej powierzchni #FBFBFB;
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (899):
+  główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
+  jasna neutralna powierzchnia #FBFBFB w zaokrąglonej ramce z lewym
+  marginesem odsłaniającym strzałkę zwijania;
   ikony są lekkie, obrysowe i wizualnie dopasowane do typografii Georgia.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
   10: `EditorToolbar`; 181: dialog tła; 316: selektor gumki;
   382: selektor kształtu; 782: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (565):
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (575):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
   underline, strike, font, rozmiar, kolor, wyrównanie, reset stylu i usunięcie.
   Listy oraz formatowanie tylko zaznaczonego fragmentu są celowo pominięte,
   ponieważ obecny `EditableText` nie renderuje ich jako rich-text.
+  Pasek ma analogiczną zaokrągloną ramkę i wspólną widoczność.
   9: `TextEditToolbar`; 43: `build`.
 
 - `lib/features/editor/presentation/interaction/object_transform_engine.dart` (362):
@@ -551,7 +553,7 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (865 linii)
+### `lib/features/board/presentation/board_screen.dart` (867 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -560,14 +562,14 @@ ignoruje pointery nawigacyjne, trackpad i scroll, a kontroler blokuje zmianę
 podczas move/resize, aby zmiany `contentBounds` nie przesuwały lokalnego
 układu współrzędnych. Po zakończeniu gestu granice odświeżają się.
 Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
-`QuillController`. Pomocnicze panele UI dziedziczą aktywną paletę.
+`QuillController`. Główny toolbar i pasek tekstu respektują `showToolbar`. Pomocnicze panele UI dziedziczą aktywną paletę.
 
 - 29: `BoardScreen`; 36: `_BoardScreenState`.
 - 57: `_buildBoardRect`; 67–388: obsługa pointerów i viewportu.
-- 721: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
+- 726: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
 - import/eksport i skróty delegują do `EditorCommands`; busy overlay pozostaje ekranowy; główny `build` buduje tylko geometrię boarda.
-- 759: `_BoardPaintProbe`; 776: `_RenderBoardPaintProbe`;
-  799: `_BoardZoomControls`.
+- 762: `_BoardPaintProbe`; 779: `_RenderBoardPaintProbe`;
+  802: `_BoardZoomControls`.
 
 ## 10. Platformy, web i testy
 
@@ -605,7 +607,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (112)
+- `test/library_screen_responsive_layout_test.dart` (183):
+  szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
+  boarda/notebooka z kontrolką umieszczoną pod strzałką panelu
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
