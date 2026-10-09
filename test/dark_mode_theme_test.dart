@@ -165,10 +165,14 @@ void main() {
           .map((segment) => segment.value),
       [ToolbarPlacement.top, ToolbarPlacement.right],
     );
-    await tester.tap(find.descendant(of: boardFinder, matching: find.text('Left')));
+    await tester.tap(
+      find.descendant(of: boardFinder, matching: find.text('Left')),
+    );
     await tester.pump();
     expect(preferences.boardToolbarPlacement, ToolbarPlacement.left);
-    await tester.tap(find.descendant(of: boardFinder, matching: find.text('Right')));
+    await tester.tap(
+      find.descendant(of: boardFinder, matching: find.text('Right')),
+    );
     await tester.pump();
     expect(preferences.boardToolbarPlacement, ToolbarPlacement.right);
     await tester.tap(
