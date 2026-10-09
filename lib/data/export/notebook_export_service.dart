@@ -392,7 +392,7 @@ class NotebookExportService {
     canvas.drawRect(
       Offset.zero & size,
       Paint()
-        ..color = darkMode ? AppColors.darkPaper : AppColors.paper,
+        ..color = darkMode ? AppColors.darkCanvas : AppColors.paper,
     );
     if (settings.style == PageBackgroundStyle.blank) {
       return;
