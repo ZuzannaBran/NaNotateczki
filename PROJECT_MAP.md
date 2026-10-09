@@ -330,7 +330,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
 - 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1199 linii)
+### `lib/features/library/presentation/library_screen.dart` (1196 linii)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 lista folderów i plików wykorzystuje ustawioną czułość dotyku.
@@ -349,7 +349,9 @@ Stan toolbaru pozostaje zachowany przy przełączaniu dokumentów. Pionowy separ
 Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
 dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej
 krawędzi panelu, jego koloru i animacji 180 ms. Lewy bok menu jest prosty,
-zaokrąglone (promień 12 px) są wyłącznie prawe narożniki.
+zaokrąglone (promień 12 px) są wyłącznie prawe narożniki. Menu
+nachodzi na 12-pikselowy uchwyt zmiany szerokości (bez zmiany funkcji
+uchwytu poza menu), nie ma cienia ani linii na styku z panelem.
 Etykiety menu mają taką samą czcionkę i rozmiar 14 px jak nazwy dokumentów;
 opcje dodawania nie mają ikonek.
 
@@ -357,8 +359,8 @@ opcje dodawania nie mają ikonek.
   545: `_CreateMenuButton`; 589: `_LibraryTreePane`;
   788: `_FolderTreeRow`; 879: `_LibraryTreeItemRow`;
   951: `_sidebarMenuShape`; 958: `_showSidebarMenu`;
-  1011: `_TreeRowActions`; 1081: `_LibraryWorkspace`;
-  1147: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
+  1008: `_TreeRowActions`; 1078: `_LibraryWorkspace`;
+  1144: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -700,7 +702,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (570):
+- `test/library_screen_responsive_layout_test.dart` (574):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
@@ -709,7 +711,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   przewijania plików bez restartu; geometria, kolor i obsługa menu
   folderu, notebooka oraz boarda, a także menu dodawania (3 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
-  czcionki menu z nazwami dokumentów oraz brak ikon w menu dodawania
+  czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
+  brak szczeliny i cienia na styku menu z panelem
 - `test/touch_navigation_sensitivity_test.dart` (83):
   granice czułości i porównanie dystansów scrolla przy gestach palcem.
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
