@@ -15,6 +15,8 @@ import 'package:flutter/gestures.dart'
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
 import '../../notebook/domain/drawing_tool.dart';
@@ -87,6 +89,11 @@ class _EditorScreenState extends State<EditorScreen> {
   Offset? _touchContextMenuStart;
 
   double get _effectivePageScale => _pageScale * _responsivePageScale;
+
+  double get _touchNavigationGain =>
+      context.read<AppPreferencesController?>()
+          ?.touchNavigationSensitivity ??
+      1.0;
 
   double get _firstPageInset =>
       widget.showToolbar ? _mainToolbarClearance : 0.0;
@@ -285,7 +292,7 @@ class _EditorScreenState extends State<EditorScreen> {
       final pendingPosition = _pendingNavigationPosition;
       if (pendingPosition != null &&
           (event.localPosition - pendingPosition).distance >
-              _inkNavigationTouchSlop) {
+              _inkNavigationTouchSlop / _touchNavigationGain) {
         _activePointers[event.pointer] = event.localPosition;
         _pendingNavigationPointer = null;
         _pendingNavigationPosition = null;
@@ -315,7 +322,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _touchLastDistance = 1.0;
         _applyPageTransform(
           scaleDelta: 1.0,
-          panDelta: panDelta * _touchPanSensitivity,
+          panDelta: panDelta * _touchPanSensitivity * _touchNavigationGain,
           focalPoint: event.localPosition,
           docWorldSize: docWorldSize,
           viewportSize: viewportSize,
@@ -348,7 +355,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
     _applyPageTransform(
       scaleDelta: scaleDelta,
-      panDelta: panDelta * _touchPanSensitivity,
+      panDelta: panDelta * _touchPanSensitivity * _touchNavigationGain,
       focalPoint: focal,
       docWorldSize: docWorldSize,
       viewportSize: viewportSize,
@@ -979,6 +986,10 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
+    final touchNavigationGain = context
+            .watch<AppPreferencesController?>()
+            ?.touchNavigationSensitivity ??
+        1.0;
     final useWideTitleInset = MediaQuery.sizeOf(context).width >= 600;
     final activeTextBlockId = controller.activeTextBlockId;
     final activeTextBlock = activeTextBlockId == null
@@ -1099,7 +1110,9 @@ class _EditorScreenState extends State<EditorScreen> {
                                 _isViewportNavigating ||
                                 _pageScale > 1.001)
                             ? const NeverScrollableScrollPhysics()
-                            : const ClampingScrollPhysics(),
+                            : TouchNavigationScrollPhysics(
+                                sensitivity: touchNavigationGain,
+                              ),
                         padding: const EdgeInsets.fromLTRB(
                           _leftMargin,
                           _topBottomPadding,
