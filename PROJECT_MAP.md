@@ -461,11 +461,13 @@ pozostaje tylko pionowo.
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (619 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (618 linii)
 
-Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual z
-wyraźnym obramowaniem oraz kontrastowym zaznaczeniem opcji w obu motywach,
-ustawienia tła i podgląd logów błędów, integralności i wydajności.
+Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
+wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
+oraz `darkActive`/`darkToolbar` w ciemnym. Zaznaczona opcja ma
+mocniejszą ramkę, bez czarnego lub białego tła. Pozostałe sekcje
+obsługują ustawienia tła i podgląd logów diagnostycznych.
 
 - 16:
   `EditorSettingsScreen`;
@@ -699,7 +701,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (199): paleta dark, odwracanie jasności
+- `test/dark_mode_theme_test.dart` (219): paleta dark, odwracanie jasności
   wszystkich barw HSL, alfa, zachowanie odcieni i przełącznik Visual.
 
 
