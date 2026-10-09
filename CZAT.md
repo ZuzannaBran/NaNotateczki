@@ -65,13 +65,13 @@ Jeśli narzędzia lub zależności są niedostępne, nie pomijaj tego po cichu.
 Opisz ograniczenie w odpowiedzi i komunikacie commita nie oznaczaj testów
 jako zaliczone.
 
-## 5. Commit i push na `dev`
+## 5. Commit i push na `dev_ui`
 
 Każdy ukończony zestaw zmian wykonany przez czat musi trafić w osobnym
-commicie na gałąź `dev`.
+commicie na gałąź `dev_ui`.
 
-1. Przed pracą upewnij się, że działasz na `dev`, i zsynchronizuj ją przez
-   `git pull --ff-only origin dev`, o ile połączenie z GitHubem jest
+1. Przed pracą upewnij się, że działasz na `dev_ui`, i zsynchronizuj ją przez
+   `git pull --ff-only origin dev_ui`, o ile połączenie z GitHubem jest
    dostępne.
 2. Po edycji przejrzyj `git diff` i wynik weryfikacji.
 3. Dodaj do commita wyłącznie własne pliki, wskazując je jawnie w `git add`.
@@ -82,7 +82,7 @@ commicie na gałąź `dev`.
 chat: <krótki opis zmiany>
 ```
 
-5. Wykonaj `git push origin dev` i sprawdź, czy operacja się powiodła.
+5. Wykonaj `git push origin dev_ui` i sprawdź, czy operacja się powiodła.
 
 Nie używaj `--force`, nie przepisuj historii i nie usuwaj cudzych zmian. Jeśli
 brakuje uprawnień, połączenia albo synchronizacja wymagałaby merge'a lub
