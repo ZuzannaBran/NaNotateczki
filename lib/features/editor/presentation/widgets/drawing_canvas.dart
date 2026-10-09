@@ -485,6 +485,7 @@ void _drawSavedStroke(
   InkStroke stroke,
   Offset translation, {
   required _StaticInkLod lod,
+  required bool darkMode,
   bool isSelected = false,
   Offset delta = Offset.zero,
 }) {
@@ -505,7 +506,10 @@ void _drawSavedStroke(
     ..strokeJoin = StrokeJoin.round
     ..style = PaintingStyle.stroke
     ..strokeWidth = stroke.width
-    ..color = _savedStrokeColor(stroke.color, stroke.tool);
+    ..color = _savedStrokeColor(
+      AppColors.displayInkColor(stroke.color, darkMode: darkMode),
+      stroke.tool,
+    );
 
   canvas.save();
   canvas.translate(effectiveTranslation.dx, effectiveTranslation.dy);
@@ -1020,6 +1024,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
                         child: CustomPaint(
                           painter: _InkPainter(
                             perfLog: _inkPerf,
+                            darkMode:
+                                Theme.of(context).brightness == Brightness.dark,
                             strokes: page.inkStrokes,
                             worldOrigin: widget.worldOrigin,
                             lod: _staticInkLodForScale(widget.effectiveScale),
@@ -1039,6 +1045,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
                             perfLog: _inkPerf,
                             repaint: _inkRepaint,
                             currentPoints: _currentPoints,
+                            darkMode:
+                                Theme.of(context).brightness == Brightness.dark,
                             currentColor: controller.inkColor,
                             currentWidth: currentWidth,
                             currentTool: activeTool,
@@ -2407,6 +2415,8 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
                 perfLog: _inkPerf,
                 repaint: _inkRepaint,
                 currentPoints: _currentPoints,
+                darkMode:
+                    Theme.of(context).brightness == Brightness.dark,
                 currentColor: controller.inkColor,
                 currentWidth: currentWidth,
                 currentTool: activeTool,
@@ -3773,6 +3783,7 @@ class _InkPainter extends CustomPainter {
   _InkPainter({
     required this.perfLog,
     required this.strokes,
+    required this.darkMode,
     required this.worldOrigin,
     required this.lod,
     required this.selectedStrokeIds,
@@ -3782,6 +3793,7 @@ class _InkPainter extends CustomPainter {
 
   final _InkPerfLog perfLog;
   final List<InkStroke> strokes;
+  final bool darkMode;
   final Offset worldOrigin;
   final _StaticInkLod lod;
   final Set<String> selectedStrokeIds;
@@ -3806,6 +3818,7 @@ class _InkPainter extends CustomPainter {
           stroke,
           -worldOrigin,
           lod: lod,
+          darkMode: darkMode,
           isSelected: isSelected,
           delta: isSelected ? selectionDelta : Offset.zero,
         );
@@ -3817,7 +3830,8 @@ class _InkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _InkPainter oldDelegate) {
-    return oldDelegate.strokes != strokes ||
+    return oldDelegate.darkMode != darkMode ||
+        oldDelegate.strokes != strokes ||
         !setEquals(oldDelegate.selectedStrokeIds, selectedStrokeIds) ||
         oldDelegate.selectionDelta != selectionDelta ||
         oldDelegate.worldOrigin != worldOrigin ||
@@ -3831,6 +3845,7 @@ class _InkOverlayPainter extends CustomPainter {
     required Listenable repaint,
     required this.currentPoints,
     required this.currentColor,
+    required this.darkMode,
     required this.currentWidth,
     required this.currentTool,
     required this.worldOrigin,
@@ -3848,6 +3863,7 @@ class _InkOverlayPainter extends CustomPainter {
   final _InkPerfLog perfLog;
   final List<InkPoint> currentPoints;
   final Color currentColor;
+  final bool darkMode;
   final double currentWidth;
   final DrawingTool currentTool;
   final Offset worldOrigin;
@@ -3871,7 +3887,7 @@ class _InkOverlayPainter extends CustomPainter {
       _drawStroke(
         canvas,
         stroke.points,
-        stroke.color,
+        AppColors.displayInkColor(stroke.color, darkMode: darkMode),
         stroke.width,
         stroke.tool,
       );
@@ -3880,7 +3896,7 @@ class _InkOverlayPainter extends CustomPainter {
       _drawStroke(
         canvas,
         currentPoints,
-        currentColor,
+        AppColors.displayInkColor(currentColor, darkMode: darkMode),
         currentWidth,
         currentTool,
       );
@@ -3888,7 +3904,10 @@ class _InkOverlayPainter extends CustomPainter {
 
     if (drawActiveContent && snapHintStart != null && snapHintEnd != null) {
       final paint = Paint()
-        ..color = currentColor.withValues(alpha: 0.35)
+        ..color = AppColors.displayInkColor(
+          currentColor,
+          darkMode: darkMode,
+        ).withValues(alpha: 0.35)
         ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.stroke
         ..strokeWidth = currentWidth + 1.5;
@@ -4017,7 +4036,9 @@ class _InkOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = width;
     if (tool == DrawingTool.eraserBrush) {
-      paint.color = _canvasBackgroundColor;
+      paint.color = darkMode
+          ? AppColors.darkPaper
+          : _canvasBackgroundColor;
     } else {
       paint.color = _toolColor(color, tool);
     }
@@ -4047,7 +4068,8 @@ class _InkOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _InkOverlayPainter oldDelegate) {
-    return oldDelegate.currentColor != currentColor ||
+    return oldDelegate.darkMode != darkMode ||
+        oldDelegate.currentColor != currentColor ||
         oldDelegate.currentWidth != currentWidth ||
         oldDelegate.currentTool != currentTool ||
         oldDelegate.worldOrigin != worldOrigin ||
@@ -4094,6 +4116,7 @@ class _InkPageLayer extends StatelessWidget {
         return CustomPaint(
           painter: _PageInkPainter(
             perfLog: perfLog,
+            darkMode: Theme.of(context).brightness == Brightness.dark,
             page: page,
             lod: lod,
             selectedStrokeIds: selectedStrokeIds,
@@ -4111,6 +4134,7 @@ class _PageInkPainter extends CustomPainter {
   _PageInkPainter({
     required this.perfLog,
     required this.page,
+    required this.darkMode,
     required this.lod,
     required this.selectedStrokeIds,
     required this.selectionDelta,
@@ -4119,6 +4143,7 @@ class _PageInkPainter extends CustomPainter {
 
   final _InkPerfLog perfLog;
   final NotePage page;
+  final bool darkMode;
   final _StaticInkLod lod;
   final Set<String> selectedStrokeIds;
   final Offset selectionDelta;
@@ -4142,6 +4167,7 @@ class _PageInkPainter extends CustomPainter {
           stroke,
           Offset.zero,
           lod: lod,
+          darkMode: darkMode,
           isSelected: isSelected,
           delta: isSelected ? selectionDelta : Offset.zero,
         );
@@ -4153,7 +4179,8 @@ class _PageInkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _PageInkPainter oldDelegate) {
-    return oldDelegate.page != page ||
+    return oldDelegate.darkMode != darkMode ||
+        oldDelegate.page != page ||
         oldDelegate.lod != lod ||
         !setEquals(oldDelegate.selectedStrokeIds, selectedStrokeIds) ||
         oldDelegate.selectionDelta != selectionDelta;
