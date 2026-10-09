@@ -161,19 +161,47 @@ void main() {
     );
     final toolbarToggle = find.byKey(const ValueKey('editor-toolbar-toggle'));
     expect(
-      tester.getTopLeft(toolbarToggle).dy,
-      greaterThan(tester.getBottomLeft(navigationToggle).dy),
+      tester.getTopLeft(navigationToggle).dx,
+      tester.getTopLeft(toolbarToggle).dx,
+    );
+    expect(tester.getCenter(navigationToggle).dy, closeTo(29, 0.01));
+    expect(tester.getCenter(toolbarToggle).dy, closeTo(92, 0.01));
+    expect(
+      find.descendant(
+        of: toolbarToggle,
+        matching: find.byIcon(Icons.chevron_left),
+      ),
+      findsOneWidget,
     );
 
     await tester.tap(find.byTooltip('Hide projects'));
     await tester.pump();
     expect(find.byTooltip('Show projects'), findsOneWidget);
     expect(find.byTooltip('Hide toolbar'), findsOneWidget);
+    expect(tester.getTopLeft(navigationToggle).dx, 0);
+    expect(tester.getTopLeft(toolbarToggle).dx, 0);
+    expect(tester.getCenter(navigationToggle).dy, closeTo(29, 0.01));
+    expect(tester.getCenter(toolbarToggle).dy, closeTo(92, 0.01));
+    expect(
+      find.descendant(
+        of: toolbarToggle,
+        matching: find.byIcon(Icons.chevron_left),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('Hide toolbar'));
     await tester.pump();
     expect(find.byType(EditorToolbar), findsNothing);
     expect(find.byTooltip('Show toolbar'), findsOneWidget);
+    expect(tester.getCenter(toolbarToggle).dy, closeTo(92, 0.01));
+    expect(
+      find.descendant(
+        of: toolbarToggle,
+        matching: find.byIcon(Icons.chevron_right),
+      ),
+      findsOneWidget,
+    );
 
     await controller.selectItem(notebook.uid);
     await tester.pump();
@@ -182,6 +210,13 @@ void main() {
     await tester.tap(find.byTooltip('Show toolbar'));
     await tester.pump();
     expect(find.byType(EditorToolbar), findsOneWidget);
+    expect(
+      find.descendant(
+        of: toolbarToggle,
+        matching: find.byIcon(Icons.chevron_left),
+      ),
+      findsOneWidget,
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
