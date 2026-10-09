@@ -353,9 +353,10 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 - `lib/features/planner/presentation/study_timer_widgets.dart`:
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i oceny sesji.
 - `lib/features/planner/presentation/study_action_theme.dart`:
-  `StudyActionTheme`, `StudyActionStyles`; spójny, kontrastowy wygląd
-  aktywnych przycisków (główne ciemne, drugorzędne beżowe, tekst ciemny),
-  osobne zaznaczenie Today/Week/Month bez zmian motywu globalnego.
+  `StudyActionTheme`, `StudyActionStyles`; czytelny, ale subtelny beż
+  tylko dla wyróżnianych akcji; pozostałe przyciski i ikony bez ciemnego
+  wypełnienia, ciemny tekst i jasne zaznaczenie Today/Week/Month.
+  Motyw globalny pozostaje bez zmian.
 - `lib/features/planner/presentation/planner_screen.dart`:
   `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
   tworzenie, edycja, usuwanie i historia.
