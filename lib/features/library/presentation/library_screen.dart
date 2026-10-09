@@ -11,6 +11,8 @@ import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/presentation/notebook_screen.dart';
+import '../../planner/presentation/study_timer_widgets.dart';
+import '../../planner/state/study_planner_controller.dart';
 import 'library_controller.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -37,6 +39,62 @@ class _LibraryScreenState extends State<LibraryScreen> {
   bool _showEditorToolbar = true;
   double _navigationPaneWidth = 320;
   bool _isShowingCorruptRecoveryDialog = false;
+  StudyPlannerController? _studyPlanner;
+  int _lastStudyNotice = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final planner = context.read<StudyPlannerController>();
+    if (!identical(_studyPlanner, planner)) {
+      _studyPlanner?.removeListener(_onStudyNotice);
+      _studyPlanner = planner;
+      _lastStudyNotice = planner.noticeRevision;
+      planner.addListener(_onStudyNotice);
+    }
+  }
+
+  @override
+  void dispose() {
+    _studyPlanner?.removeListener(_onStudyNotice);
+    super.dispose();
+  }
+
+  void _onStudyNotice() {
+    final planner = _studyPlanner;
+    if (planner == null || planner.noticeRevision == _lastStudyNotice) {
+      return;
+    }
+    _lastStudyNotice = planner.noticeRevision;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final upcoming = planner.upcoming;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 12),
+          content: Text(planner.notice ?? "Great job! Time's up."),
+          action: SnackBarAction(
+            label: upcoming.isNotEmpty ? 'Start next' : 'New timer',
+            onPressed: () {
+              if (upcoming.isNotEmpty) {
+                if (!planner.start(upcoming.first.id)) {
+                  return;
+                }
+              } else {
+                showStudySessionEditor(context, startAfterSave: true);
+              }
+            },
+          ),
+        ),
+      );
+      if (planner.pendingReviews.isNotEmpty && planner.active == null) {
+        showStudyRating(context, planner.pendingReviews.last);
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -197,6 +255,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             child: _LibraryWorkspace(
                               item: selectedItem,
                               showToolbar: _showEditorToolbar,
+                              showCompactTimer: !_showLeftNavigation,
                             ),
                           ),
                         ],
@@ -642,6 +701,12 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                     ],
                   ),
           ),
+          SizedBox(
+            height: math.min(360, MediaQuery.sizeOf(context).height * 0.42),
+            child: const SingleChildScrollView(
+              child: StudyTimerCard(),
+            ),
+          ),
         ],
       ),
     );
@@ -969,10 +1034,12 @@ class _LibraryWorkspace extends StatelessWidget {
   const _LibraryWorkspace({
     required this.item,
     required this.showToolbar,
+    required this.showCompactTimer,
   });
 
   final Notebook? item;
   final bool showToolbar;
+  final bool showCompactTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -993,8 +1060,14 @@ class _LibraryWorkspace extends StatelessWidget {
       key: ValueKey(item!.uid),
       create: (_) => EditorController(repository: repository, notebook: item!),
       child: isBoard
-          ? BoardScreen(showToolbar: showToolbar)
-          : NotebookScreen(showToolbar: showToolbar),
+          ? BoardScreen(
+              showToolbar: showToolbar,
+              showCompactTimer: showCompactTimer,
+            )
+          : NotebookScreen(
+              showToolbar: showToolbar,
+              showCompactTimer: showCompactTimer,
+            ),
     );
   }
 }
