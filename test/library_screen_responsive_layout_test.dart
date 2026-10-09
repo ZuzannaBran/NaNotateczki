@@ -8,9 +8,12 @@ import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/editor/presentation/widgets/editor_toolbar.dart';
+import 'package:program/features/editor/presentation/widgets/text_edit_toolbar.dart';
+import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/text_block.dart';
 
 void main() {
   testWidgets('library locks wide layout below editor margin breakpoint', (
@@ -144,14 +147,14 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('NaNotateczki Projects'), findsOneWidget);
+    expect(find.text('Projects'), findsOneWidget);
     expect(find.byType(EditorToolbar), findsOneWidget);
     final panel = tester.widget<Container>(
       find.byKey(const ValueKey('editor-toolbar-panel')),
     );
     expect(
       (panel.decoration as BoxDecoration).borderRadius,
-      BorderRadius.circular(14),
+      BorderRadius.circular(999),
     );
     final navigationToggle = find.byKey(
       const ValueKey('library-navigation-toggle'),
@@ -183,6 +186,82 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     preferences.dispose();
+    await database.close();
+  });
+
+  testWidgets('toolbars shrink to content, center and scroll when narrow', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1600, 750));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final controller = EditorController(
+      repository: repository,
+      notebook: notebook,
+    );
+    final block = TextBlock(
+      id: 'test-text',
+      text: 'Hello',
+      position: Offset.zero,
+      fontSize: 18,
+      color: Colors.black,
+      width: 200,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              EditorToolbar(
+                controller: controller,
+                onInsertPressed: () {},
+                onExportSelected: (_) {},
+              ),
+              TextEditToolbar(editorController: controller, block: block),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final mainPanel = find.byKey(const ValueKey('editor-toolbar-panel'));
+    final textPanel = find.byKey(const ValueKey('text-toolbar-panel'));
+    for (final panel in [mainPanel, textPanel]) {
+      final rect = tester.getRect(panel);
+      expect(rect.width, lessThan(1600 - 88));
+      expect(rect.center.dx, closeTo(800, 0.01));
+      expect(
+        (tester.widget<Container>(panel).decoration as BoxDecoration)
+            .borderRadius,
+        BorderRadius.circular(999),
+      );
+    }
+
+    await tester.binding.setSurfaceSize(const Size(560, 750));
+    await tester.pump();
+
+    for (final panel in [mainPanel, textPanel]) {
+      final rect = tester.getRect(panel);
+      expect(rect.width, closeTo(560 - 88, 0.01));
+      expect(rect.center.dx, closeTo(280, 0.01));
+      final scroller = find.descendant(
+        of: panel,
+        matching: find.byType(Scrollable),
+      );
+      expect(scroller, findsOneWidget);
+      expect(
+        tester.state<ScrollableState>(scroller).position.maxScrollExtent,
+        greaterThan(0),
+      );
+    }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
     await database.close();
   });
 }
