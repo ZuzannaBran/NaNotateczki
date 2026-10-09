@@ -40,6 +40,13 @@ void main() {
       AppColors.darkBackground,
     );
     expect(AppColors.displayInkColor(blue, darkMode: true), blue);
+    expect(
+      AppColors.displayInkColor(
+        const Color(0xFF1E2A40),
+        darkMode: true,
+      ),
+      AppColors.darkText,
+    );
   });
 
   test('dark mode is initially off for existing preferences', () {
