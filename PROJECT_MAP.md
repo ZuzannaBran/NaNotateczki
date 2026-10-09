@@ -397,11 +397,16 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2186 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2206 linii)
 
-Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; wspólny
-zaokrąglony toolbar i pasek tekstowy są ukrywane flagą `showToolbar`;
-pod paskiem nie ma osobnego separatora. Cały viewport pod toolbarami, obejmujący overview i strony notesu, ma ciemniejsze neutralne tło #E6E6E6; nagłówek, toolbary i panel folderów zachowują normalne tło motywu. Viewport, wirtualizowane strony, canvasy, minimapa,
+Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
+toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
+canvasem, zamiast zajmować jego wysokość. `showToolbar` steruje
+widocznością nakładek; strony mogą przesuwać się pod nimi.
+Minimapa i wskaźnik zoomu zachowują odstęp od widocznych pasków,
+a wysokość minimapy jest ograniczona dostępnej przestrzeni.
+Viewport obejmujący overview i strony notesu ma tło #E6E6E6;
+nagłówek, toolbary i panel folderów używają zwykłego tła motywu. Viewport, wirtualizowane strony, canvasy, minimapa,
 wspólne komendy edytora. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma po 10 px wolnej przestrzeni po lewej i prawej stronie; poziomy
@@ -425,8 +430,8 @@ pozostaje tylko pionowo.
 - 968: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1414: `_PageViewportClipper`; 1472: `_PageFramePainter`;
-  minimapa zaczyna się przy 1579 i renderuje wyłącznie zwykły ink.
+- 1434: `_PageViewportClipper`; 1492: `_PageFramePainter`;
+  minimapa zaczyna się przy 1599 i renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -633,7 +638,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
   brak mutacji źródła oraz zgodność rozmiaru segmentów z zoomem
-- `test/editor_screen_responsive_layout_test.dart` (196)
+- `test/editor_screen_responsive_layout_test.dart` (289):
+  dodatkowo pełna wysokość notebookowego canvasa pod pływającym toolbarem,
+  niezmienny viewport przy chowaniu paska, minimapa na krótkim ekranie
+  oraz interaktywność kontrolek ponad canvasem
 - `test/page_overlay_text_gestures_test.dart` (317): sprawdza blokowy
   toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
