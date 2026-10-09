@@ -60,20 +60,14 @@ Notebook _notebook(List<NotePage> pages) => Notebook(
 );
 
 void _verifyPng(Uint8List bytes) {
-  expect(
-    bytes.take(8).toList(),
-    [137, 80, 78, 71, 13, 10, 26, 10],
-  );
+  expect(bytes.take(8).toList(), [137, 80, 78, 71, 13, 10, 26, 10]);
   expect(bytes.length, greaterThan(70));
   final header = ByteData.sublistView(bytes);
   expect(header.getUint32(16), 160);
   expect(header.getUint32(20), 120);
 }
 
-Future<T> _render<T>(
-  WidgetTester tester,
-  Future<T> Function() render,
-) async {
+Future<T> _render<T>(WidgetTester tester, Future<T> Function() render) async {
   final result = await tester.runAsync(render);
   if (result == null) {
     throw TestFailure('Production export rendering failed.');
@@ -84,8 +78,9 @@ Future<T> _render<T>(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('exported PNGs have valid signatures and expected dimensions',
-      (tester) async {
+  testWidgets('exported PNGs have valid signatures and expected dimensions', (
+    tester,
+  ) async {
     final pngs = await _render(
       tester,
       () => NotebookExportService.renderPngPagesForTest(
@@ -100,8 +95,9 @@ void main() {
     expect(pngs[0], isNot(equals(pngs[1])));
   });
 
-  testWidgets('ink and formatted text are not lost during rendering',
-      (tester) async {
+  testWidgets('ink and formatted text are not lost during rendering', (
+    tester,
+  ) async {
     final rendered = await _render(tester, () async {
       final blank = (await NotebookExportService.renderPngPagesForTest(
         _notebook([_page('baseline')]),
@@ -122,15 +118,13 @@ void main() {
     expect(rendered[2], isNot(equals(rendered[1])));
   });
 
-  testWidgets('PDF export contains a valid document with two pages',
-      (tester) async {
+  testWidgets('PDF export contains a valid document with two pages', (
+    tester,
+  ) async {
     final pdf = await _render(
       tester,
       () => NotebookExportService.renderPdfBytesForTest(
-        _notebook([
-          _page('first', draw: true),
-          _page('second', text: true),
-        ]),
+        _notebook([_page('first', draw: true), _page('second', text: true)]),
         pageSize: _pageSize,
         background: const PageBackgroundSettings(
           style: PageBackgroundStyle.grid,
@@ -140,13 +134,11 @@ void main() {
     );
 
     expect(latin1.decode(pdf.take(5).toList()), '%PDF-');
-    expect(latin1.decode(pdf.skip(pdf.length - 7).toList()),
-        contains('%%EOF'));
+    expect(latin1.decode(pdf.skip(pdf.length - 7).toList()), contains('%%EOF'));
     expect(pdf.length, greaterThan(600));
   });
 
-  testWidgets('multi-page PNG export preserves page count',
-      (tester) async {
+  testWidgets('multi-page PNG export preserves page count', (tester) async {
     final pages = [
       for (var i = 0; i < 12; i++)
         _page('page-$i', draw: i.isEven, text: i.isOdd),
@@ -186,8 +178,9 @@ void main() {
     expect(latin1.decode(results.pdf.take(5).toList()), '%PDF-');
   });
 
-  testWidgets('legacy erase masks are flattened before rendering',
-      (tester) async {
+  testWidgets('legacy erase masks are flattened before rendering', (
+    tester,
+  ) async {
     final legacy = _page('legacy', draw: true);
     final erase = InkStroke(
       id: 'legacy-eraser',
@@ -199,9 +192,7 @@ void main() {
       width: 12,
       tool: DrawingTool.eraserBrush,
     );
-    final original = legacy.copyWith(
-      inkStrokes: [...legacy.inkStrokes, erase],
-    );
+    final original = legacy.copyWith(inkStrokes: [...legacy.inkStrokes, erase]);
     final pages = await _render(
       tester,
       () => NotebookExportService.renderPngPagesForTest(

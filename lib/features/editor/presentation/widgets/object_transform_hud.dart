@@ -243,8 +243,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
         ) /
         scale;
 
-    final boundary =
-        topCenter.dy - widget.style.moveHandleOffset / (2 * scale);
+    final boundary = topCenter.dy - widget.style.moveHandleOffset / (2 * scale);
     final hitRect = Rect.fromLTRB(
       point.dx - hitSize / 2,
       math.min(point.dy - hitSize / 2, boundary - 1),
@@ -368,8 +367,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     required double scale,
   }) {
     final topCenter = _pointForHandle(rect, rotation, HandlePosition.top);
-    final boundary =
-        topCenter.dy - widget.style.moveHandleOffset / (2 * scale);
+    final boundary = topCenter.dy - widget.style.moveHandleOffset / (2 * scale);
     final top = switch (handle) {
       HandlePosition.topLeft ||
       HandlePosition.top ||

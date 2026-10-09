@@ -58,11 +58,7 @@ void main() {
     final rect = Rect.fromLTWH(10, 20, 200, 80);
     final rotation = math.pi / 6;
 
-    engine.beginMove(
-      rect: rect,
-      rotation: rotation,
-      pointer: rect.center,
-    );
+    engine.beginMove(rect: rect, rotation: rotation, pointer: rect.center);
     final preview = engine.update(rect.center + const Offset(20, 10));
 
     expect(preview.kind, ObjectTransformKind.move);

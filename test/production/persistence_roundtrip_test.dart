@@ -153,39 +153,42 @@ void main() {
     }
   });
 
-  test('SQLite read-after-write preserves rich content and binary media',
-      () async {
-    final db = NotesDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final repository = _repository(db);
-    final notebook = _fixture(uid: 'roundtrip');
-    expect(await repository.saveNotebook(notebook), isTrue);
+  test(
+    'SQLite read-after-write preserves rich content and binary media',
+    () async {
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final repository = _repository(db);
+      final notebook = _fixture(uid: 'roundtrip');
+      expect(await repository.saveNotebook(notebook), isTrue);
 
-    final persisted = await repository.getNotebook(notebook.uid);
-    expect(persisted, isNotNull);
-    _verifyContent(persisted!, uid: notebook.uid);
-  });
+      final persisted = await repository.getNotebook(notebook.uid);
+      expect(persisted, isNotNull);
+      _verifyContent(persisted!, uid: notebook.uid);
+    },
+  );
 
-  test('portable archive preserves two pages, styles, crop and folders',
-      () async {
-    final db = NotesDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final repository = _repository(db);
-    final notebook = _fixture(uid: 'portable');
+  test(
+    'portable archive preserves two pages, styles, crop and folders',
+    () async {
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final repository = _repository(db);
+      final notebook = _fixture(uid: 'portable');
 
-    final payload = repository.encodePortableBackup(
-      [notebook],
-      folders: ['Production QA', 'Empty QA folder'],
-    );
-    final decoded = repository.decodePortableBackup(payload);
+      final payload = repository.encodePortableBackup(
+        [notebook],
+        folders: ['Production QA', 'Empty QA folder'],
+      );
+      final decoded = repository.decodePortableBackup(payload);
 
-    expect(decoded.notebooks, hasLength(1));
-    expect(decoded.folders, contains('Empty QA folder'));
-    _verifyContent(decoded.notebooks.single, uid: notebook.uid);
-  });
+      expect(decoded.notebooks, hasLength(1));
+      expect(decoded.folders, contains('Empty QA folder'));
+      _verifyContent(decoded.notebooks.single, uid: notebook.uid);
+    },
+  );
 
-  test('incremental dirty-page save keeps the other page unchanged',
-      () async {
+  test('incremental dirty-page save keeps the other page unchanged', () async {
     final db = NotesDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     final repository = _repository(db);
@@ -200,10 +203,7 @@ void main() {
       ],
     );
     expect(
-      await repository.saveNotebookPages(
-        updated,
-        {before.pages.first.id},
-      ),
+      await repository.saveNotebookPages(updated, {before.pages.first.id}),
       isTrue,
     );
 
@@ -213,68 +213,69 @@ void main() {
     expect(persisted?.pages.last.inkStrokes.single.id, 'dirty-page-stroke-2');
   });
 
-  test('concurrent independent saves settle without losing either document',
-      () async {
-    final db = NotesDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final repository = _repository(db);
-    final first = _fixture(uid: 'concurrent-a');
-    final second = _fixture(uid: 'concurrent-b');
+  test(
+    'concurrent independent saves settle without losing either document',
+    () async {
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final repository = _repository(db);
+      final first = _fixture(uid: 'concurrent-a');
+      final second = _fixture(uid: 'concurrent-b');
 
-    final outcome = await Future.wait([
-      repository.saveNotebook(first),
-      repository.saveNotebook(second),
-    ]);
-    expect(outcome, [true, true]);
-    await repository.waitForPendingSaves();
-    expect(repository.hasPendingSaves, isFalse);
+      final outcome = await Future.wait([
+        repository.saveNotebook(first),
+        repository.saveNotebook(second),
+      ]);
+      expect(outcome, [true, true]);
+      await repository.waitForPendingSaves();
+      expect(repository.hasPendingSaves, isFalse);
 
-    final saved = await repository.fetchNotebooks();
-    expect(saved.map((item) => item.uid).toSet(), {
-      first.uid,
-      second.uid,
-    });
-    _verifyContent(
-      saved.firstWhere((item) => item.uid == first.uid),
-      uid: first.uid,
-    );
-    _verifyContent(
-      saved.firstWhere((item) => item.uid == second.uid),
-      uid: second.uid,
-    );
-  });
+      final saved = await repository.fetchNotebooks();
+      expect(saved.map((item) => item.uid).toSet(), {first.uid, second.uid});
+      _verifyContent(
+        saved.firstWhere((item) => item.uid == first.uid),
+        uid: first.uid,
+      );
+      _verifyContent(
+        saved.firstWhere((item) => item.uid == second.uid),
+        uid: second.uid,
+      );
+    },
+  );
 
-  test('incremental backup to a fresh database restores rich content',
-      () async {
-    final source = _fixture(uid: 'restore-target');
-    final db = NotesDatabase(NativeDatabase.memory());
-    final backup = LocalBackupService(
-      _repository(db),
-      documentsDirectory: () async => documentsDirectory,
-    );
+  test(
+    'incremental backup to a fresh database restores rich content',
+    () async {
+      final source = _fixture(uid: 'restore-target');
+      final db = NotesDatabase(NativeDatabase.memory());
+      final backup = LocalBackupService(
+        _repository(db),
+        documentsDirectory: () async => documentsDirectory,
+      );
 
-    try {
-      final report = await backup.snapshot([source]);
-      expect(report.changedCount, 1);
-      expect((await backup.readLatest()), hasLength(1));
-    } finally {
-      await backup.dispose();
-      await db.close();
-    }
+      try {
+        final report = await backup.snapshot([source]);
+        expect(report.changedCount, 1);
+        expect((await backup.readLatest()), hasLength(1));
+      } finally {
+        await backup.dispose();
+        await db.close();
+      }
 
-    final secondDb = NotesDatabase(NativeDatabase.memory());
-    addTearDown(secondDb.close);
-    final restore = LocalBackupService(
-      _repository(secondDb),
-      documentsDirectory: () async => documentsDirectory,
-    );
-    addTearDown(restore.dispose);
+      final secondDb = NotesDatabase(NativeDatabase.memory());
+      addTearDown(secondDb.close);
+      final restore = LocalBackupService(
+        _repository(secondDb),
+        documentsDirectory: () async => documentsDirectory,
+      );
+      addTearDown(restore.dispose);
 
-    final result = await restore.restoreFromLatestDetailed();
-    expect(result.succeeded, isTrue);
-    expect(result.restoredCount, 1);
-    final persisted = await _repository(secondDb).getNotebook(source.uid);
-    expect(persisted, isNotNull);
-    _verifyContent(persisted!, uid: source.uid);
-  });
+      final result = await restore.restoreFromLatestDetailed();
+      expect(result.succeeded, isTrue);
+      expect(result.restoredCount, 1);
+      final persisted = await _repository(secondDb).getNotebook(source.uid);
+      expect(persisted, isNotNull);
+      _verifyContent(persisted!, uid: source.uid);
+    },
+  );
 }

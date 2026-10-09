@@ -104,12 +104,7 @@ class NotebookExportService {
     String baseName,
     PageBackgroundSettings background,
   ) async {
-    final bytes = await _buildPdfBytes(
-      notebook,
-      pageSize,
-      pageGap,
-      background,
-    );
+    final bytes = await _buildPdfBytes(notebook, pageSize, pageGap, background);
     return _saveBytesAs(
       dialogTitle: 'Save PDF export',
       fileName: '$baseName.pdf',

@@ -21,23 +21,25 @@ class _DelayedRepository extends NotebookRepository {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('closing library during asynchronous loading never notifies dispose',
-      () async {
-    final db = NotesDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final repository = _DelayedRepository(db);
-    final controller = LibraryController(
-      repository,
-      CloudSyncService(repository),
-      LocalBackupService(repository),
-    );
+  test(
+    'closing library during asynchronous loading never notifies dispose',
+    () async {
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final repository = _DelayedRepository(db);
+      final controller = LibraryController(
+        repository,
+        CloudSyncService(repository),
+        LocalBackupService(repository),
+      );
 
-    final loading = controller.loadItems();
-    expect(controller.isLoading, isTrue);
-    controller.dispose();
-    repository.completer.complete(<Notebook>[]);
-    await loading;
+      final loading = controller.loadItems();
+      expect(controller.isLoading, isTrue);
+      controller.dispose();
+      repository.completer.complete(<Notebook>[]);
+      await loading;
 
-    expect(controller.isLoading, isFalse);
-  });
+      expect(controller.isLoading, isFalse);
+    },
+  );
 }

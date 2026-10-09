@@ -41,9 +41,7 @@ void main() {
       );
       await tester.pump();
 
-      final move = find.byKey(
-        const ValueKey('object-transform-move-hit-zone'),
-      );
+      final move = find.byKey(const ValueKey('object-transform-move-hit-zone'));
       final resize = find.byKey(
         const ValueKey('object-transform-top-hit-zone'),
       );
@@ -72,10 +70,7 @@ void main() {
       await tester.pump();
       await resizePointer.up();
       await tester.pump();
-      expect(
-        committed,
-        [ObjectTransformKind.move, ObjectTransformKind.resize],
-      );
+      expect(committed, [ObjectTransformKind.move, ObjectTransformKind.resize]);
     }
   });
 

@@ -24,7 +24,8 @@ void main() {
     expect(
       find.byType(LibraryScreen),
       findsOneWidget,
-      reason: 'The actual platform storage/plugin initialization must '
+      reason:
+          'The actual platform storage/plugin initialization must '
           'reach the library, not just display a loading spinner.',
     );
   });

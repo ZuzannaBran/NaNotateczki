@@ -1,4 +1,3 @@
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/core/storage/app_save_coordinator.dart';
 import 'package:program/core/input/ink_activity_tracker.dart';
@@ -62,20 +61,20 @@ void main() {
     expect(ran, isFalse);
   });
 
-  test('a failing save propagates an error rather than reporting success', () async {
-    final owner = Object();
-    addTearDown(() => coordinator.unregister(owner));
-    coordinator.register(
-      owner,
-      hasPendingWork: () => true,
-      flush: () async => throw StateError('disk unavailable'),
-    );
-    await expectLater(
-      coordinator.flushPending(),
-      throwsA(isA<StateError>()),
-    );
-    expect(coordinator.hasPendingWork, isTrue);
-  });
+  test(
+    'a failing save propagates an error rather than reporting success',
+    () async {
+      final owner = Object();
+      addTearDown(() => coordinator.unregister(owner));
+      coordinator.register(
+        owner,
+        hasPendingWork: () => true,
+        flush: () async => throw StateError('disk unavailable'),
+      );
+      await expectLater(coordinator.flushPending(), throwsA(isA<StateError>()));
+      expect(coordinator.hasPendingWork, isTrue);
+    },
+  );
 
   test('exit waits for every active stylus contact', () async {
     final tracker = InkActivityTracker.instance;

@@ -258,8 +258,6 @@ class ObjectTransformEngine {
 
     return Rect.fromCenter(center: rect.center, width: width, height: height);
   }
-
-
 }
 
 class _ObjectTransformSession {

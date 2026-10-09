@@ -1,4 +1,3 @@
-
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -47,10 +46,7 @@ void main() {
     final notebook = _notebook();
     expect(await repository.saveNotebook(notebook), isTrue);
 
-    final editor = EditorController(
-      repository: repository,
-      notebook: notebook,
-    );
+    final editor = EditorController(repository: repository, notebook: notebook);
     addTearDown(editor.dispose);
 
     final erasedId = editor.addInkStroke(
@@ -101,73 +97,80 @@ void main() {
     expect(reopened.pages.single.inkStrokes.single.id, keptId);
   });
 
-  test('multi-erase undo/redo restores only explicitly requested history',
-      () async {
-    final db = NotesDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    var guardedReductions = 0;
-    final repository = NotebookRepository(
-      db,
-      dataIntegrityIncidentHandler: (incident, before, attempted) async {
-        guardedReductions++;
-      },
-    );
-    final notebook = _notebook();
-    expect(await repository.saveNotebook(notebook), isTrue);
-    final editor = EditorController(
-      repository: repository,
-      notebook: notebook,
-    );
-    addTearDown(editor.dispose);
+  test(
+    'multi-erase undo/redo restores only explicitly requested history',
+    () async {
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      var guardedReductions = 0;
+      final repository = NotebookRepository(
+        db,
+        dataIntegrityIncidentHandler: (incident, before, attempted) async {
+          guardedReductions++;
+        },
+      );
+      final notebook = _notebook();
+      expect(await repository.saveNotebook(notebook), isTrue);
+      final editor = EditorController(
+        repository: repository,
+        notebook: notebook,
+      );
+      addTearDown(editor.dispose);
 
-    final first = editor.addInkStroke(_line(5), toolOverride: DrawingTool.pen);
-    final second = editor.addInkStroke(_line(35), toolOverride: DrawingTool.pen);
-    editor.eraseInkStrokesById({first!});
-    editor.eraseInkStrokesById({second!});
-    expect(editor.currentPage.inkStrokes, isEmpty);
+      final first = editor.addInkStroke(
+        _line(5),
+        toolOverride: DrawingTool.pen,
+      );
+      final second = editor.addInkStroke(
+        _line(35),
+        toolOverride: DrawingTool.pen,
+      );
+      editor.eraseInkStrokesById({first!});
+      editor.eraseInkStrokesById({second!});
+      expect(editor.currentPage.inkStrokes, isEmpty);
 
-    editor.undo();
-    expect(editor.currentPage.inkStrokes.map((s) => s.id), [second]);
-    editor.undo();
-    expect(editor.currentPage.inkStrokes.map((s) => s.id), [first, second]);
-    editor.redo();
-    expect(editor.currentPage.inkStrokes.map((s) => s.id), [second]);
-    editor.redo();
-    expect(editor.currentPage.inkStrokes, isEmpty);
+      editor.undo();
+      expect(editor.currentPage.inkStrokes.map((s) => s.id), [second]);
+      editor.undo();
+      expect(editor.currentPage.inkStrokes.map((s) => s.id), [first, second]);
+      editor.redo();
+      expect(editor.currentPage.inkStrokes.map((s) => s.id), [second]);
+      editor.redo();
+      expect(editor.currentPage.inkStrokes, isEmpty);
 
-    await editor.flushPendingSaves();
-    await repository.waitForPendingSaves();
-    final saved = await repository.getNotebook(notebook.uid);
-    expect(saved?.pages.single.inkStrokes, isEmpty);
-    expect(guardedReductions, greaterThan(0));
-  });
+      await editor.flushPendingSaves();
+      await repository.waitForPendingSaves();
+      final saved = await repository.getNotebook(notebook.uid);
+      expect(saved?.pages.single.inkStrokes, isEmpty);
+      expect(guardedReductions, greaterThan(0));
+    },
+  );
 
-  test('object transform blocks viewport without shifting world coordinates',
-      () async {
-    final db = NotesDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final editor = EditorController(
-      repository: NotebookRepository(db),
-      notebook: _notebook(),
-    );
-    addTearDown(editor.dispose);
+  test(
+    'object transform blocks viewport without shifting world coordinates',
+    () async {
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final editor = EditorController(
+        repository: NotebookRepository(db),
+        notebook: _notebook(),
+      );
+      addTearDown(editor.dispose);
 
-    editor.setViewTransform(
-      pan: const Offset(70, -30),
-      scale: 1.8,
-    );
-    const world = Offset(30, 50);
-    final screen = editor.worldToViewport(world);
-    expect(editor.viewportToWorld(screen).dx, closeTo(world.dx, 0.00001));
-    expect(editor.viewportToWorld(screen).dy, closeTo(world.dy, 0.00001));
+      editor.setViewTransform(pan: const Offset(70, -30), scale: 1.8);
+      const world = Offset(30, 50);
+      final screen = editor.worldToViewport(world);
+      expect(editor.viewportToWorld(screen).dx, closeTo(world.dx, 0.00001));
+      expect(editor.viewportToWorld(screen).dy, closeTo(world.dy, 0.00001));
 
-    editor.beginObjectTransform();
-    editor.panBy(const Offset(500, 500));
-    editor.zoomBy(2, focalPoint: screen);
-    expect(editor.worldToViewport(world), screen);
+      editor.beginObjectTransform();
+      editor.panBy(const Offset(500, 500));
+      editor.zoomBy(2, focalPoint: screen);
+      expect(editor.worldToViewport(world), screen);
 
-    editor.endObjectTransform();
-    editor.panBy(const Offset(5, 0));
-    expect(editor.worldToViewport(world), screen + const Offset(5, 0));
-  });
+      editor.endObjectTransform();
+      editor.panBy(const Offset(5, 0));
+      expect(editor.worldToViewport(world), screen + const Offset(5, 0));
+    },
+  );
 }

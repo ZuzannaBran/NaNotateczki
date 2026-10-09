@@ -48,14 +48,8 @@ void main() {
           isEmpty,
           reason: 'resurrected ID at seed=$seed operation=$operation',
         );
-        expect(
-          strokes.every((item) => !item.tool.isEraser),
-          isTrue,
-        );
-        expect(
-          strokes.every((item) => item.points.isNotEmpty),
-          isTrue,
-        );
+        expect(strokes.every((item) => !item.tool.isEraser), isTrue);
+        expect(strokes.every((item) => item.points.isNotEmpty), isTrue);
       }
     }
   });

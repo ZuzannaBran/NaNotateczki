@@ -19,11 +19,7 @@ Path dashedSelectionOutline(Path outline, {double scale = 1.0}) {
   );
 }
 
-void paintSelectionOutline(
-  Canvas canvas,
-  Path outline, {
-  double scale = 1.0,
-}) {
+void paintSelectionOutline(Canvas canvas, Path outline, {double scale = 1.0}) {
   final safeScale = scale.isFinite && scale > 0 ? scale : 1.0;
   final paint = Paint()
     ..color = AppColors.inkBlack.withValues(alpha: 0.82)

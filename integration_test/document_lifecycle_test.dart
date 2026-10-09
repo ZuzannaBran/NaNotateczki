@@ -33,10 +33,7 @@ void main() {
         context,
         listen: false,
       );
-      final library = Provider.of<LibraryController>(
-        context,
-        listen: false,
-      );
+      final library = Provider.of<LibraryController>(context, listen: false);
 
       final created = await library.createBoard();
       try {
@@ -54,10 +51,7 @@ void main() {
         await library.loadItems();
         final reloaded = await repository.getNotebook(created.uid);
         expect(reloaded?.title, 'QA persisted board');
-        expect(
-          library.items.any((item) => item.uid == created.uid),
-          isTrue,
-        );
+        expect(library.items.any((item) => item.uid == created.uid), isTrue);
       } finally {
         await repository.deleteNotebook(created.uid);
         await library.loadItems();

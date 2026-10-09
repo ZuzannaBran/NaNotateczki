@@ -121,10 +121,7 @@ void main() {
         index.queryPoint(const Offset(50, 0), 4).map((item) => item.id),
         isNot(contains('first')),
       );
-      expect(
-        index.queryPoint(const Offset(50, 30), 4).single.id,
-        'second',
-      );
+      expect(index.queryPoint(const Offset(50, 30), 4).single.id, 'second');
     });
   });
 
@@ -163,11 +160,7 @@ void main() {
       engine.cancel();
       expect(engine.isActive, isFalse);
       expect(engine.end(), isNull);
-      engine.beginMove(
-        rect: original,
-        rotation: 0,
-        pointer: original.center,
-      );
+      engine.beginMove(rect: original, rotation: 0, pointer: original.center);
       expect(engine.update(original.center).rect, original);
     });
   });

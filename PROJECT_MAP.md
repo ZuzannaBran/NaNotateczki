@@ -203,7 +203,7 @@ bezpośrednio do `InkEraserEngine`. Nie zawiera własnej geometrii gumki.
 
 - 5: `flattenErasersForBackup`; 9: `flattenPageErasersForBackup`.
 
-### `lib/data/export/notebook_export_service.dart` (ok. 730 linii)
+### `lib/data/export/notebook_export_service.dart` (715 linii)
 
 Renderuje notebook/board do PNG lub PDF i zapisuje przez systemowy dialog.
 Przed renderem normalizuje legacy gumki; zapisany renderer zna wyłącznie
@@ -463,14 +463,14 @@ błędów, integralności i wydajności.
   ponieważ obecny `EditableText` nie renderuje ich jako rich-text.
   9: `TextEditToolbar`; 43: `build`.
 
-- `lib/features/editor/presentation/interaction/object_transform_engine.dart` (364):
+- `lib/features/editor/presentation/interaction/object_transform_engine.dart` (362):
   wspólny silnik move/resize dla obiektów nie-ink. Używa typów
   `HandlePosition` i `ResizeMode` z `flutter_box_transform`, ale po zmianach
   API 0.4.7 sam liczy geometrię logiczną, clamp i skalowanie, dzięki
   czemu działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
   6: `ObjectTransformKind`; 8: `ObjectTransformSnapshot`;
-  24: `ObjectTransformEngine`; 265: `_ObjectTransformSession`.
-- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (647):
+  24: `ObjectTransformEngine`; 263: `_ObjectTransformSession`.
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (645):
   wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
   `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform`
   oraz wspólnego grabbera nad górną krawędzią do przesuwania obiektu.
@@ -488,7 +488,7 @@ błędów, integralności i wydajności.
   HUD-u również zwalnia blokadę. Kolor, rozmiary i grubość ramki są
   konfigurowalne przez `ObjectTransformHudStyle`.
   13: `ObjectTransformHudStyle`; 54: `ObjectTransformHud`;
-  106: `_ObjectTransformHudState`; 593: `_ObjectTransformFramePainter`.
+  106: `_ObjectTransformHudState`; 591: `_ObjectTransformFramePainter`.
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (510):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
@@ -521,9 +521,10 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
 - 3790: `_InkPainter`; 3829: `_InkOverlayPainter`;
   4065: `_InkPageLayer`; 4111: `_PageInkPainter`.
 
-- `lib/features/editor/presentation/widgets/selection_outline.dart`:
+- `lib/features/editor/presentation/widgets/selection_outline.dart` (32):
   wspólny painter przerywanego konturu dla lassa i gumki zakresowej;
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
+  11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
 ### `lib/features/editor/presentation/widgets/page_overlay.dart` (2821 linii)
 
@@ -602,7 +603,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   dezaktywowane po wyborze narzędzia ink lub tekstu, a nowy tekst startuje
   zaznaczony w trybie edit.
 - `test/backup_eraser_flattening_test.dart` (109)
-- `test/cloud_sync_service_test.dart` (24)
+- `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
 - `test/library_screen_responsive_layout_test.dart` (112)
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
@@ -622,7 +623,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
 - `test/board_scene_bounds_test.dart`: stały układ współrzędnych boarda
   podczas resize/move i odblokowanie granic po gestach.
-- `test/object_transform_engine_test.dart` (71): wspólna geometria
+- `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
