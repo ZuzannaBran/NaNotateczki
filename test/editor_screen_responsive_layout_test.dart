@@ -184,6 +184,12 @@ void main() {
       tester.getTopLeft(page).dy,
       closeTo(canvasRect.top + 94, 0.01),
     );
+    final scaledDocumentHeight =
+        _documentLayoutSize(tester).height * _documentScale(tester);
+    expect(
+      tester.getSize(viewport).height,
+      closeTo(scaledDocumentHeight + 72, 0.01),
+    );
     expect(tester.getTopLeft(page).dy, greaterThan(toolbarRect.bottom));
     expect(
       tester.getTopLeft(overview).dy,
@@ -211,6 +217,16 @@ void main() {
     await secondFinger.moveBy(const Offset(0, -170));
     await tester.pump();
     expect(tester.getTopLeft(page).dy, lessThan(toolbarRect.bottom));
+    final verticalDocumentPan =
+        tester.getTopLeft(page).dy - tester.getTopLeft(viewport).dy;
+    expect(
+      tester.getSize(viewport).height,
+      closeTo(
+        scaledDocumentHeight +
+            (verticalDocumentPan > 0 ? verticalDocumentPan : 0),
+        0.01,
+      ),
+    );
     expect(
       tester.getTopLeft(viewport).dy,
       closeTo(canvasRect.top + 22, 0.01),
