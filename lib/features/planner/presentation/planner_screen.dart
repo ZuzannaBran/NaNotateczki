@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/study_planner_controller.dart';
+import 'study_action_theme.dart';
 import 'study_timer_widgets.dart';
 
 enum CalendarMode { today, week, month }
@@ -120,7 +121,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
               child: const Text('Edit'),
             ),
           if (session.status == StudyStatus.planned)
-            TextButton(
+            FilledButton(
+              style: StudyActionStyles.primary,
               onPressed: planner.active == null
                   ? () {
                       planner.start(session.id);
@@ -301,7 +303,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     ),
                   ),
                   if (!compact)
-                    IconButton(
+                    IconButton.filledTonal(
+                      style: StudyActionStyles.icon,
                       tooltip: 'Plan on this day',
                       icon: const Icon(Icons.add_rounded, size: 18),
                       visualDensity: VisualDensity.compact,
@@ -460,7 +463,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final planner = context.watch<StudyPlannerController>();
     final colors = Theme.of(context).colorScheme;
     final narrow = MediaQuery.sizeOf(context).width < 760;
-    return Scaffold(
+    return StudyActionTheme(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Study planner'),
         leading: IconButton(
@@ -469,7 +473,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(
+          IconButton.filledTonal(
+            style: StudyActionStyles.icon,
             tooltip: _history ? 'Calendar' : 'Study history',
             onPressed: () => setState(() => _history = !_history),
             icon: Icon(_history
@@ -477,7 +482,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 : Icons.history_rounded),
           ),
           if (narrow) ...[
-            IconButton(
+            IconButton.filledTonal(
+              style: StudyActionStyles.icon,
               tooltip: 'Smart session',
               onPressed: () => showStudySessionEditor(
                 context,
@@ -486,13 +492,14 @@ class _PlannerScreenState extends State<PlannerScreen> {
               ),
               icon: const Icon(Icons.auto_awesome_outlined),
             ),
-            IconButton(
+            IconButton.filledTonal(
+              style: StudyActionStyles.icon,
               tooltip: 'New session',
               onPressed: () => showStudySessionEditor(context),
               icon: const Icon(Icons.add_rounded),
             ),
           ] else ...[
-            TextButton.icon(
+            OutlinedButton.icon(
               onPressed: () => showStudySessionEditor(
                 context,
                 technique: StudyTechnique.pomodoro,
@@ -501,7 +508,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
               icon: const Icon(Icons.auto_awesome_outlined),
               label: const Text('Smart session'),
             ),
-            FilledButton.tonalIcon(
+            FilledButton.icon(
+              style: StudyActionStyles.primary,
               onPressed: () => showStudySessionEditor(context),
               icon: const Icon(Icons.add_rounded),
               label: const Text('New session'),
@@ -530,7 +538,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      TextButton.icon(
+                      FilledButton.tonalIcon(
+                        style: StudyActionStyles.secondary,
                         onPressed: planner.active!.status == StudyStatus.running
                             ? planner.pause
                             : planner.resume,
@@ -539,7 +548,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         label: Text(planner.active!.status == StudyStatus.running
                             ? 'Pause' : 'Resume'),
                       ),
-                      IconButton(
+                      IconButton.filledTonal(
+                        style: StudyActionStyles.icon,
                         tooltip: 'Stop session',
                         onPressed: () {
                           planner.stop();
@@ -554,7 +564,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       const Expanded(
                         child: Text('A study session needs your review.'),
                       ),
-                      TextButton(
+                      OutlinedButton(
                         onPressed: () => showStudyRating(
                           context, planner.pendingReviews.first),
                         child: const Text('Rate productivity'),
@@ -574,17 +584,19 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     740.0, MediaQuery.sizeOf(context).width - 36),
                   child: Row(
                 children: [
-                  IconButton(
+                  IconButton.filledTonal(
+                    style: StudyActionStyles.icon,
                     tooltip: 'Previous',
                     icon: const Icon(Icons.chevron_left),
                     onPressed: () => _navigate(-1),
                   ),
-                  IconButton(
+                  IconButton.filledTonal(
+                    style: StudyActionStyles.icon,
                     tooltip: 'Next',
                     icon: const Icon(Icons.chevron_right),
                     onPressed: () => _navigate(1),
                   ),
-                  TextButton(
+                  OutlinedButton(
                     onPressed: () => setState(
                       () => _anchor = DateUtils.dateOnly(DateTime.now())),
                     child: const Text('Today'),
@@ -631,6 +643,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 : _calendar(planner.sessions),
           ),
         ],
+      ),
       ),
     );
   }
