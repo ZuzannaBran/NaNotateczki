@@ -1416,12 +1416,13 @@ class _EditorScreenState extends State<EditorScreen> {
                           pageGap: _pageGap,
                           panelHeight: minimapPanelHeight,
                           visibleDocumentRect: visibleDocumentRect,
-                          onNavigate: (documentPoint) => _navigateToOverviewPoint(
-                            documentPoint,
-                            docWorldSize,
-                            viewportSize,
-                            controller,
-                          ),
+                          onNavigate: (documentPoint) =>
+                              _navigateToOverviewPoint(
+                                documentPoint,
+                                docWorldSize,
+                                viewportSize,
+                                controller,
+                              ),
                         ),
                       ),
                   ],
@@ -1947,27 +1948,27 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                     },
                     child: RepaintBoundary(
                       child: ValueListenableBuilder<int>(
-                      valueListenable: widget.controller.inkRevision,
-                      builder: (context, _, _) => CustomPaint(
-                        size: Size(_minimapWidth, contentHeight),
-                        painter: _ProjectMiniMapPainter(
-                          pages: widget.controller.pages,
-                          currentPageIndex: widget.currentPageIndex,
-                          pageWorldSize: widget.pageWorldSize,
-                          pageGap: widget.pageGap,
-                          mapScale: mapScale,
-                          cornerRadius: innerRadius,
-                          showBackgroundLines:
-                              backgroundSettings.style.index > 0,
-                          showBackgroundColumns:
-                              backgroundSettings.style.index == 1,
-                          backgroundSpacing: backgroundSettings.spacing,
-                          images: _minimapImages.map(
-                            (id, cached) => MapEntry(id, cached.image),
+                        valueListenable: widget.controller.inkRevision,
+                        builder: (context, _, _) => CustomPaint(
+                          size: Size(_minimapWidth, contentHeight),
+                          painter: _ProjectMiniMapPainter(
+                            pages: widget.controller.pages,
+                            currentPageIndex: widget.currentPageIndex,
+                            pageWorldSize: widget.pageWorldSize,
+                            pageGap: widget.pageGap,
+                            mapScale: mapScale,
+                            cornerRadius: innerRadius,
+                            showBackgroundLines:
+                                backgroundSettings.style.index > 0,
+                            showBackgroundColumns:
+                                backgroundSettings.style.index == 1,
+                            backgroundSpacing: backgroundSettings.spacing,
+                            images: _minimapImages.map(
+                              (id, cached) => MapEntry(id, cached.image),
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     ),
                   ),
                 ),
