@@ -71,18 +71,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
         return;
       }
       final upcoming = planner.upcoming;
+      final canStartNext = planner.active == null && upcoming.isNotEmpty;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 12),
           content: Text(planner.notice ?? "Great job! Time's up."),
           action: SnackBarAction(
-            label: upcoming.isNotEmpty ? 'Start next' : 'New timer',
+            label: planner.active != null
+                ? 'Planner'
+                : canStartNext ? 'Start next' : 'New timer',
             onPressed: () {
-              if (upcoming.isNotEmpty) {
-                if (!planner.start(upcoming.first.id)) {
-                  return;
-                }
+              if (planner.active != null) {
+                openStudyPlanner(context);
+              } else if (canStartNext) {
+                planner.start(upcoming.first.id);
               } else {
                 showStudySessionEditor(context, startAfterSave: true);
               }
@@ -90,7 +93,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ),
         ),
       );
-      if (planner.pendingReviews.isNotEmpty && planner.active == null) {
+      if (planner.noticeRequiresReviewPrompt &&
+          planner.pendingReviews.isNotEmpty && planner.active == null) {
         showStudyRating(context, planner.pendingReviews.last);
       }
     });
