@@ -319,13 +319,16 @@ rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
 zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. Pod strzałką panelu folderów
-jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka,
-a jego stan pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
+jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka.
+Obie strzałki są pionowo wyśrodkowane we własnych obszarach (nagłówek
+58 px i toolbar 72 px), przypięte do prawej krawędzi panelu,
+a ich kierunki lewo/prawo odpowiadają zwijaniu bocznemu.
+Stan toolbaru pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
 
 - 16: `LibraryScreen`; 23: `_LibraryScreenState`;
-  540: `_LibraryTreePane`; 767: `_FolderTreeRow`;
-  877: `_LibraryTreeItemRow`; 968: `_LibraryWorkspace`;
-  1034: `_LeftZoneToggleTab` — strzałki folderów i toolbaru.
+  544: `_LibraryTreePane`; 771: `_FolderTreeRow`;
+  881: `_LibraryTreeItemRow`; 972: `_LibraryWorkspace`;
+  1038: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -612,11 +615,12 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (267):
+- `test/library_screen_responsive_layout_test.dart` (315):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
-  boarda/notebooka z kontrolką pod strzałką panelu; dodatkowo regresja
-  wyśrodkowania, zwężania kapsułek, wysokości, odstępów bocznych
-  oraz przewijania na wąskim ekranie
+  boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
+  centrowania strzałek i prawidłowego kierunku zwijania bocznego;
+  wyśrodkowanie, zwężanie kapsułek, wysokość, odstępy boczne
+  oraz przewijanie na wąskim ekranie
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
