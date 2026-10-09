@@ -323,4 +323,86 @@ void main() {
     controller.dispose();
     await database.close();
   });
+
+  testWidgets('vertical toolbars scroll and keep icon actions upright', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(850, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final controller = EditorController(
+      repository: repository,
+      notebook: notebook,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              SizedBox(
+                width: 104,
+                height: 640,
+                child: EditorToolbar(
+                  axis: Axis.vertical,
+                  controller: controller,
+                  onInsertPressed: () {},
+                  onExportSelected: (_) {},
+                ),
+              ),
+              SizedBox(
+                width: 152,
+                height: 640,
+                child: TextEditToolbar(
+                  axis: Axis.vertical,
+                  editorController: controller,
+                  block: TextBlock(
+                    id: 'vertical-text',
+                    text: 'Text',
+                    position: Offset.zero,
+                    fontSize: 18,
+                    color: Colors.black,
+                    width: 150,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final inkPanel = find.byKey(const ValueKey('editor-toolbar-panel'));
+    final textPanel = find.byKey(const ValueKey('text-toolbar-panel'));
+    for (final panel in [inkPanel, textPanel]) {
+      final scroll = find.descendant(
+        of: panel,
+        matching: find.byType(Scrollable),
+      );
+      expect(scroll, findsOneWidget);
+      expect(
+        tester.widget<Scrollable>(scroll).axisDirection,
+        AxisDirection.down,
+      );
+      expect(
+        tester.state<ScrollableState>(scroll).position.maxScrollExtent,
+        greaterThan(0),
+      );
+    }
+    expect(
+      find.descendant(of: inkPanel, matching: find.byType(RotatedBox)),
+      findsOneWidget,
+    );
+    expect(tester.getSize(inkPanel).width, lessThan(104));
+    await tester.tap(find.byTooltip('Highlighter'));
+    await tester.pump();
+    expect(controller.tool, DrawingTool.highlighter);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
 }
