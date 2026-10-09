@@ -83,7 +83,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.dark(),
+        theme: AppTheme.light(),
         home: MultiProvider(
           providers: [
             ChangeNotifierProvider<EditorController>.value(value: controller),
@@ -91,7 +91,12 @@ void main() {
               value: preferences,
             ),
           ],
-          child: const EditorSettingsScreen(),
+          child: Consumer<AppPreferencesController>(
+            builder: (context, prefs, _) => Theme(
+              data: prefs.darkMode ? AppTheme.dark() : AppTheme.light(),
+              child: const EditorSettingsScreen(),
+            ),
+          ),
         ),
       ),
     );
@@ -101,11 +106,54 @@ void main() {
     final switchFinder = find.byKey(
       const ValueKey('visual-dark-mode-toggle'),
     );
-    expect(tester.widget<SwitchListTile>(switchFinder).value, isFalse);
-    await tester.tap(switchFinder);
-    await tester.pump();
+    final lightControl = tester.widget<SegmentedButton<bool>>(
+      switchFinder,
+    );
+    expect(lightControl.selected, {false});
+    expect(
+      lightControl.style!.backgroundColor!.resolve({
+        WidgetState.selected,
+      }),
+      AppColors.inkBlack,
+    );
+    expect(
+      lightControl.style!.foregroundColor!.resolve({
+        WidgetState.selected,
+      }),
+      AppColors.darkText,
+    );
+    expect(
+      lightControl.style!.side!.resolve({})!.width,
+      greaterThanOrEqualTo(1),
+    );
+
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
     expect(preferences.darkMode, isTrue);
-    expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
+    final darkControl = tester.widget<SegmentedButton<bool>>(
+      switchFinder,
+    );
+    expect(darkControl.selected, {true});
+    expect(
+      darkControl.style!.backgroundColor!.resolve({
+        WidgetState.selected,
+      }),
+      AppColors.darkText,
+    );
+    expect(
+      darkControl.style!.foregroundColor!.resolve({
+        WidgetState.selected,
+      }),
+      AppColors.darkBackground,
+    );
+
+    await tester.tap(find.text('Light'));
+    await tester.pumpAndSettle();
+    expect(preferences.darkMode, isFalse);
+    expect(
+      tester.widget<SegmentedButton<bool>>(switchFinder).selected,
+      {false},
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
