@@ -985,14 +985,6 @@ class _EditorScreenState extends State<EditorScreen> {
           ),
         if (widget.showToolbar && activeTextBlock != null)
           TextEditToolbar(editorController: controller, block: activeTextBlock),
-        if (widget.showToolbar)
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: Theme.of(
-              context,
-            ).colorScheme.outlineVariant.withValues(alpha: 0.45),
-          ),
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
