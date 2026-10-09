@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/input/soft_keyboard.dart';
+import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/state/editor_controller.dart';
@@ -567,6 +569,10 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
     final controller = widget.controller;
     final colorScheme = Theme.of(context).colorScheme;
     final folders = controller.folderNames;
+    final touchNavigationGain = context
+            .watch<AppPreferencesController?>()
+            ?.touchNavigationSensitivity ??
+        1.0;
 
     return DecoratedBox(
       decoration: BoxDecoration(color: colorScheme.surfaceContainerLowest),
@@ -641,6 +647,10 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                 : folders.isEmpty
                 ? _EmptyLibraryTree(onCreate: _handleCreateAction)
                 : ListView(
+                    key: const ValueKey('library-file-scroll'),
+                    physics: TouchNavigationScrollPhysics(
+                      sensitivity: touchNavigationGain,
+                    ),
                     padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
                     children: [
                       for (final folder in folders) _buildFolder(folder),
