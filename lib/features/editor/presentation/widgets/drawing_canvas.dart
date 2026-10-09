@@ -515,7 +515,8 @@ void _drawSavedStroke(
   canvas.translate(effectiveTranslation.dx, effectiveTranslation.dy);
   if (isSelected) {
     final highlightPaint = Paint()
-      ..color = _lassoAccentColor.withValues(alpha: 0.22)
+      ..color = (darkMode ? AppColors.darkText : _lassoAccentColor)
+          .withValues(alpha: 0.22)
       ..strokeCap = stroke.tool == DrawingTool.highlighter
           ? StrokeCap.square
           : StrokeCap.round
@@ -3933,7 +3934,8 @@ class _InkOverlayPainter extends CustomPainter {
     double radius,
   ) {
     final paint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.13)
+      ..color = (darkMode ? AppColors.darkText : Colors.black)
+          .withValues(alpha: 0.2)
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
