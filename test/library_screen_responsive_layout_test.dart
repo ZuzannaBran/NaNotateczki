@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:program/core/input/app_preferences_controller.dart';
+import 'package:program/core/input/touch_navigation_scroll_physics.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
@@ -321,6 +322,63 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
+    await database.close();
+  });
+
+  testWidgets('library scrolling follows live touch sensitivity', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    await repository.createNotebook(folder: 'Navigation');
+    final library = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await library.loadItems();
+    final preferences = AppPreferencesController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<LibraryController>.value(value: library),
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            Provider<NotebookRepository>.value(value: repository),
+          ],
+          child: const LibraryScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final scroll = find.byKey(const ValueKey('library-file-scroll'));
+    expect(scroll, findsOneWidget);
+    expect(
+      (tester.widget<ListView>(scroll).physics!
+              as TouchNavigationScrollPhysics)
+          .sensitivity,
+      1.0,
+    );
+
+    preferences.previewTouchNavigationSensitivity(1.8);
+    await tester.pump();
+    expect(
+      (tester.widget<ListView>(scroll).physics!
+              as TouchNavigationScrollPhysics)
+          .sensitivity,
+      1.8,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    library.dispose();
+    preferences.dispose();
     await database.close();
   });
 }
