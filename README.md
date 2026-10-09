@@ -11,6 +11,21 @@ wymaga konta ani zewnętrznego backendu: notatki są przechowywane lokalnie,
 backup działa jako pliki JSON, a synchronizacja folderowa zapisuje jeden plik
 w wybranym katalogu.
 
+## Licencja
+
+Własny kod NaNotateczki udostępniany jest na warunkach
+**[PolyForm Noncommercial License 1.0.0](LICENSE.md)**.
+Używanie, modyfikowanie i redystrybucja są dozwolone wyłącznie
+w ramach użytku niekomercyjnego określonego w licencji.
+Użycie komercyjne wymaga osobnej zgody właściciela praw.
+
+Licencja nie obejmuje na nowych zasadach bibliotek i innych materiałów
+osób trzecich: obowiązują dla nich ich własne warunki.
+Informacja copyright znajduje się w [NOTICE](NOTICE),
+a szczegóły w [przeglądzie licencji zależności](docs/LICENSING.md).
+Projekt udostępnia kod źródłowy, ale nie jest licencjonowany jako
+open source w rozumieniu OSI.
+
 ## Co potrafi aplikacja?
 
 ### Biblioteka notatek

@@ -571,6 +571,13 @@ Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 
 ## 10. Platformy, web i testy
 
+- `LICENSE.md`: niezmieniony oficjalny tekst PolyForm Noncommercial 1.0.0
+  obejmujący prawa licencjodawcy do oryginalnych elementów projektu.
+- `NOTICE`: wymagana informacja o prawach autorskich właściciela.
+- `docs/LICENSING.md`: zakres licencji, wstępny przegląd licencji
+  zależności Flutter/natywnych i kontrola przed dystrybucją.
+
+
 - `ios/Podfile`: zależności CocoaPods dla pluginów bez obsługi SwiftPM;
   deklaracja iOS 15 i targetów Runner/RunnerTests. W CI iOS wyłącza SwiftPM,
   wykonuje `pod install` i sprawdza obecność Pods w `Runner.xcworkspace`;
