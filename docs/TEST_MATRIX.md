@@ -335,3 +335,9 @@ items, not the cause of either failure in this run.
 - Android Gradle Plugin 9 migration requires built-in Kotlin compatibility
   and a cross-platform check of native plugins. Version changes are deferred
   until the diagnostic suite is confirmed by actual GitHub Actions results.
+
+## Node 24 artifact upload (9 October 2026)
+
+- CI coverage artifacts use `actions/upload-artifact@v6`, which runs on
+  Node.js 24 and replaces the deprecated Node 20 action. The upload step
+  remains a GitHub Actions runtime check; no local Flutter runtime was used.
