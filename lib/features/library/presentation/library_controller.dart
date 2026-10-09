@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Color;
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +11,39 @@ import '../../../data/backup/local_backup_service.dart';
 import '../../../data/sync/cloud_sync_service.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
+
+enum FolderCoverShape { folder, star, heart, flower, sparkle }
+
+class FolderCoverStyle {
+  const FolderCoverStyle({
+    this.shape = FolderCoverShape.folder,
+    this.iconColor,
+  });
+
+  final FolderCoverShape shape;
+  final Color? iconColor;
+
+  Map<String, Object?> toJson() => {
+    'shape': shape.name,
+    'iconColor': iconColor?.toARGB32(),
+  };
+
+  factory FolderCoverStyle.fromJson(Object? value) {
+    if (value is! Map) {
+      return const FolderCoverStyle();
+    }
+    final savedShape = value['shape'];
+    final shape = FolderCoverShape.values.firstWhere(
+      (entry) => entry.name == savedShape,
+      orElse: () => FolderCoverShape.folder,
+    );
+    final rawColor = value['iconColor'];
+    return FolderCoverStyle(
+      shape: shape,
+      iconColor: rawColor is int ? Color(rawColor) : null,
+    );
+  }
+}
 
 class LibraryController extends ChangeNotifier {
   LibraryController(
@@ -43,6 +77,8 @@ class LibraryController extends ChangeNotifier {
   CloudSyncResult? lastSyncResult;
   Object? loadError;
   final Set<String> _folders = <String>{};
+  final Map<String, FolderCoverStyle> _folderCovers =
+      <String, FolderCoverStyle>{};
   Notebook? _activeNotebook;
   bool _corruptRecoveryDismissed = false;
   int corruptDocumentCount = 0;
@@ -276,6 +312,21 @@ class LibraryController extends ChangeNotifier {
     return list;
   }
 
+  FolderCoverStyle folderCoverFor(String name) =>
+      _folderCovers[name] ?? const FolderCoverStyle();
+
+  Future<void> updateFolderCover(
+    String folder,
+    FolderCoverStyle cover,
+  ) async {
+    if (!folderNames.contains(folder)) {
+      return;
+    }
+    _folderCovers[folder] = cover;
+    await _saveFolders();
+    notifyListeners();
+  }
+
   Future<void> createFolder(String name) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
@@ -303,6 +354,10 @@ class LibraryController extends ChangeNotifier {
     _folders
       ..remove(trimmedOldName)
       ..add(trimmedNewName);
+    final cover = _folderCovers.remove(trimmedOldName);
+    if (cover != null) {
+      _folderCovers[trimmedNewName] = cover;
+    }
     final updatedItems = <Notebook>[];
     for (final item in items) {
       if (item.folder != trimmedOldName) {
@@ -341,6 +396,7 @@ class LibraryController extends ChangeNotifier {
     }
 
     _folders.remove(trimmed);
+    _folderCovers.remove(trimmed);
     for (final item in items) {
       if (item.folder != trimmed) {
         continue;
@@ -566,17 +622,32 @@ class LibraryController extends ChangeNotifier {
         return;
       }
       final decoded = jsonDecode(content);
-      if (decoded is! List) {
+      final savedFolders = decoded is List
+          ? decoded
+          : decoded is Map
+          ? decoded['folders']
+          : null;
+      if (savedFolders is! List) {
         return;
       }
       _folders
         ..clear()
         ..addAll(
-          decoded
+          savedFolders
               .whereType<String>()
               .map((item) => item.trim())
               .where((item) => item.isNotEmpty),
         );
+      _folderCovers.clear();
+      if (decoded is Map && decoded['covers'] is Map) {
+        final covers = decoded['covers'] as Map;
+        for (final entry in covers.entries) {
+          if (entry.key is String) {
+            _folderCovers[entry.key as String] =
+                FolderCoverStyle.fromJson(entry.value);
+          }
+        }
+      }
     } catch (e) {
       debugPrint('LibraryController._loadFolders failed: $e');
     }
@@ -584,7 +655,14 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> _saveFolders() async {
     try {
-      final payload = _folders.toList()..sort(_compareFolderNames);
+      final names = _folders.toList()..sort(_compareFolderNames);
+      final payload = <String, Object?>{
+        'folders': names,
+        'covers': {
+          for (final entry in _folderCovers.entries)
+            entry.key: entry.value.toJson(),
+        },
+      };
       await writeStoredText(_foldersFileName, jsonEncode(payload));
       repository.onChanged?.call(const <NotebookRepositoryChange>[]);
     } catch (e) {

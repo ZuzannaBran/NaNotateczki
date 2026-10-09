@@ -298,27 +298,33 @@ widoczności wspólnego paska narzędzi.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (663 linie)
+### `lib/features/library/presentation/library_controller.dart` (741 linii)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
-Wybór dokumentu synchronizuje też aktywny folder, dzięki czemu drzewko
-biblioteki zaznacza folder i notatkę jednocześnie. Asynchroniczny start
+Zapisuje kształt i indywidualny kolor ikony okładki folderu w zgodnym wstecznie
+`library_folders.json` (legacy lista nazw lub nowy obiekt z `folders` i
+`covers`); nie zmienia schematu SQLite. Wybór dokumentu synchronizuje
+też aktywny folder, dzięki czemu drzewko biblioteki zaznacza folder i notatkę
+jednocześnie. Asynchroniczny start
 nie powiadamia słuchaczy po usunięciu kontrolera. Zapis samych folderów
 zgłasza pusty zestaw zmian repozytorium, więc aktualizuje manifest bez
 oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
 tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
-- 14: `LibraryController`; 78: `initialize`; 87: `loadItems`;
-  159: `restoreCorruptDocumentsFromBackup`; 217: `syncNow`.
-- 261–389: tworzenie/zmiana/usuwanie folderów i dokumentów.
-- 417: `selectItem`; 433: `selectFolder`; 442: `setSearchQuery`.
-- 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
-- 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
+- 15: `FolderCoverShape`; 17: `FolderCoverStyle`; 48: `LibraryController`.
+- 112: `initialize`; 121: `loadItems`.
+- 318: `updateFolderCover`; 330–470: foldery i dokumenty.
+- 507: `selectFolder`; 618: `_loadFolders`; 656: `_saveFolders`
+  — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1085 linii)
+### `lib/features/library/presentation/library_screen.dart` (1326 linii)
 
-Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
-rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
+Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
+katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
+wraca do katalogów, kliknięcie folderu otwiera siatkę podglądów dokumentów,
+a wybór dokumentu uruchamia dotychczasowy edytor. Powrót z edytora
+wymusza flush niezapisanych zmian przed ponownym wczytaniem miniatur. Sidebar nadal rozwija
+i zwija foldery oraz zagnieżdżone notebooki i boardy. Folder
 i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
 kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
 zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. U dołu panelu jest `StudyTimerCard`,
@@ -330,10 +336,24 @@ zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. U
 jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka,
 a jego stan pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
 
-- 16: `LibraryScreen`; 23: `_LibraryScreenState`;
-  540: `_LibraryTreePane`; 767: `_FolderTreeRow`;
-  877: `_LibraryTreeItemRow`; 968: `_LibraryWorkspace`;
-  1034: `_LeftZoneToggleTab` — strzałki folderów i toolbaru.
+- 20: `LibraryScreen`; 27: `_LibraryScreenState`;
+  732: `_LibraryTreePane`; 991: `_FolderTreeRow`;
+  1109: `_LibraryTreeItemRow`; 1200: `_LibraryWorkspace`;
+  strzałki folderów i toolbaru pozostają w lewym obszarze.
+
+### `lib/features/library/presentation/library_catalog.dart` (670 linii)
+
+Kafelkowa strona główna folderów oraz siatka podglądów zawartości folderu.
+Okładka ma automatycznie rozjaśniony dominujący kolor ink/tekstu we wszystkich
+stronach dokumentów folderu; kształt i kolor ikony można zmieniać w dialogu.
+Notatki mają pionowy podgląd pierwszej strony (820×1160), boardy kwadratowy
+podgląd dopasowany do granic obiektów z pierwszej strony. Miniatury rysują
+ink, tekst oraz dostępne obrazy bez uruchamiania edytora.
+
+- 16: `dominantFolderColor`; 55: `LibraryCatalog`;
+  227: `_FolderTile`; 289: `_DocumentTile`; 393: `_DocumentPreview`;
+  473: `_boardPreviewBounds`; 511: `_PagePreviewPainter`;
+  579: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -652,6 +672,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
+- `test/library_catalog_test.dart`: kolor dominujący, serializacja okładek,
+  start katalogu, siatka notatek/boardów, edycja okładki i powrót z edytora
 - `test/library_screen_responsive_layout_test.dart` (267):
   szeroki układ, drzewo folderów, wyrównanie timera do dolnej krawędzi
   panelu i przełączanie widoczności toolbaru

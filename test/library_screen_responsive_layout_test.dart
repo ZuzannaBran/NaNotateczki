@@ -44,12 +44,12 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Pick an item'), findsOneWidget);
+    expect(find.byKey(const ValueKey('catalog-title')), findsOneWidget);
 
     await tester.binding.setSurfaceSize(const Size(1037, 700));
     await tester.pump();
 
-    expect(find.text('Pick an item'), findsOneWidget);
+    expect(find.byKey(const ValueKey('catalog-title')), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
@@ -86,7 +86,7 @@ void main() {
 
     final treeItem = find.byKey(ValueKey('library-tree-item:${created.uid}'));
 
-    expect(find.text('Project A'), findsOneWidget);
+    expect(find.text('Project A'), findsWidgets);
     expect(treeItem, findsOneWidget);
     expect(
       find.descendant(of: treeItem, matching: find.text('Nested note')),
@@ -149,6 +149,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('Projects'), findsOneWidget);
+    expect(find.byType(EditorToolbar), findsNothing);
+    await tester.tap(find.byKey(ValueKey('library-tree-item:${board.uid}')));
+    await tester.pumpAndSettle();
     expect(find.byType(EditorToolbar), findsOneWidget);
     final panel = tester.widget<Container>(
       find.byKey(const ValueKey('editor-toolbar-panel')),
