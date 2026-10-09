@@ -660,6 +660,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   `.github/scripts/test_flutter_integration_retry.sh`: ponowny start testu
   Android wyłącznie po błędzie inicjalizacji DDS; osobny test regresji
   pilnuje, żeby asercje i powtarzające się awarie pozostały blokujące.
+- `test/android_build_toolchain_test.dart`: test regresyjny progu wersji
+  pluginu Kotlin Android >= 2.3.20 wymaganego przez Flutter 3.47.6.
 - `test/production/storage_crash_recovery_test.dart`: atomiczne pliki
   ustawień: częściowe zapisy `.tmp`, odzyskiwanie `.previous`, błąd I/O
   i ponowny zapis oraz równoległe write'y jednego klucza.
