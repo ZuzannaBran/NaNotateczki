@@ -2,31 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// Strong, neutral action contrast without changing the rest of the app.
+/// Muted beige actions with legible text and no dark button fills.
 class StudyActionStyles {
-  static const Color primaryColor = Color(0xFF514A41);
-  static const Color secondaryColor = Color(0xFFD7D2C8);
-  static const Color borderColor = Color(0xFF82786C);
+  static const Color primaryColor = Color(0xFFC4BBAF);
+  static const Color secondaryColor = Color(0xFFE4E2DD);
+  static const Color borderColor = Color(0xFFB3AB9F);
 
   static final ButtonStyle primary = FilledButton.styleFrom(
     backgroundColor: primaryColor,
-    foregroundColor: AppColors.paper,
-    textStyle: const TextStyle(fontWeight: FontWeight.w600),
-  );
-
-  static final ButtonStyle secondary = FilledButton.styleFrom(
-    backgroundColor: secondaryColor,
     foregroundColor: AppColors.inkBlack,
     textStyle: const TextStyle(fontWeight: FontWeight.w600),
-  );
-
-  static final ButtonStyle icon = IconButton.styleFrom(
-    backgroundColor: secondaryColor,
-    foregroundColor: AppColors.inkBlack,
   );
 }
 
-/// Keeps enabled actions clearly darker than truly disabled controls.
+/// Highlights only pale actions while keeping regular controls understated.
 class StudyActionTheme extends StatelessWidget {
   const StudyActionTheme({required this.child, super.key});
 
@@ -46,10 +35,8 @@ class StudyActionTheme extends StatelessWidget {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.inkBlack,
-            backgroundColor: StudyActionStyles.secondaryColor,
             side: const BorderSide(
               color: StudyActionStyles.borderColor,
-              width: 1.15,
             ),
             textStyle: const TextStyle(fontWeight: FontWeight.w600),
           ),
@@ -61,10 +48,8 @@ class StudyActionTheme extends StatelessWidget {
         ),
         segmentedButtonTheme: SegmentedButtonThemeData(
           style: ButtonStyle(
-            foregroundColor: WidgetStateProperty.resolveWith(
-              (states) => states.contains(WidgetState.selected)
-                  ? AppColors.paper
-                  : AppColors.inkBlack,
+            foregroundColor: const WidgetStatePropertyAll(
+              AppColors.inkBlack,
             ),
             backgroundColor: WidgetStateProperty.resolveWith(
               (states) => states.contains(WidgetState.selected)
@@ -74,7 +59,6 @@ class StudyActionTheme extends StatelessWidget {
             side: const WidgetStatePropertyAll(
               BorderSide(
                 color: StudyActionStyles.borderColor,
-                width: 1.15,
               ),
             ),
             textStyle: const WidgetStatePropertyAll(
