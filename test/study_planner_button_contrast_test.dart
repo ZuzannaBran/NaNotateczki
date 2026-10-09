@@ -29,11 +29,12 @@ void main() {
     );
     expect(
       primary.foregroundColor!.resolve(<WidgetState>{}),
-      AppColors.paper,
+      AppColors.inkBlack,
     );
+    expect(StudyActionStyles.secondaryColor, AppColors.toolbar);
     expect(
-      StudyActionStyles.secondary.backgroundColor!.resolve(<WidgetState>{}),
-      StudyActionStyles.secondaryColor,
+      StudyActionStyles.primaryColor.computeLuminance(),
+      greaterThan(0.45),
     );
     expect(
       StudyActionStyles.primaryColor,
@@ -49,6 +50,8 @@ void main() {
           .resolve(<WidgetState>{}),
       AppColors.inkBlack,
     );
+    expect(scopedTheme.outlinedButtonTheme.style!.backgroundColor, isNull);
+    expect(scopedTheme.iconButtonTheme.style!.backgroundColor, isNull);
 
     final segmented = scopedTheme.segmentedButtonTheme.style!;
     expect(
@@ -63,7 +66,7 @@ void main() {
     expect(
       segmented.foregroundColor!
           .resolve(<WidgetState>{WidgetState.selected}),
-      AppColors.paper,
+      AppColors.inkBlack,
     );
     expect(
       segmented.foregroundColor!.resolve(<WidgetState>{}),
