@@ -351,12 +351,18 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   tylko wewnątrz działającej aplikacji.
 - `lib/features/planner/presentation/study_timer_widgets.dart`:
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i oceny sesji.
+- `lib/features/planner/presentation/study_action_theme.dart`:
+  `StudyActionTheme`, `StudyActionStyles`; spójny, kontrastowy wygląd
+  aktywnych przycisków (główne ciemne, drugorzędne beżowe, tekst ciemny),
+  osobne zaznaczenie Today/Week/Month bez zmian motywu globalnego.
 - `lib/features/planner/presentation/planner_screen.dart`:
   `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
   tworzenie, edycja, usuwanie i historia.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ranking i ochrona uszkodzonych danych.
 - `test/study_planner_widget_test.dart`: kalendarz i start–pause–stop–rating.
+- `test/study_planner_button_contrast_test.dart`: regresja widoczności
+  aktywnych przycisków i wyraźnych stanów wybranego widoku kalendarza.
 
 ## 7. Stan edytora
 
