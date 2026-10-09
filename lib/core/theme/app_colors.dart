@@ -48,6 +48,30 @@ const _beigePalette = AppAccentPalette(
 );
 
 class AppColors {
+  static const darkBackground = Color(0xFF2D2E2B);
+  static const darkToolbar = Color(0xFF3A3B39);
+  static const darkActive = Color(0xFF4A4B48);
+  static const darkPaper = Color(0xFF5A5B57);
+  static const darkText = Color(0xFFEEECE6);
+  static const darkOutline = Color(0xFF73746F);
+
+  static Color displayInkColor(Color color, {required bool darkMode}) {
+    if (!darkMode) {
+      return color;
+    }
+    final channels = [color.r, color.g, color.b];
+    final range = channels.reduce((a, b) => a > b ? a : b) -
+        channels.reduce((a, b) => a < b ? a : b);
+    if (range > 0.10) {
+      return color;
+    }
+    final value = (color.r + color.g + color.b) / 3;
+    final inverted = value < 0.5
+        ? darkText
+        : Color.lerp(darkBackground, Colors.white, 1 - value)!;
+    return inverted.withValues(alpha: color.a);
+  }
+
   // Warm beige UI palette.
   static const background = Color(0xFFF1F0EC);
   static const toolbar = Color(0xFFE4E2DD);
