@@ -330,7 +330,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
 - 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1173 linie)
+### `lib/features/library/presentation/library_screen.dart` (1213 linii)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 lista folderów i plików wykorzystuje ustawioną czułość dotyku.
@@ -346,14 +346,17 @@ Oba przyciski mają węższą szerokość 24 px, wysokość 44 px,
 ikonę 18 px oraz mocniejszy cień (elevation 8, black54)
 i cienki obrys dla kontrastu z tłem.
 Stan toolbaru pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
-Wspólne menu trzech kropek folderów, notebooków i boardów ma szerokość
-130 px, tło panelu, krótki efekt rozwijania i wyrównanie do górnej krawędzi
-wiersza przy prawej krawędzi panelu (za uchwytem zmiany szerokości).
+Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
+dodawania przez `+` (172 px) używają wspólnej pozycji przy prawej
+krawędzi panelu, jego koloru i animacji 180 ms. Lewy bok menu jest prosty,
+zaokrąglone (promień 12 px) są wyłącznie prawe narożniki.
 
 - 16: `LibraryScreen`; 23: `_LibraryScreenState`;
-  545: `_LibraryTreePane`; 780: `_FolderTreeRow`;
-  871: `_LibraryTreeItemRow`; 943: `_TreeRowActions` — wspólne menu;
-  1055: `_LibraryWorkspace`; 1121: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
+  545: `_CreateMenuButton`; 602: `_LibraryTreePane`;
+  801: `_FolderTreeRow`; 892: `_LibraryTreeItemRow`;
+  964: `_sidebarMenuShape`; 971: `_showSidebarMenu`;
+  1024: `_TreeRowActions`; 1095: `_LibraryWorkspace`;
+  1161: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -695,14 +698,15 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (488):
+- `test/library_screen_responsive_layout_test.dart` (542):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
   wyśrodkowanie, zwężanie kapsułek, wysokość, odstępy boczne
   oraz przewijanie na wąskim ekranie; również aktualizacja mnożnika
   przewijania plików bez restartu; geometria, kolor i obsługa menu
-  folderu, notebooka oraz boarda
+  folderu, notebooka oraz boarda, a także menu dodawania (3 pozycje,
+  wyrównanie do panelu i jednostronne zaokrąglenia)
 - `test/touch_navigation_sensitivity_test.dart` (83):
   granice czułości i porównanie dystansów scrolla przy gestach palcem.
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
