@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -457,6 +459,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
   Widget build(BuildContext context) {
     final planner = context.watch<StudyPlannerController>();
     final colors = Theme.of(context).colorScheme;
+    final narrow = MediaQuery.sizeOf(context).width < 760;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Study planner'),
@@ -473,20 +476,37 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 ? Icons.calendar_month_outlined
                 : Icons.history_rounded),
           ),
-          TextButton.icon(
-            onPressed: () => showStudySessionEditor(
-              context,
-              technique: StudyTechnique.pomodoro,
-              startAfterSave: true,
+          if (narrow) ...[
+            IconButton(
+              tooltip: 'Smart session',
+              onPressed: () => showStudySessionEditor(
+                context,
+                technique: StudyTechnique.pomodoro,
+                startAfterSave: true,
+              ),
+              icon: const Icon(Icons.auto_awesome_outlined),
             ),
-            icon: const Icon(Icons.auto_awesome_outlined),
-            label: const Text('Smart session'),
-          ),
-          FilledButton.tonalIcon(
-            onPressed: () => showStudySessionEditor(context),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('New session'),
-          ),
+            IconButton(
+              tooltip: 'New session',
+              onPressed: () => showStudySessionEditor(context),
+              icon: const Icon(Icons.add_rounded),
+            ),
+          ] else ...[
+            TextButton.icon(
+              onPressed: () => showStudySessionEditor(
+                context,
+                technique: StudyTechnique.pomodoro,
+                startAfterSave: true,
+              ),
+              icon: const Icon(Icons.auto_awesome_outlined),
+              label: const Text('Smart session'),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: () => showStudySessionEditor(context),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('New session'),
+            ),
+          ],
           const SizedBox(width: 16),
         ],
       ),
@@ -547,7 +567,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
           if (!_history) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-              child: Row(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: math.max(
+                    740, MediaQuery.sizeOf(context).width - 36),
+                  child: Row(
                 children: [
                   IconButton(
                     tooltip: 'Previous',
@@ -587,6 +612,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       () => _mode = next.first),
                   ),
                 ],
+                  ),
+                ),
               ),
             ),
             const Padding(
