@@ -310,23 +310,35 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              for (final item in items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 5),
-                  child: _sessionTile(item, compact: compact),
-                ),
-              if (compact && items.isEmpty)
+              if (compact || _mode == CalendarMode.week)
                 Expanded(
-                  child: InkWell(
-                    onTap: () => showStudySessionEditor(
-                      context,
-                      scheduledAt: DateTime(
-                        day.year, day.month, day.day, 9,
-                      ),
-                    ),
-                    child: const SizedBox.expand(),
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      for (final item in items)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 5),
+                          child: _sessionTile(item, compact: compact),
+                        ),
+                      if (items.isEmpty)
+                        InkWell(
+                          onTap: () => showStudySessionEditor(
+                            context,
+                            scheduledAt: DateTime(
+                              day.year, day.month, day.day, 9,
+                            ),
+                          ),
+                          child: const SizedBox(height: 45),
+                        ),
+                    ],
                   ),
-                ),
+                )
+              else
+                for (final item in items)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 5),
+                    child: _sessionTile(item, compact: compact),
+                  ),
             ],
           ),
         );
