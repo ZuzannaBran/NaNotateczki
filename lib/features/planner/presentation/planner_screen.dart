@@ -387,7 +387,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                     child: Column(
                       children: [
-                        const Row(
+                        Row(
                           children: [
                             for (final name in [
                               'Mon', 'Tue', 'Wed', 'Thu',
