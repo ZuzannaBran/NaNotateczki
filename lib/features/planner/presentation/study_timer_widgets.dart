@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/study_planner_controller.dart';
+import 'study_action_theme.dart';
 import 'planner_screen.dart';
 
 String studyClock(DateTime time) =>
@@ -33,11 +34,13 @@ Future<void> showStudySessionEditor(
 }) async {
   await showDialog<void>(
     context: context,
-    builder: (_) => _StudySessionDialog(
-      session: session,
-      scheduledAt: scheduledAt,
-      technique: technique,
-      startAfterSave: startAfterSave,
+    builder: (_) => StudyActionTheme(
+      child: _StudySessionDialog(
+        session: session,
+        scheduledAt: scheduledAt,
+        technique: technique,
+        startAfterSave: startAfterSave,
+      ),
     ),
   );
 }
@@ -45,8 +48,9 @@ Future<void> showStudySessionEditor(
 Future<void> showStudyRating(BuildContext context, StudySession session) async {
   await showDialog<void>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Rate your productivity'),
+    builder: (dialogContext) => StudyActionTheme(
+      child: AlertDialog(
+        title: const Text('Rate your productivity'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -80,6 +84,7 @@ Future<void> showStudyRating(BuildContext context, StudySession session) async {
           child: const Text('Rate later'),
         ),
       ],
+      ),
     ),
   );
 }
@@ -285,6 +290,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
+          style: StudyActionStyles.primary,
           onPressed: _save,
           child: Text(widget.startAfterSave ? 'Save & start' : 'Save'),
         ),
@@ -306,7 +312,8 @@ class StudyTimerCard extends StatelessWidget {
     final next = planner.upcoming.take(2).toList();
     final reviews = planner.pendingReviews;
     final colors = Theme.of(context).colorScheme;
-    return Container(
+    return StudyActionTheme(
+      child: Container(
       key: const ValueKey('study-timer-card'),
       margin: const EdgeInsets.fromLTRB(10, 10, 10, 12),
       padding: const EdgeInsets.all(12),
@@ -329,7 +336,8 @@ class StudyTimerCard extends StatelessWidget {
                 child: Text('Study timer',
                     style: TextStyle(fontWeight: FontWeight.w600)),
               ),
-              IconButton(
+              IconButton.filledTonal(
+                style: StudyActionStyles.icon,
                 tooltip: 'Open planner',
                 visualDensity: VisualDensity.compact,
                 onPressed: () => openStudyPlanner(context),
@@ -362,7 +370,8 @@ class StudyTimerCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: FilledButton.tonalIcon(
+                    style: StudyActionStyles.secondary,
                     onPressed: active.status == StudyStatus.running
                         ? planner.pause : planner.resume,
                     icon: Icon(active.status == StudyStatus.running
@@ -372,7 +381,8 @@ class StudyTimerCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton.outlined(
+                IconButton.filledTonal(
+                  style: StudyActionStyles.icon,
                   tooltip: 'Stop session',
                   onPressed: () {
                     planner.stop();
@@ -398,7 +408,8 @@ class StudyTimerCard extends StatelessWidget {
             spacing: 4,
             runSpacing: 4,
             children: [
-              TextButton.icon(
+              FilledButton.icon(
+                style: StudyActionStyles.primary,
                 onPressed: planner.isLoaded && planner.error == null
                     ? () => showStudySessionEditor(
                         context, startAfterSave: true)
@@ -406,7 +417,7 @@ class StudyTimerCard extends StatelessWidget {
                 icon: const Icon(Icons.play_circle_outline, size: 18),
                 label: const Text('Start session'),
               ),
-              TextButton.icon(
+              OutlinedButton.icon(
                 onPressed: planner.isLoaded && planner.error == null
                     ? () => showStudySessionEditor(
                         context,
@@ -435,7 +446,8 @@ class StudyTimerCard extends StatelessWidget {
                   ' · ${studyClock(item.scheduledAt)}',
                   style: const TextStyle(fontSize: 11),
                 ),
-                trailing: IconButton(
+                trailing: IconButton.filledTonal(
+                  style: StudyActionStyles.icon,
                   tooltip: 'Start scheduled session',
                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
                   onPressed: active == null
@@ -446,7 +458,7 @@ class StudyTimerCard extends StatelessWidget {
           ],
           if (reviews.isNotEmpty) ...[
             const Divider(height: 14),
-            TextButton.icon(
+            OutlinedButton.icon(
               onPressed: () => showStudyRating(context, reviews.first),
               icon: const Icon(Icons.star_border_rounded, size: 18),
               label: Text('Rate ${reviews.length} session(s)'),
@@ -456,6 +468,7 @@ class StudyTimerCard extends StatelessWidget {
             Text(planner.error!,
                 style: TextStyle(fontSize: 11, color: colors.error)),
         ],
+      ),
       ),
     );
   }
@@ -474,10 +487,11 @@ class CompactStudyTimer extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
       child: Material(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        shape: StadiumBorder(
+        color: StudyActionStyles.secondaryColor,
+        shape: const StadiumBorder(
           side: BorderSide(
-            color: Theme.of(context).colorScheme.outlineVariant,
+            color: StudyActionStyles.borderColor,
+            width: 1.15,
           ),
         ),
         child: InkWell(
