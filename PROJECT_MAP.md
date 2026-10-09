@@ -392,7 +392,7 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2262 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2317 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px; toolbary mają
 kolor tła aplikacji i są oddzielone od strefy notatek separatorem takim jak
@@ -407,16 +407,19 @@ obiektu viewport jest zamrożony: custom pan/zoom jest ignorowany, a pionowy
 Po zakończeniu transformacji normalna nawigacja wraca. Stronę można przesuwać
 poziomo dotykiem także wtedy, gdy jest węższa od viewportu; clamp pozwala jej
 dojść od lewej do prawej granicy pasa, ale nigdy wejść pod margines. Bleed
-pozostaje tylko pionowo. Kliknięcie minimapy przenosi widok do wskazanego
-punktu dokumentu przy obecnym zoomie, przełącza aktywną stronę i zachowuje
-blokadę nawigacji podczas move/resize obiektów. Synchronizacja strony
-z przewijaniem uwzględnia skalę dokumentu oraz pan.
+pozostaje tylko pionowo. Listener pointerów na widocznym obszarze minimapy
+obsługuje kliknięcie niezależnie od przewijania. Odwzorowanie dodaje aktualne
+przewinięcie samej minimapy, przenosi widok do wskazanego miejsca dokumentu,
+wybiera stronę i zachowuje powiększenie. Zdarzenie ScrollEnd po programowym
+skoku nie nadpisuje strony, a normalna synchronizacja podczas ręcznego
+przewijania nadal uwzględnia skalę i pan. Transformacja obiektu blokuje
+nawigację.
 
 - 33: `EditorScreen`; 40: `_EditorScreenState`.
 - 41: `_logicalPageWidth`; 84: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
-- 124: `_syncCurrentPageToViewport`; 157: `_navigateToOverviewPoint`.
-- 246–665: gesty pan/zoom, blokada viewportu i transformacje.
+- 133: `_syncCurrentPageToViewport`; 166: `_navigateToOverviewPoint`.
+- 255–674: gesty pan/zoom, blokada viewportu i transformacje.
 - 802–888: busy overlay, import/eksport i clipboard.
 - 1007: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
@@ -424,9 +427,9 @@ z przewijaniem uwzględnia skalę dokumentu oraz pan.
 - 1033: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1468: `_PageViewportClipper`; 1526: `_PageFramePainter`;
-  1633: `_ProjectMiniMapOverlay`; 1932: gest kliknięcia;
-  2006: `_ProjectMiniMapPainter` (wyłącznie zwykły ink).
+- 1480: `_PageViewportClipper`; 1538: `_PageFramePainter`;
+  1645: `_ProjectMiniMapOverlay`; 1939: zdarzenia pointerów minimapy;
+  2061: `_ProjectMiniMapPainter` (wyłącznie zwykły ink).
 
 ### `lib/features/editor/presentation/editor_settings_screen.dart` (672 linie)
 
@@ -446,11 +449,12 @@ błędów, integralności i wydajności.
   609:
   `_BackgroundSection`.
 
-### `lib/features/editor/presentation/interaction/notebook_overview_navigation.dart` (49 linii)
+### `lib/features/editor/presentation/interaction/notebook_overview_navigation.dart` (56 linii)
 
-Przelicza pozycję klikniętą na minimapie na współrzędne dokumentu i wyznacza
-przewinięcie oraz pan niezbędne do wyśrodkowania punktu z zachowaniem zoomu.
-5: `NotebookOverviewNavigation`; 40: `NotebookOverviewTarget`.
+Przelicza pozycję w widocznym obszarze minimapy wraz z jej scroll offsetem
+na współrzędne dokumentu. Nawigacja uwzględnia górny padding dokumentu oraz
+rozdziela główne przewinięcie i pan bez zmiany zoomu.
+5: `NotebookOverviewNavigation`; 47: `NotebookOverviewTarget`.
 
 ### Widgety edytora
 
@@ -636,9 +640,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
   brak mutacji źródła oraz zgodność rozmiaru segmentów z zoomem
 - `test/editor_screen_responsive_layout_test.dart` (196)
-- `test/notebook_overview_navigation_test.dart`: mapowanie współrzędnych,
-  zachowanie zoomu, nawigacja między stronami przez kliknięcie overview oraz
-  blokada podczas transformacji obiektu.
+- `test/notebook_overview_navigation_test.dart`: mapowanie współrzędnych
+  również przy przewiniętej minimapie, uwzględnienie paddingu i zoomu,
+  nawigacja między stronami, blokada podczas transformacji obiektu oraz
+  odtwarzanie kliknięcia po ręcznym przewinięciu overview.
 - `test/page_overlay_text_gestures_test.dart` (317): sprawdza blokowy
   toolbar tekstu i brak nieobsługiwanych list, skalowanie hit-area uchwytów,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
