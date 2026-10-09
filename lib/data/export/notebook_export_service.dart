@@ -522,12 +522,12 @@ class NotebookExportService {
       TextSpan(
         text: block.text,
         style: TextStyle(
-            color: AppColors.displayInkColor(
-              block.color,
-              darkMode: darkMode,
-            ),
-            fontSize: block.fontSize,
+          color: AppColors.displayInkColor(
+            block.color,
+            darkMode: darkMode,
           ),
+          fontSize: block.fontSize,
+        ),
       ),
     ];
   }
