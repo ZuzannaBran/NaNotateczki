@@ -1077,11 +1077,11 @@ class _LeftZoneToggleTab extends StatelessWidget {
               ? (expanded ? 'Hide toolbar' : 'Show toolbar')
               : (expanded ? 'Hide projects' : 'Show projects'),
           child: SizedBox(
-            width: 32,
+            width: 24,
             height: _LibraryScreenState._toggleTabHeight,
             child: Icon(
               expanded ? Icons.chevron_left : Icons.chevron_right,
-              size: 20,
+              size: 18,
             ),
           ),
         ),
