@@ -48,9 +48,19 @@ class TextEditToolbar extends StatelessWidget {
     final currentSize = block.fontSize.round();
 
     return Container(
+      key: const ValueKey('text-toolbar-panel'),
       width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(44, 0, 12, 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(
+            context,
+          ).colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
