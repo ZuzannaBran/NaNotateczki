@@ -29,12 +29,12 @@ class EditorToolbar extends StatelessWidget {
             controller.activeImageBlockId != null ||
             (controller.lassoSelection?.isEmpty == false);
         return Padding(
-          padding: const EdgeInsets.fromLTRB(44, 8, 44, 8),
+          padding: const EdgeInsets.fromLTRB(52, 8, 52, 8),
           child: Align(
             alignment: Alignment.topCenter,
             child: Container(
               key: const ValueKey('editor-toolbar-panel'),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 3),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(999),
