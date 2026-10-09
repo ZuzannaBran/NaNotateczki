@@ -364,12 +364,15 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Motyw globalny pozostaje bez zmian.
 - `lib/features/planner/presentation/planner_screen.dart`:
   `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
-  tworzenie, edycja, usuwanie i historia.
+  tworzenie, edycja, usuwanie i historia. Nazwa dnia tygodnia znajduje się
+  w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
   i ochrona uszkodzonych danych.
 - `test/study_planner_widget_test.dart`: kalendarz, timer, wybór gwiazdek,
   pominięcie i zamknięcie oceny, historia oceniona i bez oceny.
+- `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
+  tygodnia we wszystkich widokach i po zmianie daty; osobny krok CI.
 - `test/study_planner_button_contrast_test.dart`: regresja widoczności
   aktywnych przycisków i wyraźnych stanów wybranego widoku kalendarza.
 
