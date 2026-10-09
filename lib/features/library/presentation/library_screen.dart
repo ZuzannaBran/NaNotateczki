@@ -542,6 +542,59 @@ const TextStyle _sidebarTextStyle = TextStyle(
   letterSpacing: -0.05,
 );
 
+class _CreateMenuButton extends StatelessWidget {
+  const _CreateMenuButton({required this.onSelected});
+
+  final ValueChanged<_CreateAction> onSelected;
+
+  Future<void> _showActions(BuildContext context) async {
+    final colors = Theme.of(context).colorScheme;
+    final selection = await _showSidebarMenu<_CreateAction>(
+      context: context,
+      anchorContext: context,
+      width: 172,
+      items: [
+        for (final (value, icon, label) in [
+          (_CreateAction.folder, Icons.create_new_folder_outlined, 'New folder'),
+          (_CreateAction.notebook, Icons.description_outlined, 'New notebook'),
+          (_CreateAction.board, Icons.dashboard_outlined, 'New board'),
+        ])
+          PopupMenuItem<_CreateAction>(
+            value: value,
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: colors.onSurfaceVariant),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: _sidebarTextStyle.copyWith(
+                    color: colors.onSurface,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+    if (context.mounted && selection != null) {
+      onSelected(selection);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Create',
+      icon: const Icon(Icons.add_rounded, size: 21),
+      onPressed: () => _showActions(context),
+    );
+  }
+}
+
+
 class _LibraryTreePane extends StatefulWidget {
   const _LibraryTreePane({
     required this.controller,
@@ -593,43 +646,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                       ),
                     ),
                   ),
-                  PopupMenuButton<_CreateAction>(
-                    tooltip: 'Create',
-                    icon: const Icon(Icons.add_rounded, size: 21),
-                    onSelected: _handleCreateAction,
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: _CreateAction.folder,
-                        child: Row(
-                          children: [
-                            Icon(Icons.create_new_folder_outlined),
-                            SizedBox(width: 10),
-                            Text('New folder'),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: _CreateAction.notebook,
-                        child: Row(
-                          children: [
-                            Icon(Icons.description_outlined),
-                            SizedBox(width: 10),
-                            Text('New notebook'),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: _CreateAction.board,
-                        child: Row(
-                          children: [
-                            Icon(Icons.dashboard_outlined),
-                            SizedBox(width: 10),
-                            Text('New board'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  _CreateMenuButton(onSelected: _handleCreateAction),
                 ],
               ),
             ),
@@ -940,6 +957,66 @@ class _LibraryTreeItemRow extends StatelessWidget {
   }
 }
 
+const _sidebarMenuShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.only(
+    topRight: Radius.circular(12),
+    bottomRight: Radius.circular(12),
+  ),
+);
+
+Future<T?> _showSidebarMenu<T>({
+  required BuildContext context,
+  required BuildContext anchorContext,
+  required double width,
+  required List<PopupMenuEntry<T>> items,
+}) async {
+  final paneState =
+      anchorContext.findAncestorStateOfType<_LibraryTreePaneState>();
+  final paneBox = paneState?.context.findRenderObject() as RenderBox?;
+  final anchorBox = anchorContext.findRenderObject() as RenderBox?;
+  final overlayBox =
+      Overlay.of(context).context.findRenderObject() as RenderBox?;
+  if (paneBox == null || anchorBox == null || overlayBox == null) {
+    return null;
+  }
+
+  final panelEdge = paneBox.localToGlobal(
+    Offset(
+      paneBox.size.width + _LibraryScreenState._resizeHandleWidth,
+      0,
+    ),
+    ancestor: overlayBox,
+  ).dx;
+  final anchorTop = anchorBox.localToGlobal(
+    Offset.zero,
+    ancestor: overlayBox,
+  ).dy;
+  final left = panelEdge.clamp(0.0, overlayBox.size.width).toDouble();
+  final top = anchorTop.clamp(0.0, overlayBox.size.height).toDouble();
+  return showMenu<T>(
+    context: context,
+    position: RelativeRect.fromLTRB(
+      left,
+      top,
+      overlayBox.size.width - left,
+      overlayBox.size.height - top,
+    ),
+    constraints: BoxConstraints.tightFor(width: width),
+    menuPadding: const EdgeInsets.symmetric(vertical: 3),
+    color: Theme.of(context).colorScheme.surfaceContainerLowest,
+    surfaceTintColor: Colors.transparent,
+    elevation: 5,
+    shape: _sidebarMenuShape,
+    popUpAnimationStyle: const AnimationStyle(
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+      duration: Duration(milliseconds: 180),
+      reverseDuration: Duration(milliseconds: 120),
+    ),
+    items: items,
+  );
+}
+
 class _TreeRowActions extends StatelessWidget {
   const _TreeRowActions({
     required this.rowContext,
@@ -956,52 +1033,11 @@ class _TreeRowActions extends StatelessWidget {
   final VoidCallback onDelete;
 
   Future<void> _showActions(BuildContext context) async {
-    final paneState = rowContext
-        .findAncestorStateOfType<_LibraryTreePaneState>();
-    final paneBox = paneState?.context.findRenderObject() as RenderBox?;
-    final rowBox = rowContext.findRenderObject() as RenderBox?;
-    final overlayBox =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (paneBox == null || rowBox == null || overlayBox == null) {
-      return;
-    }
-
-    final panelEdge = paneBox.localToGlobal(
-      Offset(
-        paneBox.size.width + _LibraryScreenState._resizeHandleWidth,
-        0,
-      ),
-      ancestor: overlayBox,
-    ).dx;
-    final rowTop = rowBox.localToGlobal(
-      Offset.zero,
-      ancestor: overlayBox,
-    ).dy;
-    final left = panelEdge.clamp(0.0, overlayBox.size.width).toDouble();
-    final top = rowTop.clamp(0.0, overlayBox.size.height).toDouble();
     final colorScheme = Theme.of(context).colorScheme;
-    final action = await showMenu<_TreeRowAction>(
+    final action = await _showSidebarMenu<_TreeRowAction>(
       context: context,
-      position: RelativeRect.fromLTRB(
-        left,
-        top,
-        overlayBox.size.width - left,
-        overlayBox.size.height - top,
-      ),
-      constraints: const BoxConstraints.tightFor(width: 130),
-      menuPadding: const EdgeInsets.symmetric(vertical: 3),
-      color: colorScheme.surfaceContainerLowest,
-      surfaceTintColor: Colors.transparent,
-      elevation: 5,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(9),
-      ),
-      popUpAnimationStyle: const AnimationStyle(
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
-        duration: Duration(milliseconds: 180),
-        reverseDuration: Duration(milliseconds: 120),
-      ),
+      anchorContext: rowContext,
+      width: 130,
       items: [
         for (final (value, label) in [
           (_TreeRowAction.rename, 'Rename'),
