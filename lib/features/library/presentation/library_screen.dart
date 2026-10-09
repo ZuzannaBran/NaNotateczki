@@ -1055,11 +1055,16 @@ class _LeftZoneToggleTab extends StatelessWidget {
         toolbar ? 'editor-toolbar-toggle' : 'library-navigation-toggle',
       ),
       color: theme.colorScheme.surface,
-      elevation: 3,
-      shadowColor: Colors.black26,
-      borderRadius: const BorderRadius.only(
-        topRight: Radius.circular(12),
-        bottomRight: Radius.circular(12),
+      elevation: 8,
+      shadowColor: Colors.black54,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
       ),
       child: InkWell(
         borderRadius: const BorderRadius.only(
