@@ -330,7 +330,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
 - 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1196 linii)
+### `lib/features/library/presentation/library_screen.dart` (1197 linii)
 
 Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
 lista folderów i plików wykorzystuje ustawioną czułość dotyku.
@@ -360,8 +360,8 @@ opcje dodawania nie mają ikonek.
   545: `_CreateMenuButton`; 589: `_LibraryTreePane`;
   788: `_FolderTreeRow`; 879: `_LibraryTreeItemRow`;
   951: `_sidebarMenuShape`; 958: `_showSidebarMenu`;
-  1008: `_TreeRowActions`; 1078: `_LibraryWorkspace`;
-  1144: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
+  1009: `_TreeRowActions`; 1079: `_LibraryWorkspace`;
+  1145: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
