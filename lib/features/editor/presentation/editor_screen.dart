@@ -1024,13 +1024,15 @@ class _EditorScreenState extends State<EditorScreen> {
                 docWorldSize.width * clipScale,
                 docWorldSize.height * clipScale,
               );
+              final documentClipHeight =
+                  clipSize.height + math.max(0.0, _pagePan.dy);
               final viewportSize = Size(
                 maxPageWidth,
                 math.max(1.0, constraints.maxHeight - (_topBottomPadding * 2)),
               );
               final documentContentSize = Size(
                 viewportSize.width,
-                clipSize.height + (_addPageFooterHeight * clipScale),
+                documentClipHeight + (_addPageFooterHeight * clipScale),
               );
               final zoomPercent = (effectivePageScale * 100).round();
               final visibleDocumentRect = _visibleDocumentRect(
@@ -1102,7 +1104,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                 SizedBox(
                                   key: const ValueKey('notebook-page-viewport'),
                                   width: viewportSize.width,
-                                  height: clipSize.height,
+                                  height: documentClipHeight,
                                   child: ClipRect(
                                     clipper: const _PageViewportClipper(
                                       _pageViewportBleed,
