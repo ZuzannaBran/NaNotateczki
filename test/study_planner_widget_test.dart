@@ -41,7 +41,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Study planner'), findsOneWidget);
-    expect(find.text('Calculus', findRichText: true), findsWidgets);
+    expect(find.textContaining('Calculus'), findsWidgets);
 
     await tester.tap(find.text('Month'));
     await tester.pumpAndSettle();
