@@ -269,14 +269,12 @@ ButtonStyle _appearanceButtonStyle(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final foreground = isDark ? AppColors.darkText : AppColors.inkBlack;
   final selectedBackground = isDark
-      ? AppColors.darkText
-      : AppColors.inkBlack;
+      ? AppColors.darkActive
+      : AppColors.divider;
   final unselectedBackground = isDark
       ? AppColors.darkToolbar
       : AppColors.toolbar;
-  final selectedForeground = isDark
-      ? AppColors.darkBackground
-      : AppColors.darkText;
+  final outline = isDark ? AppColors.darkOutline : AppColors.inkBlack;
 
   return ButtonStyle(
     backgroundColor: WidgetStateProperty.resolveWith(
@@ -284,13 +282,14 @@ ButtonStyle _appearanceButtonStyle(BuildContext context) {
           ? selectedBackground
           : unselectedBackground,
     ),
-    foregroundColor: WidgetStateProperty.resolveWith(
-      (states) => states.contains(WidgetState.selected)
-          ? selectedForeground
-          : foreground,
-    ),
-    side: WidgetStateProperty.all(
-      BorderSide(color: foreground.withValues(alpha: 0.75), width: 1.2),
+    foregroundColor: WidgetStateProperty.all(foreground),
+    side: WidgetStateProperty.resolveWith(
+      (states) => BorderSide(
+        color: outline.withValues(
+          alpha: states.contains(WidgetState.selected) ? 0.85 : 0.35,
+        ),
+        width: states.contains(WidgetState.selected) ? 1.3 : 1,
+      ),
     ),
     padding: WidgetStateProperty.all(
       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
