@@ -52,7 +52,7 @@ class PageBackgroundPreview extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
-            ? AppColors.darkPaper
+            ? AppColors.darkCanvas
             : AppColors.paper,
         border: Border.all(color: Theme.of(context).dividerColor),
         borderRadius: BorderRadius.circular(8),
