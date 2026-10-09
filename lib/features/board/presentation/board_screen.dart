@@ -716,7 +716,7 @@ class _BoardScreenState extends State<BoardScreen> {
             bottom: 8,
             left: placement == ToolbarPlacement.left ? 0 : null,
             right: placement == ToolbarPlacement.right ? 0 : null,
-            width: 104,
+            width: 120,
             child: EditorToolbar(
               controller: controller,
               axis: Axis.vertical,
@@ -728,8 +728,8 @@ class _BoardScreenState extends State<BoardScreen> {
           Positioned(
             top: 8,
             bottom: 8,
-            left: placement == ToolbarPlacement.left ? 108 : null,
-            right: placement == ToolbarPlacement.right ? 108 : null,
+            left: placement == ToolbarPlacement.left ? 124 : null,
+            right: placement == ToolbarPlacement.right ? 124 : null,
             width: 152,
             child: TextEditToolbar(
               editorController: controller,
