@@ -22,6 +22,7 @@ void main() {
     expect(theme.colorScheme.surfaceContainerLow, const Color(0xFF3A3B39));
     expect(theme.colorScheme.primaryContainer, const Color(0xFF4A4B48));
     expect(theme.cardColor, const Color(0xFF5A5B57));
+    expect(AppColors.darkCanvas, const Color(0xFF50514D));
     expect(theme.colorScheme.onSurface, const Color(0xFFEEECE6));
     expect(AppTheme.light().brightness, Brightness.light);
   });
