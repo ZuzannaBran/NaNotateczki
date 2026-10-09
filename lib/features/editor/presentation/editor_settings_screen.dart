@@ -20,6 +20,8 @@ class EditorSettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
     final preferences = context.watch<AppPreferencesController>();
+    final sensitivityLabel = preferences.touchNavigationSensitivity
+        .toStringAsFixed(1);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -121,9 +123,7 @@ class EditorSettingsScreen extends StatelessWidget {
                                     divisions: 15,
                                     value: preferences
                                         .touchNavigationSensitivity,
-                                    label: '${preferences.'
-                                        'touchNavigationSensitivity'
-                                        '.toStringAsFixed(1)}×',
+                                    label: '$sensitivityLabel×',
                                     onChanged: preferences
                                         .previewTouchNavigationSensitivity,
                                     onChangeEnd: preferences
@@ -134,8 +134,7 @@ class EditorSettingsScreen extends StatelessWidget {
                                 SizedBox(
                                   width: 48,
                                   child: Text(
-                                    '${preferences.touchNavigationSensitivity'
-                                    '.toStringAsFixed(1)}×',
+                                    '$sensitivityLabel×',
                                     textAlign: TextAlign.end,
                                   ),
                                 ),
