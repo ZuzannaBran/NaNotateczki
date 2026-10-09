@@ -344,7 +344,7 @@ void main() {
             children: [
               SizedBox(
                 width: 104,
-                height: 640,
+                height: 340,
                 child: EditorToolbar(
                   axis: Axis.vertical,
                   controller: controller,
@@ -354,7 +354,7 @@ void main() {
               ),
               SizedBox(
                 width: 152,
-                height: 640,
+                height: 340,
                 child: TextEditToolbar(
                   axis: Axis.vertical,
                   editorController: controller,
