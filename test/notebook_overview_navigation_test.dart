@@ -16,11 +16,7 @@ import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
-import 'support/native_test_documents.dart';
-
 void main() {
-  useIsolatedNativeTestDocuments();
-
   test('minimap scroll offset changes which document point is selected', () {
     const scale = 84 / 820;
     const docSize = Size(820, 12000);
