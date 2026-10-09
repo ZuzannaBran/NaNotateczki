@@ -365,3 +365,19 @@ items, not the cause of either failure in this run.
 - Android Debug, Release (including R8/ML Kit), emulator smoke test, and
   document lifecycle must pass before adopting AGP 9 as the stable baseline.
   If the migration fails, restore the last green toolchain in a revert commit.
+
+## Gradle 9 / AGP 9 compatibility rollback (9 October 2026)
+
+- CI run 37924767077 demonstrates that Gradle 9.1.0 / AGP 9.0.1 fails
+  on Android Debug and Release at
+  `irondash_engine_context-0.5.5/cargokit/gradle/plugin.gradle:60`:
+  `Could not find method exec()` when CargoKit invokes removed
+  `Project.exec` in Gradle 9. Kotlin built-in compatibility flags cannot
+  address this different Gradle API failure.
+- Toolchain reverted to the previously passing Gradle 8.14 / AGP 8.11.1.
+  Keep Kotlin 2.3.20 and typed JVM 17 compiler options. The Android Gradle
+  deprecation notices remain tracked until upstream provides compatible
+  stable CargoKit / irondash dependencies; do not suppress or fake them.
+- Regression test `android_build_toolchain_test.dart` now guards the
+  compatibility hold. Revisit only after an updated dependency and verify
+  Android Debug, Release, R8 and emulator end-to-end on the new toolchain.

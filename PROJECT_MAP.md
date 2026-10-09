@@ -681,9 +681,10 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   liczba stron i rozmiar obrazu, treść oraz legacy gumka; renderer działa
   w `tester.runAsync`, poza strefą `FakeAsync` testu widgetowego.
   Dodatkowe regresje sprawdzają 12-stronicowy eksport PNG oraz PNG/PDF boarda.
-- Android toolchain: Gradle 9.1.0 + Android Gradle Plugin 9.0.1; Flutter 3.47
-  tymczasowo korzysta z `android.newDsl=false` i
-  `android.builtInKotlin=false`, dopóki zależności nie przejdą na AGP 9.
+- Android toolchain: sprawdzony Gradle 8.14 + AGP 8.11.1 z Kotlin
+  2.3.20; Gradle 9 blokuje zależność `irondash_engine_context 0.5.5`,
+  której skrypt CargoKit korzysta z usuniętego `Project.exec`.
+  `test/android_build_toolchain_test.dart` zabezpiecza ten stan.
 - `android/app/build.gradle.kts` i `android/app/proguard-rules.pro`:
   Release wymaga prywatnego `android/key.properties` poza CI i jawnym trybem
   debug-signing; konfiguracja odrzuca niepełne klucze i brak keystore.
