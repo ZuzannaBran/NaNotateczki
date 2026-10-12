@@ -214,14 +214,69 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                     data: preferences.darkMode
                         ? AppTheme.dark()
                         : AppTheme.light(accentColor: preferences.accentColor),
-                    child: _ExitGuardOverlay(
-                      finishingExit: _finishingExit,
-                      child: child ?? const SizedBox.shrink(),
+                    child: AppUiScale(
+                      scale: preferences.uiScale,
+                      child: _ExitGuardOverlay(
+                        finishingExit: _finishingExit,
+                        child: child ?? const SizedBox.shrink(),
+                      ),
                     ),
                   );
                 },
               );
             },
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Scales the complete application viewport while keeping its layout usable.
+class AppUiScale extends StatelessWidget {
+  const AppUiScale({super.key, required this.scale, required this.child});
+
+  final double scale;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (scale == 1) {
+      return child;
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewport = constraints.biggest;
+        if (!viewport.isFinite || viewport.isEmpty) {
+          return child;
+        }
+        final logicalSize = viewport / scale;
+        final query = MediaQuery.of(context);
+        return ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.topLeft,
+            minWidth: 0,
+            minHeight: 0,
+            maxWidth: double.infinity,
+            maxHeight: double.infinity,
+            child: Transform.scale(
+              scale: scale,
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: logicalSize.width,
+                height: logicalSize.height,
+                child: MediaQuery(
+                  data: query.copyWith(
+                    size: logicalSize,
+                    padding: query.padding / scale,
+                    viewPadding: query.viewPadding / scale,
+                    viewInsets: query.viewInsets / scale,
+                    systemGestureInsets: query.systemGestureInsets / scale,
+                  ),
+                  child: child,
+                ),
+              ),
+            ),
           ),
         );
       },
