@@ -67,4 +67,49 @@ void main() {
     await tester.pumpWidget(app(1));
     expect(logicalSize, const Size(900, 600));
   });
+
+  testWidgets('changing scale does not reset the current route', (
+    tester,
+  ) async {
+    final scale = ValueNotifier<double>(1);
+    addTearDown(scale.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => ValueListenableBuilder<double>(
+          valueListenable: scale,
+          builder: (context, value, _) => AppUiScale(
+            scale: value,
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => const Scaffold(
+                    body: Center(child: Text('Persistent page')),
+                  ),
+                ),
+              ),
+              child: const Text('Open page'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open page'));
+    await tester.pumpAndSettle();
+    expect(find.text('Persistent page'), findsOneWidget);
+
+    scale.value = 1.25;
+    await tester.pumpAndSettle();
+    expect(find.text('Persistent page'), findsOneWidget);
+
+    scale.value = 1;
+    await tester.pumpAndSettle();
+    expect(find.text('Persistent page'), findsOneWidget);
+  });
 }
