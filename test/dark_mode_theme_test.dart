@@ -134,7 +134,10 @@ void main() {
     await tester.pump();
     expect(preferences.touchNavigationSensitivity, 1.6);
     expect(tester.widget<Slider>(navigationSlider).value, 1.6);
-    expect(find.text('1.6×'), findsOneWidget);
+    expect(tester.widget<Slider>(navigationSlider).label, isNull);
+    expect(find.text('0.5×'), findsNothing);
+    expect(find.text('2.0×'), findsNothing);
+    expect(find.text('1.6×'), findsNothing);
 
     await tester.tap(find.text('Visual'));
     await tester.pumpAndSettle();
@@ -148,7 +151,10 @@ void main() {
     await tester.pump();
     expect(preferences.uiScale, 1.25);
     expect(tester.widget<Slider>(scaleFinder).value, 1.25);
-    expect(find.text('125%'), findsOneWidget);
+    expect(tester.widget<Slider>(scaleFinder).label, isNull);
+    expect(find.text('75%'), findsNothing);
+    expect(find.text('150%'), findsNothing);
+    expect(find.text('125%'), findsNothing);
 
     final switchFinder = find.byKey(const ValueKey('visual-dark-mode-toggle'));
     final lightControl = tester.widget<SegmentedButton<bool>>(switchFinder);
