@@ -269,13 +269,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   14: `inkSpatialIndexFor`; 24: `InkSpatialIndex`.
 - `lib/features/notebook/domain/ink_eraser_engine.dart` (836):
   jedyny silnik modyfikacji gumki dla boarda i notebooka. Obsługuje zwykłą
-  gumkę, erase-stroke, gumkę zakresową (przycinanie fragmentów) oraz scratch erase. Legacy maski są tu wyłącznie
-  jednorazowo normalizowane do zwykłego ink; generator fragmentów unika
+  gumkę, erase-stroke, gumkę zakresową (przycinanie fragmentów)
+  oraz scratch erase. Legacy maski są tu wyłącznie jednorazowo
+  normalizowane do zwykłego ink; generator fragmentów unika
   kolizji ID i obsługuje też pojedyncze punkty.
-  37: `InkEraserEngine`; 40: `normalizePage`; 45: `normalizeNotebook`;
-  117: `scratchInkHitCount`; 139: `eraseScratchParts`;
-  168: `eraseAreaParts` — przycinanie na krawędziach wielokąta;
-  194: `flattenLegacyErasers`.
+  34: `InkEraserEngine`; 37: `normalizePage`; 42: `normalizeNotebook`;
+  107: `scratchInkHitCount`; 129: `eraseScratchParts`;
+  169: `eraseAreaParts` — przycinanie na krawędziach wielokąta;
+  215: `flattenLegacyErasers`.
 - `lib/features/notebook/domain/text_block.dart` (45): blok Quill z pozycją,
   stylem, szerokością i rotacją.
   3: `TextBlock`.
