@@ -607,23 +607,24 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (724 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (687 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
 oraz `darkActive`/`darkToolbar` w ciemnym. Zaznaczona opcja ma
 mocniejszą ramkę, bez czarnego lub białego tła. Zakładka System
 ma suwak czułości nawigacji 0.5×–2.0×, a Visual globalną skalę
-interfejsu 75%–150% z natychmiastowym podglądem. Pozostałe sekcje
+interfejsu 75%–150% z natychmiastowym podglądem. Oba suwaki nie
+wyświetlają liczb ani etykiet wartości. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
 `EditorController` jest opcjonalny: ustawienia globalne działają z pustego
 katalogu i planera; tła i ustawienia rysika wymagają otwartego dokumentu.
 Nagłówek ma wysokość 56 px, tytuł 18 px jak Projects i linię 1 px pod
 paskiem; linia jest w body, nie w AppBar.bottom.
 
-- 17: `EditorSettingsScreen`; 406: `_showErrorsDialog`;
-  488: `_showDataIntegrityDialog`; 575: `_showOptimizationDialog`;
-  661: `_BackgroundSection`.
+- 17: `EditorSettingsScreen`; 369: `_showErrorsDialog`;
+  451: `_showDataIntegrityDialog`; 538: `_showOptimizationDialog`;
+  624: `_BackgroundSection`.
 
 ### `lib/features/editor/presentation/interaction/notebook_overview_navigation.dart` (55 linii)
 
@@ -920,7 +921,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/widget_test.dart` (20)
 - `test/dark_mode_theme_test.dart` (209): paleta dark, odwracanie jasności
   wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual,
-  suwak skali interfejsu oraz podgląd suwaka czułości w System.
+  suwak skali interfejsu oraz podgląd suwaka czułości w System;
+  oba bez liczbowych etykiet.
 - `test/ui_scale_test.dart`: rozmiary logicznego viewportu i trafianie
   w przyciski przy powiększeniu oraz pomniejszeniu całego interfejsu,
   zachowanie bieżącej trasy po powrocie do skali 100%.
