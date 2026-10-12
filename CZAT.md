@@ -1,6 +1,9 @@
 # CZAT.md
 
 Instrukcje dla czatu programującego bezpośrednio w repozytorium GitHub.
+Domyślną gałęzią dla wszystkich zadań w NaNotateczki jest `dev`.
+Pracuj, commituj i pushuj na `dev`, chyba że użytkownik
+wyraźnie wskaże inną gałąź dla konkretnego zadania.
 Domyślny język komunikacji: polski. Nie zgaduj: gdy czegoś nie wiesz,
 sprawdź repozytorium, a pytaj tylko wtedy, gdy odpowiedź zmienia kierunek
 pracy.
@@ -77,13 +80,13 @@ Jeśli narzędzia lub zależności są niedostępne, nie pomijaj tego po cichu.
 Opisz ograniczenie w odpowiedzi i komunikacie commita nie oznaczaj testów
 jako zaliczone.
 
-## 5. Commit i push na `dev_ui`
+## 5. Commit i push na `dev`
 
 Każdy ukończony zestaw zmian wykonany przez czat musi trafić w osobnym
-commicie na gałąź `dev_ui`.
+commicie na gałąź `dev`.
 
-1. Przed pracą upewnij się, że działasz na `dev_ui`, i zsynchronizuj ją przez
-   `git pull --ff-only origin dev_ui`, o ile połączenie z GitHubem jest
+1. Przed pracą upewnij się, że działasz na `dev`, i zsynchronizuj ją przez
+   `git pull --ff-only origin dev`, o ile połączenie z GitHubem jest
    dostępne.
 2. Po edycji przejrzyj `git diff` i wynik weryfikacji.
 3. Dodaj do commita wyłącznie własne pliki, wskazując je jawnie w `git add`.
@@ -94,7 +97,7 @@ commicie na gałąź `dev_ui`.
 chat: <krótki opis zmiany>
 ```
 
-5. Wykonaj `git push origin dev_ui` i sprawdź, czy operacja się powiodła.
+5. Wykonaj `git push origin dev` i sprawdź, czy operacja się powiodła.
 
 Nie używaj `--force`, nie przepisuj historii i nie usuwaj cudzych zmian. Jeśli
 brakuje uprawnień, połączenia albo synchronizacja wymagałaby merge'a lub
