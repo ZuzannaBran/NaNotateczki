@@ -27,11 +27,11 @@ class EditorSettingsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: kToolbarHeight,
+        toolbarHeight: AppHeaderDivider.toolbarHeight,
         titleSpacing: MediaQuery.sizeOf(context).width >= 600 ? 44 : null,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text('Settings', style: TextStyle(fontSize: 18)),
+        title: const Text('Settings', style: AppHeaderDivider.titleStyle),
         bottom: const AppHeaderDivider(),
       ),
       body: DefaultTabController(

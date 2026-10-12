@@ -549,12 +549,15 @@ class _PlannerScreenState extends State<PlannerScreen> {
     return StudyActionTheme(
       child: Scaffold(
         appBar: AppBar(
-          toolbarHeight: kToolbarHeight,
+          toolbarHeight: AppHeaderDivider.toolbarHeight,
           titleSpacing: MediaQuery.sizeOf(context).width >= 600 ? 44 : null,
           bottom: const AppHeaderDivider(),
           scrolledUnderElevation: 0,
           surfaceTintColor: Colors.transparent,
-          title: const Text('Study planner', style: TextStyle(fontSize: 18)),
+          title: const Text(
+            'Study planner',
+            style: AppHeaderDivider.titleStyle,
+          ),
           leading: IconButton(
             tooltip: 'Back to notes',
             icon: const Icon(Icons.arrow_back),

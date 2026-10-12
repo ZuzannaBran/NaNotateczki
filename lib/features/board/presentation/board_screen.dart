@@ -15,6 +15,7 @@ import 'package:provider/provider.dart';
 import '../../../core/diagnostics/board_scene_perf_tracker.dart';
 import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_header_divider.dart';
 import '../../editor/presentation/editor_commands.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
 import '../../editor/presentation/widgets/busy_overlay.dart';
@@ -734,10 +735,14 @@ class _BoardScreenState extends State<BoardScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: AppHeaderDivider.toolbarHeight,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         titleSpacing: useWideTitleInset ? 44 : null,
-        title: Text(controller.notebook.title),
+        title: Text(
+          controller.notebook.title,
+          style: AppHeaderDivider.titleStyle,
+        ),
         actions: [
           if (widget.showCompactTimer) const CompactStudyTimer(),
           IconButton(

@@ -4,14 +4,18 @@ import 'package:flutter/material.dart';
 class AppHeaderDivider extends StatelessWidget implements PreferredSizeWidget {
   const AppHeaderDivider({super.key});
 
+  static const double toolbarHeight = kToolbarHeight;
   static const double thickness = 1;
+  static const TextStyle titleStyle = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    height: 1.2,
+    letterSpacing: -0.05,
+  );
 
   static Color colorOf(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Color.alphaBlend(
-      scheme.outlineVariant.withValues(alpha: 0.45),
-      scheme.surfaceContainerLowest,
-    );
+    return scheme.outlineVariant;
   }
 
   @override

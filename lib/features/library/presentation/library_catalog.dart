@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_header_divider.dart';
 import '../../editor/presentation/widgets/editor_toolbar.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
@@ -98,6 +99,7 @@ class LibraryCatalog extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: AppHeaderDivider.toolbarHeight,
         automaticallyImplyLeading: false,
         titleSpacing: useWideTitleInset ? 44 : null,
         scrolledUnderElevation: 0,
@@ -105,7 +107,7 @@ class LibraryCatalog extends StatelessWidget {
         title: Text(
           activeFolder ?? 'Library',
           key: const ValueKey('catalog-title'),
-          style: const TextStyle(fontSize: 18),
+          style: AppHeaderDivider.titleStyle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

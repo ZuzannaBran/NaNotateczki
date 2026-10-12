@@ -62,6 +62,10 @@ void main() {
         const Rect.fromLTWH(0, kToolbarHeight, 1400, 1),
       );
       final libraryColor = tester.widget<ColoredBox>(libraryDivider).color;
+      expect(libraryColor, Theme.of(tester.element(libraryDivider))
+          .colorScheme.outlineVariant);
+      expect(tester.widget<Text>(find.text('Projects')).style,
+          AppHeaderDivider.titleStyle);
 
       void expectAlignedHeader(String title) {
         final appBar = find.byType(AppBar);
@@ -82,7 +86,8 @@ void main() {
           const Rect.fromLTWH(0, kToolbarHeight, 1400, 1),
         );
         expect(tester.widget<ColoredBox>(divider).color, libraryColor);
-        expect(tester.widget<Text>(find.text(title)).style?.fontSize, 18);
+        expect(tester.widget<Text>(find.text(title)).style,
+            AppHeaderDivider.titleStyle);
       }
 
       await tester.tap(find.byTooltip('Open planner'));

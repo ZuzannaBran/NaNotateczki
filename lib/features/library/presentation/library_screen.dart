@@ -40,7 +40,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   static const double _navigationPaneMinWidth = 240;
   static const double _navigationPaneMaxWidth = 420;
   static const double _resizeHandleWidth = 12;
-  static const double _navigationHeaderHeight = kToolbarHeight;
+  static const double _navigationHeaderHeight = AppHeaderDivider.toolbarHeight;
   static const double _editorToolbarAreaHeight = 72;
   static const double _toggleTabHeight = 44;
 
@@ -899,10 +899,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                       child: Text(
                         'Projects',
                         overflow: TextOverflow.ellipsis,
-                        style: _sidebarTextStyle.copyWith(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: AppHeaderDivider.titleStyle,
                       ),
                     ),
                   ),

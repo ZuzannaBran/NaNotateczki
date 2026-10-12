@@ -19,6 +19,7 @@ import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_metrics.dart';
+import '../../../core/widgets/app_header_divider.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/note_page.dart';
@@ -1512,12 +1513,13 @@ class _EditorScreenState extends State<EditorScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: AppHeaderDivider.toolbarHeight,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         titleSpacing: useWideTitleInset ? 44 : null,
         title: Text(
           controller.notebook.title,
-          style: const TextStyle(fontSize: 18),
+          style: AppHeaderDivider.titleStyle,
         ),
         actions: [
           if (widget.showCompactTimer) const CompactStudyTimer(),

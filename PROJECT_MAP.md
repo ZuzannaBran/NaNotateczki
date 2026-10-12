@@ -153,7 +153,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 ### Widgety
 
 - `lib/core/widgets/app_header_divider.dart`: wspólny 1 px separator nagłówka
-  w ekranie głównym, planerze i ustawieniach; kolor spójny z paletą sidebaru.
+  w ekranie głównym, planerze i ustawieniach. Wspólna wysokość paska to
+  56 px, styl tytułu to 18 px i waga 600 jak Projects we wszystkich ekranach.
+  Linia ma pełny, widoczny kolor outlineVariant (bez rozjaśniania alfa).
   4: `AppHeaderDivider`; 7: `colorOf`.
 - `lib/core/widgets/empty_state.dart` (30): wspólny pusty stan.
   3: `EmptyState`.

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/input/touch_navigation_scroll_physics.dart';
+import 'package:program/core/widgets/app_header_divider.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
@@ -141,11 +142,10 @@ void main() {
       expect(separator, Rect.fromLTWH(0, appBar.bottom, 1200, 1));
 
       final scheme = Theme.of(tester.element(divider)).colorScheme;
-      final expectedColor = Color.alphaBlend(
-        scheme.outlineVariant.withValues(alpha: 0.45),
-        scheme.surfaceContainerLowest,
-      );
+      final expectedColor = scheme.outlineVariant;
       expect(tester.widget<ColoredBox>(divider).color, expectedColor);
+      expect(tester.widget<Text>(find.text('Projects')).style,
+          AppHeaderDivider.titleStyle);
     }
 
     expectAligned();
