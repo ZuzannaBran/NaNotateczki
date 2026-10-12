@@ -266,20 +266,19 @@ void main() {
         );
       }
       final rect = tester.getRect(menuEntries.first);
-      if (hasCover) {
-        final menuPixel = await _sampleRenderedPixel(
-          tester,
-          captureKey,
-          Offset(rect.right - 24, rect.top + 18),
-        );
-        final panePixel = await _sampleRenderedPixel(
-          tester,
-          captureKey,
-          const Offset(160, 300),
-        );
-        expect(menuPixel, panePixel);
-        expect(menuPixel, sidebarColor);
-      }
+      final menuPixel = await _sampleRenderedPixel(
+        tester,
+        captureKey,
+        Offset(rect.right - 24, rect.top + 18),
+      );
+      final panePixel = await _sampleRenderedPixel(
+        tester,
+        captureKey,
+        const Offset(160, 300),
+      );
+      expect(menuPixel, panePixel);
+      expect(menuPixel, sidebarColor);
+      expect(tester.takeException(), isNull);
       expect(rect.left, closeTo(sidebarRight, 1));
       expect(rect.top, closeTo(actionTop, 4));
       expect(rect.width, closeTo(130, 1));
