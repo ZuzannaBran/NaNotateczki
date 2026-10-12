@@ -56,7 +56,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (632 linie)
+### `lib/app/app_scope.dart` (687 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -68,13 +68,15 @@ obowiązkowego zamknięcia. Zwykły backup nie wyświetla wskaźnika
 postępu, ale podczas zamykania blokujący spinner nadal chroni zapis.
 Scheduler w trybie exit nie czeka na idle rysika i nie porzuca zmian
 po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
+`AppUiScale` skaluje cały widok (także touch hit-test) oraz logiczny
+`MediaQuery` bez zmiany geometrii zapisanych notatek i boardów.
 
 - Dostarcza również singleton `StudyPlannerController` (Provider),
   niezależny od migracji bazy notatek.
 - 25: `AppScope`; 32: `_AppScopeState`; 74: `didRequestAppExit`.
-- 232: `_ExitGuardOverlay`; 255: `_FinishingExitOverlay`;
-  363: `_BackupScheduler`;
-  559: `flushForExit`.
+- 236: `AppUiScale`; 287: `_ExitGuardOverlay`;
+  310: `_FinishingExitOverlay`; 418: `_BackupScheduler`;
+  614: `flushForExit`.
 
 ## 3. Core
 
@@ -93,10 +95,11 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 
 ### Wejście i preferencje
 
-- `lib/core/input/app_preferences_controller.dart` (190):
-  tryb urządzenia, akcent, `darkMode` i czułość dotyku
-  `touchNavigationSensitivity` (0.5–2.0; domyślnie 1.0) w `app_prefs.json`.
-  Podgląd suwaka działa bez ciągłego zapisu na dysk, a puszczenie
+- `lib/core/input/app_preferences_controller.dart` (224):
+  tryb urządzenia, akcent, `darkMode`, czułość dotyku
+  `touchNavigationSensitivity` (0.5–2.0) i skalę `uiScale` (0.75–1.5;
+  domyślnie 1.0) w `app_prefs.json`.
+  Podgląd suwaków działa bez ciągłego zapisu na dysk, a puszczenie
   suwaka utrwala ustawienie; brak klucza zachowuje dotychczasowe 1.0;
   starsze Classic, Sakura i Mint są migrowane do nowego Bubblegum.
   Dotychczasowy zapis `bubblegum` zachowuje stary wybór jako Cherry.
@@ -600,28 +603,22 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (674 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (724 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
 oraz `darkActive`/`darkToolbar` w ciemnym. Zaznaczona opcja ma
 mocniejszą ramkę, bez czarnego lub białego tła. Zakładka System
-ma suwak czułości nawigacji 0.5×–2.0×. Pozostałe sekcje
+ma suwak czułości nawigacji 0.5×–2.0×, a Visual globalną skalę
+interfejsu 75%–150% z natychmiastowym podglądem. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
 `EditorController` jest opcjonalny: ustawienia globalne działają z pustego
 katalogu i planera; tła i ustawienia rysika wymagają otwartego dokumentu.
 Nagłówek ma wysokość 56 px, tytuł 18 px i wspólny separator 1 px jak planer.
 
-- 16:
-  `EditorSettingsScreen`;
-  356:
-  `_showErrorsDialog`;
-  438:
-  `_showDataIntegrityDialog`;
-  525:
-  `_showOptimizationDialog`;
-  611:
-  `_BackgroundSection`.
+- 17: `EditorSettingsScreen`; 406: `_showErrorsDialog`;
+  488: `_showDataIntegrityDialog`; 575: `_showOptimizationDialog`;
+  661: `_BackgroundSection`.
 
 ### `lib/features/editor/presentation/interaction/notebook_overview_navigation.dart` (55 linii)
 
@@ -916,9 +913,11 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (197): paleta dark, odwracanie jasności
-  wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual
-  i podgląd suwaka czułości w System.
+- `test/dark_mode_theme_test.dart` (209): paleta dark, odwracanie jasności
+  wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual,
+  suwak skali interfejsu oraz podgląd suwaka czułości w System.
+- `test/ui_scale_test.dart`: rozmiary logicznego viewportu i trafianie
+  w przyciski przy powiększeniu oraz pomniejszeniu całego interfejsu.
 
 
 Dodatkowe testy i automatyzacja wieloplatformowa:
@@ -972,7 +971,7 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   i fake `PathProviderPlatform`, bez zapisu do danych użytkownika. Test
   restore zamyka źródłowy `NotesDatabase` przed otwarciem docelowego,
   aby nie utrzymywać dwóch instancji Drift w tym samym isolate.
-  Weryfikuje również trwałość ustawienia czułości nawigacji.
+  Weryfikuje również trwałość ustawienia czułości nawigacji i skali UI.
 - `test/production/export_render_test.dart` (305): produkcyjne PNG/PDF
   w pamięci, liczba stron i rozmiar obrazu, treść oraz legacy gumka.
   Renderer działa w `tester.runAsync`, poza `FakeAsync` testu widgetowego.
