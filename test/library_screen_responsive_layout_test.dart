@@ -1,5 +1,8 @@
+import 'dart:ui' as ui;
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -16,6 +19,36 @@ import 'package:program/features/library/presentation/library_screen.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
 import 'package:program/features/planner/state/study_planner_controller.dart';
+
+Future<Color> _sampleRenderedPixel(
+  WidgetTester tester,
+  GlobalKey captureKey,
+  Offset globalPosition,
+) async {
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(captureKey),
+  );
+  final image = await boundary.toImage(pixelRatio: 1);
+  try {
+    final pixels = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (pixels == null) {
+      throw StateError('Unable to capture menu pixels');
+    }
+    final origin = tester.getTopLeft(find.byKey(captureKey));
+    final position = globalPosition - origin;
+    final x = position.dx.round();
+    final y = position.dy.round();
+    final index = (y * image.width + x) * 4;
+    return Color.fromARGB(
+      pixels.getUint8(index + 3),
+      pixels.getUint8(index),
+      pixels.getUint8(index + 1),
+      pixels.getUint8(index + 2),
+    );
+  } finally {
+    image.dispose();
+  }
+}
 
 void main() {
   testWidgets('library locks wide layout below editor margin breakpoint', (
@@ -136,11 +169,14 @@ void main() {
       LocalBackupService(repository),
     );
     await controller.loadItems();
+    final captureKey = GlobalKey();
 
     await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => AppPreferencesController()),
+      RepaintBoundary(
+        key: captureKey,
+        child: MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => AppPreferencesController()),
           ChangeNotifierProvider<LibraryController>.value(value: controller),
           Provider<NotebookRepository>.value(value: repository),
         ],
@@ -155,6 +191,7 @@ void main() {
             ),
           ),
           home: const LibraryScreen(),
+        ),
         ),
       ),
     );
@@ -173,11 +210,13 @@ void main() {
     final colors = Theme.of(
       tester.element(find.text('Projects')),
     ).colorScheme;
-    final toolbarColor = Theme.of(
-      tester.element(find.text('Projects')),
-    ).appBarTheme.backgroundColor!;
-    expect(toolbarColor, isNot(colors.surfaceContainerLow));
-    expect(toolbarColor, isNot(colors.surfaceContainerLowest));
+    final sidebarColor = colors.surfaceContainerLowest;
+    expect(sidebarColor, isNot(colors.surfaceContainerLow));
+    expect(
+      sidebarColor,
+      isNot(Theme.of(tester.element(find.text('Projects')))
+          .appBarTheme.backgroundColor),
+    );
     final toggles = [
       find.byKey(const ValueKey('library-navigation-toggle')),
       find.byKey(const ValueKey('editor-toolbar-toggle')),
@@ -227,6 +266,20 @@ void main() {
         );
       }
       final rect = tester.getRect(menuEntries.first);
+      if (hasCover) {
+        final menuPixel = await _sampleRenderedPixel(
+          tester,
+          captureKey,
+          Offset(rect.right - 24, rect.top + 18),
+        );
+        final panePixel = await _sampleRenderedPixel(
+          tester,
+          captureKey,
+          const Offset(160, 35),
+        );
+        expect(menuPixel, panePixel);
+        expect(menuPixel, sidebarColor);
+      }
       expect(rect.left, closeTo(sidebarRight, 1));
       expect(rect.top, closeTo(actionTop, 4));
       expect(rect.width, closeTo(130, 1));
@@ -237,7 +290,7 @@ void main() {
       expect(
         menuMaterials.any(
           (material) =>
-              material.color == toolbarColor &&
+              material.color == sidebarColor &&
               material.elevation == 0 &&
               material.shadowColor == Colors.transparent &&
               material.shape is RoundedRectangleBorder &&
@@ -254,7 +307,7 @@ void main() {
 
       final menuSurface = menuMaterials.firstWhere(
         (material) =>
-            material.color == toolbarColor &&
+            material.color == sidebarColor &&
             material.shape is RoundedRectangleBorder,
       );
       expect(
@@ -321,6 +374,18 @@ void main() {
       );
     }
     final createRect = tester.getRect(createEntries.first);
+    final createPixel = await _sampleRenderedPixel(
+      tester,
+      captureKey,
+      Offset(createRect.right - 24, createRect.top + 18),
+    );
+    final panePixel = await _sampleRenderedPixel(
+      tester,
+      captureKey,
+      const Offset(160, 35),
+    );
+    expect(createPixel, panePixel);
+    expect(createPixel, sidebarColor);
     expect(createRect.left, closeTo(sidebarRight, 1));
     expect(createRect.top, closeTo(addButtonTop, 8));
     expect(createRect.width, closeTo(150, 1));
@@ -332,7 +397,7 @@ void main() {
     expect(
       createMaterials.any(
         (material) =>
-            material.color == toolbarColor &&
+            material.color == sidebarColor &&
             material.elevation == 0 &&
             material.shadowColor == Colors.transparent &&
             material.shape is RoundedRectangleBorder &&
@@ -349,7 +414,7 @@ void main() {
 
     final createSurface = createMaterials.firstWhere(
       (material) =>
-          material.color == toolbarColor &&
+          material.color == sidebarColor &&
           material.shape is RoundedRectangleBorder,
     );
     expect(
