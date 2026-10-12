@@ -782,7 +782,9 @@ panelu biblioteki.
 Pan dotykowy boarda ma regulowaną czułość i próg gestu; rysik,
 zoom i transformacje obiektów są niezależne od tego ustawienia.
 Board ma stały boczny odstęp 16 px, ale nie ma marginesu u góry,
-więc zawartość można swobodnie przesuwać za toolbar. Nagłówek ma
+więc zawartość można swobodnie przesuwać za toolbar. Obszar roboczy
+ma proste górne rogi i zaokrąglone dolne rogi (16 px) zarówno w dekoracji,
+jak i w klipowaniu zawartości. Nagłówek ma
 wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 
 - 30: `BoardScreen`; 44: `_BoardScreenState`.
@@ -905,8 +907,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   trafia w konkretny QuillEditor, gdy aktywna i nieaktywna warstwa
   tekstowa renderują dwa widgety;
   regresja selektora koloru tekstu po utracie zaznaczenia oraz undo/redo
-- `test/board_scene_bounds_test.dart` (178): stały układ współrzędnych
+- `test/board_scene_bounds_test.dart`: stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
+  proste górne i zaokrąglone dolne rogi canvasa oraz zgodność klipu,
   zachowanie viewportu po schowaniu narzędzi, kolor nagłówka i porównanie
   szybkości przesuwania palcem dla 0.5× i 2.0×.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria

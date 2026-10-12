@@ -121,7 +121,13 @@ void main() {
     final canvasRect = tester.getRect(canvas);
     final toolbarRect = tester.getRect(toolbar);
     final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    final canvasWidget = tester.widget<Container>(canvas);
+    const bottomCorners = BorderRadius.vertical(bottom: Radius.circular(16));
+    final canvasDecoration = canvasWidget.decoration! as BoxDecoration;
+    final canvasClip = canvasWidget.child! as ClipRRect;
 
+    expect(canvasDecoration.borderRadius, bottomCorners);
+    expect(canvasClip.borderRadius, bottomCorners);
     expect(
       canvasRect.top,
       closeTo(tester.getBottomLeft(find.byType(AppBar)).dy, 0.01),

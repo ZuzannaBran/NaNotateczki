@@ -529,7 +529,9 @@ class _BoardScreenState extends State<BoardScreen> {
               color: Theme.of(context).brightness == Brightness.dark
                   ? AppColors.darkCanvas
                   : AppColors.paper,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(16),
+              ),
               boxShadow: const [
                 BoxShadow(
                   color: AppColors.shadow,
@@ -539,7 +541,9 @@ class _BoardScreenState extends State<BoardScreen> {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(16),
+              ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final buildStopwatch = Stopwatch()..start();
