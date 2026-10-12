@@ -877,14 +877,17 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   narzędzi
 - `test/editor_toolbar_color_picker_test.dart`: dark/light picker, odwrócone
   Recent i wartości RGB/HEX, suwak i zapis z zachowaniem koloru wizualnego,
-  brak modyfikacji danych po zatwierdzeniu bez zmian.
+  brak modyfikacji danych po zatwierdzeniu bez zmian; osobne widget testy
+  dla obu motywów i jawna weryfikacja aktywnej jasności motywu.
 - `test/page_overlay_text_gestures_test.dart` (679): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian;
-  w trybach ink kliknięcia przechodzą przez tekst i obrazy/PDF;
+  w trybach ink kliknięcia przechodzą przez tekst i obrazy/PDF; test
+  trafia w konkretny QuillEditor, gdy aktywna i nieaktywna warstwa
+  tekstowa renderują dwa widgety;
   regresja selektora koloru tekstu po utracie zaznaczenia oraz undo/redo
 - `test/board_scene_bounds_test.dart` (178): stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,

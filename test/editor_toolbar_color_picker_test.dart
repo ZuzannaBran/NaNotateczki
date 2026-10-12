@@ -17,7 +17,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
-        theme: darkMode ? ThemeData.dark() : ThemeData.light(),
+        theme: ThemeData.light(),
+        darkTheme: ThemeData.dark(),
+        themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
         home: Scaffold(
           body: Builder(
             builder: (context) => Center(
@@ -36,6 +38,11 @@ void main() {
           ),
         ),
       ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      Theme.of(tester.element(find.text('Open picker'))).brightness,
+      darkMode ? Brightness.dark : Brightness.light,
     );
     await tester.tap(find.text('Open picker'));
     await tester.pumpAndSettle();
@@ -128,25 +135,27 @@ void main() {
     );
   });
 
-  testWidgets('untouched picker never mutates stored dark or light colors', (
-    tester,
-  ) async {
-    for (final darkMode in [false, true]) {
-      Color? selected;
-      await openPicker(
-        tester,
-        darkMode: darkMode,
-        onSelected: (color) => selected = color,
-      );
-      expect(
-        previewColor(tester),
-        AppColors.displayInkColor(initial, darkMode: darkMode),
-      );
-      await tester.tap(find.widgetWithText(TextButton, 'Save'));
-      await tester.pumpAndSettle();
-      expect(selected, initial);
-    }
-  });
+  for (final darkMode in [false, true]) {
+    testWidgets(
+      'untouched picker preserves stored color in '
+      '${darkMode ? 'dark' : 'light'} theme',
+      (tester) async {
+        Color? selected;
+        await openPicker(
+          tester,
+          darkMode: darkMode,
+          onSelected: (color) => selected = color,
+        );
+        expect(
+          previewColor(tester),
+          AppColors.displayInkColor(initial, darkMode: darkMode),
+        );
+        await tester.tap(find.widgetWithText(TextButton, 'Save'));
+        await tester.pumpAndSettle();
+        expect(selected, initial);
+      },
+    );
+  }
 
   testWidgets('light picker keeps raw recent swatch, HEX and selection', (
     tester,

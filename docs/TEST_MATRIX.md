@@ -69,6 +69,10 @@ timing, filesystem and GPU behavior from physical hardware.
   it joins the sidebar, including during animation.
 - Color picker regression: display-mode RGB/HEX, Recent swatches and slider
   edits, preserving stored values when unchanged in light and dark modes.
+  Each brightness is tested in an isolated widget test with explicit
+  ThemeMode and a matching Theme.of(context).brightness assertion.
+  Text/ink hit tests use a single QuillEditor finder even when multiple
+  render layers contain text widgets.
   Manual: on Linux/Chrome switch themes with the same ink/text, open the pen
   and text pickers, compare Recent/HEX/slider preview to visible ink/text,
   save slider and HEX edits in dark mode, then switch back to light mode.

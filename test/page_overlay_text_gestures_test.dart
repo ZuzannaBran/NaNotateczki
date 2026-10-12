@@ -489,7 +489,9 @@ void main() {
     );
     await tester.pump();
 
-    final textPosition = tester.getCenter(find.byType(quill.QuillEditor));
+    final textEditors = find.byType(quill.QuillEditor);
+    expect(textEditors, findsWidgets);
+    final textPosition = tester.getCenter(textEditors.first);
     final imagePosition =
         tester.getTopLeft(find.byType(PageOverlay)) + const Offset(340, 260);
     for (final tool in [
