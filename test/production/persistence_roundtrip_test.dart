@@ -172,6 +172,30 @@ void main() {
     latest.dispose();
   });
 
+  test('interface scale persists after a fresh startup', () async {
+    final original = AppPreferencesController();
+    expect(original.uiScale, 1.0);
+    original.previewUiScale(1.3);
+    expect(original.uiScale, 1.3);
+    await original.setUiScale(1.3);
+    original.dispose();
+
+    final reloaded = AppPreferencesController();
+    await reloaded.load();
+    expect(reloaded.uiScale, 1.3);
+    reloaded.previewUiScale(5.0);
+    expect(reloaded.uiScale, 1.5);
+    reloaded.previewUiScale(double.nan);
+    expect(reloaded.uiScale, 1.5);
+    await reloaded.setUiScale(0.75);
+    reloaded.dispose();
+
+    final latest = AppPreferencesController();
+    await latest.load();
+    expect(latest.uiScale, 0.75);
+    latest.dispose();
+  });
+
   test(
     'SQLite read-after-write preserves rich content and binary media',
     () async {
