@@ -56,7 +56,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (687 linii)
+### `lib/app/app_scope.dart` (684 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -74,9 +74,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 - Dostarcza również singleton `StudyPlannerController` (Provider),
   niezależny od migracji bazy notatek.
 - 25: `AppScope`; 32: `_AppScopeState`; 74: `didRequestAppExit`.
-- 236: `AppUiScale`; 287: `_ExitGuardOverlay`;
-  310: `_FinishingExitOverlay`; 418: `_BackupScheduler`;
-  614: `flushForExit`.
+- 233: `AppUiScale`; 284: `_ExitGuardOverlay`;
+  307: `_FinishingExitOverlay`; 415: `_BackupScheduler`;
+  611: `flushForExit`.
 
 ## 3. Core
 
@@ -917,7 +917,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual,
   suwak skali interfejsu oraz podgląd suwaka czułości w System.
 - `test/ui_scale_test.dart`: rozmiary logicznego viewportu i trafianie
-  w przyciski przy powiększeniu oraz pomniejszeniu całego interfejsu.
+  w przyciski przy powiększeniu oraz pomniejszeniu całego interfejsu,
+  zachowanie bieżącej trasy po powrocie do skali 100%.
 
 
 Dodatkowe testy i automatyzacja wieloplatformowa:
