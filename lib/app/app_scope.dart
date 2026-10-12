@@ -241,9 +241,6 @@ class AppUiScale extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (scale == 1) {
-      return child;
-    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewport = constraints.biggest;
