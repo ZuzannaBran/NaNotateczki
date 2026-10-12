@@ -3,6 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/input/touch_navigation_scroll_physics.dart';
+import '../../editor/presentation/editor_settings_screen.dart';
 import '../state/study_planner_controller.dart';
 import 'study_action_theme.dart';
 import 'study_timer_widgets.dart';
@@ -20,6 +23,15 @@ class _PlannerScreenState extends State<PlannerScreen> {
   CalendarMode _mode = CalendarMode.week;
   DateTime _anchor = DateUtils.dateOnly(DateTime.now());
   bool _history = false;
+
+  TouchNavigationScrollPhysics get _navigationPhysics =>
+      TouchNavigationScrollPhysics(
+        sensitivity:
+            context
+                .watch<AppPreferencesController?>()
+                ?.touchNavigationSensitivity ??
+            1.0,
+      );
 
   DateTime _monday(DateTime date) =>
       DateTime(date.year, date.month, date.day - (date.weekday - 1));
@@ -166,7 +178,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               ),
             if (session.status == StudyStatus.planned)
               FilledButton(
-                style: StudyActionStyles.primary,
+                style: StudyActionStyles.primary(Theme.of(context)),
                 onPressed: planner.active == null
                     ? () {
                         planner.start(session.id);
@@ -373,6 +385,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               if (compact || _mode == CalendarMode.week)
                 Expanded(
                   child: ListView(
+                    physics: _navigationPhysics,
                     padding: EdgeInsets.zero,
                     children: [
                       for (final item in items)
@@ -413,6 +426,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final days = _visibleDays();
     if (_mode == CalendarMode.today) {
       return ListView(
+        physics: _navigationPhysics,
         padding: const EdgeInsets.all(18),
         children: [
           ConstrainedBox(
@@ -431,6 +445,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
             : constraints.maxWidth;
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          physics: _navigationPhysics,
           child: SizedBox(
             width: width,
             child: _mode == CalendarMode.week
@@ -442,6 +457,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     ],
                   )
                 : SingleChildScrollView(
+                    physics: _navigationPhysics,
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                     child: Column(
                       children: [
@@ -494,6 +510,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
       return const Center(child: Text('No study history yet.'));
     }
     return ListView.separated(
+      physics: _navigationPhysics,
       padding: const EdgeInsets.all(22),
       itemCount: list.length,
       separatorBuilder: (_, _) => const SizedBox(height: 8),
@@ -531,13 +548,25 @@ class _PlannerScreenState extends State<PlannerScreen> {
     return StudyActionTheme(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Study planner'),
+          titleSpacing: MediaQuery.sizeOf(context).width >= 600 ? 44 : null,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: const Text('Study planner', style: TextStyle(fontSize: 18)),
           leading: IconButton(
             tooltip: 'Back to notes',
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
+            IconButton(
+              tooltip: 'Settings',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const EditorSettingsScreen(),
+                ),
+              ),
+            ),
             IconButton(
               tooltip: _history ? 'Calendar' : 'Study history',
               onPressed: () => setState(() => _history = !_history),
@@ -573,7 +602,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 label: const Text('Smart session'),
               ),
               FilledButton.icon(
-                style: StudyActionStyles.primary,
+                style: StudyActionStyles.primary(Theme.of(context)),
                 onPressed: () => showStudySessionEditor(context),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('New session'),
@@ -651,6 +680,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
+                  physics: _navigationPhysics,
                   child: SizedBox(
                     width: math.max(
                       740.0,

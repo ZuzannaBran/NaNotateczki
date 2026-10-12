@@ -18,7 +18,7 @@ class EditorSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.watch<EditorController>();
+    final controller = context.watch<EditorController?>();
     final preferences = context.watch<AppPreferencesController>();
     final sensitivityLabel = preferences.touchNavigationSensitivity
         .toStringAsFixed(1);
@@ -72,30 +72,33 @@ class EditorSettingsScreen extends StatelessWidget {
                           },
                         ),
                       ),
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
+                      if (controller != null)
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                          ),
+                          title: const Text('Stylus and touch'),
+                          subtitle: Text(
+                            controller.pointerInputMode.description,
+                          ),
+                          trailing: SegmentedButton<PointerInputMode>(
+                            showSelectedIcon: false,
+                            segments: const [
+                              ButtonSegment(
+                                value: PointerInputMode.off,
+                                label: Text('Off'),
+                              ),
+                              ButtonSegment(
+                                value: PointerInputMode.on,
+                                label: Text('On'),
+                              ),
+                            ],
+                            selected: {controller.pointerInputMode},
+                            onSelectionChanged: (selection) {
+                              controller.setPointerInputMode(selection.single);
+                            },
+                          ),
                         ),
-                        title: const Text('Stylus and touch'),
-                        subtitle: Text(controller.pointerInputMode.description),
-                        trailing: SegmentedButton<PointerInputMode>(
-                          showSelectedIcon: false,
-                          segments: const [
-                            ButtonSegment(
-                              value: PointerInputMode.off,
-                              label: Text('Off'),
-                            ),
-                            ButtonSegment(
-                              value: PointerInputMode.on,
-                              label: Text('On'),
-                            ),
-                          ],
-                          selected: {controller.pointerInputMode},
-                          onSelectionChanged: (selection) {
-                            controller.setPointerInputMode(selection.single);
-                          },
-                        ),
-                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -143,48 +146,52 @@ class EditorSettingsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
+                      if (controller != null)
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                          ),
+                          title: const Text('Stylus buttons'),
+                          subtitle: const Text(
+                            'Use stylus buttons to switch eraser.',
+                          ),
+                          trailing: SegmentedButton<bool>(
+                            showSelectedIcon: false,
+                            segments: const [
+                              ButtonSegment(value: false, label: Text('Off')),
+                              ButtonSegment(value: true, label: Text('On')),
+                            ],
+                            selected: {controller.stylusButtonsEnabled},
+                            onSelectionChanged: (selection) {
+                              controller.setStylusButtonsEnabled(
+                                selection.single,
+                              );
+                            },
+                          ),
                         ),
-                        title: const Text('Stylus buttons'),
-                        subtitle: const Text(
-                          'Use stylus buttons to switch eraser.',
+                      if (controller != null)
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                          ),
+                          title: const Text('Scribble eraser'),
+                          subtitle: const Text(
+                            'Erase ink by scribbling over it with the pen.',
+                          ),
+                          trailing: SegmentedButton<bool>(
+                            showSelectedIcon: false,
+                            segments: const [
+                              ButtonSegment(value: false, label: Text('Off')),
+                              ButtonSegment(value: true, label: Text('On')),
+                            ],
+                            selected: {controller.scratchEraseEnabled},
+                            onSelectionChanged: (selection) {
+                              controller.setScratchEraseEnabled(
+                                selection.single,
+                              );
+                            },
+                          ),
                         ),
-                        trailing: SegmentedButton<bool>(
-                          showSelectedIcon: false,
-                          segments: const [
-                            ButtonSegment(value: false, label: Text('Off')),
-                            ButtonSegment(value: true, label: Text('On')),
-                          ],
-                          selected: {controller.stylusButtonsEnabled},
-                          onSelectionChanged: (selection) {
-                            controller.setStylusButtonsEnabled(
-                              selection.single,
-                            );
-                          },
-                        ),
-                      ),
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                        ),
-                        title: const Text('Scribble eraser'),
-                        subtitle: const Text(
-                          'Erase ink by scribbling over it with the pen.',
-                        ),
-                        trailing: SegmentedButton<bool>(
-                          showSelectedIcon: false,
-                          segments: const [
-                            ButtonSegment(value: false, label: Text('Off')),
-                            ButtonSegment(value: true, label: Text('On')),
-                          ],
-                          selected: {controller.scratchEraseEnabled},
-                          onSelectionChanged: (selection) {
-                            controller.setScratchEraseEnabled(selection.single);
-                          },
-                        ),
-                      ),
                       AnimatedBuilder(
                         animation: AppErrorLog.instance,
                         builder: (context, _) {
@@ -277,30 +284,32 @@ class EditorSettingsScreen extends StatelessWidget {
                           },
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _BackgroundSection(
-                        title: 'Notebook default',
-                        settings: controller.defaultBackgroundSettingsForKind(
-                          NotebookKind.notebook,
+                      if (controller != null) ...[
+                        const SizedBox(height: 12),
+                        _BackgroundSection(
+                          title: 'Notebook default',
+                          settings: controller.defaultBackgroundSettingsForKind(
+                            NotebookKind.notebook,
+                          ),
+                          onChanged: (settings) =>
+                              controller.setDefaultBackgroundSettings(
+                                NotebookKind.notebook,
+                                settings,
+                              ),
                         ),
-                        onChanged: (settings) =>
-                            controller.setDefaultBackgroundSettings(
-                              NotebookKind.notebook,
-                              settings,
-                            ),
-                      ),
-                      const SizedBox(height: 20),
-                      _BackgroundSection(
-                        title: 'Board default',
-                        settings: controller.defaultBackgroundSettingsForKind(
-                          NotebookKind.board,
+                        const SizedBox(height: 20),
+                        _BackgroundSection(
+                          title: 'Board default',
+                          settings: controller.defaultBackgroundSettingsForKind(
+                            NotebookKind.board,
+                          ),
+                          onChanged: (settings) =>
+                              controller.setDefaultBackgroundSettings(
+                                NotebookKind.board,
+                                settings,
+                              ),
                         ),
-                        onChanged: (settings) =>
-                            controller.setDefaultBackgroundSettings(
-                              NotebookKind.board,
-                              settings,
-                            ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox.shrink(),

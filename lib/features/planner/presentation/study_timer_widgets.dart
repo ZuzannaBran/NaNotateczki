@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../state/study_planner_controller.dart';
-import 'study_action_theme.dart';
 import 'planner_screen.dart';
+import 'study_action_theme.dart';
 
 String studyClock(DateTime time) =>
     '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
@@ -240,6 +242,13 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
       content: SizedBox(
         width: 400,
         child: SingleChildScrollView(
+          physics: TouchNavigationScrollPhysics(
+            sensitivity:
+                context
+                    .watch<AppPreferencesController?>()
+                    ?.touchNavigationSensitivity ??
+                1.0,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -320,7 +329,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          style: StudyActionStyles.primary,
+          style: StudyActionStyles.primary(Theme.of(context)),
           onPressed: _save,
           child: Text(widget.startAfterSave ? 'Save & start' : 'Save'),
         ),
@@ -443,7 +452,7 @@ class StudyTimerCard extends StatelessWidget {
               runSpacing: 4,
               children: [
                 FilledButton.icon(
-                  style: StudyActionStyles.primary,
+                  style: StudyActionStyles.primary(Theme.of(context)),
                   onPressed: planner.isLoaded && planner.error == null
                       ? () => showStudySessionEditor(
                           context,
@@ -518,12 +527,16 @@ class CompactStudyTimer extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final active = planner.active;
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
       child: Material(
-        color: StudyActionStyles.secondaryColor,
-        shape: const StadiumBorder(
-          side: BorderSide(color: StudyActionStyles.borderColor, width: 1.15),
+        color: StudyActionStyles.background(theme),
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: StudyActionStyles.outline(theme),
+            width: 1.15,
+          ),
         ),
         child: InkWell(
           customBorder: const StadiumBorder(),

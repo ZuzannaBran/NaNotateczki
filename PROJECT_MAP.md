@@ -336,7 +336,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 504: `selectFolder`; 615: `_loadFolders`; 654: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1468 linii)
+### `lib/features/library/presentation/library_screen.dart` (1469 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -352,8 +352,9 @@ U dołu panelu jest `StudyTimerCard`, wyrównany do dolnej krawędzi
 i przewijany przy większej zawartości. Po zwinięciu panelu
 `CompactStudyTimer` wyświetla się obok Settings w AppBar katalogu,
 notebooka lub boarda. `_openCatalogSettings` otwiera wspólne ustawienia
-na kontrolerze wybranego albo pierwszego dokumentu; pusta biblioteka
-pokazuje komunikat o konieczności utworzenia dokumentu.
+na kontrolerze wybranego albo pierwszego dokumentu; w pustej bibliotece
+udostępnia ustawienia globalne bez tworzenia dokumentu. Przewijanie timera
+również reaguje na wspólną czułość dotyku.
 Pod strzałką panelu folderów jest drugi przycisk zwijania wspólnego paska
 narzędzi; oba są pionowo wyśrodkowane we własnych obszarach, mają 24 px
 szerokości, 44 px wysokości, cień i obrys. Stan toolbaru pozostaje zachowany
@@ -369,13 +370,13 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
 
 - 23: `LibraryScreen`; 30: `_LibraryScreenState`;
   438: `_openCatalogSettings`;
-  777: `_CreateMenuButton`; 820: `_LibraryTreePane`;
-  1046: `_FolderTreeRow`; 1140: `_LibraryTreeItemRow`;
-  1212: `_sidebarMenuShape`; 1219: `_showSidebarMenu`;
-  1268: `_TreeRowActions`; 1342: `_LibraryWorkspace`;
-  1416: `_LeftZoneToggleTab`.
+  773: `_CreateMenuButton`; 816: `_LibraryTreePane`;
+  1047: `_FolderTreeRow`; 1141: `_LibraryTreeItemRow`;
+  1213: `_sidebarMenuShape`; 1220: `_showSidebarMenu`;
+  1269: `_TreeRowActions`; 1343: `_LibraryWorkspace`;
+  1417: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (693 linie)
+### `lib/features/library/presentation/library_catalog.dart` (725 linii)
 
 Kafelkowa strona główna folderów oraz siatka podglądów zawartości folderu.
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
@@ -389,11 +390,14 @@ wspólny selektor notebooka z HEX i suwakami RGB/B-W.
 Notatki mają pionowy podgląd pierwszej strony (820×1160), boardy kwadratowy
 podgląd dopasowany do granic obiektów z pierwszej strony. Miniatury rysują
 ink, tekst oraz dostępne obrazy bez uruchamiania edytora.
+Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
+tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
+Siatka reaguje na wspólną czułość dotyku.
 
-- 18: `dominantFolderColor`; 55: `LibraryCatalog`;
-  236: `_FolderTile`; 298: `_DocumentTile`; 338: `_CatalogTile`;
-  399: `_DocumentPreview`; 477: `_boardPreviewBounds`;
-  519: `_PagePreviewPainter`; 587: `showFolderCoverEditor`.
+- 21: `dominantFolderColor`; 58: `LibraryCatalog`;
+  248: `_FolderTile`; 321: `_DocumentTile`; 361: `_CatalogTile`;
+  422: `_DocumentPreview`; 505: `_boardPreviewBounds`;
+  547: `_PagePreviewPainter`; 619: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -403,7 +407,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 
 ## 6a. Planer nauki (bez migracji SQLite)
 
-- `lib/features/planner/state/study_planner_controller.dart` (528):
+- `lib/features/planner/state/study_planner_controller.dart` (537):
   `StudySession`, `StudyTechnique`, `StudyStatus`, `StudyPlannerController`.
   Jeden stan Provider + ChangeNotifier, trwały `study_planner.json` przez
   cross-platform `text_storage`. Timery liczone względem deadline,
@@ -413,36 +417,43 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   bez oceny w historii (także po ponownym uruchomieniu); starsze sesje
   pozostawione w stanie review są przenoszone do historii bez ponagleń.
   Powiadomienia tylko wewnątrz działającej aplikacji.
+  Wynik wczytywania po dispose jest ignorowany: bez powiadomienia, timera
+  ani zapisu odzyskanej historii.
   10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
-  152: `StudyPlannerController`; 232: `load`; 289: `create`;
-  357: `start`; 519: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (555):
+  152: `StudyPlannerController`; 232: `load`; 298: `create`;
+  366: `start`; 528: `flush`.
+- `lib/features/planner/presentation/study_timer_widgets.dart` (568):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
-  22: `studyRatingStars`; 29: `openStudyPlanner`;
-  35: `showStudySessionEditor`; 55: `showStudyRating`;
-  332: `StudyTimerCard`; 511: `CompactStudyTimer`.
-- `lib/features/planner/presentation/study_action_theme.dart` (73):
+  Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
+  ze wspólnej czułości przewijania.
+  24: `studyRatingStars`; 31: `openStudyPlanner`;
+  37: `showStudySessionEditor`; 57: `showStudyRating`;
+  341: `StudyTimerCard`; 520: `CompactStudyTimer`.
+- `lib/features/planner/presentation/study_action_theme.dart` (96):
   `StudyActionTheme`, `StudyActionStyles`; czytelny, ale subtelny beż
   tylko dla wyróżnianych akcji; pozostałe przyciski i ikony bez ciemnego
-  wypełnienia, ciemny tekst i jasne zaznaczenie Today/Week/Month.
-  Motyw globalny pozostaje bez zmian. 6: `StudyActionStyles`;
-  19: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (729):
+  wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
+  kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
+  od bieżącego motywu. 6: `StudyActionStyles`; 39: `StudyActionTheme`.
+- `lib/features/planner/presentation/planner_screen.dart` (759):
   `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
   tworzenie, edycja, usuwanie i historia. Nazwa dnia tygodnia znajduje się
   w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
-  10: `CalendarMode`; 12: `PlannerScreen`; 19: `_PlannerScreenState`.
+  Dostęp do globalnych ustawień i wspólnej czułości scrolla kalendarza
+  oraz historii. 13: `CalendarMode`; 15: `PlannerScreen`;
+  22: `_PlannerScreenState`.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
-  i ochrona uszkodzonych danych.
+  i ochrona uszkodzonych danych; sukces/błąd wczytywania po dispose.
 - `test/study_planner_widget_test.dart`: kalendarz, timer, wybór gwiazdek,
   pominięcie i zamknięcie oceny, historia oceniona i bez oceny.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
   tygodnia we wszystkich widokach i po zmianie daty; osobny krok CI.
 - `test/study_planner_button_contrast_test.dart`: regresja widoczności
-  aktywnych przycisków i wyraźnych stanów wybranego widoku kalendarza.
+  aktywnych przycisków i wyraźnych stanów wybranego widoku kalendarza;
+  typografia kontrolek w obu motywach.
 
 ## 7. Stan edytora
 
@@ -565,7 +576,7 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (665 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (674 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
@@ -573,16 +584,18 @@ oraz `darkActive`/`darkToolbar` w ciemnym. Zaznaczona opcja ma
 mocniejszą ramkę, bez czarnego lub białego tła. Zakładka System
 ma suwak czułości nawigacji 0.5×–2.0×. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
+`EditorController` jest opcjonalny: ustawienia globalne działają z pustego
+katalogu i planera; tła i ustawienia rysika wymagają otwartego dokumentu.
 
 - 16:
   `EditorSettingsScreen`;
-  347:
+  356:
   `_showErrorsDialog`;
-  429:
+  438:
   `_showDataIntegrityDialog`;
-  516:
+  525:
   `_showOptimizationDialog`;
-  602:
+  611:
   `_BackgroundSection`.
 
 ### `lib/features/editor/presentation/interaction/notebook_overview_navigation.dart` (55 linii)
@@ -770,6 +783,10 @@ wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 - `linux/runner/my_application.cc` (301): GTK runner i kanał przycisku rysika.
   10: `_MyApplication`; 65–134: zdarzenia rysika;
   153: `my_application_activate`.
+- `linux/runner/main.cc` (8) i `linux_environment.cc` (20): przed startem
+  GTK korygują `GSETTINGS_SCHEMA_DIR` odziedziczone z Code Snap, jeżeli
+  istnieje systemowy `gschemas.compiled`; inne jawne katalogi pozostają.
+  5: `configure_linux_environment` w `linux_environment.cc`.
 - `ios/Runner/SceneDelegate.swift` (45): Apple Pencil double tap.
   4: `SceneDelegate`; 16: `installPencilInteraction`;
   33: `pencilInteractionDidTap`.
@@ -796,6 +813,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   okładek, start katalogu, siatka notatek/boardów, nagłówek i Settings,
   edycja okładki z pełnym selektorem kolorów, bezpieczne zamknięcie
   zagnieżdżonego pickera oraz powrót z edytora.
+- `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
+  ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
+  po zmianie motywu, kontrast planera/timera, historyczna geometria menu
+  przy resize w obu motywach oraz wspólna czułość nowych scrollerów.
 - `test/library_screen_responsive_layout_test.dart` (634):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
@@ -849,6 +870,11 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 
 Dodatkowe testy i automatyzacja wieloplatformowa:
+
+- `test/linux/linux_environment_test.cc` oraz
+  `.github/scripts/test_linux_environment.sh`: sześć testów C++/GLib
+  automatycznej korekty schematów Code Snap i zachowania innych środowisk,
+  wykonywanych także w linuksowej części macierzy CI; bez GUI/bazy notatek.
 
 - `test/cross_platform/regression_test.dart`: powtarzalne wymazywanie,
   brak powracających kresek, niezmienność migracji legacy, indeks przestrzenny,

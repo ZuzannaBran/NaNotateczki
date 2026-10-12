@@ -440,22 +440,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final notebook =
         library.selectedItem() ??
         (library.items.isEmpty ? null : library.items.first);
-    if (notebook == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Create a notebook or board to open settings.'),
-        ),
-      );
-      return;
-    }
     final repository = context.read<NotebookRepository>();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ChangeNotifierProvider(
-          create: (_) =>
-              EditorController(repository: repository, notebook: notebook),
-          child: const EditorSettingsScreen(),
-        ),
+        builder: (_) => notebook == null
+            ? const EditorSettingsScreen()
+            : ChangeNotifierProvider(
+                create: (_) => EditorController(
+                  repository: repository,
+                  notebook: notebook,
+                ),
+                child: const EditorSettingsScreen(),
+              ),
       ),
     );
   }
@@ -914,9 +910,14 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
           ),
           SizedBox(
             height: math.min(360, MediaQuery.sizeOf(context).height * 0.42),
-            child: const Align(
+            child: Align(
               alignment: Alignment.bottomCenter,
-              child: SingleChildScrollView(child: StudyTimerCard()),
+              child: SingleChildScrollView(
+                physics: TouchNavigationScrollPhysics(
+                  sensitivity: touchNavigationGain,
+                ),
+                child: const StudyTimerCard(),
+              ),
             ),
           ),
         ],

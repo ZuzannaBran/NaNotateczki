@@ -24,14 +24,16 @@ a platform as tested until its actual Actions job succeeds.
   camera/OCR workflows still require manual/device-farm tests.
 - CI tests are failure detectors; a green CI run is not proof that unknown bugs
   cannot occur.
+- The desktop matrix also runs merged catalog/planner UI, typography and
+  planner lifecycle regressions directly on Linux, Windows and macOS.
 
 ## Platform coverage
 
 | Platform | Logic/widget | Native app | Build | Input/peripherals |
 |---|---|---|---|---|
 | Linux | VM suite | Xvfb integration | Release | Real stylus manual |
-| Windows | VM suite on Ubuntu; Windows smoke | Windows integration | Release | Windows Ink manual |
-| macOS | VM suite on Ubuntu; macOS smoke | macOS integration | Release | Trackpad manual |
+| Windows | Full suite on Ubuntu; merged UI/planner on Windows | Windows integration | Release | Windows Ink manual |
+| macOS | Full suite on Ubuntu; merged UI/planner on macOS | macOS integration | Release | Trackpad manual |
 | Web / Chrome | Browser-compatible suite | ChromeDriver integration | Release | Clipboard and Safari/Firefox/Edge manual |
 | Android | VM suite on Ubuntu | Emulator integration nightly | Debug APK | S Pen, pressure, OCR manual |
 | iOS / iPadOS | VM suite on Ubuntu | iPhone simulator nightly | Simulator | Apple Pencil, OCR and iPad UI manual |
@@ -60,6 +62,14 @@ timing, filesystem and GPU behavior from physical hardware.
 - Controller viewport is frozen while an object transforms.
 - Text edit/resize/formatter behavior and responsive page constraints
   (existing tests).
+- Merged UI: empty-library appearance settings, live theme changes across
+  catalog and planner routes, dark notebook/board previews without changing
+  stored ink/text, dark actions and compact timer, original sidebar menu
+  geometry before/after resizing in both themes, and live touch sensitivity
+  in catalog, calendar, sidebar timer and session form.
+- Planner controls retain global Georgia typography in both themes;
+  asynchronous planner load completed after disposal neither notifies,
+  starts a timer nor writes recovered history.
 
 ### Persistence
 - SQLite integrity, corrupted rows, strict JSON import, version migration,
@@ -78,6 +88,11 @@ timing, filesystem and GPU behavior from physical hardware.
 - Background settings invalid-value normalization.
 
 ### Platform
+- Linux native startup environment: six C++/GLib regressions for inherited
+  Code Snap schemas, preserving explicit/default/other-Snap values and
+  retaining the environment when host compiled schemas are unavailable.
+  These tests do not replace real Wayland/XWayland input/plugin checks;
+  see [Linux startup diagnostics](LINUX_STARTUP.md).
 - Each native desktop device starts real app storage/plugins and reaches
   `LibraryScreen`.
 - Same startup integration test runs in Chrome and on Android/iOS simulators

@@ -230,8 +230,14 @@ class StudyPlannerController extends ChangeNotifier {
   }
 
   Future<void> load() async {
+    if (_disposed) {
+      return;
+    }
     try {
       final value = await _read(storageKey);
+      if (_disposed) {
+        return;
+      }
       var recoveredReviews = false;
       if (value != null) {
         final decoded = jsonDecode(value) as Map<String, dynamic>;
@@ -267,6 +273,9 @@ class StudyPlannerController extends ChangeNotifier {
         _changed();
       }
     } catch (failure) {
+      if (_disposed) {
+        return;
+      }
       error = 'Study history could not be loaded: $failure';
     }
     isLoaded = true;

@@ -184,6 +184,15 @@ jobs:
           cache: true
       - run: flutter config --enable-${{ matrix.platform }}-desktop
       - run: flutter pub get
+      - name: Verify Linux startup environment
+        if: matrix.platform == 'linux'
+        run: bash .github/scripts/test_linux_environment.sh
+      - name: Verify merged UI and planner lifecycle on native desktop
+        run: >-
+          flutter test test/merged_ui_integration_test.dart
+          test/study_planner_button_contrast_test.dart
+          test/study_planner_controller_test.dart
+          --reporter expanded --timeout 90s
       - name: Run actual Linux application with a virtual display
         if: matrix.platform == 'linux'
         run: xvfb-run -a flutter test integration_test/app_smoke_test.dart -d linux

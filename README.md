@@ -178,6 +178,15 @@ flutter pub get
 flutter run
 ```
 
+Na Linuksie możesz używać zwykłego `flutter run -d linux`, również z VS Code
+Snap. Runner przed inicjalizacją GTK zastępuje ścieżkę schematów odziedziczoną
+z Code Snap systemową `/usr/share/glib-2.0/schemas`, jeśli istnieje jej
+`gschemas.compiled`. Jawne ścieżki niezwiązane z Code Snap pozostają bez zmian.
+Nowe terminale VS Code w tym projekcie również dostają systemową ścieżkę.
+Po zmianie runnera zatrzymaj aplikację i uruchom ją ponownie: hot reload
+nie przeładowuje natywnego kodu startowego.
+Diagnostyka ostrzeżeń Wayland i testy: [Linux startup](docs/LINUX_STARTUP.md).
+
 Przydatne komendy developerskie:
 
 ```bash

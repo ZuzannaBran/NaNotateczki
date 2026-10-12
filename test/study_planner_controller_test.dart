@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +26,46 @@ void main() {
     await planner.flush();
     planner.dispose();
   });
+
+  for (final readFails in [false, true]) {
+    test(
+      'late planner load is ignored after dispose, failure=$readFails',
+      () async {
+        final read = Completer<String?>();
+        final writes = <String>[];
+        var notifications = 0;
+        final closing = StudyPlannerController(
+          read: (_) => read.future,
+          write: (_, value) async => writes.add(value),
+        )..addListener(() => notifications++);
+        final loading = closing.load();
+        closing.dispose();
+        if (readFails) {
+          read.completeError(StateError('Storage unavailable'));
+        } else {
+          final review = StudySession(
+            id: 'unfinished-review',
+            title: 'Revision',
+            scheduledAt: now,
+            minutes: 30,
+          )..status = StudyStatus.review;
+          read.complete(
+            jsonEncode({
+              'version': 1,
+              'sessions': [review.toJson()],
+            }),
+          );
+        }
+        await expectLater(loading, completes);
+        await closing.flush();
+        expect(closing.sessions, isEmpty);
+        expect(closing.isLoaded, isFalse);
+        expect(notifications, 0);
+        expect(writes, isEmpty);
+        expect(closing.error, isNull);
+      },
+    );
+  }
 
   test('planned session can be edited, moved and persisted', () async {
     await planner.load();

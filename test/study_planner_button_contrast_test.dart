@@ -1,9 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/core/theme/app_colors.dart';
+import 'package:program/core/theme/app_theme.dart';
 import 'package:program/features/planner/presentation/study_action_theme.dart';
 
 void main() {
+  for (final darkMode in [false, true]) {
+    testWidgets('planner controls retain app typography in dark=$darkMode', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+          home: StudyActionTheme(
+            child: Scaffold(
+              body: Column(
+                children: [
+                  FilledButton(onPressed: () {}, child: const Text('Primary')),
+                  OutlinedButton(
+                    onPressed: () {},
+                    child: const Text('Outline'),
+                  ),
+                  TextButton(onPressed: () {}, child: const Text('Text')),
+                  SegmentedButton<int>(
+                    segments: const [
+                      ButtonSegment(value: 0, label: Text('Today')),
+                      ButtonSegment(value: 1, label: Text('Week')),
+                    ],
+                    selected: const {0},
+                    onSelectionChanged: (_) {},
+                  ),
+                  const Chip(label: Text('Technique')),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      for (final label in [
+        'Primary',
+        'Outline',
+        'Text',
+        'Today',
+        'Week',
+        'Technique',
+      ]) {
+        expect(
+          DefaultTextStyle.of(
+            tester.element(find.text(label)),
+          ).style.fontFamily,
+          'Georgia',
+          reason: '$label must inherit the application typography',
+        );
+      }
+    });
+  }
+
   testWidgets('study controls distinguish active from inactive appearances', (
     tester,
   ) async {
@@ -22,7 +74,7 @@ void main() {
       ),
     );
 
-    final primary = StudyActionStyles.primary;
+    final primary = StudyActionStyles.primary(scopedTheme);
     expect(
       primary.backgroundColor!.resolve(<WidgetState>{}),
       StudyActionStyles.primaryColor,

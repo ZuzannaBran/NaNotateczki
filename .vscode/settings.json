@@ -2,6 +2,9 @@
     "cmake.sourceDirectory": "/home/zuzanna-baran-linux/Dokumenty/NaNotateczki/NaNotateczki/linux",
     "dart.flutterHotReloadOnSave": true,
     "dart.flutterHotRestartOnSave": true,
+    "terminal.integrated.env.linux": {
+        "GSETTINGS_SCHEMA_DIR": "/usr/share/glib-2.0/schemas"
+    },
     "chat.tools.terminal.autoApprove": {
         "flutter": true
     }

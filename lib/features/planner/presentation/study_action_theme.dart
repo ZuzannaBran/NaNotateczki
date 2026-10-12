@@ -2,16 +2,36 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// Muted beige actions with legible text and no dark button fills.
+/// Muted actions retain the app palette and typography in both visual modes.
 class StudyActionStyles {
   static const Color primaryColor = Color(0xFFC4BBAF);
   static const Color secondaryColor = Color(0xFFE4E2DD);
   static const Color borderColor = Color(0xFFB3AB9F);
 
-  static final ButtonStyle primary = FilledButton.styleFrom(
-    backgroundColor: primaryColor,
-    foregroundColor: AppColors.inkBlack,
-    textStyle: const TextStyle(fontWeight: FontWeight.w600),
+  static Color background(ThemeData theme, {bool selected = false}) {
+    if (theme.brightness == Brightness.dark) {
+      return selected
+          ? theme.colorScheme.surfaceContainerHigh
+          : theme.colorScheme.surfaceContainerLow;
+    }
+    return selected ? primaryColor : secondaryColor;
+  }
+
+  static Color foreground(ThemeData theme) =>
+      theme.brightness == Brightness.dark
+      ? theme.colorScheme.onSurface
+      : AppColors.inkBlack;
+
+  static Color outline(ThemeData theme) => theme.brightness == Brightness.dark
+      ? theme.colorScheme.outline
+      : borderColor;
+
+  static ButtonStyle primary(ThemeData theme) => FilledButton.styleFrom(
+    backgroundColor: background(theme, selected: true),
+    foregroundColor: foreground(theme),
+    textStyle: theme.textTheme.labelLarge!.copyWith(
+      fontWeight: FontWeight.w600,
+    ),
   );
 }
 
@@ -24,47 +44,50 @@ class StudyActionTheme extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final foreground = StudyActionStyles.foreground(theme);
+    final outline = StudyActionStyles.outline(theme);
+    final labelStyle = theme.textTheme.labelLarge!.copyWith(
+      fontWeight: FontWeight.w600,
+    );
     return Theme(
       data: theme.copyWith(
+        filledButtonTheme: FilledButtonThemeData(
+          style: StudyActionStyles.primary(theme),
+        ),
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
-            foregroundColor: AppColors.inkBlack,
-            textStyle: const TextStyle(fontWeight: FontWeight.w600),
+            foregroundColor: foreground,
+            textStyle: labelStyle,
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.inkBlack,
-            side: const BorderSide(color: StudyActionStyles.borderColor),
-            textStyle: const TextStyle(fontWeight: FontWeight.w600),
+            foregroundColor: foreground,
+            side: BorderSide(color: outline),
+            textStyle: labelStyle,
           ),
         ),
         iconButtonTheme: IconButtonThemeData(
-          style: IconButton.styleFrom(foregroundColor: AppColors.inkBlack),
+          style: IconButton.styleFrom(foregroundColor: foreground),
         ),
         segmentedButtonTheme: SegmentedButtonThemeData(
           style: ButtonStyle(
-            foregroundColor: const WidgetStatePropertyAll(AppColors.inkBlack),
+            foregroundColor: WidgetStatePropertyAll(foreground),
             backgroundColor: WidgetStateProperty.resolveWith(
-              (states) => states.contains(WidgetState.selected)
-                  ? StudyActionStyles.primaryColor
-                  : StudyActionStyles.secondaryColor,
+              (states) => StudyActionStyles.background(
+                theme,
+                selected: states.contains(WidgetState.selected),
+              ),
             ),
-            side: const WidgetStatePropertyAll(
-              BorderSide(color: StudyActionStyles.borderColor),
-            ),
-            textStyle: const WidgetStatePropertyAll(
-              TextStyle(fontWeight: FontWeight.w600),
-            ),
+            side: WidgetStatePropertyAll(BorderSide(color: outline)),
+            textStyle: WidgetStatePropertyAll(labelStyle),
           ),
         ),
         chipTheme: theme.chipTheme.copyWith(
-          backgroundColor: StudyActionStyles.secondaryColor,
-          labelStyle: const TextStyle(
-            color: AppColors.inkBlack,
-            fontWeight: FontWeight.w600,
-          ),
-          side: const BorderSide(color: StudyActionStyles.borderColor),
+          backgroundColor: StudyActionStyles.background(theme),
+          selectedColor: StudyActionStyles.background(theme, selected: true),
+          labelStyle: labelStyle.copyWith(color: foreground),
+          side: BorderSide(color: outline),
         ),
       ),
       child: child,

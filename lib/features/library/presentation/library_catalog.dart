@@ -3,7 +3,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../editor/presentation/widgets/editor_toolbar.dart';
 import '../../notebook/domain/drawing_tool.dart';
@@ -97,6 +100,8 @@ class LibraryCatalog extends StatelessWidget {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         titleSpacing: useWideTitleInset ? 44 : null,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: Text(
           activeFolder ?? 'Library',
           key: const ValueKey('catalog-title'),
@@ -120,7 +125,7 @@ class LibraryCatalog extends StatelessWidget {
         ],
       ),
       body: ColoredBox(
-        color: AppColors.background,
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: Column(
           children: [
             if (activeFolder != null)
@@ -154,6 +159,13 @@ class LibraryCatalog extends StatelessWidget {
                   : LayoutBuilder(
                       builder: (context, constraints) {
                         return GridView.builder(
+                          physics: TouchNavigationScrollPhysics(
+                            sensitivity:
+                                context
+                                    .watch<AppPreferencesController?>()
+                                    ?.touchNavigationSensitivity ??
+                                1.0,
+                          ),
                           key: ValueKey(
                             activeFolder == null
                                 ? 'catalog-folders'
@@ -222,7 +234,7 @@ class _CatalogEmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 52, color: AppColors.inkBlack),
+          Icon(icon, size: 52, color: Theme.of(context).colorScheme.onSurface),
           const SizedBox(height: 12),
           Text(title, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
@@ -254,9 +266,20 @@ class _FolderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = dominantFolderColor(contents);
-    final background = Color.lerp(AppColors.paper, base, 0.24)!;
-    final iconColor = cover.iconColor ?? AppColors.inkBlack;
+    final theme = Theme.of(context);
+    final darkMode = theme.brightness == Brightness.dark;
+    final base = AppColors.displayInkColor(
+      dominantFolderColor(contents),
+      darkMode: darkMode,
+    );
+    final background = Color.lerp(
+      darkMode ? AppColors.darkPaper : AppColors.paper,
+      base,
+      0.24,
+    )!;
+    final iconColor = cover.iconColor == null
+        ? theme.colorScheme.onSurface
+        : AppColors.displayInkColor(cover.iconColor!, darkMode: darkMode);
     return _CatalogTile(
       key: ValueKey('catalog-folder:$name'),
       title: name,
@@ -404,15 +427,18 @@ class _DocumentPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final page = item.pages.isEmpty ? null : item.pages.first;
+    final theme = Theme.of(context);
+    final darkMode = theme.brightness == Brightness.dark;
+    final paper = darkMode ? AppColors.darkCanvas : AppColors.paper;
     final board = item.kind == NotebookKind.board;
     final bounds = board
         ? _boardPreviewBounds(page)
         : const Rect.fromLTWH(0, 0, 820, 1160);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.paper,
+        color: paper,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
         boxShadow: const [BoxShadow(color: AppColors.shadow, blurRadius: 5)],
       ),
       child: ClipRRect(
@@ -422,7 +448,7 @@ class _DocumentPreview extends StatelessWidget {
                 child: Icon(
                   board ? Icons.dashboard_outlined : Icons.description_outlined,
                   size: 46,
-                  color: AppColors.divider,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               )
             : FittedBox(
@@ -433,14 +459,16 @@ class _DocumentPreview extends StatelessWidget {
                   child: Stack(
                     clipBehavior: Clip.hardEdge,
                     children: [
-                      const Positioned.fill(
-                        child: ColoredBox(color: AppColors.paper),
-                      ),
+                      Positioned.fill(child: ColoredBox(color: paper)),
                       for (final image in page.imageBlocks)
-                        _imagePreview(image, bounds),
+                        _imagePreview(image, bounds, theme),
                       Positioned.fill(
                         child: CustomPaint(
-                          painter: _PagePreviewPainter(page, bounds.topLeft),
+                          painter: _PagePreviewPainter(
+                            page,
+                            bounds.topLeft,
+                            darkMode: darkMode,
+                          ),
                         ),
                       ),
                     ],
@@ -451,7 +479,7 @@ class _DocumentPreview extends StatelessWidget {
     );
   }
 
-  Widget _imagePreview(ImageBlock block, Rect bounds) {
+  Widget _imagePreview(ImageBlock block, Rect bounds, ThemeData theme) {
     Widget preview;
     if (block.bytes != null) {
       preview = Image.memory(block.bytes!, fit: BoxFit.fill);
@@ -462,7 +490,7 @@ class _DocumentPreview extends StatelessWidget {
         errorBuilder: (_, _, _) => const SizedBox.shrink(),
       );
     } else {
-      preview = const ColoredBox(color: AppColors.toolbar);
+      preview = ColoredBox(color: theme.colorScheme.surfaceContainerLow);
     }
     return Positioned(
       left: block.position.dx - bounds.left,
@@ -517,10 +545,11 @@ Rect _boardPreviewBounds(NotePage? page) {
 }
 
 class _PagePreviewPainter extends CustomPainter {
-  const _PagePreviewPainter(this.page, this.origin);
+  const _PagePreviewPainter(this.page, this.origin, {required this.darkMode});
 
   final NotePage page;
   final Offset origin;
+  final bool darkMode;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -530,10 +559,11 @@ class _PagePreviewPainter extends CustomPainter {
       if (stroke.tool.isEraser || stroke.points.isEmpty) {
         continue;
       }
+      final color = AppColors.displayInkColor(stroke.color, darkMode: darkMode);
       final ink = Paint()
         ..color = stroke.tool == DrawingTool.highlighter
-            ? stroke.color.withValues(alpha: 0.42)
-            : stroke.color
+            ? color.withValues(alpha: 0.42)
+            : color
         ..strokeWidth = stroke.width
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
@@ -561,7 +591,7 @@ class _PagePreviewPainter extends CustomPainter {
         text: TextSpan(
           text: block.text,
           style: TextStyle(
-            color: block.color,
+            color: AppColors.displayInkColor(block.color, darkMode: darkMode),
             fontSize: block.fontSize,
             fontFamily: 'Georgia',
           ),
@@ -581,7 +611,9 @@ class _PagePreviewPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _PagePreviewPainter oldDelegate) =>
-      !identical(page, oldDelegate.page) || origin != oldDelegate.origin;
+      !identical(page, oldDelegate.page) ||
+      origin != oldDelegate.origin ||
+      darkMode != oldDelegate.darkMode;
 }
 
 Future<void> showFolderCoverEditor(
