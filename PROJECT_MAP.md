@@ -360,7 +360,8 @@ Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
 dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej krawędzi
 panelu, jego koloru i animacji 180 ms. Lewy bok menu jest prosty, a wyłącznie
 prawe narożniki mają promień 12 px. Menu nachodzi na uchwyt zmiany szerokości
-i nie ma cienia ani linii na styku z panelem. Menu folderu zawiera także
+i nie ma szczeliny na styku z panelem; delikatny cień ma elevation 4 i alpha
+0x44, bez osobnego obramowania. Menu folderu zawiera także
 edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon.
 
 - 22: `LibraryScreen`; 29: `_LibraryScreenState`;
@@ -791,7 +792,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   folderu, notebooka oraz boarda, a także menu dodawania (3 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
-  brak szczeliny i cienia na styku menu z panelem.
+  brak szczeliny na styku menu z panelem i delikatny cień.
 - `test/touch_navigation_sensitivity_test.dart` (80):
   granice czułości i porównanie dystansów scrolla przy gestach palcem.
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec

@@ -215,7 +215,8 @@ void main() {
         menuMaterials.any(
           (material) =>
               material.color == sidebarColor &&
-              material.elevation == 0 &&
+              material.elevation == 4 &&
+              material.shadowColor == const Color(0x44000000) &&
               material.shape is RoundedRectangleBorder &&
               (material.shape! as RoundedRectangleBorder).borderRadius ==
                   const BorderRadius.only(
@@ -279,7 +280,8 @@ void main() {
       createMaterials.any(
         (material) =>
             material.color == sidebarColor &&
-            material.elevation == 0 &&
+            material.elevation == 4 &&
+              material.shadowColor == const Color(0x44000000) &&
             material.shape is RoundedRectangleBorder &&
             (material.shape! as RoundedRectangleBorder).borderRadius ==
                 const BorderRadius.only(
