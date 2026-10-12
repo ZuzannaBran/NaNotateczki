@@ -247,7 +247,8 @@ void main() {
       expect(bridgeRect.top, closeTo(actionTop, 4));
       expect(bridgeRect.height, closeTo(hasCover ? 114 : 78, 1));
 
-      if (hasCover)
+      if (hasCover) {
+        await tester.tap(find.text('Edit cover'));
         await tester.pumpAndSettle();
         expect(find.text('Edit folder cover'), findsOneWidget);
         await tester.tap(find.text('Cancel'));

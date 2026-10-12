@@ -835,7 +835,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   po zmianie motywu, kontrast planera/timera, pozycja menu względem
   prawej granicy sidebaru przy resize w obu motywach, maskowanie
   cienia na styku oraz wspólna czułość nowych scrollerów.
-- `test/library_screen_responsive_layout_test.dart` (674):
+- `test/library_screen_responsive_layout_test.dart` (676):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
