@@ -338,7 +338,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 504: `selectFolder`; 615: `_loadFolders`; 654: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1550 linii)
+### `lib/features/library/presentation/library_screen.dart` (1569 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -365,27 +365,30 @@ przy przełączaniu dokumentów.
 Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
 dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej krawędzi
 całego sidebaru (włącznie z 12 px uchwytem resize), jego koloru i animacji
-180 ms. Kolor menu i łącznika maskującego cień odpowiada dokładnie tłu
-głównego paska narzędzi (`surfaceContainerLow`). Lewe narożniki mają jawny
+180 ms. Kolor menu i łącznika maskującego cień pobierany jest z
+`appBarTheme.backgroundColor` (awaryjnie `surfaceContainerLow`), tak jak
+główny pasek narzędzi. Lewe narożniki mają jawny
 promień zero, a wyłącznie prawe promień 12 px. Menu styka się z panelem
 bez szczeliny: obie strony
 styku są bez cienia i bez 1 px kreski uchwytu resize. Menu ma elevation 0,
 a osobny dekoracyjny cień o alpha 0x44 jest przycięty do prawej strony;
+na czas otwarcia dowolnego menu cienie obu strzałek sidebaru są wyłączone
+i przywracane natychmiast po zamknięciu;
 2 px łącznik koloru panelu maskuje linię graniczną. Menu folderu zawiera także
 edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon.
 
 - 23: `LibraryScreen`; 30: `_LibraryScreenState`;
   438: `_openCatalogSettings`;
-  773: `_CreateMenuButton`;
-  816: `_LibraryTreePane`;
-  1047: `_FolderTreeRow`;
-  1141: `_LibraryTreeItemRow`;
-  1213: `_sidebarMenuShape`;
-  1227: `_SidebarMenuShadowPainter`;
-  1268: `_showSidebarMenu`;
-  1350: `_TreeRowActions`;
-  1424: `_LibraryWorkspace`;
-  1498: `_LeftZoneToggleTab`.
+  783: `_CreateMenuButton`;
+  826: `_LibraryTreePane`;
+  1057: `_FolderTreeRow`;
+  1151: `_LibraryTreeItemRow`;
+  1223: `_sidebarMenuShape`;
+  1237: `_SidebarMenuShadowPainter`;
+  1278: `_showSidebarMenu`;
+  1367: `_TreeRowActions`;
+  1441: `_LibraryWorkspace`;
+  1515: `_LeftZoneToggleTab`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (725 linii)
 
