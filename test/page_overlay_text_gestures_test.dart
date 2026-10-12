@@ -20,6 +20,7 @@ import 'package:program/features/editor/presentation/widgets/text_hud_block.dart
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
+import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
@@ -298,6 +299,124 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
+    await database.close();
+  });
+
+  testWidgets('ink tools pass through text and image hit areas', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final notebook = _notebook();
+    final textBlock = TextBlock(
+      id: 'existing-text',
+      text: 'Text under ink',
+      position: const Offset(40, 60),
+      fontSize: 20,
+      color: Colors.black,
+      width: 200,
+    );
+    final imageBlock = ImageBlock(
+      id: 'existing-image',
+      path: '',
+      ocrText: '',
+      position: const Offset(250, 200),
+      width: 180,
+      height: 140,
+    );
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: notebook.copyWith(
+        pages: [
+          notebook.pages.single.copyWith(
+            textBlocks: [textBlock],
+            imageBlocks: [imageBlock],
+          ),
+        ],
+      ),
+    );
+    var canvasPointerDowns = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<EditorController>.value(
+          value: controller,
+          child: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 600,
+                height: 500,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Listener(
+                        behavior: HitTestBehavior.opaque,
+                        onPointerDown: (_) => canvasPointerDowns++,
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                    Consumer<EditorController>(
+                      builder: (context, editor, _) =>
+                          PageOverlay(controller: editor),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final textPosition = tester.getCenter(find.byType(quill.QuillEditor));
+    final imagePosition =
+        tester.getTopLeft(find.byType(PageOverlay)) + const Offset(340, 260);
+    for (final tool in [
+      DrawingTool.pen,
+      DrawingTool.highlighter,
+      DrawingTool.eraserBrush,
+      DrawingTool.rectangle,
+    ]) {
+      controller.setTool(tool);
+      await tester.pump();
+      for (final position in [textPosition, imagePosition]) {
+        final previousDowns = canvasPointerDowns;
+        await tester.tapAt(position);
+        await tester.pump();
+        expect(
+          canvasPointerDowns,
+          previousDowns + 1,
+          reason: '$tool must pass the pointer to the ink canvas',
+        );
+        expect(controller.activeTextBlockId, isNull);
+        expect(controller.activeImageBlockId, isNull);
+        expect(controller.tool, tool);
+      }
+    }
+
+    controller.setTool(DrawingTool.pen);
+    await tester.pump();
+    final previousDowns = canvasPointerDowns;
+    await tester.tapAt(textPosition);
+    await tester.pump(kDoubleTapMinTime);
+    await tester.tapAt(textPosition);
+    await tester.pump(kDoubleTapTimeout);
+    expect(canvasPointerDowns, previousDowns + 2);
+    expect(controller.tool, DrawingTool.pen);
+    expect(controller.activeTextBlockId, isNull);
+
+    controller.setTool(DrawingTool.edit);
+    await tester.pump();
+    await tester.tapAt(imagePosition);
+    await tester.pump();
+    expect(controller.activeImageBlockId, imageBlock.id);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
     await database.close();
   });
 

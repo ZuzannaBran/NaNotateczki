@@ -706,7 +706,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2890 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2891 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -719,6 +719,9 @@ crop, a lasso/ink pozostają poza tym silnikiem. Piksele obrazów/PDF są zawsze
 tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
 tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
 mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
+W trybach rysunkowych (pióro, marker, gumki, kształty) overlay obiektów
+nie uczestniczy w hit-teście; tekst oraz obrazy/PDF pozostają widoczne.
+Lasso zachowuje swoje interakcje.
 Operuje wyłącznie w logicznych współrzędnych strony/dokumentu; responsywną
 skalę nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki
 overlayu. Pojedyncze wskazanie nieaktywnego Quilla jest stosowane po oknie
@@ -850,12 +853,13 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
   minimapa na krótkim ekranie, regulacja scrolla stron i interaktywność
   narzędzi
-- `test/page_overlay_text_gestures_test.dart` (443): blokowy toolbar
+- `test/page_overlay_text_gestures_test.dart` (562): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
-  tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
+  tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian;
+  w trybach ink kliknięcia przechodzą przez tekst i obrazy/PDF
 - `test/board_scene_bounds_test.dart` (178): stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
   zachowanie viewportu po schowaniu narzędzi, kolor nagłówka i porównanie
