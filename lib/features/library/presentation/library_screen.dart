@@ -1256,12 +1256,9 @@ class _SidebarMenuShadowPainter extends CustomPainter {
         size.height + 20,
       ),
     );
-    canvas.drawShadow(
-      _sidebarMenuShape.getOuterPath(menuRect),
-      const Color(0x44000000),
-      4,
-      false,
-    );
+    final menuPath = _sidebarMenuShape.getOuterPath(menuRect);
+    canvas.clipPath(menuPath, clipOp: ClipOp.difference, doAntiAlias: false);
+    canvas.drawShadow(menuPath, const Color(0x44000000), 4, false);
     canvas.restore();
     canvas.drawRect(
       Rect.fromLTWH(0, 0, _sidebarMenuSeamWidth, size.height),
@@ -1311,9 +1308,7 @@ Future<T?> _showSidebarMenu<T>({
   );
   final bottomLimit = math.max(8.0, overlayBox.size.height - menuHeight - 8);
   final top = anchorTop.clamp(8.0, bottomLimit).toDouble();
-  final theme = Theme.of(context);
-  final surfaceColor =
-      theme.appBarTheme.backgroundColor ?? theme.colorScheme.surfaceContainerLow;
+  final surfaceColor = Theme.of(context).colorScheme.surfaceContainerLowest;
   final shadowEntry = OverlayEntry(
     builder: (_) => Positioned(
       left: left - _sidebarMenuSeamWidth,
