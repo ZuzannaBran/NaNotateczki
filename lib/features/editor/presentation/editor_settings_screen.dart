@@ -23,6 +23,7 @@ class EditorSettingsScreen extends StatelessWidget {
     final preferences = context.watch<AppPreferencesController>();
     final sensitivityLabel = preferences.touchNavigationSensitivity
         .toStringAsFixed(1);
+    final uiScaleLabel = '${(preferences.uiScale * 100).round()}%';
 
     return Scaffold(
       appBar: AppBar(
@@ -290,6 +291,47 @@ class EditorSettingsScreen extends StatelessWidget {
                           onSelectionChanged: (selection) {
                             preferences.setDarkMode(selection.single);
                           },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Interface scale'),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Adjusts the size of the entire app interface.',
+                            ),
+                            Row(
+                              children: [
+                                const Text('75%'),
+                                Expanded(
+                                  child: Slider(
+                                    key: const ValueKey('visual-ui-scale'),
+                                    min: 0.75,
+                                    max: 1.5,
+                                    divisions: 15,
+                                    value: preferences.uiScale,
+                                    label: uiScaleLabel,
+                                    onChanged: preferences.previewUiScale,
+                                    onChangeEnd: preferences.setUiScale,
+                                  ),
+                                ),
+                                const Text('150%'),
+                                SizedBox(
+                                  width: 48,
+                                  child: Text(
+                                    uiScaleLabel,
+                                    textAlign: TextAlign.end,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                       if (controller != null) ...[
