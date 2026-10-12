@@ -182,26 +182,16 @@ void main() {
     expect(appBar.scrolledUnderElevation, 0);
     expect(appBar.surfaceTintColor, Colors.transparent);
     final viewport = find.byKey(viewportKey);
-    final page = find.byKey(const ValueKey('notebook-document-transform'));
-    expect(
-      tester.getTopLeft(viewport).dy,
-      closeTo(canvasRect.top + 22, 0.01),
-    );
-    expect(
-      tester.getTopLeft(page).dy,
-      closeTo(canvasRect.top + 94, 0.01),
-    );
+    expect(tester.getTopLeft(viewport).dy, closeTo(canvasRect.top + 22, 0.01));
+    expect(_documentTopLeft(tester).dy, closeTo(canvasRect.top + 94, 0.01));
     final scaledDocumentHeight =
         _documentLayoutSize(tester).height * _documentScale(tester);
     expect(
       tester.getSize(viewport).height,
       closeTo(scaledDocumentHeight + 72, 0.01),
     );
-    expect(tester.getTopLeft(page).dy, greaterThan(toolbarRect.bottom));
-    expect(
-      tester.getTopLeft(overview).dy,
-      closeTo(canvasRect.top + 82, 0.01),
-    );
+    expect(_documentTopLeft(tester).dy, greaterThan(toolbarRect.bottom));
+    expect(tester.getTopLeft(overview).dy, closeTo(canvasRect.top + 82, 0.01));
 
     await tester.tap(find.byTooltip('Highlighter'));
     await tester.pump();
@@ -223,9 +213,9 @@ void main() {
     await tester.pump();
     await secondFinger.moveBy(const Offset(0, -170));
     await tester.pump();
-    expect(tester.getTopLeft(page).dy, lessThan(toolbarRect.bottom));
+    expect(_documentTopLeft(tester).dy, lessThan(toolbarRect.bottom));
     final verticalDocumentPan =
-        tester.getTopLeft(page).dy - tester.getTopLeft(viewport).dy;
+        _documentTopLeft(tester).dy - tester.getTopLeft(viewport).dy;
     expect(
       tester.getSize(viewport).height,
       closeTo(
@@ -234,10 +224,7 @@ void main() {
         0.01,
       ),
     );
-    expect(
-      tester.getTopLeft(viewport).dy,
-      closeTo(canvasRect.top + 22, 0.01),
-    );
+    expect(tester.getTopLeft(viewport).dy, closeTo(canvasRect.top + 22, 0.01));
     await firstFinger.up();
     await secondFinger.up();
     await tester.pump();
@@ -246,17 +233,13 @@ void main() {
     preferences.previewTouchNavigationSensitivity(1.8);
     await tester.pump();
     final pageScrollViews = tester.widgetList<SingleChildScrollView>(
-      find.descendant(
-        of: canvas,
-        matching: find.byType(SingleChildScrollView),
-      ),
+      find.descendant(of: canvas, matching: find.byType(SingleChildScrollView)),
     );
     expect(
       pageScrollViews.any(
         (view) =>
             view.physics is TouchNavigationScrollPhysics &&
-            (view.physics! as TouchNavigationScrollPhysics).sensitivity ==
-                1.8,
+            (view.physics! as TouchNavigationScrollPhysics).sensitivity == 1.8,
       ),
       isTrue,
     );
@@ -275,10 +258,7 @@ void main() {
 
     expect(find.byKey(toolbarKey), findsNothing);
     expect(tester.getRect(canvas), canvasRect);
-    expect(
-      tester.getTopLeft(overview).dy,
-      closeTo(canvasRect.top + 10, 0.01),
-    );
+    expect(tester.getTopLeft(overview).dy, closeTo(canvasRect.top + 10, 0.01));
     expect(
       tester.getTopLeft(find.byKey(viewportKey)).dy,
       closeTo(canvasRect.top + 22, 0.01),
@@ -318,13 +298,19 @@ Size _pageViewportSize(WidgetTester tester) {
   return tester.getSize(find.byKey(const ValueKey('notebook-page-viewport')));
 }
 
+Offset _documentTopLeft(WidgetTester tester) {
+  return _documentPoint(tester, Offset.zero);
+}
+
 Offset _documentTopRight(WidgetTester tester) {
+  return _documentPoint(tester, Offset(_documentLayoutSize(tester).width, 0));
+}
+
+Offset _documentPoint(WidgetTester tester, Offset localPoint) {
   final finder = find.byKey(const ValueKey('notebook-document-transform'));
   final transform = tester.widget<Transform>(finder).transform;
   final layoutTopLeft = tester.getTopLeft(finder);
-  final layoutSize = tester.getSize(finder);
-  return layoutTopLeft +
-      MatrixUtils.transformPoint(transform, Offset(layoutSize.width, 0));
+  return layoutTopLeft + MatrixUtils.transformPoint(transform, localPoint);
 }
 
 void _expectOverviewSideGapsEqual(WidgetTester tester) {

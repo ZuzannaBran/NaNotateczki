@@ -37,6 +37,7 @@ lib/
     ├── library/                 foldery i lista dokumentów
     ├── notebook/                domena, repozytorium, ekran notebooka
     ├── editor/                  stan i UI edytora
+    ├── planner/                 sesje nauki i kalendarz
     └── board/                   ekran nieskończonej tablicy
 ```
 
@@ -55,7 +56,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (633 linie)
+### `lib/app/app_scope.dart` (632 linie)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -68,10 +69,12 @@ postępu, ale podczas zamykania blokujący spinner nadal chroni zapis.
 Scheduler w trybie exit nie czeka na idle rysika i nie porzuca zmian
 po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 
-- 24: `AppScope`; 31: `_AppScopeState`; 73: `didRequestAppExit`.
-- 226: `_ExitGuardOverlay`; 252: `_FinishingExitOverlay`;
-  360: `_BackupScheduler`;
-  556: `flushForExit`.
+- Dostarcza również singleton `StudyPlannerController` (Provider),
+  niezależny od migracji bazy notatek.
+- 25: `AppScope`; 32: `_AppScopeState`; 74: `didRequestAppExit`.
+- 232: `_ExitGuardOverlay`; 255: `_FinishingExitOverlay`;
+  363: `_BackupScheduler`;
+  559: `flushForExit`.
 
 ## 3. Core
 
@@ -85,7 +88,7 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
   bez modyfikowania zapisanych kresek. 50: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (113): `AppTheme.light` i `AppTheme.dark`
+- `lib/core/theme/app_theme.dart` (114): `AppTheme.light` i `AppTheme.dark`
   z kontrastowymi kontrolkami i nagłówkami. 5: `AppTheme`.
 
 ### Wejście i preferencje
@@ -100,7 +103,7 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
   8: `DeviceInputMode`;
   27:
   `AppPreferencesController`.
-- `lib/core/input/touch_navigation_scroll_physics.dart` (28):
+- `lib/core/input/touch_navigation_scroll_physics.dart` (24):
   mnożnik dystansu scrolla i próg startu drag listy plików i stron,
   bez ingerencji w rysowanie czy transformację obiektów.
   4: `TouchNavigationScrollPhysics`.
@@ -219,7 +222,7 @@ bezpośrednio do `InkEraserEngine`. Nie zawiera własnej geometrii gumki.
 
 - 5: `flattenErasersForBackup`; 9: `flattenPageErasersForBackup`.
 
-### `lib/data/export/notebook_export_service.dart` (779 linii)
+### `lib/data/export/notebook_export_service.dart` (764 linie)
 
 Renderuje notebook/board do PNG lub PDF i zapisuje przez systemowy dialog.
 Eksport wywołany z edytora używa aktywnego motywu: jasnego albo ciemnego.
@@ -232,7 +235,7 @@ ink i nie używa `BlendMode.clear`.
 
 - 25: `NotebookExportFormat`; 27: `NotebookExportFormatLabel`;
   38: `NotebookExportService`; 45: `exportController`;
-  62: `exportNotebook`; publiczne metody `renderPngPagesForTest` i
+  64: `exportNotebook`; publiczne metody `renderPngPagesForTest` i
   `renderPdfBytesForTest` uruchamiają produkcyjny renderer bez systemowego
   dialogu zapisu pliku.
 
@@ -304,69 +307,131 @@ i zachowuje obrazy inline.
   utrwalenie eraser-stroke.
 - `_toolFromIndex` i `_toolToIndex` muszą pozostać symetryczne.
 
-### `lib/features/notebook/presentation/notebook_screen.dart` (26 linii)
+### `lib/features/notebook/presentation/notebook_screen.dart` (34 linie)
 
 Wybiera pusty stan albo właściwy `EditorScreen`; przekazuje flagę
-widoczności wspólnego paska narzędzi.
+widoczności wspólnego paska narzędzi i `showCompactTimer`, sterujące
+wyświetlaniem `CompactStudyTimer` w nagłówku edytora.
 
 - 8: `NotebookScreen`.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (663 linie)
+### `lib/features/library/presentation/library_controller.dart` (738 linii)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
-Wybór dokumentu synchronizuje też aktywny folder, dzięki czemu drzewko
-biblioteki zaznacza folder i notatkę jednocześnie. Asynchroniczny start
+Zapisuje kształt i indywidualny kolor ikony okładki folderu w zgodnym wstecznie
+`library_folders.json` (legacy lista nazw lub nowy obiekt z `folders` i
+`covers`); nie zmienia schematu SQLite. Wybór dokumentu synchronizuje
+też aktywny folder, dzięki czemu drzewko biblioteki zaznacza folder i notatkę
+jednocześnie. Asynchroniczny start
 nie powiadamia słuchaczy po usunięciu kontrolera. Zapis samych folderów
 zgłasza pusty zestaw zmian repozytorium, więc aktualizuje manifest bez
 oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
 tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
-- 14: `LibraryController`; 78: `initialize`; 87: `loadItems`;
-  159: `restoreCorruptDocumentsFromBackup`; 217: `syncNow`.
-- 261–389: tworzenie/zmiana/usuwanie folderów i dokumentów.
-- 417: `selectItem`; 433: `selectFolder`; 442: `setSearchQuery`.
-- 447: `exportBackup`; 476: `importBackup`; 489: `selectedItem`.
-- 563: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
+- 15: `FolderCoverShape`; 17: `FolderCoverStyle`; 48: `LibraryController`.
+- 121: `initialize`; 136: `loadItems`.
+- 318: `updateFolderCover`; 330–470: foldery i dokumenty.
+- 504: `selectFolder`; 615: `_loadFolders`; 654: `_saveFolders`
+  — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1196 linii)
+### `lib/features/library/presentation/library_screen.dart` (1439 linii)
 
-Jednopanelowa biblioteka w formie drzewa: wspólny pasek sterowania,
-lista folderów i plików wykorzystuje ustawioną czułość dotyku.
-rozwijane i zwijane foldery oraz zagnieżdżone notebooki i boardy. Folder
-i aktywny dokument mają miękkie, zaokrąglone zaznaczenie; sidebar używa
-kompaktowej typografii Georgia i jasnej neutralnej powierzchni panelu. Panel można
-zwijać w całości i zmieniać jego szerokość. Tytuł panelu to `Projects`. Pod strzałką panelu folderów
-jest drugi przycisk zwijania wspólnego paska narzędzi boarda i notebooka.
-Obie strzałki są pionowo wyśrodkowane we własnych obszarach (nagłówek
-58 px i toolbar 72 px), przypięte do prawej krawędzi panelu,
-a ich kierunki lewo/prawo odpowiadają zwijaniu bocznemu.
-Oba przyciski mają węższą szerokość 24 px, wysokość 44 px,
-ikonę 18 px oraz mocniejszy cień (elevation 8, black54)
-i cienki obrys dla kontrastu z tłem.
-Stan toolbaru pozostaje zachowany przy przełączaniu dokumentów. Pionowy separator uchwytu ma 1 px i leży na jego prawej krawędzi.
+Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
+katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
+wraca do katalogów, kliknięcie folderu otwiera siatkę podglądów dokumentów,
+a wybór dokumentu uruchamia edytor. Powrót z edytora wymusza flush
+niezapisanych zmian przed ponownym wczytaniem miniatur. Lista folderów
+i plików wykorzystuje ustawioną czułość dotyku. Folder i aktywny dokument
+mają miękkie, zaokrąglone zaznaczenie; sidebar używa kompaktowej typografii
+Georgia i jasnej neutralnej powierzchni panelu. Panel można zwijać i zmieniać
+jego szerokość.
+
+U dołu panelu jest `StudyTimerCard`, wyrównany do dolnej krawędzi
+i przewijany przy większej zawartości. Po zwinięciu panelu
+`CompactStudyTimer` wyświetla się obok Settings w AppBar notebooka/boarda.
+Pod strzałką panelu folderów jest drugi przycisk zwijania wspólnego paska
+narzędzi; oba są pionowo wyśrodkowane we własnych obszarach, mają 24 px
+szerokości, 44 px wysokości, cień i obrys. Stan toolbaru pozostaje zachowany
+przy przełączaniu dokumentów.
+
 Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
-dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej
-krawędzi panelu, jego koloru i animacji 180 ms. Lewy bok menu jest prosty,
-zaokrąglone (promień 12 px) są wyłącznie prawe narożniki. Menu
-nachodzi na 12-pikselowy uchwyt zmiany szerokości (bez zmiany funkcji
-uchwytu poza menu), nie ma cienia ani linii na styku z panelem.
-Etykiety menu mają taką samą czcionkę i rozmiar 14 px jak nazwy dokumentów;
-opcje dodawania nie mają ikonek.
+dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej krawędzi
+panelu, jego koloru i animacji 180 ms. Lewy bok menu jest prosty, a wyłącznie
+prawe narożniki mają promień 12 px. Menu nachodzi na uchwyt zmiany szerokości
+i nie ma cienia ani linii na styku z panelem. Menu folderu zawiera także
+edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon.
 
-- 16: `LibraryScreen`; 23: `_LibraryScreenState`;
-  545: `_CreateMenuButton`; 589: `_LibraryTreePane`;
-  788: `_FolderTreeRow`; 879: `_LibraryTreeItemRow`;
-  951: `_sidebarMenuShape`; 958: `_showSidebarMenu`;
-  1008: `_TreeRowActions`; 1078: `_LibraryWorkspace`;
-  1144: `_LeftZoneToggleTab` — poziome strzałki folderów i toolbaru.
+- 22: `LibraryScreen`; 29: `_LibraryScreenState`;
+  749: `_CreateMenuButton`; 792: `_LibraryTreePane`;
+  1018: `_FolderTreeRow`; 1112: `_LibraryTreeItemRow`;
+  1184: `_sidebarMenuShape`; 1191: `_showSidebarMenu`;
+  1239: `_TreeRowActions`; 1313: `_LibraryWorkspace`;
+  1387: `_LeftZoneToggleTab`.
+
+### `lib/features/library/presentation/library_catalog.dart` (667 linii)
+
+Kafelkowa strona główna folderów oraz siatka podglądów zawartości folderu.
+Okładka ma automatycznie rozjaśniony dominujący kolor ink/tekstu we wszystkich
+stronach dokumentów folderu; kształt i kolor ikony można zmieniać w dialogu.
+Notatki mają pionowy podgląd pierwszej strony (820×1160), boardy kwadratowy
+podgląd dopasowany do granic obiektów z pierwszej strony. Miniatury rysują
+ink, tekst oraz dostępne obrazy bez uruchamiania edytora.
+
+- 16: `dominantFolderColor`; 53: `LibraryCatalog`;
+  226: `_FolderTile`; 288: `_DocumentTile`; 389: `_DocumentPreview`;
+  467: `_boardPreviewBounds`; 509: `_PagePreviewPainter`;
+  577: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
 Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 
 - 8: `LibraryItemCard`; 110: `_ItemKindIcon`.
+
+## 6a. Planer nauki (bez migracji SQLite)
+
+- `lib/features/planner/state/study_planner_controller.dart` (528):
+  `StudySession`, `StudyTechnique`, `StudyStatus`, `StudyPlannerController`.
+  Jeden stan Provider + ChangeNotifier, trwały `study_planner.json` przez
+  cross-platform `text_storage`. Timery liczone względem deadline,
+  odtwarzanie po restarcie, Pomodoro 25/5, Focus 50/10, Deep 90/20,
+  jednorazowa ocena 1–5 gwiazdek i zapis chroniony przez
+  `AppSaveCoordinator`. Pominięta ocena zamyka sesję i zapisuje ją
+  bez oceny w historii (także po ponownym uruchomieniu); starsze sesje
+  pozostawione w stanie review są przenoszone do historii bez ponagleń.
+  Powiadomienia tylko wewnątrz działającej aplikacji.
+  10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
+  152: `StudyPlannerController`; 232: `load`; 289: `create`;
+  357: `start`; 519: `flush`.
+- `lib/features/planner/presentation/study_timer_widgets.dart` (555):
+  `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
+  sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
+  pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
+  22: `studyRatingStars`; 29: `openStudyPlanner`;
+  35: `showStudySessionEditor`; 55: `showStudyRating`;
+  332: `StudyTimerCard`; 511: `CompactStudyTimer`.
+- `lib/features/planner/presentation/study_action_theme.dart` (73):
+  `StudyActionTheme`, `StudyActionStyles`; czytelny, ale subtelny beż
+  tylko dla wyróżnianych akcji; pozostałe przyciski i ikony bez ciemnego
+  wypełnienia, ciemny tekst i jasne zaznaczenie Today/Week/Month.
+  Motyw globalny pozostaje bez zmian. 6: `StudyActionStyles`;
+  19: `StudyActionTheme`.
+- `lib/features/planner/presentation/planner_screen.dart` (729):
+  `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
+  tworzenie, edycja, usuwanie i historia. Nazwa dnia tygodnia znajduje się
+  w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
+  10: `CalendarMode`; 12: `PlannerScreen`; 19: `_PlannerScreenState`.
+- `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
+  timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
+  i ochrona uszkodzonych danych.
+- `test/study_planner_widget_test.dart`: kalendarz, timer, wybór gwiazdek,
+  pominięcie i zamknięcie oceny, historia oceniona i bez oceny.
+- `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
+  tygodnia we wszystkich widokach i po zmianie daty; osobny krok CI.
+- `test/study_planner_button_contrast_test.dart`: regresja widoczności
+  aktywnych przycisków i wyraźnych stanów wybranego widoku kalendarza.
 
 ## 7. Stan edytora
 
@@ -426,13 +491,15 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2384 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2395 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
 toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
 canvasem, zamiast zajmować jego wysokość. `showToolbar` steruje
 widocznością nakładek. Początkowe 72 px odsunięcia strony realizuje
 `_pagePan` wewnątrz viewportu, zamiast dodatkowego paddingu przewijania.
+`showCompactTimer` pokazuje `CompactStudyTimer` w nagłówku przy zwiniętym
+panelu biblioteki.
 Viewport pozostaje 22 px od górnej krawędzi canvasa, więc strona nie jest
 ucinana przez pusty pas, gdy użytkownik wsuwa ją pod toolbar.
 Rozszerzony zakres pionowego pan pozwala również przesuwać stronę niżej.
@@ -466,28 +533,28 @@ z uwzględnieniem scrolla minimapy, paddingu, pan i granic przesunięć.
 Gest przeciągnięcia nadal przewija samą minimapę, a blokada transformacji
 obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 
-- 33: `EditorScreen`; 42: `_EditorScreenState`.
-- 43: `_logicalPageWidth`; 91: `_effectivePageScale` — skala okna pomnożona
+- 37: `EditorScreen`; 51: `_EditorScreenState`.
+- 52: `_logicalPageWidth`; 99: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
-- 144: synchronizacja strony; 175: nawigacja do klikniętego obszaru.
-- 268–682: gesty pan/zoom, blokada viewportu i transformacje.
-- 802–888: busy overlay, import/eksport i clipboard.
-- 1007: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
+- 149: synchronizacja strony; 180: nawigacja do klikniętego obszaru.
+- 275–694: gesty pan/zoom, blokada viewportu i transformacje.
+- 866–896: busy overlay, komendy importu/eksportu i clipboard oraz ustawienia.
+- 1017: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 1036: główny `build`; pasek tekstu jest renderowany na podstawie
+- 1043: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1532: `_PageViewportClipper`; 1590: `_PageFramePainter`;
-  1697: `_ProjectMiniMapOverlay`; 1991: Listener kliknięć minimapy;
-  2114: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
+- 1541: `_PageViewportClipper`; 1599: `_PageFramePainter`;
+  1706: `_ProjectMiniMapOverlay`; 1999: Listener kliknięć minimapy;
+  2125: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_commands.dart` (170 linii)
 
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (667 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (665 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
@@ -498,18 +565,16 @@ obsługują ustawienia tła i podgląd logów diagnostycznych.
 
 - 16:
   `EditorSettingsScreen`;
-  242:
+  347:
   `_showErrorsDialog`;
-  324:
+  429:
   `_showDataIntegrityDialog`;
-  411:
+  516:
   `_showOptimizationDialog`;
-  497:
-  `_AccentColorSection`;
-  609:
+  602:
   `_BackgroundSection`.
 
-### `lib/features/editor/presentation/interaction/notebook_overview_navigation.dart` (59 linii)
+### `lib/features/editor/presentation/interaction/notebook_overview_navigation.dart` (55 linii)
 
 `NotebookOverviewNavigation` (5) mapuje lokalny punkt oraz scroll minimapy
 na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
@@ -523,7 +588,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (926):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (921):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
@@ -533,8 +598,8 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   aktualny kolor wyświetlania, a styl pozostaje lekki i obrysowy.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
-  10: `EditorToolbar`; 190: dialog tła; 344: selektor gumki;
-  412: selektor kształtu; 819: `_EraserIcon`.
+  10: `EditorToolbar`; 198: dialog tła; 337: selektor gumki;
+  405: selektor kształtu; 814: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (583):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
@@ -573,7 +638,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   konfigurowalne przez `ObjectTransformHudStyle`.
   13: `ObjectTransformHudStyle`; 54: `ObjectTransformHud`;
   106: `_ObjectTransformHudState`; 591: `_ObjectTransformFramePainter`.
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (533):
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (530):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
   jest wyłączony. Podczas edycji treści uchwyty resize i osobny grabber move
@@ -585,7 +650,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   a jego jasność odwracana w dark mode. Nieaktywne teksty używają
   starego Quilla jako fallback.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4190 linii)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4189 linii)
 
 Dwa świadomie osobne canvasy ink, wspólna geometria rozpoznawania gestów,
 lasso, handoff aktywnej kreski i pomiary wydajności. Wszystkie modyfikacje
@@ -602,19 +667,19 @@ szarości w trybie ciemnym bez zmian modelu. Podczas rysowania
 pen/highlighter overlay stosuje ten sam LOD co zapisany
 tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
 
-- 45: `_InkPerfLog`; geometria rozpoznawania scratch pozostaje przed
+- 46: `_InkPerfLog`; geometria rozpoznawania scratch pozostaje przed
   deklaracjami canvasów, ale hit-test i cięcie są w `InkEraserEngine`.
-- 658: `DrawingCanvas`; 680: `DocumentDrawingCanvas`.
-- 897: `_DrawingCanvasState`; 2241: `_DocumentDrawingCanvasState`.
+- 665: `DrawingCanvas`; 687: `DocumentDrawingCanvas`.
+- 904: `_DrawingCanvasState`; 2250: `_DocumentDrawingCanvasState`.
 - 3783: `_InkPainter`; 3843: `_InkOverlayPainter`;
-  4088: `_InkPageLayer`; 4135: `_PageInkPainter`.
+  4087: `_InkPageLayer`; 4134: `_PageInkPainter`.
 
 - `lib/features/editor/presentation/widgets/selection_outline.dart` (32):
   wspólny painter przerywanego konturu dla lassa i gumki zakresowej;
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2892 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2890 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -636,13 +701,13 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 - 32: `PageOverlay`; 193: `DocumentPageOverlay`.
 - aktywny tekst: `TextHudBlock`; fallback nieaktywnego tekstu:
   `_TextBlockWidget` / `_TextBlockWidgetState`.
-- 1420: `_ImageBlockWidget`; 1443: `_ImageBlockWidgetState`.
-- 2439: `_editOcr`; 2513: `_OcrTextDialog`;
-  2612: `_LassoSelectionWidget`; 2766: `_LassoActionButton`.
+- 1418: `_ImageBlockWidget`; 1441: `_ImageBlockWidgetState`.
+- 2504: `_editOcr`; 2578: `_OcrTextDialog`;
+  2677: `_LassoSelectionWidget`; 2833: `_LassoActionButton`.
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (895 linii)
+### `lib/features/board/presentation/board_screen.dart` (899 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -653,18 +718,20 @@ układu współrzędnych. Po zakończeniu gestu granice odświeżają się.
 Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 `QuillController`. Główny toolbar i pasek tekstu respektują `showToolbar`
 i unoszą się na nakładce nad canvasem, zamiast zmniejszać jego wysokość.
+`showCompactTimer` wyświetla `CompactStudyTimer` w nagłówku po zwinięciu
+panelu biblioteki.
 Pan dotykowy boarda ma regulowaną czułość i próg gestu; rysik,
 zoom i transformacje obiektów są niezależne od tego ustawienia.
 Board ma stały boczny odstęp 16 px, ale nie ma marginesu u góry,
 więc zawartość można swobodnie przesuwać za toolbar. Nagłówek ma
 wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 
-- 28: `BoardScreen`; 37: `_BoardScreenState`.
-- 59: `_buildBoardRect`; 67–388: obsługa pointerów i viewportu.
-- 499: główny `build`; import/eksport i skróty przez `EditorCommands`.
-- 742: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
-- 778: `_BoardPaintProbe`; 795: `_RenderBoardPaintProbe`;
-  818: `_BoardZoomControls`.
+- 30: `BoardScreen`; 44: `_BoardScreenState`.
+- 70: `_buildBoardRect`; 80–394: obsługa pointerów i viewportu.
+- 512: główny `build`; import/eksport i skróty przez `EditorCommands`.
+- 758: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
+- 794: `_BoardPaintProbe`; 811: `_RenderBoardPaintProbe`;
+  834: `_BoardZoomControls`.
 
 ## 10. Platformy, web i testy
 
@@ -702,18 +769,21 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
-- `test/library_screen_responsive_layout_test.dart` (574):
+- `test/library_catalog_test.dart`: kolor dominujący, serializacja okładek,
+  start katalogu, siatka notatek/boardów, edycja okładki i powrót z edytora.
+- `test/library_screen_responsive_layout_test.dart` (632):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
   wyśrodkowanie, zwężanie kapsułek, wysokość, odstępy boczne
-  oraz przewijanie na wąskim ekranie; również aktualizacja mnożnika
-  przewijania plików bez restartu; geometria, kolor i obsługa menu
+  oraz przewijanie na wąskim ekranie; wyrównanie timera do dolnej krawędzi
+  panelu i aktualizacja mnożnika przewijania plików bez restartu; geometria,
+  kolor i obsługa menu
   folderu, notebooka oraz boarda, a także menu dodawania (3 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
-  brak szczeliny i cienia na styku menu z panelem
-- `test/touch_navigation_sensitivity_test.dart` (83):
+  brak szczeliny i cienia na styku menu z panelem.
+- `test/touch_navigation_sensitivity_test.dart` (80):
   granice czułości i porównanie dystansów scrolla przy gestach palcem.
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
@@ -727,20 +797,20 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/notebook_overview_navigation_test.dart`: kliknięcia widocznej minimapy,
   przełączanie strony, scroll minimapy bez nawigacji, wybór po przewinięciu,
   blokada transformacji, mapowanie współrzędnych i zachowanie skali.
-- `test/editor_screen_responsive_layout_test.dart` (366):
+- `test/editor_screen_responsive_layout_test.dart` (352):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
   poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
   minimapa na krótkim ekranie, regulacja scrolla stron i interaktywność
   narzędzi
-- `test/page_overlay_text_gestures_test.dart` (432): blokowy toolbar
+- `test/page_overlay_text_gestures_test.dart` (440): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian
-- `test/board_scene_bounds_test.dart` (179): stały układ współrzędnych
+- `test/board_scene_bounds_test.dart` (178): stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
   zachowanie viewportu po schowaniu narzędzi, kolor nagłówka i porównanie
   szybkości przesuwania palcem dla 0.5× i 2.0×.
@@ -748,7 +818,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (233): paleta dark, odwracanie jasności
+- `test/dark_mode_theme_test.dart` (197): paleta dark, odwracanie jasności
   wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual
   i podgląd suwaka czułości w System.
 
@@ -782,7 +852,7 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   restore zamyka źródłowy `NotesDatabase` przed otwarciem docelowego,
   aby nie utrzymywać dwóch instancji Drift w tym samym isolate.
   Weryfikuje również trwałość ustawienia czułości nawigacji.
-- `test/production/export_render_test.dart` (308): produkcyjne PNG/PDF
+- `test/production/export_render_test.dart` (305): produkcyjne PNG/PDF
   w pamięci, liczba stron i rozmiar obrazu, treść oraz legacy gumka.
   Renderer działa w `tester.runAsync`, poza `FakeAsync` testu widgetowego.
   Regresje obejmują 12 stron, eksport boarda i piksele tej samej zapisanej

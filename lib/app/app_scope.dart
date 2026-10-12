@@ -20,6 +20,7 @@ import '../features/library/presentation/library_controller.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notebook/data/notebook_repository.dart';
 import '../features/notebook/domain/notebook.dart';
+import '../features/planner/state/study_planner_controller.dart';
 
 class AppScope extends StatefulWidget {
   const AppScope({super.key});
@@ -185,6 +186,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             ChangeNotifierProvider(
               create: (_) => AppPreferencesController()..load(),
             ),
+            ChangeNotifierProvider(
+              create: (_) => StudyPlannerController()..load(),
+            ),
             Provider<NotebookRepository>.value(value: repository),
             Provider<LocalBackupService>.value(value: backupService),
             ChangeNotifierProvider(
@@ -209,9 +213,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                   return Theme(
                     data: preferences.darkMode
                         ? AppTheme.dark()
-                        : AppTheme.light(
-                            accentColor: preferences.accentColor,
-                          ),
+                        : AppTheme.light(accentColor: preferences.accentColor),
                     child: _ExitGuardOverlay(
                       finishingExit: _finishingExit,
                       child: child ?? const SizedBox.shrink(),
@@ -228,10 +230,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 }
 
 class _ExitGuardOverlay extends StatelessWidget {
-  const _ExitGuardOverlay({
-    required this.finishingExit,
-    required this.child,
-  });
+  const _ExitGuardOverlay({required this.finishingExit, required this.child});
 
   final ValueListenable<bool> finishingExit;
   final Widget child;

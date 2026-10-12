@@ -515,8 +515,9 @@ void _drawSavedStroke(
   canvas.translate(effectiveTranslation.dx, effectiveTranslation.dy);
   if (isSelected) {
     final highlightPaint = Paint()
-      ..color = (darkMode ? AppColors.darkText : _lassoAccentColor)
-          .withValues(alpha: 0.22)
+      ..color = (darkMode ? AppColors.darkText : _lassoAccentColor).withValues(
+        alpha: 0.22,
+      )
       ..strokeCap = stroke.tool == DrawingTool.highlighter
           ? StrokeCap.square
           : StrokeCap.round
@@ -2416,8 +2417,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
                 perfLog: _inkPerf,
                 repaint: _inkRepaint,
                 currentPoints: _currentPoints,
-                darkMode:
-                    Theme.of(context).brightness == Brightness.dark,
+                darkMode: Theme.of(context).brightness == Brightness.dark,
                 currentColor: controller.inkColor,
                 currentWidth: currentWidth,
                 currentTool: activeTool,
@@ -3934,8 +3934,9 @@ class _InkOverlayPainter extends CustomPainter {
     double radius,
   ) {
     final paint = Paint()
-      ..color = (darkMode ? AppColors.darkText : Colors.black)
-          .withValues(alpha: 0.2)
+      ..color = (darkMode ? AppColors.darkText : Colors.black).withValues(
+        alpha: 0.2,
+      )
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
@@ -4038,9 +4039,7 @@ class _InkOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = width;
     if (tool == DrawingTool.eraserBrush) {
-      paint.color = darkMode
-          ? AppColors.darkCanvas
-          : _canvasBackgroundColor;
+      paint.color = darkMode ? AppColors.darkCanvas : _canvasBackgroundColor;
     } else {
       paint.color = _toolColor(color, tool);
     }

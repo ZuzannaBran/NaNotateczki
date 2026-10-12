@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/input/soft_keyboard.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
+import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/state/editor_controller.dart';
@@ -13,6 +14,9 @@ import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/presentation/notebook_screen.dart';
+import '../../planner/presentation/study_timer_widgets.dart';
+import '../../planner/state/study_planner_controller.dart';
+import 'library_catalog.dart';
 import 'library_controller.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -39,9 +43,74 @@ class _LibraryScreenState extends State<LibraryScreen> {
   static const double _toggleTabHeight = 44;
 
   bool _showLeftNavigation = true;
+  bool _showCatalog = true;
+  String? _catalogFolder;
   bool _showEditorToolbar = true;
   double _navigationPaneWidth = 320;
   bool _isShowingCorruptRecoveryDialog = false;
+  StudyPlannerController? _studyPlanner;
+  int _lastStudyNotice = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final planner = context.read<StudyPlannerController?>();
+    if (!identical(_studyPlanner, planner)) {
+      _studyPlanner?.removeListener(_onStudyNotice);
+      _studyPlanner = planner;
+      _lastStudyNotice = planner?.noticeRevision ?? 0;
+      planner?.addListener(_onStudyNotice);
+    }
+  }
+
+  @override
+  void dispose() {
+    _studyPlanner?.removeListener(_onStudyNotice);
+    super.dispose();
+  }
+
+  void _onStudyNotice() {
+    final planner = _studyPlanner;
+    if (planner == null || planner.noticeRevision == _lastStudyNotice) {
+      return;
+    }
+    _lastStudyNotice = planner.noticeRevision;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final upcoming = planner.upcoming;
+      final canStartNext = planner.active == null && upcoming.isNotEmpty;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 12),
+          content: Text(planner.notice ?? "Great job! Time's up."),
+          action: SnackBarAction(
+            label: planner.active != null
+                ? 'Planner'
+                : canStartNext
+                ? 'Start next'
+                : 'New timer',
+            onPressed: () {
+              if (planner.active != null) {
+                openStudyPlanner(context);
+              } else if (canStartNext) {
+                planner.start(upcoming.first.id);
+              } else {
+                showStudySessionEditor(context, startAfterSave: true);
+              }
+            },
+          ),
+        ),
+      );
+      if (planner.noticeRequiresReviewPrompt &&
+          planner.pendingReviews.isNotEmpty &&
+          planner.active == null) {
+        showStudyRating(context, planner.pendingReviews.last);
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -173,8 +242,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                         width: navigationWidth,
                                         child: _LibraryTreePane(
                                           controller: controller,
+                                          showingProjects:
+                                              _showCatalog &&
+                                              _catalogFolder == null,
+                                          onShowProjects: _openCatalogRoot,
+                                          onOpenFolder: (name) =>
+                                              _openCatalogFolder(
+                                                controller,
+                                                name,
+                                              ),
                                           onOpen: (item) =>
-                                              controller.selectItem(item.uid),
+                                              _openItem(controller, item),
                                           onCreate: _createAndSelectItem,
                                           onCreateFolder: () {
                                             _promptNewFolder(controller);
@@ -199,17 +277,49 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 : const SizedBox.shrink(),
                           ),
                           Expanded(
-                            child: _LibraryWorkspace(
-                              item: selectedItem,
-                              showToolbar: _showEditorToolbar,
-                            ),
+                            child: _showCatalog
+                                ? LibraryCatalog(
+                                    controller: controller,
+                                    folder:
+                                        controller.folderNames.contains(
+                                          _catalogFolder,
+                                        )
+                                        ? _catalogFolder
+                                        : null,
+                                    onBack: _openCatalogRoot,
+                                    onFolderTap: (folder) =>
+                                        _openCatalogFolder(controller, folder),
+                                    onOpenItem: (item) =>
+                                        _openItem(controller, item),
+                                    onEditFolder: (folder) =>
+                                        showFolderCoverEditor(
+                                          context,
+                                          controller,
+                                          folder,
+                                        ),
+                                    onRenameFolder: (folder) =>
+                                        _promptRenameFolder(controller, folder),
+                                    onDeleteFolder: (folder) =>
+                                        _confirmDeleteFolder(
+                                          controller,
+                                          folder,
+                                        ),
+                                    onRenameItem: (item) =>
+                                        _promptRenameItem(controller, item),
+                                    onDeleteItem: (item) =>
+                                        _confirmDeleteItem(controller, item),
+                                  )
+                                : _LibraryWorkspace(
+                                    item: selectedItem,
+                                    showToolbar: _showEditorToolbar,
+                                    showCompactTimer: !_showLeftNavigation,
+                                  ),
                           ),
                         ],
                       ),
                       Positioned(
                         left: math.max(0.0, leftZoneWidth - 1),
-                        top:
-                            (_navigationHeaderHeight - _toggleTabHeight) / 2,
+                        top: (_navigationHeaderHeight - _toggleTabHeight) / 2,
                         child: _LeftZoneToggleTab(
                           expanded: _showLeftNavigation,
                           onPressed: _toggleLeftNavigation,
@@ -217,7 +327,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
                       Positioned(
                         left: math.max(0.0, leftZoneWidth - 1),
-                        top: kToolbarHeight +
+                        top:
+                            kToolbarHeight +
                             (_editorToolbarAreaHeight - _toggleTabHeight) / 2,
                         child: _LeftZoneToggleTab(
                           expanded: _showEditorToolbar,
@@ -249,6 +360,78 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
+  Future<void> _prepareCatalog() async {
+    final repository = context.read<NotebookRepository>();
+    await AppSaveCoordinator.instance.flushPending();
+    await repository.waitForPendingSaves();
+  }
+
+  Future<void> _openCatalogRoot() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final wasEditing = !_showCatalog;
+    if (wasEditing) {
+      try {
+        await _prepareCatalog();
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to save the open document.')),
+          );
+        }
+        return;
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _showCatalog = true;
+      _catalogFolder = null;
+    });
+    if (wasEditing) {
+      await context.read<LibraryController>().loadItems();
+    }
+  }
+
+  Future<void> _openCatalogFolder(
+    LibraryController controller,
+    String folder,
+  ) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final wasEditing = !_showCatalog;
+    if (wasEditing) {
+      try {
+        await _prepareCatalog();
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to save the open document.')),
+          );
+        }
+        return;
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+    controller.selectFolder(folder);
+    setState(() {
+      _showCatalog = true;
+      _catalogFolder = folder;
+    });
+    if (wasEditing) {
+      await controller.loadItems();
+    }
+  }
+
+  void _openItem(LibraryController controller, Notebook item) {
+    setState(() {
+      _showCatalog = false;
+      _catalogFolder = item.folder;
+    });
+    controller.selectItem(item.uid);
+  }
+
   void _toggleLeftNavigation() {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
@@ -270,6 +453,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
     if (!mounted) {
       return;
     }
+    setState(() {
+      _showCatalog = false;
+      _catalogFolder = item.folder;
+    });
     await _promptRenameItem(controller, item);
   }
 
@@ -287,6 +474,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     await controller.createFolder(result);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _showCatalog = true;
+      _catalogFolder = result.trim();
+    });
   }
 
   Future<void> _promptRenameFolder(
@@ -307,6 +501,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     await controller.renameFolder(folder, result);
+    if (mounted && _catalogFolder == folder) {
+      setState(() {
+        _catalogFolder = result.trim();
+      });
+    }
   }
 
   Future<void> _promptRenameItem(
@@ -360,6 +559,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     await controller.deleteFolder(folder);
+    if (mounted && _catalogFolder == folder) {
+      setState(() {
+        _catalogFolder = null;
+      });
+    }
   }
 
   Future<void> _confirmDeleteItem(
@@ -534,7 +738,7 @@ class _NameInputDialogState extends State<_NameInputDialog> {
   }
 }
 
-enum _TreeRowAction { rename, delete }
+enum _TreeRowAction { editCover, rename, delete }
 
 const TextStyle _sidebarTextStyle = TextStyle(
   fontSize: 14,
@@ -585,19 +789,24 @@ class _CreateMenuButton extends StatelessWidget {
   }
 }
 
-
 class _LibraryTreePane extends StatefulWidget {
   const _LibraryTreePane({
     required this.controller,
     required this.onOpen,
     required this.onCreate,
     required this.onCreateFolder,
+    required this.onShowProjects,
+    required this.onOpenFolder,
+    required this.showingProjects,
   });
 
   final LibraryController controller;
   final ValueChanged<Notebook> onOpen;
   final Future<void> Function(NotebookKind kind) onCreate;
   final VoidCallback onCreateFolder;
+  final VoidCallback onShowProjects;
+  final ValueChanged<String> onOpenFolder;
+  final bool showingProjects;
 
   @override
   State<_LibraryTreePane> createState() => _LibraryTreePaneState();
@@ -611,7 +820,8 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
     final controller = widget.controller;
     final colorScheme = Theme.of(context).colorScheme;
     final folders = controller.folderNames;
-    final touchNavigationGain = context
+    final touchNavigationGain =
+        context
             .watch<AppPreferencesController?>()
             ?.touchNavigationSensitivity ??
         1.0;
@@ -627,13 +837,24 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'Projects',
-                      overflow: TextOverflow.ellipsis,
-                      style: _sidebarTextStyle.copyWith(
-                        color: colorScheme.onSurface,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    child: TextButton(
+                      key: const ValueKey('projects-home'),
+                      onPressed: widget.onShowProjects,
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        alignment: Alignment.centerLeft,
+                        foregroundColor: colorScheme.onSurface,
+                        backgroundColor: widget.showingProjects
+                            ? colorScheme.surfaceContainerHigh
+                            : Colors.transparent,
+                      ),
+                      child: Text(
+                        'Projects',
+                        overflow: TextOverflow.ellipsis,
+                        style: _sidebarTextStyle.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -663,6 +884,13 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                     ],
                   ),
           ),
+          SizedBox(
+            height: math.min(360, MediaQuery.sizeOf(context).height * 0.42),
+            child: const Align(
+              alignment: Alignment.bottomCenter,
+              child: SingleChildScrollView(child: StudyTimerCard()),
+            ),
+          ),
         ],
       ),
     );
@@ -683,7 +911,8 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
           _FolderTreeRow(
             folder: folder,
             expanded: expanded,
-            selected: controller.selectedFolder == folder,
+            selected:
+                !widget.showingProjects && controller.selectedFolder == folder,
             onToggle: () {
               setState(() {
                 if (expanded) {
@@ -693,7 +922,8 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                 }
               });
             },
-            onTap: () => controller.selectFolder(folder),
+            onTap: () => widget.onOpenFolder(folder),
+            onEdit: () => showFolderCoverEditor(context, controller, folder),
             onRename: () => context
                 .findAncestorStateOfType<_LibraryScreenState>()
                 ?._promptRenameFolder(controller, folder),
@@ -792,6 +1022,7 @@ class _FolderTreeRow extends StatelessWidget {
     required this.selected,
     required this.onToggle,
     required this.onTap,
+    required this.onEdit,
     required this.onRename,
     required this.onDelete,
   });
@@ -801,6 +1032,7 @@ class _FolderTreeRow extends StatelessWidget {
   final bool selected;
   final VoidCallback onToggle;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
@@ -864,6 +1096,7 @@ class _FolderTreeRow extends StatelessWidget {
                   rowContext: context,
                   tooltip: 'Folder actions',
                   iconSize: 18,
+                  onEdit: onEdit,
                   onRename: onRename,
                   onDelete: onDelete,
                 ),
@@ -961,8 +1194,8 @@ Future<T?> _showSidebarMenu<T>({
   required double width,
   required List<PopupMenuEntry<T>> items,
 }) async {
-  final paneState =
-      anchorContext.findAncestorStateOfType<_LibraryTreePaneState>();
+  final paneState = anchorContext
+      .findAncestorStateOfType<_LibraryTreePaneState>();
   final paneBox = paneState?.context.findRenderObject() as RenderBox?;
   final anchorBox = anchorContext.findRenderObject() as RenderBox?;
   final overlayBox =
@@ -971,14 +1204,12 @@ Future<T?> _showSidebarMenu<T>({
     return null;
   }
 
-  final panelEdge = paneBox.localToGlobal(
-    Offset(paneBox.size.width, 0),
-    ancestor: overlayBox,
-  ).dx;
-  final anchorTop = anchorBox.localToGlobal(
-    Offset.zero,
-    ancestor: overlayBox,
-  ).dy;
+  final panelEdge = paneBox
+      .localToGlobal(Offset(paneBox.size.width, 0), ancestor: overlayBox)
+      .dx;
+  final anchorTop = anchorBox
+      .localToGlobal(Offset.zero, ancestor: overlayBox)
+      .dy;
   final left = panelEdge.clamp(0.0, overlayBox.size.width).toDouble();
   final top = anchorTop.clamp(0.0, overlayBox.size.height).toDouble();
   return showMenu<T>(
@@ -1012,11 +1243,13 @@ class _TreeRowActions extends StatelessWidget {
     required this.iconSize,
     required this.onRename,
     required this.onDelete,
+    this.onEdit,
   });
 
   final BuildContext rowContext;
   final String tooltip;
   final double iconSize;
+  final VoidCallback? onEdit;
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
@@ -1028,6 +1261,7 @@ class _TreeRowActions extends StatelessWidget {
       width: 130,
       items: [
         for (final (value, label) in [
+          if (onEdit != null) (_TreeRowAction.editCover, 'Edit cover'),
           (_TreeRowAction.rename, 'Rename'),
           (_TreeRowAction.delete, 'Delete'),
         ])
@@ -1037,9 +1271,7 @@ class _TreeRowActions extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               label,
-              style: _sidebarTextStyle.copyWith(
-                color: colorScheme.onSurface,
-              ),
+              style: _sidebarTextStyle.copyWith(color: colorScheme.onSurface),
             ),
           ),
       ],
@@ -1048,6 +1280,9 @@ class _TreeRowActions extends StatelessWidget {
       return;
     }
     switch (action) {
+      case _TreeRowAction.editCover:
+        onEdit?.call();
+        return;
       case _TreeRowAction.rename:
         onRename();
         return;
@@ -1079,10 +1314,12 @@ class _LibraryWorkspace extends StatelessWidget {
   const _LibraryWorkspace({
     required this.item,
     required this.showToolbar,
+    required this.showCompactTimer,
   });
 
   final Notebook? item;
   final bool showToolbar;
+  final bool showCompactTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -1103,8 +1340,14 @@ class _LibraryWorkspace extends StatelessWidget {
       key: ValueKey(item!.uid),
       create: (_) => EditorController(repository: repository, notebook: item!),
       child: isBoard
-          ? BoardScreen(showToolbar: showToolbar)
-          : NotebookScreen(showToolbar: showToolbar),
+          ? BoardScreen(
+              showToolbar: showToolbar,
+              showCompactTimer: showCompactTimer,
+            )
+          : NotebookScreen(
+              showToolbar: showToolbar,
+              showCompactTimer: showCompactTimer,
+            ),
     );
   }
 }

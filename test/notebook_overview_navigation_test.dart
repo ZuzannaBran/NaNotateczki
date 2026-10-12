@@ -56,11 +56,7 @@ void main() {
       closeTo(world.dx, 0.001),
     );
     expect(
-      (target.scrollOffset +
-              viewport.height / 2 -
-              22 -
-              target.pan.dy) /
-          scale,
+      (target.scrollOffset + viewport.height / 2 - 22 - target.pan.dy) / scale,
       closeTo(world.dy, 0.001),
     );
   });
@@ -133,9 +129,7 @@ void main() {
     );
     final firstPage = controller.currentPageIndex;
 
-    final gesture = await tester.createGesture(
-      kind: PointerDeviceKind.touch,
-    );
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.touch);
     await gesture.down(tester.getCenter(overview));
     await gesture.moveBy(const Offset(0, -260));
     await tester.pump();
@@ -170,10 +164,7 @@ void main() {
   });
 }
 
-Widget _app(
-  EditorController controller,
-  AppPreferencesController preferences,
-) {
+Widget _app(EditorController controller, AppPreferencesController preferences) {
   return MaterialApp(
     home: MultiProvider(
       providers: [

@@ -362,12 +362,7 @@ class NotebookExportService {
     _paintBackground(canvas, size, origin, background, darkMode);
     await _paintImages(canvas, page.imageBlocks, origin);
     _paintTextBlocks(canvas, page.textBlocks, origin, darkMode);
-    _paintStrokes(
-      canvas,
-      page.inkStrokes,
-      strokeOrigin ?? origin,
-      darkMode,
-    );
+    _paintStrokes(canvas, page.inkStrokes, strokeOrigin ?? origin, darkMode);
     final picture = recorder.endRecording();
     final image = await picture.toImage(
       math.max(1, (size.width * _pixelRatio).ceil()),
@@ -391,8 +386,7 @@ class NotebookExportService {
   ) {
     canvas.drawRect(
       Offset.zero & size,
-      Paint()
-        ..color = darkMode ? AppColors.darkCanvas : AppColors.paper,
+      Paint()..color = darkMode ? AppColors.darkCanvas : AppColors.paper,
     );
     if (settings.style == PageBackgroundStyle.blank) {
       return;
@@ -470,20 +464,14 @@ class NotebookExportService {
     }
   }
 
-  static List<TextSpan> _textSpans(
-    TextBlock block,
-    bool darkMode,
-  ) {
+  static List<TextSpan> _textSpans(TextBlock block, bool darkMode) {
     final decoded = _decodeDelta(block.deltaJson);
     if (decoded == null) {
       return [
         TextSpan(
           text: block.text,
           style: TextStyle(
-            color: AppColors.displayInkColor(
-              block.color,
-              darkMode: darkMode,
-            ),
+            color: AppColors.displayInkColor(block.color, darkMode: darkMode),
             fontSize: block.fontSize,
           ),
         ),
@@ -522,10 +510,7 @@ class NotebookExportService {
       TextSpan(
         text: block.text,
         style: TextStyle(
-          color: AppColors.displayInkColor(
-            block.color,
-            darkMode: darkMode,
-          ),
+          color: AppColors.displayInkColor(block.color, darkMode: darkMode),
           fontSize: block.fontSize,
         ),
       ),

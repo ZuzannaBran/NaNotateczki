@@ -121,8 +121,8 @@ class EditorSettingsScreen extends StatelessWidget {
                                     min: 0.5,
                                     max: 2.0,
                                     divisions: 15,
-                                    value: preferences
-                                        .touchNavigationSensitivity,
+                                    value:
+                                        preferences.touchNavigationSensitivity,
                                     label: '$sensitivityLabel×',
                                     onChanged: preferences
                                         .previewTouchNavigationSensitivity,
@@ -317,9 +317,7 @@ class EditorSettingsScreen extends StatelessWidget {
 ButtonStyle _appearanceButtonStyle(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final foreground = isDark ? AppColors.darkText : AppColors.inkBlack;
-  final selectedBackground = isDark
-      ? AppColors.darkActive
-      : AppColors.divider;
+  final selectedBackground = isDark ? AppColors.darkActive : AppColors.divider;
   final unselectedBackground = isDark
       ? AppColors.darkToolbar
       : AppColors.toolbar;

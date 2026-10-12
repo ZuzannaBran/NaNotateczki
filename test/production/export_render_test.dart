@@ -232,11 +232,7 @@ void main() {
     const deepPink = Color(0xFF8F214D);
     final page = _page('previously-saved').copyWith(
       inkStrokes: [
-        for (final (i, color) in [
-          black,
-          paleBlue,
-          deepPink,
-        ].indexed)
+        for (final (i, color) in [black, paleBlue, deepPink].indexed)
           InkStroke(
             id: 'saved-color-$i',
             points: [
@@ -275,12 +271,10 @@ void main() {
         lightBackground: await _pixel(light, 148, 8),
         darkBackground: await _pixel(dark, 148, 8),
         lightInk: [
-          for (final y in [15, 30, 45])
-            await _pixel(light, 60, y * 2),
+          for (final y in [15, 30, 45]) await _pixel(light, 60, y * 2),
         ],
         darkInk: [
-          for (final y in [15, 30, 45])
-            await _pixel(dark, 60, y * 2),
+          for (final y in [15, 30, 45]) await _pixel(dark, 60, y * 2),
         ],
         lightPng: light,
         darkPng: dark,
@@ -303,6 +297,9 @@ void main() {
     expect(latin1.decode(rendered.pdfLight.take(5).toList()), '%PDF-');
     expect(latin1.decode(rendered.pdfDark.take(5).toList()), '%PDF-');
     expect(rendered.pdfDark, isNot(equals(rendered.pdfLight)));
-    expect(notebook.pages.first.inkStrokes.map((stroke) => stroke.color), colors);
+    expect(
+      notebook.pages.first.inkStrokes.map((stroke) => stroke.color),
+      colors,
+    );
   });
 }

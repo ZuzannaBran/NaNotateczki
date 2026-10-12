@@ -7,28 +7,29 @@ class AppTheme {
     const foreground = AppColors.darkText;
     const background = AppColors.darkBackground;
     const surface = AppColors.darkToolbar;
-    final scheme = ColorScheme.fromSeed(
-      seedColor: AppColors.darkActive,
-      brightness: Brightness.dark,
-    ).copyWith(
-      primary: foreground,
-      onPrimary: background,
-      primaryContainer: AppColors.darkActive,
-      onPrimaryContainer: foreground,
-      secondary: foreground,
-      onSecondary: background,
-      secondaryContainer: AppColors.darkActive,
-      onSecondaryContainer: foreground,
-      surface: background,
-      onSurface: foreground,
-      surfaceContainerLowest: surface,
-      surfaceContainerLow: surface,
-      surfaceContainer: AppColors.darkActive,
-      surfaceContainerHigh: AppColors.darkActive,
-      surfaceContainerHighest: AppColors.darkPaper,
-      outline: AppColors.darkOutline,
-      outlineVariant: AppColors.darkOutline,
-    );
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: AppColors.darkActive,
+          brightness: Brightness.dark,
+        ).copyWith(
+          primary: foreground,
+          onPrimary: background,
+          primaryContainer: AppColors.darkActive,
+          onPrimaryContainer: foreground,
+          secondary: foreground,
+          onSecondary: background,
+          secondaryContainer: AppColors.darkActive,
+          onSecondaryContainer: foreground,
+          surface: background,
+          onSurface: foreground,
+          surfaceContainerLowest: surface,
+          surfaceContainerLow: surface,
+          surfaceContainer: AppColors.darkActive,
+          surfaceContainerHigh: AppColors.darkActive,
+          surfaceContainerHighest: AppColors.darkPaper,
+          outline: AppColors.darkOutline,
+          outlineVariant: AppColors.darkOutline,
+        );
     return ThemeData(
       brightness: Brightness.dark,
       fontFamily: 'Georgia',

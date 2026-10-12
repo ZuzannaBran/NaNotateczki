@@ -48,10 +48,7 @@ class NotebookOverviewNavigation {
 }
 
 class NotebookOverviewTarget {
-  const NotebookOverviewTarget({
-    required this.scrollOffset,
-    required this.pan,
-  });
+  const NotebookOverviewTarget({required this.scrollOffset, required this.pan});
 
   final double scrollOffset;
   final Offset pan;

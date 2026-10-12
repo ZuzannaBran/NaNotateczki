@@ -512,10 +512,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
     if (hex.length != 6 && hex.length != 8) {
       return null;
     }
-    final parsed = int.tryParse(
-      hex.length == 6 ? 'ff$hex' : hex,
-      radix: 16,
-    );
+    final parsed = int.tryParse(hex.length == 6 ? 'ff$hex' : hex, radix: 16);
     return parsed == null ? null : Color(parsed);
   }
 

@@ -25,11 +25,17 @@ import '../../editor/presentation/widgets/page_overlay.dart';
 import '../../editor/presentation/widgets/text_edit_toolbar.dart';
 import '../../editor/state/editor_controller.dart';
 import '../../notebook/domain/drawing_tool.dart';
+import '../../planner/presentation/study_timer_widgets.dart';
 
 class BoardScreen extends StatefulWidget {
-  const BoardScreen({super.key, this.showToolbar = true});
+  const BoardScreen({
+    super.key,
+    this.showToolbar = true,
+    this.showCompactTimer = false,
+  });
 
   final bool showToolbar;
+  final bool showCompactTimer;
 
   @override
   State<BoardScreen> createState() => _BoardScreenState();
@@ -42,8 +48,7 @@ class _BoardScreenState extends State<BoardScreen> {
   static const double _inkNavigationTouchSlop = 8.0;
 
   double get _touchNavigationGain =>
-      context.read<AppPreferencesController?>()
-          ?.touchNavigationSensitivity ??
+      context.read<AppPreferencesController?>()?.touchNavigationSensitivity ??
       1.0;
 
   Offset _insertPosition = const Offset(120, 120);
@@ -196,9 +201,7 @@ class _BoardScreenState extends State<BoardScreen> {
       controller.zoomBy(scaleDelta, focalPoint: focal);
     }
     if (panDelta != Offset.zero) {
-      controller.panBy(
-        panDelta * _touchPanSensitivity * _touchNavigationGain,
-      );
+      controller.panBy(panDelta * _touchPanSensitivity * _touchNavigationGain);
     }
   }
 
@@ -732,6 +735,7 @@ class _BoardScreenState extends State<BoardScreen> {
         titleSpacing: useWideTitleInset ? 44 : null,
         title: Text(controller.notebook.title),
         actions: [
+          if (widget.showCompactTimer) const CompactStudyTimer(),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',

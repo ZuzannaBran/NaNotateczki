@@ -286,9 +286,7 @@ class EditorToolbar extends StatelessWidget {
         tooltip: label,
         color: isActive
             ? Theme.of(context).colorScheme.onSurface
-            : Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.72),
+            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
         style: _toolHighlightStyle(context, isActive),
         onPressed: onPressed,
       ),
@@ -310,19 +308,14 @@ class EditorToolbar extends StatelessWidget {
         tooltip: label,
         color: selected
             ? Theme.of(context).colorScheme.onSurface
-            : Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.72),
+            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
         style: _toolHighlightStyle(context, selected),
         onPressed: onPressed ?? () => controller.setTool(tool),
       ),
     );
   }
 
-  ButtonStyle _toolHighlightStyle(
-    BuildContext context,
-    bool selected,
-  ) {
+  ButtonStyle _toolHighlightStyle(BuildContext context, bool selected) {
     return ButtonStyle(
       backgroundColor: WidgetStateProperty.resolveWith((states) {
         if (selected) {
@@ -360,8 +353,8 @@ class EditorToolbar extends StatelessWidget {
             color: isSelected
                 ? Theme.of(context).colorScheme.onSurface
                 : Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.72),
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.72),
             style: _toolHighlightStyle(context, isSelected),
             onPressed: () => controller.setTool(activeTool),
           ),
@@ -425,8 +418,8 @@ class EditorToolbar extends StatelessWidget {
             color: isSelected
                 ? Theme.of(context).colorScheme.onSurface
                 : Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.72),
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.72),
             style: _toolHighlightStyle(context, isSelected),
             onPressed: () => controller.setTool(activeTool),
           ),
@@ -717,7 +710,9 @@ class EditorToolbar extends StatelessWidget {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: color,
-                                border: Border.all(color: Theme.of(context).dividerColor),
+                                border: Border.all(
+                                  color: Theme.of(context).dividerColor,
+                                ),
                               ),
                             ),
                           ),

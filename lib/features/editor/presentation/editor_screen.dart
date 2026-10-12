@@ -22,6 +22,7 @@ import '../../../core/theme/app_metrics.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/note_page.dart';
+import '../../planner/presentation/study_timer_widgets.dart';
 import '../state/editor_controller.dart';
 import 'editor_commands.dart';
 import 'editor_settings_screen.dart';
@@ -34,9 +35,14 @@ import 'widgets/page_overlay.dart';
 import 'widgets/text_edit_toolbar.dart';
 
 class EditorScreen extends StatefulWidget {
-  const EditorScreen({super.key, this.showToolbar = true});
+  const EditorScreen({
+    super.key,
+    this.showToolbar = true,
+    this.showCompactTimer = false,
+  });
 
   final bool showToolbar;
+  final bool showCompactTimer;
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -93,8 +99,7 @@ class _EditorScreenState extends State<EditorScreen> {
   double get _effectivePageScale => _pageScale * _responsivePageScale;
 
   double get _touchNavigationGain =>
-      context.read<AppPreferencesController?>()
-          ?.touchNavigationSensitivity ??
+      context.read<AppPreferencesController?>()?.touchNavigationSensitivity ??
       1.0;
 
   double get _firstPageInset =>
@@ -205,8 +210,10 @@ class _EditorScreenState extends State<EditorScreen> {
       _hasUserAdjustedHorizontalPan = true;
     });
 
-    final pageIndex =
-        (point.dy / _pageExtent).floor().clamp(0, controller.pages.length - 1);
+    final pageIndex = (point.dy / _pageExtent).floor().clamp(
+      0,
+      controller.pages.length - 1,
+    );
     controller.setCurrentPage(pageIndex);
 
     if ((position.pixels - target.scrollOffset).abs() > 0.5) {
@@ -1035,7 +1042,8 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
-    final touchNavigationGain = context
+    final touchNavigationGain =
+        context
             .watch<AppPreferencesController?>()
             ?.touchNavigationSensitivity ??
         1.0;
@@ -1047,8 +1055,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
     final commands = _commands(controller);
     final toolbarOffset = widget.showToolbar
-        ? _mainToolbarClearance +
-              (activeTextBlock == null ? 0.0 : 62.0)
+        ? _mainToolbarClearance + (activeTextBlock == null ? 0.0 : 62.0)
         : 0.0;
 
     final editorContent = Stack(
@@ -1126,10 +1133,7 @@ class _EditorScreenState extends State<EditorScreen> {
               _insertPosition = insertPosition;
               final minimapPanelHeight = math.min(
                 pageWorldSize.height * 0.5,
-                math.max(
-                  180.0,
-                  constraints.maxHeight - toolbarOffset - 24,
-                ),
+                math.max(180.0, constraints.maxHeight - toolbarOffset - 24),
               );
               _pageExtent = pageWorldSize.height + _pageGap;
               _syncPageTransformBounds(
@@ -1270,11 +1274,15 @@ class _EditorScreenState extends State<EditorScreen> {
                                                         DecoratedBox(
                                                           decoration: BoxDecoration(
                                                             color:
-                                                                Theme.of(context)
-                                                                        .brightness ==
-                                                                    Brightness.dark
-                                                                ? AppColors.darkCanvas
-                                                                : AppColors.paper,
+                                                                Theme.of(
+                                                                      context,
+                                                                    ).brightness ==
+                                                                    Brightness
+                                                                        .dark
+                                                                ? AppColors
+                                                                      .darkCanvas
+                                                                : AppColors
+                                                                      .paper,
                                                             boxShadow: const [
                                                               BoxShadow(
                                                                 color: AppColors
@@ -1512,6 +1520,7 @@ class _EditorScreenState extends State<EditorScreen> {
           style: const TextStyle(fontSize: 18),
         ),
         actions: [
+          if (widget.showCompactTimer) const CompactStudyTimer(),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',
@@ -2044,63 +2053,65 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                   SingleChildScrollView(
                     key: const ValueKey('notebook-overview-scroll'),
                     controller: _minimapScrollController,
-                  physics: canScroll
-                      ? TouchNavigationScrollPhysics(
-                          sensitivity: context
-                                  .watch<AppPreferencesController?>()
-                                  ?.touchNavigationSensitivity ??
-                              1.0,
-                        )
-                      : const NeverScrollableScrollPhysics(),
-                  child: RepaintBoundary(
-                    child: ValueListenableBuilder<int>(
-                      valueListenable: widget.controller.inkRevision,
-                      builder: (context, _, _) => CustomPaint(
-                        size: Size(_minimapWidth, contentHeight),
-                        painter: _ProjectMiniMapPainter(
-                          darkMode:
-                              Theme.of(context).brightness == Brightness.dark,
-                          pages: widget.controller.pages,
-                          currentPageIndex: widget.currentPageIndex,
-                          pageWorldSize: widget.pageWorldSize,
-                          pageGap: widget.pageGap,
-                          mapScale: mapScale,
-                          cornerRadius: innerRadius,
-                          showBackgroundLines:
-                              backgroundSettings.style.index > 0,
-                          showBackgroundColumns:
-                              backgroundSettings.style.index == 1,
-                          backgroundSpacing: backgroundSettings.spacing,
-                          images: _minimapImages.map(
-                            (id, cached) => MapEntry(id, cached.image),
+                    physics: canScroll
+                        ? TouchNavigationScrollPhysics(
+                            sensitivity:
+                                context
+                                    .watch<AppPreferencesController?>()
+                                    ?.touchNavigationSensitivity ??
+                                1.0,
+                          )
+                        : const NeverScrollableScrollPhysics(),
+                    child: RepaintBoundary(
+                      child: ValueListenableBuilder<int>(
+                        valueListenable: widget.controller.inkRevision,
+                        builder: (context, _, _) => CustomPaint(
+                          size: Size(_minimapWidth, contentHeight),
+                          painter: _ProjectMiniMapPainter(
+                            darkMode:
+                                Theme.of(context).brightness == Brightness.dark,
+                            pages: widget.controller.pages,
+                            currentPageIndex: widget.currentPageIndex,
+                            pageWorldSize: widget.pageWorldSize,
+                            pageGap: widget.pageGap,
+                            mapScale: mapScale,
+                            cornerRadius: innerRadius,
+                            showBackgroundLines:
+                                backgroundSettings.style.index > 0,
+                            showBackgroundColumns:
+                                backgroundSettings.style.index == 1,
+                            backgroundSpacing: backgroundSettings.spacing,
+                            images: _minimapImages.map(
+                              (id, cached) => MapEntry(id, cached.image),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: AnimatedBuilder(
-                      animation: _minimapScrollController,
-                      builder: (context, child) {
-                        final scrollOffset = _minimapScrollController.hasClients
-                            ? _minimapScrollController.offset
-                            : 0.0;
-                        final rect = indicatorRectInContent
-                            .shift(Offset(0, -scrollOffset))
-                            .intersect(
-                              Rect.fromLTWH(0, 0, _minimapWidth, panelHeight),
-                            );
-                        return CustomPaint(
-                          painter: _MiniMapViewportOverlayPainter(
-                            indicatorRect: rect,
-                          ),
-                        );
-                      },
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: _minimapScrollController,
+                        builder: (context, child) {
+                          final scrollOffset =
+                              _minimapScrollController.hasClients
+                              ? _minimapScrollController.offset
+                              : 0.0;
+                          final rect = indicatorRectInContent
+                              .shift(Offset(0, -scrollOffset))
+                              .intersect(
+                                Rect.fromLTWH(0, 0, _minimapWidth, panelHeight),
+                              );
+                          return CustomPaint(
+                            painter: _MiniMapViewportOverlayPainter(
+                              indicatorRect: rect,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
                 ],
               ),
             ),
@@ -2175,8 +2186,9 @@ class _ProjectMiniMapPainter extends CustomPainter {
         ..color = darkMode ? AppColors.darkCanvas : AppColors.paper;
       final pageBorder = Paint()
         ..color = isCurrentPage
-            ? (darkMode ? AppColors.darkText : AppColors.inkBlack)
-                .withValues(alpha: 0.22)
+            ? (darkMode ? AppColors.darkText : AppColors.inkBlack).withValues(
+                alpha: 0.22,
+              )
             : (darkMode ? AppColors.darkOutline : AppColors.divider)
         ..style = PaintingStyle.stroke
         ..strokeWidth = isCurrentPage ? 0.7 : 0.6;

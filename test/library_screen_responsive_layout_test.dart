@@ -15,6 +15,7 @@ import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
+import 'package:program/features/planner/state/study_planner_controller.dart';
 
 void main() {
   testWidgets('library locks wide layout below editor margin breakpoint', (
@@ -44,12 +45,12 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Pick an item'), findsOneWidget);
+    expect(find.byKey(const ValueKey('catalog-title')), findsOneWidget);
 
     await tester.binding.setSurfaceSize(const Size(1037, 700));
     await tester.pump();
 
-    expect(find.text('Pick an item'), findsOneWidget);
+    expect(find.byKey(const ValueKey('catalog-title')), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
@@ -86,7 +87,7 @@ void main() {
 
     final treeItem = find.byKey(ValueKey('library-tree-item:${created.uid}'));
 
-    expect(find.text('Project A'), findsOneWidget);
+    expect(find.text('Project A'), findsWidgets);
     expect(treeItem, findsOneWidget);
     expect(
       find.descendant(of: treeItem, matching: find.text('Nested note')),
@@ -137,14 +138,13 @@ void main() {
     await controller.loadItems();
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: MultiProvider(
-          providers: [
-            ChangeNotifierProvider<LibraryController>.value(value: controller),
-            Provider<NotebookRepository>.value(value: repository),
-          ],
-          child: const LibraryScreen(),
-        ),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AppPreferencesController()),
+          ChangeNotifierProvider<LibraryController>.value(value: controller),
+          Provider<NotebookRepository>.value(value: repository),
+        ],
+        child: const MaterialApp(home: LibraryScreen()),
       ),
     );
     await tester.pumpAndSettle();
@@ -155,10 +155,9 @@ void main() {
         .fontSize;
     expect(treeFontSize, 14);
     const resizeHandleWidth = 12.0;
-    final folderPaneEdge = tester
-            .getTopLeft(
-              find.byKey(const ValueKey('library-navigation-toggle')),
-            )
+    final folderPaneEdge =
+        tester
+            .getTopLeft(find.byKey(const ValueKey('library-navigation-toggle')))
             .dx +
         1 -
         resizeHandleWidth;
@@ -166,13 +165,14 @@ void main() {
       tester.element(find.text('Projects')),
     ).colorScheme.surfaceContainerLowest;
     final cases = [
-      (find.byTooltip('Folder actions'), 'Rename folder'),
+      (find.byTooltip('Folder actions'), 'Rename folder', true),
       (
         find.descendant(
           of: find.byKey(ValueKey('library-tree-item:${notebook.uid}')),
           matching: find.byTooltip('Item actions'),
         ),
         'Rename item',
+        false,
       ),
       (
         find.descendant(
@@ -180,10 +180,11 @@ void main() {
           matching: find.byTooltip('Item actions'),
         ),
         'Rename item',
+        false,
       ),
     ];
 
-    for (final (actions, dialogTitle) in cases) {
+    for (final (actions, dialogTitle, hasCover) in cases) {
       expect(actions, findsOneWidget);
       final actionTop = tester.getTopLeft(actions).dy;
       await tester.tap(actions);
@@ -192,10 +193,11 @@ void main() {
       final menuEntries = find.byWidgetPredicate(
         (widget) => widget is PopupMenuItem && widget.height == 36,
       );
-      expect(menuEntries, findsNWidgets(2));
+      expect(menuEntries, findsNWidgets(hasCover ? 3 : 2));
+      expect(find.text('Edit cover'), hasCover ? findsOneWidget : findsNothing);
       expect(find.text('Rename'), findsOneWidget);
       expect(find.text('Delete'), findsOneWidget);
-      for (final label in ['Rename', 'Delete']) {
+      for (final label in [if (hasCover) 'Edit cover', 'Rename', 'Delete']) {
         expect(
           tester.widget<Text>(find.text(label)).style?.fontSize,
           treeFontSize,
@@ -207,10 +209,7 @@ void main() {
       expect(rect.width, closeTo(130, 1));
       expect(rect.height, 36);
       final menuMaterials = tester.widgetList<Material>(
-        find.ancestor(
-          of: menuEntries.first,
-          matching: find.byType(Material),
-        ),
+        find.ancestor(of: menuEntries.first, matching: find.byType(Material)),
       );
       expect(
         menuMaterials.any(
@@ -226,6 +225,16 @@ void main() {
         ),
         isTrue,
       );
+
+      if (hasCover) {
+        await tester.tap(find.text('Edit cover'));
+        await tester.pumpAndSettle();
+        expect(find.text('Edit folder cover'), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        await tester.tap(actions);
+        await tester.pumpAndSettle();
+      }
 
       await tester.tap(find.text('Rename'));
       await tester.pumpAndSettle();
@@ -264,10 +273,7 @@ void main() {
     expect(createRect.height, 36);
 
     final createMaterials = tester.widgetList<Material>(
-      find.ancestor(
-        of: createEntries.first,
-        matching: find.byType(Material),
-      ),
+      find.ancestor(of: createEntries.first, matching: find.byType(Material)),
     );
     expect(
       createMaterials.any(
@@ -290,8 +296,7 @@ void main() {
     expect(
       find.byWidgetPredicate(
         (widget) =>
-            widget is TextField &&
-            widget.decoration?.hintText == 'Folder name',
+            widget is TextField && widget.decoration?.hintText == 'Folder name',
       ),
       findsOneWidget,
     );
@@ -339,6 +344,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('Projects'), findsOneWidget);
+    expect(find.byType(EditorToolbar), findsNothing);
+    await tester.tap(find.byKey(ValueKey('library-tree-item:${board.uid}')));
+    await tester.pumpAndSettle();
     expect(find.byType(EditorToolbar), findsOneWidget);
     final panel = tester.widget<Container>(
       find.byKey(const ValueKey('editor-toolbar-panel')),
@@ -551,8 +559,7 @@ void main() {
     final scroll = find.byKey(const ValueKey('library-file-scroll'));
     expect(scroll, findsOneWidget);
     expect(
-      (tester.widget<ListView>(scroll).physics!
-              as TouchNavigationScrollPhysics)
+      (tester.widget<ListView>(scroll).physics! as TouchNavigationScrollPhysics)
           .sensitivity,
       1.0,
     );
@@ -560,8 +567,7 @@ void main() {
     preferences.previewTouchNavigationSensitivity(1.8);
     await tester.pump();
     expect(
-      (tester.widget<ListView>(scroll).physics!
-              as TouchNavigationScrollPhysics)
+      (tester.widget<ListView>(scroll).physics! as TouchNavigationScrollPhysics)
           .sensitivity,
       1.8,
     );
@@ -569,6 +575,58 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     library.dispose();
     preferences.dispose();
+    await database.close();
+  });
+
+  testWidgets('study timer is anchored to the bottom of the folder sidebar', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    final planner = StudyPlannerController(
+      autoTick: false,
+      read: (_) async => null,
+      write: (_, _) async {},
+    );
+    await planner.load();
+    await controller.loadItems();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
+            ChangeNotifierProvider<StudyPlannerController>.value(
+              value: planner,
+            ),
+            Provider<NotebookRepository>.value(value: repository),
+          ],
+          child: const LibraryScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final timer = find.byKey(const ValueKey('study-timer-card'));
+    expect(timer, findsOneWidget);
+    expect(
+      tester.getBottomLeft(timer).dy,
+      closeTo(tester.getBottomLeft(find.byType(LibraryScreen)).dy, 1),
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await planner.flush();
+    planner.dispose();
+    controller.dispose();
     await database.close();
   });
 }

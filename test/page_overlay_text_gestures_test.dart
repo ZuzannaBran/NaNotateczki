@@ -302,6 +302,7 @@ void main() {
     tester,
   ) async {
     final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
     const firstColor = Color(0xFFBBDCFB);
     const secondColor = Color(0xFF203E85);
     final deltaJson = jsonEncode([
@@ -336,15 +337,21 @@ void main() {
 
     Widget screen(bool darkMode) => MaterialApp(
       theme: darkMode ? AppTheme.dark() : AppTheme.light(),
-      home: ChangeNotifierProvider<EditorController>.value(
-        value: controller,
+      themeAnimationDuration: Duration.zero,
+      home: MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AppPreferencesController>.value(
+            value: preferences,
+          ),
+          ChangeNotifierProvider<EditorController>.value(value: controller),
+        ],
         child: Scaffold(
           body: SizedBox(
             width: 600,
             height: 360,
-            child: PageOverlay(
-              controller: controller,
-              renderBackground: false,
+            child: Consumer<EditorController>(
+              builder: (context, value, _) =>
+                  PageOverlay(controller: value, renderBackground: false),
             ),
           ),
         ),
@@ -360,8 +367,8 @@ void main() {
       return attributes['color'] as String;
     }
 
-    String hex(Color color) => '#${color.toARGB32().toRadixString(16)
-        .padLeft(8, '0').substring(2)}';
+    String hex(Color color) =>
+        '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
 
     await tester.pumpWidget(screen(false));
     await tester.pump();
@@ -402,6 +409,7 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
+    preferences.dispose();
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );

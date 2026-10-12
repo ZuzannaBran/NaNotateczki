@@ -43,12 +43,9 @@ void main() {
               height: 320,
               child: ListView(
                 controller: controller,
-                physics: TouchNavigationScrollPhysics(
-                  sensitivity: sensitivity,
-                ),
+                physics: TouchNavigationScrollPhysics(sensitivity: sensitivity),
                 children: [
-                  for (var i = 0; i < 60; i++)
-                    const SizedBox(height: 80),
+                  for (var i = 0; i < 60; i++) const SizedBox(height: 80),
                 ],
               ),
             ),

@@ -2,10 +2,7 @@ import 'package:flutter/widgets.dart';
 
 /// Amplifies finger-driven navigation without modifying scroll-wheel events.
 class TouchNavigationScrollPhysics extends ClampingScrollPhysics {
-  const TouchNavigationScrollPhysics({
-    required this.sensitivity,
-    super.parent,
-  });
+  const TouchNavigationScrollPhysics({required this.sensitivity, super.parent});
 
   final double sensitivity;
 
@@ -23,6 +20,5 @@ class TouchNavigationScrollPhysics extends ClampingScrollPhysics {
   }
 
   @override
-  double? get dragStartDistanceMotionThreshold =>
-      3.5 / sensitivity;
+  double? get dragStartDistanceMotionThreshold => 3.5 / sensitivity;
 }
