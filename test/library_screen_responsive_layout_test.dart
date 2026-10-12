@@ -177,21 +177,21 @@ void main() {
         child: MultiProvider(
           providers: [
             ChangeNotifierProvider(create: (_) => AppPreferencesController()),
-          ChangeNotifierProvider<LibraryController>.value(value: controller),
-          Provider<NotebookRepository>.value(value: repository),
-        ],
-        child: MaterialApp(
-          theme: ThemeData.light().copyWith(
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFFE4E2DD),
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
+            Provider<NotebookRepository>.value(value: repository),
+          ],
+          child: MaterialApp(
+            theme: ThemeData.light().copyWith(
+              appBarTheme: const AppBarTheme(
+                backgroundColor: Color(0xFFE4E2DD),
+              ),
+              colorScheme: ThemeData.light().colorScheme.copyWith(
+                surfaceContainerLow: const Color(0xFFC4D6E8),
+                surfaceContainerLowest: const Color(0xFFE9E2DD),
+              ),
             ),
-            colorScheme: ThemeData.light().colorScheme.copyWith(
-              surfaceContainerLow: const Color(0xFFC4D6E8),
-              surfaceContainerLowest: const Color(0xFFE9E2DD),
-            ),
+            home: const LibraryScreen(),
           ),
-          home: const LibraryScreen(),
-        ),
         ),
       ),
     );
@@ -275,7 +275,7 @@ void main() {
         final panePixel = await _sampleRenderedPixel(
           tester,
           captureKey,
-          const Offset(160, 35),
+          const Offset(160, 300),
         );
         expect(menuPixel, panePixel);
         expect(menuPixel, sidebarColor);
@@ -382,7 +382,7 @@ void main() {
     final panePixel = await _sampleRenderedPixel(
       tester,
       captureKey,
-      const Offset(160, 35),
+      const Offset(160, 300),
     );
     expect(createPixel, panePixel);
     expect(createPixel, sidebarColor);
