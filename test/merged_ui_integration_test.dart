@@ -92,13 +92,16 @@ void main() {
             AppHeaderDivider.titleStyle);
       }
 
+      final referencePixel = await _renderedHeaderPixel(tester);
       await tester.tap(find.byTooltip('Open planner'));
       await tester.pumpAndSettle();
       expectAlignedHeader('Study planner');
+      expect(await _renderedHeaderPixel(tester), referencePixel);
 
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
       expectAlignedHeader('Settings');
+      expect(await _renderedHeaderPixel(tester), referencePixel);
 
       await tester.tap(find.text('Visual'));
       await tester.pumpAndSettle();
@@ -463,6 +466,28 @@ void main() {
     );
     await app.close(tester);
   });
+}
+
+Future<Color> _renderedHeaderPixel(WidgetTester tester) async {
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('merged-app-snapshot')),
+  );
+  final image = await boundary.toImage(pixelRatio: 1);
+  try {
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (bytes == null) {
+      throw StateError('Unable to inspect header separator pixels');
+    }
+    final offset = (kToolbarHeight.toInt() * image.width + 24) * 4;
+    return Color.fromARGB(
+      bytes.getUint8(offset + 3),
+      bytes.getUint8(offset),
+      bytes.getUint8(offset + 1),
+      bytes.getUint8(offset + 2),
+    );
+  } finally {
+    image.dispose();
+  }
 }
 
 void _expectCatalogBackground(WidgetTester tester, Color color) {
