@@ -173,7 +173,7 @@ void main() {
         Offset(60, 10),
         Offset(40, 10),
       ],
-      createId: () => 'part-' + (index++).toString(),
+      createId: () => 'part-${index++}',
     );
     expect(result.changed, isTrue);
     expect(result.strokes, hasLength(3));
@@ -207,7 +207,7 @@ void main() {
         Offset(60, 10),
         Offset(40, 10),
       ],
-      createId: () => 'part-' + (index++).toString(),
+      createId: () => 'part-${index++}',
     );
     expect(result.changed, isTrue);
     expect(result.strokes, hasLength(3));
@@ -268,7 +268,7 @@ void main() {
         Offset(60, 10),
         Offset(40, 10),
       ],
-      createId: () => 'part-' + (index++).toString(),
+      createId: () => 'part-${index++}',
     );
     final action = RemoveInkStrokesAction(
       before: page.inkStrokes,

@@ -60,7 +60,7 @@ void main() {
   }
 
   Finder recentSwatch() => find.byKey(
-    ValueKey('color-picker-recent-' + recent.toARGB32().toString()),
+    ValueKey('color-picker-recent-${recent.toARGB32()}'),
   );
 
   testWidgets('dark picker inverts recent swatch, HEX and RGB channels', (
