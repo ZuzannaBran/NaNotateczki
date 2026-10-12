@@ -138,6 +138,18 @@ void main() {
 
     await tester.tap(find.text('Visual'));
     await tester.pumpAndSettle();
+    final scaleFinder = find.byKey(const ValueKey('visual-ui-scale'));
+    expect(scaleFinder, findsOneWidget);
+    final scaleSlider = tester.widget<Slider>(scaleFinder);
+    expect(scaleSlider.min, 0.75);
+    expect(scaleSlider.max, 1.5);
+    expect(scaleSlider.value, 1.0);
+    scaleSlider.onChanged!(1.25);
+    await tester.pump();
+    expect(preferences.uiScale, 1.25);
+    expect(tester.widget<Slider>(scaleFinder).value, 1.25);
+    expect(find.text('125%'), findsOneWidget);
+
     final switchFinder = find.byKey(const ValueKey('visual-dark-mode-toggle'));
     final lightControl = tester.widget<SegmentedButton<bool>>(switchFinder);
     expect(lightControl.selected, {false});
