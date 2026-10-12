@@ -538,7 +538,7 @@ class EditorToolbar extends StatelessWidget {
     return GestureDetector(
       onTap: onSelect,
       onDoubleTap: () async {
-        final updated = await _pickColor(
+        final updated = await EditorToolbar.pickColor(
           context,
           color,
           controller.recentColors,
@@ -569,7 +569,8 @@ class EditorToolbar extends StatelessWidget {
     );
   }
 
-  Future<Color?> _pickColor(
+  /// Opens the full notebook color picker for ink or folder covers.
+  static Future<Color?> pickColor(
     BuildContext context,
     Color current,
     List<Color> recentColors,
@@ -580,8 +581,15 @@ class EditorToolbar extends StatelessWidget {
     var shade = 0.5;
     final hexController = TextEditingController(text: _toHexColor(current));
 
-    final result = await showDialog<Color>(
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final route = DialogRoute<Color>(
       context: context,
+      themes: InheritedTheme.capture(from: context, to: navigator.context),
+      barrierColor:
+          DialogTheme.of(context).barrierColor ??
+          Theme.of(context).dialogTheme.barrierColor ??
+          Colors.black54,
+      traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -736,11 +744,13 @@ class EditorToolbar extends StatelessWidget {
         );
       },
     );
+    final result = await navigator.push(route);
+    await route.completed;
     hexController.dispose();
     return result;
   }
 
-  Widget _channelSlider({
+  static Widget _channelSlider({
     required String label,
     required double value,
     required Color color,
@@ -764,7 +774,7 @@ class EditorToolbar extends StatelessWidget {
     );
   }
 
-  Color _applyShade(Color base, double shade) {
+  static Color _applyShade(Color base, double shade) {
     if (shade == 0.5) {
       return base;
     }
@@ -789,12 +799,12 @@ class EditorToolbar extends StatelessWidget {
     );
   }
 
-  String _toHexColor(Color color) {
+  static String _toHexColor(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
     return '#${value.substring(2).toUpperCase()}';
   }
 
-  Color? _colorFromHex(String value) {
+  static Color? _colorFromHex(String value) {
     final normalized = value.replaceAll('#', '').trim();
     if (normalized.length != 6) {
       return null;
@@ -806,7 +816,7 @@ class EditorToolbar extends StatelessWidget {
     return Color(0xFF000000 | parsed);
   }
 
-  int _toByte(double component) {
+  static int _toByte(double component) {
     return (component * 255.0).round().clamp(0, 255).toInt();
   }
 }

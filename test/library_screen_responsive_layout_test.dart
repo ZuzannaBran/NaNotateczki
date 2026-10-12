@@ -281,7 +281,7 @@ void main() {
         (material) =>
             material.color == sidebarColor &&
             material.elevation == 4 &&
-              material.shadowColor == const Color(0x44000000) &&
+            material.shadowColor == const Color(0x44000000) &&
             material.shape is RoundedRectangleBorder &&
             (material.shape! as RoundedRectangleBorder).borderRadius ==
                 const BorderRadius.only(
