@@ -49,6 +49,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   bool _showEditorToolbar = true;
   double _navigationPaneWidth = 320;
   bool _isShowingCorruptRecoveryDialog = false;
+  final ValueNotifier<bool> _sidebarMenuOpen = ValueNotifier<bool>(false);
   StudyPlannerController? _studyPlanner;
   int _lastStudyNotice = 0;
 
@@ -67,6 +68,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   void dispose() {
     _studyPlanner?.removeListener(_onStudyNotice);
+    _sidebarMenuOpen.dispose();
     super.dispose();
   }
 
@@ -323,9 +325,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       Positioned(
                         left: math.max(0.0, leftZoneWidth - 1),
                         top: (_navigationHeaderHeight - _toggleTabHeight) / 2,
-                        child: _LeftZoneToggleTab(
-                          expanded: _showLeftNavigation,
-                          onPressed: _toggleLeftNavigation,
+                        child: ValueListenableBuilder<bool>(
+                          valueListenable: _sidebarMenuOpen,
+                          builder: (context, menuOpen, _) => _LeftZoneToggleTab(
+                            expanded: _showLeftNavigation,
+                            hideShadow: menuOpen,
+                            onPressed: _toggleLeftNavigation,
+                          ),
                         ),
                       ),
                       Positioned(
@@ -333,14 +339,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         top:
                             kToolbarHeight +
                             (_editorToolbarAreaHeight - _toggleTabHeight) / 2,
-                        child: _LeftZoneToggleTab(
-                          expanded: _showEditorToolbar,
-                          toolbar: true,
-                          onPressed: () {
-                            setState(() {
-                              _showEditorToolbar = !_showEditorToolbar;
-                            });
-                          },
+                        child: ValueListenableBuilder<bool>(
+                          valueListenable: _sidebarMenuOpen,
+                          builder: (context, menuOpen, _) => _LeftZoneToggleTab(
+                            expanded: _showEditorToolbar,
+                            toolbar: true,
+                            hideShadow: menuOpen,
+                            onPressed: () {
+                              setState(() {
+                                _showEditorToolbar = !_showEditorToolbar;
+                              });
+                            },
+                          ),
                         ),
                       ),
                     ],
@@ -1271,6 +1281,7 @@ Future<T?> _showSidebarMenu<T>({
   required double width,
   required List<PopupMenuEntry<T>> items,
 }) async {
+  final screenState = context.findAncestorStateOfType<_LibraryScreenState>();
   final paneState = anchorContext
       .findAncestorStateOfType<_LibraryTreePaneState>();
   final paneBox = paneState?.context.findRenderObject() as RenderBox?;
@@ -1300,7 +1311,9 @@ Future<T?> _showSidebarMenu<T>({
   );
   final bottomLimit = math.max(8.0, overlayBox.size.height - menuHeight - 8);
   final top = anchorTop.clamp(8.0, bottomLimit).toDouble();
-  final surfaceColor = Theme.of(context).colorScheme.surfaceContainerLow;
+  final theme = Theme.of(context);
+  final surfaceColor =
+      theme.appBarTheme.backgroundColor ?? theme.colorScheme.surfaceContainerLow;
   final shadowEntry = OverlayEntry(
     builder: (_) => Positioned(
       left: left - _sidebarMenuSeamWidth,
@@ -1314,6 +1327,7 @@ Future<T?> _showSidebarMenu<T>({
       ),
     ),
   );
+  screenState?._sidebarMenuOpen.value = true;
   overlay.insert(shadowEntry);
   try {
     return await showMenu<T>(
@@ -1344,6 +1358,9 @@ Future<T?> _showSidebarMenu<T>({
   } finally {
     shadowEntry.remove();
     shadowEntry.dispose();
+    if (screenState?.mounted ?? false) {
+      screenState!._sidebarMenuOpen.value = false;
+    }
   }
 }
 
@@ -1500,11 +1517,13 @@ class _LeftZoneToggleTab extends StatelessWidget {
     required this.expanded,
     required this.onPressed,
     this.toolbar = false,
+    this.hideShadow = false,
   });
 
   final bool expanded;
   final VoidCallback onPressed;
   final bool toolbar;
+  final bool hideShadow;
 
   @override
   Widget build(BuildContext context) {
@@ -1514,8 +1533,8 @@ class _LeftZoneToggleTab extends StatelessWidget {
         toolbar ? 'editor-toolbar-toggle' : 'library-navigation-toggle',
       ),
       color: theme.colorScheme.surface,
-      elevation: 8,
-      shadowColor: Colors.black54,
+      elevation: hideShadow ? 0 : 8,
+      shadowColor: hideShadow ? Colors.transparent : Colors.black54,
       shape: RoundedRectangleBorder(
         borderRadius: const BorderRadius.only(
           topRight: Radius.circular(12),
