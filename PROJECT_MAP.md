@@ -615,7 +615,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (931):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (959):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
@@ -626,10 +626,13 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
   Publiczny `EditorToolbar.pickColor` współdzieli pełny selektor HEX/RGB/B-W
-  z edycją koloru ikon okładek folderów. Kontroler HEX jest zwalniany dopiero
+  z edycją koloru ikon okładek folderów. W dark mode próbki Recent,
+  podgląd, HEX oraz suwaki pracują na odwróconym kolorze widocznym,
+  a przed zapisem wracają do wartości bazowej; wybór bez zmian jest bezstratny.
+  Kontroler HEX jest zwalniany dopiero
   po zakończeniu animacji zamykania dialogu, także przy zagnieżdżonej edycji.
   10: `EditorToolbar`; 198: dialog tła; 337: selektor gumki;
-  405: selektor kształtu; 573: `pickColor`; 824: `_EraserIcon`.
+  405: selektor kształtu; 573: `pickColor`; 852: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (345):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
@@ -858,6 +861,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
   minimapa na krótkim ekranie, regulacja scrolla stron i interaktywność
   narzędzi
+- `test/editor_toolbar_color_picker_test.dart`: dark/light picker, odwrócone
+  Recent i wartości RGB/HEX, suwak i zapis z zachowaniem koloru wizualnego,
+  brak modyfikacji danych po zatwierdzeniu bez zmian.
 - `test/page_overlay_text_gestures_test.dart` (679): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,

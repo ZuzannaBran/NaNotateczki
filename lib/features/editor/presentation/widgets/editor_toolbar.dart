@@ -575,11 +575,19 @@ class EditorToolbar extends StatelessWidget {
     Color current,
     List<Color> recentColors,
   ) async {
-    var red = _toByte(current.r).toDouble();
-    var green = _toByte(current.g).toDouble();
-    var blue = _toByte(current.b).toDouble();
+    final darkMode = Theme.of(context).brightness == Brightness.dark;
+    final displayCurrent = AppColors.displayInkColor(
+      current,
+      darkMode: darkMode,
+    );
+    var red = _toByte(displayCurrent.r).toDouble();
+    var green = _toByte(displayCurrent.g).toDouble();
+    var blue = _toByte(displayCurrent.b).toDouble();
     var shade = 0.5;
-    final hexController = TextEditingController(text: _toHexColor(current));
+    var edited = false;
+    final hexController = TextEditingController(
+      text: _toHexColor(displayCurrent),
+    );
 
     final navigator = Navigator.of(context, rootNavigator: true);
     final route = DialogRoute<Color>(
@@ -623,6 +631,7 @@ class EditorToolbar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
+                    key: const ValueKey('color-picker-preview'),
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
@@ -652,6 +661,7 @@ class EditorToolbar extends StatelessWidget {
                           green = _toByte(parsed.g).toDouble();
                           blue = _toByte(parsed.b).toDouble();
                           shade = 0.5;
+                          edited = true;
                         });
                       },
                     ),
@@ -663,6 +673,7 @@ class EditorToolbar extends StatelessWidget {
                     color: Colors.red,
                     onChanged: (value) => setState(() {
                       red = value;
+                      edited = true;
                       syncHex();
                     }),
                   ),
@@ -672,6 +683,7 @@ class EditorToolbar extends StatelessWidget {
                     color: Colors.green,
                     onChanged: (value) => setState(() {
                       green = value;
+                      edited = true;
                       syncHex();
                     }),
                   ),
@@ -681,6 +693,7 @@ class EditorToolbar extends StatelessWidget {
                     color: Colors.blue,
                     onChanged: (value) => setState(() {
                       blue = value;
+                      edited = true;
                       syncHex();
                     }),
                   ),
@@ -692,6 +705,7 @@ class EditorToolbar extends StatelessWidget {
                     max: 100,
                     onChanged: (value) => setState(() {
                       shade = value / 100;
+                      edited = true;
                       syncHex();
                     }),
                   ),
@@ -711,13 +725,19 @@ class EditorToolbar extends StatelessWidget {
                       children: [
                         for (final color in recentColors)
                           GestureDetector(
+                            key: ValueKey(
+                              'color-picker-recent-${color.toARGB32()}',
+                            ),
                             onTap: () => Navigator.of(context).pop(color),
                             child: Container(
                               width: 22,
                               height: 22,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: color,
+                                color: AppColors.displayInkColor(
+                                  color,
+                                  darkMode: darkMode,
+                                ),
                                 border: Border.all(
                                   color: Theme.of(context).dividerColor,
                                 ),
@@ -735,7 +755,15 @@ class EditorToolbar extends StatelessWidget {
                   child: const Text('Cancel'),
                 ),
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(preview),
+                  onPressed: () {
+                    final stored = edited
+                        ? AppColors.displayInkColor(
+                            preview,
+                            darkMode: darkMode,
+                          ).withValues(alpha: current.a)
+                        : current;
+                    Navigator.of(context).pop(stored);
+                  },
                   child: const Text('Save'),
                 ),
               ],

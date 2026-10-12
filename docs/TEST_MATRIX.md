@@ -62,6 +62,11 @@ timing, filesystem and GPU behavior from physical hardware.
 - Controller viewport is frozen while an object transforms.
 - Text edit/resize/formatter behavior and responsive page constraints
   (existing tests).
+- Color picker regression: display-mode RGB/HEX, Recent swatches and slider
+  edits, preserving stored values when unchanged in light and dark modes.
+  Manual: on Linux/Chrome switch themes with the same ink/text, open the pen
+  and text pickers, compare Recent/HEX/slider preview to visible ink/text,
+  save slider and HEX edits in dark mode, then switch back to light mode.
 - Merged UI: empty-library appearance settings, live theme changes across
   catalog and planner routes, dark notebook/board previews without changing
   stored ink/text, dark actions and compact timer, original sidebar menu
