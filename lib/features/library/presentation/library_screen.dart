@@ -1212,6 +1212,8 @@ class _LibraryTreeItemRow extends StatelessWidget {
 
 const _sidebarMenuShape = RoundedRectangleBorder(
   borderRadius: BorderRadius.only(
+    topLeft: Radius.zero,
+    bottomLeft: Radius.zero,
     topRight: Radius.circular(12),
     bottomRight: Radius.circular(12),
   ),
@@ -1233,13 +1235,19 @@ Future<T?> _showSidebarMenu<T>({
     return null;
   }
 
-  final panelEdge = paneBox
-      .localToGlobal(Offset(paneBox.size.width, 0), ancestor: overlayBox)
+  final sidebarRight = paneBox
+      .localToGlobal(
+        Offset(
+          paneBox.size.width + _LibraryScreenState._resizeHandleWidth,
+          0,
+        ),
+        ancestor: overlayBox,
+      )
       .dx;
   final anchorTop = anchorBox
       .localToGlobal(Offset.zero, ancestor: overlayBox)
       .dy;
-  final left = panelEdge.clamp(0.0, overlayBox.size.width).toDouble();
+  final left = sidebarRight.clamp(0.0, overlayBox.size.width).toDouble();
   final top = anchorTop.clamp(0.0, overlayBox.size.height).toDouble();
   return showMenu<T>(
     context: context,

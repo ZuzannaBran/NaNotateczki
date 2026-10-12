@@ -154,13 +154,11 @@ void main() {
         .style!
         .fontSize;
     expect(treeFontSize, 14);
-    const resizeHandleWidth = 12.0;
-    final folderPaneEdge =
+    final sidebarRight =
         tester
             .getTopLeft(find.byKey(const ValueKey('library-navigation-toggle')))
             .dx +
-        1 -
-        resizeHandleWidth;
+        1;
     final sidebarColor = Theme.of(
       tester.element(find.text('Projects')),
     ).colorScheme.surfaceContainerLowest;
@@ -204,7 +202,7 @@ void main() {
         );
       }
       final rect = tester.getRect(menuEntries.first);
-      expect(rect.left, closeTo(folderPaneEdge, 1));
+      expect(rect.left, closeTo(sidebarRight, 1));
       expect(rect.top, closeTo(actionTop, 4));
       expect(rect.width, closeTo(130, 1));
       expect(rect.height, 36);
@@ -220,11 +218,23 @@ void main() {
               material.shape is RoundedRectangleBorder &&
               (material.shape! as RoundedRectangleBorder).borderRadius ==
                   const BorderRadius.only(
+                    topLeft: Radius.zero,
+                    bottomLeft: Radius.zero,
                     topRight: Radius.circular(12),
                     bottomRight: Radius.circular(12),
                   ),
         ),
         isTrue,
+      );
+
+      final menuSurface = menuMaterials.firstWhere(
+        (material) =>
+            material.color == sidebarColor &&
+            material.shape is RoundedRectangleBorder,
+      );
+      expect(
+        tester.getRect(find.byWidget(menuSurface)).left,
+        closeTo(sidebarRight, 1),
       );
 
       if (hasCover) {
@@ -268,7 +278,7 @@ void main() {
       );
     }
     final createRect = tester.getRect(createEntries.first);
-    expect(createRect.left, closeTo(folderPaneEdge, 1));
+    expect(createRect.left, closeTo(sidebarRight, 1));
     expect(createRect.top, closeTo(addButtonTop, 8));
     expect(createRect.width, closeTo(150, 1));
     expect(createRect.height, 36);
@@ -285,11 +295,23 @@ void main() {
             material.shape is RoundedRectangleBorder &&
             (material.shape! as RoundedRectangleBorder).borderRadius ==
                 const BorderRadius.only(
+                  topLeft: Radius.zero,
+                  bottomLeft: Radius.zero,
                   topRight: Radius.circular(12),
                   bottomRight: Radius.circular(12),
                 ),
       ),
       isTrue,
+    );
+
+    final createSurface = createMaterials.firstWhere(
+      (material) =>
+          material.color == sidebarColor &&
+          material.shape is RoundedRectangleBorder,
+    );
+    expect(
+      tester.getRect(find.byWidget(createSurface)).left,
+      closeTo(sidebarRight, 1),
     );
 
     await tester.tap(find.text('New folder'));

@@ -224,14 +224,13 @@ void main() {
           await tester.dragFrom(Offset(edge - 5, 200), const Offset(70, 0));
           await tester.pumpAndSettle();
         }
-        final panelEdge =
+        final sidebarRight =
             tester
                 .getTopLeft(
                   find.byKey(const ValueKey('library-navigation-toggle')),
                 )
                 .dx +
-            1 -
-            12;
+            1;
         for (final (name, button, width, count) in [
           ('folder', find.byTooltip('Folder actions'), 130.0, 3),
           ('document', find.byTooltip('Item actions').first, 130.0, 2),
@@ -245,7 +244,7 @@ void main() {
           );
           expect(entries, findsNWidgets(count));
           final rect = tester.getRect(entries.first);
-          expect(rect.left, closeTo(panelEdge, 1));
+          expect(rect.left, closeTo(sidebarRight, 1));
           expect(rect.top, closeTo(top, 4));
           expect(rect.width, closeTo(width, 1));
           final theme = Theme.of(tester.element(entries.first));
@@ -265,8 +264,14 @@ void main() {
           expect(material.elevation, 4);
           expect(material.shadowColor, const Color(0x44000000));
           expect(
+            tester.getRect(find.byWidget(material)).left,
+            closeTo(sidebarRight, 1),
+          );
+          expect(
             (material.shape! as RoundedRectangleBorder).borderRadius,
             const BorderRadius.only(
+              topLeft: Radius.zero,
+              bottomLeft: Radius.zero,
               topRight: Radius.circular(12),
               bottomRight: Radius.circular(12),
             ),
