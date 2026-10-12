@@ -338,7 +338,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 504: `selectFolder`; 615: `_loadFolders`; 654: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1564 linii)
+### `lib/features/library/presentation/library_screen.dart` (1567 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -372,7 +372,8 @@ promień zero, a wyłącznie prawe promień 12 px. Menu styka się z panelem
 bez szczeliny: obie strony
 styku są bez cienia i bez 1 px kreski uchwytu resize. Menu ma elevation 0,
 a osobny dekoracyjny cień o alpha 0x44 jest przycięty do prawej strony
-i do obszaru poza obrysem menu (nie przyciemnia jego wypełnienia);
+i do obszaru poza obrysem menu, przez ścieżkę even-odd zgodną z Canvas
+(bez nieobsługiwanego parametru clipOp);
 na czas otwarcia dowolnego menu cienie obu strzałek sidebaru są wyłączone
 i przywracane natychmiast po zamknięciu;
 2 px łącznik koloru panelu maskuje linię graniczną. Menu folderu zawiera także
@@ -387,9 +388,9 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1223: `_sidebarMenuShape`;
   1237: `_SidebarMenuShadowPainter`;
   1278: `_showSidebarMenu`;
-  1367: `_TreeRowActions`;
-  1441: `_LibraryWorkspace`;
-  1515: `_LeftZoneToggleTab`.
+  1365: `_TreeRowActions`;
+  1439: `_LibraryWorkspace`;
+  1513: `_LeftZoneToggleTab`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (725 linii)
 
