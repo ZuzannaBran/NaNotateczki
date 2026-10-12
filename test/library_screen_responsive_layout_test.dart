@@ -213,8 +213,8 @@ void main() {
         menuMaterials.any(
           (material) =>
               material.color == sidebarColor &&
-              material.elevation == 4 &&
-              material.shadowColor == const Color(0x44000000) &&
+              material.elevation == 0 &&
+              material.shadowColor == Colors.transparent &&
               material.shape is RoundedRectangleBorder &&
               (material.shape! as RoundedRectangleBorder).borderRadius ==
                   const BorderRadius.only(
@@ -237,8 +237,17 @@ void main() {
         closeTo(sidebarRight, 1),
       );
 
-      if (hasCover) {
-        await tester.tap(find.text('Edit cover'));
+      final shadowBridge = find.byKey(
+        const ValueKey('sidebar-menu-shadow-bridge'),
+      );
+      expect(shadowBridge, findsOneWidget);
+      final bridgeRect = tester.getRect(shadowBridge);
+      expect(bridgeRect.left, closeTo(sidebarRight - 2, 1));
+      expect(bridgeRect.right, closeTo(sidebarRight + 130, 1));
+      expect(bridgeRect.top, closeTo(actionTop, 4));
+      expect(bridgeRect.height, closeTo(hasCover ? 114 : 78, 1));
+
+      if (hasCover)
         await tester.pumpAndSettle();
         expect(find.text('Edit folder cover'), findsOneWidget);
         await tester.tap(find.text('Cancel'));
@@ -290,8 +299,8 @@ void main() {
       createMaterials.any(
         (material) =>
             material.color == sidebarColor &&
-            material.elevation == 4 &&
-            material.shadowColor == const Color(0x44000000) &&
+            material.elevation == 0 &&
+            material.shadowColor == Colors.transparent &&
             material.shape is RoundedRectangleBorder &&
             (material.shape! as RoundedRectangleBorder).borderRadius ==
                 const BorderRadius.only(
@@ -313,6 +322,15 @@ void main() {
       tester.getRect(find.byWidget(createSurface)).left,
       closeTo(sidebarRight, 1),
     );
+
+    final shadowBridge = find.byKey(
+      const ValueKey('sidebar-menu-shadow-bridge'),
+    );
+    expect(shadowBridge, findsOneWidget);
+    final bridgeRect = tester.getRect(shadowBridge);
+    expect(bridgeRect.left, closeTo(sidebarRight - 2, 1));
+    expect(bridgeRect.right, closeTo(sidebarRight + 150, 1));
+    expect(bridgeRect.height, closeTo(114, 1));
 
     await tester.tap(find.text('New folder'));
     await tester.pumpAndSettle();

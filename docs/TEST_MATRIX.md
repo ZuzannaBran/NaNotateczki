@@ -62,6 +62,11 @@ timing, filesystem and GPU behavior from physical hardware.
 - Controller viewport is frozen while an object transforms.
 - Text edit/resize/formatter behavior and responsive page constraints
   (existing tests).
+- Sidebar popup seam: test folder, notebook, board and plus menus at normal
+  and resized sidebar widths in both themes. The seam bridge must mask
+  the resize divider; only the outer menu edges should cast a shadow.
+  Desktop manual check: opening/closing each menu has no dark strip where
+  it joins the sidebar, including during animation.
 - Color picker regression: display-mode RGB/HEX, Recent swatches and slider
   edits, preserving stored values when unchanged in light and dark modes.
   Manual: on Linux/Chrome switch themes with the same ink/text, open the pen

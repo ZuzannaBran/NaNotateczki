@@ -338,7 +338,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 504: `selectFolder`; 615: `_loadFolders`; 654: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1477 linii)
+### `lib/features/library/presentation/library_screen.dart` (1550 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -366,18 +366,24 @@ Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
 dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej krawędzi
 całego sidebaru (włącznie z 12 px uchwytem resize), jego koloru i animacji
 180 ms. Lewe narożniki mają jawny promień zero, a wyłącznie prawe
-promień 12 px. Menu styka się z panelem bez szczeliny; delikatny cień
-ma elevation 4 i alpha
-0x44, bez osobnego obramowania. Menu folderu zawiera także
+promień 12 px. Menu styka się z panelem bez szczeliny: obie strony
+styku są bez cienia i bez 1 px kreski uchwytu resize. Menu ma elevation 0,
+a osobny dekoracyjny cień o alpha 0x44 jest przycięty do prawej strony;
+2 px łącznik koloru panelu maskuje linię graniczną. Menu folderu zawiera także
 edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon.
 
 - 23: `LibraryScreen`; 30: `_LibraryScreenState`;
   438: `_openCatalogSettings`;
-  773: `_CreateMenuButton`; 816: `_LibraryTreePane`;
-  1047: `_FolderTreeRow`; 1141: `_LibraryTreeItemRow`;
-  1213: `_sidebarMenuShape`; 1222: `_showSidebarMenu`;
-  1277: `_TreeRowActions`; 1351: `_LibraryWorkspace`;
-  1425: `_LeftZoneToggleTab`.
+  773: `_CreateMenuButton`;
+  816: `_LibraryTreePane`;
+  1047: `_FolderTreeRow`;
+  1141: `_LibraryTreeItemRow`;
+  1213: `_sidebarMenuShape`;
+  1227: `_SidebarMenuShadowPainter`;
+  1268: `_showSidebarMenu`;
+  1350: `_TreeRowActions`;
+  1424: `_LibraryWorkspace`;
+  1498: `_LeftZoneToggleTab`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (725 linii)
 
@@ -827,9 +833,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
   ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
   po zmianie motywu, kontrast planera/timera, pozycja menu względem
-  prawej granicy sidebaru przy resize w obu motywach oraz wspólna
-  czułość nowych scrollerów.
-- `test/library_screen_responsive_layout_test.dart` (656):
+  prawej granicy sidebaru przy resize w obu motywach, maskowanie
+  cienia na styku oraz wspólna czułość nowych scrollerów.
+- `test/library_screen_responsive_layout_test.dart` (674):
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
@@ -841,7 +847,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
   stykanie menu z prawą granicą całego sidebaru (w tym resize handle),
-  prosty lewy brzeg i delikatny cień.
+  prosty lewy brzeg, brak cienia i podziałki w miejscu styku
+  oraz cień wyłącznie po zewnętrznych stronach menu.
 - `test/touch_navigation_sensitivity_test.dart` (80):
   granice czułości i porównanie dystansów scrolla przy gestach palcem.
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec

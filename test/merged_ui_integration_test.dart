@@ -261,11 +261,23 @@ void main() {
               )
               .firstWhere((widget) => widget.shape is RoundedRectangleBorder);
           expect(material.color, theme.colorScheme.surfaceContainerLowest);
-          expect(material.elevation, 4);
-          expect(material.shadowColor, const Color(0x44000000));
+          expect(material.elevation, 0);
+          expect(material.shadowColor, Colors.transparent);
           expect(
             tester.getRect(find.byWidget(material)).left,
             closeTo(sidebarRight, 1),
+          );
+          final shadowBridge = find.byKey(
+            const ValueKey('sidebar-menu-shadow-bridge'),
+          );
+          expect(shadowBridge, findsOneWidget);
+          expect(
+            tester.getRect(shadowBridge).left,
+            closeTo(sidebarRight - 2, 1),
+          );
+          expect(
+            tester.getRect(shadowBridge).right,
+            closeTo(sidebarRight + width, 1),
           );
           expect(
             (material.shape! as RoundedRectangleBorder).borderRadius,

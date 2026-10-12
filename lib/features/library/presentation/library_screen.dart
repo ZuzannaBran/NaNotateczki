@@ -1219,6 +1219,52 @@ const _sidebarMenuShape = RoundedRectangleBorder(
   ),
 );
 
+const double _sidebarMenuSeamWidth = 2;
+const double _sidebarMenuVerticalPadding = 3;
+
+/// Draws the popup shadow only outside the sidebar and covers the resize
+/// divider where the popup joins the sidebar.
+class _SidebarMenuShadowPainter extends CustomPainter {
+  const _SidebarMenuShadowPainter(this.surfaceColor);
+
+  final Color surfaceColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final menuRect = Rect.fromLTWH(
+      _sidebarMenuSeamWidth,
+      0,
+      size.width - _sidebarMenuSeamWidth,
+      size.height,
+    );
+    canvas.save();
+    canvas.clipRect(
+      Rect.fromLTRB(
+        menuRect.left,
+        -20,
+        size.width + 20,
+        size.height + 20,
+      ),
+    );
+    canvas.drawShadow(
+      _sidebarMenuShape.getOuterPath(menuRect),
+      const Color(0x44000000),
+      4,
+      false,
+    );
+    canvas.restore();
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, _sidebarMenuSeamWidth, size.height),
+      Paint()..color = surfaceColor,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SidebarMenuShadowPainter oldDelegate) {
+    return surfaceColor != oldDelegate.surfaceColor;
+  }
+}
+
 Future<T?> _showSidebarMenu<T>({
   required BuildContext context,
   required BuildContext anchorContext,
@@ -1229,8 +1275,8 @@ Future<T?> _showSidebarMenu<T>({
       .findAncestorStateOfType<_LibraryTreePaneState>();
   final paneBox = paneState?.context.findRenderObject() as RenderBox?;
   final anchorBox = anchorContext.findRenderObject() as RenderBox?;
-  final overlayBox =
-      Overlay.of(context).context.findRenderObject() as RenderBox?;
+  final overlay = Overlay.of(context);
+  final overlayBox = overlay.context.findRenderObject() as RenderBox?;
   if (paneBox == null || anchorBox == null || overlayBox == null) {
     return null;
   }
@@ -1248,30 +1294,57 @@ Future<T?> _showSidebarMenu<T>({
       .localToGlobal(Offset.zero, ancestor: overlayBox)
       .dy;
   final left = sidebarRight.clamp(0.0, overlayBox.size.width).toDouble();
-  final top = anchorTop.clamp(0.0, overlayBox.size.height).toDouble();
-  return showMenu<T>(
-    context: context,
-    position: RelativeRect.fromLTRB(
-      left,
-      top,
-      overlayBox.size.width - left,
-      overlayBox.size.height - top,
-    ),
-    constraints: BoxConstraints.tightFor(width: width),
-    menuPadding: const EdgeInsets.symmetric(vertical: 3),
-    color: Theme.of(context).colorScheme.surfaceContainerLowest,
-    surfaceTintColor: Colors.transparent,
-    elevation: 4,
-    shadowColor: const Color(0x44000000),
-    shape: _sidebarMenuShape,
-    popUpAnimationStyle: const AnimationStyle(
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-      duration: Duration(milliseconds: 180),
-      reverseDuration: Duration(milliseconds: 120),
-    ),
-    items: items,
+  final menuHeight = items.fold<double>(
+    _sidebarMenuVerticalPadding * 2,
+    (height, entry) => height + entry.height,
   );
+  final bottomLimit = math.max(8.0, overlayBox.size.height - menuHeight - 8);
+  final top = anchorTop.clamp(8.0, bottomLimit).toDouble();
+  final surfaceColor = Theme.of(context).colorScheme.surfaceContainerLowest;
+  final shadowEntry = OverlayEntry(
+    builder: (_) => Positioned(
+      left: left - _sidebarMenuSeamWidth,
+      top: top,
+      child: IgnorePointer(
+        child: CustomPaint(
+          key: const ValueKey('sidebar-menu-shadow-bridge'),
+          size: Size(width + _sidebarMenuSeamWidth, menuHeight),
+          painter: _SidebarMenuShadowPainter(surfaceColor),
+        ),
+      ),
+    ),
+  );
+  overlay.insert(shadowEntry);
+  try {
+    return await showMenu<T>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        left,
+        top,
+        overlayBox.size.width - left,
+        overlayBox.size.height - top,
+      ),
+      constraints: BoxConstraints.tightFor(width: width),
+      menuPadding: const EdgeInsets.symmetric(
+        vertical: _sidebarMenuVerticalPadding,
+      ),
+      color: surfaceColor,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      shape: _sidebarMenuShape,
+      popUpAnimationStyle: const AnimationStyle(
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+        duration: Duration(milliseconds: 180),
+        reverseDuration: Duration(milliseconds: 120),
+      ),
+      items: items,
+    );
+  } finally {
+    shadowEntry.remove();
+    shadowEntry.dispose();
+  }
 }
 
 class _TreeRowActions extends StatelessWidget {
