@@ -155,7 +155,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 - `lib/core/widgets/app_header_divider.dart`: wspólny 1 px separator nagłówka
   w ekranie głównym, planerze i ustawieniach. Wspólna wysokość paska to
   56 px, styl tytułu to 18 px i waga 600 jak Projects we wszystkich ekranach.
-  Linia ma pełny, widoczny kolor outlineVariant (bez rozjaśniania alfa).
+  Kolor linii jest identyczny jak w Projects: outlineVariant 45% na
+  surfaceContainerLowest; w planerze i ustawieniach linia jest pierwszym
+  elementem body bez zwiększania wysokości AppBar.
   4: `AppHeaderDivider`; 7: `colorOf`.
 - `lib/core/widgets/empty_state.dart` (30): wspólny pusty stan.
   3: `EmptyState`.
@@ -616,7 +618,8 @@ interfejsu 75%–150% z natychmiastowym podglądem. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
 `EditorController` jest opcjonalny: ustawienia globalne działają z pustego
 katalogu i planera; tła i ustawienia rysika wymagają otwartego dokumentu.
-Nagłówek ma wysokość 56 px, tytuł 18 px i wspólny separator 1 px jak planer.
+Nagłówek ma wysokość 56 px, tytuł 18 px jak Projects i linię 1 px pod
+paskiem; linia jest w body, nie w AppBar.bottom.
 
 - 17: `EditorSettingsScreen`; 406: `_showErrorsDialog`;
   488: `_showDataIntegrityDialog`; 575: `_showOptimizationDialog`;

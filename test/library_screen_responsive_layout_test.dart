@@ -142,7 +142,10 @@ void main() {
       expect(separator, Rect.fromLTWH(0, appBar.bottom, 1200, 1));
 
       final scheme = Theme.of(tester.element(divider)).colorScheme;
-      final expectedColor = scheme.outlineVariant;
+      final expectedColor = Color.alphaBlend(
+        scheme.outlineVariant.withValues(alpha: 0.45),
+        scheme.surfaceContainerLowest,
+      );
       expect(tester.widget<ColoredBox>(divider).color, expectedColor);
       expect(tester.widget<Text>(find.text('Projects')).style,
           AppHeaderDivider.titleStyle);

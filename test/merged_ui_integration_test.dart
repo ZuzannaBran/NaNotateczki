@@ -62,8 +62,10 @@ void main() {
         const Rect.fromLTWH(0, kToolbarHeight, 1400, 1),
       );
       final libraryColor = tester.widget<ColoredBox>(libraryDivider).color;
-      expect(libraryColor, Theme.of(tester.element(libraryDivider))
-          .colorScheme.outlineVariant);
+      expect(
+        libraryColor,
+        AppHeaderDivider.colorOf(tester.element(libraryDivider)),
+      );
       expect(tester.widget<Text>(find.text('Projects')).style,
           AppHeaderDivider.titleStyle);
 
@@ -78,7 +80,7 @@ void main() {
             0,
             0,
             1400,
-            kToolbarHeight + AppHeaderDivider.thickness,
+            AppHeaderDivider.toolbarHeight,
           ),
         );
         expect(

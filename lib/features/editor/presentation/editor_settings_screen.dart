@@ -32,12 +32,12 @@ class EditorSettingsScreen extends StatelessWidget {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         title: const Text('Settings', style: AppHeaderDivider.titleStyle),
-        bottom: const AppHeaderDivider(),
       ),
       body: DefaultTabController(
         length: 3,
         child: Column(
           children: [
+            const AppHeaderDivider(),
             const Material(
               color: Colors.transparent,
               child: TabBar(

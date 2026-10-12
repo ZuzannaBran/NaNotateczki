@@ -551,7 +551,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
         appBar: AppBar(
           toolbarHeight: AppHeaderDivider.toolbarHeight,
           titleSpacing: MediaQuery.sizeOf(context).width >= 600 ? 44 : null,
-          bottom: const AppHeaderDivider(),
           scrolledUnderElevation: 0,
           surfaceTintColor: Colors.transparent,
           title: const Text(
@@ -619,6 +618,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
         ),
         body: Column(
           children: [
+            const AppHeaderDivider(),
             if (planner.active != null || planner.pendingReviews.isNotEmpty)
               Material(
                 color: colors.surfaceContainerLow,
