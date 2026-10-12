@@ -21,10 +21,6 @@ class EditorSettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController?>();
     final preferences = context.watch<AppPreferencesController>();
-    final sensitivityLabel = preferences.touchNavigationSensitivity
-        .toStringAsFixed(1);
-    final uiScaleLabel = '${(preferences.uiScale * 100).round()}%';
-
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: AppHeaderDivider.toolbarHeight,
@@ -122,35 +118,18 @@ class EditorSettingsScreen extends StatelessWidget {
                               'Controls how quickly touch gestures move '
                               'through files and pages.',
                             ),
-                            Row(
-                              children: [
-                                const Text('0.5×'),
-                                Expanded(
-                                  child: Slider(
-                                    key: const ValueKey(
-                                      'touch-navigation-sensitivity',
-                                    ),
-                                    min: 0.5,
-                                    max: 2.0,
-                                    divisions: 15,
-                                    value:
-                                        preferences.touchNavigationSensitivity,
-                                    label: '$sensitivityLabel×',
-                                    onChanged: preferences
-                                        .previewTouchNavigationSensitivity,
-                                    onChangeEnd: preferences
-                                        .setTouchNavigationSensitivity,
-                                  ),
-                                ),
-                                const Text('2.0×'),
-                                SizedBox(
-                                  width: 48,
-                                  child: Text(
-                                    '$sensitivityLabel×',
-                                    textAlign: TextAlign.end,
-                                  ),
-                                ),
-                              ],
+                            Slider(
+                              key: const ValueKey(
+                                'touch-navigation-sensitivity',
+                              ),
+                              min: 0.5,
+                              max: 2.0,
+                              divisions: 15,
+                              value: preferences.touchNavigationSensitivity,
+                              onChanged:
+                                  preferences.previewTouchNavigationSensitivity,
+                              onChangeEnd:
+                                  preferences.setTouchNavigationSensitivity,
                             ),
                           ],
                         ),
@@ -306,30 +285,14 @@ class EditorSettingsScreen extends StatelessWidget {
                             const Text(
                               'Adjusts the size of the entire app interface.',
                             ),
-                            Row(
-                              children: [
-                                const Text('75%'),
-                                Expanded(
-                                  child: Slider(
-                                    key: const ValueKey('visual-ui-scale'),
-                                    min: 0.75,
-                                    max: 1.5,
-                                    divisions: 15,
-                                    value: preferences.uiScale,
-                                    label: uiScaleLabel,
-                                    onChanged: preferences.previewUiScale,
-                                    onChangeEnd: preferences.setUiScale,
-                                  ),
-                                ),
-                                const Text('150%'),
-                                SizedBox(
-                                  width: 48,
-                                  child: Text(
-                                    uiScaleLabel,
-                                    textAlign: TextAlign.end,
-                                  ),
-                                ),
-                              ],
+                            Slider(
+                              key: const ValueKey('visual-ui-scale'),
+                              min: 0.75,
+                              max: 1.5,
+                              divisions: 15,
+                              value: preferences.uiScale,
+                              onChanged: preferences.previewUiScale,
+                              onChangeEnd: preferences.setUiScale,
                             ),
                           ],
                         ),
