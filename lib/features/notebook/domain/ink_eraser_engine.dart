@@ -165,6 +165,37 @@ class InkEraserEngine {
     return InkBrushEraseResult(strokes: next, changed: changed);
   }
 
+  /// Removes the polygon-covered portion of each stroke, not its whole ID.
+  static InkBrushEraseResult eraseAreaParts({
+    required List<InkStroke> strokes,
+    required List<Offset> polygon,
+    required String Function() createId,
+  }) {
+    if (strokes.isEmpty || polygon.length < 3) {
+      return InkBrushEraseResult(strokes: strokes, changed: false);
+    }
+    final candidates = inkSpatialIndexFor(strokes)
+        .query(_pointsBounds(polygon))
+        .map((stroke) => stroke.id)
+        .toSet();
+    final next = <InkStroke>[];
+    var changed = false;
+    for (final stroke in strokes) {
+      if (!candidates.contains(stroke.id) || !_canErase(stroke)) {
+        next.add(stroke);
+        continue;
+      }
+      final fragments = _splitStrokeForArea(stroke, polygon, createId);
+      if (fragments.length == 1 && identical(fragments.single, stroke)) {
+        next.add(stroke);
+      } else {
+        changed = true;
+        next.addAll(fragments);
+      }
+    }
+    return InkBrushEraseResult(strokes: next, changed: changed);
+  }
+
   static Set<String> areaHits({
     required List<InkStroke> strokes,
     required List<Offset> polygon,
@@ -275,6 +306,123 @@ class InkEraserEngine {
     }
     return false;
   }
+
+  static List<InkStroke> _splitStrokeForArea(
+    InkStroke stroke,
+    List<Offset> polygon,
+    String Function() createId,
+  ) {
+    final points = stroke.points;
+    if (points.isEmpty) {
+      return [stroke];
+    }
+    if (points.length == 1) {
+      return _insideOrOnPolygon(points.single.toOffset(), polygon)
+          ? <InkStroke>[]
+          : [stroke];
+    }
+
+    var changed = false;
+    final fragments = <InkStroke>[];
+    var run = <InkPoint>[];
+    void flush() {
+      if (run.length > 1) {
+        fragments.add(stroke.copyWith(id: createId(), points: List.of(run)));
+      }
+      run = <InkPoint>[];
+    }
+
+    for (var i = 0; i < points.length - 1; i++) {
+      final a = points[i];
+      final b = points[i + 1];
+      final start = a.toOffset();
+      final delta = b.toOffset() - start;
+      final lengthSquared = delta.distanceSquared;
+      final cuts = <double>[0, 1];
+      if (lengthSquared > 0) {
+        for (var j = 0; j < polygon.length; j++) {
+          final c = polygon[j];
+          final d = polygon[(j + 1) % polygon.length];
+          final edge = d - c;
+          final relative = c - start;
+          final denominator = _cross(delta, edge);
+          if (denominator.abs() < 1e-10) {
+            if (_cross(relative, delta).abs() < 1e-8) {
+              for (final p in [c, d]) {
+                final projected = p - start;
+                final t = (projected.dx * delta.dx +
+                        projected.dy * delta.dy) /
+                    lengthSquared;
+                if (t >= 0 && t <= 1) {
+                  cuts.add(t);
+                }
+              }
+            }
+            continue;
+          }
+          final t = _cross(relative, edge) / denominator;
+          final u = _cross(relative, delta) / denominator;
+          if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+            cuts.add(t);
+          }
+        }
+      }
+      cuts.sort();
+      for (var j = 0; j < cuts.length - 1; j++) {
+        final from = cuts[j];
+        final to = cuts[j + 1];
+        if (to - from <= 1e-9) {
+          continue;
+        }
+        if (_insideOrOnPolygon(start + delta * ((from + to) / 2), polygon)) {
+          changed = true;
+          flush();
+          continue;
+        }
+        InkPoint at(double t) => InkPoint(
+          dx: a.dx + (b.dx - a.dx) * t,
+          dy: a.dy + (b.dy - a.dy) * t,
+          pressure: a.pressure + (b.pressure - a.pressure) * t,
+        );
+
+        final first = at(from);
+        final last = at(to);
+        if (run.isNotEmpty &&
+            (run.last.toOffset() - first.toOffset()).distanceSquared > 1e-10) {
+          flush();
+        }
+        if (run.isEmpty) {
+          run.add(first);
+        }
+        if ((run.last.toOffset() - last.toOffset()).distanceSquared > 1e-10) {
+          run.add(last);
+        }
+      }
+    }
+    if (!changed) {
+      return [stroke];
+    }
+    flush();
+    return fragments;
+  }
+
+  static bool _insideOrOnPolygon(Offset point, List<Offset> polygon) {
+    if (_pointInPolygon(point, polygon)) {
+      return true;
+    }
+    for (var i = 0; i < polygon.length; i++) {
+      if (_distanceSquaredToSegment(
+            point,
+            polygon[i],
+            polygon[(i + 1) % polygon.length],
+          ) <= 1e-10) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static double _cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
 
   static List<InkStroke> _splitStrokeForBrush(
     InkStroke stroke,

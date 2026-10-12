@@ -155,6 +155,134 @@ void main() {
     expect(ids, {'crossing'});
   });
 
+  test('area eraser clips only the covered part of sparse strokes', () {
+    final crossing = _stroke('crossing', const [
+      Offset(0, 0),
+      Offset(100, 0),
+    ]);
+    final miss = _stroke('miss', const [
+      Offset(0, 30),
+      Offset(100, 30),
+    ]);
+    var index = 0;
+    final result = InkEraserEngine.eraseAreaParts(
+      strokes: [crossing, miss],
+      polygon: const [
+        Offset(40, -10),
+        Offset(60, -10),
+        Offset(60, 10),
+        Offset(40, 10),
+      ],
+      createId: () => 'part-' + (index++).toString(),
+    );
+    expect(result.changed, isTrue);
+    expect(result.strokes, hasLength(3));
+    expect(result.strokes.last, same(miss));
+    expect(result.strokes.first.points.first.dx, 0);
+    expect(result.strokes.first.points.last.dx, closeTo(40, 0.001));
+    expect(result.strokes[1].points.first.dx, closeTo(60, 0.001));
+    expect(result.strokes[1].points.last.dx, 100);
+    expect(result.strokes.take(2).map((part) => part.id).toSet(),
+        {'part-0', 'part-1'});
+  });
+
+  test('area eraser splits repeated crossings and interpolates pressure', () {
+    final line = InkStroke(
+      id: 'zigzag',
+      points: const [
+        InkPoint(dx: 0, dy: 0, pressure: 0.2),
+        InkPoint(dx: 100, dy: 0, pressure: 0.8),
+        InkPoint(dx: 0, dy: 0, pressure: 0.2),
+      ],
+      color: const Color(0xFF123456),
+      width: 5,
+      tool: DrawingTool.highlighter,
+    );
+    var index = 0;
+    final result = InkEraserEngine.eraseAreaParts(
+      strokes: [line],
+      polygon: const [
+        Offset(40, -10),
+        Offset(60, -10),
+        Offset(60, 10),
+        Offset(40, 10),
+      ],
+      createId: () => 'part-' + (index++).toString(),
+    );
+    expect(result.changed, isTrue);
+    expect(result.strokes, hasLength(3));
+    expect(result.strokes.map((part) => part.id).toSet(), hasLength(3));
+    expect(result.strokes.first.points.last.pressure, closeTo(0.44, 0.001));
+    for (final part in result.strokes) {
+      expect(part.tool, DrawingTool.highlighter);
+      expect(part.color, line.color);
+      expect(part.width, line.width);
+      for (final point in part.points) {
+        expect(point.dx <= 40.001 || point.dx >= 59.999, isTrue);
+      }
+    }
+  });
+
+  test('area eraser deletes enclosed ink and preserves untouched ink', () {
+    final dot = _stroke('dot', const [Offset(50, 0)]);
+    final inside = _stroke('inside', const [Offset(45, 0), Offset(55, 0)]);
+    final outside = _stroke('outside', const [Offset(0, 20)]);
+    const area = [
+      Offset(40, -10),
+      Offset(60, -10),
+      Offset(60, 10),
+      Offset(40, 10),
+    ];
+    final noOp = InkEraserEngine.eraseAreaParts(
+      strokes: [outside],
+      polygon: area,
+      createId: () => 'unused',
+    );
+    expect(noOp.changed, isFalse);
+    expect(noOp.strokes.single, same(outside));
+    final erased = InkEraserEngine.eraseAreaParts(
+      strokes: [dot, inside, outside],
+      polygon: area,
+      createId: () => 'unused',
+    );
+    expect(erased.changed, isTrue);
+    expect(erased.strokes, [same(outside)]);
+  });
+
+  test('area eraser fragments survive undo and redo', () {
+    final line = _stroke('line', const [Offset(0, 0), Offset(100, 0)]);
+    final page = NotePage(
+      id: 'page',
+      title: 'Page',
+      textBlocks: const [],
+      imageBlocks: const [],
+      inkStrokes: [line],
+      isBookmarked: false,
+    );
+    var index = 0;
+    final result = InkEraserEngine.eraseAreaParts(
+      strokes: [line],
+      polygon: const [
+        Offset(40, -10),
+        Offset(60, -10),
+        Offset(60, 10),
+        Offset(40, 10),
+      ],
+      createId: () => 'part-' + (index++).toString(),
+    );
+    final action = RemoveInkStrokesAction(
+      before: page.inkStrokes,
+      after: result.strokes,
+    );
+    final erased = action.apply(page);
+    final restored = action.revert(erased);
+    final redone = action.apply(restored);
+    expect(erased.inkStrokes, hasLength(2));
+    expect(restored.inkStrokes.single, same(line));
+    expect(redone.inkStrokes.map((part) => part.id),
+        erased.inkStrokes.map((part) => part.id));
+  });
+
   test('legacy eraser strokes are flattened out of saved ink', () {
     final ink = _stroke('ink', const [
       Offset(0, 0),

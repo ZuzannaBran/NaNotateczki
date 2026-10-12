@@ -1356,12 +1356,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         final polygon = _closedAreaPoints(
           _currentPoints,
         ).map((point) => point.toOffset()).toList();
-        final ids = InkEraserEngine.areaHits(
-          strokes: _resolvedPage(controller).inkStrokes,
-          polygon: polygon,
-        );
-        _eraseStrokeIds.addAll(ids);
-        _commitErasedIds(controller, pageIndex);
+        _commitAreaErase(controller, pageIndex, polygon);
       }
       _resetCurrent();
       return;
@@ -1452,13 +1447,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         final polygon = _closedAreaPoints(
           _currentPoints,
         ).map((point) => point.toOffset()).toList();
-        _eraseStrokeIds.addAll(
-          InkEraserEngine.areaHits(
-            strokes: _resolvedPage(controller).inkStrokes,
-            polygon: polygon,
-          ),
-        );
-        _commitErasedIds(controller, pageIndex);
+        _commitAreaErase(controller, pageIndex, polygon);
       }
       return;
     }
@@ -1845,6 +1834,26 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       controller.eraseInkStrokesById(_eraseStrokeIds);
     }
     _eraseStrokeIds.clear();
+  }
+
+  void _commitAreaErase(
+    EditorController controller,
+    int pageIndex,
+    List<Offset> polygon,
+  ) {
+    final result = InkEraserEngine.eraseAreaParts(
+      strokes: _resolvedPage(controller).inkStrokes,
+      polygon: polygon,
+      createId: controller.createInkStrokeId,
+    );
+    if (!result.changed) {
+      return;
+    }
+    if (widget.pageIndex != null) {
+      controller.replaceInkStrokesOnPage(pageIndex, result.strokes);
+    } else {
+      controller.replaceInkStrokes(result.strokes);
+    }
   }
 
   void _commitBrushErase(EditorController controller, int pageIndex) {
@@ -2808,13 +2817,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
           _closedAreaPoints(_currentPoints),
           pageIndex,
         ).map((point) => point.toOffset()).toList();
-        _eraseStrokeIds.addAll(
-          InkEraserEngine.areaHits(
-            strokes: controller.pageAt(pageIndex).inkStrokes,
-            polygon: polygon,
-          ),
-        );
-        _commitErasedIdsOnPage(controller, pageIndex);
+        _commitAreaEraseOnPage(controller, pageIndex, polygon);
       }
       _resetCurrent();
       return;
@@ -2918,13 +2921,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
           _closedAreaPoints(_currentPoints),
           pageIndex,
         ).map((point) => point.toOffset()).toList();
-        _eraseStrokeIds.addAll(
-          InkEraserEngine.areaHits(
-            strokes: controller.pageAt(pageIndex).inkStrokes,
-            polygon: polygon,
-          ),
-        );
-        _commitErasedIdsOnPage(controller, pageIndex);
+        _commitAreaEraseOnPage(controller, pageIndex, polygon);
       }
       return;
     }
@@ -3375,6 +3372,21 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     }
     controller.eraseInkStrokesByIdOnPage(pageIndex, _eraseStrokeIds);
     _eraseStrokeIds.clear();
+  }
+
+  void _commitAreaEraseOnPage(
+    EditorController controller,
+    int pageIndex,
+    List<Offset> polygon,
+  ) {
+    final result = InkEraserEngine.eraseAreaParts(
+      strokes: controller.pageAt(pageIndex).inkStrokes,
+      polygon: polygon,
+      createId: controller.createInkStrokeId,
+    );
+    if (result.changed) {
+      controller.replaceInkStrokesOnPage(pageIndex, result.strokes);
+    }
   }
 
   void _commitBrushEraseOnPage(EditorController controller, int pageIndex) {

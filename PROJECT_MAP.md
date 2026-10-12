@@ -267,13 +267,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/ink_spatial_index.dart` (125): cache'owany
   indeks siatkowy kandydatów do hit-testu.
   14: `inkSpatialIndexFor`; 24: `InkSpatialIndex`.
-- `lib/features/notebook/domain/ink_eraser_engine.dart` (719):
+- `lib/features/notebook/domain/ink_eraser_engine.dart` (836):
   jedyny silnik modyfikacji gumki dla boarda i notebooka. Obsługuje zwykłą
-  gumkę, erase-stroke, area oraz scratch erase. Legacy maski są tu wyłącznie
+  gumkę, erase-stroke, gumkę zakresową (przycinanie fragmentów) oraz scratch erase. Legacy maski są tu wyłącznie
   jednorazowo normalizowane do zwykłego ink; generator fragmentów unika
   kolizji ID i obsługuje też pojedyncze punkty.
   37: `InkEraserEngine`; 40: `normalizePage`; 45: `normalizeNotebook`;
   117: `scratchInkHitCount`; 139: `eraseScratchParts`;
+  168: `eraseAreaParts` — przycinanie na krawędziach wielokąta;
   194: `flattenLegacyErasers`.
 - `lib/features/notebook/domain/text_block.dart` (45): blok Quill z pozycją,
   stylem, szerokością i rotacją.
@@ -677,7 +678,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   a jego jasność odwracana w dark mode. Nieaktywne teksty używają
   starego Quilla jako fallback.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4189 linii)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4201 linii)
 
 Dwa świadomie osobne canvasy ink, wspólna geometria rozpoznawania gestów,
 lasso, handoff aktywnej kreski i pomiary wydajności. Wszystkie modyfikacje
@@ -837,8 +838,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
-- `test/ink_eraser_engine_test.dart` (244): zwykła gumka, scratch erase,
-  erase-stroke/area hit-test, migracja legacy gumek, pojedyncze punkty,
+- `test/ink_eraser_engine_test.dart` (348): zwykła gumka, scratch erase,
+  erase-stroke/area hit-test, precyzyjne fragmenty zakresu, undo/redo,
+  migracja legacy gumek, pojedyncze punkty,
   kolizje ID i undo
 - `test/ink_render_benchmark_test.dart` (220)
 - `test/selection_outline_test.dart`: przerywane kontury otwarte i zamknięte,
