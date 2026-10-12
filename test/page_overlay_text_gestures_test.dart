@@ -25,7 +25,10 @@ import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
 
+import 'support/native_test_documents.dart';
+
 void main() {
+  useIsolatedNativeTestDocuments();
   test('transform handle hit area scales with frame size', () {
     const style = ObjectTransformHudStyle();
 

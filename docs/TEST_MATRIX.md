@@ -102,6 +102,10 @@ timing, filesystem and GPU behavior from physical hardware.
 ## Still required before declaring release-level cross-platform coverage
 
 **P0 data integrity and power loss**
+- Automated atomic-write interruption coverage: the test harness simulates
+  `.previous`/`.tmp` crash windows, failed filesystem writes, backup worker
+  cancellation and recovery/retry. These are controlled filesystem faults,
+  **not** proof against physical power loss or hardware write-cache failure.
 - Platform-specific filesystem fault injection: full disk, permissions,
   interrupted fsync, locked database, process killed between write/rename.
 - Race tests: concurrent editor saves, undo/save, ink activity while backup
@@ -293,3 +297,87 @@ items, not the cause of either failure in this run.
   the deprecated Node 20 runtime warning on hosted runners.
 - Render and persistence corrections are test-harness changes, not proof of
   production bugs. Recheck their actual results in the next workflow run.
+
+## Release signing and crash-safety follow-up (9 October 2026)
+
+- Android local publishable Release builds now read private
+  `android/key.properties`: `storeFile`, `storePassword`, `keyAlias`,
+  `keyPassword`. `storeFile` is relative to the `android/` directory or
+  absolute; the keystore and properties are gitignored. Invalid or incomplete
+  credentials fail early. Non-CI Release builds without signing credentials
+  are rejected. The only debug-signed Release exceptions are CI jobs or an
+  explicit developer opt-in `NANOTATECZKI_ALLOW_DEBUG_RELEASE_SIGNING=true`;
+  neither is suitable for distribution. The default application id is still
+  `com.example.program` and must be selected before publishing, with a
+  deliberate plan for compatibility with existing installs.
+- iOS Xcode Profile now inherits `Pods-Runner.profile.xcconfig` through
+  `ios/Flutter/Profile.xcconfig` instead of incorrectly using Release pods
+  configuration. App Store signing still needs a developer team,
+  certificates and provisioning profiles; CI simulator builds do not supply
+  real distribution signing.
+- New tests `storage_crash_recovery_test.dart` and
+  `backup_crash_recovery_test.dart` cover recovery from staged atomic file
+  replacements, stale temporary files, filesystem errors and backup retry.
+  Such test-injected failures do not simulate abrupt machine power removal,
+  directory durability (`fsync`) or disk hardware faults. Hardware recovery
+  tests remain release acceptance criteria.
+
+## CI warning and DDS diagnostic follow-up (9 October 2026)
+
+- Selected native Dart test suites use suite-scoped mocked documents paths
+  to isolate `path_provider` logging and preferences. Editor layering checks
+  valid inline image persistence and flushes before closing SQLite.
+- Android integration tests retry only once when the Flutter runner reports
+  `Failed to start Dart Development Service`. A shell regression verifies
+  that unrelated test assertion failures are never retried or accepted and
+  persistent DDS startup failures still fail CI. The underlying Flutter tool
+  issue remains external.
+- Android Gradle Plugin 9 migration requires built-in Kotlin compatibility
+  and a cross-platform check of native plugins. Version changes are deferred
+  until the diagnostic suite is confirmed by actual GitHub Actions results.
+
+## Node 24 artifact upload (9 October 2026)
+
+- CI coverage artifacts use `actions/upload-artifact@v6`, which runs on
+  Node.js 24 and replaces the deprecated Node 20 action. The upload step
+  remains a GitHub Actions runtime check; no local Flutter runtime was used.
+
+## Kotlin 2.3.20 Gradle DSL regression (9 October 2026)
+
+- Kotlin 2.3.20 rejects legacy `android.kotlinOptions.jvmTarget`.
+  `android/app/build.gradle.kts` now applies typed `kotlin.compilerOptions`
+  with `JvmTarget.JVM_17`. The `android_build_toolchain_test.dart` regression
+  verifies both the required Kotlin version and the compiler options DSL.
+  Android Debug, Release and emulator CI builds remain the acceptance tests.
+
+- Added `critical_editor_regressions_test.dart` to the isolated native
+  documents fixture after CI showed `MissingPluginException` in its tests.
+  The existing erase/lasso/save/undo regression scenarios remain unchanged.
+
+## Gradle 9 / AGP 9 compatibility staging (9 October 2026)
+
+- Upgrade Gradle 8.14 to 9.1.0 and Android Gradle Plugin 8.11.1 to 9.0.1,
+  matching the minimums announced by Flutter 3.47.6 and AGP 9.0.
+- Explicitly enable Flutter's temporary backwards-compatible behavior:
+  `android.newDsl=false` and `android.builtInKotlin=false`. Native
+  third-party plugins still using the legacy Kotlin Gradle Plugin require
+  this until they migrate. These flags are transitional, not permanent.
+- Android Debug, Release (including R8/ML Kit), emulator smoke test, and
+  document lifecycle must pass before adopting AGP 9 as the stable baseline.
+  If the migration fails, restore the last green toolchain in a revert commit.
+
+## Gradle 9 / AGP 9 compatibility rollback (9 October 2026)
+
+- CI run 37924767077 demonstrates that Gradle 9.1.0 / AGP 9.0.1 fails
+  on Android Debug and Release at
+  `irondash_engine_context-0.5.5/cargokit/gradle/plugin.gradle:60`:
+  `Could not find method exec()` when CargoKit invokes removed
+  `Project.exec` in Gradle 9. Kotlin built-in compatibility flags cannot
+  address this different Gradle API failure.
+- Toolchain reverted to the previously passing Gradle 8.14 / AGP 8.11.1.
+  Keep Kotlin 2.3.20 and typed JVM 17 compiler options. The Android Gradle
+  deprecation notices remain tracked until upstream provides compatible
+  stable CargoKit / irondash dependencies; do not suppress or fake them.
+- Regression test `android_build_toolchain_test.dart` now guards the
+  compatibility hold. Revisit only after an updated dependency and verify
+  Android Debug, Release, R8 and emulator end-to-end on the new toolchain.

@@ -9,6 +9,8 @@ import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
+import 'support/native_test_documents.dart';
+
 Notebook _notebook() {
   final now = DateTime.utc(2026, 10, 8);
   return Notebook(
@@ -38,6 +40,7 @@ List<InkPoint> _line(double y) => [
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  useIsolatedNativeTestDocuments();
 
   test('erase, lasso move, save and reopen never revive erased ink', () async {
     final db = NotesDatabase(NativeDatabase.memory());

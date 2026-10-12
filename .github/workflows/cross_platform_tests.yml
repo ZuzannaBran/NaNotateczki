@@ -29,10 +29,15 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Inspect formatting
-        run: dart format --output=none lib test integration_test test_driver
+      - name: Inspect formatting and show the exact patch
+        shell: bash
+        run: |
+          dart format lib test integration_test test_driver
+          git diff --exit-code -- lib test integration_test test_driver
       - name: Analyze source and tests
         run: dart analyze
+      - name: Verify DDS startup retry handles only infrastructure failures
+        run: bash .github/scripts/test_flutter_integration_retry.sh
       - name: Execute non-render native test suite
         shell: bash
         run: |
@@ -64,7 +69,7 @@ jobs:
           ' coverage/lcov.info
       - name: Publish coverage artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: flutter-coverage
           path: coverage/lcov.info

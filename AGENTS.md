@@ -43,6 +43,18 @@ mapy o oczywiste helpery ani opis każdej metody.
 
 ## 4. Kod i weryfikacja
 
+### Obowiązkowy test regresyjny przy każdej naprawie błędu
+
+- Każda naprawa błędu **musi** obejmować dodanie nowego testu regresyjnego
+  albo rozszerzenie istniejącego testu tak, aby odtwarzał naprawiany przypadek
+  i wykrywał jego ponowne wystąpienie. Nie kończ naprawy na samej zmianie kodu.
+- O ile to możliwe, potwierdź, że test nie przechodzi przed poprawką,
+  a po poprawce przechodzi. Uruchom również właściwe testy powiązanych
+  funkcji; test dołącz do odpowiedniego zestawu unit/widget/integration/CI.
+- Jeżeli automatyzacja wymaga niedostępnego sprzętu lub systemu, opisz
+  ograniczenie i dodaj powtarzalny scenariusz testu ręcznego do dokumentacji
+  testów. Nie przedstawiaj go jako zaliczonego testu automatycznego.
+
 Szczegóły stylu są w [AI_INSTRUCTIONS.md](AI_INSTRUCTIONS.md). Minimum:
 
 - `dart format`, linie do 80 znaków, standardowe nazewnictwo Darta,

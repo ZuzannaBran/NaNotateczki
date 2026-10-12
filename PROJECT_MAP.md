@@ -735,12 +735,20 @@ wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 
 ## 10. Platformy, web i testy
 
+- `LICENSE.md`: niezmieniony oficjalny tekst PolyForm Noncommercial 1.0.0
+  obejmujący prawa licencjodawcy do oryginalnych elementów projektu.
+- `NOTICE`: wymagana informacja o prawach autorskich właściciela.
+- `docs/LICENSING.md`: zakres licencji, wstępny przegląd licencji
+  zależności Flutter/natywnych i kontrola przed dystrybucją.
+
+
 - `ios/Podfile`: zależności CocoaPods dla pluginów bez obsługi SwiftPM;
   deklaracja iOS 15 i targetów Runner/RunnerTests. W CI iOS wyłącza SwiftPM,
   wykonuje `pod install` i sprawdza obecność Pods w `Runner.xcworkspace`;
   wymaga potwierdzenia w buildzie symulatora.
-- `ios/Flutter/Debug.xcconfig`, `Release.xcconfig`: dziedziczą config
-  Pods-Runner, aby linker znajdował framework CocoaPods podczas buildów.
+- `ios/Flutter/Debug.xcconfig`, `Release.xcconfig`, `Profile.xcconfig`:
+  każdy tryb Xcode dziedziczy odpowiadający mu config Pods-Runner;
+  profil nie dziedziczy już przypadkowo ustawień Release.
 
 - `windows/CMakeLists.txt`: zgodność generatora pdfx/pdfium z CMake 4; przed
   włączeniem pluginów ustawia `CMAKE_POLICY_VERSION_MINIMUM=3.5` dla
@@ -763,9 +771,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/local_backup_service_test.dart` (1337)
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
-- `test/editor_controller_layering_test.dart` (77): aktywne obrazy są
+- `test/editor_controller_layering_test.dart`: aktywne obrazy są
   dezaktywowane po wyborze narzędzia ink lub tekstu, a nowy tekst startuje
-  zaznaczony w trybie edit.
+  zaznaczony w trybie edit; obraz ma dane inline, a przed zamknięciem
+  testowej bazy następuje rzeczywisty zapis.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_controller_test.dart` (33)
@@ -835,6 +844,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   i stylus oraz anulowanie gestu.
 - `test/critical_editor_regressions_test.dart`: erase → lasso → save →
   reload, sekwencje undo/redo gumki i zamrożenie viewportu.
+  Testy używają izolowanego natywnego katalogu dla preferencji i logów błędów,
+  aby regresje nie generowały `MissingPluginException`.
 - `test/cloud_sync_service_test.dart`: dodatkowe konflikty czasów i ID.
 - `test/cross_platform/eraser_stress_test.dart`: deterministyczne sekwencje
   gumki z kontrolą unikalności i niepowracania raz usuniętych ID.
@@ -845,6 +856,22 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `integration_test/document_lifecycle_test.dart`: create/rename/read/delete
   w rzeczywistej bazie danej platformy; działa wyłącznie z flagą
   `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.
+- `test/support/native_test_documents.dart`: katalog testowy i natywny
+  adapter PathProvider zapobiegają błędom pluginu przy logowaniu i preferencjach
+  w testach; nie przekierowują danych użytkownika.
+- `.github/scripts/flutter_integration_retry.sh` i
+  `.github/scripts/test_flutter_integration_retry.sh`: ponowny start testu
+  Android wyłącznie po błędzie inicjalizacji DDS; osobny test regresji
+  pilnuje, żeby asercje i powtarzające się awarie pozostały blokujące.
+- `test/android_build_toolchain_test.dart`: test regresyjny progu wersji
+  pluginu Kotlin Android >= 2.3.20 i użycia `compilerOptions` / JVM 17
+  zamiast wycofanego `kotlinOptions.jvmTarget`.
+- `test/production/storage_crash_recovery_test.dart`: atomiczne pliki
+  ustawień: częściowe zapisy `.tmp`, odzyskiwanie `.previous`, błąd I/O
+  i ponowny zapis oraz równoległe write'y jednego klucza.
+- `test/production/backup_crash_recovery_test.dart`: symulacje awarii
+  między rename manifestu, błędu dostępu do katalogu stron i przerwania
+  backupu z zachowaniem starego kompletnego snapshotu.
 - `test/production/persistence_roundtrip_test.dart` (300): rich text z Delta,
   crop i bytes obrazów, dwie strony, dirty-page, równoległe zapisy, backup
   i przywrócenie do nowego SQLite; każdy test ma własny katalog dokumentów
@@ -857,7 +884,13 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   Renderer działa w `tester.runAsync`, poza `FakeAsync` testu widgetowego.
   Regresje obejmują 12 stron, eksport boarda i piksele tej samej zapisanej
   notatki w trybie jasnym i ciemnym, łącznie z oboma wariantami PDF.
+- Android toolchain: sprawdzony Gradle 8.14 + AGP 8.11.1 z Kotlin
+  2.3.20; Gradle 9 blokuje zależność `irondash_engine_context 0.5.5`,
+  której skrypt CargoKit korzysta z usuniętego `Project.exec`.
+  `test/android_build_toolchain_test.dart` zabezpiecza ten stan.
 - `android/app/build.gradle.kts` i `android/app/proguard-rules.pro`:
+  Release wymaga prywatnego `android/key.properties` poza CI i jawnym trybem
+  debug-signing; konfiguracja odrzuca niepełne klucze i brak keystore.
   Release uruchamia R8 z wyjątkami wyłącznie dla opcjonalnych modułów
   ML Kit (Chinese/Devanagari/Japanese/Korean). OCR używa tylko
   `TextRecognitionScript.latin`; nie dodawaj nieużywanych modeli
