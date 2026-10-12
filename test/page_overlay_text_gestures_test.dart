@@ -158,6 +158,123 @@ void main() {
     await database.close();
   });
 
+  testWidgets('text color picker updates the chosen block after focus loss', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
+    final notebook = _notebook();
+    const initialColor = Color(0xFF1E1E1E);
+    const selectedColor = Color(0xFFB02857);
+    final block = TextBlock(
+      id: 'colored-text',
+      text: 'Selected text',
+      position: const Offset(40, 150),
+      width: 260,
+      fontSize: 22,
+      color: initialColor,
+    );
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: notebook.copyWith(
+        pages: [
+          notebook.pages.single.copyWith(textBlocks: [block]),
+        ],
+      ),
+    );
+    controller.setTool(DrawingTool.text);
+    controller.setActiveTextBlock(block.id, null);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
+          ],
+          child: Scaffold(
+            body: Stack(
+              children: [
+                Positioned.fill(
+                  child: Consumer<EditorController>(
+                    builder: (context, value, _) => PageOverlay(
+                      controller: value,
+                      renderBackground: false,
+                    ),
+                  ),
+                ),
+                Consumer<EditorController>(
+                  builder: (context, value, _) {
+                    final selectedId = value.activeTextBlockId;
+                    if (selectedId == null) {
+                      return const SizedBox.shrink();
+                    }
+                    final selected = value.findTextBlockById(selectedId);
+                    if (selected == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return TextEditToolbar(
+                      editorController: value,
+                      block: selected,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(TextHudBlock), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText).first).style.color,
+      initialColor,
+    );
+
+    await tester.tap(find.byTooltip('Text color'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, '#B02857');
+    await tester.pump();
+
+    // A picker must target the block that opened it, even if focus changes.
+    controller.clearActiveTextBlock();
+    await tester.pump();
+    expect(controller.activeTextBlockId, isNull);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    final updated = controller.findTextBlockById(block.id)!;
+    expect(updated.color, selectedColor);
+    expect(updated.deltaJson!.toLowerCase(), contains('#b02857'));
+
+    controller.setActiveTextBlock(block.id, null);
+    await tester.pump();
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText).first).style.color,
+      selectedColor,
+    );
+
+    controller.undo();
+    await tester.pump();
+    expect(controller.findTextBlockById(block.id)!.color, initialColor);
+    controller.redo();
+    await tester.pump();
+    expect(controller.findTextBlockById(block.id)!.color, selectedColor);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    preferences.dispose();
+    await database.close();
+  });
+
   testWidgets('inserted text starts selected in edit mode and reopens', (
     tester,
   ) async {

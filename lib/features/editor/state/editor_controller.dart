@@ -1408,6 +1408,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void updateActiveTextStyle({
+    String? targetBlockId,
     String? fontFamily,
     bool clearFontFamily = false,
     double? fontSize,
@@ -1419,7 +1420,7 @@ class EditorController extends ChangeNotifier {
     String? alignment,
     bool clearDecorations = false,
   }) {
-    final blockId = activeTextBlockId;
+    final blockId = targetBlockId ?? activeTextBlockId;
     if (blockId == null) {
       return;
     }

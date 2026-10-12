@@ -509,7 +509,8 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
   591: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
 - 1249: `undo`; 1262: `redo`; 1334: `toggleBookmark`;
   1340: operacje tekstowe; 1410: `updateActiveTextStyle` — blokowe
-  formatowanie aktywnego tekstu, zapisywane jako `UpdateTextAction`.
+  formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
+  zapisywane jako `UpdateTextAction`.
 - 2684: `_applyAction`; 2693: `_applyInkAction`;
   2795: `_scheduleSave`; 2816: `_saveDirtyPages`; 2838: `_save`.
 
@@ -629,9 +630,10 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   po zakończeniu animacji zamykania dialogu, także przy zagnieżdżonej edycji.
   10: `EditorToolbar`; 198: dialog tła; 337: selektor gumki;
   405: selektor kształtu; 573: `pickColor`; 824: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (583):
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (345):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
-  `EditableText`. Obsługuje realne formatowanie całego bloku: bold, italic,
+  `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
+  ID bloku przez czas jego otwarcia, nawet przy utracie aktywnego zaznaczenia. Obsługuje realne formatowanie całego bloku: bold, italic,
   underline, strike, font, rozmiar, kolor, wyrównanie, reset stylu i usunięcie.
   Listy oraz formatowanie tylko zaznaczonego fragmentu są celowo pominięte,
   ponieważ obecny `EditableText` nie renderuje ich jako rich-text.
@@ -856,13 +858,14 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
   minimapa na krótkim ekranie, regulacja scrolla stron i interaktywność
   narzędzi
-- `test/page_overlay_text_gestures_test.dart` (562): blokowy toolbar
+- `test/page_overlay_text_gestures_test.dart` (679): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian;
-  w trybach ink kliknięcia przechodzą przez tekst i obrazy/PDF
+  w trybach ink kliknięcia przechodzą przez tekst i obrazy/PDF;
+  regresja selektora koloru tekstu po utracie zaznaczenia oraz undo/redo
 - `test/board_scene_bounds_test.dart` (178): stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
   zachowanie viewportu po schowaniu narzędzi, kolor nagłówka i porównanie
