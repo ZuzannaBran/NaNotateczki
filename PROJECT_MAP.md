@@ -348,7 +348,10 @@ niezapisanych zmian przed ponownym wczytaniem miniatur. Lista folderów
 i plików wykorzystuje ustawioną czułość dotyku. Folder i aktywny dokument
 mają miękkie, zaokrąglone zaznaczenie; sidebar używa kompaktowej typografii
 Georgia i jasnej neutralnej powierzchni panelu. Panel można zwijać i zmieniać
-jego szerokość.
+jego szerokość. Nagłówek `Projects` ma 56 px, tak jak górne paski
+katalogu, notebooka i boarda; jeden separator w nadrzędnym `Stack`
+biegnie przez całą szerokość na wysokości 56 px także po zwinięciu panelu.
+Lokalny panel rezerwuje pod separatorem 1 px bez rysowania drugiej linii.
 
 U dołu panelu jest `StudyTimerCard`, wyrównany do dolnej krawędzi
 i przewijany przy większej zawartości. Po zwinięciu panelu
@@ -842,7 +845,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   po zmianie motywu, kontrast planera/timera, pozycja menu względem
   prawej granicy sidebaru przy resize w obu motywach, maskowanie
   cienia na styku oraz wspólna czułość nowych scrollerów.
-- `test/library_screen_responsive_layout_test.dart` (675):
+- `test/library_screen_responsive_layout_test.dart`:
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
@@ -855,6 +858,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
   stykanie menu z prawą granicą całego sidebaru (w tym resize handle),
   prosty lewy brzeg, brak cienia i podziałki w miejscu styku,
+  ciągła linia pod nagłówkiem w katalogu, folderze, notebooku i boardzie,
+  również po ukryciu panelu,
   kolor tła zgodny z głównym toolbarem (także gdy kolory
   `surfaceContainerLow` i `surfaceContainerLowest` są różne)
   oraz cień wyłącznie po zewnętrznych stronach menu.

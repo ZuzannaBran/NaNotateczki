@@ -90,6 +90,94 @@ void main() {
     await database.close();
   });
 
+
+  testWidgets('header separator stays aligned across every workspace', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook(
+      title: 'Header notebook',
+      folder: 'Header folder',
+    );
+    final board = await repository.createBoard(
+      title: 'Header board',
+      folder: 'Header folder',
+    );
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    final preferences = AppPreferencesController();
+    await controller.loadItems();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<LibraryController>.value(value: controller),
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            Provider<NotebookRepository>.value(value: repository),
+          ],
+          child: const LibraryScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final divider = find.byKey(const ValueKey('workspace-header-divider'));
+
+    void expectAligned() {
+      expect(divider, findsOneWidget);
+      final appBar = tester.getRect(find.byType(AppBar));
+      final separator = tester.getRect(divider);
+      expect(appBar.height, kToolbarHeight);
+      expect(separator, Rect.fromLTWH(0, appBar.bottom, 1200, 1));
+
+      final scheme = Theme.of(tester.element(divider)).colorScheme;
+      final expectedColor = Color.alphaBlend(
+        scheme.outlineVariant.withValues(alpha: 0.45),
+        scheme.surfaceContainerLowest,
+      );
+      expect(tester.widget<ColoredBox>(divider).color, expectedColor);
+    }
+
+    expectAligned();
+
+    await tester.tap(find.text('Header folder').first);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('catalog-title'))).data,
+      'Header folder',
+    );
+    expectAligned();
+
+    await tester.tap(find.byKey(ValueKey('library-tree-item:${notebook.uid}')));
+    await tester.pumpAndSettle();
+    expect(find.text('Header notebook'), findsWidgets);
+    expectAligned();
+
+    await tester.tap(find.byKey(ValueKey('library-tree-item:${board.uid}')));
+    await tester.pumpAndSettle();
+    expect(find.text('Header board'), findsWidgets);
+    expectAligned();
+
+    await tester.tap(find.byTooltip('Hide projects'));
+    await tester.pump();
+    expectAligned();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    preferences.dispose();
+    controller.dispose();
+    await database.close();
+  });
+
   testWidgets('library tree expands and collapses each folder', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -515,7 +603,7 @@ void main() {
       tester.getTopLeft(navigationToggle).dx,
       tester.getTopLeft(toolbarToggle).dx,
     );
-    expect(tester.getCenter(navigationToggle).dy, closeTo(29, 0.01));
+    expect(tester.getCenter(navigationToggle).dy, closeTo(28, 0.01));
     expect(tester.getCenter(toolbarToggle).dy, closeTo(92, 0.01));
     expect(
       find.descendant(
@@ -533,7 +621,7 @@ void main() {
     expect(tester.getTopLeft(toolbarToggle).dx, 0);
     expect(tester.getSize(navigationToggle).width, 24);
     expect(tester.getSize(toolbarToggle).width, 24);
-    expect(tester.getCenter(navigationToggle).dy, closeTo(29, 0.01));
+    expect(tester.getCenter(navigationToggle).dy, closeTo(28, 0.01));
     expect(tester.getCenter(toolbarToggle).dy, closeTo(92, 0.01));
     expect(
       find.descendant(

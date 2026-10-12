@@ -39,7 +39,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   static const double _navigationPaneMinWidth = 240;
   static const double _navigationPaneMaxWidth = 420;
   static const double _resizeHandleWidth = 12;
-  static const double _navigationHeaderHeight = 58;
+  static const double _navigationHeaderHeight = kToolbarHeight;
   static const double _editorToolbarAreaHeight = 72;
   static const double _toggleTabHeight = 44;
 
@@ -127,6 +127,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<LibraryController>();
     final selectedItem = controller.selectedItem();
+    final colorScheme = Theme.of(context).colorScheme;
+    final headerDividerColor = Color.alphaBlend(
+      colorScheme.outlineVariant.withValues(alpha: 0.45),
+      colorScheme.surfaceContainerLowest,
+    );
     _maybeShowCorruptRecoveryDialog(controller);
 
     return Scaffold(
@@ -323,6 +328,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         ],
                       ),
                       Positioned(
+                        left: 0,
+                        right: 0,
+                        top: _navigationHeaderHeight,
+                        child: SizedBox(
+                          height: 1,
+                          child: ColoredBox(
+                            key: const ValueKey('workspace-header-divider'),
+                            color: headerDividerColor,
+                          ),
+                        ),
+                      ),
+                      Positioned(
                         left: math.max(0.0, leftZoneWidth - 1),
                         top: (_navigationHeaderHeight - _toggleTabHeight) / 2,
                         child: ValueListenableBuilder<bool>(
@@ -337,7 +354,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       Positioned(
                         left: math.max(0.0, leftZoneWidth - 1),
                         top:
-                            kToolbarHeight +
+                            _navigationHeaderHeight +
                             (_editorToolbarAreaHeight - _toggleTabHeight) / 2,
                         child: ValueListenableBuilder<bool>(
                           valueListenable: _sidebarMenuOpen,
@@ -897,11 +914,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
               ),
             ),
           ),
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: colorScheme.outlineVariant.withValues(alpha: 0.45),
-          ),
+          const SizedBox(height: 1),
           Expanded(
             child: controller.isLoading
                 ? const Center(child: CircularProgressIndicator())
