@@ -31,6 +31,7 @@ class AppPreferencesController extends ChangeNotifier {
   AppAccentColor accentColor = AppAccentColor.softBubblegum;
   bool darkMode = false;
   double touchNavigationSensitivity = 1.0;
+  double uiScale = 1.0;
 
   bool get shouldRequestSoftKeyboard {
     return deviceInputMode == DeviceInputMode.tablet;
@@ -73,6 +74,18 @@ class AppPreferencesController extends ChangeNotifier {
         final normalized = savedSensitivity.toDouble();
         if (normalized != touchNavigationSensitivity) {
           touchNavigationSensitivity = normalized;
+          changed = true;
+        }
+      }
+
+      final savedUiScale = decoded['uiScale'];
+      if (savedUiScale is num &&
+          savedUiScale.isFinite &&
+          savedUiScale >= 0.75 &&
+          savedUiScale <= 1.5) {
+        final normalized = savedUiScale.toDouble();
+        if (normalized != uiScale) {
+          uiScale = normalized;
           changed = true;
         }
       }
@@ -146,6 +159,26 @@ class AppPreferencesController extends ChangeNotifier {
     await _save();
   }
 
+  void previewUiScale(double value) {
+    if (!value.isFinite) {
+      return;
+    }
+    final normalized = value.clamp(0.75, 1.5).toDouble();
+    if (uiScale == normalized) {
+      return;
+    }
+    uiScale = normalized;
+    notifyListeners();
+  }
+
+  Future<void> setUiScale(double value) async {
+    if (!value.isFinite) {
+      return;
+    }
+    previewUiScale(value);
+    await _save();
+  }
+
   Future<void> setAccentColor(AppAccentColor color) async {
     if (accentColor == color) {
       return;
@@ -164,6 +197,7 @@ class AppPreferencesController extends ChangeNotifier {
           'accentColor': accentColor.name,
           'darkMode': darkMode,
           'touchNavigationSensitivity': touchNavigationSensitivity,
+          'uiScale': uiScale,
         }),
       );
     } catch (e) {
