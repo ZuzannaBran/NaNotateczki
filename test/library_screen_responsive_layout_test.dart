@@ -146,6 +146,9 @@ void main() {
         ],
         child: MaterialApp(
           theme: ThemeData.light().copyWith(
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFFE4E2DD),
+            ),
             colorScheme: ThemeData.light().colorScheme.copyWith(
               surfaceContainerLow: const Color(0xFFC4D6E8),
               surfaceContainerLowest: const Color(0xFFE9E2DD),
@@ -170,8 +173,15 @@ void main() {
     final colors = Theme.of(
       tester.element(find.text('Projects')),
     ).colorScheme;
-    final toolbarColor = colors.surfaceContainerLow;
+    final toolbarColor = Theme.of(
+      tester.element(find.text('Projects')),
+    ).appBarTheme.backgroundColor!;
+    expect(toolbarColor, isNot(colors.surfaceContainerLow));
     expect(toolbarColor, isNot(colors.surfaceContainerLowest));
+    final toggles = [
+      find.byKey(const ValueKey('library-navigation-toggle')),
+      find.byKey(const ValueKey('editor-toolbar-toggle')),
+    ];
     final cases = [
       (find.byTooltip('Folder actions'), 'Rename folder', true),
       (
@@ -197,6 +207,11 @@ void main() {
       final actionTop = tester.getTopLeft(actions).dy;
       await tester.tap(actions);
       await tester.pumpAndSettle();
+      for (final toggle in toggles) {
+        final material = tester.widget<Material>(toggle);
+        expect(material.elevation, 0);
+        expect(material.shadowColor, Colors.transparent);
+      }
 
       final menuEntries = find.byWidgetPredicate(
         (widget) => widget is PopupMenuItem && widget.height == 36,
@@ -272,6 +287,9 @@ void main() {
       expect(find.text(dialogTitle), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
+      for (final toggle in toggles) {
+        expect(tester.widget<Material>(toggle).elevation, 8);
+      }
     }
 
     final addButton = find.byTooltip('Create');
@@ -279,6 +297,11 @@ void main() {
     final addButtonTop = tester.getTopLeft(addButton).dy;
     await tester.tap(addButton);
     await tester.pumpAndSettle();
+    for (final toggle in toggles) {
+      final material = tester.widget<Material>(toggle);
+      expect(material.elevation, 0);
+      expect(material.shadowColor, Colors.transparent);
+    }
 
     final createEntries = find.byWidgetPredicate(
       (widget) => widget is PopupMenuItem && widget.height == 36,
@@ -355,6 +378,9 @@ void main() {
     );
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
+    for (final toggle in toggles) {
+      expect(tester.widget<Material>(toggle).elevation, 8);
+    }
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
