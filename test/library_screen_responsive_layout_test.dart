@@ -144,7 +144,15 @@ void main() {
           ChangeNotifierProvider<LibraryController>.value(value: controller),
           Provider<NotebookRepository>.value(value: repository),
         ],
-        child: const MaterialApp(home: LibraryScreen()),
+        child: MaterialApp(
+          theme: ThemeData.light().copyWith(
+            colorScheme: ThemeData.light().colorScheme.copyWith(
+              surfaceContainerLow: const Color(0xFFC4D6E8),
+              surfaceContainerLowest: const Color(0xFFE9E2DD),
+            ),
+          ),
+          home: const LibraryScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -159,9 +167,11 @@ void main() {
             .getTopLeft(find.byKey(const ValueKey('library-navigation-toggle')))
             .dx +
         1;
-    final sidebarColor = Theme.of(
+    final colors = Theme.of(
       tester.element(find.text('Projects')),
-    ).colorScheme.surfaceContainerLowest;
+    ).colorScheme;
+    final toolbarColor = colors.surfaceContainerLow;
+    expect(toolbarColor, isNot(colors.surfaceContainerLowest));
     final cases = [
       (find.byTooltip('Folder actions'), 'Rename folder', true),
       (
@@ -212,7 +222,7 @@ void main() {
       expect(
         menuMaterials.any(
           (material) =>
-              material.color == sidebarColor &&
+              material.color == toolbarColor &&
               material.elevation == 0 &&
               material.shadowColor == Colors.transparent &&
               material.shape is RoundedRectangleBorder &&
@@ -229,7 +239,7 @@ void main() {
 
       final menuSurface = menuMaterials.firstWhere(
         (material) =>
-            material.color == sidebarColor &&
+            material.color == toolbarColor &&
             material.shape is RoundedRectangleBorder,
       );
       expect(
@@ -299,7 +309,7 @@ void main() {
     expect(
       createMaterials.any(
         (material) =>
-            material.color == sidebarColor &&
+            material.color == toolbarColor &&
             material.elevation == 0 &&
             material.shadowColor == Colors.transparent &&
             material.shape is RoundedRectangleBorder &&
@@ -316,7 +326,7 @@ void main() {
 
     final createSurface = createMaterials.firstWhere(
       (material) =>
-          material.color == sidebarColor &&
+          material.color == toolbarColor &&
           material.shape is RoundedRectangleBorder,
     );
     expect(

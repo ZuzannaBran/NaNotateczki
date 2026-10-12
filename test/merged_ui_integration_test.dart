@@ -260,7 +260,7 @@ void main() {
                 ),
               )
               .firstWhere((widget) => widget.shape is RoundedRectangleBorder);
-          expect(material.color, theme.colorScheme.surfaceContainerLowest);
+          expect(material.color, theme.colorScheme.surfaceContainerLow);
           expect(material.elevation, 0);
           expect(material.shadowColor, Colors.transparent);
           expect(

@@ -1300,7 +1300,7 @@ Future<T?> _showSidebarMenu<T>({
   );
   final bottomLimit = math.max(8.0, overlayBox.size.height - menuHeight - 8);
   final top = anchorTop.clamp(8.0, bottomLimit).toDouble();
-  final surfaceColor = Theme.of(context).colorScheme.surfaceContainerLowest;
+  final surfaceColor = Theme.of(context).colorScheme.surfaceContainerLow;
   final shadowEntry = OverlayEntry(
     builder: (_) => Positioned(
       left: left - _sidebarMenuSeamWidth,

@@ -365,8 +365,10 @@ przy przełączaniu dokumentów.
 Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
 dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej krawędzi
 całego sidebaru (włącznie z 12 px uchwytem resize), jego koloru i animacji
-180 ms. Lewe narożniki mają jawny promień zero, a wyłącznie prawe
-promień 12 px. Menu styka się z panelem bez szczeliny: obie strony
+180 ms. Kolor menu i łącznika maskującego cień odpowiada dokładnie tłu
+głównego paska narzędzi (`surfaceContainerLow`). Lewe narożniki mają jawny
+promień zero, a wyłącznie prawe promień 12 px. Menu styka się z panelem
+bez szczeliny: obie strony
 styku są bez cienia i bez 1 px kreski uchwytu resize. Menu ma elevation 0,
 a osobny dekoracyjny cień o alpha 0x44 jest przycięty do prawej strony;
 2 px łącznik koloru panelu maskuje linię graniczną. Menu folderu zawiera także
@@ -847,7 +849,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
   stykanie menu z prawą granicą całego sidebaru (w tym resize handle),
-  prosty lewy brzeg, brak cienia i podziałki w miejscu styku
+  prosty lewy brzeg, brak cienia i podziałki w miejscu styku,
+  kolor tła zgodny z głównym toolbarem (także gdy kolory
+  `surfaceContainerLow` i `surfaceContainerLowest` są różne)
   oraz cień wyłącznie po zewnętrznych stronach menu.
 - `test/touch_navigation_sensitivity_test.dart` (80):
   granice czułości i porównanie dystansów scrolla przy gestach palcem.
