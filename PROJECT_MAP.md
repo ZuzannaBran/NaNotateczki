@@ -338,7 +338,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 504: `selectFolder`; 615: `_loadFolders`; 654: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1569 linii)
+### `lib/features/library/presentation/library_screen.dart` (1564 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -365,13 +365,14 @@ przy przełączaniu dokumentów.
 Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
 dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej krawędzi
 całego sidebaru (włącznie z 12 px uchwytem resize), jego koloru i animacji
-180 ms. Kolor menu i łącznika maskującego cień pobierany jest z
-`appBarTheme.backgroundColor` (awaryjnie `surfaceContainerLow`), tak jak
-główny pasek narzędzi. Lewe narożniki mają jawny
+180 ms. Kolor menu i łącznika maskującego cień pobierany jest bezpośrednio z
+`surfaceContainerLowest`, czyli dokładnie z tego samego źródła co panel
+folderów. Lewe narożniki mają jawny
 promień zero, a wyłącznie prawe promień 12 px. Menu styka się z panelem
 bez szczeliny: obie strony
 styku są bez cienia i bez 1 px kreski uchwytu resize. Menu ma elevation 0,
-a osobny dekoracyjny cień o alpha 0x44 jest przycięty do prawej strony;
+a osobny dekoracyjny cień o alpha 0x44 jest przycięty do prawej strony
+i do obszaru poza obrysem menu (nie przyciemnia jego wypełnienia);
 na czas otwarcia dowolnego menu cienie obu strzałek sidebaru są wyłączone
 i przywracane natychmiast po zamknięciu;
 2 px łącznik koloru panelu maskuje linię graniczną. Menu folderu zawiera także
