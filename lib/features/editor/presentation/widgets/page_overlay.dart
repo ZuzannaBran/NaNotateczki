@@ -63,7 +63,8 @@ class PageOverlay extends StatelessWidget {
         ? controller.lassoSelection
         : null;
     return IgnorePointer(
-      ignoring: !interactionEnabled,
+      ignoring: !interactionEnabled ||
+          (tool.isInk && tool != DrawingTool.lasso),
       child: Stack(
         children: [
           if (renderBackground)
