@@ -1247,17 +1247,20 @@ class _SidebarMenuShadowPainter extends CustomPainter {
       size.width - _sidebarMenuSeamWidth,
       size.height,
     );
-    canvas.save();
-    canvas.clipRect(
-      Rect.fromLTRB(
-        menuRect.left,
-        -20,
-        size.width + 20,
-        size.height + 20,
-      ),
-    );
     final menuPath = _sidebarMenuShape.getOuterPath(menuRect);
-    canvas.clipPath(menuPath, clipOp: ClipOp.difference, doAntiAlias: false);
+    final exteriorPath = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(
+        Rect.fromLTRB(
+          menuRect.left,
+          -20,
+          size.width + 20,
+          size.height + 20,
+        ),
+      )
+      ..addPath(menuPath, Offset.zero);
+    canvas.save();
+    canvas.clipPath(exteriorPath, doAntiAlias: false);
     canvas.drawShadow(menuPath, const Color(0x44000000), 4, false);
     canvas.restore();
     canvas.drawRect(
