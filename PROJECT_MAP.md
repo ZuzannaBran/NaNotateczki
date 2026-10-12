@@ -149,6 +149,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 
 ### Widgety
 
+- `lib/core/widgets/app_header_divider.dart`: wspólny 1 px separator nagłówka
+  w ekranie głównym, planerze i ustawieniach; kolor spójny z paletą sidebaru.
+  4: `AppHeaderDivider`; 7: `colorOf`.
 - `lib/core/widgets/empty_state.dart` (30): wspólny pusty stan.
   3: `EmptyState`.
 - `lib/core/widgets/resizable_frame.dart` (200): ramka z ośmioma uchwytami
@@ -461,7 +464,8 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   tworzenie, edycja, usuwanie i historia. Nazwa dnia tygodnia znajduje się
   w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
   Dostęp do globalnych ustawień i wspólnej czułości scrolla kalendarza
-  oraz historii. 13: `CalendarMode`; 15: `PlannerScreen`;
+  oraz historii. Górny pasek ma 56 px i wspólną 1 px linię pod spodem,
+  także w trybie ciemnym. 13: `CalendarMode`; 15: `PlannerScreen`;
   22: `_PlannerScreenState`.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
@@ -606,6 +610,7 @@ ma suwak czułości nawigacji 0.5×–2.0×. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
 `EditorController` jest opcjonalny: ustawienia globalne działają z pustego
 katalogu i planera; tła i ustawienia rysika wymagają otwartego dokumentu.
+Nagłówek ma wysokość 56 px, tytuł 18 px i wspólny separator 1 px jak planer.
 
 - 16:
   `EditorSettingsScreen`;
@@ -841,6 +846,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   edycja okładki z pełnym selektorem kolorów, bezpieczne zamknięcie
   zagnieżdżonego pickera oraz powrót z edytora.
 - `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
+  wysokość i 1 px separator nagłówka planera i ustawień w obu motywach,
   ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
   po zmianie motywu, kontrast planera/timera, pozycja menu względem
   prawej granicy sidebaru przy resize w obu motywach, maskowanie

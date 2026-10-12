@@ -7,6 +7,7 @@ import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/input/soft_keyboard.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/storage/app_save_coordinator.dart';
+import '../../../core/widgets/app_header_divider.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
@@ -127,11 +128,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<LibraryController>();
     final selectedItem = controller.selectedItem();
-    final colorScheme = Theme.of(context).colorScheme;
-    final headerDividerColor = Color.alphaBlend(
-      colorScheme.outlineVariant.withValues(alpha: 0.45),
-      colorScheme.surfaceContainerLowest,
-    );
+    final headerDividerColor = AppHeaderDivider.colorOf(context);
     _maybeShowCorruptRecoveryDialog(controller);
 
     return Scaffold(

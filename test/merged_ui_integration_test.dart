@@ -13,6 +13,7 @@ import 'package:program/core/input/touch_navigation_scroll_physics.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
+import 'package:program/core/widgets/app_header_divider.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
@@ -47,6 +48,64 @@ void main() {
       await loader.load();
     }
   });
+
+  for (final darkMode in [false, true]) {
+    testWidgets('planner and settings headers align in dark=$darkMode', (
+      tester,
+    ) async {
+      final app = await _pumpApp(tester, darkMode: darkMode);
+      final libraryDivider = find.byKey(
+        const ValueKey('workspace-header-divider'),
+      );
+      expect(
+        tester.getRect(libraryDivider),
+        const Rect.fromLTWH(0, kToolbarHeight, 1400, 1),
+      );
+      final libraryColor = tester.widget<ColoredBox>(libraryDivider).color;
+
+      void expectAlignedHeader(String title) {
+        final appBar = find.byType(AppBar);
+        final divider = find.byKey(const ValueKey('app-header-divider'));
+        expect(appBar, findsOneWidget);
+        expect(divider, findsOneWidget);
+        expect(
+          tester.getRect(appBar),
+          const Rect.fromLTWH(
+            0,
+            0,
+            1400,
+            kToolbarHeight + AppHeaderDivider.thickness,
+          ),
+        );
+        expect(
+          tester.getRect(divider),
+          const Rect.fromLTWH(0, kToolbarHeight, 1400, 1),
+        );
+        expect(tester.widget<ColoredBox>(divider).color, libraryColor);
+        expect(tester.widget<Text>(find.text(title)).style?.fontSize, 18);
+      }
+
+      await tester.tap(find.byTooltip('Open planner'));
+      await tester.pumpAndSettle();
+      expectAlignedHeader('Study planner');
+
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+      expectAlignedHeader('Settings');
+
+      await tester.tap(find.text('Visual'));
+      await tester.pumpAndSettle();
+      expectAlignedHeader('Settings');
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expectAlignedHeader('Study planner');
+      await tester.tap(find.byTooltip('Back to notes'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await app.close(tester);
+    });
+  }
 
   testWidgets('empty catalog and planner share live appearance settings', (
     tester,

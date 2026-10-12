@@ -7,6 +7,7 @@ import '../../../core/diagnostics/optimization_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_header_divider.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../state/editor_controller.dart';
 import '../state/input_mode.dart';
@@ -24,7 +25,14 @@ class EditorSettingsScreen extends StatelessWidget {
         .toStringAsFixed(1);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        toolbarHeight: kToolbarHeight,
+        titleSpacing: MediaQuery.sizeOf(context).width >= 600 ? 44 : null,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('Settings', style: TextStyle(fontSize: 18)),
+        bottom: const AppHeaderDivider(),
+      ),
       body: DefaultTabController(
         length: 3,
         child: Column(

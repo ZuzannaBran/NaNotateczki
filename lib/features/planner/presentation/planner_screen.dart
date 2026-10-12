@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
+import '../../../core/widgets/app_header_divider.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
 import '../state/study_planner_controller.dart';
 import 'study_action_theme.dart';
@@ -548,7 +549,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
     return StudyActionTheme(
       child: Scaffold(
         appBar: AppBar(
+          toolbarHeight: kToolbarHeight,
           titleSpacing: MediaQuery.sizeOf(context).width >= 600 ? 44 : null,
+          bottom: const AppHeaderDivider(),
           scrolledUnderElevation: 0,
           surfaceTintColor: Colors.transparent,
           title: const Text('Study planner', style: TextStyle(fontSize: 18)),
