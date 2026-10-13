@@ -485,6 +485,37 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> moveItemToFolder(String uid, String folder) async {
+    final targetFolder = folder.trim();
+    final original = _itemById(uid);
+    if (original == null ||
+        original.folder == targetFolder ||
+        !folderNames.contains(targetFolder)) {
+      return false;
+    }
+
+    final updated = await repository.updateNotebookMetadata(
+      uid,
+      folder: targetFolder,
+    );
+    if (updated == null) {
+      return false;
+    }
+
+    items = [
+      for (final item in items)
+        if (item.uid == uid) updated else item,
+    ];
+    if (selectedItemId == uid) {
+      selectedFolder = targetFolder;
+    }
+    if (_activeNotebook?.uid == uid) {
+      _activeNotebook = updated;
+    }
+    notifyListeners();
+    return true;
+  }
+
   Future<void> selectItem(String uid) async {
     final cached = _itemById(uid);
     if (cached != null) {

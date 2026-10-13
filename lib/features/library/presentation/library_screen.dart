@@ -863,6 +863,21 @@ class _LibraryTreePane extends StatefulWidget {
 class _LibraryTreePaneState extends State<_LibraryTreePane> {
   final Set<String> _collapsedFolders = <String>{};
 
+  Future<bool> _moveItemToFolder(String uid, String folder) async {
+    try {
+      await AppSaveCoordinator.instance.flushPending();
+      await widget.controller.repository.waitForPendingSaves();
+      return await widget.controller.moveItemToFolder(uid, folder);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to move the document.')),
+        );
+      }
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -953,28 +968,42 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _FolderTreeRow(
-            folder: folder,
-            expanded: expanded,
-            selected:
-                !widget.showingProjects && controller.selectedFolder == folder,
-            onToggle: () {
-              setState(() {
-                if (expanded) {
-                  _collapsedFolders.add(folder);
-                } else {
-                  _collapsedFolders.remove(folder);
-                }
-              });
+          DragTarget<String>(
+            key: ValueKey('library-folder-drop:$folder'),
+            onWillAcceptWithDetails: (details) => controller.items.any(
+              (item) => item.uid == details.data && item.folder != folder,
+            ),
+            onAcceptWithDetails: (details) async {
+              final moved = await _moveItemToFolder(details.data, folder);
+              if (moved && mounted) {
+                setState(() => _collapsedFolders.remove(folder));
+              }
             },
-            onTap: () => widget.onOpenFolder(folder),
-            onEdit: () => showFolderCoverEditor(context, controller, folder),
-            onRename: () => context
-                .findAncestorStateOfType<_LibraryScreenState>()
-                ?._promptRenameFolder(controller, folder),
-            onDelete: () => context
-                .findAncestorStateOfType<_LibraryScreenState>()
-                ?._confirmDeleteFolder(controller, folder),
+            builder: (context, candidates, rejected) => _FolderTreeRow(
+              folder: folder,
+              expanded: expanded,
+              selected:
+                  !widget.showingProjects &&
+                  controller.selectedFolder == folder,
+              dropHighlighted: candidates.isNotEmpty,
+              onToggle: () {
+                setState(() {
+                  if (expanded) {
+                    _collapsedFolders.add(folder);
+                  } else {
+                    _collapsedFolders.remove(folder);
+                  }
+                });
+              },
+              onTap: () => widget.onOpenFolder(folder),
+              onEdit: () => showFolderCoverEditor(context, controller, folder),
+              onRename: () => context
+                  .findAncestorStateOfType<_LibraryScreenState>()
+                  ?._promptRenameFolder(controller, folder),
+              onDelete: () => context
+                  .findAncestorStateOfType<_LibraryScreenState>()
+                  ?._confirmDeleteFolder(controller, folder),
+            ),
           ),
           if (expanded)
             for (final item in items)
@@ -1065,6 +1094,7 @@ class _FolderTreeRow extends StatelessWidget {
     required this.folder,
     required this.expanded,
     required this.selected,
+    required this.dropHighlighted,
     required this.onToggle,
     required this.onTap,
     required this.onEdit,
@@ -1075,6 +1105,7 @@ class _FolderTreeRow extends StatelessWidget {
   final String folder;
   final bool expanded;
   final bool selected;
+  final bool dropHighlighted;
   final VoidCallback onToggle;
   final VoidCallback onTap;
   final VoidCallback onEdit;
@@ -1088,7 +1119,9 @@ class _FolderTreeRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1),
       child: Material(
-        color: selected
+        color: dropHighlighted
+            ? colorScheme.surfaceContainerHigh
+            : selected
             ? colorScheme.surfaceContainerHighest
             : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
@@ -1172,8 +1205,10 @@ class _LibraryTreeItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
+    final icon = item.kind == NotebookKind.board
+        ? Icons.dashboard_outlined
+        : Icons.description_outlined;
+    final row = Padding(
       key: ValueKey('library-tree-item:${item.uid}'),
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
@@ -1192,9 +1227,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
               children: [
                 const SizedBox(width: 38),
                 Icon(
-                  item.kind == NotebookKind.board
-                      ? Icons.dashboard_outlined
-                      : Icons.description_outlined,
+                  icon,
                   size: 15,
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -1222,6 +1255,39 @@ class _LibraryTreeItemRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    return LongPressDraggable<String>(
+      data: item.uid,
+      maxSimultaneousDrags: 1,
+      feedback: Material(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 190),
+                child: Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _sidebarTextStyle.copyWith(
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.35, child: row),
+      child: row,
     );
   }
 }
@@ -1469,7 +1535,7 @@ class _LibraryWorkspace extends StatelessWidget {
     final repository = context.read<NotebookRepository>();
     final isBoard = item!.kind == NotebookKind.board;
     return ChangeNotifierProvider(
-      key: ValueKey(item!.uid),
+      key: ValueKey('${item!.uid}:${item!.folder}'),
       create: (_) => EditorController(repository: repository, notebook: item!),
       child: isBoard
           ? BoardScreen(

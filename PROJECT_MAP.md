@@ -332,6 +332,8 @@ wyświetlaniem `CompactStudyTimer` w nagłówku edytora.
 ### `lib/features/library/presentation/library_controller.dart` (738 linii)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
+Przenoszenie notebooków i boardów między folderami zapisuje tylko metadane
+w SQLite; aktywny dokument zachowuje zaznaczenie w nowym folderze.
 Zapisuje kształt i indywidualny kolor ikony okładki folderu w zgodnym wstecznie
 `library_folders.json` (legacy lista nazw lub nowy obiekt z `folders` i
 `covers`); nie zmienia schematu SQLite. Wybór dokumentu synchronizuje
@@ -345,7 +347,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 15: `FolderCoverShape`; 17: `FolderCoverStyle`; 48: `LibraryController`.
 - 121: `initialize`; 136: `loadItems`.
 - 318: `updateFolderCover`; 330–470: foldery i dokumenty.
-- 504: `selectFolder`; 615: `_loadFolders`; 654: `_saveFolders`
+- 504: `moveItemToFolder`; 534: `selectFolder`; 645: `_loadFolders`; 684: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
 ### `lib/features/library/presentation/library_screen.dart` (1573 linii)
@@ -376,6 +378,12 @@ Pod strzałką panelu folderów jest drugi przycisk zwijania wspólnego paska
 narzędzi; oba są pionowo wyśrodkowane we własnych obszarach, mają 24 px
 szerokości, 44 px wysokości, cień i obrys. Stan toolbaru pozostaje zachowany
 przy przełączaniu dokumentów.
+
+W drzewku folderów przytrzymanie notebooka lub boarda uruchamia drag & drop
+na wiersz innego folderu (również zwiniętego). Folder przyjmuje element
+z podświetleniem i rozwija się po upuszczeniu. Przed ruchem kończone są
+oczekujące zapisy edytora; zmiana folderu aktywnego dokumentu odtwarza
+kontroler edytora z aktualnymi metadanymi, zamiast zostawiać stary folder.
 
 Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
 dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej krawędzi
@@ -864,6 +872,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   testowej bazy następuje rzeczywisty zapis.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
+- `test/library_sidebar_drag_drop_test.dart`: trwałe przenoszenie notatek i
+  boardów między folderami, walidacja celu, zachowanie wyboru, przeciąganie
+  na zwinięty folder i rozwinięcie go po upuszczeniu.
 - `test/library_controller_test.dart` (33)
 - `test/library_catalog_test.dart` (204): kolor dominujący, serializacja
   okładek, start katalogu, siatka notatek/boardów, nagłówek i Settings,
