@@ -713,7 +713,7 @@ class EditorToolbar extends StatelessWidget {
                         syncHex();
                       }),
                     ),
-                    if (recentColors.isNotEmpty) ...[
+                    if (recentColors.isNotEmpty || onPresetSelected != null) ...[
                       const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerLeft,
