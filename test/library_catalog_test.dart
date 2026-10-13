@@ -202,7 +202,7 @@ void main() {
     await database.close();
   });
 
-  testWidgets('Projects grid centers four columns and adapts to narrow views', (
+  testWidgets('Projects centers folders without grid lines at every width', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1600, 900));
@@ -260,18 +260,12 @@ void main() {
       tester.getCenter(tiles[4]).dx,
       closeTo(tester.getCenter(grid).dx, 1),
     );
-    final vertical = find.byKey(
-      const ValueKey('catalog-vertical-divider:0:0'),
-    );
-    final horizontal = find.byKey(
-      const ValueKey('catalog-horizontal-divider:0'),
-    );
-    expect(tester.getSize(vertical).width, 1);
-    expect(tester.getSize(horizontal).height, 1);
-    expect(tester.getSize(horizontal).width, 984);
-    expect(tester.getRect(horizontal).right, lessThan(1600 - 20));
     expect(
-      find.byKey(const ValueKey('catalog-vertical-divider:1:4')),
+      find.byKey(const ValueKey('catalog-vertical-divider:0:0')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('catalog-horizontal-divider:0')),
       findsNothing,
     );
 
@@ -300,7 +294,7 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('catalog-horizontal-divider:3')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(tester.takeException(), isNull);
 
