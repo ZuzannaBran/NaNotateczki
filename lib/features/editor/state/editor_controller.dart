@@ -31,6 +31,7 @@ import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
 import 'editor_actions.dart';
 import 'input_mode.dart';
+import 'ink_color_presets.dart';
 import 'page_background.dart';
 
 class LassoSelection {
@@ -105,16 +106,12 @@ class EditorController extends ChangeNotifier {
       const PageBackgroundSettings();
   PageBackgroundSettings defaultBoardBackground =
       const PageBackgroundSettings();
-  Color penColor = const Color(0xFF1E2A40);
-  Color highlighterColor = const Color(0xFF536783);
+  Color penColor = InkColorPreset.blue.colors[0];
+  Color highlighterColor = InkColorPreset.blue.colors[1];
   Color get inkColor =>
       tool == DrawingTool.highlighter ? highlighterColor : penColor;
   double inkStrokeWidth = 2.5;
-  final List<Color> quickColors = [
-    Color(0xFF1E1E1E),
-    Color(0xFFD32F2F),
-    Color(0xFF2E7D32),
-  ];
+  final List<Color> quickColors = List.of(InkColorPreset.blue.colors);
   final List<Color> recentColors = <Color>[];
 
   final List<EditorAction> _undoActions = <EditorAction>[];
@@ -951,6 +948,18 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Replaces the three quick swatches and the default pen/marker colors.
+  void applyInkColorPreset(InkColorPreset preset) {
+    final colors = preset.colors;
+    quickColors
+      ..clear()
+      ..addAll(colors);
+    penColor = colors[0];
+    highlighterColor = colors[1];
+    _schedulePrefsSave();
+    notifyListeners();
+  }
+
   void setQuickColor(int index, Color newColor) {
     if (index < 0 || index >= quickColors.length) {
       return;
@@ -1060,12 +1069,26 @@ class EditorController extends ChangeNotifier {
           _localBackgrounds[key] = PageBackgroundSettings.fromJson(entry.value);
         }
       }
+      var migratedQuickColors = false;
       if (quick is List) {
         final mapped = quick
             .map((item) => _colorFromHex(item?.toString()))
             .whereType<Color>()
             .toList();
-        if (mapped.isNotEmpty) {
+        final isLegacyDefaults =
+            mapped.length == 3 &&
+            mapped[0] == const Color(0xFF1E1E1E) &&
+            mapped[1] == const Color(0xFFD32F2F) &&
+            mapped[2] == const Color(0xFF2E7D32);
+        if (isLegacyDefaults) {
+          migratedQuickColors = true;
+          if (penParsed == const Color(0xFF1E2A40)) {
+            penColor = InkColorPreset.blue.colors[0];
+          }
+          if (highlighterParsed == const Color(0xFF536783)) {
+            highlighterColor = InkColorPreset.blue.colors[1];
+          }
+        } else if (mapped.isNotEmpty) {
           quickColors
             ..clear()
             ..addAll(mapped);
@@ -1082,7 +1105,7 @@ class EditorController extends ChangeNotifier {
             ..addAll(mapped);
         }
       }
-      if (shouldPersistDrawingColorDefaults) {
+      if (shouldPersistDrawingColorDefaults || migratedQuickColors) {
         _schedulePrefsSave();
       }
       notifyListeners();
