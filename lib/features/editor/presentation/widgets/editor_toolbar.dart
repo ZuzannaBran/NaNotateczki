@@ -103,6 +103,7 @@ class EditorToolbar extends StatelessWidget {
                     for (var i = 0; i < controller.quickColors.length; i++)
                       _colorDot(
                         context,
+                        index: i,
                         color: controller.quickColors[i],
                         selected:
                             controller.inkColor == controller.quickColors[i],
@@ -531,25 +532,29 @@ class EditorToolbar extends StatelessWidget {
 
   Widget _colorDot(
     BuildContext context, {
+    required int index,
     required Color color,
     required bool selected,
     required VoidCallback onSelect,
     required ValueChanged<Color> onEdit,
   }) {
-    return GestureDetector(
-      onTap: onSelect,
-      onDoubleTap: () async {
-        final updated = await EditorToolbar.pickColor(
-          context,
-          color,
-          controller.recentColors,
-          onPresetSelected: controller.applyInkColorPreset,
-        );
-        if (updated == null) {
-          return;
-        }
+    Future<void> openColorPicker() async {
+      final updated = await EditorToolbar.pickColor(
+        context,
+        color,
+        controller.recentColors,
+        onPresetSelected: controller.applyInkColorPreset,
+      );
+      if (updated != null) {
         onEdit(updated);
-      },
+      }
+    }
+
+    return GestureDetector(
+      key: ValueKey('editor-quick-color-$index'),
+      onTap: onSelect,
+      onDoubleTap: openColorPicker,
+      onLongPress: openColorPicker,
       child: Container(
         margin: const EdgeInsets.only(right: 6),
         width: 24,
