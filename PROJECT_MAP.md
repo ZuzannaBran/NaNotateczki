@@ -514,7 +514,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2900 linii)
+### `lib/features/editor/state/editor_controller.dart` (2923 linie)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
@@ -527,20 +527,29 @@ przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
 tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 `isObjectTransformActive` blokuje zmianę viewportu na czas move/resize ramki.
+Trzy szybkie kolory domyślnie używają niebieskiego zestawu; wybór palety
+jednocześnie ustawia trzy próbki i aktywne domyślne kolory pióra/markera.
+Stare fabryczne czarny–czerwony–zielony są migrowane do niebieskiego,
+ale zmienione ręcznie próbki pozostają nienaruszone.
 
-- 36: `LassoSelection`; 75: `EditorController`; 2359: `addInkStroke`;
-  200: `flushPendingSaves`.
+- 37: `LassoSelection`; 76: `EditorController`;
+  197: `flushPendingSaves`; 952: `applyInkColorPreset`.
 - 259–332: layout i transformacje viewportu; 274: start blokady transformacji,
   290: `setViewTransform`.
 - 362–498: operacje `*OnPage` używane przez canvasy/overlaye.
 - 507–899: narzędzia, aktywne elementy, lasso i preferencje; 559: `setTool`;
-  591: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- 1249: `undo`; 1262: `redo`; 1334: `toggleBookmark`;
-  1340: operacje tekstowe; 1410: `updateActiveTextStyle` — blokowe
+  592: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
+- 1278: `undo`; 1291: `redo`; 1363: `toggleBookmark`;
+  1369: operacje tekstowe; 1439: `updateActiveTextStyle` — blokowe
   formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
   zapisywane jako `UpdateTextAction`.
-- 2684: `_applyAction`; 2693: `_applyInkAction`;
-  2795: `_scheduleSave`; 2816: `_saveDirtyPages`; 2838: `_save`.
+- 2713: `_applyAction`; 2722: `_applyInkAction`;
+  2824: `_scheduleSave`; 2845: `_saveDirtyPages`; 2867: `_save`.
+
+- `lib/features/editor/state/ink_color_presets.dart`:
+  `InkColorPreset` zawiera trzy zestawy po trzy barwy (Blue/Pink/Green)
+  w bazowych kolorach jasnych; tryb ciemny korzysta z niezmieniającej
+  zapisów transformacji `AppColors.displayInkColor`.
 
 ## 8. UI edytora
 
@@ -640,7 +649,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (959):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1024):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
@@ -654,10 +663,12 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   z edycją koloru ikon okładek folderów. W dark mode próbki Recent,
   podgląd, HEX oraz suwaki pracują na odwróconym kolorze widocznym,
   a przed zapisem wracają do wartości bazowej; wybór bez zmian jest bezstratny.
+  Pod Recent widoczne są trzy palety (tylko podczas edycji szybkich kolorów);
+  ich pojedynczy wybór podmienia całą trójkę i zachowuje tryb jasny/ciemny.
   Kontroler HEX jest zwalniany dopiero
   po zakończeniu animacji zamykania dialogu, także przy zagnieżdżonej edycji.
-  10: `EditorToolbar`; 198: dialog tła; 337: selektor gumki;
-  405: selektor kształtu; 573: `pickColor`; 852: `_EraserIcon`.
+  11: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
+  406: selektor kształtu; 575: `pickColor`; 917: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (345):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
@@ -900,6 +911,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   Recent i wartości RGB/HEX, suwak i zapis z zachowaniem koloru wizualnego,
   brak modyfikacji danych po zatwierdzeniu bez zmian; osobne widget testy
   dla obu motywów i jawna weryfikacja aktywnej jasności motywu.
+  Dodatkowo sprawdza obecność i rendering trzech palet oraz ich wybór
+  w trybie jasnym i ciemnym.
 - `test/page_overlay_text_gestures_test.dart` (679): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
@@ -979,7 +992,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   i fake `PathProviderPlatform`, bez zapisu do danych użytkownika. Test
   restore zamyka źródłowy `NotesDatabase` przed otwarciem docelowego,
   aby nie utrzymywać dwóch instancji Drift w tym samym isolate.
-  Weryfikuje również trwałość ustawienia czułości nawigacji i skali UI.
+  Weryfikuje również trwałość ustawienia czułości nawigacji i skali UI,
+  domyślne palety, ich utrwalanie, migrację fabrycznych kolorów i
+  zachowanie ustawionych ręcznie próbek.
 - `test/production/export_render_test.dart` (305): produkcyjne PNG/PDF
   w pamięci, liczba stron i rozmiar obrazu, treść oraz legacy gumka.
   Renderer działa w `tester.runAsync`, poza `FakeAsync` testu widgetowego.
