@@ -26,8 +26,8 @@ import 'object_transform_hud.dart';
 import '../../state/editor_controller.dart';
 
 const Color _lassoAccentColor = AppColors.inkBlack;
-const double _lassoActionOutset = 56.0;
-const double _lassoActionBarMinWidth = 112.0;
+const double _lassoActionOutset = 48.0;
+const double _lassoActionBarMinWidth = 96.0;
 
 class PageOverlay extends StatelessWidget {
   const PageOverlay({
@@ -2700,7 +2700,6 @@ class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
   @override
   Widget build(BuildContext context) {
     final controller = context.read<EditorController>();
-    final colorScheme = Theme.of(context).colorScheme;
 
     final child = Stack(
       clipBehavior: Clip.none,
@@ -2752,56 +2751,23 @@ class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
           Positioned(
             top: 4,
             right: 4,
-            child: Material(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? AppColors.darkPaper
-                  : AppColors.paper,
-              elevation: 2,
-              borderRadius: BorderRadius.circular(8),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.divider),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _LassoActionButton(
-                      icon: Icons.copy,
-                      tooltip: 'Copy selection',
-                      color: AppColors.inkBlack,
-                      onTap: () async {
-                        final message = await controller
-                            .copyActiveElementToClipboard();
-                        if (!context.mounted) return;
-                        if (message != null) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(message)));
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Copied selection')),
-                          );
-                          controller.clearLassoSelection();
-                        }
-                      },
-                    ),
-                    SizedBox(
-                      height: 32,
-                      child: VerticalDivider(
-                        width: 1,
-                        color: AppColors.divider,
-                      ),
-                    ),
-                    _LassoActionButton(
-                      icon: Icons.delete_outline,
-                      tooltip: 'Delete selection',
-                      color: colorScheme.error,
-                      onTap: controller.deleteLassoSelection,
-                    ),
-                  ],
-                ),
-              ),
+            child: LassoSelectionActionBar(
+              onCopy: () async {
+                final message =
+                    await controller.copyActiveElementToClipboard();
+                if (!context.mounted) return;
+                if (message != null) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(message)));
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Copied selection')),
+                  );
+                  controller.clearLassoSelection();
+                }
+              },
+              onDelete: controller.deleteLassoSelection,
             ),
           ),
       ],
@@ -2831,6 +2797,65 @@ class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
   }
 }
 
+class LassoSelectionActionBar extends StatelessWidget {
+  const LassoSelectionActionBar({
+    required this.onCopy,
+    required this.onDelete,
+    super.key,
+  });
+
+  final VoidCallback onCopy;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final iconColor = colors.onSurface.withValues(alpha: 0.72);
+
+    return Material(
+      color: colors.surfaceContainerLowest,
+      elevation: 1,
+      shadowColor: colors.shadow.withValues(alpha: 0.14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(9),
+        side: BorderSide(
+          color: colors.outlineVariant.withValues(alpha: 0.55),
+          width: 0.8,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _LassoActionButton(
+              icon: Icons.content_copy_outlined,
+              tooltip: 'Copy selection',
+              color: iconColor,
+              onTap: onCopy,
+            ),
+            SizedBox(
+              height: 24,
+              child: VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: colors.outlineVariant.withValues(alpha: 0.65),
+              ),
+            ),
+            _LassoActionButton(
+              icon: Icons.delete_outline,
+              tooltip: 'Delete selection',
+              color: iconColor,
+              onTap: onDelete,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LassoActionButton extends StatelessWidget {
   const _LassoActionButton({
     required this.icon,
@@ -2848,13 +2873,12 @@ class _LassoActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: InkResponse(
-        containedInkWell: true,
-        radius: 24,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(7),
         onTap: onTap,
         child: SizedBox.square(
-          dimension: 48,
-          child: Icon(icon, size: 22, color: color),
+          dimension: 40,
+          child: Icon(icon, size: 18, color: color),
         ),
       ),
     );

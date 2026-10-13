@@ -752,7 +752,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2891 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2915 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -777,9 +777,12 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 - 32: `PageOverlay`; 193: `DocumentPageOverlay`.
 - aktywny tekst: `TextHudBlock`; fallback nieaktywnego tekstu:
   `_TextBlockWidget` / `_TextBlockWidgetState`.
+  Akcje lassa korzystają z kompaktowego paska w kolorze toolbaru,
+  z neutralnymi ikonami konturowymi i zachowaną obsługą akcji.
 - 1418: `_ImageBlockWidget`; 1441: `_ImageBlockWidgetState`.
 - 2504: `_editOcr`; 2578: `_OcrTextDialog`;
-  2677: `_LassoSelectionWidget`; 2833: `_LassoActionButton`.
+  2678: `_LassoSelectionWidget`; 2800: `LassoSelectionActionBar`;
+  2859: `_LassoActionButton`.
 
 ## 9. Board
 
@@ -927,6 +930,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   trafia w konkretny QuillEditor, gdy aktywna i nieaktywna warstwa
   tekstowa renderują dwa widgety;
   regresja selektora koloru tekstu po utracie zaznaczenia oraz undo/redo
+- `test/lasso_selection_action_bar_test.dart`: kompaktowy pasek lassa,
+  kontrast i kolor przycisków w obu motywach oraz działanie kopiuj/usuń.
 - `test/board_scene_bounds_test.dart`: stały układ współrzędnych
   boarda podczas resize/move, pełna wysokość canvasa pod toolbarem,
   proste górne i zaokrąglone dolne rogi canvasa oraz zgodność klipu,
