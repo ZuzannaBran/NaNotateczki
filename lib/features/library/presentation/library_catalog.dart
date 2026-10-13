@@ -161,6 +161,162 @@ class LibraryCatalog extends StatelessWidget {
                     )
                   : LayoutBuilder(
                       builder: (context, constraints) {
+                        if (activeFolder == null) {
+                          const cellExtent = 246.0;
+                          const rowExtent = 292.0;
+                          final availableWidth = math.max(
+                            1.0,
+                            constraints.maxWidth - 40,
+                          );
+                          final columns = math.min(
+                            4,
+                            math.max(
+                              1,
+                              (availableWidth / cellExtent).floor(),
+                            ),
+                          );
+                          final gridWidth = math.min(
+                            availableWidth,
+                            columns * cellExtent,
+                          );
+                          final cellWidth = gridWidth / columns;
+                          final rowCount =
+                              (folders.length + columns - 1) ~/ columns;
+                          final dividerColor = AppHeaderDivider.colorOf(context);
+
+                          return SingleChildScrollView(
+                            key: const ValueKey('catalog-folders'),
+                            physics: TouchNavigationScrollPhysics(
+                              sensitivity:
+                                  context
+                                      .watch<AppPreferencesController?>()
+                                      ?.touchNavigationSensitivity ??
+                                  1.0,
+                            ),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: constraints.maxHeight,
+                              ),
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 24,
+                                  ),
+                                  child: SizedBox(
+                                    key: const ValueKey('catalog-folder-grid'),
+                                    width: gridWidth,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        for (
+                                          var row = 0;
+                                          row < rowCount;
+                                          row++
+                                        ) ...[
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              for (
+                                                var index = row * columns;
+                                                index <
+                                                    math.min(
+                                                      (row + 1) * columns,
+                                                      folders.length,
+                                                    );
+                                                index++
+                                              )
+                                                SizedBox(
+                                                  width: cellWidth,
+                                                  height: rowExtent,
+                                                  child: Stack(
+                                                    children: [
+                                                      Positioned.fill(
+                                                        child: Padding(
+                                                          padding:
+                                                              const EdgeInsets.all(
+                                                                18,
+                                                              ),
+                                                          child: _FolderTile(
+                                                            name:
+                                                                folders[index],
+                                                            contents: controller
+                                                                .items
+                                                                .where(
+                                                                  (item) =>
+                                                                      item.folder ==
+                                                                      folders[index],
+                                                                ),
+                                                            cover: controller
+                                                                .folderCoverFor(
+                                                                  folders[index],
+                                                                ),
+                                                            onTap: () =>
+                                                                onFolderTap(
+                                                                  folders[index],
+                                                                ),
+                                                            onEdit: () =>
+                                                                onEditFolder(
+                                                                  folders[index],
+                                                                ),
+                                                            onRename: () =>
+                                                                onRenameFolder(
+                                                                  folders[index],
+                                                                ),
+                                                            onDelete: () =>
+                                                                onDeleteFolder(
+                                                                  folders[index],
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (index <
+                                                          math.min(
+                                                                (row + 1) *
+                                                                    columns,
+                                                                folders.length,
+                                                              ) -
+                                                              1)
+                                                        Positioned(
+                                                          top: 0,
+                                                          bottom: 0,
+                                                          right: 0,
+                                                          child: SizedBox(
+                                                            key: ValueKey(
+                                                              'catalog-vertical-divider:$row:$index',
+                                                            ),
+                                                            width: 1,
+                                                            child: ColoredBox(
+                                                              color:
+                                                                  dividerColor,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          if (row < rowCount - 1)
+                                            SizedBox(
+                                              key: ValueKey(
+                                                'catalog-horizontal-divider:$row',
+                                              ),
+                                              width: gridWidth,
+                                              height: 1,
+                                              child: ColoredBox(
+                                                color: dividerColor,
+                                              ),
+                                            ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
                         return GridView.builder(
                           physics: TouchNavigationScrollPhysics(
                             sensitivity:
@@ -169,11 +325,7 @@ class LibraryCatalog extends StatelessWidget {
                                     ?.touchNavigationSensitivity ??
                                 1.0,
                           ),
-                          key: ValueKey(
-                            activeFolder == null
-                                ? 'catalog-folders'
-                                : 'catalog-items:$activeFolder',
-                          ),
+                          key: ValueKey('catalog-items:$activeFolder'),
                           padding: const EdgeInsets.all(30),
                           gridDelegate:
                               const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -182,25 +334,8 @@ class LibraryCatalog extends StatelessWidget {
                                 mainAxisSpacing: 24,
                                 crossAxisSpacing: 24,
                               ),
-                          itemCount: activeFolder == null
-                              ? folders.length
-                              : notes.length,
+                          itemCount: notes.length,
                           itemBuilder: (context, index) {
-                            if (activeFolder == null) {
-                              final name = folders[index];
-                              final contents = controller.items.where(
-                                (item) => item.folder == name,
-                              );
-                              return _FolderTile(
-                                name: name,
-                                contents: contents,
-                                cover: controller.folderCoverFor(name),
-                                onTap: () => onFolderTap(name),
-                                onEdit: () => onEditFolder(name),
-                                onRename: () => onRenameFolder(name),
-                                onDelete: () => onDeleteFolder(name),
-                              );
-                            }
                             final item = notes[index];
                             return _DocumentTile(
                               item: item,
