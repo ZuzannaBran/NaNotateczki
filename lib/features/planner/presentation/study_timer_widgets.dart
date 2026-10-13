@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../state/study_planner_controller.dart';
 import 'planner_screen.dart';
@@ -95,12 +96,12 @@ Future<void> showStudyRating(BuildContext context, StudySession session) async {
             ),
           ],
         ),
-        actions: [
+        actions: appDialogActions(context, [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Skip rating'),
           ),
-        ],
+        ]),
       ),
     ),
   );
@@ -323,7 +324,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
           ),
         ),
       ),
-      actions: [
+      actions: appDialogActions(context, [
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
@@ -333,7 +334,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
           onPressed: _save,
           child: Text(widget.startAfterSave ? 'Save & start' : 'Save'),
         ),
-      ],
+      ]),
     );
   }
 }

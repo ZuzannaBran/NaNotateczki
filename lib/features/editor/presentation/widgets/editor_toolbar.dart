@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/app_dialog_actions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/export/notebook_export_service.dart';
 import '../../../notebook/domain/drawing_tool.dart';
@@ -261,12 +262,12 @@ class EditorToolbar extends StatelessWidget {
                   ],
                 ),
               ),
-              actions: [
+              actions: appDialogActions(context, [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Close'),
                 ),
-              ],
+              ]),
             );
           },
         );
@@ -819,7 +820,7 @@ class EditorToolbar extends StatelessWidget {
                 ],
               ),
             ),
-              actions: [
+              actions: appDialogActions(context, [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Cancel'),
@@ -836,7 +837,7 @@ class EditorToolbar extends StatelessWidget {
                   },
                   child: const Text('Save'),
                 ),
-              ],
+              ]),
             );
           },
         );

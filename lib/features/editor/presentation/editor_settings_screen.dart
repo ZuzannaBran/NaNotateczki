@@ -7,6 +7,7 @@ import '../../../core/diagnostics/optimization_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../state/editor_controller.dart';
@@ -416,7 +417,7 @@ Future<void> _showErrorsDialog(BuildContext context) {
                 ),
               ),
             ),
-            actions: [
+            actions: appDialogActions(context, [
               TextButton(
                 onPressed: AppErrorLog.instance.isEmpty
                     ? null
@@ -440,7 +441,7 @@ Future<void> _showErrorsDialog(BuildContext context) {
                 icon: const Icon(Icons.copy),
                 label: const Text('Copy'),
               ),
-            ],
+            ]),
           );
         },
       );
@@ -503,7 +504,7 @@ Future<void> _showDataIntegrityDialog(BuildContext context) {
                 ),
               ),
             ),
-            actions: [
+            actions: appDialogActions(context, [
               TextButton(
                 onPressed: DataIntegrityLog.instance.isEmpty
                     ? null
@@ -527,7 +528,7 @@ Future<void> _showDataIntegrityDialog(BuildContext context) {
                 icon: const Icon(Icons.copy),
                 label: const Text('Copy'),
               ),
-            ],
+            ]),
           );
         },
       );
@@ -589,7 +590,7 @@ Future<void> _showOptimizationDialog(BuildContext context) {
                 ),
               ),
             ),
-            actions: [
+            actions: appDialogActions(context, [
               TextButton(
                 onPressed: OptimizationLog.instance.isEmpty
                     ? null
@@ -613,7 +614,7 @@ Future<void> _showOptimizationDialog(BuildContext context) {
                 icon: const Icon(Icons.copy),
                 label: const Text('Copy'),
               ),
-            ],
+            ]),
           );
         },
       );

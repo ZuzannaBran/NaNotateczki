@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
+import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
 import '../state/study_planner_controller.dart';
@@ -168,7 +169,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               ],
             ),
           ),
-          actions: [
+          actions: appDialogActions(context, [
             if (session.status == StudyStatus.planned)
               TextButton(
                 onPressed: () {
@@ -209,7 +210,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Close'),
             ),
-          ],
+          ]),
         ),
       ),
     );
@@ -222,7 +223,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
         child: AlertDialog(
           title: const Text('Delete this session?'),
           content: Text('Delete "${session.title}" and its history?'),
-          actions: [
+          actions: appDialogActions(context, [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel'),
@@ -231,7 +232,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text('Delete'),
             ),
-          ],
+          ]),
         ),
       ),
     );

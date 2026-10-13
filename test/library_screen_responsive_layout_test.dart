@@ -464,6 +464,15 @@ void main() {
       await tester.tap(find.text('Rename'));
       await tester.pumpAndSettle();
       expect(find.text(dialogTitle), findsOneWidget);
+      for (final label in ['Cancel', 'Rename']) {
+        final buttonContext = tester.element(
+          find.widgetWithText(TextButton, label),
+        );
+        expect(
+          TextButtonTheme.of(buttonContext).style?.foregroundColor?.resolve({}),
+          Theme.of(buttonContext).colorScheme.onSurface,
+        );
+      }
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       for (final toggle in toggles) {

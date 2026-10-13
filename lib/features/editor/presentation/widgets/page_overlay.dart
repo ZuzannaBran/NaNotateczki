@@ -14,6 +14,7 @@ import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:provider/provider.dart';
 
 import '../../../../core/input/soft_keyboard.dart';
+import '../../../../core/widgets/app_dialog_actions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/resizable_frame.dart';
 import '../../../notebook/domain/drawing_tool.dart';
@@ -2656,7 +2657,7 @@ class _OcrTextDialogState extends State<_OcrTextDialog> {
           ),
         ],
       ),
-      actions: [
+      actions: appDialogActions(context, [
         if (widget.controller.supportsOcr)
           TextButton(
             onPressed: _isRunning ? null : _runOcr,
@@ -2670,7 +2671,7 @@ class _OcrTextDialogState extends State<_OcrTextDialog> {
           onPressed: () => Navigator.of(context).pop(_textController.text),
           child: const Text('Save'),
         ),
-      ],
+      ]),
     );
   }
 }

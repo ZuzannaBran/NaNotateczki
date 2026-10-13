@@ -159,6 +159,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
   surfaceContainerLowest; w planerze i ustawieniach linia jest pierwszym
   elementem body bez zwiększania wysokości AppBar.
   4: `AppHeaderDivider`; 7: `colorOf`.
+- `lib/core/widgets/app_dialog_actions.dart`: kolory dolnych akcji
+  dialogowych dopasowane do `onSurface` w trybie jasnym i ciemnym;
+  pozostałe przyciski nie zmieniają wyglądu.
 - `lib/core/widgets/empty_state.dart` (30): wspólny pusty stan.
   3: `EmptyState`.
 - `lib/core/widgets/resizable_frame.dart` (200): ramka z ośmioma uchwytami
@@ -350,7 +353,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 504: `moveItemToFolder`; 534: `selectFolder`; 645: `_loadFolders`; 684: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1573 linii)
+### `lib/features/library/presentation/library_screen.dart` (1640 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -415,7 +418,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1438: `_LibraryWorkspace`;
   1512: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (725 linii)
+### `lib/features/library/presentation/library_catalog.dart` (728 linii)
 
 Kafelkowa strona główna folderów oraz siatka podglądów zawartości folderu.
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
@@ -461,7 +464,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
   152: `StudyPlannerController`; 232: `load`; 298: `create`;
   366: `start`; 528: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (568):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (569):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -476,7 +479,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`; 39: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (759):
+- `lib/features/planner/presentation/planner_screen.dart` (766):
   `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
   tworzenie, edycja, usuwanie i historia. Nazwa dnia tygodnia znajduje się
   w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
@@ -626,7 +629,7 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (687 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (688 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
@@ -659,7 +662,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1029):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1030):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
@@ -762,7 +765,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2915 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2916 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -886,6 +889,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   po zmianie motywu, kontrast planera/timera, pozycja menu względem
   prawej granicy sidebaru przy resize w obu motywach, maskowanie
   cienia na styku oraz wspólna czułość nowych scrollerów.
+- `test/dialog_actions_test.dart`: kolory przycisków stopki w obu motywach
+  oraz izolacja stylu od przycisków wewnątrz treści dialogu.
 - `test/library_screen_responsive_layout_test.dart`:
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
@@ -902,6 +907,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   ciągła linia pod nagłówkiem w katalogu, folderze, notebooku i boardzie,
   również po ukryciu panelu, brak podświetlenia Projects także po hover
   i zachowane przejście do katalogu głównego,
+  czytelny kolor tekstu Cancel/Rename w rzeczywistych dialogach,
   kolor tła zgodny z głównym toolbarem (także gdy kolory
   `surfaceContainerLow` i `surfaceContainerLowest` są różne)
   oraz cień wyłącznie po zewnętrznych stronach menu.
