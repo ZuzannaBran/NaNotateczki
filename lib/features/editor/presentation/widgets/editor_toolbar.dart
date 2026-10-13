@@ -632,187 +632,186 @@ class EditorToolbar extends StatelessWidget {
               title: const Text('Pick color'),
               content: SingleChildScrollView(
                 child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    key: const ValueKey('color-picker-preview'),
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: preview,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Theme.of(context).dividerColor),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: 180,
-                    child: TextField(
-                      controller: hexController,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(
-                        labelText: 'HEX',
-                        hintText: '#536783',
-                        isDense: true,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      key: const ValueKey('color-picker-preview'),
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: preview,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Theme.of(context).dividerColor),
                       ),
-                      onChanged: (value) {
-                        final parsed = _colorFromHex(value);
-                        if (parsed == null) {
-                          return;
-                        }
-                        setState(() {
-                          red = _toByte(parsed.r).toDouble();
-                          green = _toByte(parsed.g).toDouble();
-                          blue = _toByte(parsed.b).toDouble();
-                          shade = 0.5;
-                          edited = true;
-                        });
-                      },
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  _channelSlider(
-                    label: 'R',
-                    value: red,
-                    color: Colors.red,
-                    onChanged: (value) => setState(() {
-                      red = value;
-                      edited = true;
-                      syncHex();
-                    }),
-                  ),
-                  _channelSlider(
-                    label: 'G',
-                    value: green,
-                    color: Colors.green,
-                    onChanged: (value) => setState(() {
-                      green = value;
-                      edited = true;
-                      syncHex();
-                    }),
-                  ),
-                  _channelSlider(
-                    label: 'B',
-                    value: blue,
-                    color: Colors.blue,
-                    onChanged: (value) => setState(() {
-                      blue = value;
-                      edited = true;
-                      syncHex();
-                    }),
-                  ),
-                  _channelSlider(
-                    label: 'B/W',
-                    value: shade * 100,
-                    color: Colors.grey,
-                    min: 0,
-                    max: 100,
-                    onChanged: (value) => setState(() {
-                      shade = value / 100;
-                      edited = true;
-                      syncHex();
-                    }),
-                  ),
-                  if (recentColors.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: 180,
+                      child: TextField(
+                        controller: hexController,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: 'HEX',
+                          hintText: '#536783',
+                          isDense: true,
+                        ),
+                        onChanged: (value) {
+                          final parsed = _colorFromHex(value);
+                          if (parsed == null) {
+                            return;
+                          }
+                          setState(() {
+                            red = _toByte(parsed.r).toDouble();
+                            green = _toByte(parsed.g).toDouble();
+                            blue = _toByte(parsed.b).toDouble();
+                            shade = 0.5;
+                            edited = true;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _channelSlider(
+                      label: 'R',
+                      value: red,
+                      color: Colors.red,
+                      onChanged: (value) => setState(() {
+                        red = value;
+                        edited = true;
+                        syncHex();
+                      }),
+                    ),
+                    _channelSlider(
+                      label: 'G',
+                      value: green,
+                      color: Colors.green,
+                      onChanged: (value) => setState(() {
+                        green = value;
+                        edited = true;
+                        syncHex();
+                      }),
+                    ),
+                    _channelSlider(
+                      label: 'B',
+                      value: blue,
+                      color: Colors.blue,
+                      onChanged: (value) => setState(() {
+                        blue = value;
+                        edited = true;
+                        syncHex();
+                      }),
+                    ),
+                    _channelSlider(
+                      label: 'B/W',
+                      value: shade * 100,
+                      color: Colors.grey,
+                      min: 0,
+                      max: 100,
+                      onChanged: (value) => setState(() {
+                        shade = value / 100;
+                        edited = true;
+                        syncHex();
+                      }),
+                    ),
+                    if (recentColors.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Recent',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final color in recentColors)
+                            GestureDetector(
+                              key: ValueKey(
+                                'color-picker-recent-${color.toARGB32()}',
+                              ),
+                              onTap: () => Navigator.of(context).pop(color),
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.displayInkColor(
+                                    color,
+                                    darkMode: darkMode,
+                                  ),
+                                  border: Border.all(
+                                    color: Theme.of(context).dividerColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  if (onPresetSelected != null) ...[
                     const SizedBox(height: 12),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Recent',
+                        'Palettes',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        for (final color in recentColors)
-                          GestureDetector(
-                            key: ValueKey(
-                              'color-picker-recent-${color.toARGB32()}',
-                            ),
-                            onTap: () => Navigator.of(context).pop(color),
-                            child: Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.displayInkColor(
-                                  color,
-                                  darkMode: darkMode,
-                                ),
-                                border: Border.all(
-                                  color: Theme.of(context).dividerColor,
-                                ),
+                        for (final preset in InkColorPreset.values)
+                          InkWell(
+                            key: ValueKey('color-picker-preset-${preset.name}'),
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              onPresetSelected(preset);
+                              Navigator.of(context).pop();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(5),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      for (final color in preset.colors)
+                                        Container(
+                                          width: 20,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.displayInkColor(
+                                              color,
+                                              darkMode: darkMode,
+                                            ),
+                                            border: Border.all(
+                                              color: Theme.of(context)
+                                                  .dividerColor,
+                                              width: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    preset.label,
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                       ],
                     ),
                   ],
-                ],
-                if (onPresetSelected != null) ...[
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Palettes',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final preset in InkColorPreset.values)
-                        InkWell(
-                          key: ValueKey('color-picker-preset-${preset.name}'),
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            onPresetSelected(preset);
-                            Navigator.of(context).pop();
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(5),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    for (final color in preset.colors)
-                                      Container(
-                                        width: 20,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.displayInkColor(
-                                            color,
-                                            darkMode: darkMode,
-                                          ),
-                                          border: Border.all(
-                                            color: Theme.of(context)
-                                                .dividerColor,
-                                            width: 0.5,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  preset.label,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-                ],
+                  ],
               ),
               ),
               actions: [
