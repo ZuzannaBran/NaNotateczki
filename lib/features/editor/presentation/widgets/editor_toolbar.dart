@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../data/export/notebook_export_service.dart';
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../state/editor_controller.dart';
+import '../../state/ink_color_presets.dart';
 import '../../state/page_background.dart';
 import 'page_background_paint.dart';
 
@@ -542,6 +543,7 @@ class EditorToolbar extends StatelessWidget {
           context,
           color,
           controller.recentColors,
+          onPresetSelected: controller.applyInkColorPreset,
         );
         if (updated == null) {
           return;
@@ -573,8 +575,9 @@ class EditorToolbar extends StatelessWidget {
   static Future<Color?> pickColor(
     BuildContext context,
     Color current,
-    List<Color> recentColors,
-  ) async {
+    List<Color> recentColors, {
+    ValueChanged<InkColorPreset>? onPresetSelected,
+  }) async {
     final darkMode = Theme.of(context).brightness == Brightness.dark;
     final displayCurrent = AppColors.displayInkColor(
       current,
@@ -627,7 +630,8 @@ class EditorToolbar extends StatelessWidget {
 
             return AlertDialog(
               title: const Text('Pick color'),
-              content: Column(
+              content: SingleChildScrollView(
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
@@ -748,6 +752,68 @@ class EditorToolbar extends StatelessWidget {
                     ),
                   ],
                 ],
+                if (onPresetSelected != null) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Palettes',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final preset in InkColorPreset.values)
+                        InkWell(
+                          key: ValueKey('color-picker-preset-${preset.name}'),
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            onPresetSelected(preset);
+                            Navigator.of(context).pop();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(5),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    for (final color in preset.colors)
+                                      Container(
+                                        width: 20,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.displayInkColor(
+                                            color,
+                                            darkMode: darkMode,
+                                          ),
+                                          border: Border.all(
+                                            color: Theme.of(context)
+                                                .dividerColor,
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  preset.label,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                ],
+              ),
               ),
               actions: [
                 TextButton(
