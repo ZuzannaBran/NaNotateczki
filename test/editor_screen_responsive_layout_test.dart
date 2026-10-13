@@ -169,6 +169,7 @@ void main() {
     final original = List<Color>.of(controller.quickColors);
 
     await tester.tap(find.byKey(second));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     expect(controller.penColor, original[1]);
     expect(find.text('Pick color'), findsNothing);
