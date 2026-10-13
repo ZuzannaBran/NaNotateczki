@@ -201,4 +201,111 @@ void main() {
     preferences.dispose();
     await database.close();
   });
+
+  testWidgets('Projects grid centers four columns and adapts to narrow views', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1600, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    for (var index = 1; index <= 5; index++) {
+      await repository.createNotebook(folder: 'Folder $index');
+    }
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await controller.loadItems();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LibraryCatalog(
+          controller: controller,
+          folder: null,
+          onBack: () {},
+          onFolderTap: (_) {},
+          onOpenItem: (_) {},
+          onEditFolder: (_) {},
+          onRenameFolder: (_) {},
+          onDeleteFolder: (_) {},
+          onRenameItem: (_) {},
+          onDeleteItem: (_) {},
+          onSettings: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final grid = find.byKey(const ValueKey('catalog-folder-grid'));
+    final tiles = [
+      for (var index = 1; index <= 5; index++)
+        find.byKey(ValueKey('catalog-folder:Folder $index')),
+    ];
+    expect(tester.getSize(grid).width, 984);
+    expect(tester.getCenter(grid).dx, closeTo(800, 1));
+    for (var index = 1; index < 4; index++) {
+      expect(
+        tester.getTopLeft(tiles[index]).dy,
+        closeTo(tester.getTopLeft(tiles[0]).dy, 1),
+      );
+    }
+    expect(
+      tester.getTopLeft(tiles[4]).dy,
+      greaterThan(tester.getTopLeft(tiles[0]).dy),
+    );
+    expect(
+      tester.getCenter(tiles[4]).dx,
+      closeTo(tester.getCenter(grid).dx, 1),
+    );
+    final vertical = find.byKey(
+      const ValueKey('catalog-vertical-divider:0:0'),
+    );
+    final horizontal = find.byKey(
+      const ValueKey('catalog-horizontal-divider:0'),
+    );
+    expect(tester.getSize(vertical).width, 1);
+    expect(tester.getSize(horizontal).height, 1);
+    expect(tester.getSize(horizontal).width, 984);
+    expect(tester.getRect(horizontal).right, lessThan(1600 - 20));
+    expect(
+      find.byKey(const ValueKey('catalog-vertical-divider:1:4')),
+      findsNothing,
+    );
+
+    await tester.binding.setSurfaceSize(const Size(580, 900));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(grid).width, 492);
+    expect(
+      tester.getTopLeft(tiles[2]).dy,
+      greaterThan(tester.getTopLeft(tiles[0]).dy),
+    );
+    expect(
+      tester.getTopLeft(tiles[1]).dy,
+      closeTo(tester.getTopLeft(tiles[0]).dy, 1),
+    );
+    expect(
+      tester.getCenter(tiles[4]).dx,
+      closeTo(tester.getCenter(grid).dx, 1),
+    );
+
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(grid).width, 246);
+    expect(
+      find.byKey(const ValueKey('catalog-vertical-divider:0:0')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('catalog-horizontal-divider:3')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
 }
