@@ -811,9 +811,9 @@ class EditorToolbar extends StatelessWidget {
                       ],
                     ),
                   ],
-                  ],
+                ],
               ),
-              ),
+            ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
