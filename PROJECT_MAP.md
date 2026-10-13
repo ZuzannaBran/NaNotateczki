@@ -348,7 +348,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 504: `selectFolder`; 615: `_loadFolders`; 654: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1567 linii)
+### `lib/features/library/presentation/library_screen.dart` (1573 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -362,6 +362,8 @@ jego szerokość. Nagłówek `Projects` ma 56 px, tak jak górne paski
 katalogu, notebooka i boarda; jeden separator w nadrzędnym `Stack`
 biegnie przez całą szerokość na wysokości 56 px także po zwinięciu panelu.
 Lokalny panel rezerwuje pod separatorem 1 px bez rysowania drugiej linii.
+Nagłówek Projects jest klikalny, ale nie ma podświetlenia przy hover,
+naciśnięciu ani podczas wyświetlania katalogu głównego.
 
 U dołu panelu jest `StudyTimerCard`, wyrównany do dolnej krawędzi
 i przewijany przy większej zawartości. Po zwinięciu panelu
@@ -396,14 +398,14 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   438: `_openCatalogSettings`;
   783: `_CreateMenuButton`;
   826: `_LibraryTreePane`;
-  1057: `_FolderTreeRow`;
-  1151: `_LibraryTreeItemRow`;
-  1223: `_sidebarMenuShape`;
-  1237: `_SidebarMenuShadowPainter`;
-  1278: `_showSidebarMenu`;
-  1365: `_TreeRowActions`;
-  1439: `_LibraryWorkspace`;
-  1513: `_LeftZoneToggleTab`.
+  1056: `_FolderTreeRow`;
+  1150: `_LibraryTreeItemRow`;
+  1222: `_sidebarMenuShape`;
+  1236: `_SidebarMenuShadowPainter`;
+  1277: `_showSidebarMenu`;
+  1364: `_TreeRowActions`;
+  1438: `_LibraryWorkspace`;
+  1512: `_LeftZoneToggleTab`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (725 linii)
 
@@ -887,7 +889,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   stykanie menu z prawą granicą całego sidebaru (w tym resize handle),
   prosty lewy brzeg, brak cienia i podziałki w miejscu styku,
   ciągła linia pod nagłówkiem w katalogu, folderze, notebooku i boardzie,
-  również po ukryciu panelu,
+  również po ukryciu panelu, brak podświetlenia Projects także po hover
+  i zachowane przejście do katalogu głównego,
   kolor tła zgodny z głównym toolbarem (także gdy kolory
   `surfaceContainerLow` i `surfaceContainerLowest` są różne)
   oraz cień wyłącznie po zewnętrznych stronach menu.

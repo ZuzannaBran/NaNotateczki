@@ -153,6 +153,36 @@ void main() {
 
     expectAligned();
 
+    final projectsHome = find.byKey(const ValueKey('projects-home'));
+    void expectProjectsUnhighlighted() {
+      final button = tester.widget<TextButton>(projectsHome);
+      final style = button.style!;
+      expect(
+        style.backgroundColor?.resolve(<WidgetState>{}),
+        Colors.transparent,
+      );
+      expect(
+        style.backgroundColor?.resolve(<WidgetState>{WidgetState.hovered}),
+        Colors.transparent,
+      );
+      expect(
+        style.overlayColor?.resolve(<WidgetState>{WidgetState.hovered}),
+        Colors.transparent,
+      );
+      expect(
+        style.overlayColor?.resolve(<WidgetState>{WidgetState.pressed}),
+        Colors.transparent,
+      );
+    }
+
+    expectProjectsUnhighlighted();
+    final mouse = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+    await mouse.addPointer(location: const Offset(1100, 750));
+    await mouse.moveTo(tester.getCenter(projectsHome));
+    await tester.pumpAndSettle();
+    expectProjectsUnhighlighted();
+    await mouse.removePointer();
+
     await tester.tap(find.text('Header folder').first);
     await tester.pumpAndSettle();
     expect(
@@ -160,6 +190,7 @@ void main() {
       'Header folder',
     );
     expectAligned();
+    expectProjectsUnhighlighted();
 
     await tester.tap(find.byKey(ValueKey('library-tree-item:${notebook.uid}')));
     await tester.pumpAndSettle();
@@ -170,6 +201,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Header board'), findsWidgets);
     expectAligned();
+
+    await tester.tap(projectsHome);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('catalog-folders')), findsOneWidget);
+    expectProjectsUnhighlighted();
 
     await tester.tap(find.byTooltip('Hide projects'));
     await tester.pump();

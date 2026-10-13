@@ -892,9 +892,8 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                         padding: EdgeInsets.zero,
                         alignment: Alignment.centerLeft,
                         foregroundColor: colorScheme.onSurface,
-                        backgroundColor: widget.showingProjects
-                            ? colorScheme.surfaceContainerHigh
-                            : Colors.transparent,
+                        backgroundColor: Colors.transparent,
+                        overlayColor: Colors.transparent,
                       ),
                       child: Text(
                         'Projects',
