@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/features/editor/presentation/widgets/editor_toolbar.dart';
+import 'package:program/features/editor/state/ink_color_presets.dart';
 
 void main() {
   const initial = Color(0xFF203E85);
@@ -12,6 +13,7 @@ void main() {
     WidgetTester tester, {
     required bool darkMode,
     required ValueChanged<Color?> onSelected,
+    ValueChanged<InkColorPreset>? onPresetSelected,
   }) async {
     await tester.binding.setSurfaceSize(const Size(1000, 1100));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -29,6 +31,7 @@ void main() {
                     context,
                     initial,
                     const <Color>[recent],
+                    onPresetSelected: onPresetSelected,
                   );
                   onSelected(color);
                 },
@@ -69,6 +72,55 @@ void main() {
   Finder recentSwatch() => find.byKey(
     ValueKey('color-picker-recent-${recent.toARGB32()}'),
   );
+
+  for (final darkMode in [false, true]) {
+    testWidgets(
+      'palette buttons display theme colors and select all three quick colors '
+      '${darkMode ? 'in dark' : 'in light'} mode',
+      (tester) async {
+        InkColorPreset? selectedPreset;
+        Color? selectedColor;
+        await openPicker(
+          tester,
+          darkMode: darkMode,
+          onSelected: (color) => selectedColor = color,
+          onPresetSelected: (preset) => selectedPreset = preset,
+        );
+
+        expect(find.text('Recent'), findsOneWidget);
+        expect(find.text('Palettes'), findsOneWidget);
+        for (final preset in InkColorPreset.values) {
+          final swatch = find.byKey(
+            ValueKey('color-picker-preset-${preset.name}'),
+          );
+          expect(swatch, findsOneWidget);
+          final inkWell = tester.widget<InkWell>(swatch);
+          final padding = inkWell.child! as Padding;
+          final column = padding.child! as Column;
+          final row = column.children.first as Row;
+          expect(row.children, hasLength(3));
+          for (var i = 0; i < 3; i++) {
+            final container = row.children[i] as Container;
+            final displayed = (container.decoration! as BoxDecoration).color;
+            expect(
+              displayed,
+              AppColors.displayInkColor(
+                preset.colors[i],
+                darkMode: darkMode,
+              ),
+            );
+          }
+        }
+
+        await tester.tap(
+          find.byKey(const ValueKey('color-picker-preset-pink')),
+        );
+        await tester.pumpAndSettle();
+        expect(selectedPreset, InkColorPreset.pink);
+        expect(selectedColor, isNull);
+      },
+    );
+  }
 
   testWidgets('dark picker inverts recent swatch, HEX and RGB channels', (
     tester,
