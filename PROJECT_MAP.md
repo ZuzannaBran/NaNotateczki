@@ -421,9 +421,13 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (728 linii)
+### `lib/features/library/presentation/library_catalog.dart` (863 linie)
 
-Kafelkowa strona główna folderów oraz siatka podglądów zawartości folderu.
+Katalog główny Projects układa foldery w responsywną, wyśrodkowaną siatkę:
+maksymalnie cztery kolumny, 1 px wewnętrzne linie w kolorze separatora
+nagłówka, bez zewnętrznej ramki. Siatka kończy się na ostatnim wierszu
+folderów, nie zajmuje pełnej szerokości ekranu, a niepełny ostatni wiersz
+jest wyśrodkowany. Zawartość folderów nadal ma siatkę podglądów dokumentów.
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
 `CompactStudyTimer`; folder ma też akcję edycji okładki.
 Okładka ma automatycznie rozjaśniony dominujący kolor ink/tekstu we wszystkich
@@ -439,10 +443,10 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 21: `dominantFolderColor`; 58: `LibraryCatalog`;
-  248: `_FolderTile`; 321: `_DocumentTile`; 361: `_CatalogTile`;
-  422: `_DocumentPreview`; 505: `_boardPreviewBounds`;
-  547: `_PagePreviewPainter`; 619: `showFolderCoverEditor`.
+- 23: `dominantFolderColor`; 60: `LibraryCatalog`;
+  386: `_FolderTile`; 459: `_DocumentTile`; 499: `_CatalogTile`;
+  560: `_DocumentPreview`; 643: `_boardPreviewBounds`;
+  685: `_PagePreviewPainter`; 757: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -884,10 +888,11 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
   poziomego.
 - `test/library_controller_test.dart` (33)
-- `test/library_catalog_test.dart` (204): kolor dominujący, serializacja
+- `test/library_catalog_test.dart` (311): kolor dominujący, serializacja
   okładek, start katalogu, siatka notatek/boardów, nagłówek i Settings,
   edycja okładki z pełnym selektorem kolorów, bezpieczne zamknięcie
-  zagnieżdżonego pickera oraz powrót z edytora.
+  zagnieżdżonego pickera oraz powrót z edytora; responsywne 4/2/1 kolumny,
+  wyśrodkowanie ostatniego wiersza i ograniczenie długości separatorów.
 - `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
   wysokość i 1 px separator nagłówka planera i ustawień w obu motywach,
   ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
