@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
@@ -6,8 +7,11 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:program/core/input/app_preferences_controller.dart';
+import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/features/editor/state/editor_controller.dart';
+import 'package:program/features/editor/state/ink_color_presets.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/image_block.dart';
@@ -194,6 +198,100 @@ void main() {
     await latest.load();
     expect(latest.uiScale, 0.75);
     latest.dispose();
+  });
+
+  test('quick colors start blue and a selected palette persists', () async {
+    final db = NotesDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final repository = _repository(db);
+    final controller = EditorController(
+      repository: repository,
+      notebook: _fixture(uid: 'palette-default'),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(controller.quickColors, InkColorPreset.blue.colors);
+    expect(controller.penColor, InkColorPreset.blue.colors[0]);
+    expect(controller.highlighterColor, InkColorPreset.blue.colors[1]);
+
+    for (final preset in InkColorPreset.values) {
+      controller.applyInkColorPreset(preset);
+      expect(controller.quickColors, preset.colors);
+      expect(controller.penColor, preset.colors[0]);
+      expect(controller.highlighterColor, preset.colors[1]);
+    }
+    await controller.flushPendingSaves();
+    controller.dispose();
+
+    final persisted = jsonDecode((await readStoredText('editor_prefs.json'))!)
+        as Map<String, dynamic>;
+    expect(persisted['quickColors'], [
+      '#2c443a',
+      '#9bbfb0',
+      '#d0e1da',
+    ]);
+    expect(persisted['penColor'], '#2c443a');
+    expect(persisted['highlighterColor'], '#9bbfb0');
+  });
+
+  test('legacy default quick swatches migrate without wiping custom colors',
+      () async {
+    await writeStoredText(
+      'editor_prefs.json',
+      jsonEncode({
+        'penColor': '#1e2a40',
+        'highlighterColor': '#536783',
+        'quickColors': ['#1e1e1e', '#d32f2f', '#2e7d32'],
+      }),
+    );
+    final db = NotesDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final controller = EditorController(
+      repository: _repository(db),
+      notebook: _fixture(uid: 'palette-migration'),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(controller.quickColors, InkColorPreset.blue.colors);
+    expect(controller.penColor, InkColorPreset.blue.colors[0]);
+    expect(controller.highlighterColor, InkColorPreset.blue.colors[1]);
+    await controller.flushPendingSaves();
+    controller.dispose();
+
+    final persisted = jsonDecode((await readStoredText('editor_prefs.json'))!)
+        as Map<String, dynamic>;
+    expect(persisted['quickColors'], [
+      '#2a3851',
+      '#a1b2ce',
+      '#d0d8e7',
+    ]);
+  });
+
+  test('custom quick swatches survive startup unchanged', () async {
+    await writeStoredText(
+      'editor_prefs.json',
+      jsonEncode({
+        'penColor': '#123456',
+        'highlighterColor': '#654321',
+        'quickColors': ['#123456', '#654321', '#abcdef'],
+      }),
+    );
+    final db = NotesDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final controller = EditorController(
+      repository: _repository(db),
+      notebook: _fixture(uid: 'custom-palette'),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(controller.quickColors, const [
+      Color(0xFF123456),
+      Color(0xFF654321),
+      Color(0xFFABCDEF),
+    ]);
+    expect(controller.penColor, const Color(0xFF123456));
+    expect(controller.highlighterColor, const Color(0xFF654321));
+    controller.dispose();
   });
 
   test(
