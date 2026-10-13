@@ -108,8 +108,47 @@ void main() {
       final destination = find.byKey(
         const ValueKey('library-folder-drop:Destination'),
       );
+      final draggable = find.ancestor(
+        of: source,
+        matching: find.byType(LongPressDraggable<String>),
+      );
+      expect(tester.widget<LongPressDraggable<String>>(draggable).axis,
+          Axis.vertical);
+      final originalSize = tester.getSize(source);
       final gesture = await tester.startGesture(tester.getCenter(source));
       await tester.pump(const Duration(milliseconds: 700));
+
+      final feedback = find.byKey(
+        ValueKey('library-tree-drag-feedback:$uid'),
+      );
+      expect(feedback, findsOneWidget);
+      expect(tester.getSize(feedback), originalSize);
+      expect(find.descendant(of: feedback, matching: find.text(
+        uid == note.uid ? note.title : board.title,
+      )), findsOneWidget);
+
+      final colors = Theme.of(tester.element(source)).colorScheme;
+      final highlightedMaterial = tester.widget<Material>(
+        find.descendant(
+          of: feedback,
+          matching: find.byType(Material),
+        ).first,
+      );
+      expect(
+        highlightedMaterial.color,
+        Color.alphaBlend(
+          colors.onSurface.withValues(alpha: 0.10),
+          colors.surfaceContainerHighest,
+        ),
+      );
+
+      final initialFeedbackLeft = tester.getTopLeft(feedback).dx;
+      await gesture.moveBy(const Offset(40, 0));
+      await tester.pump();
+      expect(
+        tester.getTopLeft(feedback).dx,
+        closeTo(initialFeedbackLeft, 0.5),
+      );
       await gesture.moveTo(tester.getCenter(destination));
       await tester.pump(const Duration(milliseconds: 100));
       await gesture.up();

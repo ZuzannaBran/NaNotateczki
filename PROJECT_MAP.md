@@ -353,7 +353,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 504: `moveItemToFolder`; 534: `selectFolder`; 645: `_loadFolders`; 684: `_saveFolders`
   — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1640 linii)
+### `lib/features/library/presentation/library_screen.dart` (1647 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -383,9 +383,12 @@ szerokości, 44 px wysokości, cień i obrys. Stan toolbaru pozostaje zachowany
 przy przełączaniu dokumentów.
 
 W drzewku folderów przytrzymanie notebooka lub boarda uruchamia drag & drop
-na wiersz innego folderu (również zwiniętego). Folder przyjmuje element
-z podświetleniem i rozwija się po upuszczeniu. Przed ruchem kończone są
-oczekujące zapisy edytora; zmiana folderu aktywnego dokumentu odtwarza
+na wiersz innego folderu (również zwiniętego). Podczas przeciągania cały
+wiersz zachowuje oryginalną szerokość, ikonę, nazwę i menu, ma mocniejsze
+podświetlenie i przesuwa się tylko w pionie; w miejscu źródłowym nie
+wyświetla się jego kopia. Folder przyjmuje element z podświetleniem
+i rozwija się po upuszczeniu. Przed ruchem kończone są oczekujące
+zapisy edytora; zmiana folderu aktywnego dokumentu odtwarza
 kontroler edytora z aktualnymi metadanymi, zamiast zostawiać stary folder.
 
 Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
@@ -405,18 +408,18 @@ i przywracane natychmiast po zamknięciu;
 2 px łącznik koloru panelu maskuje linię graniczną. Menu folderu zawiera także
 edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon.
 
-- 23: `LibraryScreen`; 30: `_LibraryScreenState`;
-  438: `_openCatalogSettings`;
-  783: `_CreateMenuButton`;
-  826: `_LibraryTreePane`;
-  1056: `_FolderTreeRow`;
-  1150: `_LibraryTreeItemRow`;
-  1222: `_sidebarMenuShape`;
-  1236: `_SidebarMenuShadowPainter`;
-  1277: `_showSidebarMenu`;
-  1364: `_TreeRowActions`;
-  1438: `_LibraryWorkspace`;
-  1512: `_LeftZoneToggleTab`.
+- 25: `LibraryScreen`; 32: `_LibraryScreenState`;
+  463: `_openCatalogSettings`;
+  798: `_CreateMenuButton`;
+  841: `_LibraryTreePane`;
+  1093: `_FolderTreeRow`;
+  1191: `_LibraryTreeItemRow`;
+  1302: `_sidebarMenuShape`;
+  1316: `_SidebarMenuShadowPainter`;
+  1357: `_showSidebarMenu`;
+  1444: `_TreeRowActions`;
+  1518: `_LibraryWorkspace`;
+  1592: `_LeftZoneToggleTab`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (728 linii)
 
@@ -877,7 +880,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/cloud_sync_service_test.dart` (84)
 - `test/library_sidebar_drag_drop_test.dart`: trwałe przenoszenie notatek i
   boardów między folderami, walidacja celu, zachowanie wyboru, przeciąganie
-  na zwinięty folder i rozwinięcie go po upuszczeniu.
+  na zwinięty folder i rozwinięcie go po upuszczeniu; zgodność szerokości
+  i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
+  poziomego.
 - `test/library_controller_test.dart` (33)
 - `test/library_catalog_test.dart` (204): kolor dominujący, serializacja
   okładek, start katalogu, siatka notatek/boardów, nagłówek i Settings,

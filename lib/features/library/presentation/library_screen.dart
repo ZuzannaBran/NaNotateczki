@@ -1203,17 +1203,27 @@ class _LibraryTreeItemRow extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildRow(
+    BuildContext context, {
+    required bool dragging,
+    Key? key,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     final icon = item.kind == NotebookKind.board
         ? Icons.dashboard_outlined
         : Icons.description_outlined;
-    final row = Padding(
-      key: ValueKey('library-tree-item:${item.uid}'),
+    final draggingColor = Color.alphaBlend(
+      colorScheme.onSurface.withValues(alpha: 0.10),
+      colorScheme.surfaceContainerHighest,
+    );
+
+    return Padding(
+      key: key,
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
-        color: selected
+        color: dragging
+            ? draggingColor
+            : selected
             ? colorScheme.surfaceContainerHighest
             : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
@@ -1257,38 +1267,34 @@ class _LibraryTreeItemRow extends StatelessWidget {
         ),
       ),
     );
+  }
 
-    return LongPressDraggable<String>(
-      data: item.uid,
-      maxSimultaneousDrags: 1,
-      feedback: Material(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-        elevation: 4,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
-              const SizedBox(width: 8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 190),
-                child: Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: _sidebarTextStyle.copyWith(
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ],
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final row = _buildRow(
+          context,
+          dragging: false,
+          key: ValueKey('library-tree-item:${item.uid}'),
+        );
+
+        return LongPressDraggable<String>(
+          data: item.uid,
+          axis: Axis.vertical,
+          maxSimultaneousDrags: 1,
+          feedback: SizedBox(
+            width: constraints.maxWidth,
+            child: _buildRow(
+              context,
+              dragging: true,
+              key: ValueKey('library-tree-drag-feedback:${item.uid}'),
+            ),
           ),
-        ),
-      ),
-      childWhenDragging: Opacity(opacity: 0.35, child: row),
-      child: row,
+          childWhenDragging: Opacity(opacity: 0, child: row),
+          child: row,
+        );
+      },
     );
   }
 }
