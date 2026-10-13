@@ -10,6 +10,7 @@ import 'package:program/core/input/touch_navigation_scroll_physics.dart';
 import 'package:program/core/theme/app_metrics.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/editor_screen.dart';
+import 'package:program/features/editor/presentation/widgets/editor_toolbar.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
@@ -128,6 +129,77 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     preferences.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await database.close();
+  });
+
+  testWidgets('quick color tap, long press and double tap stay distinct', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: _notebook(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: EditorToolbar(
+            controller: controller,
+            onInsertPressed: () {},
+            onExportSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    const first = ValueKey('editor-quick-color-0');
+    const second = ValueKey('editor-quick-color-1');
+    const third = ValueKey('editor-quick-color-2');
+    expect(find.byKey(first), findsOneWidget);
+    expect(find.byKey(second), findsOneWidget);
+    expect(find.byKey(third), findsOneWidget);
+    final original = List<Color>.of(controller.quickColors);
+
+    await tester.tap(find.byKey(second));
+    await tester.pumpAndSettle();
+    expect(controller.penColor, original[1]);
+    expect(find.text('Pick color'), findsNothing);
+    expect(controller.quickColors, original);
+
+    await tester.longPress(find.byKey(first));
+    await tester.pumpAndSettle();
+    expect(find.text('Pick color'), findsOneWidget);
+    expect(find.text('Palettes'), findsOneWidget);
+    expect(controller.quickColors, original);
+
+    await tester.enterText(find.byType(TextField), '#123ABC');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(TextButton, 'Save'));
+    await tester.pumpAndSettle();
+    expect(controller.quickColors[0], const Color(0xFF123ABC));
+    expect(controller.penColor, const Color(0xFF123ABC));
+    expect(controller.quickColors[1], original[1]);
+    expect(controller.quickColors[2], original[2]);
+
+    await tester.tap(find.byKey(third));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(third));
+    await tester.pumpAndSettle();
+    expect(find.text('Pick color'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pick color'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
