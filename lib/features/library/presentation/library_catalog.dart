@@ -182,7 +182,6 @@ class LibraryCatalog extends StatelessWidget {
                           final cellWidth = gridWidth / columns;
                           final rowCount =
                               (folders.length + columns - 1) ~/ columns;
-                          final dividerColor = AppHeaderDivider.colorOf(context);
 
                           return SingleChildScrollView(
                             key: const ValueKey('catalog-folders'),
@@ -229,85 +228,40 @@ class LibraryCatalog extends StatelessWidget {
                                                 SizedBox(
                                                   width: cellWidth,
                                                   height: rowExtent,
-                                                  child: Stack(
-                                                    children: [
-                                                      Positioned.fill(
-                                                        child: Padding(
-                                                          padding:
-                                                              const EdgeInsets.all(
-                                                                18,
-                                                              ),
-                                                          child: _FolderTile(
-                                                            name:
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.all(18),
+                                                    child: _FolderTile(
+                                                      name: folders[index],
+                                                      contents: controller.items
+                                                          .where(
+                                                            (item) =>
+                                                                item.folder ==
                                                                 folders[index],
-                                                            contents: controller
-                                                                .items
-                                                                .where(
-                                                                  (item) =>
-                                                                      item.folder ==
-                                                                      folders[index],
-                                                                ),
-                                                            cover: controller
-                                                                .folderCoverFor(
-                                                                  folders[index],
-                                                                ),
-                                                            onTap: () =>
-                                                                onFolderTap(
-                                                                  folders[index],
-                                                                ),
-                                                            onEdit: () =>
-                                                                onEditFolder(
-                                                                  folders[index],
-                                                                ),
-                                                            onRename: () =>
-                                                                onRenameFolder(
-                                                                  folders[index],
-                                                                ),
-                                                            onDelete: () =>
-                                                                onDeleteFolder(
-                                                                  folders[index],
-                                                                ),
                                                           ),
-                                                        ),
+                                                      cover: controller
+                                                          .folderCoverFor(
+                                                            folders[index],
+                                                          ),
+                                                      onTap: () => onFolderTap(
+                                                        folders[index],
                                                       ),
-                                                      if (index <
-                                                          math.min(
-                                                                (row + 1) *
-                                                                    columns,
-                                                                folders.length,
-                                                              ) -
-                                                              1)
-                                                        Positioned(
-                                                          top: 0,
-                                                          bottom: 0,
-                                                          right: 0,
-                                                          child: SizedBox(
-                                                            key: ValueKey(
-                                                              'catalog-vertical-divider:$row:$index',
-                                                            ),
-                                                            width: 1,
-                                                            child: ColoredBox(
-                                                              color:
-                                                                  dividerColor,
-                                                            ),
+                                                      onEdit: () => onEditFolder(
+                                                        folders[index],
+                                                      ),
+                                                      onRename: () =>
+                                                          onRenameFolder(
+                                                            folders[index],
                                                           ),
-                                                        ),
-                                                    ],
+                                                      onDelete: () =>
+                                                          onDeleteFolder(
+                                                            folders[index],
+                                                          ),
+                                                    ),
                                                   ),
                                                 ),
                                             ],
                                           ),
-                                          if (row < rowCount - 1)
-                                            SizedBox(
-                                              key: ValueKey(
-                                                'catalog-horizontal-divider:$row',
-                                              ),
-                                              width: gridWidth,
-                                              height: 1,
-                                              child: ColoredBox(
-                                                color: dividerColor,
-                                              ),
-                                            ),
                                         ],
                                       ],
                                     ),
