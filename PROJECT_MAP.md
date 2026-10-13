@@ -649,7 +649,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1024):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1029):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
@@ -665,10 +665,13 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   a przed zapisem wracają do wartości bazowej; wybór bez zmian jest bezstratny.
   Pod Recent widoczne są trzy palety (tylko podczas edycji szybkich kolorów);
   ich pojedynczy wybór podmienia całą trójkę i zachowuje tryb jasny/ciemny.
+  Pojedynczy tap szybkiego koloru wybiera go, dwuklik oraz długie
+  przytrzymanie otwierają ten sam edytor palety.
   Kontroler HEX jest zwalniany dopiero
   po zakończeniu animacji zamykania dialogu, także przy zagnieżdżonej edycji.
   11: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
-  406: selektor kształtu; 575: `pickColor`; 917: `_EraserIcon`.
+  406: selektor kształtu; 533: `_colorDot`; 580: `pickColor`;
+  922: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (345):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
@@ -900,13 +903,14 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/notebook_overview_navigation_test.dart`: kliknięcia widocznej minimapy,
   przełączanie strony, scroll minimapy bez nawigacji, wybór po przewinięciu,
   blokada transformacji, mapowanie współrzędnych i zachowanie skali.
-- `test/editor_screen_responsive_layout_test.dart` (355):
+- `test/editor_screen_responsive_layout_test.dart` (427):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
   poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
   minimapa na krótkim ekranie, regulacja scrolla stron i interaktywność
-  narzędzi
+  narzędzi; test tap/dwuklik/przytrzymanie szybkiego koloru, otwarcia
+  selektora i zapisu nowego koloru.
 - `test/editor_toolbar_color_picker_test.dart`: dark/light picker, odwrócone
   Recent i wartości RGB/HEX, suwak i zapis z zachowaniem koloru wizualnego,
   brak modyfikacji danych po zatwierdzeniu bez zmian; osobne widget testy
