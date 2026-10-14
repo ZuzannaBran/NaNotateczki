@@ -460,30 +460,41 @@ class _CatalogTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: scheme.onSurface,
-                  fontWeight: FontWeight.w500,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: SizedBox(
+            height: 34,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: PopupMenuButton<int>(
+                    tooltip: 'Actions for $title',
+                    icon: const Icon(Icons.more_horiz_rounded, size: 19),
+                    padding: EdgeInsets.zero,
+                    onSelected: onAction,
+                    itemBuilder: (_) => actions,
+                  ),
                 ),
-              ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            PopupMenuButton<int>(
-              tooltip: 'Actions for $title',
-              icon: const Icon(Icons.more_horiz_rounded, size: 19),
-              padding: EdgeInsets.zero,
-              onSelected: onAction,
-              itemBuilder: (_) => actions,
-            ),
-          ],
+          ),
         ),
-        const SizedBox(height: 7),
+        const SizedBox(height: 2),
         Expanded(
           child: Material(
             color: Colors.transparent,
