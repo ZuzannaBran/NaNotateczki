@@ -41,6 +41,12 @@ void main() {
     expect(FolderCoverStyle.fromJson(null).iconColor, isNull);
   });
 
+  test('canvas and folder palettes use the same global colors', () {
+    expect(InkColorPreset.blue.colors, same(AppColors.blueColorSet));
+    expect(InkColorPreset.pink.colors, same(AppColors.pinkColorSet));
+    expect(InkColorPreset.green.colors, same(AppColors.greenColorSet));
+  });
+
   test('recent folder cover colors persist in selection order', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     final repository = NotebookRepository(database);
