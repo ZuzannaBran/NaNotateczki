@@ -159,9 +159,14 @@ void main() {
       const ValueKey('catalog-folder-cover:Physics'),
     );
     expect(cover, findsOneWidget);
+    final initialFolderIcon = find.descendant(
+      of: cover,
+      matching: find.byType(FolderCoverIcon),
+    );
+    expect(initialFolderIcon, findsOneWidget);
     expect(
-      find.descendant(of: cover, matching: find.byType(Icon)),
-      findsNothing,
+      tester.widget<FolderCoverIcon>(initialFolderIcon).shape,
+      FolderCoverShape.folder,
     );
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
 
@@ -258,8 +263,11 @@ void main() {
 
     await tester.tap(find.byTooltip('Edit folder cover'));
     await tester.pumpAndSettle();
-    expect(find.text('Cover decoration'), findsNothing);
-    expect(find.byKey(const ValueKey('cover-shape:heart')), findsNothing);
+    expect(find.text('Cover decoration'), findsOneWidget);
+    final heartChoice = find.byKey(const ValueKey('cover-shape:heart'));
+    expect(heartChoice, findsOneWidget);
+    await tester.tap(heartChoice);
+    await tester.pumpAndSettle();
     expect(find.text('Palettes'), findsOneWidget);
     expect(find.text('Recent'), findsOneWidget);
     for (final preset in InkColorPreset.values) {
@@ -307,7 +315,7 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    expect(controller.folderCoverFor('Physics').shape, FolderCoverShape.folder);
+    expect(controller.folderCoverFor('Physics').shape, FolderCoverShape.heart);
     expect(
       controller.folderCoverFor('Physics').iconColor,
       const Color(0xFF2B3C4D),
@@ -344,13 +352,20 @@ void main() {
       const ValueKey('catalog-folder-cover:Physics'),
     );
     expect(savedCover, findsOneWidget);
-    expect(
-      find.descendant(of: savedCover, matching: find.byType(Icon)),
-      findsNothing,
+    final displayedFolderIcon = find.descendant(
+      of: savedCover,
+      matching: find.byType(FolderCoverIcon),
     );
+    expect(displayedFolderIcon, findsOneWidget);
+    final restoredIcon = tester.widget<FolderCoverIcon>(displayedFolderIcon);
+    expect(restoredIcon.shape, FolderCoverShape.heart);
+    expect(restoredIcon.color, const Color(0xFF2B3C4D));
     expect(
-      (tester.widget<Ink>(savedCover).decoration! as BoxDecoration).color,
-      Color.lerp(AppColors.paper, const Color(0xFF2B3C4D), 0.20),
+      find.descendant(
+        of: displayedFolderIcon,
+        matching: find.byKey(const ValueKey('folder-cover-decoration')),
+      ),
+      findsOneWidget,
     );
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -359,7 +374,7 @@ void main() {
     await database.close();
   });
 
-  testWidgets('Projects shows blank colored covers for legacy shapes', (
+  testWidgets('Projects restores folder icons for saved cover shapes', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(900, 800));
@@ -413,28 +428,48 @@ void main() {
       );
       expect(customCover, findsOneWidget);
       expect(plainCover, findsOneWidget);
-      for (final cover in [customCover, plainCover]) {
-        expect(
-          find.descendant(of: cover, matching: find.byType(Icon)),
-          findsNothing,
-        );
-        expect(
-          find.descendant(of: cover, matching: find.byType(CustomPaint)),
-          findsNothing,
-        );
-      }
-      final neutral = darkMode ? AppColors.darkPaper : AppColors.paper;
+      final customIcon = find.descendant(
+        of: customCover,
+        matching: find.byType(FolderCoverIcon),
+      );
+      final plainIcon = find.descendant(
+        of: plainCover,
+        matching: find.byType(FolderCoverIcon),
+      );
+      expect(customIcon, findsOneWidget);
+      expect(plainIcon, findsOneWidget);
+      expect(tester.widget<FolderCoverIcon>(customIcon).shape,
+          FolderCoverShape.heart);
+      expect(tester.widget<FolderCoverIcon>(plainIcon).shape,
+          FolderCoverShape.folder);
       expect(
-        (tester.widget<Ink>(plainCover).decoration! as BoxDecoration).color,
-        neutral,
+        tester.widget<FolderCoverIcon>(customIcon).color,
+        AppColors.displayInkColor(customColor, darkMode: darkMode),
       );
       expect(
-        (tester.widget<Ink>(customCover).decoration! as BoxDecoration).color,
-        Color.lerp(
-          neutral,
-          AppColors.displayInkColor(customColor, darkMode: darkMode),
-          0.20,
+        tester.widget<FolderCoverIcon>(plainIcon).color,
+        Theme.of(tester.element(plainIcon)).colorScheme.onSurface,
+      );
+      expect(
+        find.descendant(
+          of: customIcon,
+          matching: find.byKey(const ValueKey('folder-cover-outline')),
         ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: customIcon,
+          matching: find.byKey(const ValueKey('folder-cover-decoration')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: plainIcon,
+          matching: find.byKey(const ValueKey('folder-cover-decoration')),
+        ),
+        findsNothing,
       );
       expect(tester.takeException(), isNull);
     }
@@ -442,6 +477,34 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     await database.close();
+  });
+
+  testWidgets('Folder icons use the delicate Lucide stroke', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Center(
+          child: FolderCoverIcon(
+            shape: FolderCoverShape.flower,
+            color: Colors.black,
+          ),
+        ),
+      ),
+    );
+    final icon = find.byType(FolderCoverIcon);
+    final outline = find.descendant(
+      of: icon,
+      matching: find.byKey(const ValueKey('folder-cover-outline')),
+    );
+    final decoration = find.descendant(
+      of: icon,
+      matching: find.byKey(const ValueKey('folder-cover-decoration')),
+    );
+    expect(outline, findsOneWidget);
+    expect(decoration, findsOneWidget);
+    final painter = tester.widget<CustomPaint>(outline).painter;
+    expect(painter, isA<FolderCoverStrokePainter>());
+    expect((painter! as FolderCoverStrokePainter).strokeWidth, 1.25);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Projects tiles keep rounded beige surfaces on hover', (
