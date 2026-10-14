@@ -10,6 +10,7 @@ import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/editor/presentation/widgets/editor_toolbar.dart';
+import 'package:program/features/editor/state/ink_color_presets.dart';
 import 'package:program/features/library/presentation/library_catalog.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
@@ -186,10 +187,36 @@ void main() {
       findsOneWidget,
     );
     await tester.tap(heartOption);
+    expect(find.text('Palettes'), findsOneWidget);
+    expect(find.text('Recent'), findsOneWidget);
+    for (final preset in InkColorPreset.values) {
+      for (final color in preset.colors) {
+        expect(
+          find.byKey(
+            ValueKey('cover-palette-${preset.name}-${color.toARGB32()}'),
+          ),
+          findsOneWidget,
+        );
+      }
+    }
+    final firstPaletteColor = InkColorPreset.blue.colors[2];
+    final paletteSwatch = find.byKey(
+      ValueKey('cover-palette-blue-${firstPaletteColor.toARGB32()}'),
+    );
+    await tester.ensureVisible(paletteSwatch);
+    await tester.tap(paletteSwatch);
+    await tester.pumpAndSettle();
+    final selectedPaletteSwatch = tester.widget<InkWell>(paletteSwatch);
+    expect(
+      (selectedPaletteSwatch.child! as Container).child,
+      isA<Icon>(),
+    );
     await tester.tap(
       find.byKey(ValueKey('cover-color:${const Color(0xFF2E7D32).toARGB32()}')),
     );
-    await tester.tap(find.byKey(const ValueKey('cover-advanced-color')));
+    final advancedButton = find.byKey(const ValueKey('cover-advanced-color'));
+    await tester.ensureVisible(advancedButton);
+    await tester.tap(advancedButton);
     await tester.pumpAndSettle();
     expect(find.text('Pick color'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
@@ -210,6 +237,26 @@ void main() {
       controller.folderCoverFor('Physics').iconColor,
       const Color(0xFF2B3C4D),
     );
+    expect(
+      controller.recentCoverColors.first,
+      const Color(0xFF2B3C4D),
+    );
+
+    await tester.tap(folderMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit cover').last);
+    await tester.pumpAndSettle();
+    final recentSwatch = find.byKey(
+      ValueKey(
+        'cover-recent-${const Color(0xFF2B3C4D).toARGB32()}',
+      ),
+    );
+    expect(recentSwatch, findsOneWidget);
+    await tester.ensureVisible(recentSwatch);
+    await tester.tap(recentSwatch);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel').last);
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(ValueKey('catalog-document:${note.uid}')));
     await tester.pumpAndSettle();
