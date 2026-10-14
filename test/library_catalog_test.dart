@@ -67,6 +67,7 @@ void main() {
       const FolderCoverStyle(iconColor: pink),
     );
     expect(controller.recentCoverColors, [pink, blue]);
+    expect((await SharedRecentColors.load()).take(2), [pink, blue]);
 
     final restored = LibraryController(
       repository,
@@ -264,6 +265,7 @@ void main() {
     await tester.tap(find.byTooltip('Edit folder cover'));
     await tester.pumpAndSettle();
     expect(find.text('Cover decoration'), findsOneWidget);
+    expect(find.text('Cover color'), findsNothing);
     final heartChoice = find.byKey(const ValueKey('cover-shape:heart'));
     expect(heartChoice, findsOneWidget);
     await tester.tap(heartChoice);
@@ -288,15 +290,21 @@ void main() {
     await tester.tap(paletteSwatch);
     await tester.pumpAndSettle();
     final selectedPaletteSwatch = tester.widget<InkWell>(paletteSwatch);
+    final paletteCircle = selectedPaletteSwatch.child! as Container;
+    expect(paletteCircle.child, isA<Icon>());
     expect(
-      (selectedPaletteSwatch.child! as Container).child,
-      isA<Icon>(),
+      (paletteCircle.decoration! as BoxDecoration).shape,
+      BoxShape.circle,
     );
-    final baseColor = find.byKey(
+    expect(find.byKey(
       ValueKey('cover-color:${const Color(0xFF2E7D32).toARGB32()}'),
-    );
-    await tester.ensureVisible(baseColor);
-    await tester.tap(baseColor);
+    ), findsNothing);
+    for (final label in ['Blue', 'Pink', 'Green']) {
+      final widget = tester.widget<Text>(find.text(label).last);
+      expect(widget.style?.color,
+          Theme.of(tester.element(find.text(label).last))
+              .colorScheme.onSurface);
+    }
     final advancedButton = find.byKey(const ValueKey('cover-advanced-color'));
     await tester.ensureVisible(advancedButton);
     await tester.tap(advancedButton);
