@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -47,7 +48,7 @@ Color dominantFolderColor(Iterable<Notebook> notebooks) {
   return Color(chosen.key);
 }
 
-/// Renders a consistent outlined folder, with an optional cover decoration.
+/// A thin, font-rendered folder with an optional decoration on its cover.
 class FolderCoverIcon extends StatelessWidget {
   const FolderCoverIcon({
     required this.shape,
@@ -64,6 +65,14 @@ class FolderCoverIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final decoration = switch (shape) {
+      FolderCoverShape.folder => null,
+      FolderCoverShape.star => CupertinoIcons.star,
+      FolderCoverShape.heart => CupertinoIcons.heart,
+      FolderCoverShape.flower => CupertinoIcons.rosette,
+      FolderCoverShape.sparkle => CupertinoIcons.sparkles,
+    };
+
     return Semantics(
       label: semanticLabel,
       child: SizedBox.square(
@@ -71,172 +80,29 @@ class FolderCoverIcon extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            CustomPaint(
-              key: const ValueKey('folder-cover-outline'),
-              painter: _FolderOutlinePainter(color),
+            Center(
+              child: Icon(
+                CupertinoIcons.folder,
+                key: const ValueKey('folder-cover-outline'),
+                color: color,
+                size: size,
+              ),
             ),
-            if (shape != FolderCoverShape.folder)
-              CustomPaint(
-                key: const ValueKey('folder-cover-decoration'),
-                painter: _FolderDecorationPainter(shape, color),
+            if (decoration != null)
+              Align(
+                alignment: const Alignment(0, 0.25),
+                child: Icon(
+                  decoration,
+                  key: const ValueKey('folder-cover-decoration'),
+                  color: color,
+                  size: size * 0.28,
+                ),
               ),
           ],
         ),
       ),
     );
   }
-}
-
-void _paintFolderLineArt(
-  Canvas canvas,
-  Size size,
-  Color color,
-  void Function(Paint) draw,
-) {
-  final scale = size.shortestSide / 100;
-  if (scale <= 0) {
-    return;
-  }
-  canvas.save();
-  canvas.translate(
-    (size.width - 100 * scale) / 2,
-    (size.height - 100 * scale) / 2,
-  );
-  canvas.scale(scale);
-  final stroke = Paint()
-    ..color = color
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = (size.shortestSide >= 50 ? 1.6 : 1.1) / scale
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round;
-  draw(stroke);
-  canvas.restore();
-}
-
-class _FolderOutlinePainter extends CustomPainter {
-  const _FolderOutlinePainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    _paintFolderLineArt(canvas, size, color, (stroke) {
-      final outline = Path()
-        ..moveTo(17, 29)
-        ..lineTo(37, 29)
-        ..quadraticBezierTo(40, 29, 43, 33)
-        ..lineTo(50, 40)
-        ..lineTo(83, 40)
-        ..quadraticBezierTo(88, 40, 88, 45)
-        ..lineTo(88, 77)
-        ..quadraticBezierTo(88, 83, 82, 83)
-        ..lineTo(18, 83)
-        ..quadraticBezierTo(12, 83, 12, 77)
-        ..lineTo(12, 35)
-        ..quadraticBezierTo(12, 29, 17, 29)
-        ..close();
-      canvas.drawPath(outline, stroke);
-    });
-  }
-
-  @override
-  bool shouldRepaint(covariant _FolderOutlinePainter oldDelegate) =>
-      color != oldDelegate.color;
-}
-
-class _FolderDecorationPainter extends CustomPainter {
-  const _FolderDecorationPainter(this.shape, this.color);
-
-  final FolderCoverShape shape;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    _paintFolderLineArt(canvas, size, color, (stroke) {
-      switch (shape) {
-        case FolderCoverShape.folder:
-          break;
-        case FolderCoverShape.star:
-          final star = Path();
-          for (var index = 0; index < 10; index++) {
-            final angle = -math.pi / 2 + index * math.pi / 5;
-            final radius = index.isEven ? 14.0 : 6.0;
-            final x = 50 + radius * math.cos(angle);
-            final y = 62 + radius * math.sin(angle);
-            if (index == 0) {
-              star.moveTo(x, y);
-            } else {
-              star.lineTo(x, y);
-            }
-          }
-          canvas.drawPath(star..close(), stroke);
-        case FolderCoverShape.heart:
-          final heart = Path()
-            ..moveTo(50, 75)
-            ..cubicTo(46, 71, 36, 65, 36, 57)
-            ..cubicTo(36, 49, 45, 48, 50, 55)
-            ..cubicTo(55, 48, 64, 49, 64, 57)
-            ..cubicTo(64, 65, 54, 71, 50, 75)
-            ..close();
-          canvas.drawPath(heart, stroke);
-        case FolderCoverShape.flower:
-          for (var index = 0; index < 5; index++) {
-            final angle = index * 2 * math.pi / 5;
-            canvas.save();
-            canvas.translate(50, 62);
-            canvas.rotate(angle);
-            canvas.drawOval(
-              Rect.fromCenter(
-                center: const Offset(0, -9),
-                width: 11,
-                height: 16,
-              ),
-              stroke,
-            );
-            canvas.restore();
-          }
-          canvas.drawCircle(const Offset(50, 62), 3.5, stroke);
-        case FolderCoverShape.sparkle:
-          void sparkle(double x, double y, double radius) {
-            final spark = Path()
-              ..moveTo(x, y - radius)
-              ..quadraticBezierTo(
-                x + radius * 0.23,
-                y - radius * 0.23,
-                x + radius,
-                y,
-              )
-              ..quadraticBezierTo(
-                x + radius * 0.23,
-                y + radius * 0.23,
-                x,
-                y + radius,
-              )
-              ..quadraticBezierTo(
-                x - radius * 0.23,
-                y + radius * 0.23,
-                x - radius,
-                y,
-              )
-              ..quadraticBezierTo(
-                x - radius * 0.23,
-                y - radius * 0.23,
-                x,
-                y - radius,
-              )
-              ..close();
-            canvas.drawPath(spark, stroke);
-          }
-
-          sparkle(48, 62, 13);
-          sparkle(65, 50, 4);
-      }
-    });
-  }
-
-  @override
-  bool shouldRepaint(covariant _FolderDecorationPainter oldDelegate) =>
-      shape != oldDelegate.shape || color != oldDelegate.color;
 }
 
 class LibraryCatalog extends StatelessWidget {
@@ -932,7 +798,7 @@ Future<void> showFolderCoverEditor(
                       label: FolderCoverIcon(
                         shape: option,
                         color: Theme.of(context).colorScheme.onSurface,
-                        size: 30,
+                        size: 40,
                         semanticLabel: option.name,
                       ),
                       selected: shape == option,

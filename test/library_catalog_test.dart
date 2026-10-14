@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -260,20 +261,37 @@ void main() {
       );
 
       final cover = find.byType(FolderCoverIcon);
-      expect(
-        find.descendant(
-          of: cover,
-          matching: find.byKey(const ValueKey('folder-cover-outline')),
-        ),
-        findsOneWidget,
+      final outline = find.descendant(
+        of: cover,
+        matching: find.byKey(const ValueKey('folder-cover-outline')),
       );
-      expect(
-        find.descendant(
-          of: cover,
-          matching: find.byKey(const ValueKey('folder-cover-decoration')),
-        ),
-        shape == FolderCoverShape.folder ? findsNothing : findsOneWidget,
+      expect(outline, findsOneWidget);
+      final folderIcon = tester.widget<Icon>(outline);
+      expect(folderIcon.icon, CupertinoIcons.folder);
+      expect(folderIcon.size, 88);
+      expect(folderIcon.color, Colors.black);
+
+      final decoration = find.descendant(
+        of: cover,
+        matching: find.byKey(const ValueKey('folder-cover-decoration')),
       );
+      if (shape == FolderCoverShape.folder) {
+        expect(decoration, findsNothing);
+      } else {
+        expect(decoration, findsOneWidget);
+        expect(
+          tester.widget<Icon>(decoration).icon,
+          switch (shape) {
+            FolderCoverShape.folder => null,
+            FolderCoverShape.star => CupertinoIcons.star,
+            FolderCoverShape.heart => CupertinoIcons.heart,
+            FolderCoverShape.flower => CupertinoIcons.rosette,
+            FolderCoverShape.sparkle => CupertinoIcons.sparkles,
+          },
+        );
+        expect(tester.widget<Icon>(decoration).size, closeTo(24.64, 0.01));
+        expect(tester.widget<Icon>(decoration).color, Colors.black);
+      }
       expect(tester.takeException(), isNull);
     }
   });

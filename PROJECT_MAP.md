@@ -421,7 +421,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1008 linii)
+### `lib/features/library/presentation/library_catalog.dart` (874 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -432,9 +432,10 @@ AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
 `CompactStudyTimer`; folder ma też akcję edycji okładki.
 Okładka ma automatycznie rozjaśniony dominujący kolor ink/tekstu we wszystkich
 stronach dokumentów folderu. Każda okładka ma delikatny, cienki kontur
-folderu; wybierany kształt (gwiazda, serce, kwiat, błysk) jest dodatkową
-dekoracją wewnątrz konturu, a nie zamiennikiem folderu. Dialog pokazuje
-podgląd kompletnej okładki i pozwala zmienić kolor obrysu oraz dekoracji.
+folderu, rysowany gotową ikoną Cupertino zamiast ręcznym CustomPaint.
+Gwiazda, serce, rozeta (kwiat) i błysk są mniejszymi ikonami Cupertino
+na przedniej części folderu, a nie zamiennikami folderu. Okno edycji
+pokazuje ten sam układ i pozwala zmienić wspólny kolor ikon.
 Dialog pozwala również wybrać dowolny kolor przez `EditorToolbar.pickColor`,
 wspólny selektor notebooka z HEX i suwakami RGB/B-W.
 `_CatalogTile` umieszcza nazwę i menu kafelka nad miniaturą.
@@ -445,11 +446,13 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 23: `dominantFolderColor`; 51: `FolderCoverIcon`;
-  243: `LibraryCatalog`; 527: `_FolderTile`;
-  599: `_DocumentTile`; 639: `_CatalogTile`;
-  700: `_DocumentPreview`; 783: `_boardPreviewBounds`;
-  825: `_PagePreviewPainter`; 897: `showFolderCoverEditor`.
+- 24: `dominantFolderColor`; 52: `FolderCoverIcon`;
+  108: `LibraryCatalog`;
+  392: `_FolderTile`; 464: `_DocumentTile`;
+  504: `_CatalogTile`; 565: `_DocumentPreview`;
+  648: `_boardPreviewBounds`;
+  690: `_PagePreviewPainter`;
+  762: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
