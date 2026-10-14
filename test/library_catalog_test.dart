@@ -270,7 +270,8 @@ void main() {
         final outlinePainter = tester.widget<CustomPaint>(outline).painter;
         expect(outlinePainter, isA<FolderCoverStrokePainter>());
         final folderPainter = outlinePainter! as FolderCoverStrokePainter;
-        expect(folderPainter.strokeWidth, 1.1);
+        expect(folderPainter.strokeWidth, 1.25);
+        expect(folderPainter.smoothingSigma, 0.55);
         expect(folderPainter.color, Colors.black);
         expect(folderPainter.isDecoration, false);
 
@@ -289,7 +290,8 @@ void main() {
             isTrue,
           );
           expect(symbolPainter.shape, shape);
-          expect(symbolPainter.strokeWidth, 1.1);
+          expect(symbolPainter.strokeWidth, 1.25);
+          expect(symbolPainter.smoothingSigma, 0.55);
         }
         expect(
           find.descendant(of: cover, matching: find.byType(Icon)),
@@ -297,6 +299,39 @@ void main() {
         );
         expect(tester.takeException(), isNull);
       }
+    }
+  });
+
+  testWidgets('cover smoothing follows device pixel density', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Center(
+          child: FolderCoverIcon(
+            shape: FolderCoverShape.heart,
+            color: Colors.black,
+          ),
+        ),
+      ),
+    );
+
+    final cover = find.byType(FolderCoverIcon);
+    final strokes = find.descendant(
+      of: cover,
+      matching: find.byType(CustomPaint),
+    );
+    final painters = tester.widgetList<CustomPaint>(strokes).map(
+      (widget) => widget.painter,
+    );
+    for (final painter in painters) {
+      expect(painter, isA<FolderCoverStrokePainter>());
+      final stroke = painter! as FolderCoverStrokePainter;
+      expect(stroke.devicePixelRatio, 2.0);
+      expect(stroke.smoothingSigma, closeTo(0.275, 0.001));
     }
   });
 

@@ -58,7 +58,8 @@ class FolderCoverIcon extends StatelessWidget {
     super.key,
   });
 
-  static const double strokeWidth = 1.1;
+  // A slightly broader, translucent stroke stays delicate without aliasing.
+  static const double strokeWidth = 1.25;
 
   final FolderCoverShape shape;
   final Color color;
@@ -67,6 +68,7 @@ class FolderCoverIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     return Semantics(
       label: semanticLabel,
       child: SizedBox.square(
@@ -80,6 +82,7 @@ class FolderCoverIcon extends StatelessWidget {
                 shape: shape,
                 color: color,
                 isDecoration: false,
+                devicePixelRatio: devicePixelRatio,
               ),
             ),
             if (shape != FolderCoverShape.folder)
@@ -89,6 +92,7 @@ class FolderCoverIcon extends StatelessWidget {
                   shape: shape,
                   color: color,
                   isDecoration: true,
+                  devicePixelRatio: devicePixelRatio,
                 ),
               ),
           ],
@@ -104,13 +108,18 @@ class FolderCoverStrokePainter extends CustomPainter {
     required this.shape,
     required this.color,
     required this.isDecoration,
+    this.devicePixelRatio = 1.0,
   });
 
   final FolderCoverShape shape;
   final Color color;
   final bool isDecoration;
+  final double devicePixelRatio;
 
   double get strokeWidth => FolderCoverIcon.strokeWidth;
+
+  // Keep the soft edge approximately half a physical pixel on all screens.
+  double get smoothingSigma => 0.55 / devicePixelRatio;
 
   static final Path _folder = parseSvgPathData(
     'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9'
@@ -188,12 +197,16 @@ class FolderCoverStrokePainter extends CustomPainter {
       canvas.scale(decorationScale);
     }
     final stroke = Paint()
-      ..color = color
+      ..color = color.withValues(alpha: color.a * 0.86)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth / (scale * decorationScale)
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..isAntiAlias = true;
+      ..isAntiAlias = true
+      ..maskFilter = MaskFilter.blur(
+        BlurStyle.normal,
+        smoothingSigma / (scale * decorationScale),
+      );
 
     final path = isDecoration
         ? switch (shape) {
@@ -212,7 +225,8 @@ class FolderCoverStrokePainter extends CustomPainter {
   bool shouldRepaint(covariant FolderCoverStrokePainter oldDelegate) =>
       shape != oldDelegate.shape ||
       color != oldDelegate.color ||
-      isDecoration != oldDelegate.isDecoration;
+      isDecoration != oldDelegate.isDecoration ||
+      devicePixelRatio != oldDelegate.devicePixelRatio;
 }
 
 class LibraryCatalog extends StatelessWidget {
