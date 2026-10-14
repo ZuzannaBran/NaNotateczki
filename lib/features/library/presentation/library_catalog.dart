@@ -940,26 +940,26 @@ Future<void> showFolderCoverEditor(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Cover decoration'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      for (final option in FolderCoverShape.values)
-                        ChoiceChip(
-                          key: ValueKey('cover-shape:${option.name}'),
-                          label: FolderCoverIcon(
-                            shape: option,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            size: 40,
-                            semanticLabel: option.name,
-                          ),
-                          selected: shape == option,
-                          onSelected: (_) => update(() => shape = option),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final option in FolderCoverShape.values)
+                      ChoiceChip(
+                        key: ValueKey('cover-shape:${option.name}'),
+                        label: FolderCoverIcon(
+                          shape: option,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          size: 40,
+                          semanticLabel: option.name,
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                    const Text('Cover color'),
+                        selected: shape == option,
+                        onSelected: (_) => update(() => shape = option),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text('Cover color'),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
