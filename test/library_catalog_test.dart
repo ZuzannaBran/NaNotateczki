@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:program/core/input/app_preferences_controller.dart';
+import 'package:program/core/theme/app_colors.dart';
+import 'package:program/core/theme/app_theme.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
@@ -333,6 +335,90 @@ void main() {
       expect(stroke.devicePixelRatio, 2.0);
       expect(stroke.smoothingSigma, closeTo(0.275, 0.001));
     }
+  });
+
+  testWidgets('Projects tiles keep rounded beige surfaces on hover', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    await repository.createNotebook(folder: 'Soft folder');
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await controller.loadItems();
+
+    for (final isDark in [false, true]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: isDark ? AppTheme.dark() : AppTheme.light(),
+          home: LibraryCatalog(
+            controller: controller,
+            folder: null,
+            onBack: () {},
+            onFolderTap: (_) {},
+            onOpenItem: (_) {},
+            onEditFolder: (_) {},
+            onRenameFolder: (_) {},
+            onDeleteFolder: (_) {},
+            onRenameItem: (_) {},
+            onDeleteItem: (_) {},
+            onSettings: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tile = find.byKey(const ValueKey('catalog-folder:Soft folder'));
+      final ink = tester.widget<Ink>(
+        find.descendant(of: tile, matching: find.byType(Ink)),
+      );
+      final decoration = ink.decoration! as BoxDecoration;
+      expect(decoration.borderRadius, BorderRadius.circular(24));
+      expect(
+        decoration.color,
+        Color.lerp(
+          isDark ? AppColors.darkPaper : AppColors.paper,
+          isDark
+              ? AppColors.displayInkColor(
+                  AppColors.divider,
+                  darkMode: true,
+                )
+              : AppColors.divider,
+          0.10,
+        ),
+      );
+      final material = tester.widget<Material>(
+        find.descendant(of: tile, matching: find.byType(Material)),
+      );
+      expect(material.clipBehavior, Clip.antiAlias);
+      expect(material.borderRadius, BorderRadius.circular(24));
+
+      final inkWell = tester.widget<InkWell>(
+        find.descendant(of: tile, matching: find.byType(InkWell)),
+      );
+      expect(inkWell.borderRadius, BorderRadius.circular(24));
+      expect(
+        inkWell.overlayColor!.resolve({WidgetState.hovered}),
+        (isDark ? AppColors.darkActive : AppColors.toolbar)
+            .withValues(alpha: isDark ? 0.32 : 0.52),
+      );
+      expect(
+        inkWell.overlayColor!.resolve({WidgetState.pressed}),
+        (isDark ? AppColors.darkActive : AppColors.divider)
+            .withValues(alpha: isDark ? 0.52 : 0.42),
+      );
+      expect(tester.takeException(), isNull);
+    }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
   });
 
   testWidgets('Projects uses top-aligned responsive five-column folder grid', (

@@ -543,7 +543,7 @@ class _FolderTile extends StatelessWidget {
     final background = Color.lerp(
       darkMode ? AppColors.darkPaper : AppColors.paper,
       base,
-      0.24,
+      0.10,
     )!;
     final iconColor = cover.iconColor == null
         ? theme.colorScheme.onSurface
@@ -567,11 +567,15 @@ class _FolderTile extends StatelessWidget {
             onDelete();
         }
       },
-      child: DecoratedBox(
+      child: Ink(
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: base.withValues(alpha: 0.25)),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(
+              alpha: darkMode ? 0.30 : 0.22,
+            ),
+          ),
         ),
         child: Center(
           child: FolderCoverIcon(
@@ -643,7 +647,13 @@ class _CatalogTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final darkMode = theme.brightness == Brightness.dark;
+    final hoverColor = (darkMode ? AppColors.darkActive : AppColors.toolbar)
+        .withValues(alpha: darkMode ? 0.32 : 0.52);
+    final pressedColor = (darkMode ? AppColors.darkActive : AppColors.divider)
+        .withValues(alpha: darkMode ? 0.52 : 0.42);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -674,9 +684,23 @@ class _CatalogTile extends StatelessWidget {
         Expanded(
           child: Material(
             color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(24),
+              overlayColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.pressed)) {
+                  return pressedColor;
+                }
+                if (states.contains(WidgetState.hovered) ||
+                    states.contains(WidgetState.focused)) {
+                  return hoverColor;
+                }
+                return Colors.transparent;
+              }),
+              splashColor: pressedColor,
+              highlightColor: Colors.transparent,
               child: Padding(padding: const EdgeInsets.all(4), child: child),
             ),
           ),

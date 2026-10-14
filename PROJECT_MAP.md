@@ -421,7 +421,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (998 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1022 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -437,6 +437,10 @@ geometrii Lucide, rysowanej istniejącym `path_drawing` z cienką kreską
 Gaussa (sigma 0,55 piksela fizycznego) i lekko obniżoną alfą.
 Rozmiar ikony nie pogrubia konturu;
 wybrana dekoracja (gwiazda, serce, kwiat, błysk) znajduje się na okładce.
+Kafelki mają promień 24 px, tło mieszane z kolorem zawartości tylko w 10%
+oraz delikatne obrysy z motywu. Hover i press są w ciepłej palecie beżowej
+(lub stonowanej ciemnej), rysowane nad tłem za pomocą `Ink` i przycinane
+do tego samego zaokrąglenia przez `Material`.
 Źródła ikon i ich licencja ISC: `third_party/lucide/LICENSE`.
 Dialog pozwala również wybrać dowolny kolor przez `EditorToolbar.pickColor`,
 wspólny selektor notebooka z HEX i suwakami RGB/B-W.
@@ -448,7 +452,7 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 24: `dominantFolderColor`; 52: `FolderCoverIcon`; 106: `FolderCoverStrokePainter`; 232: `LibraryCatalog`; 516: `_FolderTile`; 588: `_DocumentTile`; 628: `_CatalogTile`; 689: `_DocumentPreview`; 772: `_boardPreviewBounds`; 814: `_PagePreviewPainter`; 886: `showFolderCoverEditor`.
+- 24: `dominantFolderColor`; 52: `FolderCoverIcon`; 106: `FolderCoverStrokePainter`; 232: `LibraryCatalog`; 516: `_FolderTile`; 592: `_DocumentTile`; 632: `_CatalogTile`; 713: `_DocumentPreview`; 796: `_boardPreviewBounds`; 838: `_PagePreviewPainter`; 910: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
