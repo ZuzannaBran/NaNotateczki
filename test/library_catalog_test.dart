@@ -345,7 +345,25 @@ void main() {
 
     final database = NotesDatabase(NativeDatabase.memory());
     final repository = NotebookRepository(database);
-    await repository.createNotebook(folder: 'Soft folder');
+    final colored = await repository.createNotebook(
+      folder: 'Soft folder',
+    );
+    final page = colored.pages.first.copyWith(
+      inkStrokes: [
+        InkStroke(
+          id: 'black-ink',
+          points: const [InkPoint(dx: 1, dy: 2, pressure: 1)],
+          color: Colors.black,
+          width: 2,
+          tool: DrawingTool.pen,
+        ),
+      ],
+    );
+    expect(
+      await repository.saveNotebook(colored.copyWith(pages: [page])),
+      isTrue,
+    );
+    await repository.createNotebook(folder: 'Plain folder');
     final controller = LibraryController(
       repository,
       CloudSyncService(repository),
@@ -380,19 +398,15 @@ void main() {
       );
       final decoration = ink.decoration! as BoxDecoration;
       expect(decoration.borderRadius, BorderRadius.circular(24));
-      expect(
-        decoration.color,
-        Color.lerp(
-          isDark ? AppColors.darkPaper : AppColors.paper,
-          isDark
-              ? AppColors.displayInkColor(
-                  AppColors.divider,
-                  darkMode: true,
-                )
-              : AppColors.divider,
-          0.10,
-        ),
+      final idleColor = isDark ? AppColors.darkPaper : AppColors.paper;
+      expect(decoration.color, idleColor);
+      final plainTile = find.byKey(
+        const ValueKey('catalog-folder:Plain folder'),
       );
+      final plainInk = tester.widget<Ink>(
+        find.descendant(of: plainTile, matching: find.byType(Ink)),
+      );
+      expect((plainInk.decoration! as BoxDecoration).color, idleColor);
       final material = tester.widget<Material>(
         find.descendant(of: tile, matching: find.byType(Material)),
       );
@@ -403,6 +417,7 @@ void main() {
         find.descendant(of: tile, matching: find.byType(InkWell)),
       );
       expect(inkWell.borderRadius, BorderRadius.circular(24));
+      expect(inkWell.overlayColor!.resolve({}), Colors.transparent);
       expect(
         inkWell.overlayColor!.resolve({WidgetState.hovered}),
         (isDark ? AppColors.darkActive : AppColors.toolbar)
