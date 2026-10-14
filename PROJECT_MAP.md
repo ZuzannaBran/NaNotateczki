@@ -423,7 +423,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1107 linii)
+### `lib/features/library/presentation/library_catalog.dart` (904 linie)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -432,17 +432,13 @@ oddzielających kafelki i zewnętrznej ramki; blok nie zajmuje całej
 szerokości ekranu. Zawartość folderów nadal ma siatkę podglądów dokumentów.
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
 `CompactStudyTimer`; folder ma też akcję edycji okładki.
-Obrys folderu oraz dekoracje pochodzą z wektorowej geometrii Lucide,
-rysowanej istniejącym `path_drawing` z cienką kreską 1,25 px. Subpikselowe krawędzie są dodatkowo wygładzane łagodnym filtrem
-Gaussa (sigma 0,55 piksela fizycznego) i lekko obniżoną alfą.
-Rozmiar ikony nie pogrubia konturu;
-wybrana dekoracja (gwiazda, serce, kwiat, błysk) znajduje się na okładce.
-Kafelki mają promień 24 px, jednolite neutralne tło niezależne od koloru
-zawartości folderu i delikatne obrysy z motywu. Hover i press są w ciepłej
-palecie beżowej
-(lub stonowanej ciemnej), rysowane nad tłem za pomocą `Ink` i przycinane
-do tego samego zaokrąglenia przez `Material`.
-Źródła ikon i ich licencja ISC: `third_party/lucide/LICENSE`.
+Okładki folderów to puste, zaokrąglone kafelki bez ikon i dekoracji.
+Nie ma wyboru kształtu ikony w edytorze okładki; historyczne wartości
+`FolderCoverShape` pozostają w zapisie dla zgodności ze starymi plikami.
+Kafelki mają promień 24 px, neutralne tło, a jeśli użytkownik ręcznie
+wybrał kolor okładki — delikatny tint 20% z uwzględnieniem trybu
+jasnego/ciemnego. Hover i press są nakładkami na `Ink` przyciętymi
+przez `Material`, bez zmiany koloru spoczynkowego.
 Dialog kolorów okładki zawiera bazowe próbki, trzy zestawy Blue/Pink/Green
 z szybkimi kolorami canvasu oraz sekcję Recent. Pojedyncze kolory z zestawów
 mogą być wybierane bez zmiany ustawień pisaka. Wspólny selektor
@@ -456,11 +452,10 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 25: `dominantFolderColor`; 53: `FolderCoverIcon`;
-  107: `FolderCoverStrokePainter`; 233: `LibraryCatalog`;
-  511: `_FolderTile`; 577: `_DocumentTile`; 617: `_CatalogTile`;
-  698: `_DocumentPreview`; 781: `_boardPreviewBounds`;
-  823: `_PagePreviewPainter`; 895: `showFolderCoverEditor`.
+- 24: `dominantFolderColor`; 51: `LibraryCatalog`;
+  329: `_FolderTile`; 395: `_DocumentTile`; 435: `_CatalogTile`;
+  516: `_DocumentPreview`; 599: `_boardPreviewBounds`;
+  641: `_PagePreviewPainter`; 713: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -903,13 +898,11 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
   poziomego.
 - `test/library_controller_test.dart` (33)
-- `test/library_catalog_test.dart` (641): kolor dominujący, serializacja
-  okładek, start katalogu, siatka notatek/boardów, nagłówek i Settings,
-  edycja okładki z pełnym selektorem kolorów, bezpieczne zamknięcie
-  zagnieżdżonego pickera oraz powrót z edytora; responsywna siatka 1–5
-  kolumn, cienkie ikony Lucide, jednakowe tło folderów o różnych kolorach
-  zawartości, palety canvasu, ponowne wykorzystanie Recent, ich trwały
-  zapis i odczyt oraz odrębne kolory hover/press w obu motywach.
+- `test/library_catalog_test.dart` (615): kolor dominujący, serializacja
+  starszych kształtów, start katalogu, siatka notatek/boardów,
+  edycja kolorów z paletami i Recent, zapis i odczyt Recent,
+  brak ikon/dekoracji oraz zachowanie tintu okładki w obu motywach,
+  responsywna siatka 1–5 kolumn i odrębne kolory hover/press.
 - `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
   wysokość i 1 px separator nagłówka planera i ustawień w obu motywach,
   ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
