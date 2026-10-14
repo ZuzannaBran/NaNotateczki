@@ -919,170 +919,170 @@ Future<void> showFolderCoverEditor(
           width: 340,
           child: SingleChildScrollView(
             child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Cover decoration'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final option in FolderCoverShape.values)
-                    ChoiceChip(
-                      key: ValueKey('cover-shape:${option.name}'),
-                      label: FolderCoverIcon(
-                        shape: option,
-                        color: Theme.of(context).colorScheme.onSurface,
-                        size: 40,
-                        semanticLabel: option.name,
-                      ),
-                      selected: shape == option,
-                      onSelected: (_) => update(() => shape = option),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Text('Cover color'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final color in colors)
-                    InkWell(
-                      key: ValueKey('cover-color:${color.toARGB32()}'),
-                      borderRadius: BorderRadius.circular(30),
-                      onTap: () => update(() => iconColor = color),
-                      child: CircleAvatar(
-                        radius: 19,
-                        backgroundColor: AppColors.displayInkColor(
-                          color,
-                          darkMode: darkMode,
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Cover decoration'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final option in FolderCoverShape.values)
+                      ChoiceChip(
+                        key: ValueKey('cover-shape:${option.name}'),
+                        label: FolderCoverIcon(
+                          shape: option,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          size: 40,
+                          semanticLabel: option.name,
                         ),
-                        child: iconColor == color
-                            ? Icon(
-                                Icons.check,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              )
-                            : null,
+                        selected: shape == option,
+                        onSelected: (_) => update(() => shape = option),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text('Recent', style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final color in controller.recentCoverColors)
-                    InkWell(
-                      key: ValueKey(
-                        'cover-recent-${color.toARGB32()}',
-                      ),
-                      borderRadius: BorderRadius.circular(30),
-                      onTap: () => update(() => iconColor = color),
-                      child: CircleAvatar(
-                        radius: 15,
-                        backgroundColor: AppColors.displayInkColor(
-                          color,
-                          darkMode: darkMode,
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text('Cover color'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final color in colors)
+                      InkWell(
+                        key: ValueKey('cover-color:${color.toARGB32()}'),
+                        borderRadius: BorderRadius.circular(30),
+                        onTap: () => update(() => iconColor = color),
+                        child: CircleAvatar(
+                          radius: 19,
+                          backgroundColor: AppColors.displayInkColor(
+                            color,
+                            darkMode: darkMode,
+                          ),
+                          child: iconColor == color
+                              ? Icon(
+                                  Icons.check,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                )
+                              : null,
                         ),
-                        child: iconColor == color
-                            ? Icon(
-                                Icons.check,
-                                size: 16,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              )
-                            : null,
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text('Palettes', style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  for (final preset in InkColorPreset.values)
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (final color in preset.colors)
-                              InkWell(
-                                key: ValueKey(
-                                  'cover-palette-${preset.name}-'
-                                  '${color.toARGB32()}',
-                                ),
-                                onTap: () => update(() => iconColor = color),
-                                child: Container(
-                                  width: 26,
-                                  height: 28,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.displayInkColor(
-                                      color,
-                                      darkMode: darkMode,
-                                    ),
-                                    border: Border.all(
-                                      color: Theme.of(context).dividerColor,
-                                      width: 0.5,
-                                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text('Recent', style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final color in controller.recentCoverColors)
+                      InkWell(
+                        key: ValueKey(
+                          'cover-recent-${color.toARGB32()}',
+                        ),
+                        borderRadius: BorderRadius.circular(30),
+                        onTap: () => update(() => iconColor = color),
+                        child: CircleAvatar(
+                          radius: 15,
+                          backgroundColor: AppColors.displayInkColor(
+                            color,
+                            darkMode: darkMode,
+                          ),
+                          child: iconColor == color
+                              ? Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                )
+                              : null,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text('Palettes', style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    for (final preset in InkColorPreset.values)
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final color in preset.colors)
+                                InkWell(
+                                  key: ValueKey(
+                                    'cover-palette-${preset.name}-'
+                                    '${color.toARGB32()}',
                                   ),
-                                  child: iconColor == color
-                                      ? Icon(
-                                          Icons.check,
-                                          size: 15,
-                                          color: Theme.of(context)
-                                              .colorScheme.onSurface,
-                                        )
-                                      : null,
+                                  onTap: () => update(() => iconColor = color),
+                                  child: Container(
+                                    width: 26,
+                                    height: 28,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.displayInkColor(
+                                        color,
+                                        darkMode: darkMode,
+                                      ),
+                                      border: Border.all(
+                                        color: Theme.of(context).dividerColor,
+                                        width: 0.5,
+                                      ),
+                                    ),
+                                    child: iconColor == color
+                                        ? Icon(
+                                            Icons.check,
+                                            size: 15,
+                                            color: Theme.of(context)
+                                                .colorScheme.onSurface,
+                                          )
+                                        : null,
+                                  ),
                                 ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          preset.label,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              TextButton.icon(
-                key: const ValueKey('cover-advanced-color'),
-                onPressed: () async {
-                  final picked = await EditorToolbar.pickColor(
-                    context,
-                    iconColor ?? AppColors.inkBlack,
-                    controller.recentCoverColors,
-                    onPaletteColorSelected: (color) {
-                      if (context.mounted) {
-                        update(() => iconColor = color);
-                      }
-                    },
-                  );
-                  if (picked != null && context.mounted) {
-                    update(() => iconColor = picked);
-                  }
-                },
-                icon: const Icon(Icons.tune_rounded),
-                label: const Text('Custom color / HEX'),
-              ),
-              TextButton(
-                onPressed: () => update(() => iconColor = null),
-                child: const Text('Default cover color'),
-              ),
-            ],
-          ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            preset.label,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  key: const ValueKey('cover-advanced-color'),
+                  onPressed: () async {
+                    final picked = await EditorToolbar.pickColor(
+                      context,
+                      iconColor ?? AppColors.inkBlack,
+                      controller.recentCoverColors,
+                      onPaletteColorSelected: (color) {
+                        if (context.mounted) {
+                          update(() => iconColor = color);
+                        }
+                      },
+                    );
+                    if (picked != null && context.mounted) {
+                      update(() => iconColor = picked);
+                    }
+                  },
+                  icon: const Icon(Icons.tune_rounded),
+                  label: const Text('Custom color / HEX'),
+                ),
+                TextButton(
+                  onPressed: () => update(() => iconColor = null),
+                  child: const Text('Default cover color'),
+                ),
+              ],
+            ),
           ),
         ),
         actions: appDialogActions(context, [
