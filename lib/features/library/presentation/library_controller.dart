@@ -79,6 +79,9 @@ class LibraryController extends ChangeNotifier {
   final Set<String> _folders = <String>{};
   final Map<String, FolderCoverStyle> _folderCovers =
       <String, FolderCoverStyle>{};
+  final List<Color> _recentCoverColors = <Color>[];
+
+  List<Color> get recentCoverColors => List.unmodifiable(_recentCoverColors);
   Notebook? _activeNotebook;
   bool _corruptRecoveryDismissed = false;
   int corruptDocumentCount = 0;
@@ -320,6 +323,15 @@ class LibraryController extends ChangeNotifier {
       return;
     }
     _folderCovers[folder] = cover;
+    if (cover.iconColor case final Color selectedColor) {
+      _recentCoverColors.removeWhere(
+        (color) => color.toARGB32() == selectedColor.toARGB32(),
+      );
+      _recentCoverColors.insert(0, selectedColor);
+      if (_recentCoverColors.length > 12) {
+        _recentCoverColors.removeRange(12, _recentCoverColors.length);
+      }
+    }
     await _saveFolders();
     notifyListeners();
   }
@@ -667,6 +679,15 @@ class LibraryController extends ChangeNotifier {
               .where((item) => item.isNotEmpty),
         );
       _folderCovers.clear();
+      _recentCoverColors.clear();
+      if (decoded is Map && decoded['recentCoverColors'] is List) {
+        _recentCoverColors.addAll(
+          (decoded['recentCoverColors'] as List)
+              .whereType<int>()
+              .take(12)
+              .map((value) => Color(value)),
+        );
+      }
       if (decoded is Map && decoded['covers'] is Map) {
         final covers = decoded['covers'] as Map;
         for (final entry in covers.entries) {
@@ -687,6 +708,9 @@ class LibraryController extends ChangeNotifier {
       final names = _folders.toList()..sort(_compareFolderNames);
       final payload = <String, Object?>{
         'folders': names,
+        'recentCoverColors': _recentCoverColors
+            .map((color) => color.toARGB32())
+            .toList(),
         'covers': {
           for (final entry in _folderCovers.entries)
             entry.key: entry.value.toJson(),
