@@ -9,6 +9,7 @@ import '../../../core/error/app_error_log.dart';
 import '../../../core/storage/text_storage.dart';
 import '../../../data/backup/local_backup_service.dart';
 import '../../../data/sync/cloud_sync_service.dart';
+import '../../editor/state/ink_color_presets.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
 
@@ -331,6 +332,7 @@ class LibraryController extends ChangeNotifier {
       if (_recentCoverColors.length > 12) {
         _recentCoverColors.removeRange(12, _recentCoverColors.length);
       }
+      await SharedRecentColors.record(selectedColor);
     }
     await _saveFolders();
     notifyListeners();
