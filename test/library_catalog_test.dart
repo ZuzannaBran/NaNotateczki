@@ -202,7 +202,7 @@ void main() {
     await database.close();
   });
 
-  testWidgets('Projects centers folders without grid lines at every width', (
+  testWidgets('Projects uses top-aligned responsive five-column folder grid', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1600, 900));
@@ -210,7 +210,7 @@ void main() {
 
     final database = NotesDatabase(NativeDatabase.memory());
     final repository = NotebookRepository(database);
-    for (var index = 1; index <= 5; index++) {
+    for (var index = 1; index <= 7; index++) {
       await repository.createNotebook(folder: 'Folder $index');
     }
     final controller = LibraryController(
@@ -241,24 +241,29 @@ void main() {
 
     final grid = find.byKey(const ValueKey('catalog-folder-grid'));
     final tiles = [
-      for (var index = 1; index <= 5; index++)
+      for (var index = 1; index <= 7; index++)
         find.byKey(ValueKey('catalog-folder:Folder $index')),
     ];
-    expect(tester.getSize(grid).width, 984);
+    expect(tester.getSize(grid).width, 1230);
     expect(tester.getCenter(grid).dx, closeTo(800, 1));
-    for (var index = 1; index < 4; index++) {
+    expect(tester.getTopLeft(grid).dy, closeTo(80, 1));
+    for (var index = 1; index < 5; index++) {
       expect(
         tester.getTopLeft(tiles[index]).dy,
         closeTo(tester.getTopLeft(tiles[0]).dy, 1),
       );
     }
     expect(
-      tester.getTopLeft(tiles[4]).dy,
+      tester.getTopLeft(tiles[5]).dy,
       greaterThan(tester.getTopLeft(tiles[0]).dy),
     );
     expect(
-      tester.getCenter(tiles[4]).dx,
-      closeTo(tester.getCenter(grid).dx, 1),
+      tester.getTopLeft(tiles[5]).dx,
+      closeTo(tester.getTopLeft(tiles[0]).dx, 1),
+    );
+    expect(
+      tester.getTopLeft(tiles[6]).dx,
+      closeTo(tester.getTopLeft(tiles[1]).dx, 1),
     );
     expect(
       find.byKey(const ValueKey('catalog-vertical-divider:0:0')),
@@ -281,13 +286,19 @@ void main() {
       closeTo(tester.getTopLeft(tiles[0]).dy, 1),
     );
     expect(
-      tester.getCenter(tiles[4]).dx,
-      closeTo(tester.getCenter(grid).dx, 1),
+      tester.getTopLeft(tiles[6]).dx,
+      closeTo(tester.getTopLeft(tiles[0]).dx, 1),
     );
 
     await tester.binding.setSurfaceSize(const Size(390, 900));
     await tester.pumpAndSettle();
     expect(tester.getSize(grid).width, 246);
+    expect(tester.getCenter(grid).dx, closeTo(195, 1));
+    expect(tester.getTopLeft(grid).dy, closeTo(80, 1));
+    expect(
+      tester.getTopLeft(tiles[1]).dy,
+      greaterThan(tester.getTopLeft(tiles[0]).dy),
+    );
     expect(
       find.byKey(const ValueKey('catalog-vertical-divider:0:0')),
       findsNothing,

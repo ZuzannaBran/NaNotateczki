@@ -169,10 +169,13 @@ class LibraryCatalog extends StatelessWidget {
                             constraints.maxWidth - 40,
                           );
                           final columns = math.min(
-                            4,
-                            math.max(
-                              1,
-                              (availableWidth / cellExtent).floor(),
+                            5,
+                            math.min(
+                              folders.length,
+                              math.max(
+                                1,
+                                (availableWidth / cellExtent).floor(),
+                              ),
                             ),
                           );
                           final gridWidth = math.min(
@@ -196,7 +199,8 @@ class LibraryCatalog extends StatelessWidget {
                               constraints: BoxConstraints(
                                 minHeight: constraints.maxHeight,
                               ),
-                              child: Center(
+                              child: Align(
+                                alignment: Alignment.topCenter,
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 24,
@@ -214,7 +218,7 @@ class LibraryCatalog extends StatelessWidget {
                                         ) ...[
                                           Row(
                                             mainAxisAlignment:
-                                                MainAxisAlignment.center,
+                                                MainAxisAlignment.start,
                                             children: [
                                               for (
                                                 var index = row * columns;

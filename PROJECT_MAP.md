@@ -423,9 +423,10 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
 
 ### `lib/features/library/presentation/library_catalog.dart` (817 linii)
 
-Katalog główny Projects układa foldery w responsywne, wyśrodkowane wiersze
-z maksymalnie czterema kolumnami. Bez linii siatki i zewnętrznej ramki;
-ostatni niepełny wiersz jest wyśrodkowany. Układ nie zajmuje całej
+Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
+kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
+w poziomie, a ostatni niepełny wiersz zaczyna się od lewej. Brak linii
+oddzielających kafelki i zewnętrznej ramki; blok nie zajmuje całej
 szerokości ekranu. Zawartość folderów nadal ma siatkę podglądów dokumentów.
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
 `CompactStudyTimer`; folder ma też akcję edycji okładki.
