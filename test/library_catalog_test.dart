@@ -237,9 +237,9 @@ void main() {
       final menuRect = tester.getRect(documentMenu);
       final labelRect = tester.getRect(documentLabel);
       final areaRect = tester.getRect(previewArea);
-      expect(menuRect.left, closeTo(areaRect.left, 1));
+      expect(menuRect.left, closeTo(areaRect.left + 4, 1));
       expect(labelRect.left, greaterThan(menuRect.right));
-      expect(labelRect.right, lessThanOrEqualTo(areaRect.right));
+      expect(labelRect.right, lessThanOrEqualTo(areaRect.right - 4));
       expect(areaRect.top - menuRect.bottom, lessThan(12));
       expect(tester.widget<Text>(documentLabel).textAlign, TextAlign.left);
       expect(tester.widget<Text>(documentLabel).overflow, TextOverflow.ellipsis);
