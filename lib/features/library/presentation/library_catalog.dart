@@ -12,6 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
 import '../../editor/presentation/widgets/editor_toolbar.dart';
+import '../../editor/state/ink_color_presets.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/note_page.dart';
@@ -899,6 +900,7 @@ Future<void> showFolderCoverEditor(
   final saved = controller.folderCoverFor(folder);
   var shape = saved.shape;
   Color? iconColor = saved.iconColor;
+  final darkMode = Theme.of(context).brightness == Brightness.dark;
   const colors = <Color>[
     AppColors.inkBlack,
     Color(0xFFB33636),
@@ -915,7 +917,8 @@ Future<void> showFolderCoverEditor(
         title: const Text('Edit folder cover'),
         content: SizedBox(
           width: 340,
-          child: Column(
+          child: SingleChildScrollView(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -952,11 +955,104 @@ Future<void> showFolderCoverEditor(
                       onTap: () => update(() => iconColor = color),
                       child: CircleAvatar(
                         radius: 19,
-                        backgroundColor: color,
+                        backgroundColor: AppColors.displayInkColor(
+                          color,
+                          darkMode: darkMode,
+                        ),
                         child: iconColor == color
-                            ? const Icon(Icons.check, color: Colors.white)
+                            ? Icon(
+                                Icons.check,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              )
                             : null,
                       ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text('Recent', style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final color in controller.recentCoverColors)
+                    InkWell(
+                      key: ValueKey(
+                        'cover-recent-${color.toARGB32()}',
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                      onTap: () => update(() => iconColor = color),
+                      child: CircleAvatar(
+                        radius: 15,
+                        backgroundColor: AppColors.displayInkColor(
+                          color,
+                          darkMode: darkMode,
+                        ),
+                        child: iconColor == color
+                            ? Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              )
+                            : null,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text('Palettes', style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  for (final preset in InkColorPreset.values)
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final color in preset.colors)
+                              InkWell(
+                                key: ValueKey(
+                                  'cover-palette-${preset.name}-'
+                                  '${color.toARGB32()}',
+                                ),
+                                onTap: () => update(() => iconColor = color),
+                                child: Container(
+                                  width: 26,
+                                  height: 28,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.displayInkColor(
+                                      color,
+                                      darkMode: darkMode,
+                                    ),
+                                    border: Border.all(
+                                      color: Theme.of(context).dividerColor,
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                  child: iconColor == color
+                                      ? Icon(
+                                          Icons.check,
+                                          size: 15,
+                                          color: Theme.of(context)
+                                              .colorScheme.onSurface,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          preset.label,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -967,7 +1063,12 @@ Future<void> showFolderCoverEditor(
                   final picked = await EditorToolbar.pickColor(
                     context,
                     iconColor ?? AppColors.inkBlack,
-                    const <Color>[],
+                    controller.recentCoverColors,
+                    onPaletteColorSelected: (color) {
+                      if (context.mounted) {
+                        update(() => iconColor = color);
+                      }
+                    },
                   );
                   if (picked != null && context.mounted) {
                     update(() => iconColor = picked);
@@ -981,6 +1082,7 @@ Future<void> showFolderCoverEditor(
                 child: const Text('Default cover color'),
               ),
             ],
+          ),
           ),
         ),
         actions: appDialogActions(context, [
