@@ -21,7 +21,11 @@ import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
+import 'support/native_test_documents.dart';
+
 void main() {
+  useIsolatedNativeTestDocuments();
+
   test('folder cover settings round-trip and handle unknown shapes', () {
     const style = FolderCoverStyle(
       shape: FolderCoverShape.sparkle,
@@ -35,6 +39,46 @@ void main() {
       FolderCoverShape.folder,
     );
     expect(FolderCoverStyle.fromJson(null).iconColor, isNull);
+  });
+
+  test('recent folder cover colors persist in selection order', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    await repository.createNotebook(folder: 'Saved');
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await controller.loadItems();
+
+    const pink = Color(0xFFE9D8DE);
+    const blue = Color(0xFFD0D8E7);
+    await controller.updateFolderCover(
+      'Saved',
+      const FolderCoverStyle(iconColor: pink),
+    );
+    await controller.updateFolderCover(
+      'Saved',
+      const FolderCoverStyle(iconColor: blue),
+    );
+    await controller.updateFolderCover(
+      'Saved',
+      const FolderCoverStyle(iconColor: pink),
+    );
+    expect(controller.recentCoverColors, [pink, blue]);
+
+    final restored = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await restored.initialize();
+    expect(restored.recentCoverColors, [pink, blue]);
+    expect(restored.folderCoverFor('Saved').iconColor, pink);
+    restored.dispose();
+    controller.dispose();
+    await database.close();
   });
 
   test('folder cover reflects the dominant content color', () {
