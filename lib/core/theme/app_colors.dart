@@ -75,6 +75,23 @@ class AppColors {
   static const shadow = Color(0x22000000);
   static const divider = Color(0xFFCFCCC5);
 
+  // Shared canvas and folder cover preset colors.
+  static const blueColorSet = <Color>[
+    Color(0xFF2A3851),
+    Color(0xFFA1B2CE),
+    Color(0xFFD0D8E7),
+  ];
+  static const pinkColorSet = <Color>[
+    Color(0xFF583240),
+    Color(0xFFCCA4B2),
+    Color(0xFFE9D8DE),
+  ];
+  static const greenColorSet = <Color>[
+    Color(0xFF2C443A),
+    Color(0xFF9BBFB0),
+    Color(0xFFD0E1DA),
+  ];
+
   static const inkPalette = <Color>[
     inkBlack,
     Color(0xFF2E5AAC),
