@@ -104,7 +104,9 @@ void main() {
           for (var i = 0; i < 3; i++) {
             final swatch = row.children[i] as InkWell;
             final container = swatch.child! as Container;
-            final displayed = (container.decoration! as BoxDecoration).color;
+            final decoration = container.decoration! as BoxDecoration;
+            final displayed = decoration.color;
+            expect(decoration.shape, BoxShape.circle);
             expect(
               displayed,
               AppColors.displayInkColor(
@@ -149,6 +151,10 @@ void main() {
             );
             final ink = tester.widget<InkWell>(swatch);
             final square = ink.child! as Container;
+            expect(
+              (square.decoration! as BoxDecoration).shape,
+              BoxShape.circle,
+            );
             expect(
               (square.decoration! as BoxDecoration).color,
               AppColors.displayInkColor(color, darkMode: darkMode),
