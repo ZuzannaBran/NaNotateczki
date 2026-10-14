@@ -918,15 +918,10 @@ Future<void> showFolderCoverEditor(
   var shape = saved.shape;
   Color? iconColor = saved.iconColor;
   final darkMode = Theme.of(context).brightness == Brightness.dark;
-  const colors = <Color>[
-    AppColors.inkBlack,
-    Color(0xFFB33636),
-    Color(0xFFB9792A),
-    Color(0xFF2E7D32),
-    Color(0xFF2E5AAC),
-    Color(0xFF6A4C93),
-    Color(0xFFB8749A),
-  ];
+  final recentColors = await SharedRecentColors.load();
+  if (!context.mounted) {
+    return;
+  }
   final result = await showDialog<FolderCoverStyle>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
@@ -959,41 +954,18 @@ Future<void> showFolderCoverEditor(
                   ],
                 ),
                 const SizedBox(height: 20),
-                const Text('Cover color'),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final color in colors)
-                      InkWell(
-                        key: ValueKey('cover-color:${color.toARGB32()}'),
-                        borderRadius: BorderRadius.circular(30),
-                        onTap: () => update(() => iconColor = color),
-                        child: CircleAvatar(
-                          radius: 19,
-                          backgroundColor: AppColors.displayInkColor(
-                            color,
-                            darkMode: darkMode,
-                          ),
-                          child: iconColor == color
-                              ? Icon(
-                                  Icons.check,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                )
-                              : null,
-                        ),
-                      ),
-                  ],
+                Text(
+                  'Recent',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Text('Recent', style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final color in controller.recentCoverColors)
+                    for (final color in recentColors)
                       InkWell(
                         key: ValueKey(
                           'cover-recent-${color.toARGB32()}',
@@ -1018,7 +990,12 @@ Future<void> showFolderCoverEditor(
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text('Palettes', style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  'Palettes',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 12,
@@ -1040,9 +1017,10 @@ Future<void> showFolderCoverEditor(
                                   onTap: () => update(() => iconColor = color),
                                   child: Container(
                                     width: 26,
-                                    height: 28,
+                                    height: 26,
                                     alignment: Alignment.center,
                                     decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
                                       color: AppColors.displayInkColor(
                                         color,
                                         darkMode: darkMode,
@@ -1067,7 +1045,10 @@ Future<void> showFolderCoverEditor(
                           const SizedBox(height: 4),
                           Text(
                             preset.label,
-                            style: Theme.of(context).textTheme.bodySmall,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
                           ),
                         ],
                       ),
@@ -1080,7 +1061,7 @@ Future<void> showFolderCoverEditor(
                     final picked = await EditorToolbar.pickColor(
                       context,
                       iconColor ?? AppColors.inkBlack,
-                      controller.recentCoverColors,
+                      recentColors,
                       onPaletteColorSelected: (color) {
                         if (context.mounted) {
                           update(() => iconColor = color);
