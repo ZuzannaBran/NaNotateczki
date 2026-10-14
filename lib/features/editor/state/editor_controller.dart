@@ -975,6 +975,7 @@ class EditorController extends ChangeNotifier {
     if (recentColors.length > 12) {
       recentColors.removeRange(12, recentColors.length);
     }
+    unawaited(SharedRecentColors.record(color));
   }
 
   Future<void> _loadEditorPrefs() async {
@@ -1094,17 +1095,20 @@ class EditorController extends ChangeNotifier {
             ..addAll(mapped);
         }
       }
-      if (recent is List) {
-        final mapped = recent
-            .map((item) => _colorFromHex(item?.toString()))
-            .whereType<Color>()
-            .toList();
-        if (mapped.isNotEmpty) {
-          recentColors
-            ..clear()
-            ..addAll(mapped);
-        }
-      }
+      final sharedRecent = await SharedRecentColors.load();
+      final legacyRecent = recent is List
+          ? recent
+                .map((item) => _colorFromHex(item?.toString()))
+                .whereType<Color>()
+                .toList()
+          : <Color>[];
+      final mergedRecent = SharedRecentColors.merge(
+        recentColors,
+        sharedRecent.isNotEmpty ? sharedRecent : legacyRecent,
+      );
+      recentColors
+        ..clear()
+        ..addAll(mergedRecent);
       if (shouldPersistDrawingColorDefaults || migratedQuickColors) {
         _schedulePrefsSave();
       }
