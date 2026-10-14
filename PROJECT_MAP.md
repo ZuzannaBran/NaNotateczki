@@ -421,7 +421,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (817 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1008 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -445,10 +445,11 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 23: `dominantFolderColor`; 50: `FolderCoverIcon`;
-  340: `_FolderTile`; 413: `_DocumentTile`; 453: `_CatalogTile`;
-  514: `_DocumentPreview`; 597: `_boardPreviewBounds`;
-  639: `_PagePreviewPainter`; 711: `showFolderCoverEditor`.
+- 23: `dominantFolderColor`; 51: `FolderCoverIcon`;
+  243: `LibraryCatalog`; 527: `_FolderTile`;
+  599: `_DocumentTile`; 639: `_CatalogTile`;
+  700: `_DocumentPreview`; 783: `_boardPreviewBounds`;
+  825: `_PagePreviewPainter`; 897: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 

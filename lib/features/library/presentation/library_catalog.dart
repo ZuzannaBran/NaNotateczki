@@ -933,6 +933,7 @@ Future<void> showFolderCoverEditor(
                         shape: option,
                         color: Theme.of(context).colorScheme.onSurface,
                         size: 30,
+                        semanticLabel: option.name,
                       ),
                       selected: shape == option,
                       onSelected: (_) => update(() => shape = option),
