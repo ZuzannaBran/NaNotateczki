@@ -421,7 +421,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1022 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1005 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -430,15 +430,14 @@ oddzielających kafelki i zewnętrznej ramki; blok nie zajmuje całej
 szerokości ekranu. Zawartość folderów nadal ma siatkę podglądów dokumentów.
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
 `CompactStudyTimer`; folder ma też akcję edycji okładki.
-Okładka ma automatycznie rozjaśniony dominujący kolor ink/tekstu we wszystkich
-stronach dokumentów folderu. Obrys folderu oraz dekoracje pochodzą z wektorowej
-geometrii Lucide, rysowanej istniejącym `path_drawing` z cienką kreską
-1,25 px. Subpikselowe krawędzie są dodatkowo wygładzane łagodnym filtrem
+Obrys folderu oraz dekoracje pochodzą z wektorowej geometrii Lucide,
+rysowanej istniejącym `path_drawing` z cienką kreską 1,25 px. Subpikselowe krawędzie są dodatkowo wygładzane łagodnym filtrem
 Gaussa (sigma 0,55 piksela fizycznego) i lekko obniżoną alfą.
 Rozmiar ikony nie pogrubia konturu;
 wybrana dekoracja (gwiazda, serce, kwiat, błysk) znajduje się na okładce.
-Kafelki mają promień 24 px, tło mieszane z kolorem zawartości tylko w 10%
-oraz delikatne obrysy z motywu. Hover i press są w ciepłej palecie beżowej
+Kafelki mają promień 24 px, jednolite neutralne tło niezależne od koloru
+zawartości folderu i delikatne obrysy z motywu. Hover i press są w ciepłej
+palecie beżowej
 (lub stonowanej ciemnej), rysowane nad tłem za pomocą `Ink` i przycinane
 do tego samego zaokrąglenia przez `Material`.
 Źródła ikon i ich licencja ISC: `third_party/lucide/LICENSE`.
@@ -452,7 +451,7 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 24: `dominantFolderColor`; 52: `FolderCoverIcon`; 106: `FolderCoverStrokePainter`; 232: `LibraryCatalog`; 516: `_FolderTile`; 592: `_DocumentTile`; 632: `_CatalogTile`; 713: `_DocumentPreview`; 796: `_boardPreviewBounds`; 838: `_PagePreviewPainter`; 910: `showFolderCoverEditor`.
+- 24: `dominantFolderColor`; 52: `FolderCoverIcon`; 106: `FolderCoverStrokePainter`; 232: `LibraryCatalog`; 510: `_FolderTile`; 576: `_DocumentTile`; 616: `_CatalogTile`; 697: `_DocumentPreview`; 780: `_boardPreviewBounds`; 822: `_PagePreviewPainter`; 894: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -894,11 +893,12 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
   poziomego.
 - `test/library_controller_test.dart` (33)
-- `test/library_catalog_test.dart` (305): kolor dominujący, serializacja
+- `test/library_catalog_test.dart` (550): kolor dominujący, serializacja
   okładek, start katalogu, siatka notatek/boardów, nagłówek i Settings,
   edycja okładki z pełnym selektorem kolorów, bezpieczne zamknięcie
-  zagnieżdżonego pickera oraz powrót z edytora; responsywne 4/2/1 kolumny,
-  wyśrodkowanie ostatniego wiersza i brak separatorów.
+  zagnieżdżonego pickera oraz powrót z edytora; responsywna siatka 1–5
+  kolumn, cienkie ikony Lucide, jednakowe tło folderów o różnych kolorach
+  zawartości oraz odrębne kolory hover/press w obu motywach.
 - `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
   wysokość i 1 px separator nagłówka planera i ustawień w obu motywach,
   ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
