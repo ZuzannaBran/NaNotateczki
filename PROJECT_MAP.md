@@ -423,7 +423,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (915 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1124 linie)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -432,19 +432,20 @@ oddzielających kafelki i zewnętrznej ramki; blok nie zajmuje całej
 szerokości ekranu. Zawartość folderów nadal ma siatkę podglądów dokumentów.
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
 `CompactStudyTimer`; folder ma też akcję edycji okładki.
-Okładki folderów to puste, zaokrąglone kafelki bez ikon i dekoracji.
-Nie ma wyboru kształtu ikony w edytorze okładki; historyczne wartości
-`FolderCoverShape` pozostają w zapisie dla zgodności ze starymi plikami.
-Kafelki mają promień 24 px, neutralne tło, a jeśli użytkownik ręcznie
-wybrał kolor okładki — delikatny tint 20% z uwzględnieniem trybu
-jasnego/ciemnego. Hover i press są nakładkami na `Ink` przyciętymi
-przez `Material`, bez zmiany koloru spoczynkowego.
+Okładki folderów mają ponownie delikatne, wektorowe ikony Lucide
+(`FolderCoverIcon`, `FolderCoverStrokePainter`), z konturem 1,25 px
+i wygładzonymi krawędziami. Dekoracje na okładce (serce, gwiazdka,
+kwiat, błysk) można ponownie wybierać z poziomu edytora folderu.
+Kafelki mają promień 24 px i neutralne tło; zapisany kolor modyfikuje
+kolor ikon, nie powoduje automatycznego podświetlania całej okładki.
+Hover i press są nakładkami na `Ink` przyciętymi przez `Material`.
 Dialog kolorów okładki zawiera bazowe próbki, trzy zestawy Blue/Pink/Green
 z szybkimi kolorami canvasu oraz sekcję Recent. Pojedyncze kolory z zestawów
 mogą być wybierane bez zmiany ustawień pisaka. Wspólny selektor
 `EditorToolbar.pickColor` udostępnia te same kolory, Recent, HEX i RGB/B-W;
 pokazuje kolory po transformacji aktywnego motywu.
-`_CatalogTile` umieszcza kompaktowe menu trzech kropek po lewej od nazwy;
+`_CatalogTile` umieszcza menu trzech kropek w jawnym rozmiarze
+32×32 px (bez przycinania ikony) po lewej od nazwy;
 oba elementy są wyrównane do lewej krawędzi okładki/podglądu i mieszczą
 się w jego szerokości. Podpis przylega bliżej miniatury (odstęp 2 px),
 a długie nazwy są obcinane wielokropkiem.
@@ -455,10 +456,11 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 24: `dominantFolderColor`; 51: `LibraryCatalog`;
-  329: `_FolderTile`; 395: `_DocumentTile`; 435: `_CatalogTile`;
-  527: `_DocumentPreview`; 610: `_boardPreviewBounds`;
-  652: `_PagePreviewPainter`; 724: `showFolderCoverEditor`.
+- 24: `dominantFolderColor`; 53: `FolderCoverIcon`;
+  107: `FolderCoverStrokePainter`; 233: `LibraryCatalog`;
+  511: `_FolderTile`; 578: `_DocumentTile`; 618: `_CatalogTile`;
+  715: `_DocumentPreview`; 798: `_boardPreviewBounds`;
+  840: `_PagePreviewPainter`; 912: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -692,7 +694,9 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   Lasso używa gotowej ikony Material `highlight_alt_outlined`, która
   przedstawia zaznaczanie obszaru kursorem.
   Publiczny `EditorToolbar.pickColor` współdzieli pełny selektor HEX/RGB/B-W
-  z edycją koloru ikon okładek folderów. W dark mode próbki Recent,
+  z edycją koloru ikon okładek folderów. Wywołanie opcjonalnego callbacku
+  wyboru całej palety korzysta z promocji typu po sprawdzeniu null
+  (bez zbędnego operatora `!`). W dark mode próbki Recent,
   podgląd, HEX oraz suwaki pracują na odwróconym kolorze widocznym,
   a przed zapisem wracają do wartości bazowej; wybór bez zmian jest bezstratny.
   Pod Recent dostępne są trzy palety: w trybie szybkich kolorów wybór
@@ -901,10 +905,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
   poziomego.
 - `test/library_controller_test.dart` (33)
-- `test/library_catalog_test.dart` (657): kolor dominujący, serializacja
-  starszych kształtów, start katalogu, siatka notatek/boardów,
-  edycja kolorów z paletami i Recent, zapis i odczyt Recent,
-  brak ikon/dekoracji oraz zachowanie tintu okładki w obu motywach,
+- `test/library_catalog_test.dart` (720): kolor dominujący, serializacja
+  stylu okładek, start katalogu, siatka notatek/boardów,
+  edycja kolorów i dekoracji z paletami i Recent, zapis i odczyt Recent,
+  regresja widoczności ikon i dekoracji w obu motywach, kontur Lucide,
   responsywna siatka 1–5 kolumn, odrębne kolory hover/press oraz
   geometria menu po lewej od nazw folderów, notatek i boardów.
 - `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
