@@ -182,6 +182,22 @@ void main() {
       tester.getTopLeft(folderMenu).dy,
       lessThan(tester.getTopLeft(folderTile).dy + 70),
     );
+    final folderLabel = find.descendant(
+      of: folderTile,
+      matching: find.text('Physics'),
+    );
+    final folderCover = find.byKey(
+      const ValueKey('catalog-folder-cover:Physics'),
+    );
+    final folderMenuRect = tester.getRect(folderMenu);
+    final folderLabelRect = tester.getRect(folderLabel);
+    final folderCoverRect = tester.getRect(folderCover);
+    expect(folderMenuRect.left, closeTo(folderCoverRect.left, 1));
+    expect(folderLabelRect.left, greaterThan(folderMenuRect.right));
+    expect(folderLabelRect.right, lessThanOrEqualTo(folderCoverRect.right));
+    expect(folderCoverRect.top - folderMenuRect.bottom, lessThan(12));
+    expect(tester.widget<Text>(folderLabel).textAlign, TextAlign.left);
+    expect(tester.widget<Text>(folderLabel).overflow, TextOverflow.ellipsis);
     await tester.tap(folderTile);
     await tester.pumpAndSettle();
 
@@ -202,6 +218,32 @@ void main() {
       tester.getTopLeft(itemMenu).dy,
       lessThan(tester.getTopLeft(noteTile).dy + 70),
     );
+    for (final item in [note, board]) {
+      final documentTile = find.byKey(
+        ValueKey('catalog-document:${item.uid}'),
+      );
+      final documentMenu = find.descendant(
+        of: documentTile,
+        matching: find.byTooltip('Actions for ${item.title}'),
+      );
+      final documentLabel = find.descendant(
+        of: documentTile,
+        matching: find.text(item.title),
+      );
+      final previewArea = find.descendant(
+        of: documentTile,
+        matching: find.byType(InkWell),
+      );
+      final menuRect = tester.getRect(documentMenu);
+      final labelRect = tester.getRect(documentLabel);
+      final areaRect = tester.getRect(previewArea);
+      expect(menuRect.left, closeTo(areaRect.left, 1));
+      expect(labelRect.left, greaterThan(menuRect.right));
+      expect(labelRect.right, lessThanOrEqualTo(areaRect.right));
+      expect(areaRect.top - menuRect.bottom, lessThan(12));
+      expect(tester.widget<Text>(documentLabel).textAlign, TextAlign.left);
+      expect(tester.widget<Text>(documentLabel).overflow, TextOverflow.ellipsis);
+    }
 
     final noteRatio = find.descendant(
       of: find.byKey(ValueKey('catalog-document:${note.uid}')),
