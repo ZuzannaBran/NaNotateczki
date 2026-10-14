@@ -780,7 +780,7 @@ class EditorToolbar extends StatelessWidget {
                             onTap: onPresetSelected == null
                                 ? null
                                 : () {
-                                    onPresetSelected(preset);
+                                    onPresetSelected!(preset);
                                     Navigator.of(context).pop();
                                   },
                             child: Padding(
