@@ -14,6 +14,7 @@ void main() {
     required bool darkMode,
     required ValueChanged<Color?> onSelected,
     ValueChanged<InkColorPreset>? onPresetSelected,
+    ValueChanged<Color>? onPaletteColorSelected,
   }) async {
     await tester.binding.setSurfaceSize(const Size(1000, 1100));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -32,6 +33,7 @@ void main() {
                     initial,
                     const <Color>[recent],
                     onPresetSelected: onPresetSelected,
+                    onPaletteColorSelected: onPaletteColorSelected,
                   );
                   onSelected(color);
                 },
@@ -100,7 +102,8 @@ void main() {
           final row = column.children.first as Row;
           expect(row.children, hasLength(3));
           for (var i = 0; i < 3; i++) {
-            final container = row.children[i] as Container;
+            final swatch = row.children[i] as InkWell;
+            final container = swatch.child! as Container;
             final displayed = (container.decoration! as BoxDecoration).color;
             expect(
               displayed,
@@ -118,6 +121,51 @@ void main() {
         await tester.pumpAndSettle();
         expect(selectedPreset, InkColorPreset.pink);
         expect(selectedColor, isNull);
+      },
+    );
+  }
+
+  for (final darkMode in [false, true]) {
+    testWidgets(
+      'folder picker selects one palette color without changing canvas '
+      '${darkMode ? 'in dark' : 'in light'} mode',
+      (tester) async {
+        Color? paletteColor;
+        Color? returnedColor;
+        await openPicker(
+          tester,
+          darkMode: darkMode,
+          onSelected: (color) => returnedColor = color,
+          onPaletteColorSelected: (color) => paletteColor = color,
+        );
+
+        expect(find.text('Recent'), findsOneWidget);
+        for (final preset in InkColorPreset.values) {
+          for (final color in preset.colors) {
+            final swatch = find.byKey(
+              ValueKey(
+                'color-picker-palette-${preset.name}-${color.toARGB32()}',
+              ),
+            );
+            final ink = tester.widget<InkWell>(swatch);
+            final square = ink.child! as Container;
+            expect(
+              (square.decoration! as BoxDecoration).color,
+              AppColors.displayInkColor(color, darkMode: darkMode),
+            );
+          }
+        }
+
+        final chosen = InkColorPreset.green.colors[1];
+        await tester.tap(
+          find.byKey(
+            ValueKey('color-picker-palette-green-${chosen.toARGB32()}'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(paletteColor, chosen);
+        expect(returnedColor, isNull);
+        expect(find.text('Pick color'), findsNothing);
       },
     );
   }
