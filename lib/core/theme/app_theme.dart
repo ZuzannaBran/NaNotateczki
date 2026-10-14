@@ -92,6 +92,14 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
       useMaterial3: true,
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: AppColors.inkBlack),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.inkBlack,
+        ),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.toolbar,
         elevation: 0,
