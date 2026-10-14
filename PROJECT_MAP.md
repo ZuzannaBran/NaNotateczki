@@ -332,14 +332,15 @@ wyświetlaniem `CompactStudyTimer` w nagłówku edytora.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (738 linii)
+### `lib/features/library/presentation/library_controller.dart` (793 linie)
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
 Przenoszenie notebooków i boardów między folderami zapisuje tylko metadane
 w SQLite; aktywny dokument zachowuje zaznaczenie w nowym folderze.
-Zapisuje kształt i indywidualny kolor ikony okładki folderu w zgodnym wstecznie
-`library_folders.json` (legacy lista nazw lub nowy obiekt z `folders` i
-`covers`); nie zmienia schematu SQLite. Wybór dokumentu synchronizuje
+Zapisuje kształt, indywidualny kolor ikony okładki i ostatnie 12
+wybranych kolorów w zgodnym wstecznie `library_folders.json`
+(legacy lista nazw lub obiekt z `folders`, `covers` i `recentCoverColors`);
+nie zmienia schematu SQLite. Wybór dokumentu synchronizuje
 też aktywny folder, dzięki czemu drzewko biblioteki zaznacza folder i notatkę
 jednocześnie. Asynchroniczny start
 nie powiadamia słuchaczy po usunięciu kontrolera. Zapis samych folderów
@@ -348,10 +349,11 @@ oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
 tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
 - 15: `FolderCoverShape`; 17: `FolderCoverStyle`; 48: `LibraryController`.
-- 121: `initialize`; 136: `loadItems`.
-- 318: `updateFolderCover`; 330–470: foldery i dokumenty.
-- 504: `moveItemToFolder`; 534: `selectFolder`; 645: `_loadFolders`; 684: `_saveFolders`
-  — zapis folderów zgłasza pusty zestaw zmian.
+- 124: `initialize`; 139: `loadItems`.
+- 321: `updateFolderCover` — aktualizuje również listę Recent; 339–483:
+  foldery i dokumenty.
+- 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
+  706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
 ### `lib/features/library/presentation/library_screen.dart` (1647 linii)
 
@@ -421,7 +423,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1005 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1107 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -441,8 +443,11 @@ palecie beżowej
 (lub stonowanej ciemnej), rysowane nad tłem za pomocą `Ink` i przycinane
 do tego samego zaokrąglenia przez `Material`.
 Źródła ikon i ich licencja ISC: `third_party/lucide/LICENSE`.
-Dialog pozwala również wybrać dowolny kolor przez `EditorToolbar.pickColor`,
-wspólny selektor notebooka z HEX i suwakami RGB/B-W.
+Dialog kolorów okładki zawiera bazowe próbki, trzy zestawy Blue/Pink/Green
+z szybkimi kolorami canvasu oraz sekcję Recent. Pojedyncze kolory z zestawów
+mogą być wybierane bez zmiany ustawień pisaka. Wspólny selektor
+`EditorToolbar.pickColor` udostępnia te same kolory, Recent, HEX i RGB/B-W;
+pokazuje kolory po transformacji aktywnego motywu.
 `_CatalogTile` umieszcza nazwę i menu kafelka nad miniaturą.
 Notatki mają pionowy podgląd pierwszej strony (820×1160), boardy kwadratowy
 podgląd dopasowany do granic obiektów z pierwszej strony. Miniatury rysują
@@ -451,7 +456,11 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 24: `dominantFolderColor`; 52: `FolderCoverIcon`; 106: `FolderCoverStrokePainter`; 232: `LibraryCatalog`; 510: `_FolderTile`; 576: `_DocumentTile`; 616: `_CatalogTile`; 697: `_DocumentPreview`; 780: `_boardPreviewBounds`; 822: `_PagePreviewPainter`; 894: `showFolderCoverEditor`.
+- 25: `dominantFolderColor`; 53: `FolderCoverIcon`;
+  107: `FolderCoverStrokePainter`; 233: `LibraryCatalog`;
+  511: `_FolderTile`; 577: `_DocumentTile`; 617: `_CatalogTile`;
+  698: `_DocumentPreview`; 781: `_boardPreviewBounds`;
+  823: `_PagePreviewPainter`; 895: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -674,7 +683,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1030):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1046):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
@@ -688,15 +697,16 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   z edycją koloru ikon okładek folderów. W dark mode próbki Recent,
   podgląd, HEX oraz suwaki pracują na odwróconym kolorze widocznym,
   a przed zapisem wracają do wartości bazowej; wybór bez zmian jest bezstratny.
-  Pod Recent widoczne są trzy palety (tylko podczas edycji szybkich kolorów);
-  ich pojedynczy wybór podmienia całą trójkę i zachowuje tryb jasny/ciemny.
+  Pod Recent dostępne są trzy palety: w trybie szybkich kolorów wybór
+  zestawu podmienia całą trójkę; w trybie okładki folderu wybiera się
+  pojedynczą próbkę bez ingerencji w kolory edytora.
   Pojedynczy tap szybkiego koloru wybiera go, dwuklik oraz długie
   przytrzymanie otwierają ten sam edytor palety.
   Kontroler HEX jest zwalniany dopiero
   po zakończeniu animacji zamykania dialogu, także przy zagnieżdżonej edycji.
-  11: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
-  406: selektor kształtu; 533: `_colorDot`; 580: `pickColor`;
-  922: `_EraserIcon`.
+  12: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
+  406: selektor kształtu; 534: `_colorDot`; 581: `pickColor`;
+  939: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (345):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
@@ -893,12 +903,13 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
   poziomego.
 - `test/library_controller_test.dart` (33)
-- `test/library_catalog_test.dart` (550): kolor dominujący, serializacja
+- `test/library_catalog_test.dart` (641): kolor dominujący, serializacja
   okładek, start katalogu, siatka notatek/boardów, nagłówek i Settings,
   edycja okładki z pełnym selektorem kolorów, bezpieczne zamknięcie
   zagnieżdżonego pickera oraz powrót z edytora; responsywna siatka 1–5
   kolumn, cienkie ikony Lucide, jednakowe tło folderów o różnych kolorach
-  zawartości oraz odrębne kolory hover/press w obu motywach.
+  zawartości, palety canvasu, ponowne wykorzystanie Recent, ich trwały
+  zapis i odczyt oraz odrębne kolory hover/press w obu motywach.
 - `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
   wysokość i 1 px separator nagłówka planera i ustawień w obu motywach,
   ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
@@ -954,8 +965,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   Recent i wartości RGB/HEX, suwak i zapis z zachowaniem koloru wizualnego,
   brak modyfikacji danych po zatwierdzeniu bez zmian; osobne widget testy
   dla obu motywów i jawna weryfikacja aktywnej jasności motywu.
-  Dodatkowo sprawdza obecność i rendering trzech palet oraz ich wybór
-  w trybie jasnym i ciemnym.
+  Dodatkowo sprawdza obecność i rendering trzech palet, wybór całego
+  zestawu w edytorze i pojedynczego koloru w folderze w obu motywach.
 - `test/page_overlay_text_gestures_test.dart` (679): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
