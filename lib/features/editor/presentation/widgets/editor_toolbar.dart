@@ -583,6 +583,7 @@ class EditorToolbar extends StatelessWidget {
     Color current,
     List<Color> recentColors, {
     ValueChanged<InkColorPreset>? onPresetSelected,
+    ValueChanged<Color>? onPaletteColorSelected,
   }) async {
     final darkMode = Theme.of(context).brightness == Brightness.dark;
     final displayCurrent = AppColors.displayInkColor(
@@ -757,7 +758,8 @@ class EditorToolbar extends StatelessWidget {
                         ],
                       ),
                     ],
-                  if (onPresetSelected != null) ...[
+                  if (onPresetSelected != null ||
+                      onPaletteColorSelected != null) ...[
                     const SizedBox(height: 12),
                     Align(
                       alignment: Alignment.centerLeft,
@@ -775,10 +777,12 @@ class EditorToolbar extends StatelessWidget {
                           InkWell(
                             key: ValueKey('color-picker-preset-${preset.name}'),
                             borderRadius: BorderRadius.circular(8),
-                            onTap: () {
-                              onPresetSelected(preset);
-                              Navigator.of(context).pop();
-                            },
+                            onTap: onPresetSelected == null
+                                ? null
+                                : () {
+                                    onPresetSelected(preset);
+                                    Navigator.of(context).pop();
+                                  },
                             child: Padding(
                               padding: const EdgeInsets.all(5),
                               child: Column(
@@ -788,18 +792,30 @@ class EditorToolbar extends StatelessWidget {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       for (final color in preset.colors)
-                                        Container(
-                                          width: 20,
-                                          height: 24,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.displayInkColor(
-                                              color,
-                                              darkMode: darkMode,
-                                            ),
-                                            border: Border.all(
-                                              color: Theme.of(context)
-                                                  .dividerColor,
-                                              width: 0.5,
+                                        InkWell(
+                                          key: ValueKey(
+                                            'color-picker-palette-'
+                                            '${preset.name}-${color.toARGB32()}',
+                                          ),
+                                          onTap: onPaletteColorSelected == null
+                                              ? null
+                                              : () {
+                                                  onPaletteColorSelected(color);
+                                                  Navigator.of(context).pop();
+                                                },
+                                          child: Container(
+                                            width: 20,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.displayInkColor(
+                                                color,
+                                                darkMode: darkMode,
+                                              ),
+                                              border: Border.all(
+                                                color: Theme.of(context)
+                                                    .dividerColor,
+                                                width: 0.5,
+                                              ),
                                             ),
                                           ),
                                         ),
