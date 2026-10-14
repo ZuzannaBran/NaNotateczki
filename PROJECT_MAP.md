@@ -431,8 +431,10 @@ szerokości ekranu. Zawartość folderów nadal ma siatkę podglądów dokument�
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
 `CompactStudyTimer`; folder ma też akcję edycji okładki.
 Okładka ma automatycznie rozjaśniony dominujący kolor ink/tekstu we wszystkich
-stronach dokumentów folderu; kształt i kolor ikony można zmieniać w dialogu.
-Domyślna okładka używa takiej samej obrysowanej ikony folderu jak sidebar.
+stronach dokumentów folderu. Każda okładka ma delikatny, cienki kontur
+folderu; wybierany kształt (gwiazda, serce, kwiat, błysk) jest dodatkową
+dekoracją wewnątrz konturu, a nie zamiennikiem folderu. Dialog pokazuje
+podgląd kompletnej okładki i pozwala zmienić kolor obrysu oraz dekoracji.
 Dialog pozwala również wybrać dowolny kolor przez `EditorToolbar.pickColor`,
 wspólny selektor notebooka z HEX i suwakami RGB/B-W.
 `_CatalogTile` umieszcza nazwę i menu kafelka nad miniaturą.
@@ -443,7 +445,7 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 23: `dominantFolderColor`; 60: `LibraryCatalog`;
+- 23: `dominantFolderColor`; 50: `FolderCoverIcon`;
   340: `_FolderTile`; 413: `_DocumentTile`; 453: `_CatalogTile`;
   514: `_DocumentPreview`; 597: `_boardPreviewBounds`;
   639: `_PagePreviewPainter`; 711: `showFolderCoverEditor`.

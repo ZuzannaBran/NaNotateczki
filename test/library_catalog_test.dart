@@ -108,7 +108,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('catalog-folders')), findsOneWidget);
     expect(find.byType(EditorToolbar), findsNothing);
-    expect(folderCoverIcon(FolderCoverShape.folder), Icons.folder_outlined);
+    expect(find.byType(FolderCoverIcon), findsWidgets);
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
 
     final catalogHeader = find.ancestor(
@@ -162,7 +162,28 @@ void main() {
 
     await tester.tap(find.byTooltip('Edit folder cover'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('cover-shape:heart')));
+    final heartOption = find.byKey(const ValueKey('cover-shape:heart'));
+    final heartPreview = find.descendant(
+      of: heartOption,
+      matching: find.byType(FolderCoverIcon),
+    );
+    expect(tester.widget<FolderCoverIcon>(heartPreview).shape,
+        FolderCoverShape.heart);
+    expect(
+      find.descendant(
+        of: heartPreview,
+        matching: find.byKey(const ValueKey('folder-cover-outline')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: heartPreview,
+        matching: find.byKey(const ValueKey('folder-cover-decoration')),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(heartOption);
     await tester.tap(
       find.byKey(ValueKey('cover-color:${const Color(0xFF2E7D32).toARGB32()}')),
     );
@@ -195,11 +216,66 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('projects-home')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('catalog-folders')), findsOneWidget);
+    final selectedCover = find.descendant(
+      of: folderTile,
+      matching: find.byType(FolderCoverIcon),
+    );
+    expect(tester.widget<FolderCoverIcon>(selectedCover).shape,
+        FolderCoverShape.heart);
+    expect(
+      find.descendant(
+        of: selectedCover,
+        matching: find.byKey(const ValueKey('folder-cover-outline')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: selectedCover,
+        matching: find.byKey(const ValueKey('folder-cover-decoration')),
+      ),
+      findsOneWidget,
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     preferences.dispose();
     await database.close();
+  });
+
+  testWidgets('all folder decorations preserve the thin folder outline', (
+    tester,
+  ) async {
+    for (final shape in FolderCoverShape.values) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: FolderCoverIcon(
+              shape: shape,
+              color: Colors.black,
+              semanticLabel: 'Folder cover',
+            ),
+          ),
+        ),
+      );
+
+      final cover = find.byType(FolderCoverIcon);
+      expect(
+        find.descendant(
+          of: cover,
+          matching: find.byKey(const ValueKey('folder-cover-outline')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cover,
+          matching: find.byKey(const ValueKey('folder-cover-decoration')),
+        ),
+        shape == FolderCoverShape.folder ? findsNothing : findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('Projects uses top-aligned responsive five-column folder grid', (
