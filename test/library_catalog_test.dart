@@ -255,9 +255,11 @@ void main() {
       (selectedPaletteSwatch.child! as Container).child,
       isA<Icon>(),
     );
-    await tester.tap(
-      find.byKey(ValueKey('cover-color:${const Color(0xFF2E7D32).toARGB32()}')),
+    final baseColor = find.byKey(
+      ValueKey('cover-color:${const Color(0xFF2E7D32).toARGB32()}'),
     );
+    await tester.ensureVisible(baseColor);
+    await tester.tap(baseColor);
     final advancedButton = find.byKey(const ValueKey('cover-advanced-color'));
     await tester.ensureVisible(advancedButton);
     await tester.tap(advancedButton);
