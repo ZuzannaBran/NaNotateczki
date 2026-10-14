@@ -585,6 +585,11 @@ class EditorToolbar extends StatelessWidget {
     ValueChanged<InkColorPreset>? onPresetSelected,
     ValueChanged<Color>? onPaletteColorSelected,
   }) async {
+    final sharedRecent = await SharedRecentColors.load();
+    if (!context.mounted) {
+      return null;
+    }
+    final shownRecent = SharedRecentColors.merge(sharedRecent, recentColors);
     final darkMode = Theme.of(context).brightness == Brightness.dark;
     final displayCurrent = AppColors.displayInkColor(
       current,
@@ -720,7 +725,7 @@ class EditorToolbar extends StatelessWidget {
                         syncHex();
                       }),
                     ),
-                    if (recentColors.isNotEmpty || onPresetSelected != null) ...[
+                    if (shownRecent.isNotEmpty || onPresetSelected != null) ...[
                       const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerLeft,
@@ -734,7 +739,7 @@ class EditorToolbar extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          for (final color in recentColors)
+                          for (final color in shownRecent)
                             GestureDetector(
                               key: ValueKey(
                                 'color-picker-recent-${color.toARGB32()}',
@@ -804,9 +809,10 @@ class EditorToolbar extends StatelessWidget {
                                                   Navigator.of(context).pop();
                                                 },
                                           child: Container(
-                                            width: 20,
+                                            width: 24,
                                             height: 24,
                                             decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
                                               color: AppColors.displayInkColor(
                                                 color,
                                                 darkMode: darkMode,
@@ -824,7 +830,11 @@ class EditorToolbar extends StatelessWidget {
                                   const SizedBox(height: 4),
                                   Text(
                                     preset.label,
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme.onSurface,
+                                        ),
                                   ),
                                 ],
                               ),
