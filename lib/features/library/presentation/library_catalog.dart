@@ -982,7 +982,8 @@ Future<void> showFolderCoverEditor(
                               ? Icon(
                                   Icons.check,
                                   size: 16,
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color: Theme.of(context)
+                                      .colorScheme.onSurface,
                                 )
                               : null,
                         ),
@@ -1047,7 +1048,8 @@ Future<void> showFolderCoverEditor(
                             preset.label,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color: Theme.of(context)
+                                      .colorScheme.onSurface,
                                 ),
                           ),
                         ],
