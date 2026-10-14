@@ -1,5 +1,4 @@
 import 'package:drift/native.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -244,55 +243,60 @@ void main() {
     await database.close();
   });
 
-  testWidgets('all folder decorations preserve the thin folder outline', (
+  testWidgets('Lucide folder covers keep a thin stroke at every size', (
     tester,
   ) async {
-    for (final shape in FolderCoverShape.values) {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Center(
-            child: FolderCoverIcon(
-              shape: shape,
-              color: Colors.black,
-              semanticLabel: 'Folder cover',
+    for (final size in [32.0, 88.0, 120.0]) {
+      for (final shape in FolderCoverShape.values) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Center(
+              child: FolderCoverIcon(
+                shape: shape,
+                color: Colors.black,
+                size: size,
+                semanticLabel: 'Folder cover',
+              ),
             ),
           ),
-        ),
-      );
-
-      final cover = find.byType(FolderCoverIcon);
-      final outline = find.descendant(
-        of: cover,
-        matching: find.byKey(const ValueKey('folder-cover-outline')),
-      );
-      expect(outline, findsOneWidget);
-      final folderIcon = tester.widget<Icon>(outline);
-      expect(folderIcon.icon, CupertinoIcons.folder);
-      expect(folderIcon.size, 88);
-      expect(folderIcon.color, Colors.black);
-
-      final decoration = find.descendant(
-        of: cover,
-        matching: find.byKey(const ValueKey('folder-cover-decoration')),
-      );
-      if (shape == FolderCoverShape.folder) {
-        expect(decoration, findsNothing);
-      } else {
-        expect(decoration, findsOneWidget);
-        expect(
-          tester.widget<Icon>(decoration).icon,
-          switch (shape) {
-            FolderCoverShape.folder => null,
-            FolderCoverShape.star => CupertinoIcons.star,
-            FolderCoverShape.heart => CupertinoIcons.heart,
-            FolderCoverShape.flower => CupertinoIcons.rosette,
-            FolderCoverShape.sparkle => CupertinoIcons.sparkles,
-          },
         );
-        expect(tester.widget<Icon>(decoration).size, closeTo(24.64, 0.01));
-        expect(tester.widget<Icon>(decoration).color, Colors.black);
+
+        final cover = find.byType(FolderCoverIcon);
+        final outline = find.descendant(
+          of: cover,
+          matching: find.byKey(const ValueKey('folder-cover-outline')),
+        );
+        expect(outline, findsOneWidget);
+        final outlinePainter = tester.widget<CustomPaint>(outline).painter;
+        expect(outlinePainter, isA<FolderCoverStrokePainter>());
+        final folderPainter = outlinePainter! as FolderCoverStrokePainter;
+        expect(folderPainter.strokeWidth, 1.1);
+        expect(folderPainter.color, Colors.black);
+        expect(folderPainter.isDecoration, false);
+
+        final decoration = find.descendant(
+          of: cover,
+          matching: find.byKey(const ValueKey('folder-cover-decoration')),
+        );
+        if (shape == FolderCoverShape.folder) {
+          expect(decoration, findsNothing);
+        } else {
+          expect(decoration, findsOneWidget);
+          final symbolPainter = tester.widget<CustomPaint>(decoration).painter;
+          expect(symbolPainter, isA<FolderCoverStrokePainter>());
+          expect(
+            (symbolPainter! as FolderCoverStrokePainter).isDecoration,
+            isTrue,
+          );
+          expect(symbolPainter.shape, shape);
+          expect(symbolPainter.strokeWidth, 1.1);
+        }
+        expect(
+          find.descendant(of: cover, matching: find.byType(Icon)),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
       }
-      expect(tester.takeException(), isNull);
     }
   });
 

@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:path_drawing/path_drawing.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
@@ -48,7 +48,7 @@ Color dominantFolderColor(Iterable<Notebook> notebooks) {
   return Color(chosen.key);
 }
 
-/// A thin, font-rendered folder with an optional decoration on its cover.
+/// Lucide SVG outlines with a fixed, delicate stroke at any icon size.
 class FolderCoverIcon extends StatelessWidget {
   const FolderCoverIcon({
     required this.shape,
@@ -58,6 +58,8 @@ class FolderCoverIcon extends StatelessWidget {
     super.key,
   });
 
+  static const double strokeWidth = 1.1;
+
   final FolderCoverShape shape;
   final Color color;
   final double size;
@@ -65,14 +67,6 @@ class FolderCoverIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final decoration = switch (shape) {
-      FolderCoverShape.folder => null,
-      FolderCoverShape.star => CupertinoIcons.star,
-      FolderCoverShape.heart => CupertinoIcons.heart,
-      FolderCoverShape.flower => CupertinoIcons.rosette,
-      FolderCoverShape.sparkle => CupertinoIcons.sparkles,
-    };
-
     return Semantics(
       label: semanticLabel,
       child: SizedBox.square(
@@ -80,22 +74,21 @@ class FolderCoverIcon extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Center(
-              child: Icon(
-                CupertinoIcons.folder,
-                key: const ValueKey('folder-cover-outline'),
+            CustomPaint(
+              key: const ValueKey('folder-cover-outline'),
+              painter: FolderCoverStrokePainter(
+                shape: shape,
                 color: color,
-                size: size,
+                isDecoration: false,
               ),
             ),
-            if (decoration != null)
-              Align(
-                alignment: const Alignment(0, 0.25),
-                child: Icon(
-                  decoration,
-                  key: const ValueKey('folder-cover-decoration'),
+            if (shape != FolderCoverShape.folder)
+              CustomPaint(
+                key: const ValueKey('folder-cover-decoration'),
+                painter: FolderCoverStrokePainter(
+                  shape: shape,
                   color: color,
-                  size: size * 0.28,
+                  isDecoration: true,
                 ),
               ),
           ],
@@ -103,6 +96,123 @@ class FolderCoverIcon extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Uses the original Lucide vector geometry without scaling stroke weight.
+class FolderCoverStrokePainter extends CustomPainter {
+  const FolderCoverStrokePainter({
+    required this.shape,
+    required this.color,
+    required this.isDecoration,
+  });
+
+  final FolderCoverShape shape;
+  final Color color;
+  final bool isDecoration;
+
+  double get strokeWidth => FolderCoverIcon.strokeWidth;
+
+  static final Path _folder = parseSvgPathData(
+    'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9'
+    'a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4'
+    'a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z',
+  );
+  static final Path _star = parseSvgPathData(
+    'M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679'
+    'a2.123 2.123 0 0 0 1.595 1.16l5.166.756'
+    'a.53.53 0 0 1 .294.904l-3.736 3.638'
+    'a2.123 2.123 0 0 0-.611 1.878l.882 5.14'
+    'a.53.53 0 0 1-.771.56l-4.618-2.428'
+    'a2.122 2.122 0 0 0-1.973 0L6.396 21.01'
+    'a.53.53 0 0 1-.77-.56l.881-5.139'
+    'a2.122 2.122 0 0 0-.611-1.879L2.16 9.795'
+    'a.53.53 0 0 1 .294-.906l5.165-.755'
+    'a2.122 2.122 0 0 0 1.597-1.16z',
+  );
+  static final Path _heart = parseSvgPathData(
+    'M2 9.5a5.5 5.5 0 0 1 9.591-3.676'
+    'a.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5'
+    'c0 2.29-1.5 4-3 5.5l-5.492 5.313'
+    'a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5',
+  );
+  static final Path _flower = Path()
+    ..addOval(Rect.fromCircle(center: const Offset(12, 12), radius: 3))
+    ..addPath(
+      parseSvgPathData(
+        'M12 16.5A4.5 4.5 0 1 1 7.5 12'
+        ' 4.5 4.5 0 1 1 12 7.5'
+        'a4.5 4.5 0 1 1 4.5 4.5'
+        ' 4.5 4.5 0 1 1-4.5 4.5',
+      ),
+      Offset.zero,
+    )
+    ..addPath(
+      parseSvgPathData(
+        'M12 7.5V9M7.5 12H9M16.5 12H15M12 16.5V15'
+        'm-4-7 1.88 1.88M14.12 9.88 16 8'
+        'm-8 8 1.88-1.88M14.12 14.12 16 16',
+      ),
+      Offset.zero,
+    );
+  static final Path _sparkles = Path()
+    ..addPath(
+      parseSvgPathData(
+        'M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558'
+        'a2 2 0 0 0 1.594 1.594l5.558 1.051'
+        'a1 1 0 0 1 0 1.966l-5.558 1.051'
+        'a2 2 0 0 0-1.594 1.594l-1.051 5.558'
+        'a1 1 0 0 1-1.966 0l-1.051-5.558'
+        'a2 2 0 0 0-1.594-1.594l-5.558-1.051'
+        'a1 1 0 0 1 0-1.966l5.558-1.051'
+        'a2 2 0 0 0 1.594-1.594z',
+      ),
+      Offset.zero,
+    )
+    ..addPath(parseSvgPathData('M20 2v4M22 4h-4'), Offset.zero)
+    ..addOval(Rect.fromCircle(center: const Offset(4, 20), radius: 2));
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final side = size.shortestSide;
+    if (side <= 0) {
+      return;
+    }
+    final scale = side / 24;
+    final decorationScale = isDecoration ? 0.3 : 1.0;
+
+    canvas.save();
+    canvas.translate((size.width - side) / 2, (size.height - side) / 2);
+    canvas.scale(scale);
+    if (isDecoration) {
+      canvas.translate(8.4, 10.2);
+      canvas.scale(decorationScale);
+    }
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth / (scale * decorationScale)
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true;
+
+    final path = isDecoration
+        ? switch (shape) {
+            FolderCoverShape.folder => _folder,
+            FolderCoverShape.star => _star,
+            FolderCoverShape.heart => _heart,
+            FolderCoverShape.flower => _flower,
+            FolderCoverShape.sparkle => _sparkles,
+          }
+        : _folder;
+    canvas.drawPath(path, stroke);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant FolderCoverStrokePainter oldDelegate) =>
+      shape != oldDelegate.shape ||
+      color != oldDelegate.color ||
+      isDecoration != oldDelegate.isDecoration;
 }
 
 class LibraryCatalog extends StatelessWidget {
