@@ -82,7 +82,8 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 
 ### Motyw
 
-- `lib/core/theme/app_colors.dart` (86): jasna paleta oraz tryb ciemny:
+- `lib/core/theme/app_colors.dart`: jasna paleta i trzy współdzielone
+  zestawy Blue/Pink/Green dla canvasu oraz okładek; tryb ciemny:
   tło #2D2E2B, panele #3A3B39, aktywne #4A4B48, kartka/panele #5A5B57,
   ciemniejszy canvas notatek #50514D, tekst #EEECE6. `displayInkColor` odwraca jasność HSL wszystkich odcieni,
   zachowując hue, saturację i alpha (czerń↔biel, jasny błękit↔ciemny).
@@ -90,8 +91,10 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
   bez modyfikowania zapisanych kresek. 50: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
-- `lib/core/theme/app_theme.dart` (114): `AppTheme.light` i `AppTheme.dark`
-  z kontrastowymi kontrolkami i nagłówkami. 5: `AppTheme`.
+- `lib/core/theme/app_theme.dart`: `AppTheme.light` i `AppTheme.dark`
+  z kontrastowymi kontrolkami i nagłówkami. Tekstowe i konturowe
+  przyciski jasnego motywu używają `onSurface` zamiast bladego akcentu.
+  5: `AppTheme`.
 
 ### Wejście i preferencje
 
@@ -423,7 +426,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1124 linie)
+### `lib/features/library/presentation/library_catalog.dart` (1105 linie)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -439,8 +442,10 @@ kwiat, błysk) można ponownie wybierać z poziomu edytora folderu.
 Kafelki mają promień 24 px i neutralne tło; zapisany kolor modyfikuje
 kolor ikon, nie powoduje automatycznego podświetlania całej okładki.
 Hover i press są nakładkami na `Ink` przyciętymi przez `Material`.
-Dialog kolorów okładki zawiera bazowe próbki, trzy zestawy Blue/Pink/Green
-z szybkimi kolorami canvasu oraz sekcję Recent. Pojedyncze kolory z zestawów
+Dialog kolorów okładki zachowuje wybór dekoracji, ale nie pokazuje
+bazowych próbek Cover color. Recent współdzieli zapis kolorów z canvasem
+(również po ponownym uruchomieniu), a trzy zestawy Blue/Pink/Green
+wyświetlają osobne okrągłe próbki. Pojedyncze kolory z zestawów
 mogą być wybierane bez zmiany ustawień pisaka. Wspólny selektor
 `EditorToolbar.pickColor` udostępnia te same kolory, Recent, HEX i RGB/B-W;
 pokazuje kolory po transformacji aktywnego motywu.
@@ -581,9 +586,10 @@ ale zmienione ręcznie próbki pozostają nienaruszone.
   2824: `_scheduleSave`; 2845: `_saveDirtyPages`; 2867: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
-  `InkColorPreset` zawiera trzy zestawy po trzy barwy (Blue/Pink/Green)
-  w bazowych kolorach jasnych; tryb ciemny korzysta z niezmieniającej
-  zapisów transformacji `AppColors.displayInkColor`.
+  `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`.
+  `SharedRecentColors` udostępnia wspólną, serializowaną historię do 12
+  kolorów pisaka, tekstu i okładek, z migracją `editor_prefs.json`.
+  Tryb ciemny zachowuje zapisane bazowe wartości kolorów.
 
 ## 8. UI edytora
 
@@ -907,7 +913,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/library_controller_test.dart` (33)
 - `test/library_catalog_test.dart` (720): kolor dominujący, serializacja
   stylu okładek, start katalogu, siatka notatek/boardów,
-  edycja kolorów i dekoracji z paletami i Recent, zapis i odczyt Recent,
+  edycja dekoracji i kolorów z okrągłymi paletami i wspólnym Recent,
+  bez bazowych próbek Cover color, zapis i odczyt historii,
   regresja widoczności ikon i dekoracji w obu motywach, kontur Lucide,
   responsywna siatka 1–5 kolumn, odrębne kolory hover/press oraz
   geometria menu po lewej od nazw folderów, notatek i boardów.
