@@ -409,12 +409,6 @@ class LibraryCatalog extends StatelessWidget {
                                                         const EdgeInsets.all(18),
                                                     child: _FolderTile(
                                                       name: folders[index],
-                                                      contents: controller.items
-                                                          .where(
-                                                            (item) =>
-                                                                item.folder ==
-                                                                folders[index],
-                                                          ),
                                                       cover: controller
                                                           .folderCoverFor(
                                                             folders[index],
@@ -516,7 +510,6 @@ class _CatalogEmptyState extends StatelessWidget {
 class _FolderTile extends StatelessWidget {
   const _FolderTile({
     required this.name,
-    required this.contents,
     required this.cover,
     required this.onTap,
     required this.onEdit,
@@ -525,7 +518,6 @@ class _FolderTile extends StatelessWidget {
   });
 
   final String name;
-  final Iterable<Notebook> contents;
   final FolderCoverStyle cover;
   final VoidCallback onTap;
   final VoidCallback onEdit;
@@ -536,15 +528,7 @@ class _FolderTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final darkMode = theme.brightness == Brightness.dark;
-    final base = AppColors.displayInkColor(
-      dominantFolderColor(contents),
-      darkMode: darkMode,
-    );
-    final background = Color.lerp(
-      darkMode ? AppColors.darkPaper : AppColors.paper,
-      base,
-      0.10,
-    )!;
+    final background = darkMode ? AppColors.darkPaper : AppColors.paper;
     final iconColor = cover.iconColor == null
         ? theme.colorScheme.onSurface
         : AppColors.displayInkColor(cover.iconColor!, darkMode: darkMode);
