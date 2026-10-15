@@ -27,6 +27,27 @@ a platform as tested until its actual Actions job succeeds.
 - The desktop matrix also runs merged catalog/planner UI, typography and
   planner lifecycle regressions directly on Linux, Windows and macOS.
 
+## Manual check: symmetric notebook and board grid (October 2026)
+
+1. Create a folder with alternating notebooks and boards, including at
+   least seven items and a long document name.
+2. At a wide window size, check that five columns are horizontally centered
+   and that the next row starts under the first column.
+3. Confirm all thumbnails have the same width and aligned top and left
+   edges within their grid columns. Notebook previews must remain portrait;
+   board previews must remain square. The shorter boards leave empty space
+   beneath their preview, not a stretched or distorted image.
+4. Verify three-dot menus and truncated titles remain inside the thumbnail
+   width and start at the same position for both document types.
+5. Reduce the window until the grid shows two columns, then one. Check
+   spacing, centering, action menus, and opening both kinds of documents.
+6. Repeat in light and dark mode. Verify hover/press is limited to each
+   preview and the folder grid has not changed.
+
+Automated coverage: `test/library_catalog_test.dart` exercises grid widths,
+alignment, preview aspect ratios, title/menu bounds, and responsive columns.
+A visual check is still needed on a running Flutter UI.
+
 ## Platform coverage
 
 | Platform | Logic/widget | Native app | Build | Input/peripherals |

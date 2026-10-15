@@ -802,7 +802,7 @@ void main() {
     );
     expect(tester.getRect(cells[5]).top, greaterThan(firstCell.top));
 
-    final previewWidths = <NotebookKind, double>{};
+    final previewHeights = <NotebookKind, double>{};
     for (final item in items.take(5)) {
       final tile = find.byKey(ValueKey('catalog-document:${item.uid}'));
       final preview = find.descendant(
@@ -824,21 +824,22 @@ void main() {
       final menuRect = tester.getRect(menu);
       final titleRect = tester.getRect(title);
       expect(previewRect.center.dx, closeTo(tester.getCenter(cell).dx, 1));
-      expect(menuRect.left, closeTo(previewRect.left, 1));
-      expect(titleRect.right, lessThanOrEqualTo(previewRect.right + 1));
+      expect(previewRect.width, closeTo(210, 1));
+      expect(menuRect.left, closeTo(previewRect.left + 4, 1));
+      expect(titleRect.right, lessThanOrEqualTo(previewRect.right - 4));
       expect(
         previewRect.top,
-        closeTo(tester.getRect(cells.first).top + 18 + 40, 1),
+        closeTo(tester.getRect(cells.first).top + 18 + 36, 1),
       );
-      previewWidths[item.kind] = previewRect.width;
+      previewHeights[item.kind] = previewRect.height;
       expect(
         tester.widget<AspectRatio>(preview).aspectRatio,
         item.kind == NotebookKind.board ? 1 : 0.72,
       );
     }
     expect(
-      previewWidths[NotebookKind.board]!,
-      greaterThan(previewWidths[NotebookKind.notebook]!),
+      previewHeights[NotebookKind.notebook]!,
+      greaterThan(previewHeights[NotebookKind.board]!),
     );
 
     await tester.binding.setSurfaceSize(const Size(580, 900));

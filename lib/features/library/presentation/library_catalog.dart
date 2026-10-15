@@ -329,7 +329,7 @@ class LibraryCatalog extends StatelessWidget {
                   : LayoutBuilder(
                       builder: (context, constraints) {
                         const cellExtent = 246.0;
-                        const rowExtent = 292.0;
+                        final rowExtent = activeFolder == null ? 292.0 : 372.0;
                         final itemCount = activeFolder == null
                             ? folders.length
                             : notes.length;
@@ -599,45 +599,23 @@ class _DocumentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final ratio = item.kind == NotebookKind.board ? 1.0 : 0.72;
-        final maxPreviewWidth = math.max(1.0, constraints.maxWidth - 8);
-        final maxPreviewHeight = math.max(1.0, constraints.maxHeight - 44);
-        final previewWidth = math.min(
-          maxPreviewWidth,
-          maxPreviewHeight * ratio,
-        );
-        final previewHeight = previewWidth / ratio;
-
-        return Align(
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-            width: previewWidth + 8,
-            height: previewHeight + 44,
-            child: _CatalogTile(
-              key: ValueKey('catalog-document:${item.uid}'),
-              title: item.title,
-              onTap: onTap,
-              actions: const [
-                PopupMenuItem(value: 0, child: Text('Rename')),
-                PopupMenuItem(value: 1, child: Text('Delete')),
-              ],
-              onAction: (action) {
-                if (action == 0) {
-                  onRename();
-                } else {
-                  onDelete();
-                }
-              },
-              child: AspectRatio(
-                aspectRatio: ratio,
-                child: _DocumentPreview(item: item),
-              ),
-            ),
-          ),
-        );
+    return _CatalogTile(
+      key: ValueKey('catalog-document:${item.uid}'),
+      title: item.title,
+      onTap: onTap,
+      actions: const [
+        PopupMenuItem(value: 0, child: Text('Rename')),
+        PopupMenuItem(value: 1, child: Text('Delete')),
+      ],
+      onAction: (action) {
+        if (action == 0) {
+          onRename();
+        } else {
+          onDelete();
+        }
       },
+      previewAspectRatio: item.kind == NotebookKind.board ? 1 : 0.72,
+      child: _DocumentPreview(item: item),
     );
   }
 }
@@ -649,6 +627,7 @@ class _CatalogTile extends StatelessWidget {
     required this.onTap,
     required this.actions,
     required this.onAction,
+    this.previewAspectRatio,
     super.key,
   });
 
@@ -657,6 +636,7 @@ class _CatalogTile extends StatelessWidget {
   final VoidCallback onTap;
   final List<PopupMenuItem<int>> actions;
   final ValueChanged<int> onAction;
+  final double? previewAspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -667,6 +647,29 @@ class _CatalogTile extends StatelessWidget {
         .withValues(alpha: darkMode ? 0.32 : 0.52);
     final pressedColor = (darkMode ? AppColors.darkActive : AppColors.divider)
         .withValues(alpha: darkMode ? 0.52 : 0.42);
+    final previewSurface = Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(24),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        overlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed)) {
+            return pressedColor;
+          }
+          if (states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.focused)) {
+            return hoverColor;
+          }
+          return Colors.transparent;
+        }),
+        splashColor: pressedColor,
+        highlightColor: Colors.transparent,
+        child: Padding(padding: const EdgeInsets.all(4), child: child),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -711,28 +714,15 @@ class _CatalogTile extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Expanded(
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(24),
-              overlayColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.pressed)) {
-                  return pressedColor;
-                }
-                if (states.contains(WidgetState.hovered) ||
-                    states.contains(WidgetState.focused)) {
-                  return hoverColor;
-                }
-                return Colors.transparent;
-              }),
-              splashColor: pressedColor,
-              highlightColor: Colors.transparent,
-              child: Padding(padding: const EdgeInsets.all(4), child: child),
-            ),
-          ),
+          child: previewAspectRatio == null
+              ? previewSurface
+              : Align(
+                  alignment: Alignment.topCenter,
+                  child: AspectRatio(
+                    aspectRatio: previewAspectRatio!,
+                    child: previewSurface,
+                  ),
+                ),
         ),
       ],
     );
