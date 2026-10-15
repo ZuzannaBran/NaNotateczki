@@ -328,27 +328,31 @@ class LibraryCatalog extends StatelessWidget {
                     )
                   : LayoutBuilder(
                       builder: (context, constraints) {
-                        if (activeFolder == null) {
-                          const cellExtent = 246.0;
-                          const rowExtent = 292.0;
-                          final availableWidth = math.max(
-                            1.0,
-                            constraints.maxWidth - 40,
-                          );
-                          final columns = math.min(
-                            5,
-                            math.min(
-                              folders.length,
-                              math.max(
-                                1,
-                                (availableWidth / cellExtent).floor(),
-                              ),
+                        const cellExtent = 246.0;
+                        const rowExtent = 292.0;
+                        final itemCount = activeFolder == null
+                            ? folders.length
+                            : notes.length;
+                        final availableWidth = math.max(
+                          1.0,
+                          constraints.maxWidth - 40,
+                        );
+                        final columns = math.min(
+                          5,
+                          math.min(
+                            itemCount,
+                            math.max(
+                              1,
+                              (availableWidth / cellExtent).floor(),
                             ),
-                          );
-                          final gridWidth = math.min(
-                            availableWidth,
-                            columns * cellExtent,
-                          );
+                          ),
+                        );
+                        final gridWidth = math.min(
+                          availableWidth,
+                          columns * cellExtent,
+                        );
+
+                        if (activeFolder == null) {
                           final cellWidth = gridWidth / columns;
                           final rowCount =
                               (folders.length + columns - 1) ~/ columns;
@@ -436,33 +440,44 @@ class LibraryCatalog extends StatelessWidget {
                             ),
                           );
                         }
-                        return GridView.builder(
-                          physics: TouchNavigationScrollPhysics(
-                            sensitivity:
-                                context
-                                    .watch<AppPreferencesController?>()
-                                    ?.touchNavigationSensitivity ??
-                                1.0,
-                          ),
-                          key: ValueKey('catalog-items:$activeFolder'),
-                          padding: const EdgeInsets.all(30),
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 224,
-                                mainAxisExtent: 263,
-                                mainAxisSpacing: 24,
-                                crossAxisSpacing: 24,
+                        return Align(
+                          alignment: Alignment.topCenter,
+                          child: SizedBox(
+                            key: const ValueKey('catalog-document-grid'),
+                            width: gridWidth,
+                            child: GridView.builder(
+                              key: ValueKey('catalog-items:$activeFolder'),
+                              physics: TouchNavigationScrollPhysics(
+                                sensitivity:
+                                    context
+                                        .watch<AppPreferencesController?>()
+                                        ?.touchNavigationSensitivity ??
+                                    1.0,
                               ),
-                          itemCount: notes.length,
-                          itemBuilder: (context, index) {
-                            final item = notes[index];
-                            return _DocumentTile(
-                              item: item,
-                              onTap: () => onOpenItem(item),
-                              onRename: () => onRenameItem(item),
-                              onDelete: () => onDeleteItem(item),
-                            );
-                          },
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: columns,
+                                    mainAxisExtent: rowExtent,
+                                  ),
+                              itemCount: notes.length,
+                              itemBuilder: (context, index) {
+                                final item = notes[index];
+                                return Padding(
+                                  key: ValueKey(
+                                    'catalog-document-cell:${item.uid}',
+                                  ),
+                                  padding: const EdgeInsets.all(18),
+                                  child: _DocumentTile(
+                                    item: item,
+                                    onTap: () => onOpenItem(item),
+                                    onRename: () => onRenameItem(item),
+                                    onDelete: () => onDeleteItem(item),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -584,27 +599,45 @@ class _DocumentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _CatalogTile(
-      key: ValueKey('catalog-document:${item.uid}'),
-      title: item.title,
-      onTap: onTap,
-      actions: const [
-        PopupMenuItem(value: 0, child: Text('Rename')),
-        PopupMenuItem(value: 1, child: Text('Delete')),
-      ],
-      onAction: (action) {
-        if (action == 0) {
-          onRename();
-        } else {
-          onDelete();
-        }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ratio = item.kind == NotebookKind.board ? 1.0 : 0.72;
+        final maxPreviewWidth = math.max(1.0, constraints.maxWidth - 8);
+        final maxPreviewHeight = math.max(1.0, constraints.maxHeight - 44);
+        final previewWidth = math.min(
+          maxPreviewWidth,
+          maxPreviewHeight * ratio,
+        );
+        final previewHeight = previewWidth / ratio;
+
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: previewWidth + 8,
+            height: previewHeight + 44,
+            child: _CatalogTile(
+              key: ValueKey('catalog-document:${item.uid}'),
+              title: item.title,
+              onTap: onTap,
+              actions: const [
+                PopupMenuItem(value: 0, child: Text('Rename')),
+                PopupMenuItem(value: 1, child: Text('Delete')),
+              ],
+              onAction: (action) {
+                if (action == 0) {
+                  onRename();
+                } else {
+                  onDelete();
+                }
+              },
+              child: AspectRatio(
+                aspectRatio: ratio,
+                child: _DocumentPreview(item: item),
+              ),
+            ),
+          ),
+        );
       },
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: item.kind == NotebookKind.board ? 1 : 0.72,
-          child: _DocumentPreview(item: item),
-        ),
-      ),
     );
   }
 }

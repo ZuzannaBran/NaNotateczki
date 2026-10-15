@@ -735,4 +735,141 @@ void main() {
     controller.dispose();
     await database.close();
   });
+
+  testWidgets('mixed notebook and board previews use centered equal slots', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1600, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    for (var index = 0; index < 7; index++) {
+      if (index.isEven) {
+        await repository.createNotebook(folder: 'Mixed');
+      } else {
+        await repository.createBoard(folder: 'Mixed');
+      }
+    }
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await controller.loadItems();
+    final items = controller.items
+        .where((item) => item.folder == 'Mixed')
+        .toList();
+    expect(items.length, 7);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LibraryCatalog(
+          controller: controller,
+          folder: 'Mixed',
+          onBack: () {},
+          onFolderTap: (_) {},
+          onOpenItem: (_) {},
+          onEditFolder: (_) {},
+          onRenameFolder: (_) {},
+          onDeleteFolder: (_) {},
+          onRenameItem: (_) {},
+          onDeleteItem: (_) {},
+          onSettings: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final grid = find.byKey(const ValueKey('catalog-document-grid'));
+    final cells = [
+      for (final item in items)
+        find.byKey(ValueKey('catalog-document-cell:${item.uid}')),
+    ];
+    expect(tester.getSize(grid).width, 1230);
+    expect(tester.getCenter(grid).dx, closeTo(800, 1));
+    final firstCell = tester.getRect(cells.first);
+    for (var index = 0; index < 5; index++) {
+      final cell = tester.getRect(cells[index]);
+      expect(cell.width, closeTo(firstCell.width, 1));
+      expect(cell.top, closeTo(firstCell.top, 1));
+      expect(cell.left, closeTo(firstCell.left + index * 246, 1));
+    }
+    expect(tester.getRect(cells[5]).left, closeTo(firstCell.left, 1));
+    expect(
+      tester.getRect(cells[6]).left,
+      closeTo(tester.getRect(cells[1]).left, 1),
+    );
+    expect(tester.getRect(cells[5]).top, greaterThan(firstCell.top));
+
+    final previewWidths = <NotebookKind, double>{};
+    for (final item in items.take(5)) {
+      final tile = find.byKey(ValueKey('catalog-document:${item.uid}'));
+      final preview = find.descendant(
+        of: tile,
+        matching: find.byType(AspectRatio),
+      );
+      final menu = find.descendant(
+        of: tile,
+        matching: find.byTooltip('Actions for ${item.title}'),
+      );
+      final title = find.descendant(
+        of: tile,
+        matching: find.text(item.title),
+      );
+      final cell = find.byKey(
+        ValueKey('catalog-document-cell:${item.uid}'),
+      );
+      final previewRect = tester.getRect(preview);
+      final menuRect = tester.getRect(menu);
+      final titleRect = tester.getRect(title);
+      expect(previewRect.center.dx, closeTo(tester.getCenter(cell).dx, 1));
+      expect(menuRect.left, closeTo(previewRect.left, 1));
+      expect(titleRect.right, lessThanOrEqualTo(previewRect.right + 1));
+      expect(
+        previewRect.top,
+        closeTo(tester.getRect(cells.first).top + 18 + 40, 1),
+      );
+      previewWidths[item.kind] = previewRect.width;
+      expect(
+        tester.widget<AspectRatio>(preview).aspectRatio,
+        item.kind == NotebookKind.board ? 1 : 0.72,
+      );
+    }
+    expect(
+      previewWidths[NotebookKind.board]!,
+      greaterThan(previewWidths[NotebookKind.notebook]!),
+    );
+
+    await tester.binding.setSurfaceSize(const Size(580, 900));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(grid).width, 492);
+    expect(tester.getCenter(grid).dx, closeTo(290, 1));
+    expect(
+      tester.getRect(cells[0]).top,
+      closeTo(tester.getRect(cells[1]).top, 1),
+    );
+    expect(
+      tester.getRect(cells[2]).top,
+      greaterThan(tester.getRect(cells[0]).top),
+    );
+
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(grid).width, 246);
+    expect(tester.getCenter(grid).dx, closeTo(195, 1));
+    expect(
+      tester.getRect(cells[1]).left,
+      closeTo(tester.getRect(cells[0]).left, 1),
+    );
+    expect(
+      tester.getRect(cells[1]).top,
+      greaterThan(tester.getRect(cells[0]).top),
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
 }
