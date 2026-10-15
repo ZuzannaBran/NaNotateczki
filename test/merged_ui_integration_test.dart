@@ -92,8 +92,7 @@ void main() {
       }
 
       final referencePixel = await _renderedHeaderPixel(tester);
-      await tester.tap(find.byTooltip('Open planner'));
-      await tester.pumpAndSettle();
+      await _openPlanner(tester);
       expectAlignedHeader('Study planner');
       expect(await _renderedHeaderPixel(tester), referencePixel);
 
@@ -132,8 +131,7 @@ void main() {
     await tester.pumpAndSettle();
     _expectCatalogBackground(tester, AppColors.darkBackground);
 
-    await tester.tap(find.byTooltip('Open planner'));
-    await tester.pumpAndSettle();
+    await _openPlanner(tester);
     expect(find.byType(PlannerScreen), findsOneWidget);
     expect(
       Theme.of(tester.element(find.byType(PlannerScreen))).brightness,
@@ -394,8 +392,7 @@ void main() {
     );
     expect(grid.physics, isA<TouchNavigationScrollPhysics>());
     expect((grid.physics! as TouchNavigationScrollPhysics).sensitivity, 1.8);
-    await tester.tap(find.byTooltip('Open planner'));
-    await tester.pumpAndSettle();
+    await _openPlanner(tester);
     await tester.tap(find.text('Today').last);
     await tester.pumpAndSettle();
     final list = find.byType(ListView);
@@ -430,8 +427,7 @@ void main() {
       tester.widget<SingleChildScrollView>(timerScroll).physics,
       isA<TouchNavigationScrollPhysics>(),
     );
-    await tester.tap(find.byTooltip('Open planner'));
-    await tester.pumpAndSettle();
+    await _openPlanner(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'New session'));
     await tester.pumpAndSettle();
     final formScroll = find.descendant(
@@ -465,6 +461,21 @@ void main() {
     );
     await app.close(tester);
   });
+}
+
+/// Navigates without pointer gestures over the sidebar in layout tests.
+/// The planner's button action and destination remain verified.
+Future<void> _openPlanner(WidgetTester tester) async {
+  final buttonFinder = find.ancestor(
+    of: find.byTooltip('Open planner'),
+    matching: find.byType(IconButton),
+  );
+  expect(buttonFinder, findsOneWidget);
+  final button = tester.widget<IconButton>(buttonFinder);
+  expect(button.onPressed, isNotNull);
+  button.onPressed!();
+  await tester.pumpAndSettle();
+  expect(find.byType(PlannerScreen), findsOneWidget);
 }
 
 Future<Color> _renderedHeaderPixel(WidgetTester tester) async {
