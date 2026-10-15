@@ -341,10 +341,7 @@ class LibraryCatalog extends StatelessWidget {
                           5,
                           math.min(
                             itemCount,
-                            math.max(
-                              1,
-                              (availableWidth / cellExtent).floor(),
-                            ),
+                            math.max(1, (availableWidth / cellExtent).floor()),
                           ),
                         );
                         final gridWidth = math.min(
@@ -405,7 +402,9 @@ class LibraryCatalog extends StatelessWidget {
                                                   height: rowExtent,
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsets.all(18),
+                                                        const EdgeInsets.all(
+                                                          18,
+                                                        ),
                                                     child: _FolderTile(
                                                       name: folders[index],
                                                       cover: controller
@@ -415,9 +414,10 @@ class LibraryCatalog extends StatelessWidget {
                                                       onTap: () => onFolderTap(
                                                         folders[index],
                                                       ),
-                                                      onEdit: () => onEditFolder(
-                                                        folders[index],
-                                                      ),
+                                                      onEdit: () =>
+                                                          onEditFolder(
+                                                            folders[index],
+                                                          ),
                                                       onRename: () =>
                                                           onRenameFolder(
                                                             folders[index],
@@ -1000,9 +1000,7 @@ Future<void> showFolderCoverEditor(
                   children: [
                     for (final color in recentColors)
                       InkWell(
-                        key: ValueKey(
-                          'cover-recent-${color.toARGB32()}',
-                        ),
+                        key: ValueKey('cover-recent-${color.toARGB32()}'),
                         borderRadius: BorderRadius.circular(30),
                         onTap: () => update(() => iconColor = color),
                         child: CircleAvatar(
@@ -1015,8 +1013,9 @@ Future<void> showFolderCoverEditor(
                               ? Icon(
                                   Icons.check,
                                   size: 16,
-                                  color: Theme.of(context)
-                                      .colorScheme.onSurface,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 )
                               : null,
                         ),
@@ -1068,8 +1067,9 @@ Future<void> showFolderCoverEditor(
                                         ? Icon(
                                             Icons.check,
                                             size: 15,
-                                            color: Theme.of(context)
-                                                .colorScheme.onSurface,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                           )
                                         : null,
                                   ),
@@ -1081,8 +1081,9 @@ Future<void> showFolderCoverEditor(
                             preset.label,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme.onSurface,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 ),
                           ),
                         ],

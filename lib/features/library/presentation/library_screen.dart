@@ -1203,11 +1203,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
-  Widget _buildRow(
-    BuildContext context, {
-    required bool dragging,
-    Key? key,
-  }) {
+  Widget _buildRow(BuildContext context, {required bool dragging, Key? key}) {
     final colorScheme = Theme.of(context).colorScheme;
     final icon = item.kind == NotebookKind.board
         ? Icons.dashboard_outlined
@@ -1237,11 +1233,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
             child: Row(
               children: [
                 const SizedBox(width: 38),
-                Icon(
-                  icon,
-                  size: 15,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+                Icon(icon, size: 15, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
@@ -1330,12 +1322,7 @@ class _SidebarMenuShadowPainter extends CustomPainter {
     final exteriorPath = Path()
       ..fillType = PathFillType.evenOdd
       ..addRect(
-        Rect.fromLTRB(
-          menuRect.left,
-          -20,
-          size.width + 20,
-          size.height + 20,
-        ),
+        Rect.fromLTRB(menuRect.left, -20, size.width + 20, size.height + 20),
       )
       ..addPath(menuPath, Offset.zero);
     canvas.save();
@@ -1373,10 +1360,7 @@ Future<T?> _showSidebarMenu<T>({
 
   final sidebarRight = paneBox
       .localToGlobal(
-        Offset(
-          paneBox.size.width + _LibraryScreenState._resizeHandleWidth,
-          0,
-        ),
+        Offset(paneBox.size.width + _LibraryScreenState._resizeHandleWidth, 0),
         ancestor: overlayBox,
       )
       .dx;

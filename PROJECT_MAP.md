@@ -283,7 +283,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/ink_spatial_index.dart` (125): cache'owany
   indeks siatkowy kandydatów do hit-testu.
   14: `inkSpatialIndexFor`; 24: `InkSpatialIndex`.
-- `lib/features/notebook/domain/ink_eraser_engine.dart` (836):
+- `lib/features/notebook/domain/ink_eraser_engine.dart` (837):
   jedyny silnik modyfikacji gumki dla boarda i notebooka. Obsługuje zwykłą
   gumkę, erase-stroke, gumkę zakresową (przycinanie fragmentów)
   oraz scratch erase. Legacy maski są tu wyłącznie jednorazowo
@@ -358,7 +358,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1647 linii)
+### `lib/features/library/presentation/library_screen.dart` (1631 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -426,7 +426,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1140 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1142 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -702,7 +702,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1059):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1072):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.

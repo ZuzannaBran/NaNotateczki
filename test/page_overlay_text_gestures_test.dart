@@ -202,10 +202,8 @@ void main() {
               children: [
                 Positioned.fill(
                   child: Consumer<EditorController>(
-                    builder: (context, value, _) => PageOverlay(
-                      controller: value,
-                      renderBackground: false,
-                    ),
+                    builder: (context, value, _) =>
+                        PageOverlay(controller: value, renderBackground: false),
                   ),
                 ),
                 Consumer<EditorController>(

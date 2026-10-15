@@ -16,10 +16,8 @@ void main() {
 
     Widget app(double scale) {
       return MaterialApp(
-        builder: (context, child) => AppUiScale(
-          scale: scale,
-          child: child ?? const SizedBox.shrink(),
-        ),
+        builder: (context, child) =>
+            AppUiScale(scale: scale, child: child ?? const SizedBox.shrink()),
         home: Builder(
           builder: (context) {
             logicalSize = MediaQuery.sizeOf(context);
@@ -78,10 +76,8 @@ void main() {
       MaterialApp(
         builder: (context, child) => ValueListenableBuilder<double>(
           valueListenable: scale,
-          builder: (context, value, _) => AppUiScale(
-            scale: value,
-            child: child ?? const SizedBox.shrink(),
-          ),
+          builder: (context, value, _) =>
+              AppUiScale(scale: value, child: child ?? const SizedBox.shrink()),
         ),
         home: Scaffold(
           body: Builder(

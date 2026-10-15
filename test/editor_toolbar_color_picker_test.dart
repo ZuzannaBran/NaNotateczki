@@ -71,9 +71,8 @@ void main() {
     expect((actual.b - expected.b).abs(), lessThan(2 / 255));
   }
 
-  Finder recentSwatch() => find.byKey(
-    ValueKey('color-picker-recent-${recent.toARGB32()}'),
-  );
+  Finder recentSwatch() =>
+      find.byKey(ValueKey('color-picker-recent-${recent.toARGB32()}'));
 
   for (final darkMode in [false, true]) {
     testWidgets(
@@ -109,10 +108,7 @@ void main() {
             expect(decoration.shape, BoxShape.circle);
             expect(
               displayed,
-              AppColors.displayInkColor(
-                preset.colors[i],
-                darkMode: darkMode,
-              ),
+              AppColors.displayInkColor(preset.colors[i], darkMode: darkMode),
             );
           }
         }
@@ -242,25 +238,22 @@ void main() {
   });
 
   for (final darkMode in [false, true]) {
-    testWidgets(
-      'untouched picker preserves stored color in '
-      '${darkMode ? 'dark' : 'light'} theme',
-      (tester) async {
-        Color? selected;
-        await openPicker(
-          tester,
-          darkMode: darkMode,
-          onSelected: (color) => selected = color,
-        );
-        expect(
-          previewColor(tester),
-          AppColors.displayInkColor(initial, darkMode: darkMode),
-        );
-        await tester.tap(find.widgetWithText(TextButton, 'Save'));
-        await tester.pumpAndSettle();
-        expect(selected, initial);
-      },
-    );
+    testWidgets('untouched picker preserves stored color in '
+        '${darkMode ? 'dark' : 'light'} theme', (tester) async {
+      Color? selected;
+      await openPicker(
+        tester,
+        darkMode: darkMode,
+        onSelected: (color) => selected = color,
+      );
+      expect(
+        previewColor(tester),
+        AppColors.displayInkColor(initial, darkMode: darkMode),
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'Save'));
+      await tester.pumpAndSettle();
+      expect(selected, initial);
+    });
   }
 
   testWidgets('light picker keeps raw recent swatch, HEX and selection', (

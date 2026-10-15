@@ -30,10 +30,7 @@ class SharedRecentColors {
   static const _storageKey = 'shared_recent_colors.json';
   static Future<void> _pending = Future<void>.value();
 
-  static List<Color> merge(
-    Iterable<Color> newest,
-    Iterable<Color> older,
-  ) {
+  static List<Color> merge(Iterable<Color> newest, Iterable<Color> older) {
     final colors = <Color>[];
     final seen = <int>{};
     for (final color in <Color>[...newest, ...older]) {

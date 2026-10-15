@@ -341,5 +341,4 @@ class TextEditToolbar extends StatelessWidget {
     }
     return const <String, dynamic>{};
   }
-
 }

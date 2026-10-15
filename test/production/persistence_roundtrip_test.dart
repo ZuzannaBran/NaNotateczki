@@ -223,49 +223,45 @@ void main() {
     await controller.flushPendingSaves();
     controller.dispose();
 
-    final persisted = jsonDecode((await readStoredText('editor_prefs.json'))!)
-        as Map<String, dynamic>;
-    expect(persisted['quickColors'], [
-      '#2c443a',
-      '#9bbfb0',
-      '#d0e1da',
-    ]);
+    final persisted =
+        jsonDecode((await readStoredText('editor_prefs.json'))!)
+            as Map<String, dynamic>;
+    expect(persisted['quickColors'], ['#2c443a', '#9bbfb0', '#d0e1da']);
     expect(persisted['penColor'], '#2c443a');
     expect(persisted['highlighterColor'], '#9bbfb0');
   });
 
-  test('legacy default quick swatches migrate without wiping custom colors',
-      () async {
-    await writeStoredText(
-      'editor_prefs.json',
-      jsonEncode({
-        'penColor': '#1e2a40',
-        'highlighterColor': '#536783',
-        'quickColors': ['#1e1e1e', '#d32f2f', '#2e7d32'],
-      }),
-    );
-    final db = NotesDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final controller = EditorController(
-      repository: _repository(db),
-      notebook: _fixture(uid: 'palette-migration'),
-    );
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+  test(
+    'legacy default quick swatches migrate without wiping custom colors',
+    () async {
+      await writeStoredText(
+        'editor_prefs.json',
+        jsonEncode({
+          'penColor': '#1e2a40',
+          'highlighterColor': '#536783',
+          'quickColors': ['#1e1e1e', '#d32f2f', '#2e7d32'],
+        }),
+      );
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final controller = EditorController(
+        repository: _repository(db),
+        notebook: _fixture(uid: 'palette-migration'),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    expect(controller.quickColors, InkColorPreset.blue.colors);
-    expect(controller.penColor, InkColorPreset.blue.colors[0]);
-    expect(controller.highlighterColor, InkColorPreset.blue.colors[1]);
-    await controller.flushPendingSaves();
-    controller.dispose();
+      expect(controller.quickColors, InkColorPreset.blue.colors);
+      expect(controller.penColor, InkColorPreset.blue.colors[0]);
+      expect(controller.highlighterColor, InkColorPreset.blue.colors[1]);
+      await controller.flushPendingSaves();
+      controller.dispose();
 
-    final persisted = jsonDecode((await readStoredText('editor_prefs.json'))!)
-        as Map<String, dynamic>;
-    expect(persisted['quickColors'], [
-      '#2a3851',
-      '#a1b2ce',
-      '#d0d8e7',
-    ]);
-  });
+      final persisted =
+          jsonDecode((await readStoredText('editor_prefs.json'))!)
+              as Map<String, dynamic>;
+      expect(persisted['quickColors'], ['#2a3851', '#a1b2ce', '#d0d8e7']);
+    },
+  );
 
   test('custom quick swatches survive startup unchanged', () async {
     await writeStoredText(

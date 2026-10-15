@@ -48,10 +48,9 @@ void main() {
       for (final label in ['Cancel', 'Rename']) {
         final action = find.widgetWithText(TextButton, label);
         final actionContext = tester.element(action);
-        final buttonColor = TextButtonTheme.of(actionContext)
-            .style
-            ?.foregroundColor
-            ?.resolve(<WidgetState>{});
+        final buttonColor = TextButtonTheme.of(
+          actionContext,
+        ).style?.foregroundColor?.resolve(<WidgetState>{});
         expect(buttonColor, theme.colorScheme.onSurface);
         expect(
           DefaultTextStyle.of(tester.element(find.text(label))).style.color,

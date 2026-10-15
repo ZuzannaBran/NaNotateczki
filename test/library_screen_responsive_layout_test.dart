@@ -91,7 +91,6 @@ void main() {
     await database.close();
   });
 
-
   testWidgets('header separator stays aligned across every workspace', (
     tester,
   ) async {
@@ -147,8 +146,10 @@ void main() {
         scheme.surfaceContainerLowest,
       );
       expect(tester.widget<ColoredBox>(divider).color, expectedColor);
-      expect(tester.widget<Text>(find.text('Projects')).style,
-          AppHeaderDivider.titleStyle);
+      expect(
+        tester.widget<Text>(find.text('Projects')).style,
+        AppHeaderDivider.titleStyle,
+      );
     }
 
     expectAligned();
@@ -334,15 +335,16 @@ void main() {
             .getTopLeft(find.byKey(const ValueKey('library-navigation-toggle')))
             .dx +
         1;
-    final colors = Theme.of(
-      tester.element(find.text('Projects')),
-    ).colorScheme;
+    final colors = Theme.of(tester.element(find.text('Projects'))).colorScheme;
     final sidebarColor = colors.surfaceContainerLowest;
     expect(sidebarColor, isNot(colors.surfaceContainerLow));
     expect(
       sidebarColor,
-      isNot(Theme.of(tester.element(find.text('Projects')))
-          .appBarTheme.backgroundColor),
+      isNot(
+        Theme.of(
+          tester.element(find.text('Projects')),
+        ).appBarTheme.backgroundColor,
+      ),
     );
     final toggles = [
       find.byKey(const ValueKey('library-navigation-toggle')),

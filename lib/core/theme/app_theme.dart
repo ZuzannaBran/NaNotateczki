@@ -96,9 +96,7 @@ class AppTheme {
         style: TextButton.styleFrom(foregroundColor: AppColors.inkBlack),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.inkBlack,
-        ),
+        style: OutlinedButton.styleFrom(foregroundColor: AppColors.inkBlack),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.toolbar,

@@ -162,9 +162,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('catalog-folders')), findsOneWidget);
     expect(find.byType(EditorToolbar), findsNothing);
-    final cover = find.byKey(
-      const ValueKey('catalog-folder-cover:Physics'),
-    );
+    final cover = find.byKey(const ValueKey('catalog-folder-cover:Physics'));
     expect(cover, findsOneWidget);
     final initialFolderIcon = find.descendant(
       of: cover,
@@ -231,9 +229,7 @@ void main() {
       lessThan(tester.getTopLeft(noteTile).dy + 70),
     );
     for (final item in [note, board]) {
-      final documentTile = find.byKey(
-        ValueKey('catalog-document:${item.uid}'),
-      );
+      final documentTile = find.byKey(ValueKey('catalog-document:${item.uid}'));
       final documentMenu = find.descendant(
         of: documentTile,
         matching: find.byTooltip('Actions for ${item.title}'),
@@ -254,7 +250,10 @@ void main() {
       expect(labelRect.right, lessThanOrEqualTo(areaRect.right - 4));
       expect(areaRect.top - menuRect.bottom, lessThan(12));
       expect(tester.widget<Text>(documentLabel).textAlign, TextAlign.left);
-      expect(tester.widget<Text>(documentLabel).overflow, TextOverflow.ellipsis);
+      expect(
+        tester.widget<Text>(documentLabel).overflow,
+        TextOverflow.ellipsis,
+      );
     }
 
     final noteRatio = find.descendant(
@@ -302,18 +301,17 @@ void main() {
     final selectedPaletteSwatch = tester.widget<InkWell>(paletteSwatch);
     final paletteCircle = selectedPaletteSwatch.child! as Container;
     expect(paletteCircle.child, isA<Icon>());
+    expect((paletteCircle.decoration! as BoxDecoration).shape, BoxShape.circle);
     expect(
-      (paletteCircle.decoration! as BoxDecoration).shape,
-      BoxShape.circle,
+      find.byKey(ValueKey('cover-color:${const Color(0xFF2E7D32).toARGB32()}')),
+      findsNothing,
     );
-    expect(find.byKey(
-      ValueKey('cover-color:${const Color(0xFF2E7D32).toARGB32()}'),
-    ), findsNothing);
     for (final label in ['Blue', 'Pink', 'Green']) {
       final widget = tester.widget<Text>(find.text(label).last);
-      expect(widget.style?.color,
-          Theme.of(tester.element(find.text(label).last))
-              .colorScheme.onSurface);
+      expect(
+        widget.style?.color,
+        Theme.of(tester.element(find.text(label).last)).colorScheme.onSurface,
+      );
     }
     final advancedButton = find.byKey(const ValueKey('cover-advanced-color'));
     await tester.ensureVisible(advancedButton);
@@ -338,19 +336,14 @@ void main() {
       controller.folderCoverFor('Physics').iconColor,
       const Color(0xFF2B3C4D),
     );
-    expect(
-      controller.recentCoverColors.first,
-      const Color(0xFF2B3C4D),
-    );
+    expect(controller.recentCoverColors.first, const Color(0xFF2B3C4D));
 
     await tester.tap(find.byTooltip('Folder actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Edit cover').last);
     await tester.pumpAndSettle();
     final recentSwatch = find.byKey(
-      ValueKey(
-        'cover-recent-${const Color(0xFF2B3C4D).toARGB32()}',
-      ),
+      ValueKey('cover-recent-${const Color(0xFF2B3C4D).toARGB32()}'),
     );
     expect(recentSwatch, findsOneWidget);
     await tester.ensureVisible(recentSwatch);
@@ -456,10 +449,14 @@ void main() {
       );
       expect(customIcon, findsOneWidget);
       expect(plainIcon, findsOneWidget);
-      expect(tester.widget<FolderCoverIcon>(customIcon).shape,
-          FolderCoverShape.heart);
-      expect(tester.widget<FolderCoverIcon>(plainIcon).shape,
-          FolderCoverShape.folder);
+      expect(
+        tester.widget<FolderCoverIcon>(customIcon).shape,
+        FolderCoverShape.heart,
+      );
+      expect(
+        tester.widget<FolderCoverIcon>(plainIcon).shape,
+        FolderCoverShape.folder,
+      );
       expect(
         tester.widget<FolderCoverIcon>(customIcon).color,
         AppColors.displayInkColor(customColor, darkMode: darkMode),
@@ -533,9 +530,7 @@ void main() {
 
     final database = NotesDatabase(NativeDatabase.memory());
     final repository = NotebookRepository(database);
-    final colored = await repository.createNotebook(
-      folder: 'Soft folder',
-    );
+    final colored = await repository.createNotebook(folder: 'Soft folder');
     final page = colored.pages.first.copyWith(
       inkStrokes: [
         InkStroke(
@@ -608,13 +603,15 @@ void main() {
       expect(inkWell.overlayColor!.resolve({}), Colors.transparent);
       expect(
         inkWell.overlayColor!.resolve({WidgetState.hovered}),
-        (isDark ? AppColors.darkActive : AppColors.toolbar)
-            .withValues(alpha: isDark ? 0.32 : 0.52),
+        (isDark ? AppColors.darkActive : AppColors.toolbar).withValues(
+          alpha: isDark ? 0.32 : 0.52,
+        ),
       );
       expect(
         inkWell.overlayColor!.resolve({WidgetState.pressed}),
-        (isDark ? AppColors.darkActive : AppColors.divider)
-            .withValues(alpha: isDark ? 0.52 : 0.42),
+        (isDark ? AppColors.darkActive : AppColors.divider).withValues(
+          alpha: isDark ? 0.52 : 0.42,
+        ),
       );
       expect(tester.takeException(), isNull);
     }
@@ -813,13 +810,8 @@ void main() {
         of: tile,
         matching: find.byTooltip('Actions for ${item.title}'),
       );
-      final title = find.descendant(
-        of: tile,
-        matching: find.text(item.title),
-      );
-      final cell = find.byKey(
-        ValueKey('catalog-document-cell:${item.uid}'),
-      );
+      final title = find.descendant(of: tile, matching: find.text(item.title));
+      final cell = find.byKey(ValueKey('catalog-document-cell:${item.uid}'));
       final previewRect = tester.getRect(preview);
       final menuRect = tester.getRect(menu);
       final titleRect = tester.getRect(title);

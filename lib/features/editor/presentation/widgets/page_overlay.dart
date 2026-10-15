@@ -64,8 +64,8 @@ class PageOverlay extends StatelessWidget {
         ? controller.lassoSelection
         : null;
     return IgnorePointer(
-      ignoring: !interactionEnabled ||
-          (tool.isInk && tool != DrawingTool.lasso),
+      ignoring:
+          !interactionEnabled || (tool.isInk && tool != DrawingTool.lasso),
       child: Stack(
         children: [
           if (renderBackground)
@@ -2754,8 +2754,7 @@ class _LassoSelectionWidgetState extends State<_LassoSelectionWidget> {
             right: 4,
             child: LassoSelectionActionBar(
               onCopy: () async {
-                final message =
-                    await controller.copyActiveElementToClipboard();
+                final message = await controller.copyActiveElementToClipboard();
                 if (!context.mounted) return;
                 if (message != null) {
                   ScaffoldMessenger.of(

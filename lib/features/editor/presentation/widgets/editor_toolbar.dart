@@ -656,7 +656,9 @@ class EditorToolbar extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: preview,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Theme.of(context).dividerColor),
+                        border: Border.all(
+                          color: Theme.of(context).dividerColor,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -766,89 +768,99 @@ class EditorToolbar extends StatelessWidget {
                         ],
                       ),
                     ],
-                  if (onPresetSelected != null ||
-                      onPaletteColorSelected != null) ...[
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Palettes',
-                        style: Theme.of(context).textTheme.bodySmall,
+                    if (onPresetSelected != null ||
+                        onPaletteColorSelected != null) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Palettes',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final preset in InkColorPreset.values)
-                          InkWell(
-                            key: ValueKey('color-picker-preset-${preset.name}'),
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: onPresetSelected == null
-                                ? null
-                                : () {
-                                    onPresetSelected(preset);
-                                    Navigator.of(context).pop();
-                                  },
-                            child: Padding(
-                              padding: const EdgeInsets.all(5),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      for (final color in preset.colors)
-                                        InkWell(
-                                          key: ValueKey(
-                                            'color-picker-palette-'
-                                            '${preset.name}-${color.toARGB32()}',
-                                          ),
-                                          onTap: onPaletteColorSelected == null
-                                              ? null
-                                              : () {
-                                                  onPaletteColorSelected(color);
-                                                  Navigator.of(context).pop();
-                                                },
-                                          child: Container(
-                                            width: 24,
-                                            height: 24,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: AppColors.displayInkColor(
-                                                color,
-                                                darkMode: darkMode,
-                                              ),
-                                              border: Border.all(
-                                                color: Theme.of(context)
-                                                    .dividerColor,
-                                                width: 0.5,
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final preset in InkColorPreset.values)
+                            InkWell(
+                              key: ValueKey(
+                                'color-picker-preset-${preset.name}',
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: onPresetSelected == null
+                                  ? null
+                                  : () {
+                                      onPresetSelected(preset);
+                                      Navigator.of(context).pop();
+                                    },
+                              child: Padding(
+                                padding: const EdgeInsets.all(5),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        for (final color in preset.colors)
+                                          InkWell(
+                                            key: ValueKey(
+                                              'color-picker-palette-'
+                                              '${preset.name}-${color.toARGB32()}',
+                                            ),
+                                            onTap:
+                                                onPaletteColorSelected == null
+                                                ? null
+                                                : () {
+                                                    onPaletteColorSelected(
+                                                      color,
+                                                    );
+                                                    Navigator.of(context).pop();
+                                                  },
+                                            child: Container(
+                                              width: 24,
+                                              height: 24,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color:
+                                                    AppColors.displayInkColor(
+                                                      color,
+                                                      darkMode: darkMode,
+                                                    ),
+                                                border: Border.all(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).dividerColor,
+                                                  width: 0.5,
+                                                ),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    preset.label,
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme.onSurface,
-                                        ),
-                                  ),
-                                ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      preset.label,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                          ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
               actions: appDialogActions(context, [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),

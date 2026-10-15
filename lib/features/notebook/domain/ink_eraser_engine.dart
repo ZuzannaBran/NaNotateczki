@@ -174,10 +174,9 @@ class InkEraserEngine {
     if (strokes.isEmpty || polygon.length < 3) {
       return InkBrushEraseResult(strokes: strokes, changed: false);
     }
-    final candidates = inkSpatialIndexFor(strokes)
-        .query(_pointsBounds(polygon))
-        .map((stroke) => stroke.id)
-        .toSet();
+    final candidates = inkSpatialIndexFor(
+      strokes,
+    ).query(_pointsBounds(polygon)).map((stroke) => stroke.id).toSet();
     final next = <InkStroke>[];
     var changed = false;
     for (final stroke in strokes) {
@@ -350,8 +349,8 @@ class InkEraserEngine {
             if (_cross(relative, delta).abs() < 1e-8) {
               for (final p in [c, d]) {
                 final projected = p - start;
-                final t = (projected.dx * delta.dx +
-                        projected.dy * delta.dy) /
+                final t =
+                    (projected.dx * delta.dx + projected.dy * delta.dy) /
                     lengthSquared;
                 if (t >= 0 && t <= 1) {
                   cuts.add(t);
@@ -415,7 +414,8 @@ class InkEraserEngine {
             point,
             polygon[i],
             polygon[(i + 1) % polygon.length],
-          ) <= 1e-10) {
+          ) <=
+          1e-10) {
         return true;
       }
     }

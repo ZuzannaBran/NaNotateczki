@@ -66,8 +66,10 @@ void main() {
         libraryColor,
         AppHeaderDivider.colorOf(tester.element(libraryDivider)),
       );
-      expect(tester.widget<Text>(find.text('Projects')).style,
-          AppHeaderDivider.titleStyle);
+      expect(
+        tester.widget<Text>(find.text('Projects')).style,
+        AppHeaderDivider.titleStyle,
+      );
 
       void expectAlignedHeader(String title) {
         final appBar = find.byType(AppBar);
@@ -76,20 +78,17 @@ void main() {
         expect(divider, findsOneWidget);
         expect(
           tester.getRect(appBar),
-          const Rect.fromLTWH(
-            0,
-            0,
-            1400,
-            AppHeaderDivider.toolbarHeight,
-          ),
+          const Rect.fromLTWH(0, 0, 1400, AppHeaderDivider.toolbarHeight),
         );
         expect(
           tester.getRect(divider),
           const Rect.fromLTWH(0, kToolbarHeight, 1400, 1),
         );
         expect(tester.widget<ColoredBox>(divider).color, libraryColor);
-        expect(tester.widget<Text>(find.text(title)).style,
-            AppHeaderDivider.titleStyle);
+        expect(
+          tester.widget<Text>(find.text(title)).style,
+          AppHeaderDivider.titleStyle,
+        );
       }
 
       final referencePixel = await _renderedHeaderPixel(tester);

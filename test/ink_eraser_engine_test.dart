@@ -156,14 +156,8 @@ void main() {
   });
 
   test('area eraser clips only the covered part of sparse strokes', () {
-    final crossing = _stroke('crossing', const [
-      Offset(0, 0),
-      Offset(100, 0),
-    ]);
-    final miss = _stroke('miss', const [
-      Offset(0, 30),
-      Offset(100, 30),
-    ]);
+    final crossing = _stroke('crossing', const [Offset(0, 0), Offset(100, 0)]);
+    final miss = _stroke('miss', const [Offset(0, 30), Offset(100, 30)]);
     var index = 0;
     final result = InkEraserEngine.eraseAreaParts(
       strokes: [crossing, miss],
@@ -182,8 +176,10 @@ void main() {
     expect(result.strokes.first.points.last.dx, closeTo(40, 0.001));
     expect(result.strokes[1].points.first.dx, closeTo(60, 0.001));
     expect(result.strokes[1].points.last.dx, 100);
-    expect(result.strokes.take(2).map((part) => part.id).toSet(),
-        {'part-0', 'part-1'});
+    expect(result.strokes.take(2).map((part) => part.id).toSet(), {
+      'part-0',
+      'part-1',
+    });
   });
 
   test('area eraser splits repeated crossings and interpolates pressure', () {
@@ -279,8 +275,10 @@ void main() {
     final redone = action.apply(restored);
     expect(erased.inkStrokes, hasLength(2));
     expect(restored.inkStrokes.single, same(line));
-    expect(redone.inkStrokes.map((part) => part.id),
-        erased.inkStrokes.map((part) => part.id));
+    expect(
+      redone.inkStrokes.map((part) => part.id),
+      erased.inkStrokes.map((part) => part.id),
+    );
   });
 
   test('legacy eraser strokes are flattened out of saved ink', () {
