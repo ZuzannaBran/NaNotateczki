@@ -312,10 +312,7 @@ void main() {
 
     final pickerTitle = find.text('Pick color');
     expect(pickerTitle, findsOneWidget);
-    expect(
-      Theme.of(tester.element(pickerTitle)).brightness,
-      Brightness.dark,
-    );
+    expect(Theme.of(tester.element(pickerTitle)).brightness, Brightness.dark);
     expect(
       previewColor(tester),
       AppColors.displayInkColor(initial, darkMode: true),
