@@ -268,7 +268,11 @@ void main() {
     expect(tester.widget<AspectRatio>(noteRatio).aspectRatio, 0.72);
     expect(tester.widget<AspectRatio>(boardRatio).aspectRatio, 1);
 
-    await tester.tap(find.byTooltip('Edit folder cover'));
+    expect(find.byTooltip('Edit folder cover'), findsNothing);
+    expect(find.byIcon(Icons.palette_outlined), findsNothing);
+    await tester.tap(find.byTooltip('Folder actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit cover').last);
     await tester.pumpAndSettle();
     expect(find.text('Cover decoration'), findsOneWidget);
     expect(find.text('Cover color'), findsNothing);
@@ -339,7 +343,7 @@ void main() {
       const Color(0xFF2B3C4D),
     );
 
-    await tester.tap(folderMenu);
+    await tester.tap(find.byTooltip('Folder actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Edit cover').last);
     await tester.pumpAndSettle();

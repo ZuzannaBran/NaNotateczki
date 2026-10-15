@@ -426,7 +426,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1105 linie)
+### `lib/features/library/presentation/library_catalog.dart` (1101 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -434,7 +434,8 @@ w poziomie, a ostatni niepełny wiersz zaczyna się od lewej. Brak linii
 oddzielających kafelki i zewnętrznej ramki; blok nie zajmuje całej
 szerokości ekranu. Zawartość folderów nadal ma siatkę podglądów dokumentów.
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
-`CompactStudyTimer`; folder ma też akcję edycji okładki.
+`CompactStudyTimer`; edycja okładki
+pozostaje w menu folderu, bez ikony palety w nagłówku otwartego folderu.
 Okładki folderów mają ponownie delikatne, wektorowe ikony Lucide
 (`FolderCoverIcon`, `FolderCoverStrokePainter`), z konturem 1,25 px
 i wygładzonymi krawędziami. Dekoracje na okładce (serce, gwiazdka,
@@ -463,9 +464,9 @@ Siatka reaguje na wspólną czułość dotyku.
 
 - 24: `dominantFolderColor`; 53: `FolderCoverIcon`;
   107: `FolderCoverStrokePainter`; 233: `LibraryCatalog`;
-  511: `_FolderTile`; 578: `_DocumentTile`; 618: `_CatalogTile`;
-  715: `_DocumentPreview`; 798: `_boardPreviewBounds`;
-  840: `_PagePreviewPainter`; 912: `showFolderCoverEditor`.
+  505: `_FolderTile`; 572: `_DocumentTile`; 612: `_CatalogTile`;
+  709: `_DocumentPreview`; 792: `_boardPreviewBounds`;
+  834: `_PagePreviewPainter`; 906: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -911,8 +912,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
   poziomego.
 - `test/library_controller_test.dart` (33)
-- `test/library_catalog_test.dart` (720): kolor dominujący, serializacja
+- `test/library_catalog_test.dart` (738): kolor dominujący, serializacja
   stylu okładek, start katalogu, siatka notatek/boardów,
+  brak palety w nagłówku folderu i edycja przez menu boczne,
   edycja dekoracji i kolorów z okrągłymi paletami i wspólnym Recent,
   bez bazowych próbek Cover color, zapis i odczyt historii,
   regresja widoczności ikon i dekoracji w obu motywach, kontur Lucide,

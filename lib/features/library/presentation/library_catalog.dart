@@ -287,12 +287,6 @@ class LibraryCatalog extends StatelessWidget {
         ),
         actions: [
           if (showCompactTimer) const CompactStudyTimer(),
-          if (activeFolder != null)
-            IconButton(
-              tooltip: 'Edit folder cover',
-              icon: const Icon(Icons.palette_outlined),
-              onPressed: () => onEditFolder(activeFolder),
-            ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',
