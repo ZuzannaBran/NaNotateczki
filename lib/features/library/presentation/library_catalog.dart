@@ -620,6 +620,8 @@ class _DocumentTile extends StatelessWidget {
   }
 }
 
+const _catalogPreviewRadius = BorderRadius.all(Radius.circular(24));
+
 class _CatalogTile extends StatelessWidget {
   const _CatalogTile({
     required this.title,
@@ -647,26 +649,40 @@ class _CatalogTile extends StatelessWidget {
         .withValues(alpha: darkMode ? 0.32 : 0.52);
     final pressedColor = (darkMode ? AppColors.darkActive : AppColors.divider)
         .withValues(alpha: darkMode ? 0.52 : 0.42);
-    final previewSurface = Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(24),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        overlayColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.pressed)) {
-            return pressedColor;
-          }
-          if (states.contains(WidgetState.hovered) ||
-              states.contains(WidgetState.focused)) {
-            return hoverColor;
-          }
-          return Colors.transparent;
-        }),
-        splashColor: pressedColor,
-        highlightColor: Colors.transparent,
-        child: Padding(padding: const EdgeInsets.all(4), child: child),
+    final previewSurface = DecoratedBox(
+      key: const ValueKey('catalog-preview-shadow'),
+      decoration: const BoxDecoration(
+        borderRadius: _catalogPreviewRadius,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 9,
+            spreadRadius: 0.5,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: _catalogPreviewRadius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: _catalogPreviewRadius,
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return pressedColor;
+            }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
+              return hoverColor;
+            }
+            return Colors.transparent;
+          }),
+          splashColor: pressedColor,
+          highlightColor: Colors.transparent,
+          child: child,
+        ),
       ),
     );
 
@@ -745,14 +761,14 @@ class _DocumentPreview extends StatelessWidget {
         ? _boardPreviewBounds(page)
         : const Rect.fromLTWH(0, 0, 820, 1160);
     return DecoratedBox(
+      key: ValueKey('catalog-preview-paper:${item.uid}'),
       decoration: BoxDecoration(
         color: paper,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: _catalogPreviewRadius,
         border: Border.all(color: theme.colorScheme.outlineVariant),
-        boxShadow: const [BoxShadow(color: AppColors.shadow, blurRadius: 5)],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: _catalogPreviewRadius,
         child: page == null
             ? Center(
                 child: Icon(

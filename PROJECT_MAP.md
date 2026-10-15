@@ -426,7 +426,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1518: `_LibraryWorkspace`;
   1592: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1124 linie)
+### `lib/features/library/presentation/library_catalog.dart` (1140 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -463,6 +463,11 @@ a długie nazwy są obcinane wielokropkiem.
 Notatki mają pionowy podgląd pierwszej strony (820×1160), boardy kwadratowy
 podgląd dopasowany do granic obiektów z pierwszej strony. Miniatury rysują
 ink, tekst oraz dostępne obrazy bez uruchamiania edytora.
+Wspólny `_catalogPreviewRadius` (24 px) określa narożniki cienia,
+przycinającego `Material`, papieru i `ClipRRect`. Zewnętrzny
+`DecoratedBox` rysuje miękki cień przed klipowaniem, więc cień pozostaje
+widoczny również przy zaokrąglonych rogach folderów i dokumentów.
+Oba motywy wykorzystują tę samą geometrię i parametry cienia.
 Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
@@ -470,10 +475,10 @@ Siatka reaguje na wspólną czułość dotyku.
 - 24: `dominantFolderColor`; 53: `FolderCoverIcon`;
   107: `FolderCoverStrokePainter`; 233: `LibraryCatalog`;
   520: `_FolderTile`; 587: `_DocumentTile`;
-  623: `_CatalogTile`; 732: `_DocumentPreview`;
-  815: `_boardPreviewBounds`;
-  857: `_PagePreviewPainter`;
-  929: `showFolderCoverEditor`.
+  625: `_CatalogTile`; 748: `_DocumentPreview`;
+  831: `_boardPreviewBounds`;
+  873: `_PagePreviewPainter`;
+  945: `showFolderCoverEditor`.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
@@ -919,11 +924,12 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
   poziomego.
 - `test/library_controller_test.dart` (33)
-- `test/library_catalog_test.dart` (876): kolor dominujący, serializacja
+- `test/library_catalog_test.dart` (971): kolor dominujący, serializacja
   stylu okładek, start katalogu, siatka notatek/boardów,
   brak palety w nagłówku folderu i edycja przez menu boczne,
   siatka dokumentów 1–5 kolumn, wspólna szerokość i górna krawędź
   miniatur oraz różna wysokość notatników i boardów,
+  wspólny promień i zewnętrzny cień folderów i dokumentów w obu motywach,
   edycja dekoracji i kolorów z okrągłymi paletami i wspólnym Recent,
   bez bazowych próbek Cover color, zapis i odczyt historii,
   regresja widoczności ikon i dekoracji w obu motywach, kontur Lucide,

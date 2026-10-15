@@ -873,4 +873,99 @@ void main() {
     controller.dispose();
     await database.close();
   });
+
+  testWidgets('rounded preview shadows match in light and dark themes', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final note = await repository.createNotebook(folder: 'Corners');
+    final board = await repository.createBoard(folder: 'Corners');
+    final controller = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await controller.loadItems();
+
+    for (final darkMode in [false, true]) {
+      Widget catalog(String? folder) => MaterialApp(
+        theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+        home: LibraryCatalog(
+          controller: controller,
+          folder: folder,
+          onBack: () {},
+          onFolderTap: (_) {},
+          onOpenItem: (_) {},
+          onEditFolder: (_) {},
+          onRenameFolder: (_) {},
+          onDeleteFolder: (_) {},
+          onRenameItem: (_) {},
+          onDeleteItem: (_) {},
+          onSettings: () {},
+        ),
+      );
+
+      await tester.pumpWidget(catalog('Corners'));
+      await tester.pumpAndSettle();
+      for (final item in [note, board]) {
+        final tile = find.byKey(ValueKey('catalog-document:${item.uid}'));
+        final shadow = find.descendant(
+          of: tile,
+          matching: find.byKey(const ValueKey('catalog-preview-shadow')),
+        );
+        expect(shadow, findsOneWidget);
+        final decoration =
+            tester.widget<DecoratedBox>(shadow).decoration as BoxDecoration;
+        expect(decoration.borderRadius, BorderRadius.circular(24));
+        expect(decoration.boxShadow, hasLength(1));
+        expect(decoration.boxShadow!.single.color, AppColors.shadow);
+        expect(decoration.boxShadow!.single.blurRadius, 9);
+
+        final material = tester.widget<Material>(
+          find.descendant(of: shadow, matching: find.byType(Material)).first,
+        );
+        expect(material.borderRadius, BorderRadius.circular(24));
+        expect(material.clipBehavior, Clip.antiAlias);
+
+        final paper = find.descendant(
+          of: tile,
+          matching: find.byKey(ValueKey('catalog-preview-paper:${item.uid}')),
+        );
+        expect(paper, findsOneWidget);
+        final paperDecoration =
+            tester.widget<DecoratedBox>(paper).decoration as BoxDecoration;
+        expect(paperDecoration.borderRadius, BorderRadius.circular(24));
+        expect(paperDecoration.boxShadow, isNull);
+        expect(
+          paperDecoration.color,
+          darkMode ? AppColors.darkCanvas : AppColors.paper,
+        );
+        final contentClip = tester.widget<ClipRRect>(
+          find.descendant(of: paper, matching: find.byType(ClipRRect)).first,
+        );
+        expect(contentClip.borderRadius, BorderRadius.circular(24));
+      }
+
+      await tester.pumpWidget(catalog(null));
+      await tester.pumpAndSettle();
+      final folderShadow = find.descendant(
+        of: find.byKey(const ValueKey('catalog-folder:Corners')),
+        matching: find.byKey(const ValueKey('catalog-preview-shadow')),
+      );
+      expect(folderShadow, findsOneWidget);
+      final folderDecoration =
+          tester.widget<DecoratedBox>(folderShadow).decoration as BoxDecoration;
+      expect(folderDecoration.borderRadius, BorderRadius.circular(24));
+      expect(folderDecoration.boxShadow, hasLength(1));
+      expect(tester.takeException(), isNull);
+    }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
 }
