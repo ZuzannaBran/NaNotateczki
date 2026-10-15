@@ -702,7 +702,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1046):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1059):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
@@ -725,9 +725,12 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   przytrzymanie otwierają ten sam edytor palety.
   Kontroler HEX jest zwalniany dopiero
   po zakończeniu animacji zamykania dialogu, także przy zagnieżdżonej edycji.
+  Po odczycie Recent selektor sprawdza osobno `context.mounted` i
+  `navigator.mounted` przed odwołaniem do `NavigatorState.context`;
+  chroni to dostęp do kontekstu na granicy asynchronicznej.
   12: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
   406: selektor kształtu; 534: `_colorDot`; 581: `pickColor`;
-  939: `_EraserIcon`.
+  952: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (345):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
@@ -991,7 +994,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   brak modyfikacji danych po zatwierdzeniu bez zmian; osobne widget testy
   dla obu motywów i jawna weryfikacja aktywnej jasności motywu.
   Dodatkowo sprawdza obecność i rendering trzech palet, wybór całego
-  zestawu w edytorze i pojedynczego koloru w folderze w obu motywach.
+  zestawu w edytorze i pojedynczego koloru w folderze w obu motywach
+  oraz zachowanie zagnieżdżonego motywu podczas asynchronicznego otwarcia
+  selektora kolorów na głównym navigatorze.
 - `test/page_overlay_text_gestures_test.dart` (679): blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,

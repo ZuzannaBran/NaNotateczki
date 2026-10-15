@@ -600,11 +600,14 @@ class EditorToolbar extends StatelessWidget {
     var blue = _toByte(displayCurrent.b).toDouble();
     var shade = 0.5;
     var edited = false;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    if (!navigator.mounted) {
+      return null;
+    }
     final hexController = TextEditingController(
       text: _toHexColor(displayCurrent),
     );
 
-    final navigator = Navigator.of(context, rootNavigator: true);
     final route = DialogRoute<Color>(
       context: context,
       themes: InheritedTheme.capture(from: context, to: navigator.context),

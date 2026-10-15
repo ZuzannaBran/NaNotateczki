@@ -286,4 +286,50 @@ void main() {
     await tester.pumpAndSettle();
     expect(selected, recent);
   });
+
+  testWidgets('picker captures a nested theme after async recent load', (
+    tester,
+  ) async {
+    Color? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.light(),
+        home: Scaffold(
+          body: Theme(
+            data: ThemeData.dark(),
+            child: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  selected = await EditorToolbar.pickColor(
+                    context,
+                    initial,
+                    const <Color>[recent],
+                  );
+                },
+                child: const Text('Open nested picker'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open nested picker'));
+    await tester.pumpAndSettle();
+
+    final pickerTitle = find.text('Pick color');
+    expect(pickerTitle, findsOneWidget);
+    expect(
+      Theme.of(tester.element(pickerTitle)).brightness,
+      Brightness.dark,
+    );
+    expect(
+      previewColor(tester),
+      AppColors.displayInkColor(initial, darkMode: true),
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Save'));
+    await tester.pumpAndSettle();
+    expect(selected, initial);
+    expect(tester.takeException(), isNull);
+  });
 }
