@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:program/core/error/app_error_log.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -1082,6 +1083,105 @@ void main() {
       jsonDecode(await folders.readAsString()),
       containsAll(['Empty Folder', 'Notes']),
     );
+  });
+
+  test('modern folder metadata is backed up without a format error', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final service = LocalBackupService(
+      repository,
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    final folders = File('${directory.path}/library_folders.json');
+    final metadata = <String, dynamic>{
+      'folders': ['Empty Folder', 'Notes'],
+      'covers': {
+        'Empty Folder': {'shape': 'heart', 'iconColor': 0xFF123456},
+      },
+      'recentCoverColors': [0xFF123456, 0xFFABCDEF],
+    };
+    await folders.writeAsString(jsonEncode(metadata), flush: true);
+    final errorsBefore = AppErrorLog.instance.length;
+
+    await service.snapshot([_notebook()]);
+
+    expect(AppErrorLog.instance.length, errorsBefore);
+    final manifest = jsonDecode(
+      await File(
+        '${directory.path}/local_backup/manifest.json',
+      ).readAsString(),
+    ) as Map<String, dynamic>;
+    expect(manifest['folders'], ['Empty Folder', 'Notes']);
+    expect(manifest['folderMetadata'], metadata);
+
+    await folders.writeAsString(
+      jsonEncode({'folders': ['Wrong Folder']}),
+      flush: true,
+    );
+    final report = await service.restoreFromLatestDetailed();
+
+    expect(report.succeeded, isTrue);
+    expect(report.restoredCount, 1);
+    expect(jsonDecode(await folders.readAsString()), metadata);
+  });
+
+  test('snapshot recovers notebook folders from malformed metadata', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    await File('${directory.path}/library_folders.json').writeAsString(
+      jsonEncode({'folders': 123}),
+      flush: true,
+    );
+
+    await service.snapshot([_notebook()]);
+
+    final manifest = jsonDecode(
+      await File(
+        '${directory.path}/local_backup/manifest.json',
+      ).readAsString(),
+    ) as Map<String, dynamic>;
+    expect(manifest['folders'], ['Notes']);
+    expect(manifest.containsKey('folderMetadata'), isFalse);
+  });
+
+  test('empty modern library retains folder covers in backup', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    final folders = File('${directory.path}/library_folders.json');
+    final metadata = <String, dynamic>{
+      'folders': ['Empty'],
+      'covers': {
+        'Empty': {'shape': 'star', 'iconColor': 0xFF445566},
+      },
+      'recentCoverColors': [0xFF445566],
+    };
+    await folders.writeAsString(jsonEncode(metadata), flush: true);
+
+    await service.snapshot([]);
+    await folders.delete();
+    final restored = await service.restoreFromLatestDetailed();
+
+    expect(restored.succeeded, isTrue);
+    expect(restored.restoredCount, 0);
+    expect(jsonDecode(await folders.readAsString()), metadata);
   });
 
   test('empty valid snapshot is a successful restore', () async {

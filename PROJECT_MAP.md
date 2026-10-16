@@ -137,9 +137,10 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
   8: `readStoredText`; 17: `writeStoredText`.
 - `lib/core/storage/text_storage_web.dart` (9): odpowiednik w `localStorage`.
   3: `readStoredText`; 7: `writeStoredText`.
-- `lib/core/error/app_error_log.dart` (161): trwały bufor błędów z ostatnich
-  3 dni.
-  8: `AppErrorLog`; 106: `AppErrorLogEntry`.
+- `lib/core/error/app_error_log.dart` (180): trwały bufor błędów z ostatnich
+  3 dni. Identyczne błędy z 10 minut są grupowane z licznikiem powtórzeń;
+  starsze logi bez licznika pozostają czytelne.
+  8: `AppErrorLog`; 120: `AppErrorLogEntry`.
 - `lib/core/diagnostics/data_integrity_log.dart` (225): indeks podejrzanych
   zapisów i ścieżek do pełnych archiwów.
   8: `DataIntegrityLog`; 91: `DataIntegrityIncident`.
@@ -204,7 +205,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2607 linii)
+### `lib/data/backup/local_backup_service.dart` (2658 linii)
 
 Przyrostowy backup z atomowym `manifest.json` i checksumami SHA-256. Format
 v6 rozdziela notebook na niezmienne, content-addressed pliki stron w
@@ -220,8 +221,10 @@ assetów są przechowywane per strona. Pierwsza zmiana notebooka ze starszego
 formatu migruje go do v6, potem zapis jest page-level. Odczyt pozostaje zgodny
 z manifestami v1–v5 oraz mieszanymi wpisami legacy/v6. Restore weryfikuje
 checksumę każdej strony i assetu. Pliki stron i assetów nie są usuwane w hot
-path, żeby historia manifestów nie straciła zależności. Web nadal zapisuje
-pełny snapshot w `localStorage`.
+path, żeby historia manifestów nie straciła zależności. Manifest
+v6 zachowuje też metadane `library_folders.json` (okładki i Recent), obok
+listy `folders` zachowanej dla starszych kopii. Restore starszych manifestów
+pozostaje zgodny. Web nadal zapisuje pełny snapshot w `localStorage`.
 
 - 19: `LocalBackupService`; 37: `waitUntilIdle`; 153: `snapshot`;
   84: `_pagesDir`.
@@ -915,7 +918,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (1141): zapis, migracja legacy gumek, ochrona danych i
   migracja v1→v2 usuwająca dane Index tab bez utraty stron.
-- `test/local_backup_service_test.dart` (1337)
+- `test/local_backup_service_test.dart` (1438):
+  nowy i starszy format folderów, odtwarzanie okładek/Recent i backup
+- `test/app_error_log_test.dart`: grupowanie powtarzalnych błędów
+  i odczyt liczników z zachowaniem zgodności starych logów.
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
 - `test/editor_controller_layering_test.dart`: aktywne obrazy są

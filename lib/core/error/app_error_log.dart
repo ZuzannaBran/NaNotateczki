@@ -13,6 +13,7 @@ class AppErrorLog extends ChangeNotifier {
   static const String _fileName = 'app_error_log.json';
   static const int _maxEntries = 80;
   static const Duration _retention = Duration(days: 3);
+  static const Duration _duplicateWindow = Duration(minutes: 10);
 
   final List<AppErrorLogEntry> _entries = [];
 
@@ -44,13 +45,26 @@ class AppErrorLog extends ChangeNotifier {
   }
 
   void record(Object error, StackTrace? stackTrace, {required String source}) {
+    final now = DateTime.now();
+    final message = error.toString();
+    final stack = stackTrace?.toString();
+    final match = _entries.indexWhere(
+      (entry) =>
+          entry.source == source &&
+          entry.error == message &&
+          entry.stackTrace == stack &&
+          !entry.occurredAt.isAfter(now) &&
+          now.difference(entry.occurredAt) <= _duplicateWindow,
+    );
+    final previous = match < 0 ? null : _entries.removeAt(match);
     _entries.insert(
       0,
       AppErrorLogEntry(
-        occurredAt: DateTime.now(),
+        occurredAt: now,
         source: source,
-        error: error.toString(),
-        stackTrace: stackTrace?.toString(),
+        error: message,
+        stackTrace: stack,
+        occurrences: (previous?.occurrences ?? 0) + 1,
       ),
     );
     _prune();
@@ -109,12 +123,14 @@ class AppErrorLogEntry {
     required this.source,
     required this.error,
     required this.stackTrace,
+    this.occurrences = 1,
   });
 
   final DateTime occurredAt;
   final String source;
   final String error;
   final String? stackTrace;
+  final int occurrences;
 
   static AppErrorLogEntry? fromJson(Object? value) {
     if (value is! Map<String, dynamic>) {
@@ -124,6 +140,7 @@ class AppErrorLogEntry {
     final source = value['source'];
     final error = value['error'];
     final stackTrace = value['stackTrace'];
+    final occurrences = value['occurrences'];
     if (occurredAtText is! String || source is! String || error is! String) {
       return null;
     }
@@ -136,6 +153,7 @@ class AppErrorLogEntry {
       source: source,
       error: error,
       stackTrace: stackTrace is String ? stackTrace : null,
+      occurrences: occurrences is int && occurrences > 0 ? occurrences : 1,
     );
   }
 
@@ -145,13 +163,14 @@ class AppErrorLogEntry {
       'source': source,
       'error': error,
       'stackTrace': stackTrace,
+      'occurrences': occurrences,
     };
   }
 
   String format() {
     final buffer = StringBuffer()
       ..writeln('[${occurredAt.toIso8601String()}] $source')
-      ..writeln(error);
+      ..writeln(occurrences > 1 ? '$error (x$occurrences)' : error);
     final stack = stackTrace;
     if (stack != null && stack.isNotEmpty) {
       buffer.write(stack);

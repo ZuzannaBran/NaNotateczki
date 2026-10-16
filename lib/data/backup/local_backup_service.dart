@@ -447,9 +447,11 @@ class LocalBackupService {
       }
 
       _throwIfInterrupted(shouldInterrupt);
-      final folders = await _foldersForSnapshot(items);
+      final folderSnapshot = await _foldersForSnapshot(items);
       final manifestBody = <String, dynamic>{
-        'folders': folders,
+        'folders': folderSnapshot.names,
+        if (folderSnapshot.metadata != null)
+          'folderMetadata': folderSnapshot.metadata,
         'notebooks': [
           for (final notebook in items) currentEntries[notebook.uid]!.toJson(),
         ],
@@ -534,29 +536,43 @@ class LocalBackupService {
     }
   }
 
-  Future<List<String>> _foldersForSnapshot(List<Notebook> items) async {
+  Future<({List<String> names, Map<String, dynamic>? metadata})>
+  _foldersForSnapshot(List<Notebook> items) async {
     final names = <String>{
       for (final notebook in items)
         if (notebook.folder.trim().isNotEmpty) notebook.folder.trim(),
     };
+    Map<String, dynamic>? metadata;
     try {
       final content = await _readStoredFolders();
       if (content != null) {
         final decoded = jsonDecode(content);
-        if (decoded is! List<dynamic> ||
-            decoded.any((item) => item is! String)) {
+        final Object? savedFolders;
+        if (decoded is List<dynamic>) {
+          savedFolders = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          savedFolders = decoded['folders'];
+          metadata = decoded;
+        } else {
+          throw const FormatException(
+            'Stored library folder metadata is malformed.',
+          );
+        }
+        if (savedFolders is! List<dynamic> ||
+            savedFolders.any((item) => item is! String)) {
           throw const FormatException(
             'Stored library folder metadata is malformed.',
           );
         }
         names.addAll(
-          decoded
+          savedFolders
               .cast<String>()
               .map((item) => item.trim())
               .where((item) => item.isNotEmpty),
         );
       }
     } catch (e, st) {
+      metadata = null;
       AppErrorLog.instance.record(
         e,
         st,
@@ -565,7 +581,12 @@ class LocalBackupService {
     }
     final folders = names.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    return folders;
+    return (
+      names: folders,
+      metadata: metadata == null
+          ? null
+          : <String, dynamic>{...metadata, 'folders': folders},
+    );
   }
 
   Future<String?> _readStoredFolders() async {
@@ -581,11 +602,17 @@ class LocalBackupService {
     return file.readAsString();
   }
 
-  Future<void> _restoreFolders(List<String>? folders) async {
+  Future<void> _restoreFolders(_BackupSnapshotData data) async {
+    final folders = data.folders;
     if (folders == null) {
       return;
     }
-    final content = jsonEncode(folders);
+    final metadata = data.folderMetadata;
+    final content = jsonEncode(
+      metadata == null
+          ? folders
+          : <String, dynamic>{...metadata, 'folders': folders},
+    );
     if (kIsWeb) {
       await writeStoredText(_libraryFoldersFile, content);
       return;
@@ -1171,6 +1198,7 @@ class LocalBackupService {
       );
     }
     final folders = _foldersFromManifest(decoded);
+    final folderMetadata = _folderMetadataFromManifest(decoded);
     final notebookEntries = decoded['notebooks'];
     if (notebookEntries is! List<dynamic>) {
       throw const BackupValidationException(
@@ -1246,7 +1274,11 @@ class LocalBackupService {
       }
       notebooks.add(notebook);
     }
-    return _BackupSnapshotData(notebooks: notebooks, folders: folders);
+    return _BackupSnapshotData(
+      notebooks: notebooks,
+      folders: folders,
+      folderMetadata: folderMetadata,
+    );
   }
 
   Future<Map<String, dynamic>> _readPageBackedNotebookJson(
@@ -1469,6 +1501,25 @@ class LocalBackupService {
     return folders;
   }
 
+  Map<String, dynamic>? _folderMetadataFromManifest(
+    Map<String, dynamic> manifest,
+  ) {
+    final metadata = manifest['folderMetadata'];
+    if (metadata == null) {
+      return null;
+    }
+    if (metadata is! Map<String, dynamic> ||
+        metadata['folders'] is! List<dynamic> ||
+        (metadata['folders'] as List<dynamic>).any(
+          (item) => item is! String,
+        )) {
+      throw const BackupValidationException(
+        'Manifest contains malformed extended folder metadata.',
+      );
+    }
+    return metadata;
+  }
+
   Future<_BackupSnapshotData?> _readLegacyLatest() async {
     try {
       final file = await _file(_latest);
@@ -1519,7 +1570,7 @@ class LocalBackupService {
       );
     }
     if (read.data.notebooks.isEmpty) {
-      await _restoreFolders(read.data.folders);
+      await _restoreFolders(read.data);
       return const BackupRestoreReport(
         snapshotFound: true,
         succeeded: true,
@@ -1548,7 +1599,7 @@ class LocalBackupService {
     final succeeded = restored == read.data.notebooks.length;
     if (succeeded) {
       try {
-        await _restoreFolders(read.data.folders);
+        await _restoreFolders(read.data);
       } catch (e, st) {
         AppErrorLog.instance.record(
           e,
@@ -2349,10 +2400,15 @@ void _atomicWriteWorkerAsset(File file, List<int> bytes) {
 }
 
 class _BackupSnapshotData {
-  const _BackupSnapshotData({required this.notebooks, required this.folders});
+  const _BackupSnapshotData({
+    required this.notebooks,
+    required this.folders,
+    this.folderMetadata,
+  });
 
   final List<Notebook> notebooks;
   final List<String>? folders;
+  final Map<String, dynamic>? folderMetadata;
 }
 
 class _BackupReadResult {
