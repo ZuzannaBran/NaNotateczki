@@ -325,10 +325,10 @@ i zachowuje obrazy inline.
   utrwalenie eraser-stroke.
 - `_toolFromIndex` i `_toolToIndex` muszą pozostać symetryczne.
 
-### `lib/features/notebook/presentation/notebook_screen.dart` (34 linie)
+### `lib/features/notebook/presentation/notebook_screen.dart` (37 linii)
 
-Wybiera pusty stan albo właściwy `EditorScreen`; przekazuje flagę
-widoczności wspólnego paska narzędzi i `showCompactTimer`, sterujące
+Wybiera pusty stan albo właściwy `EditorScreen`; przekazuje aktualny tytuł
+notatnika z biblioteki oraz flagę widoczności wspólnego paska narzędzi i `showCompactTimer`, sterujące
 wyświetlaniem `CompactStudyTimer` w nagłówku edytora.
 
 - 8: `NotebookScreen`.
@@ -358,7 +358,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1631 linii)
+### `lib/features/library/presentation/library_screen.dart` (1632 linii)
 
 Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
 katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
@@ -385,7 +385,8 @@ również reaguje na wspólną czułość dotyku.
 Pod strzałką panelu folderów jest drugi przycisk zwijania wspólnego paska
 narzędzi; oba są pionowo wyśrodkowane we własnych obszarach, mają 24 px
 szerokości, 44 px wysokości, cień i obrys. Stan toolbaru pozostaje zachowany
-przy przełączaniu dokumentów.
+przy przełączaniu dokumentów. Aktualny tytuł notebooka lub boarda jest
+przekazywany do nagłówka bez odtwarzania kontrolera edytora po zmianie nazwy.
 
 W drzewku folderów przytrzymanie notebooka lub boarda uruchamia drag & drop
 na wiersz innego folderu (również zwiniętego). Podczas przeciągania cały
@@ -606,9 +607,10 @@ ale zmienione ręcznie próbki pozostają nienaruszone.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2395 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2399 linii)
 
-Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px;
+Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px i korzysta z
+aktualnego tytułu przekazanego przez bibliotekę (fallback: kontroler);
 toolbar i pasek tekstowy są nakładkami `Stack` nad pełnowymiarowym
 canvasem, zamiast zajmować jego wysokość. `showToolbar` steruje
 widocznością nakładek. Początkowe 72 px odsunięcia strony realizuje
@@ -657,7 +659,7 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 - 1017: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 1043: główny `build`; pasek tekstu jest renderowany na podstawie
+- 1045: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
 - 1541: `_PageViewportClipper`; 1599: `_PageFramePainter`;
@@ -845,7 +847,7 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (899 linii)
+### `lib/features/board/presentation/board_screen.dart` (910 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -853,7 +855,8 @@ ignoruje pointery nawigacyjne, trackpad i scroll, a kontroler blokuje zmianę
 `viewPan/viewScale`. `BoardSceneBoundsResolver` zamraża prostokąt sceny
 podczas move/resize, aby zmiany `contentBounds` nie przesuwały lokalnego
 układu współrzędnych. Po zakończeniu gestu granice odświeżają się.
-Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
+Nagłówek może otrzymać aktualną nazwę boarda od biblioteki bez resetu
+edytora. Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 `QuillController`. Główny toolbar i pasek tekstu respektują `showToolbar`
 i unoszą się na nakładce nad canvasem, zamiast zmniejszać jego wysokość.
 `showCompactTimer` wyświetla `CompactStudyTimer` w nagłówku po zwinięciu
@@ -866,9 +869,9 @@ ma proste górne rogi i zaokrąglone dolne rogi (16 px) zarówno w dekoracji,
 jak i w klipowaniu zawartości. Nagłówek ma
 wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 
-- 30: `BoardScreen`; 44: `_BoardScreenState`.
+- 30: `BoardScreen`; 46: `_BoardScreenState`.
 - 70: `_buildBoardRect`; 80–394: obsługa pointerów i viewportu.
-- 512: główny `build`; import/eksport i skróty przez `EditorCommands`.
+- 514: główny `build`; import/eksport i skróty przez `EditorCommands`.
 - 758: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
 - 794: `_BoardPaintProbe`; 811: `_RenderBoardPaintProbe`;
   834: `_BoardZoomControls`.
@@ -959,6 +962,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
   stykanie menu z prawą granicą całego sidebaru (w tym resize handle),
   prosty lewy brzeg, brak cienia i podziałki w miejscu styku,
+  aktualizacja tytułu otwartego notebooka i boarda po zmianie nazwy bez
+  utraty `EditorController`,
   ciągła linia pod nagłówkiem w katalogu, folderze, notebooku i boardzie,
   również po ukryciu panelu, brak podświetlenia Projects także po hover
   i zachowane przejście do katalogu głównego,

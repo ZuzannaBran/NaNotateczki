@@ -1530,10 +1530,12 @@ class _LibraryWorkspace extends StatelessWidget {
       create: (_) => EditorController(repository: repository, notebook: item!),
       child: isBoard
           ? BoardScreen(
+              title: item!.title,
               showToolbar: showToolbar,
               showCompactTimer: showCompactTimer,
             )
           : NotebookScreen(
+              title: item!.title,
               showToolbar: showToolbar,
               showCompactTimer: showCompactTimer,
             ),

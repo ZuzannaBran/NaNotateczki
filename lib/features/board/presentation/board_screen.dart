@@ -31,10 +31,12 @@ import '../../planner/presentation/study_timer_widgets.dart';
 class BoardScreen extends StatefulWidget {
   const BoardScreen({
     super.key,
+    this.title,
     this.showToolbar = true,
     this.showCompactTimer = false,
   });
 
+  final String? title;
   final bool showToolbar;
   final bool showCompactTimer;
 
@@ -740,7 +742,7 @@ class _BoardScreenState extends State<BoardScreen> {
         surfaceTintColor: Colors.transparent,
         titleSpacing: useWideTitleInset ? 44 : null,
         title: Text(
-          controller.notebook.title,
+          widget.title ?? controller.notebook.title,
           style: AppHeaderDivider.titleStyle,
         ),
         actions: [

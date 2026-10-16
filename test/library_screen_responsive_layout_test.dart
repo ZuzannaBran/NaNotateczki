@@ -9,6 +9,8 @@ import 'package:provider/provider.dart';
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/input/touch_navigation_scroll_physics.dart';
 import 'package:program/core/widgets/app_header_divider.dart';
+import 'package:program/features/board/presentation/board_screen.dart';
+import 'package:program/features/editor/presentation/editor_screen.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
@@ -198,10 +200,38 @@ void main() {
     expect(find.text('Header notebook'), findsWidgets);
     expectAligned();
 
+    final notebookEditor = tester
+        .element(find.byType(EditorScreen))
+        .read<EditorController>();
+    await controller.renameItem(notebook.uid, 'Znotes');
+    await tester.pumpAndSettle();
+    expect(
+      (tester.widget<AppBar>(find.byType(AppBar)).title as Text).data,
+      'Znotes',
+    );
+    expect(
+      tester.element(find.byType(EditorScreen)).read<EditorController>(),
+      same(notebookEditor),
+    );
+
     await tester.tap(find.byKey(ValueKey('library-tree-item:${board.uid}')));
     await tester.pumpAndSettle();
     expect(find.text('Header board'), findsWidgets);
     expectAligned();
+
+    final boardEditor = tester
+        .element(find.byType(BoardScreen))
+        .read<EditorController>();
+    await controller.renameItem(board.uid, 'Renamed board');
+    await tester.pumpAndSettle();
+    expect(
+      (tester.widget<AppBar>(find.byType(AppBar)).title as Text).data,
+      'Renamed board',
+    );
+    expect(
+      tester.element(find.byType(BoardScreen)).read<EditorController>(),
+      same(boardEditor),
+    );
 
     await tester.tap(projectsHome);
     await tester.pumpAndSettle();

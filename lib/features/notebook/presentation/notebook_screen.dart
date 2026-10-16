@@ -8,10 +8,12 @@ import '../../editor/state/editor_controller.dart';
 class NotebookScreen extends StatelessWidget {
   const NotebookScreen({
     super.key,
+    this.title,
     this.showToolbar = true,
     this.showCompactTimer = false,
   });
 
+  final String? title;
   final bool showToolbar;
   final bool showCompactTimer;
 
@@ -27,6 +29,7 @@ class NotebookScreen extends StatelessWidget {
     }
 
     return EditorScreen(
+      title: title,
       showToolbar: showToolbar,
       showCompactTimer: showCompactTimer,
     );

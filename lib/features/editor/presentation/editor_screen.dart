@@ -38,10 +38,12 @@ import 'widgets/text_edit_toolbar.dart';
 class EditorScreen extends StatefulWidget {
   const EditorScreen({
     super.key,
+    this.title,
     this.showToolbar = true,
     this.showCompactTimer = false,
   });
 
+  final String? title;
   final bool showToolbar;
   final bool showCompactTimer;
 
@@ -1518,7 +1520,7 @@ class _EditorScreenState extends State<EditorScreen> {
         surfaceTintColor: Colors.transparent,
         titleSpacing: useWideTitleInset ? 44 : null,
         title: Text(
-          controller.notebook.title,
+          widget.title ?? controller.notebook.title,
           style: AppHeaderDivider.titleStyle,
         ),
         actions: [
