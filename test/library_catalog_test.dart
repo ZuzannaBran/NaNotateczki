@@ -202,7 +202,8 @@ void main() {
     final folderMenuRect = tester.getRect(folderMenu);
     final folderLabelRect = tester.getRect(folderLabel);
     final folderCoverRect = tester.getRect(folderCover);
-    expect(folderMenuRect.left, closeTo(folderCoverRect.left, 1));
+    // The actions row has four pixels of horizontal inset.
+    expect(folderMenuRect.left, closeTo(folderCoverRect.left + 4, 1));
     expect(folderLabelRect.left, greaterThan(folderMenuRect.right));
     expect(folderLabelRect.right, lessThanOrEqualTo(folderCoverRect.right));
     expect(folderCoverRect.top - folderMenuRect.bottom, lessThan(12));
@@ -402,11 +403,13 @@ void main() {
     );
     await controller.loadItems();
     const customColor = Color(0xFFCCA4B2);
-    await controller.updateFolderCover(
-      'Custom',
-      const FolderCoverStyle(
-        shape: FolderCoverShape.heart,
-        iconColor: customColor,
+    await tester.runAsync(
+      () => controller.updateFolderCover(
+        'Custom',
+        const FolderCoverStyle(
+          shape: FolderCoverShape.heart,
+          iconColor: customColor,
+        ),
       ),
     );
 
@@ -590,8 +593,12 @@ void main() {
         find.descendant(of: plainTile, matching: find.byType(Ink)),
       );
       expect((plainInk.decoration! as BoxDecoration).color, idleColor);
+      final preview = find.descendant(
+        of: tile,
+        matching: find.byKey(const ValueKey('catalog-preview-shadow')),
+      );
       final material = tester.widget<Material>(
-        find.descendant(of: tile, matching: find.byType(Material)),
+        find.descendant(of: preview, matching: find.byType(Material)),
       );
       expect(material.clipBehavior, Clip.antiAlias);
       expect(material.borderRadius, BorderRadius.circular(24));

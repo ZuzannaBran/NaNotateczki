@@ -61,7 +61,10 @@ void main() {
       final contentContext = tester.element(
         find.widgetWithText(TextButton, 'Content action'),
       );
-      expect(TextButtonTheme.of(contentContext).style, isNull);
+      expect(
+        TextButtonTheme.of(contentContext).style?.foregroundColor?.resolve({}),
+        theme.textButtonTheme.style?.foregroundColor?.resolve({}),
+      );
 
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();

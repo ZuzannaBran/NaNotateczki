@@ -25,6 +25,7 @@ void main() {
         ),
       );
 
+      await tester.pumpAndSettle();
       final copy = find.byTooltip('Copy selection');
       final delete = find.byTooltip('Delete selection');
       expect(copy, findsOneWidget);

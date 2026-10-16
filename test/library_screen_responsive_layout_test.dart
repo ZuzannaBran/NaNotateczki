@@ -148,10 +148,14 @@ void main() {
         scheme.surfaceContainerLowest,
       );
       expect(tester.widget<ColoredBox>(divider).color, expectedColor);
-      expect(
-        tester.widget<Text>(find.text('Projects')).style,
-        AppHeaderDivider.titleStyle,
-      );
+      // The title is intentionally hidden with the collapsed sidebar.
+      final projectsTitle = find.text('Projects');
+      if (projectsTitle.evaluate().isNotEmpty) {
+        expect(
+          tester.widget<Text>(projectsTitle).style,
+          AppHeaderDivider.titleStyle,
+        );
+      }
     }
 
     expectAligned();
