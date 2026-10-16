@@ -10,7 +10,6 @@ import 'package:provider/provider.dart';
 
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/input/touch_navigation_scroll_physics.dart';
-import 'package:program/core/storage/text_storage.dart';
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
 import 'package:program/core/widgets/app_header_divider.dart';
@@ -511,11 +510,9 @@ void _expectCatalogBackground(WidgetTester tester, Color color) {
 }
 
 Future<void> _tapAppearance(WidgetTester tester, String label) async {
-  // Native preference writes must finish outside the widget FakeAsync zone.
-  await tester.runAsync(() async {
-    await tester.tap(find.text(label));
-    await readStoredText('app_prefs.json');
-  });
+  // Theme changes synchronously; persistence has separate storage tests.
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _snapshot(WidgetTester tester, String name) async {

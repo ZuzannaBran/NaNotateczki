@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/app_dialog_actions.dart';
@@ -585,11 +587,8 @@ class EditorToolbar extends StatelessWidget {
     ValueChanged<InkColorPreset>? onPresetSelected,
     ValueChanged<Color>? onPaletteColorSelected,
   }) async {
-    final sharedRecent = await SharedRecentColors.load();
-    if (!context.mounted) {
-      return null;
-    }
-    final shownRecent = SharedRecentColors.merge(sharedRecent, recentColors);
+    var shownRecent = SharedRecentColors.merge(recentColors, const []);
+    StateSetter? updateDialog;
     final darkMode = Theme.of(context).brightness == Brightness.dark;
     final displayCurrent = AppColors.displayInkColor(
       current,
@@ -619,6 +618,7 @@ class EditorToolbar extends StatelessWidget {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            updateDialog = setState;
             final base = Color.fromARGB(
               255,
               red.round(),
@@ -884,7 +884,18 @@ class EditorToolbar extends StatelessWidget {
         );
       },
     );
-    final result = await navigator.push(route);
+    final resultFuture = navigator.push(route);
+    unawaited(
+      SharedRecentColors.load().then((sharedRecent) {
+        if (!route.isActive) {
+          return;
+        }
+        updateDialog?.call(() {
+          shownRecent = SharedRecentColors.merge(sharedRecent, recentColors);
+        });
+      }),
+    );
+    final result = await resultFuture;
     await route.completed;
     hexController.dispose();
     return result;

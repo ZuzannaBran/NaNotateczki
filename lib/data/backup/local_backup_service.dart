@@ -1054,6 +1054,8 @@ class LocalBackupService {
     }
     final body = <String, dynamic>{
       'folders': decoded['folders'],
+      if (decoded.containsKey('folderMetadata'))
+        'folderMetadata': decoded['folderMetadata'],
       'notebooks': decoded['notebooks'],
     };
     return _sha256Checksum(jsonEncode(body)) == checksum;

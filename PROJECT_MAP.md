@@ -223,7 +223,9 @@ z manifestami v1–v5 oraz mieszanymi wpisami legacy/v6. Restore weryfikuje
 checksumę każdej strony i assetu. Pliki stron i assetów nie są usuwane w hot
 path, żeby historia manifestów nie straciła zależności. Manifest
 v6 zachowuje też metadane `library_folders.json` (okładki i Recent), obok
-listy `folders` zachowanej dla starszych kopii. Restore starszych manifestów
+listy `folders` zachowanej dla starszych kopii. Walidacja sumy kontrolnej
+uwzględnia opcjonalne `folderMetadata`, bez łamania starych manifestów.
+Restore starszych manifestów
 pozostaje zgodny. Web nadal zapisuje pełny snapshot w `localStorage`.
 
 - 19: `LocalBackupService`; 37: `waitUntilIdle`; 153: `snapshot`;
@@ -461,7 +463,8 @@ bazowych próbek Cover color. Recent współdzieli zapis kolorów z canvasem
 wyświetlają osobne okrągłe próbki. Pojedyncze kolory z zestawów
 mogą być wybierane bez zmiany ustawień pisaka. Wspólny selektor
 `EditorToolbar.pickColor` udostępnia te same kolory, Recent, HEX i RGB/B-W;
-pokazuje kolory po transformacji aktywnego motywu.
+pokazuje kolory po transformacji aktywnego motywu. Dialog otwiera się
+bez czekania na dysk, a wspólna historia Recent doładowuje się asynchronicznie.
 `_CatalogTile` umieszcza menu trzech kropek w jawnym rozmiarze
 32×32 px (bez przycinania ikony) po lewej od nazwy;
 oba elementy są wyrównane do lewej krawędzi okładki/podglądu i mieszczą

@@ -312,6 +312,7 @@ void main() {
 
     final pickerTitle = find.text('Pick color');
     expect(pickerTitle, findsOneWidget);
+    expect(find.text('Recent'), findsOneWidget);
     expect(Theme.of(tester.element(pickerTitle)).brightness, Brightness.dark);
     expect(
       previewColor(tester),

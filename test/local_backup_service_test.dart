@@ -1133,6 +1133,42 @@ void main() {
     expect(jsonDecode(await folders.readAsString()), metadata);
   });
 
+  test('modern folder metadata participates in manifest checksum', () async {
+    final directory = await Directory.systemTemp.createTemp('backup-test-');
+    addTearDown(() => directory.delete(recursive: true));
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final service = LocalBackupService(
+      NotebookRepository(database),
+      documentsDirectory: () async => directory,
+    );
+    addTearDown(service.dispose);
+    final folders = File('${directory.path}/library_folders.json');
+    await folders.writeAsString(
+      jsonEncode({
+        'folders': ['Protected'],
+        'covers': {
+          'Protected': {'shape': 'heart', 'iconColor': 0xFF123456},
+        },
+      }),
+      flush: true,
+    );
+    await service.snapshot([]);
+
+    final manifestFile = File('${directory.path}/local_backup/manifest.json');
+    final manifest =
+        jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+    final metadata = manifest['folderMetadata'] as Map<String, dynamic>;
+    metadata['covers'] = {
+      'Protected': {'shape': 'star', 'iconColor': 0xFF123456},
+    };
+    await manifestFile.writeAsString(jsonEncode(manifest), flush: true);
+
+    final result = await service.restoreFromLatestDetailed();
+    expect(result.snapshotFound, isFalse);
+    expect(result.succeeded, isFalse);
+  });
+
   test('snapshot recovers notebook folders from malformed metadata', () async {
     final directory = await Directory.systemTemp.createTemp('backup-test-');
     addTearDown(() => directory.delete(recursive: true));

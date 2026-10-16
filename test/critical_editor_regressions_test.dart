@@ -145,7 +145,8 @@ void main() {
       await repository.waitForPendingSaves();
       final saved = await repository.getNotebook(notebook.uid);
       expect(saved?.pages.single.inkStrokes, isEmpty);
-      expect(guardedReductions, greaterThan(0));
+      // User-requested erasures are not unexplained data loss.
+      expect(guardedReductions, 0);
     },
   );
 
