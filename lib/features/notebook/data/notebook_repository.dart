@@ -319,6 +319,7 @@ class NotebookRepository {
           operation: 'importBackup',
           affectedPageIds: notebook.pages.map((page) => page.id).toSet(),
           requestStackTrace: requestStackTrace,
+          expectedRemovedIdsByPage: const {},
         );
       }
       candidates.add(notebook);
