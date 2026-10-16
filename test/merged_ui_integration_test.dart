@@ -163,9 +163,10 @@ void main() {
     _expectCatalogBackground(tester, AppColors.darkBackground);
     await _snapshot(tester, 'catalog-dark');
     final folder = find.byKey(const ValueKey('catalog-folder:Project'));
-    final icon = tester.widget<Icon>(
-      find.descendant(of: folder, matching: find.byIcon(Icons.folder_outlined)),
+    final icon = tester.widget<FolderCoverIcon>(
+      find.descendant(of: folder, matching: find.byType(FolderCoverIcon)),
     );
+    expect(icon.shape, FolderCoverShape.folder);
     expect(icon.color, AppColors.darkText);
     await tester.tap(folder);
     await tester.pumpAndSettle();
