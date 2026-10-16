@@ -481,22 +481,28 @@ Future<Color> _renderedHeaderPixel(WidgetTester tester) async {
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(const ValueKey('merged-app-snapshot')),
   );
-  final image = await boundary.toImage(pixelRatio: 1);
-  try {
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    if (bytes == null) {
-      throw StateError('Unable to inspect header separator pixels');
+  final color = await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 1);
+    try {
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      if (bytes == null) {
+        throw StateError('Unable to inspect header separator pixels');
+      }
+      final offset = (kToolbarHeight.toInt() * image.width + 24) * 4;
+      return Color.fromARGB(
+        bytes.getUint8(offset + 3),
+        bytes.getUint8(offset),
+        bytes.getUint8(offset + 1),
+        bytes.getUint8(offset + 2),
+      );
+    } finally {
+      image.dispose();
     }
-    final offset = (kToolbarHeight.toInt() * image.width + 24) * 4;
-    return Color.fromARGB(
-      bytes.getUint8(offset + 3),
-      bytes.getUint8(offset),
-      bytes.getUint8(offset + 1),
-      bytes.getUint8(offset + 2),
-    );
-  } finally {
-    image.dispose();
+  });
+  if (color == null) {
+    throw StateError('Header snapshot could not complete');
   }
+  return color;
 }
 
 void _expectCatalogBackground(WidgetTester tester, Color color) {

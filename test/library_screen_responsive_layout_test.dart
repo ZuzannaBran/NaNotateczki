@@ -31,26 +31,32 @@ Future<Color> _sampleRenderedPixel(
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(captureKey),
   );
-  final image = await boundary.toImage(pixelRatio: 1);
-  try {
-    final pixels = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    if (pixels == null) {
-      throw StateError('Unable to capture menu pixels');
+  final origin = tester.getTopLeft(find.byKey(captureKey));
+  final position = globalPosition - origin;
+  final color = await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 1);
+    try {
+      final pixels = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      if (pixels == null) {
+        throw StateError('Unable to capture menu pixels');
+      }
+      final x = position.dx.round();
+      final y = position.dy.round();
+      final index = (y * image.width + x) * 4;
+      return Color.fromARGB(
+        pixels.getUint8(index + 3),
+        pixels.getUint8(index),
+        pixels.getUint8(index + 1),
+        pixels.getUint8(index + 2),
+      );
+    } finally {
+      image.dispose();
     }
-    final origin = tester.getTopLeft(find.byKey(captureKey));
-    final position = globalPosition - origin;
-    final x = position.dx.round();
-    final y = position.dy.round();
-    final index = (y * image.width + x) * 4;
-    return Color.fromARGB(
-      pixels.getUint8(index + 3),
-      pixels.getUint8(index),
-      pixels.getUint8(index + 1),
-      pixels.getUint8(index + 2),
-    );
-  } finally {
-    image.dispose();
+  });
+  if (color == null) {
+    throw StateError('Menu snapshot could not complete');
   }
+  return color;
 }
 
 void main() {
