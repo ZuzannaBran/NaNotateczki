@@ -31,11 +31,12 @@ void main() {
       },
     );
     final source = await repository.createNotebook();
-    final controller = EditorController(repository: repository, notebook: source);
-    addTearDown(controller.dispose);
-    controller.addInkStroke(
-      const [InkPoint(dx: 5, dy: 10, pressure: 0.5)],
+    final controller = EditorController(
+      repository: repository,
+      notebook: source,
     );
+    addTearDown(controller.dispose);
+    controller.addInkStroke(const [InkPoint(dx: 5, dy: 10, pressure: 0.5)]);
     await controller.flushPendingSaves();
 
     controller.undo();
@@ -70,18 +71,25 @@ void main() {
     );
     final withImage = source.copyWith(
       updatedAt: DateTime.now().add(const Duration(seconds: 1)),
-      pages: [source.pages.single.copyWith(imageBlocks: [image])],
+      pages: [
+        source.pages.single.copyWith(imageBlocks: [image]),
+      ],
     );
     expect(await repository.saveNotebook(withImage), isTrue);
     final saved = (await repository.getNotebook(source.uid))!;
-    final controller = EditorController(repository: repository, notebook: saved);
+    final controller = EditorController(
+      repository: repository,
+      notebook: saved,
+    );
     addTearDown(controller.dispose);
 
     controller.deleteImageBlock(image.id);
     await controller.flushPendingSaves();
 
-    expect((await repository.getNotebook(source.uid))!
-        .pages.single.imageBlocks, isEmpty);
+    expect(
+      (await repository.getNotebook(source.uid))!.pages.single.imageBlocks,
+      isEmpty,
+    );
     expect(incidents, isEmpty);
   });
 

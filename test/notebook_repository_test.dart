@@ -725,57 +725,61 @@ void main() {
       isTrue,
     );
     expect(incidents, isEmpty);
-    expect((await repository.getNotebook(notebook.uid))!
-        .pages.single.inkStrokes, isEmpty);
-  });
-
-  test('unacknowledged deletion is still reported even with approvals',
-      () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final incidents = <DataIntegrityIncident>[];
-    final repository = NotebookRepository(
-      database,
-      dataIntegrityIncidentHandler: (incident, _, _) async {
-        incidents.add(incident);
-      },
-    );
-    final notebook = await repository.createNotebook();
-    InkStroke stroke(String id) => InkStroke(
-      id: id,
-      points: const [InkPoint(dx: 5, dy: 10, pressure: 0.5)],
-      color: const Color(0xFF000000),
-      width: 2,
-      tool: DrawingTool.pen,
-    );
-    final source = notebook.copyWith(
-      updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
-      pages: [
-        notebook.pages.single.copyWith(
-          inkStrokes: [stroke('approved'), stroke('unexpected')],
-        ),
-      ],
-    );
-    expect(await repository.saveNotebook(source), isTrue);
-    final emptied = source.copyWith(
-      updatedAt: source.updatedAt.add(const Duration(seconds: 1)),
-      pages: [source.pages.single.copyWith(inkStrokes: [])],
-    );
-
     expect(
-      await repository.saveNotebook(
-        emptied,
-        expectedRemovedIdsByPage: {
-          source.pages.single.id: {'ink:approved'},
-        },
-      ),
-      isTrue,
+      (await repository.getNotebook(notebook.uid))!.pages.single.inkStrokes,
+      isEmpty,
     );
-    expect(incidents, hasLength(1));
-    expect(incidents.single.reasons, contains('all_content_removed'));
   });
 
-  test('failed evidence recording prevents a suspicious overwrite', () async {
+  test(
+    'unacknowledged deletion is still reported even with approvals',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final incidents = <DataIntegrityIncident>[];
+      final repository = NotebookRepository(
+        database,
+        dataIntegrityIncidentHandler: (incident, _, _) async {
+          incidents.add(incident);
+        },
+      );
+      final notebook = await repository.createNotebook();
+      InkStroke stroke(String id) => InkStroke(
+        id: id,
+        points: const [InkPoint(dx: 5, dy: 10, pressure: 0.5)],
+        color: const Color(0xFF000000),
+        width: 2,
+        tool: DrawingTool.pen,
+      );
+      final source = notebook.copyWith(
+        updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+        pages: [
+          notebook.pages.single.copyWith(
+            inkStrokes: [stroke('approved'), stroke('unexpected')],
+          ),
+        ],
+      );
+      expect(await repository.saveNotebook(source), isTrue);
+      final emptied = source.copyWith(
+        updatedAt: source.updatedAt.add(const Duration(seconds: 1)),
+        pages: [source.pages.single.copyWith(inkStrokes: [])],
+      );
+
+      expect(
+        await repository.saveNotebook(
+          emptied,
+          expectedRemovedIdsByPage: {
+            source.pages.single.id: {'ink:approved'},
+          },
+        ),
+        isTrue,
+      );
+      expect(incidents, hasLength(1));
+      expect(incidents.single.reasons, contains('all_content_removed'));
+    },
+  );
+
+    test('failed evidence recording prevents a suspicious overwrite', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(

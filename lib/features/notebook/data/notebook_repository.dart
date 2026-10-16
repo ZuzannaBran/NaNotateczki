@@ -1041,9 +1041,7 @@ class NotebookRepository {
         before.pages.length != attempted.pages.length) {
       return false;
     }
-    final attemptedPages = {
-      for (final page in attempted.pages) page.id: page,
-    };
+    final attemptedPages = {for (final page in attempted.pages) page.id: page};
     var removed = false;
     for (final page in before.pages) {
       final next = attemptedPages[page.id];

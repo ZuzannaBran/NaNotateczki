@@ -2801,9 +2801,9 @@ class EditorController extends ChangeNotifier {
     };
     final removed = previous.difference(remaining);
     if (removed.isNotEmpty) {
-      _expectedRemovedIdsByPage.putIfAbsent(before.id, () => {}).addAll(
-        removed,
-      );
+      _expectedRemovedIdsByPage
+          .putIfAbsent(before.id, () => {})
+          .addAll(removed);
     }
   }
 
@@ -2815,9 +2815,7 @@ class EditorController extends ChangeNotifier {
     };
   }
 
-  void _clearSavedExpectedRemovals(
-    Map<String, Set<String>> expectedRemoved,
-  ) {
+  void _clearSavedExpectedRemovals(Map<String, Set<String>> expectedRemoved) {
     for (final entry in expectedRemoved.entries) {
       final pending = _expectedRemovedIdsByPage[entry.key];
       pending?.removeAll(entry.value);
