@@ -779,7 +779,7 @@ void main() {
     },
   );
 
-    test('failed evidence recording prevents a suspicious overwrite', () async {
+  test('failed evidence recording prevents a suspicious overwrite', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(
