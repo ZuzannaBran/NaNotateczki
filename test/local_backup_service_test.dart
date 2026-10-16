@@ -1110,16 +1110,20 @@ void main() {
     await service.snapshot([_notebook()]);
 
     expect(AppErrorLog.instance.length, errorsBefore);
-    final manifest = jsonDecode(
-      await File(
-        '${directory.path}/local_backup/manifest.json',
-      ).readAsString(),
-    ) as Map<String, dynamic>;
+    final manifest =
+        jsonDecode(
+              await File(
+                '${directory.path}/local_backup/manifest.json',
+              ).readAsString(),
+            )
+            as Map<String, dynamic>;
     expect(manifest['folders'], ['Empty Folder', 'Notes']);
     expect(manifest['folderMetadata'], metadata);
 
     await folders.writeAsString(
-      jsonEncode({'folders': ['Wrong Folder']}),
+      jsonEncode({
+        'folders': ['Wrong Folder'],
+      }),
       flush: true,
     );
     final report = await service.restoreFromLatestDetailed();
@@ -1139,18 +1143,19 @@ void main() {
       documentsDirectory: () async => directory,
     );
     addTearDown(service.dispose);
-    await File('${directory.path}/library_folders.json').writeAsString(
-      jsonEncode({'folders': 123}),
-      flush: true,
-    );
+    await File(
+      '${directory.path}/library_folders.json',
+    ).writeAsString(jsonEncode({'folders': 123}), flush: true);
 
     await service.snapshot([_notebook()]);
 
-    final manifest = jsonDecode(
-      await File(
-        '${directory.path}/local_backup/manifest.json',
-      ).readAsString(),
-    ) as Map<String, dynamic>;
+    final manifest =
+        jsonDecode(
+              await File(
+                '${directory.path}/local_backup/manifest.json',
+              ).readAsString(),
+            )
+            as Map<String, dynamic>;
     expect(manifest['folders'], ['Notes']);
     expect(manifest.containsKey('folderMetadata'), isFalse);
   });

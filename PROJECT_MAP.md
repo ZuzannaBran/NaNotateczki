@@ -205,7 +205,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2658 linii)
+### `lib/data/backup/local_backup_service.dart` (2656 linii)
 
 Przyrostowy backup z atomowym `manifest.json` i checksumami SHA-256. Format
 v6 rozdziela notebook na niezmienne, content-addressed pliki stron w
@@ -918,7 +918,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
 - `test/notebook_repository_test.dart` (1141): zapis, migracja legacy gumek, ochrona danych i
   migracja v1→v2 usuwająca dane Index tab bez utraty stron.
-- `test/local_backup_service_test.dart` (1438):
+- `test/local_backup_service_test.dart` (1443):
   nowy i starszy format folderów, odtwarzanie okładek/Recent i backup
 - `test/app_error_log_test.dart`: grupowanie powtarzalnych błędów
   i odczyt liczników z zachowaniem zgodności starych logów.

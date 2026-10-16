@@ -1510,9 +1510,7 @@ class LocalBackupService {
     }
     if (metadata is! Map<String, dynamic> ||
         metadata['folders'] is! List<dynamic> ||
-        (metadata['folders'] as List<dynamic>).any(
-          (item) => item is! String,
-        )) {
+        (metadata['folders'] as List<dynamic>).any((item) => item is! String)) {
       throw const BackupValidationException(
         'Manifest contains malformed extended folder metadata.',
       );
