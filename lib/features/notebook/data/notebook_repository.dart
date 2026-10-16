@@ -516,6 +516,7 @@ class NotebookRepository {
   Future<bool> saveNotebook(
     Notebook notebook, {
     bool preserveMetadata = false,
+    Map<String, Set<String>> expectedRemovedIdsByPage = const {},
   }) async {
     final normalizedNotebook = InkEraserEngine.normalizeNotebook(notebook);
     if (normalizedNotebook.pages.isEmpty) {
@@ -535,6 +536,7 @@ class NotebookRepository {
         normalizedNotebook,
         requestStackTrace,
         preserveMetadata: preserveMetadata,
+        expectedRemovedIdsByPage: expectedRemovedIdsByPage,
       );
     } finally {
       completion.complete();
@@ -544,7 +546,11 @@ class NotebookRepository {
     }
   }
 
-  Future<bool> saveNotebookPages(Notebook notebook, Set<String> pageIds) async {
+  Future<bool> saveNotebookPages(
+    Notebook notebook,
+    Set<String> pageIds, {
+    Map<String, Set<String>> expectedRemovedIdsByPage = const {},
+  }) async {
     if (pageIds.isEmpty) {
       return true;
     }
@@ -566,6 +572,7 @@ class NotebookRepository {
         normalizedNotebook,
         pageIds,
         requestStackTrace,
+        expectedRemovedIdsByPage: expectedRemovedIdsByPage,
       );
     } finally {
       completion.complete();
@@ -578,8 +585,9 @@ class NotebookRepository {
   Future<bool> _saveNotebookPagesNow(
     Notebook notebook,
     Set<String> pageIds,
-    StackTrace requestStackTrace,
-  ) async {
+    StackTrace requestStackTrace, {
+    required Map<String, Set<String>> expectedRemovedIdsByPage,
+  }) async {
     if (_lastCorruptNotebookIds.contains(notebook.uid)) {
       return false;
     }
@@ -612,6 +620,7 @@ class NotebookRepository {
       operation: 'saveNotebookPages',
       affectedPageIds: pageIds,
       requestStackTrace: requestStackTrace,
+      expectedRemovedIdsByPage: expectedRemovedIdsByPage,
     );
     DateTime? persistedAt;
     final saved = await database.transaction(() async {
@@ -653,6 +662,7 @@ class NotebookRepository {
     Notebook notebook,
     StackTrace requestStackTrace, {
     bool preserveMetadata = false,
+    required Map<String, Set<String>> expectedRemovedIdsByPage,
   }) async {
     if (_lastCorruptNotebookIds.contains(notebook.uid)) {
       debugPrint(
@@ -691,6 +701,7 @@ class NotebookRepository {
         operation: 'saveNotebook',
         affectedPageIds: notebook.pages.map((page) => page.id).toSet(),
         requestStackTrace: requestStackTrace,
+        expectedRemovedIdsByPage: expectedRemovedIdsByPage,
       );
     }
     final notebookToSave = await _persistInlineImages(notebook);
@@ -970,6 +981,7 @@ class NotebookRepository {
     required String operation,
     required Set<String> affectedPageIds,
     required StackTrace requestStackTrace,
+    required Map<String, Set<String>> expectedRemovedIdsByPage,
   }) async {
     final beforeSummary = _NotebookContentSummary.fromNotebook(before);
     final attemptedSummary = _NotebookContentSummary.fromNotebook(attempted);
@@ -991,7 +1003,12 @@ class NotebookRepository {
       );
       reasons.addAll(pageReasons.map((reason) => 'page:$pageId:$reason'));
     }
-    if (reasons.isEmpty) {
+    if (reasons.isEmpty ||
+        _onlyExpectedContentWasRemoved(
+          before,
+          attempted,
+          expectedRemovedIdsByPage,
+        )) {
       return;
     }
 
@@ -1013,6 +1030,62 @@ class NotebookRepository {
       return;
     }
     await _recordDataIntegrityIncident(incident, before, attempted);
+  }
+
+  bool _onlyExpectedContentWasRemoved(
+    Notebook before,
+    Notebook attempted,
+    Map<String, Set<String>> expectedRemovedIdsByPage,
+  ) {
+    if (expectedRemovedIdsByPage.isEmpty ||
+        before.pages.length != attempted.pages.length) {
+      return false;
+    }
+    final attemptedPages = {
+      for (final page in attempted.pages) page.id: page,
+    };
+    var removed = false;
+    for (final page in before.pages) {
+      final next = attemptedPages[page.id];
+      if (next == null) {
+        return false;
+      }
+      final approved = expectedRemovedIdsByPage[page.id] ?? const <String>{};
+      final nextInk = {for (final ink in next.inkStrokes) ink.id: ink};
+      final nextText = {for (final text in next.textBlocks) text.id: text};
+      final nextImages = {for (final image in next.imageBlocks) image.id};
+      for (final ink in page.inkStrokes) {
+        final current = nextInk[ink.id];
+        if (current == null) {
+          if (!approved.contains('ink:${ink.id}')) {
+            return false;
+          }
+          removed = true;
+        } else if (current.points.length < ink.points.length) {
+          return false;
+        }
+      }
+      for (final text in page.textBlocks) {
+        final current = nextText[text.id];
+        if (current == null) {
+          if (!approved.contains('text:${text.id}')) {
+            return false;
+          }
+          removed = true;
+        } else if (current.text.length < text.text.length) {
+          return false;
+        }
+      }
+      for (final image in page.imageBlocks) {
+        if (!nextImages.contains(image.id)) {
+          if (!approved.contains('image:${image.id}')) {
+            return false;
+          }
+          removed = true;
+        }
+      }
+    }
+    return removed;
   }
 
   Future<void> _recordDataIntegrityIncident(

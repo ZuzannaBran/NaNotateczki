@@ -306,7 +306,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 ### `lib/features/notebook/data/notebook_repository.dart` (2361 linii)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
-podejrzaną utratą danych. Jest też kanoniczną granicą migracji starego modelu
+podejrzaną utratą danych. Zapis z edytora przekazuje identyfikatory elementów
+usuniętych jawnie przez akcję użytkownika; guard pomija jedynie udokumentowane
+ubycie, a niezgłoszone usunięcia i skrócenie istniejących danych nadal
+generują incydent. Jest też kanoniczną granicą migracji starego modelu
 gumki: odczyt normalizuje legacy maski, a zdrowe strony są fizycznie
 przepisywane w SQLite bez eraser-stroke'ów i bez zmiany metadanych notebooka.
 Migracja korzysta z tej samej kolejki per UID co zwykłe zapisy, więc nie
@@ -916,7 +919,8 @@ wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart` (1141): zapis, migracja legacy gumek, ochrona danych i
+- `test/notebook_repository_test.dart`: zapis, migracja legacy gumek, kontrola
+  uprawnionych usunięć i nieoczekiwanej utraty danych,
   migracja v1→v2 usuwająca dane Index tab bez utraty stron.
 - `test/local_backup_service_test.dart` (1443):
   nowy i starszy format folderów, odtwarzanie okładek/Recent i backup
@@ -924,7 +928,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i odczyt liczników z zachowaniem zgodności starych logów.
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed
   zamknięciem.
-- `test/editor_controller_layering_test.dart`: aktywne obrazy są
+- `test/editor_controller_layering_test.dart`: regresje cofnięcia ostatniej
+  kreski i jawnego usunięcia obrazu bez fałszywych incydentów; aktywne obrazy są
   dezaktywowane po wyborze narzędzia ink lub tekstu, a nowy tekst startuje
   zaznaczony w trybie edit; obraz ma dane inline, a przed zamknięciem
   testowej bazy następuje rzeczywisty zapis.

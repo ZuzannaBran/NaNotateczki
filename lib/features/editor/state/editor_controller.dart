@@ -128,6 +128,7 @@ class EditorController extends ChangeNotifier {
   Future<void>? _activePrefsSave;
   Timer? _notebookSaveDebounce;
   final Set<String> _dirtyPageIds = <String>{};
+  final Map<String, Set<String>> _expectedRemovedIdsByPage = {};
   bool _fullSavePending = false;
   bool _isDisposed = false;
 
@@ -1279,7 +1280,9 @@ class EditorController extends ChangeNotifier {
       return;
     }
     final action = _undoActions.removeLast();
-    final updated = action.revert(currentPage);
+    final before = currentPage;
+    final updated = action.revert(before);
+    _recordExpectedRemovals(action, before, updated, undo: true);
     _redoActions.add(action);
     _notifyHistoryChanged();
     _updatePage(updated);
@@ -1292,7 +1295,9 @@ class EditorController extends ChangeNotifier {
       return;
     }
     final action = _redoActions.removeLast();
-    final updated = action.apply(currentPage);
+    final before = currentPage;
+    final updated = action.apply(before);
+    _recordExpectedRemovals(action, before, updated);
     _undoActions.add(action);
     _notifyHistoryChanged();
     _updatePage(updated);
@@ -2716,7 +2721,9 @@ class EditorController extends ChangeNotifier {
 
   void _applyAction(EditorAction action) {
     _commitActiveTextEdit();
-    final updated = action.apply(currentPage);
+    final before = currentPage;
+    final updated = action.apply(before);
+    _recordExpectedRemovals(action, before, updated);
     _undoActions.add(action);
     _redoActions.clear();
     _notifyHistoryChanged();
@@ -2725,7 +2732,9 @@ class EditorController extends ChangeNotifier {
 
   void _applyInkAction(EditorAction action) {
     _commitActiveTextEdit();
-    final updated = action.apply(currentPage);
+    final before = currentPage;
+    final updated = action.apply(before);
+    _recordExpectedRemovals(action, before, updated);
     _undoActions.add(action);
     _redoActions.clear();
     _notifyHistoryChanged();
@@ -2749,7 +2758,9 @@ class EditorController extends ChangeNotifier {
   }
 
   void _applyActionWithoutNotify(EditorAction action) {
-    final updated = action.apply(currentPage);
+    final before = currentPage;
+    final updated = action.apply(before);
+    _recordExpectedRemovals(action, before, updated);
     _undoActions.add(action);
     _redoActions.clear();
     _notifyHistoryChanged();
@@ -2757,6 +2768,63 @@ class EditorController extends ChangeNotifier {
       for (var i = 0; i < pages.length; i++)
         if (i == currentPageIndex) updated else pages[i],
     ];
+  }
+
+  void _recordExpectedRemovals(
+    EditorAction action,
+    NotePage before,
+    NotePage after, {
+    bool undo = false,
+  }) {
+    final deliberate = undo
+        ? action is AddInkStrokeAction ||
+              action is AddImageAction ||
+              action is AddTextAction ||
+              action is PasteSelectionAction
+        : action is DeleteInkStrokesAction ||
+              action is RemoveInkStrokesAction ||
+              action is DeleteImageAction ||
+              action is DeleteTextAction ||
+              action is DeleteSelectionAction;
+    if (!deliberate) {
+      return;
+    }
+    final previous = <String>{
+      for (final ink in before.inkStrokes) 'ink:${ink.id}',
+      for (final image in before.imageBlocks) 'image:${image.id}',
+      for (final text in before.textBlocks) 'text:${text.id}',
+    };
+    final remaining = <String>{
+      for (final ink in after.inkStrokes) 'ink:${ink.id}',
+      for (final image in after.imageBlocks) 'image:${image.id}',
+      for (final text in after.textBlocks) 'text:${text.id}',
+    };
+    final removed = previous.difference(remaining);
+    if (removed.isNotEmpty) {
+      _expectedRemovedIdsByPage.putIfAbsent(before.id, () => {}).addAll(
+        removed,
+      );
+    }
+  }
+
+  Map<String, Set<String>> _pendingExpectedRemovals(Set<String> pageIds) {
+    return {
+      for (final pageId in pageIds)
+        if (_expectedRemovedIdsByPage.containsKey(pageId))
+          pageId: Set<String>.of(_expectedRemovedIdsByPage[pageId]!),
+    };
+  }
+
+  void _clearSavedExpectedRemovals(
+    Map<String, Set<String>> expectedRemoved,
+  ) {
+    for (final entry in expectedRemoved.entries) {
+      final pending = _expectedRemovedIdsByPage[entry.key];
+      pending?.removeAll(entry.value);
+      if (pending != null && pending.isEmpty) {
+        _expectedRemovedIdsByPage.remove(entry.key);
+      }
+    }
   }
 
   void _updatePage(NotePage page) {
@@ -2852,9 +2920,17 @@ class EditorController extends ChangeNotifier {
     }
     final pageIds = Set<String>.of(_dirtyPageIds);
     _dirtyPageIds.removeAll(pageIds);
+    final expectedRemoved = _pendingExpectedRemovals(pageIds);
     final updated = notebook.copyWith(pages: pages, updatedAt: DateTime.now());
     try {
-      final saved = await repository.saveNotebookPages(updated, pageIds);
+      final saved = await repository.saveNotebookPages(
+        updated,
+        pageIds,
+        expectedRemovedIdsByPage: expectedRemoved,
+      );
+      if (saved) {
+        _clearSavedExpectedRemovals(expectedRemoved);
+      }
       if (!saved) {
         _dirtyPageIds.addAll(pageIds);
         _armSaveTimer();
@@ -2873,6 +2949,9 @@ class EditorController extends ChangeNotifier {
     _notebookSaveDebounce = null;
     _fullSavePending = true;
     final savedPages = pages;
+    final expectedRemoved = _pendingExpectedRemovals({
+      for (final page in savedPages) page.id,
+    });
     final updated = notebook.copyWith(
       pages: savedPages,
       updatedAt: DateTime.now(),
@@ -2881,7 +2960,11 @@ class EditorController extends ChangeNotifier {
       final saved = await repository.saveNotebook(
         updated,
         preserveMetadata: true,
+        expectedRemovedIdsByPage: expectedRemoved,
       );
+      if (saved) {
+        _clearSavedExpectedRemovals(expectedRemoved);
+      }
       if (saved && identical(pages, savedPages)) {
         _fullSavePending = false;
         _dirtyPageIds.clear();
