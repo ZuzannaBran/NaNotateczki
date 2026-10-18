@@ -961,7 +961,7 @@ Future<void> showFolderCoverEditor(
   var shape = saved.shape;
   Color? iconColor = saved.iconColor;
   final darkMode = Theme.of(context).brightness == Brightness.dark;
-  List<Color> recentColors = const <Color>[];
+  List<Color> recentColors = controller.recentCoverColors;
   final recentColorsFuture = SharedRecentColors.load();
   if (!context.mounted) {
     return;
@@ -1008,7 +1008,14 @@ Future<void> showFolderCoverEditor(
                 FutureBuilder<List<Color>>(
                   future: recentColorsFuture,
                   builder: (context, snapshot) {
-                    recentColors = snapshot.data ?? const <Color>[];
+                    final combinedColors = <int, Color>{};
+                    for (final color in controller.recentCoverColors) {
+                      combinedColors[color.toARGB32()] = color;
+                    }
+                    for (final color in snapshot.data ?? const <Color>[]) {
+                      combinedColors.putIfAbsent(color.toARGB32(), () => color);
+                    }
+                    recentColors = combinedColors.values.take(12).toList();
                     return Wrap(
                       spacing: 8,
                       runSpacing: 8,

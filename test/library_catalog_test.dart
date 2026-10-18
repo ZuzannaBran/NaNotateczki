@@ -342,7 +342,7 @@ void main() {
     await tester.tap(find.byTooltip('Folder actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Edit cover').last);
-    await tester.pumpAndSettle();
+    await tester.pump();
     final recentSwatch = find.byKey(
       ValueKey('cover-recent-${const Color(0xFF2B3C4D).toARGB32()}'),
     );

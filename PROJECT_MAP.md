@@ -464,8 +464,9 @@ kwiat, błysk) można ponownie wybierać z poziomu edytora folderu.
 Kafelki mają promień 24 px i neutralne tło; zapisany kolor modyfikuje
 kolor ikon, nie powoduje automatycznego podświetlania całej okładki.
 Hover i press są nakładkami na `Ink` przyciętymi przez `Material`.
-Dialog edycji okładki otwiera się natychmiast; `FutureBuilder`
-asynchronicznie doładowuje Recent bez blokowania całego okna.
+Dialog edycji okładki otwiera się natychmiast; próbki Recent pochodzą
+od razu z kontrolera folderów, a `FutureBuilder` doładowuje dodatkowe
+kolory ze wspólnej historii bez duplikatów i bez blokowania okna.
 Dialog kolorów okładki zachowuje wybór dekoracji, ale nie pokazuje
 bazowych próbek Cover color. Recent współdzieli zapis kolorów z canvasem
 (również po ponownym uruchomieniu), a trzy zestawy Blue/Pink/Green
