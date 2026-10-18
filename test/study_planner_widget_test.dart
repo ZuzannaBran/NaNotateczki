@@ -73,6 +73,13 @@ void main() {
     expect(find.byKey(const ValueKey('mobile-planner-days')), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.binding.setSurfaceSize(const Size(768, 1024));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('mobile-planner-days')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Planner actions'));
     await tester.pumpAndSettle();
     expect(find.text('New session'), findsOneWidget);

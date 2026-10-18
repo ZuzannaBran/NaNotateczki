@@ -442,7 +442,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final minimumWidth = _mode == CalendarMode.week ? 1050.0 : 980.0;
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 600) {
+        if (constraints.maxWidth < 960) {
           final compactDays = _mode == CalendarMode.month
               ? days.where((day) => day.month == _anchor.month).toList()
               : days;
@@ -563,6 +563,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final colors = Theme.of(context).colorScheme;
     final narrow = MediaQuery.sizeOf(context).width < 760;
     final mobile = MediaQuery.sizeOf(context).width < 600;
+    final compactCalendar = MediaQuery.sizeOf(context).width < 960;
     return StudyActionTheme(
       child: Scaffold(
         appBar: AppBar(
@@ -733,7 +734,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   ),
                 ),
               if (!_history) ...[
-                if (mobile)
+                if (compactCalendar)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
                     child: Column(

@@ -539,7 +539,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
   Dostęp do globalnych ustawień i wspólnej czułości scrolla kalendarza
   oraz historii. Górny pasek ma 56 px i wspólną 1 px linię pod spodem,
-  także w trybie ciemnym. Na telefonie Week/Month to pionowa lista
+  także w trybie ciemnym. Poniżej 960 px Week/Month to pionowa lista
   dni zamiast poziomego kalendarza 1050 px; nagłówek dat i akcje
   mieszczą się bez poziomego przewijania. Body chroni dolny systemowy
   inset. 13: `CalendarMode`; 15: `PlannerScreen`;
@@ -634,6 +634,9 @@ widocznością nakładek. Początkowe 72 px odsunięcia strony realizuje
 `_pagePan` wewnątrz viewportu, zamiast dodatkowego paddingu przewijania.
 `showCompactTimer` pokazuje `CompactStudyTimer` w nagłówku przy zwiniętym
 panelu biblioteki.
+W trybie kompaktowej nawigacji (telefon/tablet) edytor nie wyświetla minimapy,
+stosuje 12 px marginesów bocznych i dopasowuje stronę do wolnego miejsca
+bez zmiany logicznych współrzędnych dokumentu.
 Viewport pozostaje 22 px od górnej krawędzi canvasa, więc strona nie jest
 ucinana przez pusty pas, gdy użytkownik wsuwa ją pod toolbar.
 Rozszerzony zakres pionowego pan pozwala również przesuwać stronę niżej.

@@ -1068,7 +1068,8 @@ class _EditorScreenState extends State<EditorScreen> {
         Positioned.fill(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final compactCanvas = constraints.maxWidth < 600;
+              final compactCanvas =
+                  widget.onOpenNavigation != null || constraints.maxWidth < 600;
               final leftPageMargin = compactCanvas ? 12.0 : _leftMargin;
               final rightPageMargin = compactCanvas ? 12.0 : _rightMargin;
               final showProjectOverview =
