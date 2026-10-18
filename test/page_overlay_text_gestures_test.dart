@@ -532,7 +532,7 @@ void main() {
     controller.setTool(DrawingTool.edit);
     await tester.pump();
     await tester.tap(imageTarget);
-    await tester.pump();
+    await tester.pump(kDoubleTapTimeout);
     expect(controller.activeImageBlockId, imageBlock.id);
 
     await tester.pumpWidget(const SizedBox.shrink());

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:program/core/storage/text_storage.dart';
+import 'package:program/features/editor/state/ink_color_presets.dart';
 
 class _IsolatedDocumentsProvider extends PathProviderPlatform {
   _IsolatedDocumentsProvider(this.path);
@@ -37,6 +38,7 @@ void useIsolatedNativeTestDocuments() {
 void useInMemoryTestTextStorage() {
   final values = <String, String>{};
   setUp(() {
+    SharedRecentColors.resetPendingForTests();
     values.clear();
     textStorageReadOverride = (key) async => values[key];
     textStorageWriteOverride = (key, value) async {

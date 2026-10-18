@@ -629,6 +629,7 @@ ale zmienione ręcznie próbki pozostają nienaruszone.
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`.
   `SharedRecentColors` udostępnia wspólną, serializowaną historię do 12
   kolorów pisaka, tekstu i okładek, z migracją `editor_prefs.json`.
+  `resetPendingForTests` izoluje oczekujące operacje między testami FakeAsync.
   Tryb ciemny zachowuje zapisane bazowe wartości kolorów.
 
 ## 8. UI edytora
