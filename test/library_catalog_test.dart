@@ -25,6 +25,7 @@ import 'support/native_test_documents.dart';
 
 void main() {
   useIsolatedNativeTestDocuments();
+  useInMemoryTestTextStorage();
 
   test('folder cover settings round-trip and handle unknown shapes', () {
     const style = FolderCoverStyle(

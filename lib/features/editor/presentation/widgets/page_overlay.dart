@@ -1504,6 +1504,7 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     final double extraHitArea = isSelected ? _imageHandleOutset : 0.0;
 
     final child = GestureDetector(
+      key: ValueKey('page-image-hit-target-${widget.block.id}'),
       behavior: HitTestBehavior.translucent,
       onTap: () {
         if (controller.currentPageIndex != widget.pageIndex) {

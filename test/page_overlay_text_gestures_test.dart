@@ -490,8 +490,11 @@ void main() {
     final textEditors = find.byType(quill.QuillEditor);
     expect(textEditors, findsWidgets);
     final textPosition = tester.getCenter(textEditors.first);
-    final imagePosition =
-        tester.getTopLeft(find.byType(PageOverlay)) + const Offset(340, 260);
+    final imageTarget = find.byKey(
+      const ValueKey('page-image-hit-target-existing-image'),
+    );
+    expect(imageTarget, findsOneWidget);
+    final imagePosition = tester.getCenter(imageTarget);
     for (final tool in [
       DrawingTool.pen,
       DrawingTool.highlighter,
@@ -528,7 +531,7 @@ void main() {
 
     controller.setTool(DrawingTool.edit);
     await tester.pump();
-    await tester.tapAt(imagePosition);
+    await tester.tap(imageTarget);
     await tester.pump();
     expect(controller.activeImageBlockId, imageBlock.id);
 

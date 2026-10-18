@@ -33,6 +33,7 @@ import 'support/native_test_documents.dart';
 
 void main() {
   useIsolatedNativeTestDocuments();
+  useInMemoryTestTextStorage();
   setUpAll(() async {
     const fontPath = String.fromEnvironment('MERGE_REVIEW_FONT');
     if (fontPath.isNotEmpty) {

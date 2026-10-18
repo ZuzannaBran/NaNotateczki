@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
+import 'package:program/core/storage/text_storage.dart';
+
 class _IsolatedDocumentsProvider extends PathProviderPlatform {
   _IsolatedDocumentsProvider(this.path);
 
@@ -28,5 +30,21 @@ void useIsolatedNativeTestDocuments() {
     if (await directory.exists()) {
       await directory.delete(recursive: true);
     }
+  });
+}
+
+/// Keeps widget tests deterministic without performing disk I/O in FakeAsync.
+void useInMemoryTestTextStorage() {
+  final values = <String, String>{};
+  setUp(() {
+    values.clear();
+    textStorageReadOverride = (key) async => values[key];
+    textStorageWriteOverride = (key, value) async {
+      values[key] = value;
+    };
+  });
+  tearDown(() {
+    textStorageReadOverride = null;
+    textStorageWriteOverride = null;
   });
 }

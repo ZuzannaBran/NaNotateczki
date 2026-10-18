@@ -130,7 +130,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 - `lib/core/storage/app_save_coordinator.dart` (50): rejestr aktywnych
   edytorów i wspólny flush ich oczekujących zapisów przed zamknięciem.
   3: `AppSaveCoordinator`.
-- `lib/core/storage/text_storage.dart` (2): conditional export IO/web.
+- `lib/core/storage/text_storage.dart` (20): conditional import IO/web i
+  opcjonalne podmiany odczytu/zapisu na potrzeby testów widgetowych;
+  produkcja nadal używa platformowego storage.
 - `lib/core/storage/text_storage_io.dart` (82): małe pliki tekstowe w
   dokumentach aplikacji; odczyty czekają na trwający zapis, a zapisy są serializowane per plik i atomowe przez
   `.tmp`/`.previous` z odzyskiem po przerwanym zapisie.
@@ -1056,6 +1058,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   dodatkowo rozdział stref dotyku uchwytów dla różnych rozmiarów ramek;
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian;
   w trybach ink kliknięcia przechodzą przez tekst i obrazy/PDF; test
+  wskazuje rzeczywisty cel dotyku obrazu, a nie wyliczoną pozycję;
   trafia w konkretny QuillEditor, gdy aktywna i nieaktywna warstwa
   tekstowa renderują dwa widgety;
   regresja selektora koloru tekstu po utracie zaznaczenia oraz undo/redo
@@ -1109,8 +1112,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   w rzeczywistej bazie danej platformy; działa wyłącznie z flagą
   `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.
 - `test/support/native_test_documents.dart`: katalog testowy i natywny
-  adapter PathProvider zapobiegają błędom pluginu przy logowaniu i preferencjach
-  w testach; nie przekierowują danych użytkownika.
+  adapter PathProvider; opcjonalny pamięciowy tekstowy storage zapobiega
+  zablokowaniu FakeAsync przez natywne I/O w testach widgetowych. Nie
+  przekierowuje danych użytkownika.
 - `.github/scripts/flutter_integration_retry.sh` i
   `.github/scripts/test_flutter_integration_retry.sh`: ponowny start testu
   Android wyłącznie po błędzie inicjalizacji DDS; osobny test regresji
