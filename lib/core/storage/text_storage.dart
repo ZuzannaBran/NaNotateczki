@@ -1,5 +1,6 @@
 import 'text_storage_io.dart'
-    if (dart.library.js_interop) 'text_storage_web.dart' as platform;
+    if (dart.library.js_interop) 'text_storage_web.dart'
+    as platform;
 
 /// Overrides for tests that exercise UI without depending on physical I/O.
 Future<String?> Function(String key)? textStorageReadOverride;
