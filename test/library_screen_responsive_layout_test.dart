@@ -99,7 +99,10 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('catalog-title')), findsOneWidget);
-    expect(find.byKey(const ValueKey('mobile-navigation-open')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('mobile-navigation-open')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('library-navigation-toggle')),
       findsNothing,

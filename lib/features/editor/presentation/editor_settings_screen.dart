@@ -33,293 +33,299 @@ class EditorSettingsScreen extends StatelessWidget {
       body: SafeArea(
         top: false,
         child: DefaultTabController(
-        length: 3,
-        child: Column(
-          children: [
-            const AppHeaderDivider(),
-            const Material(
-              color: Colors.transparent,
-              child: TabBar(
-                tabs: [
-                  Tab(text: 'System'),
-                  Tab(text: 'Visual'),
-                  Tab(text: 'Widgets'),
-                ],
+          length: 3,
+          child: Column(
+            children: [
+              const AppHeaderDivider(),
+              const Material(
+                color: Colors.transparent,
+                child: TabBar(
+                  tabs: [
+                    Tab(text: 'System'),
+                    Tab(text: 'Visual'),
+                    Tab(text: 'Widgets'),
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  ListView(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                      horizontal: 16,
-                    ),
-                    children: [
-                      _SettingsSelectorTile(
-                        title: const Text('Device mode'),
-                        subtitle: Text(preferences.deviceInputMode.description),
-                        control: SegmentedButton<DeviceInputMode>(
-                          showSelectedIcon: false,
-                          segments: const [
-                            ButtonSegment(
-                              value: DeviceInputMode.computer,
-                              label: Text('Computer'),
-                            ),
-                            ButtonSegment(
-                              value: DeviceInputMode.tablet,
-                              label: Text('Tablet'),
-                            ),
-                          ],
-                          selected: {preferences.deviceInputMode},
-                          onSelectionChanged: (selection) {
-                            preferences.setDeviceInputMode(selection.single);
-                          },
-                        ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    ListView(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
                       ),
-                      if (controller != null)
+                      children: [
                         _SettingsSelectorTile(
-                          title: const Text('Stylus and touch'),
+                          title: const Text('Device mode'),
                           subtitle: Text(
-                            controller.pointerInputMode.description,
+                            preferences.deviceInputMode.description,
                           ),
-                          control: SegmentedButton<PointerInputMode>(
+                          control: SegmentedButton<DeviceInputMode>(
                             showSelectedIcon: false,
                             segments: const [
                               ButtonSegment(
-                                value: PointerInputMode.off,
-                                label: Text('Off'),
+                                value: DeviceInputMode.computer,
+                                label: Text('Computer'),
                               ),
                               ButtonSegment(
-                                value: PointerInputMode.on,
-                                label: Text('On'),
+                                value: DeviceInputMode.tablet,
+                                label: Text('Tablet'),
                               ),
                             ],
-                            selected: {controller.pointerInputMode},
+                            selected: {preferences.deviceInputMode},
                             onSelectionChanged: (selection) {
-                              controller.setPointerInputMode(selection.single);
+                              preferences.setDeviceInputMode(selection.single);
                             },
                           ),
                         ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Touch navigation sensitivity'),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Controls how quickly touch gestures move '
-                              'through files and pages.',
+                        if (controller != null)
+                          _SettingsSelectorTile(
+                            title: const Text('Stylus and touch'),
+                            subtitle: Text(
+                              controller.pointerInputMode.description,
                             ),
-                            Slider(
-                              key: const ValueKey(
-                                'touch-navigation-sensitivity',
+                            control: SegmentedButton<PointerInputMode>(
+                              showSelectedIcon: false,
+                              segments: const [
+                                ButtonSegment(
+                                  value: PointerInputMode.off,
+                                  label: Text('Off'),
+                                ),
+                                ButtonSegment(
+                                  value: PointerInputMode.on,
+                                  label: Text('On'),
+                                ),
+                              ],
+                              selected: {controller.pointerInputMode},
+                              onSelectionChanged: (selection) {
+                                controller.setPointerInputMode(
+                                  selection.single,
+                                );
+                              },
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Touch navigation sensitivity'),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Controls how quickly touch gestures move '
+                                'through files and pages.',
                               ),
-                              min: 0.5,
-                              max: 2.0,
-                              divisions: 15,
-                              value: preferences.touchNavigationSensitivity,
-                              onChanged:
-                                  preferences.previewTouchNavigationSensitivity,
-                              onChangeEnd:
-                                  preferences.setTouchNavigationSensitivity,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (controller != null)
-                        _SettingsSelectorTile(
-                          title: const Text('Stylus buttons'),
-                          subtitle: const Text(
-                            'Use stylus buttons to switch eraser.',
-                          ),
-                          control: SegmentedButton<bool>(
-                            showSelectedIcon: false,
-                            segments: const [
-                              ButtonSegment(value: false, label: Text('Off')),
-                              ButtonSegment(value: true, label: Text('On')),
+                              Slider(
+                                key: const ValueKey(
+                                  'touch-navigation-sensitivity',
+                                ),
+                                min: 0.5,
+                                max: 2.0,
+                                divisions: 15,
+                                value: preferences.touchNavigationSensitivity,
+                                onChanged: preferences
+                                    .previewTouchNavigationSensitivity,
+                                onChangeEnd:
+                                    preferences.setTouchNavigationSensitivity,
+                              ),
                             ],
-                            selected: {controller.stylusButtonsEnabled},
-                            onSelectionChanged: (selection) {
-                              controller.setStylusButtonsEnabled(
-                                selection.single,
-                              );
-                            },
                           ),
                         ),
-                      if (controller != null)
-                        _SettingsSelectorTile(
-                          title: const Text('Scribble eraser'),
-                          subtitle: const Text(
-                            'Erase ink by scribbling over it with the pen.',
+                        if (controller != null)
+                          _SettingsSelectorTile(
+                            title: const Text('Stylus buttons'),
+                            subtitle: const Text(
+                              'Use stylus buttons to switch eraser.',
+                            ),
+                            control: SegmentedButton<bool>(
+                              showSelectedIcon: false,
+                              segments: const [
+                                ButtonSegment(value: false, label: Text('Off')),
+                                ButtonSegment(value: true, label: Text('On')),
+                              ],
+                              selected: {controller.stylusButtonsEnabled},
+                              onSelectionChanged: (selection) {
+                                controller.setStylusButtonsEnabled(
+                                  selection.single,
+                                );
+                              },
+                            ),
                           ),
-                          control: SegmentedButton<bool>(
-                            showSelectedIcon: false,
-                            segments: const [
-                              ButtonSegment(value: false, label: Text('Off')),
-                              ButtonSegment(value: true, label: Text('On')),
-                            ],
-                            selected: {controller.scratchEraseEnabled},
-                            onSelectionChanged: (selection) {
-                              controller.setScratchEraseEnabled(
-                                selection.single,
-                              );
-                            },
+                        if (controller != null)
+                          _SettingsSelectorTile(
+                            title: const Text('Scribble eraser'),
+                            subtitle: const Text(
+                              'Erase ink by scribbling over it with the pen.',
+                            ),
+                            control: SegmentedButton<bool>(
+                              showSelectedIcon: false,
+                              segments: const [
+                                ButtonSegment(value: false, label: Text('Off')),
+                                ButtonSegment(value: true, label: Text('On')),
+                              ],
+                              selected: {controller.scratchEraseEnabled},
+                              onSelectionChanged: (selection) {
+                                controller.setScratchEraseEnabled(
+                                  selection.single,
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      AnimatedBuilder(
-                        animation: AppErrorLog.instance,
-                        builder: (context, _) {
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
-                            title: const Text('Errors'),
-                            subtitle: Text(
-                              AppErrorLog.instance.isEmpty
-                                  ? 'No errors recorded.'
-                                  : '${AppErrorLog.instance.length} recorded.',
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => _showErrorsDialog(context),
-                          );
-                        },
-                      ),
-                      AnimatedBuilder(
-                        animation: DataIntegrityLog.instance,
-                        builder: (context, _) {
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
-                            title: const Text('Data integrity'),
-                            subtitle: Text(
-                              DataIntegrityLog.instance.isEmpty
-                                  ? 'No suspicious saves recorded.'
-                                  : '${DataIntegrityLog.instance.length} recorded.',
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => _showDataIntegrityDialog(context),
-                          );
-                        },
-                      ),
-                      AnimatedBuilder(
-                        animation: OptimizationLog.instance,
-                        builder: (context, _) {
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
-                            title: const Text('Optimization'),
-                            subtitle: Text(
-                              OptimizationLog.instance.isEmpty
-                                  ? 'No suspicious events recorded.'
-                                  : '${OptimizationLog.instance.length} recorded.',
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => _showOptimizationDialog(context),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  ListView(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                      horizontal: 16,
-                    ),
-                    children: [
-                      _SettingsSelectorTile(
-                        title: const Text('Appearance'),
-                        subtitle: const Text(
-                          'Light or dark interface with contrasting ink.',
-                        ),
-                        control: SegmentedButton<bool>(
-                          key: const ValueKey('visual-dark-mode-toggle'),
-                          showSelectedIcon: false,
-                          segments: const [
-                            ButtonSegment(
-                              value: false,
-                              icon: Icon(Icons.light_mode_outlined, size: 18),
-                              label: Text('Light'),
-                            ),
-                            ButtonSegment(
-                              value: true,
-                              icon: Icon(Icons.dark_mode_outlined, size: 18),
-                              label: Text('Dark'),
-                            ),
-                          ],
-                          selected: {preferences.darkMode},
-                          style: _appearanceButtonStyle(context),
-                          onSelectionChanged: (selection) {
-                            preferences.setDarkMode(selection.single);
+                        AnimatedBuilder(
+                          animation: AppErrorLog.instance,
+                          builder: (context, _) {
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              title: const Text('Errors'),
+                              subtitle: Text(
+                                AppErrorLog.instance.isEmpty
+                                    ? 'No errors recorded.'
+                                    : '${AppErrorLog.instance.length} recorded.',
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => _showErrorsDialog(context),
+                            );
                           },
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Interface scale'),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Adjusts the size of the entire app interface.',
-                            ),
-                            Slider(
-                              key: const ValueKey('visual-ui-scale'),
-                              min: 0.75,
-                              max: 1.5,
-                              divisions: 15,
-                              value: preferences.uiScale,
-                              onChanged: preferences.previewUiScale,
-                              onChangeEnd: preferences.setUiScale,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (controller != null) ...[
-                        const SizedBox(height: 12),
-                        _BackgroundSection(
-                          title: 'Notebook default',
-                          settings: controller.defaultBackgroundSettingsForKind(
-                            NotebookKind.notebook,
-                          ),
-                          onChanged: (settings) =>
-                              controller.setDefaultBackgroundSettings(
-                                NotebookKind.notebook,
-                                settings,
+                        AnimatedBuilder(
+                          animation: DataIntegrityLog.instance,
+                          builder: (context, _) {
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
                               ),
-                        ),
-                        const SizedBox(height: 20),
-                        _BackgroundSection(
-                          title: 'Board default',
-                          settings: controller.defaultBackgroundSettingsForKind(
-                            NotebookKind.board,
-                          ),
-                          onChanged: (settings) =>
-                              controller.setDefaultBackgroundSettings(
-                                NotebookKind.board,
-                                settings,
+                              title: const Text('Data integrity'),
+                              subtitle: Text(
+                                DataIntegrityLog.instance.isEmpty
+                                    ? 'No suspicious saves recorded.'
+                                    : '${DataIntegrityLog.instance.length} recorded.',
                               ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => _showDataIntegrityDialog(context),
+                            );
+                          },
+                        ),
+                        AnimatedBuilder(
+                          animation: OptimizationLog.instance,
+                          builder: (context, _) {
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              title: const Text('Optimization'),
+                              subtitle: Text(
+                                OptimizationLog.instance.isEmpty
+                                    ? 'No suspicious events recorded.'
+                                    : '${OptimizationLog.instance.length} recorded.',
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => _showOptimizationDialog(context),
+                            );
+                          },
                         ),
                       ],
-                    ],
-                  ),
-                  const SizedBox.shrink(),
-                ],
+                    ),
+                    ListView(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
+                      children: [
+                        _SettingsSelectorTile(
+                          title: const Text('Appearance'),
+                          subtitle: const Text(
+                            'Light or dark interface with contrasting ink.',
+                          ),
+                          control: SegmentedButton<bool>(
+                            key: const ValueKey('visual-dark-mode-toggle'),
+                            showSelectedIcon: false,
+                            segments: const [
+                              ButtonSegment(
+                                value: false,
+                                icon: Icon(Icons.light_mode_outlined, size: 18),
+                                label: Text('Light'),
+                              ),
+                              ButtonSegment(
+                                value: true,
+                                icon: Icon(Icons.dark_mode_outlined, size: 18),
+                                label: Text('Dark'),
+                              ),
+                            ],
+                            selected: {preferences.darkMode},
+                            style: _appearanceButtonStyle(context),
+                            onSelectionChanged: (selection) {
+                              preferences.setDarkMode(selection.single);
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Interface scale'),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Adjusts the size of the entire app interface.',
+                              ),
+                              Slider(
+                                key: const ValueKey('visual-ui-scale'),
+                                min: 0.75,
+                                max: 1.5,
+                                divisions: 15,
+                                value: preferences.uiScale,
+                                onChanged: preferences.previewUiScale,
+                                onChangeEnd: preferences.setUiScale,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (controller != null) ...[
+                          const SizedBox(height: 12),
+                          _BackgroundSection(
+                            title: 'Notebook default',
+                            settings: controller
+                                .defaultBackgroundSettingsForKind(
+                                  NotebookKind.notebook,
+                                ),
+                            onChanged: (settings) =>
+                                controller.setDefaultBackgroundSettings(
+                                  NotebookKind.notebook,
+                                  settings,
+                                ),
+                          ),
+                          const SizedBox(height: 20),
+                          _BackgroundSection(
+                            title: 'Board default',
+                            settings: controller
+                                .defaultBackgroundSettingsForKind(
+                                  NotebookKind.board,
+                                ),
+                            onChanged: (settings) =>
+                                controller.setDefaultBackgroundSettings(
+                                  NotebookKind.board,
+                                  settings,
+                                ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox.shrink(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

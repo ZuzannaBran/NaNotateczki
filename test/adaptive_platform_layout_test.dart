@@ -46,9 +46,7 @@ void main() {
             ),
             child: MultiProvider(
               providers: [
-                ChangeNotifierProvider<LibraryController>.value(
-                  value: library,
-                ),
+                ChangeNotifierProvider<LibraryController>.value(value: library),
                 Provider<NotebookRepository>.value(value: repository),
               ],
               child: const LibraryScreen(),
@@ -67,9 +65,7 @@ void main() {
     await tester.tap(menu);
     await tester.pumpAndSettle();
     expect(find.text('Projects'), findsOneWidget);
-    await tester.tap(
-      find.byKey(ValueKey('library-tree-item:${notebook.uid}')),
-    );
+    await tester.tap(find.byKey(ValueKey('library-tree-item:${notebook.uid}')));
     await tester.pumpAndSettle();
 
     expect(find.byType(EditorScreen), findsOneWidget);
@@ -91,9 +87,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(EditorScreen), findsOneWidget);
       expect(
-        tester
-            .element(find.byType(EditorScreen))
-            .read<EditorController>(),
+        tester.element(find.byType(EditorScreen)).read<EditorController>(),
         same(editorBefore),
       );
       if (size.width < 960) {

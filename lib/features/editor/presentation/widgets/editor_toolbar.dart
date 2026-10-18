@@ -34,12 +34,7 @@ class EditorToolbar extends StatelessWidget {
             (controller.lassoSelection?.isEmpty == false);
         final mobile = MediaQuery.sizeOf(context).width < 600;
         return Padding(
-          padding: EdgeInsets.fromLTRB(
-            mobile ? 8 : 52,
-            8,
-            mobile ? 8 : 52,
-            8,
-          ),
+          padding: EdgeInsets.fromLTRB(mobile ? 8 : 52, 8, mobile ? 8 : 52, 8),
           child: Align(
             alignment: Alignment.topCenter,
             child: Container(

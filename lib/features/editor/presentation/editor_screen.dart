@@ -1553,10 +1553,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 }
               },
               itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'add',
-                  child: Text('Add page'),
-                ),
+                const PopupMenuItem(value: 'add', child: Text('Add page')),
                 PopupMenuItem(
                   value: 'delete',
                   enabled: controller.pages.length > 1,

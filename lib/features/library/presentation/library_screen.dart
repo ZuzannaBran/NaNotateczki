@@ -132,255 +132,257 @@ class _LibraryScreenState extends State<LibraryScreen> {
     return Scaffold(
       body: SafeArea(
         child: Column(
-        children: [
-          if (controller.shouldShowResetBanner)
-            MaterialBanner(
-              backgroundColor: Colors.amber.shade100,
-              content: Text(
-                controller.autoRestoreCount > 0
-                    ? 'Local database recovery completed. Restored '
-                          '${controller.autoRestoreCount} documents from the '
-                          'local backup.'
-                    : 'The previous local database was preserved after a '
-                          'recovery event, but no documents were restored '
-                          'automatically.',
+          children: [
+            if (controller.shouldShowResetBanner)
+              MaterialBanner(
+                backgroundColor: Colors.amber.shade100,
+                content: Text(
+                  controller.autoRestoreCount > 0
+                      ? 'Local database recovery completed. Restored '
+                            '${controller.autoRestoreCount} documents from the '
+                            'local backup.'
+                      : 'The previous local database was preserved after a '
+                            'recovery event, but no documents were restored '
+                            'automatically.',
+                ),
+                actions: [
+                  if (controller.autoRestoreCount == 0)
+                    TextButton(
+                      onPressed: controller.isLoading
+                          ? null
+                          : controller.loadItems,
+                      child: const Text('Retry recovery'),
+                    ),
+                  TextButton(
+                    onPressed: controller.dismissResetBanner,
+                    child: const Text('Dismiss'),
+                  ),
+                ],
               ),
-              actions: [
-                if (controller.autoRestoreCount == 0)
+            if (controller.shouldShowCorruptionBanner)
+              MaterialBanner(
+                backgroundColor: Colors.red.shade50,
+                content: Text(
+                  controller.recoverableCorruptDocuments.isNotEmpty
+                      ? 'Some documents could not be loaded. You can restore recovered copies from the local backup.'
+                      : 'Some documents could not be loaded. No matching local backup copy was found.',
+                ),
+                actions: [
+                  if (controller.recoverableCorruptDocuments.isNotEmpty)
+                    TextButton(
+                      onPressed: () async {
+                        final restored = await controller
+                            .restoreCorruptDocumentsFromBackup();
+                        if (!context.mounted) {
+                          return;
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              restored > 0
+                                  ? 'Recovered $restored document copies from the local backup.'
+                                  : 'No document copies were recovered.',
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text('Recover'),
+                    ),
+                  TextButton(
+                    onPressed: controller.dismissCorruptRecoveryPrompt,
+                    child: const Text('Dismiss'),
+                  ),
+                ],
+              ),
+            if (controller.loadError != null)
+              MaterialBanner(
+                backgroundColor: Colors.red.shade50,
+                content: const Text(
+                  'The library could not be loaded. Existing documents were '
+                  'left unchanged.',
+                ),
+                actions: [
                   TextButton(
                     onPressed: controller.isLoading
                         ? null
                         : controller.loadItems,
-                    child: const Text('Retry recovery'),
+                    child: const Text('Retry'),
                   ),
-                TextButton(
-                  onPressed: controller.dismissResetBanner,
-                  child: const Text('Dismiss'),
-                ),
-              ],
-            ),
-          if (controller.shouldShowCorruptionBanner)
-            MaterialBanner(
-              backgroundColor: Colors.red.shade50,
-              content: Text(
-                controller.recoverableCorruptDocuments.isNotEmpty
-                    ? 'Some documents could not be loaded. You can restore recovered copies from the local backup.'
-                    : 'Some documents could not be loaded. No matching local backup copy was found.',
+                ],
               ),
-              actions: [
-                if (controller.recoverableCorruptDocuments.isNotEmpty)
-                  TextButton(
-                    onPressed: () async {
-                      final restored = await controller
-                          .restoreCorruptDocumentsFromBackup();
-                      if (!context.mounted) {
-                        return;
-                      }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            restored > 0
-                                ? 'Recovered $restored document copies from the local backup.'
-                                : 'No document copies were recovered.',
-                          ),
-                        ),
-                      );
-                    },
-                    child: const Text('Recover'),
-                  ),
-                TextButton(
-                  onPressed: controller.dismissCorruptRecoveryPrompt,
-                  child: const Text('Dismiss'),
-                ),
-              ],
-            ),
-          if (controller.loadError != null)
-            MaterialBanner(
-              backgroundColor: Colors.red.shade50,
-              content: const Text(
-                'The library could not be loaded. Existing documents were '
-                'left unchanged.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: controller.isLoading ? null : controller.loadItems,
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final layoutWidth = constraints.maxWidth;
-                final maxNavigationWidth = math.max(
-                  _navigationPaneMinWidth,
-                  layoutWidth - 320,
-                );
-                final navigationMax = math.min(
-                  _navigationPaneMaxWidth,
-                  maxNavigationWidth,
-                );
-                final navigationWidth = _navigationPaneWidth
-                    .clamp(_navigationPaneMinWidth, navigationMax)
-                    .toDouble();
-                final leftZoneWidth = _showLeftNavigation
-                    ? navigationWidth + _resizeHandleWidth
-                    : 0.0;
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final layoutWidth = constraints.maxWidth;
+                  final maxNavigationWidth = math.max(
+                    _navigationPaneMinWidth,
+                    layoutWidth - 320,
+                  );
+                  final navigationMax = math.min(
+                    _navigationPaneMaxWidth,
+                    maxNavigationWidth,
+                  );
+                  final navigationWidth = _navigationPaneWidth
+                      .clamp(_navigationPaneMinWidth, navigationMax)
+                      .toDouble();
+                  final leftZoneWidth = _showLeftNavigation
+                      ? navigationWidth + _resizeHandleWidth
+                      : 0.0;
 
-                final wideLayout = SizedBox(
-                  width: layoutWidth,
-                  height: constraints.maxHeight,
-                  child: Stack(
-                    children: [
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: leftZoneWidth,
-                            child: _showLeftNavigation
-                                ? Row(
-                                    children: [
-                                      SizedBox(
-                                        width: navigationWidth,
-                                        child: _LibraryTreePane(
-                                          controller: controller,
-                                          showingProjects:
-                                              _showCatalog &&
-                                              _catalogFolder == null,
-                                          onShowProjects: _openCatalogRoot,
-                                          onOpenFolder: (name) =>
-                                              _openCatalogFolder(
-                                                controller,
-                                                name,
-                                              ),
-                                          onOpen: (item) =>
-                                              _openItem(controller, item),
-                                          onCreate: _createAndSelectItem,
-                                          onCreateFolder: () {
-                                            _promptNewFolder(controller);
+                  final wideLayout = SizedBox(
+                    width: layoutWidth,
+                    height: constraints.maxHeight,
+                    child: Stack(
+                      children: [
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: leftZoneWidth,
+                              child: _showLeftNavigation
+                                  ? Row(
+                                      children: [
+                                        SizedBox(
+                                          width: navigationWidth,
+                                          child: _LibraryTreePane(
+                                            controller: controller,
+                                            showingProjects:
+                                                _showCatalog &&
+                                                _catalogFolder == null,
+                                            onShowProjects: _openCatalogRoot,
+                                            onOpenFolder: (name) =>
+                                                _openCatalogFolder(
+                                                  controller,
+                                                  name,
+                                                ),
+                                            onOpen: (item) =>
+                                                _openItem(controller, item),
+                                            onCreate: _createAndSelectItem,
+                                            onCreateFolder: () {
+                                              _promptNewFolder(controller);
+                                            },
+                                          ),
+                                        ),
+                                        _PaneResizeHandle(
+                                          onDragDelta: (delta) {
+                                            setState(() {
+                                              _navigationPaneWidth =
+                                                  (_navigationPaneWidth + delta)
+                                                      .clamp(
+                                                        _navigationPaneMinWidth,
+                                                        _navigationPaneMaxWidth,
+                                                      )
+                                                      .toDouble();
+                                            });
                                           },
                                         ),
-                                      ),
-                                      _PaneResizeHandle(
-                                        onDragDelta: (delta) {
-                                          setState(() {
-                                            _navigationPaneWidth =
-                                                (_navigationPaneWidth + delta)
-                                                    .clamp(
-                                                      _navigationPaneMinWidth,
-                                                      _navigationPaneMaxWidth,
-                                                    )
-                                                    .toDouble();
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                          Expanded(
-                            child: _buildWorkspace(
-                              controller,
-                              selectedItem,
-                              showCompactTimer: !_showLeftNavigation,
+                                      ],
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                            Expanded(
+                              child: _buildWorkspace(
+                                controller,
+                                selectedItem,
+                                showCompactTimer: !_showLeftNavigation,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          top: _navigationHeaderHeight,
+                          child: SizedBox(
+                            height: 1,
+                            child: ColoredBox(
+                              key: const ValueKey('workspace-header-divider'),
+                              color: headerDividerColor,
                             ),
                           ),
-                        ],
-                      ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        top: _navigationHeaderHeight,
-                        child: SizedBox(
-                          height: 1,
-                          child: ColoredBox(
-                            key: const ValueKey('workspace-header-divider'),
-                            color: headerDividerColor,
+                        ),
+                        Positioned(
+                          left: math.max(0.0, leftZoneWidth - 1),
+                          top: (_navigationHeaderHeight - _toggleTabHeight) / 2,
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: _sidebarMenuOpen,
+                            builder: (context, menuOpen, _) =>
+                                _LeftZoneToggleTab(
+                                  expanded: _showLeftNavigation,
+                                  hideShadow: menuOpen,
+                                  onPressed: _toggleLeftNavigation,
+                                ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        left: math.max(0.0, leftZoneWidth - 1),
-                        top: (_navigationHeaderHeight - _toggleTabHeight) / 2,
-                        child: ValueListenableBuilder<bool>(
-                          valueListenable: _sidebarMenuOpen,
-                          builder: (context, menuOpen, _) => _LeftZoneToggleTab(
-                            expanded: _showLeftNavigation,
-                            hideShadow: menuOpen,
-                            onPressed: _toggleLeftNavigation,
+                        Positioned(
+                          left: math.max(0.0, leftZoneWidth - 1),
+                          top:
+                              _navigationHeaderHeight +
+                              (_editorToolbarAreaHeight - _toggleTabHeight) / 2,
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: _sidebarMenuOpen,
+                            builder: (context, menuOpen, _) =>
+                                _LeftZoneToggleTab(
+                                  expanded: _showEditorToolbar,
+                                  toolbar: true,
+                                  hideShadow: menuOpen,
+                                  onPressed: () {
+                                    setState(() {
+                                      _showEditorToolbar = !_showEditorToolbar;
+                                    });
+                                  },
+                                ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        left: math.max(0.0, leftZoneWidth - 1),
-                        top:
-                            _navigationHeaderHeight +
-                            (_editorToolbarAreaHeight - _toggleTabHeight) / 2,
-                        child: ValueListenableBuilder<bool>(
-                          valueListenable: _sidebarMenuOpen,
-                          builder: (context, menuOpen, _) => _LeftZoneToggleTab(
-                            expanded: _showEditorToolbar,
-                            toolbar: true,
-                            hideShadow: menuOpen,
-                            onPressed: () {
-                              setState(() {
-                                _showEditorToolbar = !_showEditorToolbar;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-
-                if (constraints.maxWidth >= _adaptiveBreakpoint) {
-                  return wideLayout;
-                }
-
-                return Scaffold(
-                  key: _compactScaffoldKey,
-                  drawer: Drawer(
-                    width: math.min(
-                      360,
-                      math.max(240, constraints.maxWidth - 32),
-                    ).toDouble(),
-                    child: _LibraryTreePane(
-                      controller: controller,
-                      showingProjects:
-                          _showCatalog && _catalogFolder == null,
-                      onShowProjects: () {
-                        _closeCompactNavigation();
-                        _openCatalogRoot();
-                      },
-                      onOpenFolder: (folder) {
-                        _closeCompactNavigation();
-                        _openCatalogFolder(controller, folder);
-                      },
-                      onOpen: (item) {
-                        _closeCompactNavigation();
-                        _openItem(controller, item);
-                      },
-                      onCreate: (kind) {
-                        _closeCompactNavigation();
-                        return _createAndSelectItem(kind);
-                      },
-                      onCreateFolder: () {
-                        _closeCompactNavigation();
-                        _promptNewFolder(controller);
-                      },
+                      ],
                     ),
-                  ),
-                  body: _buildWorkspace(
-                    controller,
-                    selectedItem,
-                    showCompactTimer: false,
-                    onOpenNavigation: _openCompactNavigation,
-                  ),
-                );
-              },
+                  );
+
+                  if (constraints.maxWidth >= _adaptiveBreakpoint) {
+                    return wideLayout;
+                  }
+
+                  return Scaffold(
+                    key: _compactScaffoldKey,
+                    drawer: Drawer(
+                      width: math
+                          .min(360, math.max(240, constraints.maxWidth - 32))
+                          .toDouble(),
+                      child: _LibraryTreePane(
+                        controller: controller,
+                        showingProjects: _showCatalog && _catalogFolder == null,
+                        onShowProjects: () {
+                          _closeCompactNavigation();
+                          _openCatalogRoot();
+                        },
+                        onOpenFolder: (folder) {
+                          _closeCompactNavigation();
+                          _openCatalogFolder(controller, folder);
+                        },
+                        onOpen: (item) {
+                          _closeCompactNavigation();
+                          _openItem(controller, item);
+                        },
+                        onCreate: (kind) {
+                          _closeCompactNavigation();
+                          return _createAndSelectItem(kind);
+                        },
+                        onCreateFolder: () {
+                          _closeCompactNavigation();
+                          _promptNewFolder(controller);
+                        },
+                      ),
+                    ),
+                    body: _buildWorkspace(
+                      controller,
+                      selectedItem,
+                      showCompactTimer: false,
+                      onOpenNavigation: _openCompactNavigation,
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -414,10 +416,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
         onOpenItem: (item) => _openItem(controller, item),
         onEditFolder: (folder) =>
             showFolderCoverEditor(context, controller, folder),
-        onRenameFolder: (folder) =>
-            _promptRenameFolder(controller, folder),
-        onDeleteFolder: (folder) =>
-            _confirmDeleteFolder(controller, folder),
+        onRenameFolder: (folder) => _promptRenameFolder(controller, folder),
+        onDeleteFolder: (folder) => _confirmDeleteFolder(controller, folder),
         onRenameItem: (item) => _promptRenameItem(controller, item),
         onDeleteItem: (item) => _confirmDeleteItem(controller, item),
       );
@@ -1410,10 +1410,12 @@ Future<T?> _showSidebarMenu<T>({
     final left = (anchorRect.dx + anchorBox.size.width - width)
         .clamp(8.0, math.max(8.0, overlayBox.size.width - width - 8))
         .toDouble();
-    final top = anchorRect.dy.clamp(
-      8.0,
-      math.max(8.0, overlayBox.size.height - items.length * 36 - 16),
-    ).toDouble();
+    final top = anchorRect.dy
+        .clamp(
+          8.0,
+          math.max(8.0, overlayBox.size.height - items.length * 36 - 16),
+        )
+        .toDouble();
     return showMenu<T>(
       context: context,
       position: RelativeRect.fromLTRB(

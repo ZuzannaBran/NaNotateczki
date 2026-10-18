@@ -580,15 +580,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
-            if (!mobile) IconButton(
-              tooltip: 'Settings',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const EditorSettingsScreen(),
+            if (!mobile)
+              IconButton(
+                tooltip: 'Settings',
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const EditorSettingsScreen(),
+                  ),
                 ),
               ),
-            ),
             IconButton(
               tooltip: _history ? 'Calendar' : 'Study history',
               onPressed: () => setState(() => _history = !_history),
@@ -667,163 +668,105 @@ class _PlannerScreenState extends State<PlannerScreen> {
         body: SafeArea(
           top: false,
           child: Column(
-          children: [
-            const AppHeaderDivider(),
-            if (planner.active != null || planner.pendingReviews.isNotEmpty)
-              Material(
-                color: colors.surfaceContainerLow,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 7,
-                  ),
-                  child: Row(
-                    children: [
-                      if (planner.active != null) ...[
-                        const Icon(Icons.timer_outlined),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            '${planner.active!.title} · '
-                            '${studyDuration(planner.secondsLeft(planner.active!))}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed:
-                              planner.active!.status == StudyStatus.running
-                              ? planner.pause
-                              : planner.resume,
-                          icon: Icon(
-                            planner.active!.status == StudyStatus.running
-                                ? Icons.pause
-                                : Icons.play_arrow,
-                          ),
-                          label: Text(
-                            planner.active!.status == StudyStatus.running
-                                ? 'Pause'
-                                : 'Resume',
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Stop session',
-                          onPressed: () {
-                            final session = planner.active;
-                            if (session != null && planner.stop()) {
-                              showStudyRating(context, session);
-                            }
-                          },
-                          icon: const Icon(Icons.stop_rounded),
-                        ),
-                      ] else ...[
-                        const Expanded(
-                          child: Text('A study session needs your review.'),
-                        ),
-                        TextButton(
-                          onPressed: () => showStudyRating(
-                            context,
-                            planner.pendingReviews.first,
-                          ),
-                          child: const Text('Rate productivity'),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            if (!_history) ...[
-              if (mobile)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          IconButton(
-                            tooltip: 'Previous',
-                            icon: const Icon(Icons.chevron_left),
-                            onPressed: () => _navigate(-1),
-                          ),
-                          Expanded(
-                            child: Text(
-                              _heading(),
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Next',
-                            icon: const Icon(Icons.chevron_right),
-                            onPressed: () => _navigate(1),
-                          ),
-                          TextButton(
-                            onPressed: () => setState(
-                              () => _anchor = DateUtils.dateOnly(DateTime.now()),
-                            ),
-                            child: const Text('Today'),
-                          ),
-                        ],
-                      ),
-                      SegmentedButton<CalendarMode>(
-                        showSelectedIcon: false,
-                        segments: const [
-                          ButtonSegment(
-                            value: CalendarMode.today,
-                            label: Text('Today'),
-                          ),
-                          ButtonSegment(
-                            value: CalendarMode.week,
-                            label: Text('Week'),
-                          ),
-                          ButtonSegment(
-                            value: CalendarMode.month,
-                            label: Text('Month'),
-                          ),
-                        ],
-                        selected: {_mode},
-                        onSelectionChanged: (next) =>
-                            setState(() => _mode = next.first),
-                      ),
-                    ],
-                  ),
-                )
-              else
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: _navigationPhysics,
-                  child: SizedBox(
-                    width: math.max(
-                      740.0,
-                      MediaQuery.sizeOf(context).width - 36,
+            children: [
+              const AppHeaderDivider(),
+              if (planner.active != null || planner.pendingReviews.isNotEmpty)
+                Material(
+                  color: colors.surfaceContainerLow,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 7,
                     ),
                     child: Row(
                       children: [
-                        IconButton(
-                          tooltip: 'Previous',
-                          icon: const Icon(Icons.chevron_left),
-                          onPressed: () => _navigate(-1),
-                        ),
-                        IconButton(
-                          tooltip: 'Next',
-                          icon: const Icon(Icons.chevron_right),
-                          onPressed: () => _navigate(1),
-                        ),
-                        TextButton(
-                          onPressed: () => setState(
-                            () => _anchor = DateUtils.dateOnly(DateTime.now()),
+                        if (planner.active != null) ...[
+                          const Icon(Icons.timer_outlined),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              '${planner.active!.title} · '
+                              '${studyDuration(planner.secondsLeft(planner.active!))}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          child: const Text('Today'),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _heading(),
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium,
+                          TextButton.icon(
+                            onPressed:
+                                planner.active!.status == StudyStatus.running
+                                ? planner.pause
+                                : planner.resume,
+                            icon: Icon(
+                              planner.active!.status == StudyStatus.running
+                                  ? Icons.pause
+                                  : Icons.play_arrow,
+                            ),
+                            label: Text(
+                              planner.active!.status == StudyStatus.running
+                                  ? 'Pause'
+                                  : 'Resume',
+                            ),
                           ),
+                          IconButton(
+                            tooltip: 'Stop session',
+                            onPressed: () {
+                              final session = planner.active;
+                              if (session != null && planner.stop()) {
+                                showStudyRating(context, session);
+                              }
+                            },
+                            icon: const Icon(Icons.stop_rounded),
+                          ),
+                        ] else ...[
+                          const Expanded(
+                            child: Text('A study session needs your review.'),
+                          ),
+                          TextButton(
+                            onPressed: () => showStudyRating(
+                              context,
+                              planner.pendingReviews.first,
+                            ),
+                            child: const Text('Rate productivity'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              if (!_history) ...[
+                if (mobile)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            IconButton(
+                              tooltip: 'Previous',
+                              icon: const Icon(Icons.chevron_left),
+                              onPressed: () => _navigate(-1),
+                            ),
+                            Expanded(
+                              child: Text(
+                                _heading(),
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Next',
+                              icon: const Icon(Icons.chevron_right),
+                              onPressed: () => _navigate(1),
+                            ),
+                            TextButton(
+                              onPressed: () => setState(
+                                () => _anchor = DateUtils.dateOnly(
+                                  DateTime.now(),
+                                ),
+                              ),
+                              child: const Text('Today'),
+                            ),
+                          ],
                         ),
                         SegmentedButton<CalendarMode>(
                           showSelectedIcon: false,
@@ -847,25 +790,87 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         ),
                       ],
                     ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: _navigationPhysics,
+                      child: SizedBox(
+                        width: math.max(
+                          740.0,
+                          MediaQuery.sizeOf(context).width - 36,
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              tooltip: 'Previous',
+                              icon: const Icon(Icons.chevron_left),
+                              onPressed: () => _navigate(-1),
+                            ),
+                            IconButton(
+                              tooltip: 'Next',
+                              icon: const Icon(Icons.chevron_right),
+                              onPressed: () => _navigate(1),
+                            ),
+                            TextButton(
+                              onPressed: () => setState(
+                                () => _anchor = DateUtils.dateOnly(
+                                  DateTime.now(),
+                                ),
+                              ),
+                              child: const Text('Today'),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _heading(),
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                            SegmentedButton<CalendarMode>(
+                              showSelectedIcon: false,
+                              segments: const [
+                                ButtonSegment(
+                                  value: CalendarMode.today,
+                                  label: Text('Today'),
+                                ),
+                                ButtonSegment(
+                                  value: CalendarMode.week,
+                                  label: Text('Week'),
+                                ),
+                                ButtonSegment(
+                                  value: CalendarMode.month,
+                                  label: Text('Month'),
+                                ),
+                              ],
+                              selected: {_mode},
+                              onSelectionChanged: (next) =>
+                                  setState(() => _mode = next.first),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 18),
+                  child: Text(
+                    'Long-press and drag a planned session to another day. '
+                    'Tap any session to edit, delete or start it.',
+                    style: TextStyle(fontSize: 12),
                   ),
                 ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 18),
-                child: Text(
-                  'Long-press and drag a planned session to another day. '
-                  'Tap any session to edit, delete or start it.',
-                  style: TextStyle(fontSize: 12),
-                ),
+              ],
+              Expanded(
+                child: _history
+                    ? _historyView(planner)
+                    : _calendar(planner.sessions),
               ),
             ],
-            Expanded(
-              child: _history
-                  ? _historyView(planner)
-                  : _calendar(planner.sessions),
-            ),
-          ],
-        ),
+          ),
         ),
       ),
     );
