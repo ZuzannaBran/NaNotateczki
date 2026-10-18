@@ -961,7 +961,8 @@ Future<void> showFolderCoverEditor(
   var shape = saved.shape;
   Color? iconColor = saved.iconColor;
   final darkMode = Theme.of(context).brightness == Brightness.dark;
-  final recentColors = await SharedRecentColors.load();
+  List<Color> recentColors = const <Color>[];
+  final recentColorsFuture = SharedRecentColors.load();
   if (!context.mounted) {
     return;
   }
@@ -1004,33 +1005,39 @@ Future<void> showFolderCoverEditor(
                   ),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final color in recentColors)
-                      InkWell(
-                        key: ValueKey('cover-recent-${color.toARGB32()}'),
-                        borderRadius: BorderRadius.circular(30),
-                        onTap: () => update(() => iconColor = color),
-                        child: CircleAvatar(
-                          radius: 15,
-                          backgroundColor: AppColors.displayInkColor(
-                            color,
-                            darkMode: darkMode,
+                FutureBuilder<List<Color>>(
+                  future: recentColorsFuture,
+                  builder: (context, snapshot) {
+                    recentColors = snapshot.data ?? const <Color>[];
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final color in recentColors)
+                          InkWell(
+                            key: ValueKey('cover-recent-${color.toARGB32()}'),
+                            borderRadius: BorderRadius.circular(30),
+                            onTap: () => update(() => iconColor = color),
+                            child: CircleAvatar(
+                              radius: 15,
+                              backgroundColor: AppColors.displayInkColor(
+                                color,
+                                darkMode: darkMode,
+                              ),
+                              child: iconColor == color
+                                  ? Icon(
+                                      Icons.check,
+                                      size: 16,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                    )
+                                  : null,
+                            ),
                           ),
-                          child: iconColor == color
-                              ? Icon(
-                                  Icons.check,
-                                  size: 16,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
-                                )
-                              : null,
-                        ),
-                      ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 Text(

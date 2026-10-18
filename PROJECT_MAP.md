@@ -441,7 +441,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1574: `_LibraryWorkspace`;
   1655: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1151 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1158 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -464,6 +464,8 @@ kwiat, błysk) można ponownie wybierać z poziomu edytora folderu.
 Kafelki mają promień 24 px i neutralne tło; zapisany kolor modyfikuje
 kolor ikon, nie powoduje automatycznego podświetlania całej okładki.
 Hover i press są nakładkami na `Ink` przyciętymi przez `Material`.
+Dialog edycji okładki otwiera się natychmiast; `FutureBuilder`
+asynchronicznie doładowuje Recent bez blokowania całego okna.
 Dialog kolorów okładki zachowuje wybór dekoracji, ale nie pokazuje
 bazowych próbek Cover color. Recent współdzieli zapis kolorów z canvasem
 (również po ponownym uruchomieniu), a trzy zestawy Blue/Pink/Green
@@ -535,7 +537,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`; 39: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (883):
+- `lib/features/planner/presentation/planner_screen.dart` (894):
   `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
   tworzenie, edycja, usuwanie i historia. Nazwa dnia tygodnia znajduje się
   w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
@@ -730,7 +732,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1088):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1093):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
@@ -762,7 +764,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   14: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
   406: selektor kształtu; 534: `_colorDot`; 581: `pickColor`;
   952: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (352):
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (353):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
   ID bloku przez czas jego otwarcia, nawet przy utracie aktywnego zaznaczenia. Obsługuje realne formatowanie całego bloku: bold, italic,
@@ -990,7 +992,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/adaptive_platform_layout_test.dart`: bezpieczne górne i dolne
   marginesy systemowe, dostęp do drawer/edytora, układy 320/390/768/844/
   1024/1440 px i zachowanie kontrolera przy zmianie orientacji.
-- `test/library_screen_responsive_layout_test.dart`:
+- `test/library_screen_responsive_layout_test.dart`: używa
+  `useIsolatedNativeTestDocuments` także w testach popup i okładek,
+  aby asynchroniczny startup nie rzucał `MissingPluginException`.
+  `test/library_screen_responsive_layout_test.dart`:
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;

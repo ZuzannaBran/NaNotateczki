@@ -23,6 +23,8 @@ import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
 import 'package:program/features/planner/state/study_planner_controller.dart';
 
+import 'support/native_test_documents.dart';
+
 Future<Color> _sampleRenderedPixel(
   WidgetTester tester,
   GlobalKey captureKey,
@@ -60,6 +62,8 @@ Future<Color> _sampleRenderedPixel(
 }
 
 void main() {
+  useIsolatedNativeTestDocuments();
+
   testWidgets('library switches from sidebar to drawer at 960 pixels', (
     tester,
   ) async {

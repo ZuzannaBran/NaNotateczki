@@ -567,271 +567,218 @@ class _PlannerScreenState extends State<PlannerScreen> {
         final mobile = constraints.maxWidth < 600;
         final compactCalendar = constraints.maxWidth < 960;
         return StudyActionTheme(
-      child: Scaffold(
-        appBar: AppBar(
-          toolbarHeight: AppHeaderDivider.toolbarHeight,
-          titleSpacing: MediaQuery.sizeOf(context).width >= 600 ? 44 : null,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          title: const Text(
-            'Study planner',
-            style: AppHeaderDivider.titleStyle,
-          ),
-          leading: IconButton(
-            tooltip: 'Back to notes',
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
-          ),
-          actions: [
-            if (!mobile)
-              IconButton(
-                tooltip: 'Settings',
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const EditorSettingsScreen(),
-                  ),
-                ),
+          child: Scaffold(
+            appBar: AppBar(
+              toolbarHeight: AppHeaderDivider.toolbarHeight,
+              titleSpacing: MediaQuery.sizeOf(context).width >= 600 ? 44 : null,
+              scrolledUnderElevation: 0,
+              surfaceTintColor: Colors.transparent,
+              title: const Text(
+                'Study planner',
+                style: AppHeaderDivider.titleStyle,
               ),
-            IconButton(
-              tooltip: _history ? 'Calendar' : 'Study history',
-              onPressed: () => setState(() => _history = !_history),
-              icon: Icon(
-                _history
-                    ? Icons.calendar_month_outlined
-                    : Icons.history_rounded,
+              leading: IconButton(
+                tooltip: 'Back to notes',
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
               ),
-            ),
-            if (mobile)
-              PopupMenuButton<String>(
-                tooltip: 'Planner actions',
-                icon: const Icon(Icons.more_vert_rounded),
-                onSelected: (action) {
-                  switch (action) {
-                    case 'new':
-                      showStudySessionEditor(context);
-                      return;
-                    case 'smart':
-                      showStudySessionEditor(
-                        context,
-                        technique: StudyTechnique.pomodoro,
-                        startAfterSave: true,
-                      );
-                      return;
-                    case 'settings':
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const EditorSettingsScreen(),
-                        ),
-                      );
-                      return;
-                  }
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'new', child: Text('New session')),
-                  PopupMenuItem(value: 'smart', child: Text('Smart session')),
-                  PopupMenuItem(value: 'settings', child: Text('Settings')),
-                ],
-              )
-            else if (narrow) ...[
-              IconButton(
-                tooltip: 'Smart session',
-                onPressed: () => showStudySessionEditor(
-                  context,
-                  technique: StudyTechnique.pomodoro,
-                  startAfterSave: true,
-                ),
-                icon: const Icon(Icons.auto_awesome_outlined),
-              ),
-              IconButton(
-                tooltip: 'New session',
-                onPressed: () => showStudySessionEditor(context),
-                icon: const Icon(Icons.add_rounded),
-              ),
-            ] else ...[
-              OutlinedButton.icon(
-                onPressed: () => showStudySessionEditor(
-                  context,
-                  technique: StudyTechnique.pomodoro,
-                  startAfterSave: true,
-                ),
-                icon: const Icon(Icons.auto_awesome_outlined),
-                label: const Text('Smart session'),
-              ),
-              FilledButton.icon(
-                style: StudyActionStyles.primary(Theme.of(context)),
-                onPressed: () => showStudySessionEditor(context),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('New session'),
-              ),
-            ],
-            const SizedBox(width: 16),
-          ],
-        ),
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              const AppHeaderDivider(),
-              if (planner.active != null || planner.pendingReviews.isNotEmpty)
-                Material(
-                  color: colors.surfaceContainerLow,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 7,
-                    ),
-                    child: Row(
-                      children: [
-                        if (planner.active != null) ...[
-                          const Icon(Icons.timer_outlined),
-                          const SizedBox(width: 9),
-                          Expanded(
-                            child: Text(
-                              '${planner.active!.title} · '
-                              '${studyDuration(planner.secondsLeft(planner.active!))}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          TextButton.icon(
-                            onPressed:
-                                planner.active!.status == StudyStatus.running
-                                ? planner.pause
-                                : planner.resume,
-                            icon: Icon(
-                              planner.active!.status == StudyStatus.running
-                                  ? Icons.pause
-                                  : Icons.play_arrow,
-                            ),
-                            label: Text(
-                              planner.active!.status == StudyStatus.running
-                                  ? 'Pause'
-                                  : 'Resume',
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Stop session',
-                            onPressed: () {
-                              final session = planner.active;
-                              if (session != null && planner.stop()) {
-                                showStudyRating(context, session);
-                              }
-                            },
-                            icon: const Icon(Icons.stop_rounded),
-                          ),
-                        ] else ...[
-                          const Expanded(
-                            child: Text('A study session needs your review.'),
-                          ),
-                          TextButton(
-                            onPressed: () => showStudyRating(
-                              context,
-                              planner.pendingReviews.first,
-                            ),
-                            child: const Text('Rate productivity'),
-                          ),
-                        ],
-                      ],
+              actions: [
+                if (!mobile)
+                  IconButton(
+                    tooltip: 'Settings',
+                    icon: const Icon(Icons.settings_outlined),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const EditorSettingsScreen(),
+                      ),
                     ),
                   ),
+                IconButton(
+                  tooltip: _history ? 'Calendar' : 'Study history',
+                  onPressed: () => setState(() => _history = !_history),
+                  icon: Icon(
+                    _history
+                        ? Icons.calendar_month_outlined
+                        : Icons.history_rounded,
+                  ),
                 ),
-              if (!_history) ...[
-                if (compactCalendar)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              tooltip: 'Previous',
-                              icon: const Icon(Icons.chevron_left),
-                              onPressed: () => _navigate(-1),
+                if (mobile)
+                  PopupMenuButton<String>(
+                    tooltip: 'Planner actions',
+                    icon: const Icon(Icons.more_vert_rounded),
+                    onSelected: (action) {
+                      switch (action) {
+                        case 'new':
+                          showStudySessionEditor(context);
+                          return;
+                        case 'smart':
+                          showStudySessionEditor(
+                            context,
+                            technique: StudyTechnique.pomodoro,
+                            startAfterSave: true,
+                          );
+                          return;
+                        case 'settings':
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const EditorSettingsScreen(),
                             ),
-                            Expanded(
-                              child: Text(
-                                _heading(),
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Next',
-                              icon: const Icon(Icons.chevron_right),
-                              onPressed: () => _navigate(1),
-                            ),
-                            TextButton(
-                              onPressed: () => setState(
-                                () => _anchor = DateUtils.dateOnly(
-                                  DateTime.now(),
-                                ),
-                              ),
-                              child: const Text('Today'),
-                            ),
-                          ],
-                        ),
-                        SegmentedButton<CalendarMode>(
-                          showSelectedIcon: false,
-                          segments: const [
-                            ButtonSegment(
-                              value: CalendarMode.today,
-                              label: Text('Today'),
-                            ),
-                            ButtonSegment(
-                              value: CalendarMode.week,
-                              label: Text('Week'),
-                            ),
-                            ButtonSegment(
-                              value: CalendarMode.month,
-                              label: Text('Month'),
-                            ),
-                          ],
-                          selected: {_mode},
-                          onSelectionChanged: (next) =>
-                              setState(() => _mode = next.first),
-                        ),
-                      ],
-                    ),
+                          );
+                          return;
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'new', child: Text('New session')),
+                      PopupMenuItem(
+                        value: 'smart',
+                        child: Text('Smart session'),
+                      ),
+                      PopupMenuItem(value: 'settings', child: Text('Settings')),
+                    ],
                   )
-                else
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: _navigationPhysics,
-                      child: SizedBox(
-                        width: math.max(
-                          740.0,
-                          MediaQuery.sizeOf(context).width - 36,
+                else if (narrow) ...[
+                  IconButton(
+                    tooltip: 'Smart session',
+                    onPressed: () => showStudySessionEditor(
+                      context,
+                      technique: StudyTechnique.pomodoro,
+                      startAfterSave: true,
+                    ),
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'New session',
+                    onPressed: () => showStudySessionEditor(context),
+                    icon: const Icon(Icons.add_rounded),
+                  ),
+                ] else ...[
+                  OutlinedButton.icon(
+                    onPressed: () => showStudySessionEditor(
+                      context,
+                      technique: StudyTechnique.pomodoro,
+                      startAfterSave: true,
+                    ),
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                    label: const Text('Smart session'),
+                  ),
+                  FilledButton.icon(
+                    style: StudyActionStyles.primary(Theme.of(context)),
+                    onPressed: () => showStudySessionEditor(context),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('New session'),
+                  ),
+                ],
+                const SizedBox(width: 16),
+              ],
+            ),
+            body: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  const AppHeaderDivider(),
+                  if (planner.active != null ||
+                      planner.pendingReviews.isNotEmpty)
+                    Material(
+                      color: colors.surfaceContainerLow,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 7,
                         ),
                         child: Row(
                           children: [
-                            IconButton(
-                              tooltip: 'Previous',
-                              icon: const Icon(Icons.chevron_left),
-                              onPressed: () => _navigate(-1),
-                            ),
-                            IconButton(
-                              tooltip: 'Next',
-                              icon: const Icon(Icons.chevron_right),
-                              onPressed: () => _navigate(1),
-                            ),
-                            TextButton(
-                              onPressed: () => setState(
-                                () => _anchor = DateUtils.dateOnly(
-                                  DateTime.now(),
+                            if (planner.active != null) ...[
+                              const Icon(Icons.timer_outlined),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: Text(
+                                  '${planner.active!.title} · '
+                                  '${studyDuration(planner.secondsLeft(planner.active!))}',
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              child: const Text('Today'),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                _heading(),
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleMedium,
+                              TextButton.icon(
+                                onPressed:
+                                    planner.active!.status ==
+                                        StudyStatus.running
+                                    ? planner.pause
+                                    : planner.resume,
+                                icon: Icon(
+                                  planner.active!.status == StudyStatus.running
+                                      ? Icons.pause
+                                      : Icons.play_arrow,
+                                ),
+                                label: Text(
+                                  planner.active!.status == StudyStatus.running
+                                      ? 'Pause'
+                                      : 'Resume',
+                                ),
                               ),
+                              IconButton(
+                                tooltip: 'Stop session',
+                                onPressed: () {
+                                  final session = planner.active;
+                                  if (session != null && planner.stop()) {
+                                    showStudyRating(context, session);
+                                  }
+                                },
+                                icon: const Icon(Icons.stop_rounded),
+                              ),
+                            ] else ...[
+                              const Expanded(
+                                child: Text(
+                                  'A study session needs your review.',
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => showStudyRating(
+                                  context,
+                                  planner.pendingReviews.first,
+                                ),
+                                child: const Text('Rate productivity'),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (!_history) ...[
+                    if (compactCalendar)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                IconButton(
+                                  tooltip: 'Previous',
+                                  icon: const Icon(Icons.chevron_left),
+                                  onPressed: () => _navigate(-1),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    _heading(),
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Next',
+                                  icon: const Icon(Icons.chevron_right),
+                                  onPressed: () => _navigate(1),
+                                ),
+                                TextButton(
+                                  onPressed: () => setState(
+                                    () => _anchor = DateUtils.dateOnly(
+                                      DateTime.now(),
+                                    ),
+                                  ),
+                                  child: const Text('Today'),
+                                ),
+                              ],
                             ),
                             SegmentedButton<CalendarMode>(
                               showSelectedIcon: false,
@@ -855,27 +802,91 @@ class _PlannerScreenState extends State<PlannerScreen> {
                             ),
                           ],
                         ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: _navigationPhysics,
+                          child: SizedBox(
+                            width: math.max(
+                              740.0,
+                              MediaQuery.sizeOf(context).width - 36,
+                            ),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  tooltip: 'Previous',
+                                  icon: const Icon(Icons.chevron_left),
+                                  onPressed: () => _navigate(-1),
+                                ),
+                                IconButton(
+                                  tooltip: 'Next',
+                                  icon: const Icon(Icons.chevron_right),
+                                  onPressed: () => _navigate(1),
+                                ),
+                                TextButton(
+                                  onPressed: () => setState(
+                                    () => _anchor = DateUtils.dateOnly(
+                                      DateTime.now(),
+                                    ),
+                                  ),
+                                  child: const Text('Today'),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _heading(),
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                ),
+                                SegmentedButton<CalendarMode>(
+                                  showSelectedIcon: false,
+                                  segments: const [
+                                    ButtonSegment(
+                                      value: CalendarMode.today,
+                                      label: Text('Today'),
+                                    ),
+                                    ButtonSegment(
+                                      value: CalendarMode.week,
+                                      label: Text('Week'),
+                                    ),
+                                    ButtonSegment(
+                                      value: CalendarMode.month,
+                                      label: Text('Month'),
+                                    ),
+                                  ],
+                                  selected: {_mode},
+                                  onSelectionChanged: (next) =>
+                                      setState(() => _mode = next.first),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 18),
+                      child: Text(
+                        'Long-press and drag a planned session to another day. '
+                        'Tap any session to edit, delete or start it.',
+                        style: TextStyle(fontSize: 12),
                       ),
                     ),
+                  ],
+                  Expanded(
+                    child: _history
+                        ? _historyView(planner)
+                        : _calendar(planner.sessions),
                   ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 18),
-                  child: Text(
-                    'Long-press and drag a planned session to another day. '
-                    'Tap any session to edit, delete or start it.',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
-              ],
-              Expanded(
-                child: _history
-                    ? _historyView(planner)
-                    : _calendar(planner.sessions),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
         );
       },
     );

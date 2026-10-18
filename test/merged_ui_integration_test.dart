@@ -391,10 +391,7 @@ void main() {
       find.byKey(const ValueKey('catalog-folders')),
     );
     expect(folders.physics, isA<TouchNavigationScrollPhysics>());
-    expect(
-      (folders.physics! as TouchNavigationScrollPhysics).sensitivity,
-      1.8,
-    );
+    expect((folders.physics! as TouchNavigationScrollPhysics).sensitivity, 1.8);
     await _openPlanner(tester);
     await tester.tap(find.text('Today').last);
     await tester.pumpAndSettle();

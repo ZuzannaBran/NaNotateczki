@@ -52,115 +52,116 @@ class TextEditToolbar extends StatelessWidget {
       builder: (context, constraints) {
         final mobile = constraints.maxWidth < 600;
         return Padding(
-      padding: EdgeInsets.fromLTRB(mobile ? 8 : 52, 0, mobile ? 8 : 52, 8),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Container(
-          key: const ValueKey('text-toolbar-panel'),
-          padding: EdgeInsets.symmetric(
-            horizontal: mobile ? 8 : 22,
-            vertical: 2,
-          ),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.outlineVariant.withValues(alpha: 0.45),
+          padding: EdgeInsets.fromLTRB(mobile ? 8 : 52, 0, mobile ? 8 : 52, 8),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Container(
+              key: const ValueKey('text-toolbar-panel'),
+              padding: EdgeInsets.symmetric(
+                horizontal: mobile ? 8 : 22,
+                vertical: 2,
+              ),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.45),
+                ),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _styleButton(
+                      icon: Icons.format_bold,
+                      tooltip: 'Bold',
+                      isActive: inline['bold'] == true,
+                      onPressed: () => editorController.updateActiveTextStyle(
+                        bold: inline['bold'] != true,
+                      ),
+                    ),
+                    _styleButton(
+                      icon: Icons.format_italic,
+                      tooltip: 'Italic',
+                      isActive: inline['italic'] == true,
+                      onPressed: () => editorController.updateActiveTextStyle(
+                        italic: inline['italic'] != true,
+                      ),
+                    ),
+                    _styleButton(
+                      icon: Icons.format_underline,
+                      tooltip: 'Underline',
+                      isActive: inline['underline'] == true,
+                      onPressed: () => editorController.updateActiveTextStyle(
+                        underline: inline['underline'] != true,
+                      ),
+                    ),
+                    _styleButton(
+                      icon: Icons.strikethrough_s,
+                      tooltip: 'Strikethrough',
+                      isActive: inline['strike'] == true,
+                      onPressed: () => editorController.updateActiveTextStyle(
+                        strike: inline['strike'] != true,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _fontDropdown(currentFont),
+                    const SizedBox(width: 8),
+                    _sizeDropdown(currentSize),
+                    const SizedBox(width: 8),
+                    _colorPicker(context),
+                    const SizedBox(width: 8),
+                    _alignmentButton(
+                      icon: Icons.format_align_left,
+                      tooltip: 'Align left',
+                      alignment: 'left',
+                      current: currentAlign,
+                    ),
+                    _alignmentButton(
+                      icon: Icons.format_align_center,
+                      tooltip: 'Align center',
+                      alignment: 'center',
+                      current: currentAlign,
+                    ),
+                    _alignmentButton(
+                      icon: Icons.format_align_right,
+                      tooltip: 'Align right',
+                      alignment: 'right',
+                      current: currentAlign,
+                    ),
+                    _alignmentButton(
+                      icon: Icons.format_align_justify,
+                      tooltip: 'Justify',
+                      alignment: 'justify',
+                      current: currentAlign,
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.format_clear),
+                      tooltip: 'Clear block formatting',
+                      iconSize: 20,
+                      onPressed: () => editorController.updateActiveTextStyle(
+                        clearDecorations: true,
+                        clearFontFamily: true,
+                        alignment: 'left',
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      tooltip: 'Delete text',
+                      iconSize: 20,
+                      onPressed: () =>
+                          editorController.deleteTextBlock(block.id),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _styleButton(
-                  icon: Icons.format_bold,
-                  tooltip: 'Bold',
-                  isActive: inline['bold'] == true,
-                  onPressed: () => editorController.updateActiveTextStyle(
-                    bold: inline['bold'] != true,
-                  ),
-                ),
-                _styleButton(
-                  icon: Icons.format_italic,
-                  tooltip: 'Italic',
-                  isActive: inline['italic'] == true,
-                  onPressed: () => editorController.updateActiveTextStyle(
-                    italic: inline['italic'] != true,
-                  ),
-                ),
-                _styleButton(
-                  icon: Icons.format_underline,
-                  tooltip: 'Underline',
-                  isActive: inline['underline'] == true,
-                  onPressed: () => editorController.updateActiveTextStyle(
-                    underline: inline['underline'] != true,
-                  ),
-                ),
-                _styleButton(
-                  icon: Icons.strikethrough_s,
-                  tooltip: 'Strikethrough',
-                  isActive: inline['strike'] == true,
-                  onPressed: () => editorController.updateActiveTextStyle(
-                    strike: inline['strike'] != true,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                _fontDropdown(currentFont),
-                const SizedBox(width: 8),
-                _sizeDropdown(currentSize),
-                const SizedBox(width: 8),
-                _colorPicker(context),
-                const SizedBox(width: 8),
-                _alignmentButton(
-                  icon: Icons.format_align_left,
-                  tooltip: 'Align left',
-                  alignment: 'left',
-                  current: currentAlign,
-                ),
-                _alignmentButton(
-                  icon: Icons.format_align_center,
-                  tooltip: 'Align center',
-                  alignment: 'center',
-                  current: currentAlign,
-                ),
-                _alignmentButton(
-                  icon: Icons.format_align_right,
-                  tooltip: 'Align right',
-                  alignment: 'right',
-                  current: currentAlign,
-                ),
-                _alignmentButton(
-                  icon: Icons.format_align_justify,
-                  tooltip: 'Justify',
-                  alignment: 'justify',
-                  current: currentAlign,
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.format_clear),
-                  tooltip: 'Clear block formatting',
-                  iconSize: 20,
-                  onPressed: () => editorController.updateActiveTextStyle(
-                    clearDecorations: true,
-                    clearFontFamily: true,
-                    alignment: 'left',
-                  ),
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Delete text',
-                  iconSize: 20,
-                  onPressed: () => editorController.deleteTextBlock(block.id),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
         );
       },
     );

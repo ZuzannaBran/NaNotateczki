@@ -598,19 +598,13 @@ void main() {
         matching: find.byKey(const ValueKey('catalog-preview-shadow')),
       );
       final material = tester.widget<Material>(
-        find.descendant(
-          of: preview,
-          matching: find.byType(Material),
-        ).first,
+        find.descendant(of: preview, matching: find.byType(Material)).first,
       );
       expect(material.clipBehavior, Clip.antiAlias);
       expect(material.borderRadius, BorderRadius.circular(24));
 
       final inkWell = tester.widget<InkWell>(
-        find.descendant(
-          of: preview,
-          matching: find.byType(InkWell),
-        ).first,
+        find.descendant(of: preview, matching: find.byType(InkWell)).first,
       );
       expect(inkWell.borderRadius, BorderRadius.circular(24));
       expect(inkWell.overlayColor!.resolve({}), Colors.transparent);
