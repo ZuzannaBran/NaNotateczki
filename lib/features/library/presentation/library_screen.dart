@@ -30,14 +30,7 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  static const double _editorOverviewRight = 106;
-  static const double _editorPageWidth = 820;
-  static const double _editorPageMargin = 56;
-  static const double _wideBreakpoint =
-      _editorOverviewRight +
-      _editorPageMargin +
-      _editorPageWidth +
-      _editorPageMargin;
+  static const double _adaptiveBreakpoint = 960;
   static const double _navigationPaneMinWidth = 240;
   static const double _navigationPaneMaxWidth = 420;
   static const double _resizeHandleWidth = 12;
@@ -52,6 +45,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
   double _navigationPaneWidth = 320;
   bool _isShowingCorruptRecoveryDialog = false;
   final ValueNotifier<bool> _sidebarMenuOpen = ValueNotifier<bool>(false);
+  final GlobalKey<ScaffoldState> _compactScaffoldKey =
+      GlobalKey<ScaffoldState>();
+  final GlobalKey _workspaceKey = GlobalKey();
+
   StudyPlannerController? _studyPlanner;
   int _lastStudyNotice = 0;
 
@@ -133,7 +130,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
     _maybeShowCorruptRecoveryDialog(controller);
 
     return Scaffold(
-      body: Column(
+      body: SafeArea(
+        child: Column(
         children: [
           if (controller.shouldShowResetBanner)
             MaterialBanner(
@@ -213,10 +211,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final layoutWidth = math.max(
-                  constraints.maxWidth,
-                  _wideBreakpoint,
-                );
+                final layoutWidth = constraints.maxWidth;
                 final maxNavigationWidth = math.max(
                   _navigationPaneMinWidth,
                   layoutWidth - 320,
@@ -283,45 +278,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 : const SizedBox.shrink(),
                           ),
                           Expanded(
-                            child: _showCatalog
-                                ? LibraryCatalog(
-                                    controller: controller,
-                                    showCompactTimer: !_showLeftNavigation,
-                                    onSettings: _openCatalogSettings,
-                                    folder:
-                                        controller.folderNames.contains(
-                                          _catalogFolder,
-                                        )
-                                        ? _catalogFolder
-                                        : null,
-                                    onBack: _openCatalogRoot,
-                                    onFolderTap: (folder) =>
-                                        _openCatalogFolder(controller, folder),
-                                    onOpenItem: (item) =>
-                                        _openItem(controller, item),
-                                    onEditFolder: (folder) =>
-                                        showFolderCoverEditor(
-                                          context,
-                                          controller,
-                                          folder,
-                                        ),
-                                    onRenameFolder: (folder) =>
-                                        _promptRenameFolder(controller, folder),
-                                    onDeleteFolder: (folder) =>
-                                        _confirmDeleteFolder(
-                                          controller,
-                                          folder,
-                                        ),
-                                    onRenameItem: (item) =>
-                                        _promptRenameItem(controller, item),
-                                    onDeleteItem: (item) =>
-                                        _confirmDeleteItem(controller, item),
-                                  )
-                                : _LibraryWorkspace(
-                                    item: selectedItem,
-                                    showToolbar: _showEditorToolbar,
-                                    showCompactTimer: !_showLeftNavigation,
-                                  ),
+                            child: _buildWorkspace(
+                              controller,
+                              selectedItem,
+                              showCompactTimer: !_showLeftNavigation,
+                            ),
                           ),
                         ],
                       ),
@@ -372,19 +333,101 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   ),
                 );
 
-                if (constraints.maxWidth >= _wideBreakpoint) {
+                if (constraints.maxWidth >= _adaptiveBreakpoint) {
                   return wideLayout;
                 }
 
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: wideLayout,
+                return Scaffold(
+                  key: _compactScaffoldKey,
+                  drawer: Drawer(
+                    width: math.min(
+                      360,
+                      math.max(240, constraints.maxWidth - 32),
+                    ).toDouble(),
+                    child: _LibraryTreePane(
+                      controller: controller,
+                      showingProjects:
+                          _showCatalog && _catalogFolder == null,
+                      onShowProjects: () {
+                        _closeCompactNavigation();
+                        _openCatalogRoot();
+                      },
+                      onOpenFolder: (folder) {
+                        _closeCompactNavigation();
+                        _openCatalogFolder(controller, folder);
+                      },
+                      onOpen: (item) {
+                        _closeCompactNavigation();
+                        _openItem(controller, item);
+                      },
+                      onCreate: (kind) {
+                        _closeCompactNavigation();
+                        return _createAndSelectItem(kind);
+                      },
+                      onCreateFolder: () {
+                        _closeCompactNavigation();
+                        _promptNewFolder(controller);
+                      },
+                    ),
+                  ),
+                  body: _buildWorkspace(
+                    controller,
+                    selectedItem,
+                    showCompactTimer: false,
+                    onOpenNavigation: _openCompactNavigation,
+                  ),
                 );
               },
             ),
           ),
         ],
+        ),
       ),
+    );
+  }
+
+  void _openCompactNavigation() {
+    _compactScaffoldKey.currentState?.openDrawer();
+  }
+
+  void _closeCompactNavigation() {
+    _compactScaffoldKey.currentState?.closeDrawer();
+  }
+
+  Widget _buildWorkspace(
+    LibraryController controller,
+    Notebook? selectedItem, {
+    required bool showCompactTimer,
+    VoidCallback? onOpenNavigation,
+  }) {
+    if (_showCatalog) {
+      return LibraryCatalog(
+        controller: controller,
+        showCompactTimer: showCompactTimer,
+        onOpenNavigation: onOpenNavigation,
+        onSettings: _openCatalogSettings,
+        folder: controller.folderNames.contains(_catalogFolder)
+            ? _catalogFolder
+            : null,
+        onBack: _openCatalogRoot,
+        onFolderTap: (folder) => _openCatalogFolder(controller, folder),
+        onOpenItem: (item) => _openItem(controller, item),
+        onEditFolder: (folder) =>
+            showFolderCoverEditor(context, controller, folder),
+        onRenameFolder: (folder) =>
+            _promptRenameFolder(controller, folder),
+        onDeleteFolder: (folder) =>
+            _confirmDeleteFolder(controller, folder),
+        onRenameItem: (item) => _promptRenameItem(controller, item),
+        onDeleteItem: (item) => _confirmDeleteItem(controller, item),
+      );
+    }
+    return _LibraryWorkspace(
+      key: _workspaceKey,
+      item: selectedItem,
+      showToolbar: _showEditorToolbar,
+      showCompactTimer: showCompactTimer,
+      onOpenNavigation: onOpenNavigation,
     );
   }
 
@@ -1358,6 +1401,34 @@ Future<T?> _showSidebarMenu<T>({
     return null;
   }
 
+  if (MediaQuery.sizeOf(context).width <
+      _LibraryScreenState._adaptiveBreakpoint) {
+    final anchorRect = anchorBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final left = (anchorRect.dx + anchorBox.size.width - width)
+        .clamp(8.0, math.max(8.0, overlayBox.size.width - width - 8))
+        .toDouble();
+    final top = anchorRect.dy.clamp(
+      8.0,
+      math.max(8.0, overlayBox.size.height - items.length * 36 - 16),
+    ).toDouble();
+    return showMenu<T>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        left,
+        top,
+        overlayBox.size.width - left,
+        overlayBox.size.height - top,
+      ),
+      constraints: BoxConstraints.tightFor(width: width),
+      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+      surfaceTintColor: Colors.transparent,
+      items: items,
+    );
+  }
+
   final sidebarRight = paneBox
       .localToGlobal(
         Offset(paneBox.size.width + _LibraryScreenState._resizeHandleWidth, 0),
@@ -1504,11 +1575,14 @@ class _LibraryWorkspace extends StatelessWidget {
     required this.item,
     required this.showToolbar,
     required this.showCompactTimer,
+    this.onOpenNavigation,
+    super.key,
   });
 
   final Notebook? item;
   final bool showToolbar;
   final bool showCompactTimer;
+  final VoidCallback? onOpenNavigation;
 
   @override
   Widget build(BuildContext context) {
@@ -1533,11 +1607,13 @@ class _LibraryWorkspace extends StatelessWidget {
               title: item!.title,
               showToolbar: showToolbar,
               showCompactTimer: showCompactTimer,
+              onOpenNavigation: onOpenNavigation,
             )
           : NotebookScreen(
               title: item!.title,
               showToolbar: showToolbar,
               showCompactTimer: showCompactTimer,
+              onOpenNavigation: onOpenNavigation,
             ),
     );
   }

@@ -435,3 +435,37 @@ items, not the cause of either failure in this run.
 - Regression test `android_build_toolchain_test.dart` now guards the
   compatibility hold. Revisit only after an updated dependency and verify
   Android Debug, Release, R8 and emulator end-to-end on the new toolchain.
+
+## Adaptive layouts and system insets (18 October 2026)
+
+Widget regressions: `test/adaptive_platform_layout_test.dart`,
+`test/library_screen_responsive_layout_test.dart`,
+`test/editor_screen_responsive_layout_test.dart` and
+`test/study_planner_widget_test.dart`.
+
+Manual release checks required on actual devices (widget tests do not replace
+platform or accessibility testing):
+
+1. Android 13–16 phone: portrait and landscape; status and gesture bars,
+   3-button navigation, camera cutout, keyboard open, font/display scaling,
+   dark mode and system back gesture.
+2. iPhone with notch/Dynamic Island and home indicator: portrait/landscape,
+   keyboard open, VoiceOver, enlarged Dynamic Type and modal/drawer navigation.
+3. Android tablets and iPad/iPadOS: 600–960 dp portrait, 960+ dp landscape,
+   split screen, Stage Manager/window resize, stylus, physical keyboard and
+   touch input. Verify sidebar/drawer transitions while a document is open.
+4. Foldable and dual-screen devices: folded/narrow, expanded, rotating and
+   changing app-window width; verify hinge/cutout insets and unobstructed
+   controls on both sides. Hinge spanning behavior needs real-device testing.
+5. Windows, Linux, macOS and web: resize between 320, 600, 959, 960 and
+   1440 logical pixels; verify no lost editor state, accessible menus and
+   existing desktop sidebar. Also test 125–200% OS display/text scaling.
+6. Across all platforms: open a notebook and board, draw/erase with touch
+   and stylus, scroll the toolbars, zoom the page, add/delete a page, create
+   folders and study sessions, rotate or resize, then save/reopen and verify
+   persisted content. Confirm timer, settings, dialogs and export are usable.
+
+Layouts depend on available logical viewport width, not the operating system:
+compact navigation below 960 dp and desktop sidebar at 960 dp or above.
+System UI insets use Flutter `SafeArea`/`MediaQuery`; do not disable Android
+edge-to-edge, and do not assume iOS devices share the same status bar height.

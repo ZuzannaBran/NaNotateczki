@@ -34,11 +34,13 @@ class BoardScreen extends StatefulWidget {
     this.title,
     this.showToolbar = true,
     this.showCompactTimer = false,
+    this.onOpenNavigation,
   });
 
   final String? title;
   final bool showToolbar;
   final bool showCompactTimer;
+  final VoidCallback? onOpenNavigation;
 
   @override
   State<BoardScreen> createState() => _BoardScreenState();
@@ -741,9 +743,19 @@ class _BoardScreenState extends State<BoardScreen> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         titleSpacing: useWideTitleInset ? 44 : null,
+        leading: widget.onOpenNavigation == null
+            ? null
+            : IconButton(
+                key: const ValueKey('mobile-navigation-open'),
+                tooltip: 'Open navigation',
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: widget.onOpenNavigation,
+              ),
         title: Text(
           widget.title ?? controller.notebook.title,
           style: AppHeaderDivider.titleStyle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
           if (widget.showCompactTimer) const CompactStudyTimer(),

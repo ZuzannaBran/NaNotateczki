@@ -11,11 +11,13 @@ class NotebookScreen extends StatelessWidget {
     this.title,
     this.showToolbar = true,
     this.showCompactTimer = false,
+    this.onOpenNavigation,
   });
 
   final String? title;
   final bool showToolbar;
   final bool showCompactTimer;
+  final VoidCallback? onOpenNavigation;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +34,7 @@ class NotebookScreen extends StatelessWidget {
       title: title,
       showToolbar: showToolbar,
       showCompactTimer: showCompactTimer,
+      onOpenNavigation: onOpenNavigation,
     );
   }
 }

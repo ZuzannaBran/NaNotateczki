@@ -333,11 +333,11 @@ i zachowuje obrazy inline.
   utrwalenie eraser-stroke.
 - `_toolFromIndex` i `_toolToIndex` muszą pozostać symetryczne.
 
-### `lib/features/notebook/presentation/notebook_screen.dart` (37 linii)
+### `lib/features/notebook/presentation/notebook_screen.dart` (40 linii)
 
 Wybiera pusty stan albo właściwy `EditorScreen`; przekazuje aktualny tytuł
-notatnika z biblioteki oraz flagę widoczności wspólnego paska narzędzi i `showCompactTimer`, sterujące
-wyświetlaniem `CompactStudyTimer` w nagłówku edytora.
+notatnika, flagi narzędzi/timera i opcjonalny przycisk otwarcia nawigacji
+mobilnej, bez zmiany modelu dokumentu.
 
 - 8: `NotebookScreen`.
 
@@ -366,10 +366,14 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1632 linii)
+### `lib/features/library/presentation/library_screen.dart` (1708 linii)
 
-Jednopanelowy sidebar biblioteki w formie drzewa obok pełnego widoku
-katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
+Widok responsywny: od 960 logicznych px sidebar biblioteki pozostaje
+obok katalogu/edytora; poniżej progu ten sam panel otwiera się jako
+wysuwany drawer z przycisku w nagłówku. `SafeArea` zabezpiecza cały
+widok przed systemowymi paskami i wycięciami ekranów Android/iOS.
+Globalny klucz workspace zachowuje kontroler podczas obracania ekranu.
+Układ desktopowy z drzewem obok pełnego widoku katalogów: start aplikacji pokazuje kafelki folderów, przycisk `Projects`
 wraca do katalogów, kliknięcie folderu otwiera siatkę podglądów dokumentów,
 a wybór dokumentu uruchamia edytor. Powrót z edytora wymusza flush
 niezapisanych zmian przed ponownym wczytaniem miniatur. Lista folderów
@@ -423,19 +427,19 @@ i przywracane natychmiast po zamknięciu;
 edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon.
 
 - 25: `LibraryScreen`; 32: `_LibraryScreenState`;
-  463: `_openCatalogSettings`;
-  798: `_CreateMenuButton`;
-  841: `_LibraryTreePane`;
+  506: `_openCatalogSettings`;
+  841: `_CreateMenuButton`;
+  884: `_LibraryTreePane`;
   1093: `_FolderTreeRow`;
   1191: `_LibraryTreeItemRow`;
   1302: `_sidebarMenuShape`;
   1316: `_SidebarMenuShadowPainter`;
   1357: `_showSidebarMenu`;
   1444: `_TreeRowActions`;
-  1518: `_LibraryWorkspace`;
-  1592: `_LeftZoneToggleTab`.
+  1573: `_LibraryWorkspace`;
+  1654: `_LeftZoneToggleTab`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1142 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1151 linii)
 
 Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
@@ -448,6 +452,7 @@ górnej krawędzi; notebooki są wyższe (0,72), boardy kwadratowe (1,0).
 Rzędy dokumentów mają 372 px wysokości. Menu i nazwa są wyrównane
 do wspólnej lewej krawędzi podglądów i nie wychodzą poza ich szerokość.
 AppBar pokazuje nazwę biblioteki/folderu, Settings i opcjonalny
+przycisk nawigacji w trybie kompaktowym oraz
 `CompactStudyTimer`; edycja okładki
 pozostaje w menu folderu, bez ikony palety w nagłówku otwartego folderu.
 Okładki folderów mają ponownie delikatne, wektorowe ikony Lucide
@@ -484,7 +489,7 @@ Siatka reaguje na wspólną czułość dotyku.
 
 - 24: `dominantFolderColor`; 53: `FolderCoverIcon`;
   107: `FolderCoverStrokePainter`; 233: `LibraryCatalog`;
-  520: `_FolderTile`; 587: `_DocumentTile`;
+  530: `_FolderTile`; 597: `_DocumentTile`;
   625: `_CatalogTile`; 748: `_DocumentPreview`;
   831: `_boardPreviewBounds`;
   873: `_PagePreviewPainter`;
@@ -528,13 +533,16 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`; 39: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (766):
+- `lib/features/planner/presentation/planner_screen.dart` (873):
   `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
   tworzenie, edycja, usuwanie i historia. Nazwa dnia tygodnia znajduje się
   w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
   Dostęp do globalnych ustawień i wspólnej czułości scrolla kalendarza
   oraz historii. Górny pasek ma 56 px i wspólną 1 px linię pod spodem,
-  także w trybie ciemnym. 13: `CalendarMode`; 15: `PlannerScreen`;
+  także w trybie ciemnym. Na telefonie Week/Month to pionowa lista
+  dni zamiast poziomego kalendarza 1050 px; nagłówek dat i akcje
+  mieszczą się bez poziomego przewijania. Body chroni dolny systemowy
+  inset. 13: `CalendarMode`; 15: `PlannerScreen`;
   22: `_PlannerScreenState`.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
@@ -616,7 +624,7 @@ ale zmienione ręcznie próbki pozostają nienaruszone.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2399 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2438 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px i korzysta z
 aktualnego tytułu przekazanego przez bibliotekę (fallback: kontroler);
@@ -680,7 +688,7 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (688 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (716 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
@@ -690,6 +698,8 @@ ma suwak czułości nawigacji 0.5×–2.0×, a Visual globalną skalę
 interfejsu 75%–150% z natychmiastowym podglądem. Oba suwaki nie
 wyświetlają liczb ani etykiet wartości. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
+  Na telefonach selektory System/Visual są pod etykietami; `SafeArea`
+  chroni dolny obszar systemowych gestów.
 `EditorController` jest opcjonalny: ustawienia globalne działają z pustego
 katalogu i planera; tła i ustawienia rysika wymagają otwartego dokumentu.
 Nagłówek ma wysokość 56 px, tytuł 18 px jak Projects i linię 1 px pod
@@ -713,11 +723,12 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1072):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1091):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
-  Zewnętrzne marginesy wynoszą po 52 px, wewnętrzne boczne po 22 px,
+  Zewnętrzne marginesy na szerokim ekranie wynoszą po 52 px,
+  wewnętrzne po 22 px; poniżej 600 px oba wynoszą po 8 px,
   a pionowy padding 3 px; przycisk zwijania pozostaje dostępny;
   ikony pobierają kontrast z motywu, próbki szarości pokazują ich
   aktualny kolor wyświetlania, a styl pozostaje lekki i obrysowy.
@@ -742,7 +753,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   12: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
   406: selektor kształtu; 534: `_colorDot`; 581: `pickColor`;
   952: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (345):
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (348):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
   ID bloku przez czas jego otwarcia, nawet przy utracie aktywnego zaznaczenia. Obsługuje realne formatowanie całego bloku: bold, italic,
@@ -751,7 +762,8 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   ponieważ obecny `EditableText` nie renderuje ich jako rich-text.
   Pasek używa takiej samej kapsułki: zwęża się do zawartości,
   pozostaje wycentrowany i przewija poziomo na wąskich ekranach.
-  Ma 52 px zewnętrznego i 22 px wewnętrznego marginesu bocznego
+  Na ekranach szerokich ma 52 px zewnętrznego i 22 px wewnętrznego
+  marginesu bocznego; na telefonach 8 px + 8 px.
   oraz 2 px pionowego paddingu.
   9: `TextEditToolbar`; 43: `build`.
 
@@ -856,7 +868,7 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (910 linii)
+### `lib/features/board/presentation/board_screen.dart` (922 linii)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -881,7 +893,7 @@ wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 - 30: `BoardScreen`; 46: `_BoardScreenState`.
 - 70: `_buildBoardRect`; 80–394: obsługa pointerów i viewportu.
 - 514: główny `build`; import/eksport i skróty przez `EditorCommands`.
-- 758: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
+- 781: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
 - 794: `_BoardPaintProbe`; 811: `_RenderBoardPaintProbe`;
   834: `_BoardZoomControls`.
 
@@ -963,6 +975,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   cienia na styku oraz wspólna czułość nowych scrollerów.
 - `test/dialog_actions_test.dart`: kolory przycisków stopki w obu motywach
   oraz izolacja stylu od przycisków wewnątrz treści dialogu.
+- `test/adaptive_platform_layout_test.dart`: bezpieczne górne i dolne
+  marginesy systemowe, dostęp do drawer/edytora, układy 320/390/768/844/
+  1024/1440 px i zachowanie kontrolera przy zmianie orientacji.
 - `test/library_screen_responsive_layout_test.dart`:
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego

@@ -30,7 +30,9 @@ class EditorSettingsScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         title: const Text('Settings', style: AppHeaderDivider.titleStyle),
       ),
-      body: DefaultTabController(
+      body: SafeArea(
+        top: false,
+        child: DefaultTabController(
         length: 3,
         child: Column(
           children: [
@@ -54,13 +56,10 @@ class EditorSettingsScreen extends StatelessWidget {
                       horizontal: 16,
                     ),
                     children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                        ),
+                      _SettingsSelectorTile(
                         title: const Text('Device mode'),
                         subtitle: Text(preferences.deviceInputMode.description),
-                        trailing: SegmentedButton<DeviceInputMode>(
+                        control: SegmentedButton<DeviceInputMode>(
                           showSelectedIcon: false,
                           segments: const [
                             ButtonSegment(
@@ -79,15 +78,12 @@ class EditorSettingsScreen extends StatelessWidget {
                         ),
                       ),
                       if (controller != null)
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                          ),
+                        _SettingsSelectorTile(
                           title: const Text('Stylus and touch'),
                           subtitle: Text(
                             controller.pointerInputMode.description,
                           ),
-                          trailing: SegmentedButton<PointerInputMode>(
+                          control: SegmentedButton<PointerInputMode>(
                             showSelectedIcon: false,
                             segments: const [
                               ButtonSegment(
@@ -136,15 +132,12 @@ class EditorSettingsScreen extends StatelessWidget {
                         ),
                       ),
                       if (controller != null)
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                          ),
+                        _SettingsSelectorTile(
                           title: const Text('Stylus buttons'),
                           subtitle: const Text(
                             'Use stylus buttons to switch eraser.',
                           ),
-                          trailing: SegmentedButton<bool>(
+                          control: SegmentedButton<bool>(
                             showSelectedIcon: false,
                             segments: const [
                               ButtonSegment(value: false, label: Text('Off')),
@@ -159,15 +152,12 @@ class EditorSettingsScreen extends StatelessWidget {
                           ),
                         ),
                       if (controller != null)
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                          ),
+                        _SettingsSelectorTile(
                           title: const Text('Scribble eraser'),
                           subtitle: const Text(
                             'Erase ink by scribbling over it with the pen.',
                           ),
-                          trailing: SegmentedButton<bool>(
+                          control: SegmentedButton<bool>(
                             showSelectedIcon: false,
                             segments: const [
                               ButtonSegment(value: false, label: Text('Off')),
@@ -243,15 +233,12 @@ class EditorSettingsScreen extends StatelessWidget {
                       horizontal: 16,
                     ),
                     children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                        ),
+                      _SettingsSelectorTile(
                         title: const Text('Appearance'),
                         subtitle: const Text(
                           'Light or dark interface with contrasting ink.',
                         ),
-                        trailing: SegmentedButton<bool>(
+                        control: SegmentedButton<bool>(
                           key: const ValueKey('visual-dark-mode-toggle'),
                           showSelectedIcon: false,
                           segments: const [
@@ -332,6 +319,47 @@ class EditorSettingsScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+      ),
+    );
+  }
+}
+
+/// Places setting choices below their labels on narrow touch screens.
+class _SettingsSelectorTile extends StatelessWidget {
+  const _SettingsSelectorTile({
+    required this.title,
+    required this.subtitle,
+    required this.control,
+  });
+
+  final Widget title;
+  final Widget subtitle;
+  final Widget control;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width >= 600) {
+      return ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+        title: title,
+        subtitle: subtitle,
+        trailing: control,
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: title,
+            subtitle: subtitle,
+          ),
+          const SizedBox(height: 4),
+          control,
+        ],
       ),
     );
   }

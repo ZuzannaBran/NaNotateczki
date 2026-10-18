@@ -47,6 +47,39 @@ void main() {
     await planner.flush();
   });
 
+  testWidgets('phone planner uses vertical days and compact actions', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: PlannerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('mobile-planner-days')), findsOneWidget);
+    expect(find.byTooltip('Planner actions'), findsOneWidget);
+    expect(find.byTooltip('Previous'), findsOneWidget);
+    expect(find.byTooltip('Next'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('mobile-planner-days')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byTooltip('Planner actions'));
+    await tester.pumpAndSettle();
+    expect(find.text('New session'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('sidebar timer starts pauses and rates a session', (
     tester,
   ) async {

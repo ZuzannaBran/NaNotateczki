@@ -442,6 +442,21 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final minimumWidth = _mode == CalendarMode.week ? 1050.0 : 980.0;
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (constraints.maxWidth < 600) {
+          final compactDays = _mode == CalendarMode.month
+              ? days.where((day) => day.month == _anchor.month).toList()
+              : days;
+          return ListView.builder(
+            key: const ValueKey('mobile-planner-days'),
+            physics: _navigationPhysics,
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
+            itemCount: compactDays.length,
+            itemBuilder: (context, index) => SizedBox(
+              height: 168,
+              child: _dayCell(compactDays[index], sessions),
+            ),
+          );
+        }
         final width = constraints.maxWidth < minimumWidth
             ? minimumWidth
             : constraints.maxWidth;
@@ -547,6 +562,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final planner = context.watch<StudyPlannerController>();
     final colors = Theme.of(context).colorScheme;
     final narrow = MediaQuery.sizeOf(context).width < 760;
+    final mobile = MediaQuery.sizeOf(context).width < 600;
     return StudyActionTheme(
       child: Scaffold(
         appBar: AppBar(
@@ -564,7 +580,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
-            IconButton(
+            if (!mobile) IconButton(
               tooltip: 'Settings',
               icon: const Icon(Icons.settings_outlined),
               onPressed: () => Navigator.of(context).push(
@@ -582,7 +598,38 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     : Icons.history_rounded,
               ),
             ),
-            if (narrow) ...[
+            if (mobile)
+              PopupMenuButton<String>(
+                tooltip: 'Planner actions',
+                icon: const Icon(Icons.more_vert_rounded),
+                onSelected: (action) {
+                  switch (action) {
+                    case 'new':
+                      showStudySessionEditor(context);
+                      return;
+                    case 'smart':
+                      showStudySessionEditor(
+                        context,
+                        technique: StudyTechnique.pomodoro,
+                        startAfterSave: true,
+                      );
+                      return;
+                    case 'settings':
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const EditorSettingsScreen(),
+                        ),
+                      );
+                      return;
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'new', child: Text('New session')),
+                  PopupMenuItem(value: 'smart', child: Text('Smart session')),
+                  PopupMenuItem(value: 'settings', child: Text('Settings')),
+                ],
+              )
+            else if (narrow) ...[
               IconButton(
                 tooltip: 'Smart session',
                 onPressed: () => showStudySessionEditor(
@@ -617,7 +664,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
             const SizedBox(width: 16),
           ],
         ),
-        body: Column(
+        body: SafeArea(
+          top: false,
+          child: Column(
           children: [
             const AppHeaderDivider(),
             if (planner.active != null || planner.pendingReviews.isNotEmpty)
@@ -683,6 +732,63 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 ),
               ),
             if (!_history) ...[
+              if (mobile)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            tooltip: 'Previous',
+                            icon: const Icon(Icons.chevron_left),
+                            onPressed: () => _navigate(-1),
+                          ),
+                          Expanded(
+                            child: Text(
+                              _heading(),
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Next',
+                            icon: const Icon(Icons.chevron_right),
+                            onPressed: () => _navigate(1),
+                          ),
+                          TextButton(
+                            onPressed: () => setState(
+                              () => _anchor = DateUtils.dateOnly(DateTime.now()),
+                            ),
+                            child: const Text('Today'),
+                          ),
+                        ],
+                      ),
+                      SegmentedButton<CalendarMode>(
+                        showSelectedIcon: false,
+                        segments: const [
+                          ButtonSegment(
+                            value: CalendarMode.today,
+                            label: Text('Today'),
+                          ),
+                          ButtonSegment(
+                            value: CalendarMode.week,
+                            label: Text('Week'),
+                          ),
+                          ButtonSegment(
+                            value: CalendarMode.month,
+                            label: Text('Month'),
+                          ),
+                        ],
+                        selected: {_mode},
+                        onSelectionChanged: (next) =>
+                            setState(() => _mode = next.first),
+                      ),
+                    ],
+                  ),
+                )
+              else
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
                 child: SingleChildScrollView(
@@ -759,6 +865,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   : _calendar(planner.sessions),
             ),
           ],
+        ),
         ),
       ),
     );

@@ -41,11 +41,13 @@ class EditorScreen extends StatefulWidget {
     this.title,
     this.showToolbar = true,
     this.showCompactTimer = false,
+    this.onOpenNavigation,
   });
 
   final String? title;
   final bool showToolbar;
   final bool showCompactTimer;
+  final VoidCallback? onOpenNavigation;
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -1066,15 +1068,19 @@ class _EditorScreenState extends State<EditorScreen> {
         Positioned.fill(
           child: LayoutBuilder(
             builder: (context, constraints) {
+              final compactCanvas = constraints.maxWidth < 600;
+              final leftPageMargin = compactCanvas ? 12.0 : _leftMargin;
+              final rightPageMargin = compactCanvas ? 12.0 : _rightMargin;
               final showProjectOverview =
+                  !compactCanvas &&
                   constraints.maxWidth >
-                  _overviewRight + _overviewSideGap + _rightMargin;
+                      _overviewRight + _overviewSideGap + _rightMargin;
               final pageLeftBoundary = showProjectOverview
                   ? _overviewRight + _overviewSideGap
-                  : _leftMargin;
+                  : leftPageMargin;
               final maxPageWidth = math.max(
                 1.0,
-                constraints.maxWidth - pageLeftBoundary - _rightMargin,
+                constraints.maxWidth - pageLeftBoundary - rightPageMargin,
               );
               const pageWidth = _logicalPageWidth;
               final pageHeight = pageWidth * AppMetrics.a4HeightRatio;
@@ -1170,10 +1176,10 @@ class _EditorScreenState extends State<EditorScreen> {
                             : TouchNavigationScrollPhysics(
                                 sensitivity: touchNavigationGain,
                               ),
-                        padding: const EdgeInsets.fromLTRB(
-                          _leftMargin,
+                        padding: EdgeInsets.fromLTRB(
+                          leftPageMargin,
                           _topBottomPadding,
-                          _rightMargin,
+                          rightPageMargin,
                           _topBottomPadding,
                         ),
                         child: Align(
@@ -1519,12 +1525,45 @@ class _EditorScreenState extends State<EditorScreen> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         titleSpacing: useWideTitleInset ? 44 : null,
+        leading: widget.onOpenNavigation == null
+            ? null
+            : IconButton(
+                key: const ValueKey('mobile-navigation-open'),
+                tooltip: 'Open navigation',
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: widget.onOpenNavigation,
+              ),
         title: Text(
           widget.title ?? controller.notebook.title,
           style: AppHeaderDivider.titleStyle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
           if (widget.showCompactTimer) const CompactStudyTimer(),
+          if (MediaQuery.sizeOf(context).width < 600)
+            PopupMenuButton<String>(
+              tooltip: 'Page actions',
+              icon: const Icon(Icons.more_vert_rounded),
+              onSelected: (action) {
+                if (action == 'add') {
+                  _addPageBelow(controller);
+                } else if (action == 'delete') {
+                  controller.deleteLastPage();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'add',
+                  child: Text('Add page'),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  enabled: controller.pages.length > 1,
+                  child: const Text('Delete last page'),
+                ),
+              ],
+            ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',

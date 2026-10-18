@@ -79,12 +79,15 @@ void main() {
       const Size(logicalPageWidth, logicalPageWidth * AppMetrics.a4HeightRatio),
     );
     expect(_documentLayoutSize(tester).width, logicalPageWidth);
-    expect(_documentScale(tester), closeTo((500 - 106 - 10 - 56) / 820, 0.001));
+    expect(_documentScale(tester), closeTo((500 - 24) / 820, 0.001));
     final narrowRightMargin = 500 - _documentTopRight(tester).dx;
-    expect(narrowRightMargin, closeTo(wideViewportRightMargin, 0.001));
-    expect(_pageViewportSize(tester).width, closeTo(328.0, 0.001));
+    expect(narrowRightMargin, closeTo(12.0, 0.001));
+    expect(_pageViewportSize(tester).width, closeTo(476.0, 0.001));
     expect(_documentTranslationX(tester), closeTo(0.0, 0.001));
-    _expectOverviewSideGapsEqual(tester);
+    expect(
+      find.byKey(const ValueKey('notebook-project-overview')),
+      findsNothing,
+    );
     expect(find.text('Widen the window to edit this notebook.'), findsNothing);
 
     await tester.binding.setSurfaceSize(const Size(1100, 900));

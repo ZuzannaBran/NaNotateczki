@@ -244,6 +244,7 @@ class LibraryCatalog extends StatelessWidget {
     required this.onDeleteItem,
     required this.onSettings,
     this.showCompactTimer = false,
+    this.onOpenNavigation,
     super.key,
   });
 
@@ -259,6 +260,7 @@ class LibraryCatalog extends StatelessWidget {
   final ValueChanged<Notebook> onDeleteItem;
   final VoidCallback onSettings;
   final bool showCompactTimer;
+  final VoidCallback? onOpenNavigation;
 
   @override
   Widget build(BuildContext context) {
@@ -275,6 +277,14 @@ class LibraryCatalog extends StatelessWidget {
       appBar: AppBar(
         toolbarHeight: AppHeaderDivider.toolbarHeight,
         automaticallyImplyLeading: false,
+        leading: onOpenNavigation == null
+            ? null
+            : IconButton(
+                key: const ValueKey('mobile-navigation-open'),
+                tooltip: 'Open navigation',
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: onOpenNavigation,
+              ),
         titleSpacing: useWideTitleInset ? 44 : null,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,

@@ -60,10 +60,10 @@ Future<Color> _sampleRenderedPixel(
 }
 
 void main() {
-  testWidgets('library locks wide layout below editor margin breakpoint', (
+  testWidgets('library switches from sidebar to drawer at 960 pixels', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(1038, 700));
+    await tester.binding.setSurfaceSize(const Size(960, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     final database = NotesDatabase(NativeDatabase.memory());
@@ -89,10 +89,21 @@ void main() {
 
     expect(find.byKey(const ValueKey('catalog-title')), findsOneWidget);
 
-    await tester.binding.setSurfaceSize(const Size(1037, 700));
+    expect(
+      find.byKey(const ValueKey('library-navigation-toggle')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('mobile-navigation-open')), findsNothing);
+
+    await tester.binding.setSurfaceSize(const Size(959, 700));
     await tester.pump();
 
     expect(find.byKey(const ValueKey('catalog-title')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile-navigation-open')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('library-navigation-toggle')),
+      findsNothing,
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
@@ -826,7 +837,7 @@ void main() {
 
     for (final panel in [mainPanel, textPanel]) {
       final rect = tester.getRect(panel);
-      expect(rect.width, closeTo(560 - 104, 0.01));
+      expect(rect.width, closeTo(560 - 16, 0.01));
       expect(rect.center.dx, closeTo(280, 0.01));
       final scroller = find.descendant(
         of: panel,
