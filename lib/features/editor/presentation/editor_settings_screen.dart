@@ -345,28 +345,32 @@ class _SettingsSelectorTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.sizeOf(context).width >= 600) {
-      return ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-        title: title,
-        subtitle: subtitle,
-        trailing: control,
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 600) {
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
             title: title,
             subtitle: subtitle,
+            trailing: control,
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: title,
+                subtitle: subtitle,
+              ),
+              const SizedBox(height: 4),
+              control,
+            ],
           ),
-          const SizedBox(height: 4),
-          control,
-        ],
-      ),
+        );
+      },
     );
   }
 }

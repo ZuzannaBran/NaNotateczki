@@ -366,8 +366,10 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1708 linii)
+### `lib/features/library/presentation/library_screen.dart` (1709 linii)
 
+Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
+`MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
 Widok responsywny: od 960 logicznych px sidebar biblioteki pozostaje
 obok katalogu/edytora; poniżej progu ten sam panel otwiera się jako
 wysuwany drawer z przycisku w nagłówku. `SafeArea` zabezpiecza cały
@@ -436,8 +438,8 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1316: `_SidebarMenuShadowPainter`;
   1357: `_showSidebarMenu`;
   1444: `_TreeRowActions`;
-  1573: `_LibraryWorkspace`;
-  1654: `_LeftZoneToggleTab`.
+  1574: `_LibraryWorkspace`;
+  1655: `_LeftZoneToggleTab`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1151 linii)
 
@@ -533,12 +535,14 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`; 39: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (873):
+- `lib/features/planner/presentation/planner_screen.dart` (883):
   `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
   tworzenie, edycja, usuwanie i historia. Nazwa dnia tygodnia znajduje się
   w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
   Dostęp do globalnych ustawień i wspólnej czułości scrolla kalendarza
   oraz historii. Górny pasek ma 56 px i wspólną 1 px linię pod spodem,
+  Nagłówek telefonu/tabletu korzysta z ograniczeń rodzica
+  (`LayoutBuilder`), aby nie przepełniać systemowego AppBar.
   także w trybie ciemnym. Poniżej 960 px Week/Month to pionowa lista
   dni zamiast poziomego kalendarza 1050 px; nagłówek dat i akcje
   mieszczą się bez poziomego przewijania. Body chroni dolny systemowy
@@ -691,7 +695,7 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
-### `lib/features/editor/presentation/editor_settings_screen.dart` (716 linii)
+### `lib/features/editor/presentation/editor_settings_screen.dart` (726 linii)
 
 Ustawienia wejścia, dwuczłonowy selektor `Light` / `Dark` w Visual:
 wybór używa beżowych odcieni `divider`/`toolbar` w jasnym motywie
@@ -726,10 +730,12 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
   kartce #50514D. 6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1091):
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1088):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
+  Szerokość dostępna dla toolbaru jest mierzona przez `LayoutBuilder`
+  podczas resize, niezależnie od opóźnień w aktualizacji `MediaQuery`.
   Zewnętrzne marginesy na szerokim ekranie wynoszą po 52 px,
   wewnętrzne po 22 px; poniżej 600 px oba wynoszą po 8 px,
   a pionowy padding 3 px; przycisk zwijania pozostaje dostępny;
@@ -753,10 +759,10 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   Po odczycie Recent selektor sprawdza osobno `context.mounted` i
   `navigator.mounted` przed odwołaniem do `NavigatorState.context`;
   chroni to dostęp do kontekstu na granicy asynchronicznej.
-  12: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
+  14: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
   406: selektor kształtu; 534: `_colorDot`; 581: `pickColor`;
   952: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (348):
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (352):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
   ID bloku przez czas jego otwarcia, nawet przy utracie aktywnego zaznaczenia. Obsługuje realne formatowanie całego bloku: bold, italic,
@@ -978,6 +984,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   cienia na styku oraz wspólna czułość nowych scrollerów.
 - `test/dialog_actions_test.dart`: kolory przycisków stopki w obu motywach
   oraz izolacja stylu od przycisków wewnątrz treści dialogu.
+- `.github/workflows/cross_platform_tests.yml`: osobny szybki job
+  `adaptive-layout` dla regresji viewportów; pełny zestaw testów ma
+  limit 3 minut na przypadek (wcześniej 10 minut), bez wyłączania testów.
 - `test/adaptive_platform_layout_test.dart`: bezpieczne górne i dolne
   marginesy systemowe, dostęp do drawer/edytora, układy 320/390/768/844/
   1024/1440 px i zachowanie kontrolera przy zmianie orientacji.

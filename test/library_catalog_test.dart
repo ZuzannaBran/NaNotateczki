@@ -241,7 +241,7 @@ void main() {
       );
       final previewArea = find.descendant(
         of: documentTile,
-        matching: find.byType(InkWell),
+        matching: find.byKey(const ValueKey('catalog-preview-shadow')),
       );
       final menuRect = tester.getRect(documentMenu);
       final labelRect = tester.getRect(documentLabel);
@@ -598,13 +598,19 @@ void main() {
         matching: find.byKey(const ValueKey('catalog-preview-shadow')),
       );
       final material = tester.widget<Material>(
-        find.descendant(of: preview, matching: find.byType(Material)),
+        find.descendant(
+          of: preview,
+          matching: find.byType(Material),
+        ).first,
       );
       expect(material.clipBehavior, Clip.antiAlias);
       expect(material.borderRadius, BorderRadius.circular(24));
 
       final inkWell = tester.widget<InkWell>(
-        find.descendant(of: tile, matching: find.byType(InkWell)),
+        find.descendant(
+          of: preview,
+          matching: find.byType(InkWell),
+        ).first,
       );
       expect(inkWell.borderRadius, BorderRadius.circular(24));
       expect(inkWell.overlayColor!.resolve({}), Colors.transparent);

@@ -561,10 +561,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
   Widget build(BuildContext context) {
     final planner = context.watch<StudyPlannerController>();
     final colors = Theme.of(context).colorScheme;
-    final narrow = MediaQuery.sizeOf(context).width < 760;
-    final mobile = MediaQuery.sizeOf(context).width < 600;
-    final compactCalendar = MediaQuery.sizeOf(context).width < 960;
-    return StudyActionTheme(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 760;
+        final mobile = constraints.maxWidth < 600;
+        final compactCalendar = constraints.maxWidth < 960;
+        return StudyActionTheme(
       child: Scaffold(
         appBar: AppBar(
           toolbarHeight: AppHeaderDivider.toolbarHeight,
@@ -874,6 +876,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
           ),
         ),
       ),
+        );
+      },
     );
   }
 }

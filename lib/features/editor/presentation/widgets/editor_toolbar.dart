@@ -25,14 +25,15 @@ class EditorToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
+    return LayoutBuilder(
+      builder: (context, constraints) => AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
+          final mobile = constraints.maxWidth < 600;
         final canDelete =
             controller.activeTextBlockId != null ||
             controller.activeImageBlockId != null ||
             (controller.lassoSelection?.isEmpty == false);
-        final mobile = MediaQuery.sizeOf(context).width < 600;
         return Padding(
           padding: EdgeInsets.fromLTRB(mobile ? 8 : 52, 8, mobile ? 8 : 52, 8),
           child: Align(
@@ -158,7 +159,8 @@ class EditorToolbar extends StatelessWidget {
             ),
           ),
         );
-      },
+        },
+      ),
     );
   }
 

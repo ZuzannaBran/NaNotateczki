@@ -47,7 +47,7 @@ jobs:
               -print0 | sort -z
           )
           test "${#test_files[@]}" -gt 0
-          flutter test "${test_files[@]}" --coverage --reporter expanded
+          flutter test "${test_files[@]}" --coverage --reporter expanded --timeout 3m --concurrency 3
       - name: Enforce initial line coverage floor
         shell: bash
         env:
@@ -74,6 +74,28 @@ jobs:
           name: flutter-coverage
           path: coverage/lcov.info
           if-no-files-found: ignore
+
+  adaptive-layout:
+    name: Phone, tablet and desktop layout regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Validate changing viewport, insets, editor and planner
+        run: |
+          flutter test \
+            test/adaptive_platform_layout_test.dart \
+            test/library_screen_responsive_layout_test.dart \
+            test/editor_screen_responsive_layout_test.dart \
+            test/library_catalog_test.dart \
+            test/study_planner_widget_test.dart \
+            --reporter expanded --timeout 3m --concurrency 2
 
   export-render:
     name: PNG/PDF production renderer

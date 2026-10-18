@@ -48,8 +48,10 @@ class TextEditToolbar extends StatelessWidget {
     final currentAlign = paragraph['align']?.toString() ?? 'left';
     final currentSize = block.fontSize.round();
 
-    final mobile = MediaQuery.sizeOf(context).width < 600;
-    return Padding(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final mobile = constraints.maxWidth < 600;
+        return Padding(
       padding: EdgeInsets.fromLTRB(mobile ? 8 : 52, 0, mobile ? 8 : 52, 8),
       child: Align(
         alignment: Alignment.topCenter,
@@ -159,6 +161,8 @@ class TextEditToolbar extends StatelessWidget {
           ),
         ),
       ),
+        );
+      },
     );
   }
 

@@ -387,11 +387,14 @@ void main() {
     final app = await _pumpApp(tester);
     app.preferences.previewTouchNavigationSensitivity(1.8);
     await tester.pumpAndSettle();
-    final grid = tester.widget<GridView>(
+    final folders = tester.widget<SingleChildScrollView>(
       find.byKey(const ValueKey('catalog-folders')),
     );
-    expect(grid.physics, isA<TouchNavigationScrollPhysics>());
-    expect((grid.physics! as TouchNavigationScrollPhysics).sensitivity, 1.8);
+    expect(folders.physics, isA<TouchNavigationScrollPhysics>());
+    expect(
+      (folders.physics! as TouchNavigationScrollPhysics).sensitivity,
+      1.8,
+    );
     await _openPlanner(tester);
     await tester.tap(find.text('Today').last);
     await tester.pumpAndSettle();

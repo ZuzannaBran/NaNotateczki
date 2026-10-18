@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -65,6 +66,16 @@ void main() {
     await tester.tap(menu);
     await tester.pumpAndSettle();
     expect(find.text('Projects'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Create'));
+    await tester.pumpAndSettle();
+    final createMenu = tester.getRect(find.text('New folder'));
+    expect(createMenu.left, greaterThanOrEqualTo(0));
+    expect(createMenu.right, lessThanOrEqualTo(390));
+    expect(createMenu.top, greaterThanOrEqualTo(30));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byKey(ValueKey('library-tree-item:${notebook.uid}')));
     await tester.pumpAndSettle();
 

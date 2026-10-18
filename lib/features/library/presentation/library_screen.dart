@@ -1401,8 +1401,7 @@ Future<T?> _showSidebarMenu<T>({
     return null;
   }
 
-  if (MediaQuery.sizeOf(context).width <
-      _LibraryScreenState._adaptiveBreakpoint) {
+  if (screenState?._compactScaffoldKey.currentState != null) {
     final anchorRect = anchorBox.localToGlobal(
       Offset.zero,
       ancestor: overlayBox,
