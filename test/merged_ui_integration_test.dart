@@ -62,6 +62,16 @@ void main() {
         const Rect.fromLTWH(0, kToolbarHeight, 1400, 1),
       );
       final libraryColor = tester.widget<ColoredBox>(libraryDivider).color;
+      final scheme = Theme.of(tester.element(libraryDivider)).colorScheme;
+      expect(
+        libraryColor,
+        Color.alphaBlend(
+          scheme.outlineVariant.withValues(
+            alpha: darkMode ? 0.45 : 0.20,
+          ),
+          scheme.surfaceContainerLowest,
+        ),
+      );
       expect(
         libraryColor,
         AppHeaderDivider.colorOf(tester.element(libraryDivider)),
