@@ -41,11 +41,10 @@ class StudyActionStyles {
     ),
   );
 
-  static ButtonStyle sessionPrimary(ThemeData theme) =>
-      primary(theme).copyWith(
-        shape: const WidgetStatePropertyAll(sessionButtonShape),
-        padding: const WidgetStatePropertyAll(sessionButtonPadding),
-      );
+  static ButtonStyle sessionPrimary(ThemeData theme) => primary(theme).copyWith(
+    shape: const WidgetStatePropertyAll(sessionButtonShape),
+    padding: const WidgetStatePropertyAll(sessionButtonPadding),
+  );
 
   static ButtonStyle sessionOutlined() => OutlinedButton.styleFrom(
     shape: sessionButtonShape,

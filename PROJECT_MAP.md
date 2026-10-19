@@ -368,7 +368,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1735 linii)
+### `lib/features/library/presentation/library_screen.dart` (1729 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -441,14 +441,14 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   506: `_openCatalogSettings`;
   841: `_CreateMenuButton`;
   884: `_LibraryTreePane`;
-  1093: `_FolderTreeRow`;
-  1191: `_LibraryTreeItemRow`;
-  1302: `_sidebarMenuShape`;
-  1316: `_SidebarMenuShadowPainter`;
-  1357: `_showSidebarMenu`;
-  1444: `_TreeRowActions`;
-  1574: `_LibraryWorkspace`;
-  1655: `_LeftZoneToggleTab`.
+  1156: `_FolderTreeRow`;
+  1254: `_LibraryTreeItemRow`;
+  1357: `_sidebarMenuShape`;
+  1371: `_SidebarMenuShadowPainter`;
+  1407: `_showSidebarMenu`;
+  1520: `_TreeRowActions`;
+  1594: `_LibraryWorkspace`;
+  1675: `_LeftZoneToggleTab`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1158 linii)
 
@@ -532,7 +532,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
   152: `StudyPlannerController`; 232: `load`; 298: `create`;
   366: `start`; 528: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (572):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (573):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -541,12 +541,13 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Przyciski `Start session` i `Smart` w panelu bocznym wypełniają
   po połowie dostępnej szerokości z odstępem 8 px i promieniem 12 px;
   etykiety bez ikon są optycznie wyśrodkowane także na wąskim panelu.
+  Selektor techniki w formularzu `isExpanded` mieści się w wąskim dialogu.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
   24: `studyRatingStars`; 31: `openStudyPlanner`;
   37: `showStudySessionEditor`; 57: `showStudyRating`;
-  343: `StudyTimerCard`; 524: `CompactStudyTimer`.
-- `lib/features/planner/presentation/study_action_theme.dart` (114):
+  343: `StudyTimerCard`; 525: `CompactStudyTimer`.
+- `lib/features/planner/presentation/study_action_theme.dart` (113):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); subtelny beż
   tylko dla wyróżnianych akcji; pozostałe przyciski i ikony bez ciemnego
@@ -554,13 +555,14 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   57: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (806):
+- `lib/features/planner/presentation/planner_screen.dart` (812):
   `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme` i promieniem 12 px w obu motywach. Osobne przyciski
   Settings i Study history usunięto – historia pozostaje w kalendarzu,
   a globalne ustawienia w katalogu. Smart/New session mają wspólne
-  style z timerem; poniżej 760 px leżą pod nagłówkiem w równym rzędzie.
+  style z timerem i wysokość 44 px; poniżej 760 px leżą pod nagłówkiem
+  w równym rzędzie.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px, Week/Month na wąskim ekranie listę.
   13: `CalendarMode`; 15: `PlannerScreen`;
@@ -571,7 +573,8 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 - `test/study_planner_widget_test.dart`: szerokości 50/50, odstępy
   i zaokrąglenia przycisków timera przy panelach 240/320 px;
   środkowanie etykiet, ciemniejsze ukończone sesje w obu motywach,
-  przyciski kalendarza i margines dolny, oceny sesji z kalendarza.
+  przyciski kalendarza o tej samej wysokości, brak overflow
+  selektora techniki w wąskim oknie, margines dolny i oceny kalendarza.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
   tygodnia we wszystkich widokach i po zmianie daty; osobny krok CI.
 - `test/study_planner_button_contrast_test.dart`: regresja widoczności

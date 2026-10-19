@@ -65,14 +65,8 @@ void main() {
 
     expect(find.byKey(const ValueKey('mobile-planner-days')), findsOneWidget);
     expect(find.byTooltip('Planner actions'), findsNothing);
-    expect(
-      find.byKey(const ValueKey('planner-smart-session')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('planner-new-session')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('planner-smart-session')), findsOneWidget);
+    expect(find.byKey(const ValueKey('planner-new-session')), findsOneWidget);
     expect(find.byTooltip('Previous'), findsOneWidget);
     expect(find.byTooltip('Next'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -91,6 +85,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('planner-new-session')));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     expect(find.text('Session name'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -127,12 +122,8 @@ void main() {
       final timer = tester.getRect(
         find.byKey(const ValueKey('study-timer-card')),
       );
-      final startFinder = find.byKey(
-        const ValueKey('sidebar-start-session'),
-      );
-      final smartFinder = find.byKey(
-        const ValueKey('sidebar-smart-session'),
-      );
+      final startFinder = find.byKey(const ValueKey('sidebar-start-session'));
+      final smartFinder = find.byKey(const ValueKey('sidebar-smart-session'));
       final start = tester.getRect(startFinder);
       final smart = tester.getRect(smartFinder);
 
@@ -389,9 +380,15 @@ void main() {
 
     final smart = find.byKey(const ValueKey('planner-smart-session'));
     final create = find.byKey(const ValueKey('planner-new-session'));
-    final shape = tester.widget<OutlinedButton>(smart).style!.shape!
+    final shape = tester
+        .widget<OutlinedButton>(smart)
+        .style!
+        .shape!
         .resolve(<WidgetState>{});
-    final filledShape = tester.widget<FilledButton>(create).style!.shape!
+    final filledShape = tester
+        .widget<FilledButton>(create)
+        .style!
+        .shape!
         .resolve(<WidgetState>{});
     expect(
       (shape! as RoundedRectangleBorder).borderRadius,
@@ -403,9 +400,9 @@ void main() {
     );
     expect(tester.getSize(smart).width, closeTo(148, 0.1));
     expect(tester.getSize(create).width, closeTo(148, 0.1));
-    final bottomGap = find.byKey(
-      const ValueKey('planner-calendar-bottom-gap'),
-    );
+    expect(tester.getSize(smart).height, 44);
+    expect(tester.getSize(create).height, 44);
+    final bottomGap = find.byKey(const ValueKey('planner-calendar-bottom-gap'));
     expect(tester.getSize(bottomGap).height, 24);
     expect(
       tester.getBottomLeft(bottomGap).dy,
@@ -421,5 +418,4 @@ void main() {
     expect(tester.getRect(smart).top, closeTo(tester.getRect(create).top, 1));
     expect(tester.takeException(), isNull);
   });
-
 }

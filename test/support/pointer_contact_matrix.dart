@@ -85,11 +85,7 @@ class _Contact {
 
   Future<void> cancel() async {
     await tester.sendEventToBinding(
-      PointerCancelEvent(
-        pointer: pointer,
-        kind: kind,
-        position: _position!,
-      ),
+      PointerCancelEvent(pointer: pointer, kind: kind, position: _position!),
     );
     await tester.pump();
   }
@@ -174,9 +170,7 @@ class _CanvasFixture {
       MaterialApp(
         home: MultiProvider(
           providers: [
-            ChangeNotifierProvider<EditorController>.value(
-              value: controller,
-            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
             ChangeNotifierProvider<AppPreferencesController>.value(
               value: preferences,
             ),
@@ -358,26 +352,14 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
           radiusMajor: 55,
         );
         await palmFirst.down(f.farPalm);
-        final penAfter = _Contact(
-          tester,
-          231,
-          PointerDeviceKind.stylus,
-        );
+        final penAfter = _Contact(tester, 231, PointerDeviceKind.stylus);
         await _stroke(penAfter, f.inkStart);
         await palmFirst.up();
         f.expectStrokeCount(++count);
         f.expectLastStrokeLocal();
 
-        final fingerOne = _Contact(
-          tester,
-          232,
-          PointerDeviceKind.touch,
-        );
-        final fingerTwo = _Contact(
-          tester,
-          233,
-          PointerDeviceKind.touch,
-        );
+        final fingerOne = _Contact(tester, 232, PointerDeviceKind.touch);
+        final fingerTwo = _Contact(tester, 233, PointerDeviceKind.touch);
         await fingerOne.down(f.nearPalm);
         await fingerTwo.down(f.farPalm);
         final pen = _Contact(tester, 234, PointerDeviceKind.stylus);
@@ -417,11 +399,7 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
         await touch.cancel();
         f.expectStrokeCount(0);
 
-        final recoveredPen = _Contact(
-          tester,
-          312,
-          PointerDeviceKind.stylus,
-        );
+        final recoveredPen = _Contact(tester, 312, PointerDeviceKind.stylus);
         await _stroke(recoveredPen, f.inkStart);
         f.expectStrokeCount(1);
         f.expectLastStrokeLocal();

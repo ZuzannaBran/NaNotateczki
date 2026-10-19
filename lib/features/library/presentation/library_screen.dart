@@ -993,9 +993,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                         ],
                       ),
               ),
-              const AppHeaderDivider(
-                key: ValueKey('sidebar-timer-divider'),
-              ),
+              const AppHeaderDivider(key: ValueKey('sidebar-timer-divider')),
               ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: timerMaxHeight),
                 child: SingleChildScrollView(

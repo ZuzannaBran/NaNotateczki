@@ -965,8 +965,10 @@ void main() {
       of: divider,
       matching: find.byType(ColoredBox),
     );
-    expect(tester.widget<ColoredBox>(line).color,
-        AppHeaderDivider.colorOf(tester.element(divider)));
+    expect(
+      tester.widget<ColoredBox>(line).color,
+      AppHeaderDivider.colorOf(tester.element(divider)),
+    );
 
     expect(list, findsOneWidget);
     expect(timer, findsOneWidget);
@@ -980,10 +982,7 @@ void main() {
       AppHeaderDivider.titleStyle,
     );
     expect(
-      find.descendant(
-        of: timer,
-        matching: find.byIcon(Icons.timer_outlined),
-      ),
+      find.descendant(of: timer, matching: find.byIcon(Icons.timer_outlined)),
       findsNothing,
     );
     expect(

@@ -273,6 +273,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
               const SizedBox(height: 8),
               DropdownButtonFormField<StudyTechnique>(
                 initialValue: _technique,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Study technique'),
                 items: [
                   for (final method in StudyTechnique.values)

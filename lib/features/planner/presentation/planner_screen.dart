@@ -523,22 +523,28 @@ class _PlannerScreenState extends State<PlannerScreen> {
     );
   }
 
-  Widget _smartButton() => OutlinedButton(
-    key: const ValueKey('planner-smart-session'),
-    style: StudyActionStyles.sessionOutlined(),
-    onPressed: () => showStudySessionEditor(
-      context,
-      technique: StudyTechnique.pomodoro,
-      startAfterSave: true,
+  Widget _smartButton() => SizedBox(
+    height: 44,
+    child: OutlinedButton(
+      key: const ValueKey('planner-smart-session'),
+      style: StudyActionStyles.sessionOutlined(),
+      onPressed: () => showStudySessionEditor(
+        context,
+        technique: StudyTechnique.pomodoro,
+        startAfterSave: true,
+      ),
+      child: const Text('Smart session', textAlign: TextAlign.center),
     ),
-    child: const Text('Smart session', textAlign: TextAlign.center),
   );
 
-  Widget _newSessionButton() => FilledButton(
-    key: const ValueKey('planner-new-session'),
-    style: StudyActionStyles.sessionPrimary(Theme.of(context)),
-    onPressed: () => showStudySessionEditor(context),
-    child: const Text('New session', textAlign: TextAlign.center),
+  Widget _newSessionButton() => SizedBox(
+    height: 44,
+    child: FilledButton(
+      key: const ValueKey('planner-new-session'),
+      style: StudyActionStyles.sessionPrimary(Theme.of(context)),
+      onPressed: () => showStudySessionEditor(context),
+      child: const Text('New session', textAlign: TextAlign.center),
+    ),
   );
 
   @override
@@ -657,139 +663,139 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       ),
                     ),
                   if (compactCalendar)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                IconButton(
-                                  tooltip: 'Previous',
-                                  icon: const Icon(Icons.chevron_left),
-                                  onPressed: () => _navigate(-1),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              IconButton(
+                                tooltip: 'Previous',
+                                icon: const Icon(Icons.chevron_left),
+                                onPressed: () => _navigate(-1),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _heading(),
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
                                 ),
-                                Expanded(
-                                  child: Text(
-                                    _heading(),
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
+                              ),
+                              IconButton(
+                                tooltip: 'Next',
+                                icon: const Icon(Icons.chevron_right),
+                                onPressed: () => _navigate(1),
+                              ),
+                              TextButton(
+                                onPressed: () => setState(
+                                  () => _anchor = DateUtils.dateOnly(
+                                    DateTime.now(),
                                   ),
                                 ),
-                                IconButton(
-                                  tooltip: 'Next',
-                                  icon: const Icon(Icons.chevron_right),
-                                  onPressed: () => _navigate(1),
-                                ),
-                                TextButton(
-                                  onPressed: () => setState(
-                                    () => _anchor = DateUtils.dateOnly(
-                                      DateTime.now(),
-                                    ),
-                                  ),
-                                  child: const Text('Today'),
-                                ),
-                              ],
-                            ),
-                            SegmentedButton<CalendarMode>(
-                              showSelectedIcon: false,
-                              segments: const [
-                                ButtonSegment(
-                                  value: CalendarMode.today,
-                                  label: Text('Today'),
-                                ),
-                                ButtonSegment(
-                                  value: CalendarMode.week,
-                                  label: Text('Week'),
-                                ),
-                                ButtonSegment(
-                                  value: CalendarMode.month,
-                                  label: Text('Month'),
-                                ),
-                              ],
-                              selected: {_mode},
-                              onSelectionChanged: (next) =>
-                                  setState(() => _mode = next.first),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          physics: _navigationPhysics,
-                          child: SizedBox(
-                            width: math.max(
-                              740.0,
-                              MediaQuery.sizeOf(context).width - 36,
-                            ),
-                            child: Row(
-                              children: [
-                                IconButton(
-                                  tooltip: 'Previous',
-                                  icon: const Icon(Icons.chevron_left),
-                                  onPressed: () => _navigate(-1),
-                                ),
-                                IconButton(
-                                  tooltip: 'Next',
-                                  icon: const Icon(Icons.chevron_right),
-                                  onPressed: () => _navigate(1),
-                                ),
-                                TextButton(
-                                  onPressed: () => setState(
-                                    () => _anchor = DateUtils.dateOnly(
-                                      DateTime.now(),
-                                    ),
-                                  ),
-                                  child: const Text('Today'),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _heading(),
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
+                                child: const Text('Today'),
+                              ),
+                            ],
+                          ),
+                          SegmentedButton<CalendarMode>(
+                            showSelectedIcon: false,
+                            segments: const [
+                              ButtonSegment(
+                                value: CalendarMode.today,
+                                label: Text('Today'),
+                              ),
+                              ButtonSegment(
+                                value: CalendarMode.week,
+                                label: Text('Week'),
+                              ),
+                              ButtonSegment(
+                                value: CalendarMode.month,
+                                label: Text('Month'),
+                              ),
+                            ],
+                            selected: {_mode},
+                            onSelectionChanged: (next) =>
+                                setState(() => _mode = next.first),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: _navigationPhysics,
+                        child: SizedBox(
+                          width: math.max(
+                            740.0,
+                            MediaQuery.sizeOf(context).width - 36,
+                          ),
+                          child: Row(
+                            children: [
+                              IconButton(
+                                tooltip: 'Previous',
+                                icon: const Icon(Icons.chevron_left),
+                                onPressed: () => _navigate(-1),
+                              ),
+                              IconButton(
+                                tooltip: 'Next',
+                                icon: const Icon(Icons.chevron_right),
+                                onPressed: () => _navigate(1),
+                              ),
+                              TextButton(
+                                onPressed: () => setState(
+                                  () => _anchor = DateUtils.dateOnly(
+                                    DateTime.now(),
                                   ),
                                 ),
-                                SegmentedButton<CalendarMode>(
-                                  showSelectedIcon: false,
-                                  segments: const [
-                                    ButtonSegment(
-                                      value: CalendarMode.today,
-                                      label: Text('Today'),
-                                    ),
-                                    ButtonSegment(
-                                      value: CalendarMode.week,
-                                      label: Text('Week'),
-                                    ),
-                                    ButtonSegment(
-                                      value: CalendarMode.month,
-                                      label: Text('Month'),
-                                    ),
-                                  ],
-                                  selected: {_mode},
-                                  onSelectionChanged: (next) =>
-                                      setState(() => _mode = next.first),
+                                child: const Text('Today'),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _heading(),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
                                 ),
-                              ],
-                            ),
+                              ),
+                              SegmentedButton<CalendarMode>(
+                                showSelectedIcon: false,
+                                segments: const [
+                                  ButtonSegment(
+                                    value: CalendarMode.today,
+                                    label: Text('Today'),
+                                  ),
+                                  ButtonSegment(
+                                    value: CalendarMode.week,
+                                    label: Text('Week'),
+                                  ),
+                                  ButtonSegment(
+                                    value: CalendarMode.month,
+                                    label: Text('Month'),
+                                  ),
+                                ],
+                                selected: {_mode},
+                                onSelectionChanged: (next) =>
+                                    setState(() => _mode = next.first),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 18),
-                      child: Text(
-                        'Long-press and drag a planned session to another day. '
-                        'Tap any session to edit, delete or start it.',
-                        style: TextStyle(fontSize: 12),
-                      ),
                     ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 18),
+                    child: Text(
+                      'Long-press and drag a planned session to another day. '
+                      'Tap any session to edit, delete or start it.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
                   Expanded(child: _calendar(planner.sessions)),
                   const SizedBox(
                     key: ValueKey('planner-calendar-bottom-gap'),
