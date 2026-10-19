@@ -161,8 +161,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 - `lib/core/widgets/app_header_divider.dart`: wspólny 1 px separator nagłówka
   w ekranie głównym, planerze i ustawieniach. Wspólna wysokość paska to
   56 px, styl tytułu to 18 px i waga 600 jak Projects we wszystkich ekranach.
-  Kolor linii jest identyczny jak w Projects: outlineVariant 45% na
-  surfaceContainerLowest; w planerze i ustawieniach linia jest pierwszym
+  Kolor linii we wszystkich ekranach: outlineVariant 20% w trybie jasnym
+  i 45% w ciemnym na surfaceContainerLowest; w planerze i ustawieniach
+  linia jest pierwszym
   elementem body bez zwiększania wysokości AppBar.
   4: `AppHeaderDivider`; 7: `colorOf`.
 - `lib/core/widgets/app_dialog_actions.dart`: kolory dolnych akcji
@@ -394,9 +395,10 @@ naciśnięciu ani podczas wyświetlania katalogu głównego.
 Panel dzieli wysokość na rozwijane drzewko folderów,
 bezramkową sekcję `StudyTimerCard` i pusty dolny pasek konta o wysokości
 56 px (identycznej jak Projects). Timer zajmuje tylko wysokość treści,
-maksymalnie 38% obszaru między nagłówkiem a paskiem konta;
-separator folderów i timera jest komponentem `AppHeaderDivider`,
-takim jak pod Projects; pasek konta zachowuje taki sam styl linii.
+maksymalnie 45% obszaru między nagłówkiem a paskiem konta;
+separatory folderów/timera i paska konta używają `AppHeaderDivider`,
+na desktopie sięgają przez 12 px uchwytu do prawej krawędzi sidebaru.
+Pionowy separator uchwytu korzysta z tego samego koloru motywu.
 Przy małym oknie timer przewija się niezależnie, a drzewko folderów
 wykorzystuje pozostałą wysokość. Działa również w mobilnym drawerze.
 Po zwinięciu panelu
@@ -540,7 +542,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   używa typografii nagłówka `Projects`. Ikona kalendarza pozostaje.
   Przyciski `Start session` i `Smart` w panelu bocznym wypełniają
   po połowie dostępnej szerokości z odstępem 8 px i promieniem 12 px;
-  etykiety bez ikon są optycznie wyśrodkowane także na wąskim panelu.
+  ikony Play i Smart z podpisami są centrowane jako jeden blok,
+  skalowany do wąskiego panelu. Zwiększone są odstępy pionowe pod tekstem
+  Ready i odliczaniem oraz padding timera.
   Selektor techniki w formularzu `isExpanded` mieści się w wąskim dialogu.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
@@ -1050,7 +1054,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
   wyśrodkowanie, zwężanie kapsułek, wysokość, odstępy boczne
   oraz przewijanie na wąskim ekranie; dynamiczny podział folderów,
-  bezramkowego timera i paska konta, limit 38% z przewijaniem na małym
+  bezramkowego timera i paska konta, limit 45% z przewijaniem na małym
   ekranie, nagłówek timera w stylu Projects bez ikony zegara,
   wspólny `AppHeaderDivider` nad timerem,
   i aktualizacja mnożnika przewijania plików bez restartu; geometria,
