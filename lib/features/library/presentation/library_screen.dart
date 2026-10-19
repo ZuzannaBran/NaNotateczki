@@ -258,7 +258,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                           width: navigationWidth,
                                           child: _LibraryTreePane(
                                             controller: controller,
-                                            extendDividersIntoResizeHandle: true,
+                                            extendDividersIntoResizeHandle:
+                                                true,
                                             showingProjects:
                                                 _showCatalog &&
                                                 _catalogFolder == null,
