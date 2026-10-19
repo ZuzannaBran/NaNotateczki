@@ -33,7 +33,8 @@ Automated regression: `test/android_finger_ink_test.dart` injects Android-like
 touch contact ellipses (major radius 34 logical px) at a phone viewport,
 for both notebook and board. It verifies that Off draws with a single finger,
 On ignores fingers but accepts a stylus, two stationary contacts create no
-dots, and finger writing resumes after multi-touch. This is synthetic pointer
+dots, finger writing resumes after multi-touch, and an incoming stylus
+supersedes a resting finger. This is synthetic pointer
 testing, not a claim of verification on a physical phone.
 
 Manual checks on a physical Android phone (repeat on iPhone/iPad and

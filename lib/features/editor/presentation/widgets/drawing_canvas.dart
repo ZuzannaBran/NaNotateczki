@@ -996,7 +996,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         );
         final eraserRadius = _eraserStrokeRadius(controller.inkStrokeWidth);
         final child = IgnorePointer(
-          ignoring: !isInkTool || !widget.interactionEnabled || _suspendInk,
+          ignoring: !isInkTool || !widget.interactionEnabled,
           child: MouseRegion(
             cursor: _usesCustomInkCursor(controller.tool)
                 ? SystemMouseCursors.basic
@@ -1084,6 +1084,15 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     if (event.kind == PointerDeviceKind.touch &&
         !controller.allowsFingerDrawing) {
       return;
+    }
+    final incomingStylus =
+        event.kind == PointerDeviceKind.stylus ||
+        event.kind == PointerDeviceKind.invertedStylus;
+    if (incomingStylus &&
+        (_primaryPointerKind == PointerDeviceKind.touch || _suspendInk)) {
+      _activePointers.clear();
+      _suspendInk = false;
+      _resetCurrent();
     }
     if (_primaryPointer != null) {
       if (!_shouldDelayTouchStroke(_primaryPointerKind!)) {
@@ -2336,7 +2345,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         );
         final eraserRadius = _eraserStrokeRadius(controller.inkStrokeWidth);
         final child = IgnorePointer(
-          ignoring: !isInkTool || !widget.interactionEnabled || _suspendInk,
+          ignoring: !isInkTool || !widget.interactionEnabled,
           child: MouseRegion(
             cursor: _usesCustomInkCursor(controller.tool)
                 ? SystemMouseCursors.basic
@@ -2483,6 +2492,15 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     if (event.kind == PointerDeviceKind.touch &&
         !controller.allowsFingerDrawing) {
       return;
+    }
+    final incomingStylus =
+        event.kind == PointerDeviceKind.stylus ||
+        event.kind == PointerDeviceKind.invertedStylus;
+    if (incomingStylus &&
+        (_primaryPointerKind == PointerDeviceKind.touch || _suspendInk)) {
+      _activePointers.clear();
+      _suspendInk = false;
+      _resetCurrent();
     }
     if (_primaryPointer != null) {
       if (!_shouldDelayTouchStroke(_primaryPointerKind!)) {

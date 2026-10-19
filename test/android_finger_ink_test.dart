@@ -228,6 +228,26 @@ void main() {
         reason: 'Touch drawing must resume after a two-finger gesture',
       );
 
+      final restingPalm = drawingPoint + const Offset(60, 180);
+      await _touchDown(tester, restingPalm, 107);
+      await tester.pump();
+      await _drawPointer(
+        tester,
+        drawingPoint + const Offset(0, 210),
+        pointer: 108,
+        kind: PointerDeviceKind.stylus,
+        radiusMajor: 1,
+        radiusMinor: 1,
+      );
+      expect(
+        controller.currentPage.inkStrokes,
+        hasLength(4),
+        reason: 'A stylus must take priority if the palm lands first',
+      );
+      await _touchUp(tester, restingPalm, 107);
+      await tester.pump();
+      expect(controller.currentPage.inkStrokes, hasLength(4));
+
       await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();
       preferences.dispose();

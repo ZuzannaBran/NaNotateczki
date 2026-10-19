@@ -828,7 +828,9 @@ Promień kontaktu Androida nie jest wiarygodnym kryterium rozróżnienia
 palca i dłoni. Gdy tryb Off zezwala na rysowanie palcem, pojedynczy
 kontakt jest przyjmowany niezależnie od radiusMajor/radiusMinor;
 blokada trybu On, opóźnienie początku gestu, brak kropek od tapnięć i
-anulowanie multi-touch nadal obowiązują w obu canvasach. Wszystkie modyfikacje
+anulowanie multi-touch nadal obowiązują w obu canvasach. Rysik ma
+pierwszeństwo, gdy pojedynczy kontakt dłoni pojawił się przed nim; canvasy
+zachowują hit-test podczas anulowania multi-touch, aby przyjąć nowy rysik. Wszystkie modyfikacje
 gumki, włącznie ze scratch erase, delegują dane do jednego
 `InkEraserEngine`. Canvas nie ma już drugiego silnika cięcia, zapisanego
 `BlendMode.clear` ani martwego stanu kursora gumki. Tymczasowy podgląd
