@@ -356,7 +356,7 @@ class StudyTimerCard extends StatelessWidget {
     return StudyActionTheme(
       child: Padding(
         key: const ValueKey('study-timer-card'),
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        padding: const EdgeInsets.fromLTRB(14, 16, 14, 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -402,6 +402,7 @@ class StudyTimerCard extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(
@@ -438,7 +439,7 @@ class StudyTimerCard extends StatelessWidget {
                 'Ready for your next focus session?',
                 style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 24),
             ],
             IntrinsicHeight(
               child: Row(
@@ -456,9 +457,19 @@ class StudyTimerCard extends StatelessWidget {
                               startAfterSave: true,
                             )
                           : null,
-                      child: const Text(
-                        'Start session',
-                        textAlign: TextAlign.center,
+                      child: const Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            key: ValueKey('sidebar-start-session-content'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.play_arrow_rounded, size: 18),
+                              SizedBox(width: 4),
+                              Text('Start session'),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -474,7 +485,20 @@ class StudyTimerCard extends StatelessWidget {
                               startAfterSave: true,
                             )
                           : null,
-                      child: const Text('Smart', textAlign: TextAlign.center),
+                      child: const Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            key: ValueKey('sidebar-smart-session-content'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.auto_awesome_rounded, size: 18),
+                              SizedBox(width: 4),
+                              Text('Smart'),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],
