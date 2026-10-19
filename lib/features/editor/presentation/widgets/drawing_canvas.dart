@@ -951,6 +951,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       _handleEraserToggleRequest,
     );
     _endInkActivity();
+    _snapTimer?.cancel();
+    _snapHintTimer?.cancel();
     _inkRepaint.dispose();
     super.dispose();
   }
@@ -1897,7 +1899,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   }
 
   void _snapToShape() {
-    if (_currentPoints.length < 2 ||
+    if (!mounted || _currentPoints.length < 2 ||
         _snappedStraight ||
         _snappedRect ||
         _snappedEllipse) {
@@ -2310,6 +2312,8 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       _handleEraserToggleRequest,
     );
     _endInkActivity();
+    _snapTimer?.cancel();
+    _snapHintTimer?.cancel();
     _inkRepaint.dispose();
     super.dispose();
   }
@@ -3436,7 +3440,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   }
 
   void _snapToShape() {
-    if (_currentPoints.length < 2 ||
+    if (!mounted || _currentPoints.length < 2 ||
         _snappedStraight ||
         _snappedRect ||
         _snappedEllipse) {

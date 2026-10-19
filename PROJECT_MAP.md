@@ -1036,7 +1036,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   kursora przez rysik, bliskiego/dalekiego kontaktu dłoni, anulowania
   gestów, braku kropek i skoków zapisanej geometrii. Porównanie długości
   odbywa się w pikselach ekranu, a dwupalczasta nawigacja ma osobne
-testy, także gdy pierwszy palec zdążył rozpocząć kreskę.
+testy, także gdy pierwszy palec zdążył rozpocząć kreskę. Test
+notatnika mierzy łączną transformację strony i scroll dokumentu, bo gest
+przesuwający stronę poza dozwolony pan przechodzi w przewijanie; kierunek
+gestu jest dobrany tak, aby nie utknąć na górnym ograniczeniu.
 - `test/pointer_contact_matrix_test.dart`: natywna macierz widgetowa dla
   ekranu telefonu, wykonywana też na systemach desktopowych.
 - `integration_test/pointer_contact_matrix_test.dart`: te same scenariusze

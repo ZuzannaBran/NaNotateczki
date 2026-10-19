@@ -232,7 +232,11 @@ class _CanvasFixture {
           find.byKey(const ValueKey('notebook-document-transform')),
         )
         .transform;
-    return Offset(transform.entry(0, 3), transform.entry(1, 3));
+    final scroll = tester.widget<SingleChildScrollView>(
+      find.byKey(const ValueKey('notebook-document-scroll')),
+    );
+    final scrollOffset = scroll.controller!.offset;
+    return Offset(transform.entry(0, 3), transform.entry(1, 3) - scrollOffset);
   }
 
   void expectStrokeCount(int count) {
@@ -416,8 +420,8 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
         final second = _Contact(tester, 251, PointerDeviceKind.touch);
         await first.down(f.nearPalm);
         await second.down(f.farPalm);
-        await first.move(f.nearPalm + const Offset(0, 45));
-        await second.move(f.farPalm + const Offset(0, 45));
+        await first.move(f.nearPalm + const Offset(0, -45));
+        await second.move(f.farPalm + const Offset(0, -45));
         f.expectStrokeCount(0);
         expect(
           (f.navigationOffset - previousPan).distance,
@@ -452,8 +456,8 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
         await first.down(f.nearPalm);
         await first.move(f.nearPalm + const Offset(24, 7));
         await second.down(f.farPalm);
-        await first.move(f.nearPalm + const Offset(24, 53));
-        await second.move(f.farPalm + const Offset(0, 46));
+        await first.move(f.nearPalm + const Offset(24, -43));
+        await second.move(f.farPalm + const Offset(0, -50));
         f.expectStrokeCount(0);
         expect(
           (f.navigationOffset - previousPan).distance,
