@@ -933,12 +933,22 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
             ?.touchNavigationSensitivity ??
         1.0;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(color: colorScheme.surfaceContainerLowest),
-      child: Column(
-        children: [
-          SizedBox(
-            height: _LibraryScreenState._navigationHeaderHeight,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final timerMaxHeight =
+            math.max(
+              0.0,
+              constraints.maxHeight -
+                  _LibraryScreenState._navigationHeaderHeight * 2 -
+                  AppHeaderDivider.thickness * 2,
+            ) *
+            0.38;
+        return DecoratedBox(
+          decoration: BoxDecoration(color: colorScheme.surfaceContainerLowest),
+          child: Column(
+            children: [
+              SizedBox(
+                height: _LibraryScreenState._navigationHeaderHeight,
             child: Padding(
               padding: const EdgeInsets.only(left: 14, right: 8),
               child: Row(
@@ -983,20 +993,36 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                     ],
                   ),
           ),
-          SizedBox(
-            height: math.min(360, MediaQuery.sizeOf(context).height * 0.42),
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: SingleChildScrollView(
-                physics: TouchNavigationScrollPhysics(
-                  sensitivity: touchNavigationGain,
+              SizedBox(
+                height: AppHeaderDivider.thickness,
+                child: ColoredBox(
+                  key: const ValueKey('sidebar-timer-divider'),
+                  color: AppHeaderDivider.colorOf(context),
                 ),
-                child: const StudyTimerCard(),
               ),
-            ),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: timerMaxHeight),
+                child: SingleChildScrollView(
+                  key: const ValueKey('sidebar-timer-region'),
+                  physics: TouchNavigationScrollPhysics(
+                    sensitivity: touchNavigationGain,
+                  ),
+                  child: const StudyTimerCard(),
+                ),
+              ),
+              Container(
+                key: const ValueKey('sidebar-account-slot'),
+                height: _LibraryScreenState._navigationHeaderHeight,
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: AppHeaderDivider.colorOf(context)),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

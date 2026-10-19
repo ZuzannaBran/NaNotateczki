@@ -352,17 +352,9 @@ class StudyTimerCard extends StatelessWidget {
     final next = planner.upcoming.take(2).toList();
     final colors = Theme.of(context).colorScheme;
     return StudyActionTheme(
-      child: Container(
+      child: Padding(
         key: const ValueKey('study-timer-card'),
-        margin: const EdgeInsets.fromLTRB(10, 10, 10, 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: colors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: colors.outlineVariant.withValues(alpha: 0.65),
-          ),
-        ),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,

@@ -368,7 +368,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1709 linii)
+### `lib/features/library/presentation/library_screen.dart` (1735 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -391,8 +391,14 @@ Lokalny panel rezerwuje pod separatorem 1 px bez rysowania drugiej linii.
 Nagłówek Projects jest klikalny, ale nie ma podświetlenia przy hover,
 naciśnięciu ani podczas wyświetlania katalogu głównego.
 
-U dołu panelu jest `StudyTimerCard`, wyrównany do dolnej krawędzi
-i przewijany przy większej zawartości. Po zwinięciu panelu
+Panel dzieli wysokość na rozwijane drzewko folderów,
+bezramkową sekcję `StudyTimerCard` i pusty dolny pasek konta o wysokości
+56 px (identycznej jak Projects). Timer zajmuje tylko wysokość treści,
+maksymalnie 38% obszaru między nagłówkiem a paskiem konta;
+nad sekcją timera i konta są cienkie linie w stylu `AppHeaderDivider`.
+Przy małym oknie timer przewija się niezależnie, a drzewko folderów
+wykorzystuje pozostałą wysokość. Działa również w mobilnym drawerze.
+Po zwinięciu panelu
 `CompactStudyTimer` wyświetla się obok Settings w AppBar katalogu,
 notebooka lub boarda. `_openCatalogSettings` otwiera wspólne ustawienia
 na kontrolerze wybranego albo pierwszego dokumentu; w pustej bibliotece
@@ -1014,8 +1020,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
   centrowania i szerokości strzałek, cienia/obrysu i kierunku zwijania;
   wyśrodkowanie, zwężanie kapsułek, wysokość, odstępy boczne
-  oraz przewijanie na wąskim ekranie; wyrównanie timera do dolnej krawędzi
-  panelu i aktualizacja mnożnika przewijania plików bez restartu; geometria,
+  oraz przewijanie na wąskim ekranie; dynamiczny podział folderów,
+  bezramkowego timera i paska konta, limit 38% z przewijaniem na małym
+  ekranie i aktualizacja mnożnika przewijania plików bez restartu; geometria,
   kolor i obsługa menu
   folderu, notebooka oraz boarda, a także menu dodawania (3 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości

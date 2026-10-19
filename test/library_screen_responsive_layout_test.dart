@@ -917,7 +917,7 @@ void main() {
     await database.close();
   });
 
-  testWidgets('study timer is anchored to the bottom of the folder sidebar', (
+  testWidgets('sidebar allocates space for folders, timer and account', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1200, 900));
@@ -925,6 +925,7 @@ void main() {
 
     final database = NotesDatabase(NativeDatabase.memory());
     final repository = NotebookRepository(database);
+    await repository.createNotebook(folder: 'Timer layout');
     final controller = LibraryController(
       repository,
       CloudSyncService(repository),
@@ -954,11 +955,58 @@ void main() {
     );
     await tester.pump();
 
+    final list = find.byKey(const ValueKey('library-file-scroll'));
     final timer = find.byKey(const ValueKey('study-timer-card'));
+    final divider = find.byKey(const ValueKey('sidebar-timer-divider'));
+    final timerRegion = find.byKey(const ValueKey('sidebar-timer-region'));
+    final account = find.byKey(const ValueKey('sidebar-account-slot'));
+
+    expect(list, findsOneWidget);
     expect(timer, findsOneWidget);
     expect(
-      tester.getBottomLeft(timer).dy,
+      tester.widget<Padding>(timer).padding,
+      const EdgeInsets.fromLTRB(14, 12, 14, 12),
+    );
+    expect(tester.getSize(account).height, AppHeaderDivider.toolbarHeight);
+    expect(
+      tester.getBottomLeft(account).dy,
       closeTo(tester.getBottomLeft(find.byType(LibraryScreen)).dy, 1),
+    );
+    expect(
+      tester.getBottomLeft(timerRegion).dy,
+      closeTo(tester.getTopLeft(account).dy, 1),
+    );
+    expect(
+      tester.getBottomLeft(divider).dy,
+      closeTo(tester.getTopLeft(timerRegion).dy, 1),
+    );
+    expect(
+      tester.getBottomLeft(list).dy,
+      closeTo(tester.getTopLeft(divider).dy, 1),
+    );
+    expect(tester.getSize(timerRegion).height, lessThan(360));
+
+    await tester.binding.setSurfaceSize(const Size(1200, 430));
+    await tester.pump();
+    const usableHeight =
+        430 - AppHeaderDivider.toolbarHeight * 2 -
+        AppHeaderDivider.thickness * 2;
+    expect(
+      tester.getSize(timerRegion).height,
+      lessThanOrEqualTo(usableHeight * 0.38 + 1),
+    );
+    expect(tester.getSize(list).height, greaterThan(0));
+    expect(
+      tester.getBottomLeft(account).dy,
+      closeTo(tester.getBottomLeft(find.byType(LibraryScreen)).dy, 1),
+    );
+    final timerScroll = find.descendant(
+      of: timerRegion,
+      matching: find.byType(Scrollable),
+    );
+    expect(
+      tester.state<ScrollableState>(timerScroll).position.maxScrollExtent,
+      greaterThan(0),
     );
     expect(tester.takeException(), isNull);
 
