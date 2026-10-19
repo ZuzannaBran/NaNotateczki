@@ -531,17 +531,20 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
   152: `StudyPlannerController`; 232: `load`; 298: `create`;
   366: `start`; 528: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (560):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (581):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
   Nagłówek bocznego timera nie ma ikony zegara, a napis `Study timer`
   używa typografii nagłówka `Projects`. Ikona kalendarza pozostaje.
+  Przyciski `Start session` i `Smart` w panelu bocznym wypełniają
+  po połowie dostępnej szerokości z odstępem 8 px i promieniem 12 px;
+  równa wysokość adaptuje się do zawijania etykiety na wąskim panelu.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
   24: `studyRatingStars`; 31: `openStudyPlanner`;
   37: `showStudySessionEditor`; 57: `showStudyRating`;
-  343: `StudyTimerCard`; 512: `CompactStudyTimer`.
+  343: `StudyTimerCard`; 533: `CompactStudyTimer`.
 - `lib/features/planner/presentation/study_action_theme.dart` (96):
   `StudyActionTheme`, `StudyActionStyles`; czytelny, ale subtelny beż
   tylko dla wyróżnianych akcji; pozostałe przyciski i ikony bez ciemnego
@@ -564,7 +567,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
   i ochrona uszkodzonych danych; sukces/błąd wczytywania po dispose.
-- `test/study_planner_widget_test.dart`: kalendarz, timer, wybór gwiazdek,
+- `test/study_planner_widget_test.dart`: szerokości 50/50, odstępy
+  i zaokrąglenia przycisków timera przy panelach 240/320 px;
+  kalendarz, timer, wybór gwiazdek,
   pominięcie i zamknięcie oceny, historia oceniona i bez oceny.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
   tygodnia we wszystkich widokach i po zmianie daty; osobny krok CI.

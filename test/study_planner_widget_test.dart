@@ -87,6 +87,69 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('sidebar session buttons share width and corner shape', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    for (final sidebarWidth in [240.0, 320.0]) {
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: MaterialApp(
+            home: Scaffold(
+              body: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: sidebarWidth,
+                  child: const StudyTimerCard(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final timer = tester.getRect(
+        find.byKey(const ValueKey('study-timer-card')),
+      );
+      final startFinder = find.byKey(
+        const ValueKey('sidebar-start-session'),
+      );
+      final smartFinder = find.byKey(
+        const ValueKey('sidebar-smart-session'),
+      );
+      final start = tester.getRect(startFinder);
+      final smart = tester.getRect(smartFinder);
+
+      expect(start.width, closeTo(smart.width, 0.1));
+      expect(start.height, closeTo(smart.height, 0.1));
+      expect(start.top, closeTo(smart.top, 0.1));
+      expect(start.left, closeTo(timer.left + 14, 0.1));
+      expect(smart.right, closeTo(timer.right - 14, 0.1));
+      expect(smart.left - start.right, closeTo(8, 0.1));
+
+      final startButton = tester.widget<FilledButton>(startFinder);
+      final smartButton = tester.widget<OutlinedButton>(smartFinder);
+      final firstShape = startButton.style!.shape!.resolve({});
+      final secondShape = smartButton.style!.shape!.resolve({});
+      expect(firstShape, isA<RoundedRectangleBorder>());
+      expect(secondShape, isA<RoundedRectangleBorder>());
+      expect(
+        (firstShape! as RoundedRectangleBorder).borderRadius,
+        const BorderRadius.all(Radius.circular(12)),
+      );
+      expect(
+        (secondShape! as RoundedRectangleBorder).borderRadius,
+        const BorderRadius.all(Radius.circular(12)),
+      );
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('sidebar timer starts pauses and rates a session', (
     tester,
   ) async {

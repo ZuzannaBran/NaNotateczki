@@ -352,6 +352,10 @@ class StudyTimerCard extends StatelessWidget {
     final active = planner.active;
     final next = planner.upcoming.take(2).toList();
     final colors = Theme.of(context).colorScheme;
+    const actionShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+    );
+    const actionPadding = EdgeInsets.symmetric(horizontal: 8, vertical: 10);
     return StudyActionTheme(
       child: Padding(
         key: const ValueKey('study-timer-card'),
@@ -439,33 +443,50 @@ class StudyTimerCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
             ],
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: [
-                FilledButton.icon(
-                  style: StudyActionStyles.primary(Theme.of(context)),
-                  onPressed: planner.isLoaded && planner.error == null
-                      ? () => showStudySessionEditor(
-                          context,
-                          startAfterSave: true,
-                        )
-                      : null,
-                  icon: const Icon(Icons.play_circle_outline, size: 18),
-                  label: const Text('Start session'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: planner.isLoaded && planner.error == null
-                      ? () => showStudySessionEditor(
-                          context,
-                          technique: StudyTechnique.pomodoro,
-                          startAfterSave: true,
-                        )
-                      : null,
-                  icon: const Icon(Icons.auto_awesome_outlined, size: 18),
-                  label: const Text('Smart'),
-                ),
-              ],
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: const ValueKey('sidebar-start-session'),
+                      style: StudyActionStyles.primary(
+                        Theme.of(context),
+                      ).copyWith(
+                        shape: const WidgetStatePropertyAll(actionShape),
+                        padding: const WidgetStatePropertyAll(actionPadding),
+                      ),
+                      onPressed: planner.isLoaded && planner.error == null
+                          ? () => showStudySessionEditor(
+                              context,
+                              startAfterSave: true,
+                            )
+                          : null,
+                      icon: const Icon(Icons.play_circle_outline, size: 18),
+                      label: const Text('Start session'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('sidebar-smart-session'),
+                      style: OutlinedButton.styleFrom(
+                        shape: actionShape,
+                        padding: actionPadding,
+                      ),
+                      onPressed: planner.isLoaded && planner.error == null
+                          ? () => showStudySessionEditor(
+                              context,
+                              technique: StudyTechnique.pomodoro,
+                              startAfterSave: true,
+                            )
+                          : null,
+                      icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                      label: const Text('Smart'),
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (next.isNotEmpty) ...[
               const Divider(height: 16),
