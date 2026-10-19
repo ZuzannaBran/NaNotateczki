@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
-import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
+import '../../../core/widgets/app_dialog_actions.dart';
+import '../../../core/widgets/app_header_divider.dart';
 import '../state/study_planner_controller.dart';
 import 'planner_screen.dart';
 import 'study_action_theme.dart';
@@ -361,12 +362,10 @@ class StudyTimerCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.timer_outlined, size: 19),
-                const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'Study timer',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: AppHeaderDivider.titleStyle,
                   ),
                 ),
                 IconButton(

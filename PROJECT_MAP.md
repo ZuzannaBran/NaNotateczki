@@ -531,15 +531,17 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
   152: `StudyPlannerController`; 232: `load`; 298: `create`;
   366: `start`; 528: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (569):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (560):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
+  Nagłówek bocznego timera nie ma ikony zegara, a napis `Study timer`
+  używa typografii nagłówka `Projects`. Ikona kalendarza pozostaje.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
   24: `studyRatingStars`; 31: `openStudyPlanner`;
   37: `showStudySessionEditor`; 57: `showStudyRating`;
-  341: `StudyTimerCard`; 520: `CompactStudyTimer`.
+  343: `StudyTimerCard`; 512: `CompactStudyTimer`.
 - `lib/features/planner/presentation/study_action_theme.dart` (96):
   `StudyActionTheme`, `StudyActionStyles`; czytelny, ale subtelny beż
   tylko dla wyróżnianych akcji; pozostałe przyciski i ikony bez ciemnego
@@ -1022,7 +1024,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   wyśrodkowanie, zwężanie kapsułek, wysokość, odstępy boczne
   oraz przewijanie na wąskim ekranie; dynamiczny podział folderów,
   bezramkowego timera i paska konta, limit 38% z przewijaniem na małym
-  ekranie i aktualizacja mnożnika przewijania plików bez restartu; geometria,
+  ekranie, nagłówek timera w stylu Projects bez ikony zegara,
+  i aktualizacja mnożnika przewijania plików bez restartu; geometria,
   kolor i obsługa menu
   folderu, notebooka oraz boarda, a także menu dodawania (3 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości

@@ -963,6 +963,29 @@ void main() {
 
     expect(list, findsOneWidget);
     expect(timer, findsOneWidget);
+    final timerHeading = find.descendant(
+      of: timer,
+      matching: find.text('Study timer'),
+    );
+    expect(timerHeading, findsOneWidget);
+    expect(
+      tester.widget<Text>(timerHeading).style,
+      AppHeaderDivider.titleStyle,
+    );
+    expect(
+      find.descendant(
+        of: timer,
+        matching: find.byIcon(Icons.timer_outlined),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: timer,
+        matching: find.byIcon(Icons.calendar_month_outlined),
+      ),
+      findsOneWidget,
+    );
     expect(
       tester.widget<Padding>(timer).padding,
       const EdgeInsets.fromLTRB(14, 12, 14, 12),
