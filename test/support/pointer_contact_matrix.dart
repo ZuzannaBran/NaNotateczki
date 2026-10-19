@@ -85,11 +85,7 @@ class _Contact {
 
   Future<void> cancel() async {
     await tester.sendEventToBinding(
-      PointerCancelEvent(
-        pointer: pointer,
-        kind: kind,
-        position: _position!,
-      ),
+      PointerCancelEvent(pointer: pointer, kind: kind, position: _position!),
     );
     await tester.pump();
   }
@@ -106,14 +102,8 @@ void _expectLocalInk(InkStroke stroke, double scale) {
   final xs = stroke.points.map((point) => point.dx).toList();
   final ys = stroke.points.map((point) => point.dy).toList();
   expect(xs.length, greaterThan(1));
-  expect(
-    (xs.reduce(math.max) - xs.reduce(math.min)) * scale,
-    lessThan(75),
-  );
-  expect(
-    (ys.reduce(math.max) - ys.reduce(math.min)) * scale,
-    lessThan(55),
-  );
+  expect((xs.reduce(math.max) - xs.reduce(math.min)) * scale, lessThan(75));
+  expect((ys.reduce(math.max) - ys.reduce(math.min)) * scale, lessThan(55));
   for (var i = 1; i < stroke.points.length; i++) {
     final previous = stroke.points[i - 1].toOffset();
     final current = stroke.points[i].toOffset();
@@ -189,9 +179,7 @@ class _CanvasFixture {
       MaterialApp(
         home: MultiProvider(
           providers: [
-            ChangeNotifierProvider<EditorController>.value(
-              value: controller,
-            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
             ChangeNotifierProvider<AppPreferencesController>.value(
               value: preferences,
             ),
@@ -240,9 +228,11 @@ class _CanvasFixture {
     if (kind == NotebookKind.board) {
       return controller.viewPan;
     }
-    final transform = tester.widget<Transform>(
-      find.byKey(const ValueKey('notebook-document-transform')),
-    ).transform;
+    final transform = tester
+        .widget<Transform>(
+          find.byKey(const ValueKey('notebook-document-transform')),
+        )
+        .transform;
     return Offset(transform.entry(0, 3), transform.entry(1, 3));
   }
 
@@ -257,9 +247,12 @@ class _CanvasFixture {
   void expectLastStrokeLocal() {
     final scale = kind == NotebookKind.board
         ? controller.viewScale
-        : tester.widget<Transform>(
-            find.byKey(const ValueKey('notebook-document-transform')),
-          ).transform.entry(0, 0);
+        : tester
+              .widget<Transform>(
+                find.byKey(const ValueKey('notebook-document-transform')),
+              )
+              .transform
+              .entry(0, 0);
     expect(scale, greaterThan(0));
     _expectLocalInk(controller.currentPage.inkStrokes.last, scale);
   }
@@ -389,26 +382,14 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
           radiusMajor: 55,
         );
         await palmFirst.down(f.farPalm);
-        final penAfter = _Contact(
-          tester,
-          231,
-          PointerDeviceKind.stylus,
-        );
+        final penAfter = _Contact(tester, 231, PointerDeviceKind.stylus);
         await _stroke(penAfter, f.inkStart);
         await palmFirst.up();
         f.expectStrokeCount(++count);
         f.expectLastStrokeLocal();
 
-        final fingerOne = _Contact(
-          tester,
-          232,
-          PointerDeviceKind.touch,
-        );
-        final fingerTwo = _Contact(
-          tester,
-          233,
-          PointerDeviceKind.touch,
-        );
+        final fingerOne = _Contact(tester, 232, PointerDeviceKind.touch);
+        final fingerTwo = _Contact(tester, 233, PointerDeviceKind.touch);
         await fingerOne.down(f.nearPalm);
         await fingerTwo.down(f.farPalm);
         final pen = _Contact(tester, 234, PointerDeviceKind.stylus);
@@ -483,11 +464,7 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
         await touch.cancel();
         f.expectStrokeCount(0);
 
-        final recoveredPen = _Contact(
-          tester,
-          312,
-          PointerDeviceKind.stylus,
-        );
+        final recoveredPen = _Contact(tester, 312, PointerDeviceKind.stylus);
         await _stroke(recoveredPen, f.inkStart);
         f.expectStrokeCount(1);
         f.expectLastStrokeLocal();
