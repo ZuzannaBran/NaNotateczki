@@ -234,6 +234,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     height: constraints.maxHeight,
                     child: Stack(
                       children: [
+                        if (_showLeftNavigation)
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: leftZoneWidth,
+                            child: ColoredBox(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerLowest,
+                              child: const SizedBox.expand(),
+                            ),
+                          ),
                         Row(
                           children: [
                             SizedBox(
@@ -245,6 +258,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                           width: navigationWidth,
                                           child: _LibraryTreePane(
                                             controller: controller,
+                                            extendDividersIntoResizeHandle: true,
                                             showingProjects:
                                                 _showCatalog &&
                                                 _catalogFolder == null,
@@ -890,9 +904,11 @@ class _LibraryTreePane extends StatefulWidget {
     required this.onShowProjects,
     required this.onOpenFolder,
     required this.showingProjects,
+    this.extendDividersIntoResizeHandle = false,
   });
 
   final LibraryController controller;
+  final bool extendDividersIntoResizeHandle;
   final ValueChanged<Notebook> onOpen;
   final Future<void> Function(NotebookKind kind) onCreate;
   final VoidCallback onCreateFolder;
@@ -927,6 +943,9 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
     final controller = widget.controller;
     final colorScheme = Theme.of(context).colorScheme;
     final folders = controller.folderNames;
+    final dividerExtension = widget.extendDividersIntoResizeHandle
+        ? _LibraryScreenState._resizeHandleWidth
+        : 0.0;
     final touchNavigationGain =
         context
             .watch<AppPreferencesController?>()
@@ -942,7 +961,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                   _LibraryScreenState._navigationHeaderHeight * 2 -
                   AppHeaderDivider.thickness * 2,
             ) *
-            0.38;
+            0.45;
         return DecoratedBox(
           decoration: BoxDecoration(color: colorScheme.surfaceContainerLowest),
           child: Column(
@@ -993,7 +1012,10 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                         ],
                       ),
               ),
-              const AppHeaderDivider(key: ValueKey('sidebar-timer-divider')),
+              _SidebarSpanDivider(
+                dividerKey: const ValueKey('sidebar-timer-divider'),
+                extendBy: dividerExtension,
+              ),
               ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: timerMaxHeight),
                 child: SingleChildScrollView(
@@ -1004,13 +1026,18 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                   child: const StudyTimerCard(),
                 ),
               ),
-              Container(
+              SizedBox(
                 key: const ValueKey('sidebar-account-slot'),
+                width: double.infinity,
                 height: _LibraryScreenState._navigationHeaderHeight,
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: AppHeaderDivider.colorOf(context)),
-                  ),
+                child: Column(
+                  children: [
+                    _SidebarSpanDivider(
+                      dividerKey: const ValueKey('sidebar-account-divider'),
+                      extendBy: dividerExtension,
+                    ),
+                    const Spacer(),
+                  ],
                 ),
               ),
             ],
@@ -1642,6 +1669,29 @@ class _LibraryWorkspace extends StatelessWidget {
 
 enum _CreateAction { folder, notebook, board }
 
+class _SidebarSpanDivider extends StatelessWidget {
+  const _SidebarSpanDivider({this.dividerKey, this.extendBy = 0});
+
+  final Key? dividerKey;
+  final double extendBy;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: AppHeaderDivider.thickness,
+      child: LayoutBuilder(
+        builder: (context, constraints) => OverflowBox(
+          alignment: Alignment.centerLeft,
+          minWidth: constraints.maxWidth + extendBy,
+          maxWidth: constraints.maxWidth + extendBy,
+          child: AppHeaderDivider(key: dividerKey),
+        ),
+      ),
+    );
+  }
+}
+
 class _PaneResizeHandle extends StatelessWidget {
   const _PaneResizeHandle({required this.onDragDelta});
 
@@ -1649,22 +1699,17 @@ class _PaneResizeHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dividerColor = Theme.of(
-      context,
-    ).colorScheme.outlineVariant.withValues(alpha: 0.45);
+    final dividerColor = AppHeaderDivider.colorOf(context);
     return MouseRegion(
       cursor: SystemMouseCursors.resizeColumn,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onHorizontalDragUpdate: (details) => onDragDelta(details.delta.dx),
-        child: ColoredBox(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
-          child: SizedBox(
-            width: _LibraryScreenState._resizeHandleWidth,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Container(width: 1, color: dividerColor),
-            ),
+        child: SizedBox(
+          width: _LibraryScreenState._resizeHandleWidth,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(width: 1, color: dividerColor),
           ),
         ),
       ),
