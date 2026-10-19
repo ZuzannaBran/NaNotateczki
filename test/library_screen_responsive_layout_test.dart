@@ -166,11 +166,8 @@ void main() {
       expect(appBar.height, kToolbarHeight);
       expect(separator, Rect.fromLTWH(0, appBar.bottom, 1200, 1));
 
-      final scheme = Theme.of(tester.element(divider)).colorScheme;
-      final expectedColor = Color.alphaBlend(
-        scheme.outlineVariant.withValues(alpha: 0.45),
-        scheme.surfaceContainerLowest,
-      );
+      final expectedColor =
+          AppHeaderDivider.colorOf(tester.element(divider));
       expect(tester.widget<ColoredBox>(divider).color, expectedColor);
       // The title is intentionally hidden with the collapsed sidebar.
       final projectsTitle = find.text('Projects');
@@ -960,7 +957,19 @@ void main() {
     final divider = find.byKey(const ValueKey('sidebar-timer-divider'));
     final timerRegion = find.byKey(const ValueKey('sidebar-timer-region'));
     final account = find.byKey(const ValueKey('sidebar-account-slot'));
+    final accountDivider = find.byKey(
+      const ValueKey('sidebar-account-divider'),
+    );
     expect(tester.widget<AppHeaderDivider>(divider), isA<AppHeaderDivider>());
+    expect(
+      tester.getRect(divider).right,
+      closeTo(tester.getRect(account).right + 12, 0.1),
+    );
+    expect(
+      tester.getRect(accountDivider).right,
+      closeTo(tester.getRect(divider).right, 0.1),
+    );
+    expect(tester.getRect(accountDivider).left, tester.getRect(divider).left);
     final line = find.descendant(
       of: divider,
       matching: find.byType(ColoredBox),
@@ -994,7 +1003,7 @@ void main() {
     );
     expect(
       tester.widget<Padding>(timer).padding,
-      const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      const EdgeInsets.fromLTRB(14, 16, 14, 18),
     );
     expect(tester.getSize(account).height, AppHeaderDivider.toolbarHeight);
     expect(
@@ -1015,6 +1024,59 @@ void main() {
     );
     expect(tester.getSize(timerRegion).height, lessThan(360));
 
+    final readyText = find.text('Ready for your next focus session?');
+    final start = find.byKey(const ValueKey('sidebar-start-session'));
+    final smart = find.byKey(const ValueKey('sidebar-smart-session'));
+    final startContent = find.byKey(
+      const ValueKey('sidebar-start-session-content'),
+    );
+    final smartContent = find.byKey(
+      const ValueKey('sidebar-smart-session-content'),
+    );
+    expect(readyText, findsOneWidget);
+    expect(
+      tester.getTopLeft(start).dy - tester.getBottomLeft(readyText).dy,
+      greaterThanOrEqualTo(20),
+    );
+    expect(tester.getSize(start).width, closeTo(tester.getSize(smart).width, 1));
+    expect(
+      tester.getCenter(startContent).dx,
+      closeTo(tester.getCenter(start).dx, 1),
+    );
+    expect(
+      tester.getCenter(smartContent).dx,
+      closeTo(tester.getCenter(smart).dx, 1),
+    );
+    expect(
+      find.descendant(
+        of: start,
+        matching: find.byIcon(Icons.play_arrow_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: smart,
+        matching: find.byIcon(Icons.auto_awesome_rounded),
+      ),
+      findsOneWidget,
+    );
+
+    final session = planner.create(
+      title: 'Focus timer',
+      scheduledAt: DateTime.now(),
+    );
+    expect(planner.start(session.id), isTrue);
+    await tester.pump();
+    final countdown = find.byKey(const ValueKey('study-countdown'));
+    final pause = find.widgetWithText(OutlinedButton, 'Pause');
+    expect(countdown, findsOneWidget);
+    expect(pause, findsOneWidget);
+    expect(
+      tester.getTopLeft(pause).dy - tester.getBottomLeft(countdown).dy,
+      greaterThanOrEqualTo(18),
+    );
+
     await tester.binding.setSurfaceSize(const Size(1200, 430));
     await tester.pump();
     const usableHeight =
@@ -1023,7 +1085,7 @@ void main() {
         AppHeaderDivider.thickness * 2;
     expect(
       tester.getSize(timerRegion).height,
-      lessThanOrEqualTo(usableHeight * 0.38 + 1),
+      lessThanOrEqualTo(usableHeight * 0.45 + 1),
     );
     expect(tester.getSize(list).height, greaterThan(0));
     expect(
