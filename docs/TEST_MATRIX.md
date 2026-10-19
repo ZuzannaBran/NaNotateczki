@@ -54,6 +54,56 @@ Windows/Linux touchscreens when hardware is available):
    the toolbar remains interactive in either mode. Record device model,
    Android version and whether pointer input was Off or On.
 
+## Shared pen, palm and pointer routing matrix (October 2026)
+
+The production notebook and board canvas are exercised by the same six
+synthetic widget scenarios in `test/pointer_contact_matrix_test.dart` and
+`integration_test/pointer_contact_matrix_test.dart` (shared driver:
+`test/support/pointer_contact_matrix.dart`). The scenarios validate:
+
+- Finger drawing with multiple contact radii, including Android-like large
+  touch ellipses, versus touch blocking in the stylus-only input mode.
+- Stylus continuity with a palm near and far from the writing tip, including
+  moving the palm, and no phantom ink or wide coordinate jumps.
+- Palm-first, two-fingers-first, stylus-first and finger-after-multi-touch
+  ordering. The pen must keep or regain ownership of the stroke.
+- A canceled finger or stylus stroke must not be saved; a later valid stroke
+  must still work. A stationary touch never becomes a saved dot.
+
+`test/cross_platform/pointer_dispatch_contract_test.dart` checks synthesized
+touch/stylus identities, contact size and cancel dispatch in Chrome and the
+native Dart suite. This is a **framework contract** check, not browser/OS
+hardware classification.
+
+GitHub Actions runs the native widget matrix on Ubuntu and Windows/macOS,
+device-level Flutter integration on Linux/Windows/macOS desktops, the Android
+emulator and iPhone/iPad simulators. Chrome runs the browser-compatible
+contract test. These inject Flutter pointer events; they validate real
+production canvas behavior and persistence boundaries, **but do not inject
+physical capacitive contacts or native palm rejection decisions**. A green
+result must not be described as a hardware palm-rejection certification.
+
+Manual/device-farm acceptance on each supported pen-capable platform:
+
+1. Select Pen, allow finger ink, draw a deliberate finger stroke, including
+   contacts with different contact areas; verify the actual saved stroke.
+2. Hold a stylus on the canvas. Rest and move the palm at approximately
+   30, 100 and 300 logical pixels from the tip; alternate both sides.
+   Confirm zero extra dots and no pointer/cursor jump.
+3. Repeat in reverse order (palm before stylus), add a second touch,
+   then release the pen before the palm. Drawing must resume normally.
+4. Repeat with the stylus-only mode: touch must not create ink, while
+   stylus pressure and drawing remain functional.
+5. Force a gesture cancellation where the native input stack supports it;
+   confirm no partial canceled stroke persists after save/reopen.
+6. Log platform, OS version, device and digitizer model, active input mode,
+   pointer kind and cancel transitions; compare with the saved stroke count.
+
+Limit: when finger drawing is intentionally enabled and the OS reports a
+moving palm *only* as an ordinary touch with no contemporaneous stylus,
+there may be insufficient information to distinguish it from a deliberate
+finger stroke. A universal zero-false-positive promise is not realistic.
+
 ## Manual check: symmetric notebook and board grid (October 2026)
 
 1. Create a folder with alternating notebooks and boards, including at

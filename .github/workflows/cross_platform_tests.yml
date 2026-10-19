@@ -212,6 +212,7 @@ jobs:
       - name: Verify merged UI and planner lifecycle on native desktop
         run: >-
           flutter test test/merged_ui_integration_test.dart
+          test/pointer_contact_matrix_test.dart
           test/study_planner_button_contrast_test.dart
           test/study_planner_controller_test.dart
           --reporter expanded --timeout 90s
@@ -237,6 +238,15 @@ jobs:
         run: |
           flutter test integration_test/document_lifecycle_test.dart \
             -d macos --dart-define=NANOTATECZKI_ISOLATED_CI=true
+      - name: Verify synthetic pen and palm contacts on Linux desktop
+        if: matrix.platform == 'linux'
+        run: xvfb-run -a flutter test integration_test/pointer_contact_matrix_test.dart -d linux
+      - name: Verify synthetic pen and palm contacts on Windows desktop
+        if: matrix.platform == 'windows'
+        run: flutter test integration_test/pointer_contact_matrix_test.dart -d windows
+      - name: Verify synthetic pen and palm contacts on macOS desktop
+        if: matrix.platform == 'macos'
+        run: flutter test integration_test/pointer_contact_matrix_test.dart -d macos
       - name: Build release application
         if: ${{ !cancelled() }}
         run: flutter build ${{ matrix.platform }} --release
@@ -352,3 +362,4 @@ jobs:
         run: |
           flutter test integration_test/app_smoke_test.dart -d "$SIMULATOR_UDID"
           flutter test integration_test/document_lifecycle_test.dart -d "$SIMULATOR_UDID" --dart-define=NANOTATECZKI_ISOLATED_CI=true
+          flutter test integration_test/pointer_contact_matrix_test.dart -d "$SIMULATOR_UDID"

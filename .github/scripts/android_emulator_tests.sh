@@ -12,3 +12,5 @@ bash .github/scripts/flutter_integration_retry.sh \
 bash .github/scripts/flutter_integration_retry.sh \
   integration_test/document_lifecycle_test.dart -d "$device" \
   --dart-define=NANOTATECZKI_ISOLATED_CI=true
+bash .github/scripts/flutter_integration_retry.sh \
+  integration_test/pointer_contact_matrix_test.dart -d "$device"

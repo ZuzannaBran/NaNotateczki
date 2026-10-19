@@ -1010,9 +1010,22 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   cienia na styku oraz wspólna czułość nowych scrollerów.
 - `test/dialog_actions_test.dart`: kolory przycisków stopki w obu motywach
   oraz izolacja stylu od przycisków wewnątrz treści dialogu.
+- `.github/workflows/cross_platform_tests.yml`: macierz gestów działa w
+  CI na trzech systemach desktopowych, Androidzie i symulatorach iOS;
+  przeglądarka weryfikuje kontrakt zdarzeń (nie sprzętowy palm rejection).
 - `.github/workflows/cross_platform_tests.yml`: osobny szybki job
   `adaptive-layout` dla regresji viewportów; pełny zestaw testów ma
   limit 3 minut na przypadek (wcześniej 10 minut), bez wyłączania testów.
+- `test/support/pointer_contact_matrix.dart`: wspólne scenariusze Flutter
+  dla notebooka i boarda, kontrola rysowania palcem, utrzymania własności
+  kursora przez rysik, bliskiego/dalekiego kontaktu dłoni, anulowania
+  gestów, braku kropek i skoków zapisanej geometrii.
+- `test/pointer_contact_matrix_test.dart`: natywna macierz widgetowa dla
+  ekranu telefonu, wykonywana też na systemach desktopowych.
+- `integration_test/pointer_contact_matrix_test.dart`: te same scenariusze
+  na runtime Android/iOS/iPadOS oraz desktop Linux/Windows/macOS.
+- `test/cross_platform/pointer_dispatch_contract_test.dart`: kontrakt
+  Flutter PointerEvent (rodzaj, promień, cancel) uruchamiany także w Chrome.
 - `test/android_finger_ink_test.dart`: regresja telefonu Android z dużym
   promieniem styku palca w obu edytorach, wyłączenie palca w trybie On,
   zachowany rysik, brak kropek przy wielodotyku i wznowienie po nim.
