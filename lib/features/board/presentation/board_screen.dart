@@ -156,6 +156,7 @@ class _BoardScreenState extends State<BoardScreen> {
       if (pendingPosition != null &&
           (event.localPosition - pendingPosition).distance >
               _inkNavigationTouchSlop / _touchNavigationGain) {
+        _activePointers[event.pointer] = event.localPosition;
         _pendingNavigationPointer = null;
         _pendingNavigationPosition = null;
       }

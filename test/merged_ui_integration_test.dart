@@ -66,9 +66,7 @@ void main() {
       expect(
         libraryColor,
         Color.alphaBlend(
-          scheme.outlineVariant.withValues(
-            alpha: darkMode ? 0.45 : 0.20,
-          ),
+          scheme.outlineVariant.withValues(alpha: darkMode ? 0.45 : 0.20),
           scheme.surfaceContainerLowest,
         ),
       );

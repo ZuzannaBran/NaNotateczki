@@ -437,6 +437,42 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
       }
     });
 
+    testWidgets('pointer matrix: drawing touch yields to second finger $kind', (
+      tester,
+    ) async {
+      final f = await _CanvasFixture.create(
+        tester,
+        kind,
+        surfaceSize: surfaceSize,
+      );
+      try {
+        final previousPan = f.navigationOffset;
+        final first = _Contact(tester, 260, PointerDeviceKind.touch);
+        final second = _Contact(tester, 261, PointerDeviceKind.touch);
+        await first.down(f.nearPalm);
+        await first.move(f.nearPalm + const Offset(24, 7));
+        await second.down(f.farPalm);
+        await first.move(f.nearPalm + const Offset(24, 53));
+        await second.move(f.farPalm + const Offset(0, 46));
+        f.expectStrokeCount(0);
+        expect(
+          (f.navigationOffset - previousPan).distance,
+          greaterThan(1),
+          reason: 'A second finger must take over after a touch began drawing',
+        );
+        await first.up();
+        await second.up();
+        f.expectStrokeCount(0);
+
+        final recovered = _Contact(tester, 262, PointerDeviceKind.touch);
+        await _stroke(recovered, f.inkStart);
+        f.expectStrokeCount(1);
+        f.expectLastStrokeLocal();
+      } finally {
+        await f.close();
+      }
+    });
+
     testWidgets('pointer matrix: canceled contact never saves ink $kind', (
       tester,
     ) async {

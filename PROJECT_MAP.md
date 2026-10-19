@@ -927,8 +927,11 @@ edytora. Pasek tekstu jest wiązany z aktywnym `TextBlock`, a nie ze starym
 i unoszą się na nakładce nad canvasem, zamiast zmniejszać jego wysokość.
 `showCompactTimer` wyświetla `CompactStudyTimer` w nagłówku po zwinięciu
 panelu biblioteki.
-Pan dotykowy boarda ma regulowaną czułość i próg gestu; rysik,
-zoom i transformacje obiektów są niezależne od tego ustawienia.
+Pan dotykowy boarda ma regulowaną czułość i próg gestu; pierwszy
+palec po przekroczeniu progu trafia do aktywnych kontaktów nawigacji,
+więc dołożony drugi palec zawsze przejmuje gest zamiast pozostawić
+board bez przesuwania. Rysik, zoom i transformacje obiektów są
+niezależne od tego ustawienia.
 Board ma stały boczny odstęp 16 px, ale nie ma marginesu u góry,
 więc zawartość można swobodnie przesuwać za toolbar. Obszar roboczy
 ma proste górne rogi i zaokrąglone dolne rogi (16 px) zarówno w dekoracji,
@@ -1032,7 +1035,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   dla notebooka i boarda, kontrola rysowania palcem, utrzymania własności
   kursora przez rysik, bliskiego/dalekiego kontaktu dłoni, anulowania
   gestów, braku kropek i skoków zapisanej geometrii. Porównanie długości
-  odbywa się w pikselach ekranu, a dwupalczasta nawigacja ma osobny test.
+  odbywa się w pikselach ekranu, a dwupalczasta nawigacja ma osobne
+testy, także gdy pierwszy palec zdążył rozpocząć kreskę.
 - `test/pointer_contact_matrix_test.dart`: natywna macierz widgetowa dla
   ekranu telefonu, wykonywana też na systemach desktopowych.
 - `integration_test/pointer_contact_matrix_test.dart`: te same scenariusze

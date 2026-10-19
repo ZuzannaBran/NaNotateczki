@@ -241,9 +241,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             bottom: 0,
                             width: leftZoneWidth,
                             child: ColoredBox(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerLowest,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerLowest,
                               child: const SizedBox.expand(),
                             ),
                           ),

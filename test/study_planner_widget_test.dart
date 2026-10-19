@@ -128,21 +128,27 @@ void main() {
       final smart = tester.getRect(smartFinder);
 
       expect(start.width, closeTo(smart.width, 0.1));
-      final startLabel = tester.getRect(
-        find.descendant(of: startFinder, matching: find.text('Start session')),
+      final startContent = tester.getRect(
+        find.byKey(const ValueKey('sidebar-start-session-content')),
       );
-      final smartLabel = tester.getRect(
-        find.descendant(of: smartFinder, matching: find.text('Smart')),
+      final smartContent = tester.getRect(
+        find.byKey(const ValueKey('sidebar-smart-session-content')),
       );
-      expect(startLabel.center.dx, closeTo(start.center.dx, 1));
-      expect(smartLabel.center.dx, closeTo(smart.center.dx, 1));
+      expect(startContent.center.dx, closeTo(start.center.dx, 1));
+      expect(smartContent.center.dx, closeTo(smart.center.dx, 1));
       expect(
-        find.descendant(of: startFinder, matching: find.byType(Icon)),
-        findsNothing,
+        find.descendant(
+          of: startFinder,
+          matching: find.byIcon(Icons.play_arrow_rounded),
+        ),
+        findsOneWidget,
       );
       expect(
-        find.descendant(of: smartFinder, matching: find.byType(Icon)),
-        findsNothing,
+        find.descendant(
+          of: smartFinder,
+          matching: find.byIcon(Icons.auto_awesome_rounded),
+        ),
+        findsOneWidget,
       );
       expect(start.height, closeTo(smart.height, 0.1));
       expect(start.top, closeTo(smart.top, 0.1));
