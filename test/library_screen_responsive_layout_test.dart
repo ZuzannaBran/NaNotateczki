@@ -1038,7 +1038,10 @@ void main() {
       tester.getTopLeft(start).dy - tester.getBottomLeft(readyText).dy,
       greaterThanOrEqualTo(20),
     );
-    expect(tester.getSize(start).width, closeTo(tester.getSize(smart).width, 1));
+    expect(
+      tester.getSize(start).width,
+      closeTo(tester.getSize(smart).width, 1),
+    );
     expect(
       tester.getCenter(startContent).dx,
       closeTo(tester.getCenter(start).dx, 1),
