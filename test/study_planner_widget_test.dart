@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:program/core/theme/app_theme.dart';
 import 'package:program/features/planner/presentation/planner_screen.dart';
 import 'package:program/features/planner/presentation/study_timer_widgets.dart';
 import 'package:program/features/planner/state/study_planner_controller.dart';
@@ -63,7 +64,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('mobile-planner-days')), findsOneWidget);
-    expect(find.byTooltip('Planner actions'), findsOneWidget);
+    expect(find.byTooltip('Planner actions'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('planner-smart-session')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('planner-new-session')),
+      findsOneWidget,
+    );
     expect(find.byTooltip('Previous'), findsOneWidget);
     expect(find.byTooltip('Next'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -80,10 +89,12 @@ void main() {
 
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Planner actions'));
+    await tester.tap(find.byKey(const ValueKey('planner-new-session')));
     await tester.pumpAndSettle();
-    expect(find.text('New session'), findsOneWidget);
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Session name'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Settings'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -126,6 +137,22 @@ void main() {
       final smart = tester.getRect(smartFinder);
 
       expect(start.width, closeTo(smart.width, 0.1));
+      final startLabel = tester.getRect(
+        find.descendant(of: startFinder, matching: find.text('Start session')),
+      );
+      final smartLabel = tester.getRect(
+        find.descendant(of: smartFinder, matching: find.text('Smart')),
+      );
+      expect(startLabel.center.dx, closeTo(start.center.dx, 1));
+      expect(smartLabel.center.dx, closeTo(smart.center.dx, 1));
+      expect(
+        find.descendant(of: startFinder, matching: find.byType(Icon)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: smartFinder, matching: find.byType(Icon)),
+        findsNothing,
+      );
       expect(start.height, closeTo(smart.height, 0.1));
       expect(start.top, closeTo(smart.top, 0.1));
       expect(start.left, closeTo(timer.left + 14, 0.1));
@@ -250,7 +277,7 @@ void main() {
     await planner.flush();
   });
 
-  testWidgets('history shows star counts and never null over five', (
+  testWidgets('calendar shows completed session ratings without history', (
     tester,
   ) async {
     final planner = await loadPlanner();
@@ -279,9 +306,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Study history'));
-    await tester.pumpAndSettle();
-
+    expect(find.byTooltip('Study history'), findsNothing);
+    expect(find.byTooltip('Settings'), findsNothing);
     expect(find.textContaining('★★★☆☆'), findsWidgets);
     expect(find.textContaining('Not rated'), findsWidgets);
     expect(find.textContaining('null/5'), findsNothing);
@@ -289,4 +315,111 @@ void main() {
     expect(tester.takeException(), isNull);
     await planner.flush();
   });
+
+  for (final darkMode in [false, true]) {
+    testWidgets('completed sessions use darker cards in dark=$darkMode', (
+      tester,
+    ) async {
+      final planner = await loadPlanner();
+      await tester.binding.setSurfaceSize(const Size(1440, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final finished = planner.create(
+        title: 'Finished lesson',
+        scheduledAt: DateTime.now(),
+      );
+      planner.start(finished.id);
+      planner.stop();
+      planner.rate(finished.id, 4);
+      final planned = planner.create(
+        title: 'Planned lesson',
+        scheduledAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: MaterialApp(
+            theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+            home: const PlannerScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final done = find.byKey(ValueKey('planner-session-tile:${finished.id}'));
+      final upcoming = find.byKey(
+        ValueKey('planner-session-tile:${planned.id}'),
+      );
+      final scheme = Theme.of(tester.element(done)).colorScheme;
+      final doneColor = tester.widget<Material>(done).color!;
+      final upcomingColor = tester.widget<Material>(upcoming).color!;
+      expect(
+        doneColor,
+        darkMode
+            ? scheme.surfaceContainerLowest
+            : scheme.surfaceContainerHighest,
+      );
+      expect(
+        upcomingColor,
+        darkMode ? scheme.surfaceContainerHighest : scheme.surface,
+      );
+      expect(
+        doneColor.computeLuminance(),
+        lessThan(upcomingColor.computeLuminance()),
+      );
+      expect(tester.takeException(), isNull);
+      await planner.flush();
+    });
+  }
+
+  testWidgets('calendar buttons match sidebar styling and bottom spacing', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: PlannerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final smart = find.byKey(const ValueKey('planner-smart-session'));
+    final create = find.byKey(const ValueKey('planner-new-session'));
+    final shape = tester.widget<OutlinedButton>(smart).style!.shape!
+        .resolve(<WidgetState>{});
+    final filledShape = tester.widget<FilledButton>(create).style!.shape!
+        .resolve(<WidgetState>{});
+    expect(
+      (shape! as RoundedRectangleBorder).borderRadius,
+      const BorderRadius.all(Radius.circular(12)),
+    );
+    expect(
+      (filledShape! as RoundedRectangleBorder).borderRadius,
+      const BorderRadius.all(Radius.circular(12)),
+    );
+    expect(tester.getSize(smart).width, closeTo(148, 0.1));
+    expect(tester.getSize(create).width, closeTo(148, 0.1));
+    final bottomGap = find.byKey(
+      const ValueKey('planner-calendar-bottom-gap'),
+    );
+    expect(tester.getSize(bottomGap).height, 24);
+    expect(
+      tester.getBottomLeft(bottomGap).dy,
+      closeTo(tester.getBottomLeft(find.byType(PlannerScreen)).dy, 1),
+    );
+    expect(find.byTooltip('Settings'), findsNothing);
+    expect(find.byTooltip('Study history'), findsNothing);
+
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(smart).width, closeTo(179, 1));
+    expect(tester.getSize(create).width, closeTo(179, 1));
+    expect(tester.getRect(smart).top, closeTo(tester.getRect(create).top, 1));
+    expect(tester.takeException(), isNull);
+  });
+
 }

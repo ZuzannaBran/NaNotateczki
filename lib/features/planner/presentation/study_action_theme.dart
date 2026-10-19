@@ -7,6 +7,13 @@ class StudyActionStyles {
   static const Color primaryColor = Color(0xFFC4BBAF);
   static const Color secondaryColor = Color(0xFFE4E2DD);
   static const Color borderColor = Color(0xFFB3AB9F);
+  static const sessionButtonShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.all(Radius.circular(12)),
+  );
+  static const sessionButtonPadding = EdgeInsets.symmetric(
+    horizontal: 8,
+    vertical: 10,
+  );
 
   static Color background(ThemeData theme, {bool selected = false}) {
     if (theme.brightness == Brightness.dark) {
@@ -32,6 +39,17 @@ class StudyActionStyles {
     textStyle: theme.textTheme.labelLarge!.copyWith(
       fontWeight: FontWeight.w600,
     ),
+  );
+
+  static ButtonStyle sessionPrimary(ThemeData theme) =>
+      primary(theme).copyWith(
+        shape: const WidgetStatePropertyAll(sessionButtonShape),
+        padding: const WidgetStatePropertyAll(sessionButtonPadding),
+      );
+
+  static ButtonStyle sessionOutlined() => OutlinedButton.styleFrom(
+    shape: sessionButtonShape,
+    padding: sessionButtonPadding,
   );
 }
 

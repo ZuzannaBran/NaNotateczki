@@ -352,10 +352,6 @@ class StudyTimerCard extends StatelessWidget {
     final active = planner.active;
     final next = planner.upcoming.take(2).toList();
     final colors = Theme.of(context).colorScheme;
-    const actionShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.all(Radius.circular(12)),
-    );
-    const actionPadding = EdgeInsets.symmetric(horizontal: 8, vertical: 10);
     return StudyActionTheme(
       child: Padding(
         key: const ValueKey('study-timer-card'),
@@ -448,13 +444,10 @@ class StudyTimerCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: FilledButton.icon(
+                    child: FilledButton(
                       key: const ValueKey('sidebar-start-session'),
-                      style: StudyActionStyles.primary(
+                      style: StudyActionStyles.sessionPrimary(
                         Theme.of(context),
-                      ).copyWith(
-                        shape: const WidgetStatePropertyAll(actionShape),
-                        padding: const WidgetStatePropertyAll(actionPadding),
                       ),
                       onPressed: planner.isLoaded && planner.error == null
                           ? () => showStudySessionEditor(
@@ -462,18 +455,17 @@ class StudyTimerCard extends StatelessWidget {
                               startAfterSave: true,
                             )
                           : null,
-                      icon: const Icon(Icons.play_circle_outline, size: 18),
-                      label: const Text('Start session'),
+                      child: const Text(
+                        'Start session',
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: OutlinedButton.icon(
+                    child: OutlinedButton(
                       key: const ValueKey('sidebar-smart-session'),
-                      style: OutlinedButton.styleFrom(
-                        shape: actionShape,
-                        padding: actionPadding,
-                      ),
+                      style: StudyActionStyles.sessionOutlined(),
                       onPressed: planner.isLoaded && planner.error == null
                           ? () => showStudySessionEditor(
                               context,
@@ -481,8 +473,7 @@ class StudyTimerCard extends StatelessWidget {
                               startAfterSave: true,
                             )
                           : null,
-                      icon: const Icon(Icons.auto_awesome_outlined, size: 18),
-                      label: const Text('Smart'),
+                      child: const Text('Smart', textAlign: TextAlign.center),
                     ),
                   ),
                 ],

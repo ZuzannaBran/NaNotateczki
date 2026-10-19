@@ -7,7 +7,6 @@ import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
-import '../../editor/presentation/editor_settings_screen.dart';
 import '../state/study_planner_controller.dart';
 import 'study_action_theme.dart';
 import 'study_timer_widgets.dart';
@@ -24,7 +23,6 @@ class PlannerScreen extends StatefulWidget {
 class _PlannerScreenState extends State<PlannerScreen> {
   CalendarMode _mode = CalendarMode.week;
   DateTime _anchor = DateUtils.dateOnly(DateTime.now());
-  bool _history = false;
 
   TouchNavigationScrollPhysics get _navigationPhysics =>
       TouchNavigationScrollPhysics(
@@ -246,12 +244,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final planner = context.read<StudyPlannerController>();
     final done = session.status == StudyStatus.completed;
     final reviewing = session.status == StudyStatus.review;
-    final color = done
-        ? scheme.secondaryContainer
-        : reviewing
+    final darkMode = Theme.of(context).brightness == Brightness.dark;
+    final color = reviewing
         ? scheme.tertiaryContainer
-        : scheme.surfaceContainerHigh;
+        : done
+        ? (darkMode
+              ? scheme.surfaceContainerLowest
+              : scheme.surfaceContainerHighest)
+        : (darkMode ? scheme.surfaceContainerHighest : scheme.surface);
     final tile = Material(
+      key: ValueKey('planner-session-tile:${session.id}'),
       color: color,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
@@ -521,41 +523,23 @@ class _PlannerScreenState extends State<PlannerScreen> {
     );
   }
 
-  Widget _historyView(StudyPlannerController planner) {
-    final list = [...planner.pendingReviews, ...planner.history];
-    if (list.isEmpty) {
-      return const Center(child: Text('No study history yet.'));
-    }
-    return ListView.separated(
-      physics: _navigationPhysics,
-      padding: const EdgeInsets.all(22),
-      itemCount: list.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final session = list[i];
-        return ListTile(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          tileColor: Theme.of(context).colorScheme.surfaceContainerLow,
-          leading: Icon(
-            session.status == StudyStatus.review
-                ? Icons.star_border_rounded
-                : Icons.check_circle_outline,
-          ),
-          title: Text(session.title),
-          subtitle: Text(
-            '${session.scheduledAt.day}/${session.scheduledAt.month}/'
-            '${session.scheduledAt.year} · '
-            '${session.totalFocusMinutes} min · '
-            '${studyRatingStars(session.productivity)}',
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _sessionOptions(session),
-        );
-      },
-    );
-  }
+  Widget _smartButton() => OutlinedButton(
+    key: const ValueKey('planner-smart-session'),
+    style: StudyActionStyles.sessionOutlined(),
+    onPressed: () => showStudySessionEditor(
+      context,
+      technique: StudyTechnique.pomodoro,
+      startAfterSave: true,
+    ),
+    child: const Text('Smart session', textAlign: TextAlign.center),
+  );
+
+  Widget _newSessionButton() => FilledButton(
+    key: const ValueKey('planner-new-session'),
+    style: StudyActionStyles.sessionPrimary(Theme.of(context)),
+    onPressed: () => showStudySessionEditor(context),
+    child: const Text('New session', textAlign: TextAlign.center),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -564,7 +548,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final narrow = constraints.maxWidth < 760;
-        final mobile = constraints.maxWidth < 600;
         final compactCalendar = constraints.maxWidth < 960;
         return StudyActionTheme(
           child: Scaffold(
@@ -583,90 +566,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 onPressed: () => Navigator.pop(context),
               ),
               actions: [
-                if (!mobile)
-                  IconButton(
-                    tooltip: 'Settings',
-                    icon: const Icon(Icons.settings_outlined),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const EditorSettingsScreen(),
-                      ),
-                    ),
-                  ),
-                IconButton(
-                  tooltip: _history ? 'Calendar' : 'Study history',
-                  onPressed: () => setState(() => _history = !_history),
-                  icon: Icon(
-                    _history
-                        ? Icons.calendar_month_outlined
-                        : Icons.history_rounded,
-                  ),
-                ),
-                if (mobile)
-                  PopupMenuButton<String>(
-                    tooltip: 'Planner actions',
-                    icon: const Icon(Icons.more_vert_rounded),
-                    onSelected: (action) {
-                      switch (action) {
-                        case 'new':
-                          showStudySessionEditor(context);
-                          return;
-                        case 'smart':
-                          showStudySessionEditor(
-                            context,
-                            technique: StudyTechnique.pomodoro,
-                            startAfterSave: true,
-                          );
-                          return;
-                        case 'settings':
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const EditorSettingsScreen(),
-                            ),
-                          );
-                          return;
-                      }
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'new', child: Text('New session')),
-                      PopupMenuItem(
-                        value: 'smart',
-                        child: Text('Smart session'),
-                      ),
-                      PopupMenuItem(value: 'settings', child: Text('Settings')),
-                    ],
-                  )
-                else if (narrow) ...[
-                  IconButton(
-                    tooltip: 'Smart session',
-                    onPressed: () => showStudySessionEditor(
-                      context,
-                      technique: StudyTechnique.pomodoro,
-                      startAfterSave: true,
-                    ),
-                    icon: const Icon(Icons.auto_awesome_outlined),
-                  ),
-                  IconButton(
-                    tooltip: 'New session',
-                    onPressed: () => showStudySessionEditor(context),
-                    icon: const Icon(Icons.add_rounded),
-                  ),
-                ] else ...[
-                  OutlinedButton.icon(
-                    onPressed: () => showStudySessionEditor(
-                      context,
-                      technique: StudyTechnique.pomodoro,
-                      startAfterSave: true,
-                    ),
-                    icon: const Icon(Icons.auto_awesome_outlined),
-                    label: const Text('Smart session'),
-                  ),
-                  FilledButton.icon(
-                    style: StudyActionStyles.primary(Theme.of(context)),
-                    onPressed: () => showStudySessionEditor(context),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('New session'),
-                  ),
+                if (!narrow) ...[
+                  SizedBox(width: 148, child: _smartButton()),
+                  const SizedBox(width: 8),
+                  SizedBox(width: 148, child: _newSessionButton()),
                 ],
                 const SizedBox(width: 16),
               ],
@@ -676,6 +579,17 @@ class _PlannerScreenState extends State<PlannerScreen> {
               child: Column(
                 children: [
                   const AppHeaderDivider(),
+                  if (narrow)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                      child: Row(
+                        children: [
+                          Expanded(child: _smartButton()),
+                          const SizedBox(width: 8),
+                          Expanded(child: _newSessionButton()),
+                        ],
+                      ),
+                    ),
                   if (planner.active != null ||
                       planner.pendingReviews.isNotEmpty)
                     Material(
@@ -742,8 +656,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         ),
                       ),
                     ),
-                  if (!_history) ...[
-                    if (compactCalendar)
+                  if (compactCalendar)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
                         child: Column(
@@ -877,11 +790,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         style: TextStyle(fontSize: 12),
                       ),
                     ),
-                  ],
-                  Expanded(
-                    child: _history
-                        ? _historyView(planner)
-                        : _calendar(planner.sessions),
+                  Expanded(child: _calendar(planner.sessions)),
+                  const SizedBox(
+                    key: ValueKey('planner-calendar-bottom-gap'),
+                    height: 24,
                   ),
                 ],
               ),

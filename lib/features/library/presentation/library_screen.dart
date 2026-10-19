@@ -993,12 +993,8 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                         ],
                       ),
               ),
-              SizedBox(
-                height: AppHeaderDivider.thickness,
-                child: ColoredBox(
-                  key: const ValueKey('sidebar-timer-divider'),
-                  color: AppHeaderDivider.colorOf(context),
-                ),
+              const AppHeaderDivider(
+                key: ValueKey('sidebar-timer-divider'),
               ),
               ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: timerMaxHeight),

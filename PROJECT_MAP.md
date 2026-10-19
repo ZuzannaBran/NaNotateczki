@@ -395,7 +395,8 @@ Panel dzieli wysokość na rozwijane drzewko folderów,
 bezramkową sekcję `StudyTimerCard` i pusty dolny pasek konta o wysokości
 56 px (identycznej jak Projects). Timer zajmuje tylko wysokość treści,
 maksymalnie 38% obszaru między nagłówkiem a paskiem konta;
-nad sekcją timera i konta są cienkie linie w stylu `AppHeaderDivider`.
+separator folderów i timera jest komponentem `AppHeaderDivider`,
+takim jak pod Projects; pasek konta zachowuje taki sam styl linii.
 Przy małym oknie timer przewija się niezależnie, a drzewko folderów
 wykorzystuje pozostałą wysokość. Działa również w mobilnym drawerze.
 Po zwinięciu panelu
@@ -531,7 +532,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
   152: `StudyPlannerController`; 232: `load`; 298: `create`;
   366: `start`; 528: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (581):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (572):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -539,38 +540,38 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   używa typografii nagłówka `Projects`. Ikona kalendarza pozostaje.
   Przyciski `Start session` i `Smart` w panelu bocznym wypełniają
   po połowie dostępnej szerokości z odstępem 8 px i promieniem 12 px;
-  równa wysokość adaptuje się do zawijania etykiety na wąskim panelu.
+  etykiety bez ikon są optycznie wyśrodkowane także na wąskim panelu.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
   24: `studyRatingStars`; 31: `openStudyPlanner`;
   37: `showStudySessionEditor`; 57: `showStudyRating`;
-  343: `StudyTimerCard`; 533: `CompactStudyTimer`.
-- `lib/features/planner/presentation/study_action_theme.dart` (96):
-  `StudyActionTheme`, `StudyActionStyles`; czytelny, ale subtelny beż
+  343: `StudyTimerCard`; 524: `CompactStudyTimer`.
+- `lib/features/planner/presentation/study_action_theme.dart` (114):
+  `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
+  timera i kalendarza (promień 12 px, padding 8/10); subtelny beż
   tylko dla wyróżnianych akcji; pozostałe przyciski i ikony bez ciemnego
   wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
-  od bieżącego motywu. 6: `StudyActionStyles`; 39: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (894):
-  `PlannerScreen` – pełnoekranowe Today/Week/Month, drag/drop między dniami,
-  tworzenie, edycja, usuwanie i historia. Nazwa dnia tygodnia znajduje się
-  w każdej komórce kalendarza: pełna w Today, skrócona w Week/Month.
-  Dostęp do globalnych ustawień i wspólnej czułości scrolla kalendarza
-  oraz historii. Górny pasek ma 56 px i wspólną 1 px linię pod spodem,
-  Nagłówek telefonu/tabletu korzysta z ograniczeń rodzica
-  (`LayoutBuilder`), aby nie przepełniać systemowego AppBar.
-  także w trybie ciemnym. Poniżej 960 px Week/Month to pionowa lista
-  dni zamiast poziomego kalendarza 1050 px; nagłówek dat i akcje
-  mieszczą się bez poziomego przewijania. Body chroni dolny systemowy
-  inset. 13: `CalendarMode`; 15: `PlannerScreen`;
+  od bieżącego motywu. 6: `StudyActionStyles`;
+  57: `StudyActionTheme`.
+- `lib/features/planner/presentation/planner_screen.dart` (806):
+  `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
+  Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
+  z `ColorScheme` i promieniem 12 px w obu motywach. Osobne przyciski
+  Settings i Study history usunięto – historia pozostaje w kalendarzu,
+  a globalne ustawienia w katalogu. Smart/New session mają wspólne
+  style z timerem; poniżej 760 px leżą pod nagłówkiem w równym rzędzie.
+  Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
+  Nagłówek ma 56 px i linię 1 px, Week/Month na wąskim ekranie listę.
+  13: `CalendarMode`; 15: `PlannerScreen`;
   22: `_PlannerScreenState`.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
   i ochrona uszkodzonych danych; sukces/błąd wczytywania po dispose.
 - `test/study_planner_widget_test.dart`: szerokości 50/50, odstępy
   i zaokrąglenia przycisków timera przy panelach 240/320 px;
-  kalendarz, timer, wybór gwiazdek,
-  pominięcie i zamknięcie oceny, historia oceniona i bez oceny.
+  środkowanie etykiet, ciemniejsze ukończone sesje w obu motywach,
+  przyciski kalendarza i margines dolny, oceny sesji z kalendarza.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
   tygodnia we wszystkich widokach i po zmianie daty; osobny krok CI.
 - `test/study_planner_button_contrast_test.dart`: regresja widoczności
@@ -1004,7 +1005,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   geometria menu po lewej od nazw folderów, notatek i boardów.
 - `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
   wysokość i 1 px separator nagłówka planera i ustawień w obu motywach,
-  ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
+  dostęp do Settings przez katalog, ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
   po zmianie motywu, kontrast planera/timera, pozycja menu względem
   prawej granicy sidebaru przy resize w obu motywach, maskowanie
   cienia na styku oraz wspólna czułość nowych scrollerów.
@@ -1043,6 +1044,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   oraz przewijanie na wąskim ekranie; dynamiczny podział folderów,
   bezramkowego timera i paska konta, limit 38% z przewijaniem na małym
   ekranie, nagłówek timera w stylu Projects bez ikony zegara,
+  wspólny `AppHeaderDivider` nad timerem,
   i aktualizacja mnożnika przewijania plików bez restartu; geometria,
   kolor i obsługa menu
   folderu, notebooka oraz boarda, a także menu dodawania (3 pozycje,

@@ -96,6 +96,10 @@ void main() {
       expectAlignedHeader('Study planner');
       expect(await _renderedHeaderPixel(tester), referencePixel);
 
+      expect(find.byTooltip('Settings'), findsNothing);
+      await tester.tap(find.byTooltip('Back to notes'));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
       expectAlignedHeader('Settings');
@@ -107,6 +111,7 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
+      await _openPlanner(tester);
       expectAlignedHeader('Study planner');
       await tester.tap(find.byTooltip('Back to notes'));
       await tester.pumpAndSettle();
@@ -137,6 +142,9 @@ void main() {
       Theme.of(tester.element(find.byType(PlannerScreen))).brightness,
       Brightness.dark,
     );
+    expect(find.byTooltip('Settings'), findsNothing);
+    await tester.tap(find.byTooltip('Back to notes'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
     expect(find.byType(EditorSettingsScreen), findsOneWidget);
@@ -146,6 +154,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
+    _expectCatalogBackground(tester, AppColors.background);
+    await _openPlanner(tester);
     expect(
       Theme.of(tester.element(find.byType(PlannerScreen))).brightness,
       Brightness.light,

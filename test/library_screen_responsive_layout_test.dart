@@ -960,6 +960,13 @@ void main() {
     final divider = find.byKey(const ValueKey('sidebar-timer-divider'));
     final timerRegion = find.byKey(const ValueKey('sidebar-timer-region'));
     final account = find.byKey(const ValueKey('sidebar-account-slot'));
+    expect(tester.widget<AppHeaderDivider>(divider), isA<AppHeaderDivider>());
+    final line = find.descendant(
+      of: divider,
+      matching: find.byType(ColoredBox),
+    );
+    expect(tester.widget<ColoredBox>(line).color,
+        AppHeaderDivider.colorOf(tester.element(divider)));
 
     expect(list, findsOneWidget);
     expect(timer, findsOneWidget);
