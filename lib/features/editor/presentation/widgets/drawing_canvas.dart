@@ -903,7 +903,6 @@ void _trimEraserTrail(List<Offset> trail) {
 
 class _DrawingCanvasState extends State<DrawingCanvas> {
   static const double _touchStrokeStartSlop = 6.0;
-  static const double _palmContactRadius = 22.0;
 
   final List<InkPoint> _currentPoints = <InkPoint>[];
   final List<_PendingCommittedStroke> _committedOverlayStrokes =
@@ -1095,9 +1094,6 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         _suspendInk = true;
         _resetCurrent();
       }
-      return;
-    }
-    if (_isPalmLikeTouch(event)) {
       return;
     }
     if ((controller.tool == DrawingTool.pen ||
@@ -1789,13 +1785,6 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         kind == PointerDeviceKind.mouse;
   }
 
-  bool _isPalmLikeTouch(PointerEvent event) {
-    if (event.kind != PointerDeviceKind.touch) {
-      return false;
-    }
-    return max(event.radiusMajor, event.radiusMinor) >= _palmContactRadius;
-  }
-
   void _startSnapTimer(Offset offset) {
     const jitterTolerance = 20.0;
     if (_snapAnchor == null ||
@@ -2258,7 +2247,6 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
 
 class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   static const double _touchStrokeStartSlop = 6.0;
-  static const double _palmContactRadius = 22.0;
 
   final List<InkPoint> _currentPoints = <InkPoint>[];
   final List<_PendingCommittedStroke> _committedOverlayStrokes =
@@ -2505,9 +2493,6 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         _suspendInk = true;
         _resetCurrent();
       }
-      return;
-    }
-    if (_isPalmLikeTouch(event)) {
       return;
     }
     if ((controller.tool == DrawingTool.pen ||
@@ -3329,13 +3314,6 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     return kind == PointerDeviceKind.stylus ||
         kind == PointerDeviceKind.invertedStylus ||
         kind == PointerDeviceKind.mouse;
-  }
-
-  bool _isPalmLikeTouch(PointerEvent event) {
-    if (event.kind != PointerDeviceKind.touch) {
-      return false;
-    }
-    return max(event.radiusMajor, event.radiusMinor) >= _palmContactRadius;
   }
 
   void _startSnapTimer(Offset offset) {

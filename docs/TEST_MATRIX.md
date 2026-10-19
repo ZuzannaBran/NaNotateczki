@@ -27,6 +27,32 @@ a platform as tested until its actual Actions job succeeds.
 - The desktop matrix also runs merged catalog/planner UI, typography and
   planner lifecycle regressions directly on Linux, Windows and macOS.
 
+## Android finger-ink acceptance (October 2026)
+
+Automated regression: `test/android_finger_ink_test.dart` injects Android-like
+touch contact ellipses (major radius 34 logical px) at a phone viewport,
+for both notebook and board. It verifies that Off draws with a single finger,
+On ignores fingers but accepts a stylus, two stationary contacts create no
+dots, and finger writing resumes after multi-touch. This is synthetic pointer
+testing, not a claim of verification on a physical phone.
+
+Manual checks on a physical Android phone (repeat on iPhone/iPad and
+Windows/Linux touchscreens when hardware is available):
+
+1. Open a notebook and a board, set **Pointer input / Off** (finger allowed),
+   select Pen, and draw several strokes with one finger, including slow
+   strokes and starting in the middle of the canvas. Confirm strokes persist.
+2. Set **On** (stylus only): a finger must navigate rather than create ink;
+   a supported pen must still draw.
+3. Return to **Off**: rest two fingers without moving them. They must not
+   create dots. Lift them and draw with a single finger immediately.
+4. With a stylus touching the canvas, rest part of the hand on the screen;
+   it must not generate strokes, interrupt existing stylus ink or select
+   unrelated objects.
+5. Repeat with orientation and split-screen changes, and check that
+   the toolbar remains interactive in either mode. Record device model,
+   Android version and whether pointer input was Off or On.
+
 ## Manual check: symmetric notebook and board grid (October 2026)
 
 1. Create a folder with alternating notebooks and boards, including at

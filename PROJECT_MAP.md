@@ -823,7 +823,12 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4201 linii)
 
 Dwa świadomie osobne canvasy ink, wspólna geometria rozpoznawania gestów,
-lasso, handoff aktywnej kreski i pomiary wydajności. Wszystkie modyfikacje
+lasso, handoff aktywnej kreski i pomiary wydajności.
+Promień kontaktu Androida nie jest wiarygodnym kryterium rozróżnienia
+palca i dłoni. Gdy tryb Off zezwala na rysowanie palcem, pojedynczy
+kontakt jest przyjmowany niezależnie od radiusMajor/radiusMinor;
+blokada trybu On, opóźnienie początku gestu, brak kropek od tapnięć i
+anulowanie multi-touch nadal obowiązują w obu canvasach. Wszystkie modyfikacje
 gumki, włącznie ze scratch erase, delegują dane do jednego
 `InkEraserEngine`. Canvas nie ma już drugiego silnika cięcia, zapisanego
 `BlendMode.clear` ani martwego stanu kursora gumki. Tymczasowy podgląd
@@ -993,6 +998,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `.github/workflows/cross_platform_tests.yml`: osobny szybki job
   `adaptive-layout` dla regresji viewportów; pełny zestaw testów ma
   limit 3 minut na przypadek (wcześniej 10 minut), bez wyłączania testów.
+- `test/android_finger_ink_test.dart`: regresja telefonu Android z dużym
+  promieniem styku palca w obu edytorach, wyłączenie palca w trybie On,
+  zachowany rysik, brak kropek przy wielodotyku i wznowienie po nim.
 - `test/adaptive_platform_layout_test.dart`: bezpieczne górne i dolne
   marginesy systemowe, dostęp do drawer/edytora, układy 320/390/768/844/
   1024/1440 px i zachowanie kontrolera przy zmianie orientacji.
