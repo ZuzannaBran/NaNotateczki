@@ -13,6 +13,22 @@ import 'study_timer_widgets.dart';
 
 enum CalendarMode { today, week, month }
 
+List<DateTime> monthCalendarDays(DateTime month) {
+  final first = DateTime(month.year, month.month);
+  final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+  final leadingDays = first.weekday - DateTime.monday;
+  final dayCount = ((leadingDays + daysInMonth + 6) ~/ 7) * 7;
+  final firstMonday = DateTime(first.year, first.month, 1 - leadingDays);
+  return List.generate(
+    dayCount,
+    (index) => DateTime(
+      firstMonday.year,
+      firstMonday.month,
+      firstMonday.day + index,
+    ),
+  );
+}
+
 class PlannerScreen extends StatefulWidget {
   const PlannerScreen({super.key});
 
@@ -43,12 +59,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
   };
 
   List<DateTime> _visibleDays() {
+    if (_mode == CalendarMode.month) {
+      return monthCalendarDays(_anchor);
+    }
     final first = _firstDay();
-    final count = switch (_mode) {
-      CalendarMode.today => 1,
-      CalendarMode.week => 7,
-      CalendarMode.month => 42,
-    };
+    final count = _mode == CalendarMode.today ? 1 : 7;
     return List.generate(
       count,
       (i) => DateTime(first.year, first.month, first.day + i),
@@ -255,7 +270,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final tile = Material(
       key: ValueKey('planner-session-tile:${session.id}'),
       color: color,
-      borderRadius: BorderRadius.circular(12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.onSurface),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _sessionOptions(session),
@@ -325,104 +343,108 @@ class _PlannerScreenState extends State<PlannerScreen> {
   }) {
     final scheme = Theme.of(context).colorScheme;
     final today = _isSameDate(day, DateTime.now());
-    final inMonth = _mode != CalendarMode.month || day.month == _anchor.month;
+    final inMonth = _mode != CalendarMode.month ||
+        (day.month == _anchor.month && day.year == _anchor.year);
     final items =
         sessions.where((s) => _isSameDate(s.scheduledAt, day)).toList()
           ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
 
-    return DragTarget<StudySession>(
-      onWillAcceptWithDetails: (details) =>
-          details.data.status == StudyStatus.planned,
-      onAcceptWithDetails: (details) {
-        context.read<StudyPlannerController>().move(details.data.id, day);
-      },
-      builder: (context, candidates, rejected) {
-        return Container(
-          decoration: BoxDecoration(
-            color: candidates.isNotEmpty
-                ? scheme.primaryContainer
-                : today
-                ? scheme.surfaceContainerLow
-                : scheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: today ? scheme.outline : scheme.outlineVariant,
-            ),
-          ),
-          margin: const EdgeInsets.all(3),
-          padding: EdgeInsets.all(compact ? 6 : 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _dayLabel(day),
-                      key: ValueKey(
-                        'planner-day-label-${day.year}-${day.month}-${day.day}',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: compact ? 12 : 15,
-                        fontWeight: today ? FontWeight.bold : FontWeight.w500,
-                        color: inMonth
-                            ? scheme.onSurface
-                            : scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  if (!compact)
-                    IconButton(
-                      tooltip: 'Plan on this day',
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => showStudySessionEditor(
-                        context,
-                        scheduledAt: DateTime(day.year, day.month, day.day, 9),
-                      ),
-                    ),
-                ],
+    return Opacity(
+      opacity: inMonth ? 1 : 0.5,
+      child: DragTarget<StudySession>(
+        onWillAcceptWithDetails: (details) =>
+            details.data.status == StudyStatus.planned,
+        onAcceptWithDetails: (details) {
+          context.read<StudyPlannerController>().move(details.data.id, day);
+        },
+        builder: (context, candidates, rejected) {
+          return Container(
+            decoration: BoxDecoration(
+              color: candidates.isNotEmpty
+                  ? scheme.primaryContainer
+                  : today
+                  ? scheme.surfaceContainerLow
+                  : scheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: today ? scheme.outline : scheme.outlineVariant,
               ),
-              const SizedBox(height: 6),
-              if (compact || _mode == CalendarMode.week)
-                Expanded(
-                  child: ListView(
-                    physics: _navigationPhysics,
-                    padding: EdgeInsets.zero,
-                    children: [
-                      for (final item in items)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 5),
-                          child: _sessionTile(item, compact: compact),
+            ),
+            margin: const EdgeInsets.all(3),
+            padding: EdgeInsets.all(compact ? 6 : 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _dayLabel(day),
+                        key: ValueKey(
+                          'planner-day-label-${day.year}-${day.month}-${day.day}',
                         ),
-                      if (items.isEmpty)
-                        InkWell(
-                          onTap: () => showStudySessionEditor(
-                            context,
-                            scheduledAt: DateTime(
-                              day.year,
-                              day.month,
-                              day.day,
-                              9,
-                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: compact ? 12 : 15,
+                          fontWeight: today ? FontWeight.bold : FontWeight.w500,
+                          color: inMonth
+                              ? scheme.onSurface
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    if (!compact)
+                      IconButton(
+                        tooltip: 'Plan on this day',
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => showStudySessionEditor(
+                          context,
+                          scheduledAt: DateTime(day.year, day.month, day.day, 9),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (compact || _mode == CalendarMode.week)
+                  Expanded(
+                    child: ListView(
+                      physics: _navigationPhysics,
+                      padding: EdgeInsets.zero,
+                      children: [
+                        for (final item in items)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 5),
+                            child: _sessionTile(item, compact: compact),
                           ),
-                          child: const SizedBox(height: 45),
-                        ),
-                    ],
-                  ),
-                )
-              else
-                for (final item in items)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 5),
-                    child: _sessionTile(item, compact: compact),
-                  ),
-            ],
-          ),
-        );
-      },
+                        if (items.isEmpty)
+                          InkWell(
+                            onTap: () => showStudySessionEditor(
+                              context,
+                              scheduledAt: DateTime(
+                                day.year,
+                                day.month,
+                                day.day,
+                                9,
+                              ),
+                            ),
+                            child: const SizedBox(height: 45),
+                          ),
+                      ],
+                    ),
+                  )
+                else
+                  for (final item in items)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: _sessionTile(item, compact: compact),
+                    ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -533,7 +555,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
         technique: StudyTechnique.pomodoro,
         startAfterSave: true,
       ),
-      child: const Text('Smart session', textAlign: TextAlign.center),
+      child: StudyActionStyles.sessionButtonContent(
+        icon: Icons.auto_awesome_rounded,
+        label: 'Smart session',
+        contentKey: const ValueKey('planner-smart-session-content'),
+      ),
     ),
   );
 
@@ -543,7 +569,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
       key: const ValueKey('planner-new-session'),
       style: StudyActionStyles.sessionPrimary(Theme.of(context)),
       onPressed: () => showStudySessionEditor(context),
-      child: const Text('New session', textAlign: TextAlign.center),
+      child: StudyActionStyles.sessionButtonContent(
+        icon: Icons.add_rounded,
+        label: 'New session',
+        contentKey: const ValueKey('planner-new-session-content'),
+      ),
     ),
   );
 
@@ -788,14 +818,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         ),
                       ),
                     ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 18),
-                    child: Text(
-                      'Long-press and drag a planned session to another day. '
-                      'Tap any session to edit, delete or start it.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
                   Expanded(child: _calendar(planner.sessions)),
                   const SizedBox(
                     key: ValueKey('planner-calendar-bottom-gap'),

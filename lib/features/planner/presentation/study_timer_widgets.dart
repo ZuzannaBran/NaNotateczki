@@ -457,18 +457,11 @@ class StudyTimerCard extends StatelessWidget {
                               startAfterSave: true,
                             )
                           : null,
-                      child: const Center(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            key: ValueKey('sidebar-start-session-content'),
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.play_arrow_rounded, size: 18),
-                              SizedBox(width: 4),
-                              Text('Start session'),
-                            ],
-                          ),
+                      child: StudyActionStyles.sessionButtonContent(
+                        icon: Icons.play_arrow_rounded,
+                        label: 'Start session',
+                        contentKey: const ValueKey(
+                          'sidebar-start-session-content',
                         ),
                       ),
                     ),
@@ -485,18 +478,11 @@ class StudyTimerCard extends StatelessWidget {
                               startAfterSave: true,
                             )
                           : null,
-                      child: const Center(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            key: ValueKey('sidebar-smart-session-content'),
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.auto_awesome_rounded, size: 18),
-                              SizedBox(width: 4),
-                              Text('Smart'),
-                            ],
-                          ),
+                      child: StudyActionStyles.sessionButtonContent(
+                        icon: Icons.auto_awesome_rounded,
+                        label: 'Smart',
+                        contentKey: const ValueKey(
+                          'sidebar-smart-session-content',
                         ),
                       ),
                     ),

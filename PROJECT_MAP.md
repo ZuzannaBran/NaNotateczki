@@ -161,9 +161,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 - `lib/core/widgets/app_header_divider.dart`: wspólny 1 px separator nagłówka
   w ekranie głównym, planerze i ustawieniach. Wspólna wysokość paska to
   56 px, styl tytułu to 18 px i waga 600 jak Projects we wszystkich ekranach.
-  Kolor linii we wszystkich ekranach: outlineVariant 20% w trybie jasnym
-  i 45% w ciemnym na surfaceContainerLowest; w planerze i ustawieniach
-  linia jest pierwszym
+  Kolor linii w jasnym motywie: AppColors.paper (kolor canvy), wyraźnie
+  jaśniejszy od paneli; w ciemnym outlineVariant 45% na
+  surfaceContainerLowest. W planerze i ustawieniach linia jest pierwszym
   elementem body bez zwiększania wysokości AppBar.
   4: `AppHeaderDivider`; 7: `colorOf`.
 - `lib/core/widgets/app_dialog_actions.dart`: kolory dolnych akcji
@@ -553,8 +553,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   343: `StudyTimerCard`; 525: `CompactStudyTimer`.
 - `lib/features/planner/presentation/study_action_theme.dart` (113):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
-  timera i kalendarza (promień 12 px, padding 8/10); subtelny beż
-  tylko dla wyróżnianych akcji; pozostałe przyciski i ikony bez ciemnego
+  timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
+  zawartość ikon i tekstu oraz promień 12 px selektora Today/Week/Month;
+  subtelny beż tylko dla wyróżnianych akcji; pozostałe przyciski bez ciemnego
   wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
@@ -562,7 +563,10 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 - `lib/features/planner/presentation/planner_screen.dart` (812):
   `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
-  z `ColorScheme` i promieniem 12 px w obu motywach. Osobne przyciski
+  z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
+  Miesiąc generuje tylko niezbędne 4–6 tygodni; komórki dni granicznych
+  innych miesięcy pozostają widoczne z opacity 0.5; pomocniczy napis
+  Long-press usunięty. Osobne przyciski
   Settings i Study history usunięto – historia pozostaje w kalendarzu,
   a globalne ustawienia w katalogu. Smart/New session mają wspólne
   style z timerem i wysokość 44 px; poniżej 760 px leżą pod nagłówkiem
@@ -576,11 +580,14 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   i ochrona uszkodzonych danych; sukces/błąd wczytywania po dispose.
 - `test/study_planner_widget_test.dart`: szerokości 50/50, odstępy
   i zaokrąglenia przycisków timera przy panelach 240/320 px;
-  środkowanie etykiet, ciemniejsze ukończone sesje w obu motywach,
-  przyciski kalendarza o tej samej wysokości, brak overflow
+  środkowanie etykiet i ikon przycisków, ciemniejsze ukończone sesje
+  z obrysem w kolorze tekstu w obu motywach, przyciski kalendarza o
+  tej samej wysokości i zaokrągleniu selektora, przygaszenie dni z
+  innych miesięcy i brak tekstu instruktażowego, brak overflow
   selektora techniki w wąskim oknie, margines dolny i oceny kalendarza.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
-  tygodnia we wszystkich widokach i po zmianie daty; osobny krok CI.
+  tygodnia we wszystkich widokach i po zmianie daty; 4/5/6 tygodni
+  miesiąca z zachowaniem dni przejściowych; osobny krok CI.
 - `test/study_planner_button_contrast_test.dart`: regresja widoczności
   aktywnych przycisków i wyraźnych stanów wybranego widoku kalendarza;
   typografia kontrolek w obu motywach.

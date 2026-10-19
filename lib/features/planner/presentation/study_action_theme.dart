@@ -50,6 +50,25 @@ class StudyActionStyles {
     shape: sessionButtonShape,
     padding: sessionButtonPadding,
   );
+
+  static Widget sessionButtonContent({
+    required IconData icon,
+    required String label,
+    Key? contentKey,
+  }) => Center(
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        key: contentKey,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 4),
+          Text(label),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Highlights only pale actions while keeping regular controls understated.
@@ -89,6 +108,9 @@ class StudyActionTheme extends StatelessWidget {
         ),
         segmentedButtonTheme: SegmentedButtonThemeData(
           style: ButtonStyle(
+            shape: const WidgetStatePropertyAll(
+              StudyActionStyles.sessionButtonShape,
+            ),
             foregroundColor: WidgetStatePropertyAll(foreground),
             backgroundColor: WidgetStateProperty.resolveWith(
               (states) => StudyActionStyles.background(

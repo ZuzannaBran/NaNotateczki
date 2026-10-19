@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
 /// The same one-pixel divider used below all top app bars.
 class AppHeaderDivider extends StatelessWidget {
   const AppHeaderDivider({super.key});
@@ -14,12 +15,12 @@ class AppHeaderDivider extends StatelessWidget {
   );
 
   static Color colorOf(BuildContext context) {
+    if (Theme.of(context).brightness == Brightness.light) {
+      return AppColors.paper;
+    }
     final scheme = Theme.of(context).colorScheme;
-    final alpha = Theme.of(context).brightness == Brightness.light
-        ? 0.20
-        : 0.45;
     return Color.alphaBlend(
-      scheme.outlineVariant.withValues(alpha: alpha),
+      scheme.outlineVariant.withValues(alpha: 0.45),
       scheme.surfaceContainerLowest,
     );
   }

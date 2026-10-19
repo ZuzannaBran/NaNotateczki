@@ -27,6 +27,23 @@ void expectCalendarLabel(WidgetTester tester, DateTime day, String label) {
 }
 
 void main() {
+  test('month shows only weeks intersecting the selected month', () {
+    final fourWeeks = monthCalendarDays(DateTime(2027, 2));
+    expect(fourWeeks.length, 28);
+    expect(fourWeeks.first, DateTime(2027, 2, 1));
+    expect(fourWeeks.last, DateTime(2027, 2, 28));
+
+    final fiveWeeks = monthCalendarDays(DateTime(2026, 10));
+    expect(fiveWeeks.length, 35);
+    expect(fiveWeeks.first, DateTime(2026, 9, 28));
+    expect(fiveWeeks.last, DateTime(2026, 11, 1));
+
+    final sixWeeks = monthCalendarDays(DateTime(2026, 8));
+    expect(sixWeeks.length, 42);
+    expect(sixWeeks.first, DateTime(2026, 7, 27));
+    expect(sixWeeks.last, DateTime(2026, 9, 6));
+  });
+
   testWidgets('weekday names appear in today, week and month cells', (
     tester,
   ) async {

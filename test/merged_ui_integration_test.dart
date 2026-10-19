@@ -65,10 +65,12 @@ void main() {
       final scheme = Theme.of(tester.element(libraryDivider)).colorScheme;
       expect(
         libraryColor,
-        Color.alphaBlend(
-          scheme.outlineVariant.withValues(alpha: darkMode ? 0.45 : 0.20),
-          scheme.surfaceContainerLowest,
-        ),
+        darkMode
+            ? Color.alphaBlend(
+                scheme.outlineVariant.withValues(alpha: 0.45),
+                scheme.surfaceContainerLowest,
+              )
+            : AppColors.paper,
       );
       expect(
         libraryColor,

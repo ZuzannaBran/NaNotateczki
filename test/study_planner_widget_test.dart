@@ -351,6 +351,12 @@ void main() {
       final scheme = Theme.of(tester.element(done)).colorScheme;
       final doneColor = tester.widget<Material>(done).color!;
       final upcomingColor = tester.widget<Material>(upcoming).color!;
+      for (final tile in [done, upcoming]) {
+        final border = tester.widget<Material>(tile).shape;
+        expect(border, isA<RoundedRectangleBorder>());
+        expect((border! as RoundedRectangleBorder).side.color, scheme.onSurface);
+        expect(border.side.width, 1);
+      }
       expect(
         doneColor,
         darkMode
@@ -369,6 +375,59 @@ void main() {
       await planner.flush();
     });
   }
+
+  testWidgets('month fades only boundary days outside selected month', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const PlannerScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+
+    var anchor = DateTime.now();
+    var days = monthCalendarDays(anchor);
+    if (days.first.month == anchor.month) {
+      await tester.tap(find.byTooltip('Next'));
+      await tester.pumpAndSettle();
+      anchor = DateTime(anchor.year, anchor.month + 1);
+      days = monthCalendarDays(anchor);
+    }
+
+    final grid = tester.widget<GridView>(find.byType(GridView));
+    expect(grid.childrenDelegate.estimatedChildCount, days.length);
+
+    Finder labelFor(DateTime day) => find.byKey(
+      ValueKey('planner-day-label-${day.year}-${day.month}-${day.day}'),
+    );
+    final outsideLabel = labelFor(days.first);
+    final insideLabel = labelFor(DateTime(anchor.year, anchor.month));
+    expect(outsideLabel, findsOneWidget);
+    expect(insideLabel, findsOneWidget);
+    expect(
+      tester.widget<Opacity>(
+        find.ancestor(of: outsideLabel, matching: find.byType(Opacity)).first,
+      ).opacity,
+      0.5,
+    );
+    expect(
+      tester.widget<Opacity>(
+        find.ancestor(of: insideLabel, matching: find.byType(Opacity)).first,
+      ).opacity,
+      1,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('calendar buttons match sidebar styling and bottom spacing', (
     tester,
@@ -408,6 +467,41 @@ void main() {
     expect(tester.getSize(create).width, closeTo(148, 0.1));
     expect(tester.getSize(smart).height, 44);
     expect(tester.getSize(create).height, 44);
+    expect(
+      find.descendant(
+        of: smart,
+        matching: find.byIcon(Icons.auto_awesome_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: create, matching: find.byIcon(Icons.add_rounded)),
+      findsOneWidget,
+    );
+    final smartContent = find.byKey(
+      const ValueKey('planner-smart-session-content'),
+    );
+    final newContent = find.byKey(
+      const ValueKey('planner-new-session-content'),
+    );
+    expect(
+      tester.getCenter(smartContent).dx,
+      closeTo(tester.getCenter(smart).dx, 1),
+    );
+    expect(
+      tester.getCenter(newContent).dx,
+      closeTo(tester.getCenter(create).dx, 1),
+    );
+    final calendarMode = find.byType(SegmentedButton<CalendarMode>);
+    final calendarTheme = Theme.of(tester.element(calendarMode));
+    final modeShape = calendarTheme.segmentedButtonTheme.style!.shape!
+        .resolve(<WidgetState>{});
+    expect(
+      (modeShape! as RoundedRectangleBorder).borderRadius,
+      const BorderRadius.all(Radius.circular(12)),
+    );
+    expect(find.textContaining('Long-press'), findsNothing);
+    expect(find.textContaining('Tap any session'), findsNothing);
     final bottomGap = find.byKey(const ValueKey('planner-calendar-bottom-gap'));
     expect(tester.getSize(bottomGap).height, 24);
     expect(
