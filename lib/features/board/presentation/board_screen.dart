@@ -88,6 +88,10 @@ class _BoardScreenState extends State<BoardScreen> {
     }
     if (controller.tool.isInk && _isStylusPointerKind(event.kind)) {
       _activeInkPointer = event.pointer;
+      _activePointers.clear();
+      if (_isViewportNavigating && !_panZoomSessionActive) {
+        _stopViewportNavigation(controller);
+      }
       _pendingNavigationPointer = null;
       _pendingNavigationPosition = null;
       return;

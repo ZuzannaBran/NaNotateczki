@@ -75,6 +75,38 @@ jobs:
           path: coverage/lcov.info
           if-no-files-found: ignore
 
+  stylus-input:
+    name: Stylus and palm input regression (isolated)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Format only pen and palm input files
+        shell: bash
+        run: |
+          dart format \
+            lib/features/editor/presentation/widgets/drawing_canvas.dart \
+            lib/features/editor/presentation/editor_screen.dart \
+            lib/features/board/presentation/board_screen.dart \
+            test/support/pointer_contact_matrix.dart
+          git diff --exit-code -- \
+            lib/features/editor/presentation/widgets/drawing_canvas.dart \
+            lib/features/editor/presentation/editor_screen.dart \
+            lib/features/board/presentation/board_screen.dart \
+            test/support/pointer_contact_matrix.dart
+      - name: Exercise two-finger navigation, stylus priority and cancellation
+        run: >-
+          flutter test test/pointer_contact_matrix_test.dart
+          test/android_finger_ink_test.dart
+          test/cross_platform/pointer_dispatch_contract_test.dart
+          --reporter expanded --timeout 90s
+
   adaptive-layout:
     name: Phone, tablet and desktop layout regressions
     runs-on: ubuntu-24.04

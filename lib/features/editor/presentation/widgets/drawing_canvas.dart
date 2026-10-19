@@ -996,7 +996,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         );
         final eraserRadius = _eraserStrokeRadius(controller.inkStrokeWidth);
         final child = IgnorePointer(
-          ignoring: !isInkTool || !widget.interactionEnabled,
+          ignoring: !isInkTool,
           child: MouseRegion(
             cursor: _usesCustomInkCursor(controller.tool)
                 ? SystemMouseCursors.basic
@@ -1088,8 +1088,13 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     final incomingStylus =
         event.kind == PointerDeviceKind.stylus ||
         event.kind == PointerDeviceKind.invertedStylus;
+    if (!widget.interactionEnabled && !incomingStylus) {
+      return;
+    }
     if (incomingStylus &&
-        (_primaryPointerKind == PointerDeviceKind.touch || _suspendInk)) {
+        (_primaryPointerKind == PointerDeviceKind.touch ||
+            _suspendInk ||
+            _activePointers.isNotEmpty)) {
       _activePointers.clear();
       _suspendInk = false;
       _resetCurrent();
@@ -2345,7 +2350,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         );
         final eraserRadius = _eraserStrokeRadius(controller.inkStrokeWidth);
         final child = IgnorePointer(
-          ignoring: !isInkTool || !widget.interactionEnabled,
+          ignoring: !isInkTool,
           child: MouseRegion(
             cursor: _usesCustomInkCursor(controller.tool)
                 ? SystemMouseCursors.basic
@@ -2496,8 +2501,13 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     final incomingStylus =
         event.kind == PointerDeviceKind.stylus ||
         event.kind == PointerDeviceKind.invertedStylus;
+    if (!widget.interactionEnabled && !incomingStylus) {
+      return;
+    }
     if (incomingStylus &&
-        (_primaryPointerKind == PointerDeviceKind.touch || _suspendInk)) {
+        (_primaryPointerKind == PointerDeviceKind.touch ||
+            _suspendInk ||
+            _activePointers.isNotEmpty)) {
       _activePointers.clear();
       _suspendInk = false;
       _resetCurrent();

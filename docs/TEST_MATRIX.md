@@ -66,7 +66,8 @@ synthetic widget scenarios in `test/pointer_contact_matrix_test.dart` and
 - Stylus continuity with a palm near and far from the writing tip, including
   moving the palm, and no phantom ink or wide coordinate jumps.
 - Palm-first, two-fingers-first, stylus-first and finger-after-multi-touch
-  ordering. The pen must keep or regain ownership of the stroke.
+  ordering. Two fingers alone must pan/zoom the canvas without ink; when
+  a stylus arrives, it must regain drawing control without a phantom stroke.
 - A canceled finger or stylus stroke must not be saved; a later valid stroke
   must still work. A stationary touch never becomes a saved dot.
 
@@ -75,6 +76,8 @@ touch/stylus identities, contact size and cancel dispatch in Chrome and the
 native Dart suite. This is a **framework contract** check, not browser/OS
 hardware classification.
 
+An independent `stylus-input` CI job checks pen-related formatting and
+regressions without being blocked by unrelated planner changes.
 GitHub Actions runs the native widget matrix on Ubuntu and Windows/macOS,
 device-level Flutter integration on Linux/Windows/macOS desktops, the Android
 emulator and iPhone/iPad simulators. Chrome runs the browser-compatible

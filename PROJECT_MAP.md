@@ -847,7 +847,9 @@ kontakt jest przyjmowany niezależnie od radiusMajor/radiusMinor;
 blokada trybu On, opóźnienie początku gestu, brak kropek od tapnięć i
 anulowanie multi-touch nadal obowiązują w obu canvasach. Rysik ma
 pierwszeństwo, gdy pojedynczy kontakt dłoni pojawił się przed nim; canvasy
-zachowują hit-test podczas anulowania multi-touch, aby przyjąć nowy rysik. Wszystkie modyfikacje
+przyjmują zdarzenia rysika podczas nawigacji wielodotykowej, aby móc
+bezpiecznie przejąć kontakt. Dwa palce bez rysika pozostają wyłącznie
+nawigacją (pan/zoom), bez tworzenia ink. Wszystkie modyfikacje
 gumki, włącznie ze scratch erase, delegują dane do jednego
 `InkEraserEngine`. Canvas nie ma już drugiego silnika cięcia, zapisanego
 `BlendMode.clear` ani martwego stanu kursora gumki. Tymczasowy podgląd
@@ -1014,8 +1016,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   cienia na styku oraz wspólna czułość nowych scrollerów.
 - `test/dialog_actions_test.dart`: kolory przycisków stopki w obu motywach
   oraz izolacja stylu od przycisków wewnątrz treści dialogu.
-- `.github/workflows/cross_platform_tests.yml`: macierz gestów działa w
-  CI na trzech systemach desktopowych, Androidzie i symulatorach iOS;
+- `.github/workflows/cross_platform_tests.yml`: niezależny job `stylus-input`
+  weryfikuje wyłącznie rysik/dłoń, bez zależności od formatowania planera.
+  Macierz gestów działa w CI na trzech systemach desktopowych, Androidzie
+  i symulatorach iOS;
   przeglądarka weryfikuje kontrakt zdarzeń (nie sprzętowy palm rejection).
 - `.github/workflows/cross_platform_tests.yml`: osobny szybki job
   `adaptive-layout` dla regresji viewportów; pełny zestaw testów ma
@@ -1023,7 +1027,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/support/pointer_contact_matrix.dart`: wspólne scenariusze Flutter
   dla notebooka i boarda, kontrola rysowania palcem, utrzymania własności
   kursora przez rysik, bliskiego/dalekiego kontaktu dłoni, anulowania
-  gestów, braku kropek i skoków zapisanej geometrii.
+  gestów, braku kropek i skoków zapisanej geometrii. Porównanie długości
+  odbywa się w pikselach ekranu, a dwupalczasta nawigacja ma osobny test.
 - `test/pointer_contact_matrix_test.dart`: natywna macierz widgetowa dla
   ekranu telefonu, wykonywana też na systemach desktopowych.
 - `integration_test/pointer_contact_matrix_test.dart`: te same scenariusze

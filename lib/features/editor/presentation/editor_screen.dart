@@ -288,6 +288,10 @@ class _EditorScreenState extends State<EditorScreen> {
     }
     if (controller.tool.isInk && _isStylusPointerKind(event.kind)) {
       _activeInkPointer = event.pointer;
+      _activePointers.clear();
+      if (_isViewportNavigating && !_panZoomSessionActive) {
+        _stopViewportNavigation();
+      }
       _pendingNavigationPointer = null;
       _pendingNavigationPosition = null;
       return;

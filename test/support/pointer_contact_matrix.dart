@@ -85,7 +85,11 @@ class _Contact {
 
   Future<void> cancel() async {
     await tester.sendEventToBinding(
-      PointerCancelEvent(pointer: pointer, kind: kind, position: _position!),
+      PointerCancelEvent(
+        pointer: pointer,
+        kind: kind,
+        position: _position!,
+      ),
     );
     await tester.pump();
   }
@@ -98,12 +102,27 @@ Future<void> _stroke(_Contact contact, Offset start) async {
   await contact.up();
 }
 
-void _expectLocalInk(InkStroke stroke) {
+void _expectLocalInk(InkStroke stroke, double scale) {
   final xs = stroke.points.map((point) => point.dx).toList();
   final ys = stroke.points.map((point) => point.dy).toList();
   expect(xs.length, greaterThan(1));
-  expect(xs.reduce(math.max) - xs.reduce(math.min), lessThan(85));
-  expect(ys.reduce(math.max) - ys.reduce(math.min), lessThan(65));
+  expect(
+    (xs.reduce(math.max) - xs.reduce(math.min)) * scale,
+    lessThan(75),
+  );
+  expect(
+    (ys.reduce(math.max) - ys.reduce(math.min)) * scale,
+    lessThan(55),
+  );
+  for (var i = 1; i < stroke.points.length; i++) {
+    final previous = stroke.points[i - 1].toOffset();
+    final current = stroke.points[i].toOffset();
+    expect(
+      (current - previous).distance * scale,
+      lessThan(75),
+      reason: 'Palm input must not teleport the active pen cursor',
+    );
+  }
 }
 
 class _CanvasFixture {
@@ -170,7 +189,9 @@ class _CanvasFixture {
       MaterialApp(
         home: MultiProvider(
           providers: [
-            ChangeNotifierProvider<EditorController>.value(value: controller),
+            ChangeNotifierProvider<EditorController>.value(
+              value: controller,
+            ),
             ChangeNotifierProvider<AppPreferencesController>.value(
               value: preferences,
             ),
@@ -215,6 +236,16 @@ class _CanvasFixture {
     await database.close();
   }
 
+  Offset get navigationOffset {
+    if (kind == NotebookKind.board) {
+      return controller.viewPan;
+    }
+    final transform = tester.widget<Transform>(
+      find.byKey(const ValueKey('notebook-document-transform')),
+    ).transform;
+    return Offset(transform.entry(0, 3), transform.entry(1, 3));
+  }
+
   void expectStrokeCount(int count) {
     expect(
       controller.currentPage.inkStrokes,
@@ -224,7 +255,13 @@ class _CanvasFixture {
   }
 
   void expectLastStrokeLocal() {
-    _expectLocalInk(controller.currentPage.inkStrokes.last);
+    final scale = kind == NotebookKind.board
+        ? controller.viewScale
+        : tester.widget<Transform>(
+            find.byKey(const ValueKey('notebook-document-transform')),
+          ).transform.entry(0, 0);
+    expect(scale, greaterThan(0));
+    _expectLocalInk(controller.currentPage.inkStrokes.last, scale);
   }
 }
 
@@ -352,14 +389,26 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
           radiusMajor: 55,
         );
         await palmFirst.down(f.farPalm);
-        final penAfter = _Contact(tester, 231, PointerDeviceKind.stylus);
+        final penAfter = _Contact(
+          tester,
+          231,
+          PointerDeviceKind.stylus,
+        );
         await _stroke(penAfter, f.inkStart);
         await palmFirst.up();
         f.expectStrokeCount(++count);
         f.expectLastStrokeLocal();
 
-        final fingerOne = _Contact(tester, 232, PointerDeviceKind.touch);
-        final fingerTwo = _Contact(tester, 233, PointerDeviceKind.touch);
+        final fingerOne = _Contact(
+          tester,
+          232,
+          PointerDeviceKind.touch,
+        );
+        final fingerTwo = _Contact(
+          tester,
+          233,
+          PointerDeviceKind.touch,
+        );
         await fingerOne.down(f.nearPalm);
         await fingerTwo.down(f.farPalm);
         final pen = _Contact(tester, 234, PointerDeviceKind.stylus);
@@ -367,6 +416,41 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
         await fingerOne.up();
         await fingerTwo.up();
         f.expectStrokeCount(++count);
+        f.expectLastStrokeLocal();
+      } finally {
+        await f.close();
+      }
+    });
+
+    testWidgets('pointer matrix: two fingers navigate without ink $kind', (
+      tester,
+    ) async {
+      final f = await _CanvasFixture.create(
+        tester,
+        kind,
+        surfaceSize: surfaceSize,
+      );
+      try {
+        final previousPan = f.navigationOffset;
+        final first = _Contact(tester, 250, PointerDeviceKind.touch);
+        final second = _Contact(tester, 251, PointerDeviceKind.touch);
+        await first.down(f.nearPalm);
+        await second.down(f.farPalm);
+        await first.move(f.nearPalm + const Offset(0, 45));
+        await second.move(f.farPalm + const Offset(0, 45));
+        f.expectStrokeCount(0);
+        expect(
+          (f.navigationOffset - previousPan).distance,
+          greaterThan(1),
+          reason: 'Two fingers must navigate rather than create ink',
+        );
+        await first.up();
+        await second.up();
+        f.expectStrokeCount(0);
+
+        final pen = _Contact(tester, 252, PointerDeviceKind.stylus);
+        await _stroke(pen, f.inkStart);
+        f.expectStrokeCount(1);
         f.expectLastStrokeLocal();
       } finally {
         await f.close();
@@ -399,7 +483,11 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
         await touch.cancel();
         f.expectStrokeCount(0);
 
-        final recoveredPen = _Contact(tester, 312, PointerDeviceKind.stylus);
+        final recoveredPen = _Contact(
+          tester,
+          312,
+          PointerDeviceKind.stylus,
+        );
         await _stroke(recoveredPen, f.inkStart);
         f.expectStrokeCount(1);
         f.expectLastStrokeLocal();
