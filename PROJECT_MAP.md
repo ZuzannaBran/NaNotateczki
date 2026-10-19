@@ -1039,7 +1039,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 testy, także gdy pierwszy palec zdążył rozpocząć kreskę. Test
 notatnika mierzy łączną transformację strony i scroll dokumentu, bo gest
 przesuwający stronę poza dozwolony pan przechodzi w przewijanie; kierunek
-gestu jest dobrany tak, aby nie utknąć na górnym ograniczeniu.
+gestu jest dobrany tak, aby nie utknąć na górnym ograniczeniu. Kontakty
+na testach natywnych są umieszczane tylko w części viewportu widocznej
+w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
 - `test/pointer_contact_matrix_test.dart`: natywna macierz widgetowa dla
   ekranu telefonu, wykonywana też na systemach desktopowych.
 - `integration_test/pointer_contact_matrix_test.dart`: te same scenariusze

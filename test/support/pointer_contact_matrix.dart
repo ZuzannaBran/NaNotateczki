@@ -195,9 +195,16 @@ class _CanvasFixture {
         ? find.byKey(const ValueKey('board-canvas-area'))
         : find.byKey(const ValueKey('notebook-page-viewport'));
     final rect = tester.getRect(finder);
+    // The notebook's document viewport can extend below the real window.
+    // Native desktop tests must send both contacts inside the visible screen.
+    final visibleRect = rect.intersect(
+      tester.getRect(find.byType(Scaffold).first),
+    );
+    expect(visibleRect.width, greaterThan(80));
+    expect(visibleRect.height, greaterThan(220));
     final start = Offset(
-      rect.left + rect.width * 0.24,
-      rect.top + math.min(170.0, rect.height * 0.32),
+      visibleRect.left + visibleRect.width * 0.24,
+      visibleRect.top + math.min(170.0, visibleRect.height * 0.32),
     );
     return _CanvasFixture(
       tester: tester,
@@ -209,8 +216,8 @@ class _CanvasFixture {
       inkStart: start,
       nearPalm: start + const Offset(60, 70),
       farPalm: Offset(
-        rect.right - math.max(18.0, rect.width * 0.09),
-        rect.top + rect.height * 0.77,
+        visibleRect.right - math.max(18.0, visibleRect.width * 0.09),
+        visibleRect.top + visibleRect.height * 0.77,
       ),
     );
   }
