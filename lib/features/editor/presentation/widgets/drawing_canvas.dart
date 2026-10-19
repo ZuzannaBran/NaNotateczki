@@ -1899,7 +1899,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   }
 
   void _snapToShape() {
-    if (!mounted || _currentPoints.length < 2 ||
+    if (!mounted ||
+        _currentPoints.length < 2 ||
         _snappedStraight ||
         _snappedRect ||
         _snappedEllipse) {
@@ -3440,7 +3441,8 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   }
 
   void _snapToShape() {
-    if (!mounted || _currentPoints.length < 2 ||
+    if (!mounted ||
+        _currentPoints.length < 2 ||
         _snappedStraight ||
         _snappedRect ||
         _snappedEllipse) {
