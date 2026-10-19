@@ -949,50 +949,50 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
             children: [
               SizedBox(
                 height: _LibraryScreenState._navigationHeaderHeight,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 14, right: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      key: const ValueKey('projects-home'),
-                      onPressed: widget.onShowProjects,
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        alignment: Alignment.centerLeft,
-                        foregroundColor: colorScheme.onSurface,
-                        backgroundColor: Colors.transparent,
-                        overlayColor: Colors.transparent,
-                      ),
-                      child: Text(
-                        'Projects',
-                        overflow: TextOverflow.ellipsis,
-                        style: AppHeaderDivider.titleStyle,
-                      ),
-                    ),
-                  ),
-                  _CreateMenuButton(onSelected: _handleCreateAction),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 1),
-          Expanded(
-            child: controller.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : folders.isEmpty
-                ? _EmptyLibraryTree(onCreate: _handleCreateAction)
-                : ListView(
-                    key: const ValueKey('library-file-scroll'),
-                    physics: TouchNavigationScrollPhysics(
-                      sensitivity: touchNavigationGain,
-                    ),
-                    padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 14, right: 8),
+                  child: Row(
                     children: [
-                      for (final folder in folders) _buildFolder(folder),
+                      Expanded(
+                        child: TextButton(
+                          key: const ValueKey('projects-home'),
+                          onPressed: widget.onShowProjects,
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            alignment: Alignment.centerLeft,
+                            foregroundColor: colorScheme.onSurface,
+                            backgroundColor: Colors.transparent,
+                            overlayColor: Colors.transparent,
+                          ),
+                          child: Text(
+                            'Projects',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppHeaderDivider.titleStyle,
+                          ),
+                        ),
+                      ),
+                      _CreateMenuButton(onSelected: _handleCreateAction),
                     ],
                   ),
-          ),
+                ),
+              ),
+              const SizedBox(height: 1),
+              Expanded(
+                child: controller.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : folders.isEmpty
+                    ? _EmptyLibraryTree(onCreate: _handleCreateAction)
+                    : ListView(
+                        key: const ValueKey('library-file-scroll'),
+                        physics: TouchNavigationScrollPhysics(
+                          sensitivity: touchNavigationGain,
+                        ),
+                        padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+                        children: [
+                          for (final folder in folders) _buildFolder(folder),
+                        ],
+                      ),
+              ),
               SizedBox(
                 height: AppHeaderDivider.thickness,
                 child: ColoredBox(

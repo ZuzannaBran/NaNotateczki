@@ -989,7 +989,8 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1200, 430));
     await tester.pump();
     const usableHeight =
-        430 - AppHeaderDivider.toolbarHeight * 2 -
+        430 -
+        AppHeaderDivider.toolbarHeight * 2 -
         AppHeaderDivider.thickness * 2;
     expect(
       tester.getSize(timerRegion).height,
