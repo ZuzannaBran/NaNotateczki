@@ -481,7 +481,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   841: `_CreateMenuButton`;
   882: `_LibraryTreePane` (`_LibraryTreePaneState` 907);
   1196: `_FolderTreeRow`;
-  1295: `_LibraryTreeItemRow`;
+  1295: `_LibraryTreeItemRow` (planner: konturowy kwadrat z tikiem);
   1400: `_sidebarMenuShape`;
   1414: `_SidebarMenuShadowPainter`;
   1450: `_showSidebarMenu`;
@@ -1197,7 +1197,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   odhaczonego wiersza, automatyczne sortowanie również ze starym
   ustawieniem, jasny Add task, poprawność nagłówka i bezpieczne Settings;
   wyrównanie daty i kontrolek, responsywność, zapis i odczyt zadań,
-  edycja, usuwanie, opcjonalny deadline, kolor statusów oraz widget canvasu.
+  edycja, usuwanie, opcjonalny deadline, kolor statusów oraz widget canvasu;
+  ikonę planera (kwadrat z tikiem) w drzewie folderów.
 - `test/study_planner_controller_test.dart` i
   `test/study_planner_widget_test.dart`: wydarzenia kalendarza bez timera,
   powtarzanie, wydarzenia wielodniowe, brak wydarzeń w Upcoming,

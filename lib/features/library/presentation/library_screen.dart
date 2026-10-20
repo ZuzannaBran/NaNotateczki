@@ -1312,7 +1312,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
     final icon = switch (item.kind) {
       NotebookKind.board => Icons.dashboard_outlined,
       NotebookKind.notebook => Icons.description_outlined,
-      NotebookKind.planner => Icons.checklist_rounded,
+      NotebookKind.planner => Icons.check_box_outlined,
     };
     final draggingColor = Color.alphaBlend(
       colorScheme.onSurface.withValues(alpha: 0.10),

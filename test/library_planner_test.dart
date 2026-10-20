@@ -355,9 +355,24 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(ValueKey('library-tree-item:${planner.uid}')),
+    final plannerRow = find.byKey(
+      ValueKey('library-tree-item:${planner.uid}'),
     );
+    expect(
+      find.descendant(
+        of: plannerRow,
+        matching: find.byIcon(Icons.check_box_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: plannerRow,
+        matching: find.byIcon(Icons.checklist_rounded),
+      ),
+      findsNothing,
+    );
+    await tester.tap(plannerRow);
     await tester.pumpAndSettle();
     expect(find.byType(TaskListScreen), findsOneWidget);
     final tasksSurface = find.byKey(const ValueKey('planner-tasks-surface'));
