@@ -376,12 +376,12 @@ void main() {
       final lastColumn = tester.widget<Container>(monthCell(seventh));
       expect(firstCell.margin, EdgeInsets.zero);
       expect(lastColumn.margin, EdgeInsets.zero);
-      final firstBorder =
-          (firstCell.decoration! as BoxDecoration).border! as Border;
-      final seventhBorder =
-          (lastColumn.decoration! as BoxDecoration).border! as Border;
-      expect(firstBorder.borderRadius, isNull);
-      expect(seventhBorder.borderRadius, isNull);
+      final firstDecoration = firstCell.decoration! as BoxDecoration;
+      final seventhDecoration = lastColumn.decoration! as BoxDecoration;
+      final firstBorder = firstDecoration.border! as Border;
+      final seventhBorder = seventhDecoration.border! as Border;
+      expect(firstDecoration.borderRadius, isNull);
+      expect(seventhDecoration.borderRadius, isNull);
       expect(firstBorder.right.width, 1);
       expect(firstBorder.bottom.width, 1);
       final adjacentDay = start[1];
