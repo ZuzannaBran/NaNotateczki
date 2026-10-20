@@ -552,9 +552,10 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   usuwanie oraz pełnoszerokie separatory. Kolory statusów są wyłącznie
   beżowymi/neutralnymi odcieniami `AppColors` dla aktualnego motywu:
   bez deadline'u ("Recent"), upcoming i overdue; zaległe mają
-  najjaśniejszy, nadchodzące pośredni, a "Recent" najciemniejszy
-  odcień w obu motywach. Wszystkie odhaczone zadania, także wcześniej
-  zaległe i bez deadline'u, mają ten sam przygaszony kolor i są na dole.
+  najjaśniejsze tło papieru, nadchodzące pośredni odcień, a
+  "Recent" dokładny kolor paska folderów z `surfaceContainerLowest`.
+  Ukończone (także wcześniej zaległe) mają tło Recent z `Opacity(0.6)`
+  dla całego wiersza (tekstu, ikon, checkboxa i tła), i są na dole.
   Przycisk Add task używa jaśniejszego beżu AppColors.toolbar.
   Planer współdzieli nagłówek z edytorami i ma globalne ustawienia.
   Przyciski deadline'u wyrównują się do prawej i zawijają
@@ -1159,8 +1160,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   testowej bazy następuje rzeczywisty zapis.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
-- `test/library_planner_test.dart`: beżowe kolory, wspólny odcień dla
-  wszystkich odhaczonych, automatyczne sortowanie również ze starym
+- `test/library_planner_test.dart`: kolory według statusu w obu motywach,
+  zgodność Recent i ukończonych z paskiem folderów, `Opacity` całego
+  odhaczonego wiersza, automatyczne sortowanie również ze starym
   ustawieniem, jasny Add task, poprawność nagłówka i bezpieczne Settings;
   wyrównanie daty i kontrolek, responsywność, zapis i odczyt zadań,
   edycja, usuwanie, opcjonalny deadline, kolor statusów oraz widget canvasu.

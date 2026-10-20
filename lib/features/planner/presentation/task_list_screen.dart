@@ -14,35 +14,21 @@ import '../../notebook/domain/notebook.dart';
 import '../state/planner_task.dart';
 import 'study_timer_widgets.dart';
 
-/// Keeps planner tasks within the application's warm beige palette.
+/// Uses the folder sidebar color for Recent and completed tasks.
 Color plannerTaskBackground(
   PlannerTaskTone tone, {
-  required bool darkMode,
-  bool completed = false,
+  required ThemeData theme,
 }) {
-  final resolvedTone = completed ? PlannerTaskTone.completed : tone;
-  final color = darkMode
-      ? switch (resolvedTone) {
-          PlannerTaskTone.undated => AppColors.darkActive,
-          PlannerTaskTone.upcoming => AppColors.darkCanvas,
-          PlannerTaskTone.overdue => AppColors.darkPaper,
-          PlannerTaskTone.completed => AppColors.darkCanvas,
-        }
-      : switch (tone) {
-          PlannerTaskTone.undated => AppColors.divider,
-          PlannerTaskTone.upcoming => AppColors.toolbar,
-          PlannerTaskTone.overdue => AppColors.background,
-          PlannerTaskTone.completed => AppColors.background,
-        };
-  if (!completed) {
-    return color;
-  }
-  return Color.alphaBlend(
-    color.withValues(alpha: 0.42),
-    darkMode ? AppColors.darkToolbar : AppColors.paper,
-  );
+  final darkMode = theme.brightness == Brightness.dark;
+  return switch (tone) {
+    PlannerTaskTone.undated || PlannerTaskTone.completed =>
+      theme.colorScheme.surfaceContainerLowest,
+    PlannerTaskTone.upcoming =>
+      darkMode ? AppColors.darkCanvas : AppColors.background,
+    PlannerTaskTone.overdue =>
+      darkMode ? AppColors.darkPaper : AppColors.paper,
+  };
 }
-
 
 class TaskListScreen extends StatelessWidget {
   const TaskListScreen({
@@ -276,14 +262,13 @@ class _PlannerTaskRowState extends State<_PlannerTaskRow> {
   @override
   Widget build(BuildContext context) {
     final task = widget.task;
-    final darkMode = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final darkMode = theme.brightness == Brightness.dark;
     final background = plannerTaskBackground(
       task.toneAt(DateTime.now()),
-      darkMode: darkMode,
-      completed: task.completed,
+      theme: theme,
     );
-    final ink = (darkMode ? AppColors.darkText : AppColors.inkBlack)
-        .withValues(alpha: task.completed ? 0.7 : 1);
+    final ink = darkMode ? AppColors.darkText : AppColors.inkBlack;
     final library = context.read<LibraryController>();
 
     final deadlineControls = <Widget>[
@@ -363,112 +348,115 @@ class _PlannerTaskRowState extends State<_PlannerTaskRow> {
       ],
     ];
 
-    return Container(
-      key: ValueKey('planner-task-row:${task.id}'),
-      color: background,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 760;
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Checkbox(
-                    key: ValueKey('planner-task-check:${task.id}'),
-                    value: task.completed,
-                    checkColor: background,
-                    activeColor: ink,
-                    side: BorderSide(color: ink, width: 1.5),
-                    onChanged: (value) => unawaited(
-                      library.updatePlannerTask(
-                        widget.plannerUid,
-                        task.id,
-                        completed: value ?? false,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: TextField(
-                      key: ValueKey('planner-task-name:${task.id}'),
-                      controller: _title,
-                      autofocus: task.title.isEmpty,
-                      maxLines: 1,
-                      maxLength: 200,
-                      style: TextStyle(
-                        color: ink,
-                        fontSize: AppTypography.document,
-                        decoration: task.completed
-                            ? TextDecoration.lineThrough
-                            : null,
-                        decorationColor: ink,
-                      ),
-                      cursorColor: ink,
-                      decoration: InputDecoration(
-                        hintText: 'Task name',
-                        hintStyle: TextStyle(
-                          color: ink.withValues(alpha: 0.68),
-                        ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        isDense: true,
-                        counterText: '',
-                        filled: false,
-                      ),
+    return Opacity(
+      opacity: task.completed ? 0.6 : 1,
+      child: Container(
+        key: ValueKey('planner-task-row:${task.id}'),
+        color: background,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 760;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Checkbox(
+                      key: ValueKey('planner-task-check:${task.id}'),
+                      value: task.completed,
+                      checkColor: background,
+                      activeColor: ink,
+                      side: BorderSide(color: ink, width: 1.5),
                       onChanged: (value) => unawaited(
                         library.updatePlannerTask(
                           widget.plannerUid,
                           task.id,
-                          title: value,
+                          completed: value ?? false,
                         ),
                       ),
                     ),
-                  ),
-                  if (!narrow)
-                    Flexible(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Wrap(
-                          alignment: WrapAlignment.end,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 2,
-                          runSpacing: 2,
-                          children: deadlineControls,
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: TextField(
+                        key: ValueKey('planner-task-name:${task.id}'),
+                        controller: _title,
+                        autofocus: task.title.isEmpty,
+                        maxLines: 1,
+                        maxLength: 200,
+                        style: TextStyle(
+                          color: ink,
+                          fontSize: AppTypography.document,
+                          decoration: task.completed
+                              ? TextDecoration.lineThrough
+                              : null,
+                          decorationColor: ink,
+                        ),
+                        cursorColor: ink,
+                        decoration: InputDecoration(
+                          hintText: 'Task name',
+                          hintStyle: TextStyle(
+                            color: ink.withValues(alpha: 0.68),
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          isDense: true,
+                          counterText: '',
+                          filled: false,
+                        ),
+                        onChanged: (value) => unawaited(
+                          library.updatePlannerTask(
+                            widget.plannerUid,
+                            task.id,
+                            title: value,
+                          ),
                         ),
                       ),
                     ),
-                  IconButton(
-                    key: ValueKey('planner-task-delete:${task.id}'),
-                    tooltip: 'Delete task',
-                    onPressed: () => unawaited(
-                      library.removePlannerTask(widget.plannerUid, task.id),
+                    if (!narrow)
+                      Flexible(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Wrap(
+                            alignment: WrapAlignment.end,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 2,
+                            runSpacing: 2,
+                            children: deadlineControls,
+                          ),
+                        ),
+                      ),
+                    IconButton(
+                      key: ValueKey('planner-task-delete:${task.id}'),
+                      tooltip: 'Delete task',
+                      onPressed: () => unawaited(
+                        library.removePlannerTask(widget.plannerUid, task.id),
+                      ),
+                      icon: const Icon(Icons.delete_outline, size: 19),
+                      color: ink,
+                      visualDensity: VisualDensity.compact,
                     ),
-                    icon: const Icon(Icons.delete_outline, size: 19),
-                    color: ink,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
-              if (narrow)
-                Padding(
-                  padding: const EdgeInsets.only(left: 50),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Wrap(
-                      alignment: WrapAlignment.end,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 2,
-                      runSpacing: 2,
-                      children: deadlineControls,
-                    ),
-                  ),
+                  ],
                 ),
-            ],
-          );
-        },
+                if (narrow)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 50),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Wrap(
+                        alignment: WrapAlignment.end,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 2,
+                        runSpacing: 2,
+                        children: deadlineControls,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

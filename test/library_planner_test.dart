@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/core/theme/app_colors.dart';
+import 'package:program/core/theme/app_theme.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
@@ -68,71 +69,28 @@ void main() {
     expect(PlannerTask.fromJson({'title': 'Bad'}), isNull);
   });
 
-  test('planner rows use beige tones and fade completed tasks', () {
-    expect(
-      plannerTaskBackground(PlannerTaskTone.undated, darkMode: false),
-      AppColors.divider,
-    );
-    expect(
-      plannerTaskBackground(PlannerTaskTone.upcoming, darkMode: false),
-      AppColors.toolbar,
-    );
-    expect(
-      plannerTaskBackground(PlannerTaskTone.overdue, darkMode: false),
-      AppColors.background,
-    );
-    expect(
-      plannerTaskBackground(PlannerTaskTone.undated, darkMode: true),
-      AppColors.darkActive,
-    );
-    expect(
-      plannerTaskBackground(PlannerTaskTone.upcoming, darkMode: true),
-      AppColors.darkCanvas,
-    );
-    expect(
-      plannerTaskBackground(PlannerTaskTone.overdue, darkMode: true),
-      AppColors.darkPaper,
-    );
-    expect(
-      plannerTaskBackground(
-        PlannerTaskTone.overdue,
-        darkMode: false,
-        completed: true,
-      ),
-      plannerTaskBackground(
-        PlannerTaskTone.completed,
-        darkMode: false,
-        completed: true,
-      ),
-    );
-    expect(
-      plannerTaskBackground(
-        PlannerTaskTone.undated,
-        darkMode: true,
-        completed: true,
-      ),
-      plannerTaskBackground(
-        PlannerTaskTone.completed,
-        darkMode: true,
-        completed: true,
-      ),
-    );
-    expect(
-      plannerTaskBackground(
-        PlannerTaskTone.completed,
-        darkMode: false,
-        completed: true,
-      ),
-      isNot(AppColors.background),
-    );
-    expect(
-      plannerTaskBackground(
-        PlannerTaskTone.completed,
-        darkMode: true,
-        completed: true,
-      ),
-      isNot(AppColors.darkCanvas),
-    );
+  test('planner tones match the sidebar and keep overdue light', () {
+    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+      final darkMode = theme.brightness == Brightness.dark;
+      final sidebar = theme.colorScheme.surfaceContainerLowest;
+
+      expect(
+        plannerTaskBackground(PlannerTaskTone.undated, theme: theme),
+        sidebar,
+      );
+      expect(
+        plannerTaskBackground(PlannerTaskTone.completed, theme: theme),
+        sidebar,
+      );
+      expect(
+        plannerTaskBackground(PlannerTaskTone.upcoming, theme: theme),
+        darkMode ? AppColors.darkCanvas : AppColors.background,
+      );
+      expect(
+        plannerTaskBackground(PlannerTaskTone.overdue, theme: theme),
+        darkMode ? AppColors.darkPaper : AppColors.paper,
+      );
+    }
   });
 
   test('planner tasks survive reload, updates and deletion', () async {
@@ -271,6 +229,7 @@ void main() {
       ChangeNotifierProvider<LibraryController>.value(
         value: library,
         child: MaterialApp(
+          theme: AppTheme.light(),
           home: TaskListScreen(
             planner: planner,
             onSettings: () {},
@@ -291,6 +250,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('planner-add-task')));
     await tester.pumpAndSettle();
     final task = library.plannerTasks(planner.uid).single;
+    final row = find.byKey(ValueKey('planner-task-row:${task.id}'));
+    expect(tester.widget<Container>(row).color, AppColors.toolbar);
     expect(
       find.byKey(ValueKey('planner-task-deadline:${task.id}')),
       findsNothing,
@@ -331,11 +292,26 @@ void main() {
       ).dx),
     );
 
+    await library.updatePlannerTask(
+      planner.uid,
+      task.id,
+      deadline: DateTime.now().subtract(const Duration(days: 1)),
+    );
+    await tester.pump();
+    expect(tester.widget<Container>(row).color, AppColors.paper);
+
     await tester.tap(
       find.byKey(ValueKey('planner-task-check:${task.id}')),
     );
     await tester.pump();
     expect(library.plannerTasks(planner.uid).single.completed, isTrue);
+    expect(tester.widget<Container>(row).color, AppColors.toolbar);
+    final rowOpacity = find.ancestor(
+      of: row,
+      matching: find.byType(Opacity),
+    );
+    expect(rowOpacity, findsOneWidget);
+    expect(tester.widget<Opacity>(rowOpacity).opacity, 0.6);
     await tester.tap(
       find.byKey(ValueKey('planner-task-delete:${task.id}')),
     );
