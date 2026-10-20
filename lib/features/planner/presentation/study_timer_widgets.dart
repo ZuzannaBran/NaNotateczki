@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
+import '../../editor/presentation/widgets/editor_toolbar.dart';
+import '../../editor/state/ink_color_presets.dart';
 import '../state/study_planner_controller.dart';
 import 'planner_screen.dart';
 import 'study_action_theme.dart';
@@ -64,7 +69,11 @@ Future<void> showStudyRating(BuildContext context, StudySession session) async {
     context: context,
     builder: (dialogContext) => StudyActionTheme(
       child: AlertDialog(
-        title: const Text('Rate your productivity'),
+        title: const Text(
+          "Great job! Time's up.",
+          key: ValueKey('study-finished-title'),
+          style: AppHeaderDivider.titleStyle,
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -139,6 +148,8 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
   late final TextEditingController _description;
   late final TextEditingController _minutes;
   late StudyTechnique _technique;
+  late int _focusBlocks;
+  Color? _color;
   late DateTime _date;
 
   @override
@@ -146,6 +157,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
     super.initState();
     final session = widget.session;
     _technique = session?.technique ?? widget.technique;
+    _focusBlocks = session?.focusBlocks ?? _technique.rounds;
+    _color = session == null || session.colorValue == null
+        ? null
+        : Color(session.colorValue!);
     _date = session?.scheduledAt ?? widget.scheduledAt ?? DateTime.now();
     _title = TextEditingController(text: session?.title ?? '');
     _description = TextEditingController(text: session?.description ?? '');
@@ -198,6 +213,26 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
     }
   }
 
+  Future<void> _pickColor() async {
+    final recent = await SharedRecentColors.load();
+    if (!mounted) {
+      return;
+    }
+    final picked = await EditorToolbar.pickColor(
+      context,
+      _color ?? AppColors.blueColorSet.first,
+      recent,
+      onPaletteColorSelected: (color) {
+        if (mounted) {
+          setState(() => _color = color);
+        }
+      },
+    );
+    if (picked != null && mounted) {
+      setState(() => _color = picked);
+    }
+  }
+
   void _save() {
     final planner = context.read<StudyPlannerController>();
     final minutes = int.tryParse(_minutes.text);
@@ -216,6 +251,8 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
         scheduledAt: _date,
         minutes: minutes ?? 30,
         technique: _technique,
+        focusBlocks: _focusBlocks,
+        colorValue: _color?.toARGB32(),
       );
       if (widget.startAfterSave && !planner.start(created.id)) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -230,7 +267,13 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
         scheduledAt: _date,
         minutes: minutes ?? 30,
         technique: _technique,
+        focusBlocks: _focusBlocks,
+        colorValue: _color?.toARGB32(),
+        updateColor: true,
       );
+    }
+    if (_color != null) {
+      unawaited(SharedRecentColors.record(_color!));
     }
     Navigator.pop(context);
   }
@@ -282,7 +325,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                 ],
                 onChanged: (value) {
                   if (value != null) {
-                    setState(() => _technique = value);
+                    setState(() {
+                      _technique = value;
+                      _focusBlocks = value.rounds;
+                    });
                   }
                 },
               ),
@@ -292,21 +338,61 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: 'Minutes'),
                 )
-              else
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(
-                    '${_technique.rounds} focus block(s) × '
-                    '${_technique.focusMinutes} min; '
-                    '${_technique.breakMinutes}-min breaks',
-                    style: TextStyle(color: scheme.onSurfaceVariant),
+              else ...[
+                const SizedBox(height: 12),
+                KeyedSubtree(
+                  key: ValueKey('blocks-for-${_technique.name}'),
+                  child: DropdownButtonFormField<int>(
+                    key: const ValueKey('study-focus-blocks'),
+                    initialValue: _focusBlocks,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Focus blocks',
+                    ),
+                    items: [
+                      for (var blocks = 1; blocks <= 12; blocks++)
+                        DropdownMenuItem(
+                          value: blocks,
+                          child: Text('$blocks'),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _focusBlocks = value);
+                      }
+                    },
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_technique.focusMinutes}-min focus; '
+                  '${_technique.breakMinutes}-min breaks',
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+              ],
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
                 children: [
+                  OutlinedButton.icon(
+                    key: const ValueKey('study-session-colour'),
+                    onPressed: _pickColor,
+                    icon: Icon(
+                      Icons.palette_outlined,
+                      color: _color == null
+                          ? scheme.onSurface
+                          : _color!,
+                      size: 18,
+                    ),
+                    label: const Text('Colour'),
+                  ),
+                  if (_color != null)
+                    TextButton(
+                      key: const ValueKey('study-session-colour-reset'),
+                      onPressed: () => setState(() => _color = null),
+                      child: const Text('Default colour'),
+                    ),
                   OutlinedButton.icon(
                     onPressed: _pickDate,
                     icon: const Icon(Icons.calendar_today_outlined, size: 18),
@@ -399,7 +485,7 @@ class StudyTimerCard extends StatelessWidget {
               if (active.technique != StudyTechnique.custom)
                 Text(
                   '${active.phase == StudyPhase.focus ? 'Focus' : 'Break'}'
-                  ' · ${active.round}/${active.technique.rounds}',
+                  ' · ${active.round}/${active.focusBlocks}',
                   style: TextStyle(
                     color: colors.onSurfaceVariant,
                     fontSize: AppTypography.small,
@@ -455,61 +541,65 @@ class StudyTimerCard extends StatelessWidget {
             ] else ...[
               Text(
                 'Ready for your next focus session?',
-                style: TextStyle(fontSize: AppTypography.small, color: colors.onSurfaceVariant),
+                style: TextStyle(
+                  fontSize: AppTypography.small,
+                  color: colors.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 30),
             ],
-            SizedBox(
-              height: StudyActionStyles.sessionButtonHeight,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: FilledButton(
-                      key: const ValueKey('sidebar-start-session'),
-                      style: StudyActionStyles.sessionPrimary(
-                        Theme.of(context),
-                      ),
-                      onPressed: planner.isLoaded && planner.error == null
-                          ? () => showStudySessionEditor(
-                              context,
-                              startAfterSave: true,
-                            )
-                          : null,
-                      child: StudyActionStyles.sessionButtonContent(
-                        icon: Icons.play_arrow_rounded,
-                        label: 'Start session',
-                        contentKey: const ValueKey(
-                          'sidebar-start-session-content',
+            if (active == null)
+              SizedBox(
+                height: StudyActionStyles.sessionButtonHeight,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        key: const ValueKey('sidebar-start-session'),
+                        style: StudyActionStyles.sessionPrimary(
+                          Theme.of(context),
+                        ),
+                        onPressed: planner.isLoaded && planner.error == null
+                            ? () => showStudySessionEditor(
+                                context,
+                                startAfterSave: true,
+                              )
+                            : null,
+                        child: StudyActionStyles.sessionButtonContent(
+                          icon: Icons.play_arrow_rounded,
+                          label: 'Start session',
+                          contentKey: const ValueKey(
+                            'sidebar-start-session-content',
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      key: const ValueKey('sidebar-smart-session'),
-                      style: StudyActionStyles.sessionOutlined(),
-                      onPressed: planner.isLoaded && planner.error == null
-                          ? () => showStudySessionEditor(
-                              context,
-                              technique: StudyTechnique.pomodoro,
-                              startAfterSave: true,
-                            )
-                          : null,
-                      child: StudyActionStyles.sessionButtonContent(
-                        icon: Icons.auto_awesome_rounded,
-                        label: 'Smart',
-                        contentKey: const ValueKey(
-                          'sidebar-smart-session-content',
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        key: const ValueKey('sidebar-smart-session'),
+                        style: StudyActionStyles.sessionOutlined(),
+                        onPressed: planner.isLoaded && planner.error == null
+                            ? () => showStudySessionEditor(
+                                context,
+                                technique: StudyTechnique.pomodoro,
+                                startAfterSave: true,
+                              )
+                            : null,
+                        child: StudyActionStyles.sessionButtonContent(
+                          icon: Icons.auto_awesome_rounded,
+                          label: 'Smart',
+                          contentKey: const ValueKey(
+                            'sidebar-smart-session-content',
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (next.isNotEmpty) ...[
+            if (active != null || next.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
                 'Upcoming',
@@ -534,13 +624,19 @@ class StudyTimerCard extends StatelessWidget {
                   ),
                   padding: EdgeInsets.zero,
                   children: [
+                    if (next.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('No upcoming sessions'),
+                      ),
                     for (final item in next)
                       Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.only(bottom: 8),
                       child: Material(
                         key: ValueKey('sidebar-upcoming-card:${item.id}'),
-                        color: StudyActionStyles.plannedSessionColor(
+                        color: StudyActionStyles.sessionCardColor(
                           Theme.of(context),
+                          item.colorValue,
                         ),
                         shape: StudyActionStyles.sessionCardShape(colors),
                         child: Padding(
@@ -595,7 +691,10 @@ class StudyTimerCard extends StatelessWidget {
             if (planner.error != null)
               Text(
                 planner.error!,
-                style: TextStyle(fontSize: AppTypography.small, color: colors.error),
+                style: TextStyle(
+                  fontSize: AppTypography.small,
+                  color: colors.error,
+                ),
               ),
           ],
         ),

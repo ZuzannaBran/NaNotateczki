@@ -51,6 +51,8 @@ class StudySession {
     required this.minutes,
     this.description = '',
     this.technique = StudyTechnique.custom,
+    int? focusBlocks,
+    this.colorValue,
     this.status = StudyStatus.planned,
     this.phase = StudyPhase.focus,
     this.round = 1,
@@ -59,7 +61,7 @@ class StudySession {
     this.startedAt,
     this.finishedAt,
     this.productivity,
-  });
+  }) : focusBlocks = (focusBlocks ?? technique.rounds).clamp(1, 12).toInt();
 
   final String id;
   String title;
@@ -67,6 +69,8 @@ class StudySession {
   DateTime scheduledAt;
   int minutes;
   StudyTechnique technique;
+  int focusBlocks;
+  int? colorValue;
   StudyStatus status;
   StudyPhase phase;
   int round;
@@ -78,7 +82,7 @@ class StudySession {
 
   int get totalFocusMinutes => technique == StudyTechnique.custom
       ? minutes
-      : technique.focusMinutes * technique.rounds;
+      : technique.focusMinutes * focusBlocks;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -87,6 +91,8 @@ class StudySession {
     'scheduledAt': scheduledAt.toIso8601String(),
     'minutes': minutes,
     'technique': technique.name,
+    'focusBlocks': focusBlocks,
+    'colorValue': colorValue,
     'status': status.name,
     'phase': phase.name,
     'round': round,
@@ -113,6 +119,11 @@ class StudySession {
     if (json['id'] is! String || planned == null) {
       throw const FormatException('Invalid study session');
     }
+    final technique = parseEnum(
+      StudyTechnique.values,
+      json['technique'],
+      StudyTechnique.custom,
+    );
     return StudySession(
       id: json['id'] as String,
       title: (json['title'] as String?) ?? 'Study session',
@@ -121,11 +132,12 @@ class StudySession {
       minutes: ((json['minutes'] as num?)?.toInt() ?? 30)
           .clamp(1, 1440)
           .toInt(),
-      technique: parseEnum(
-        StudyTechnique.values,
-        json['technique'],
-        StudyTechnique.custom,
-      ),
+      technique: technique,
+      focusBlocks: (json['focusBlocks'] as num?)?.toInt() ??
+          technique.rounds,
+      colorValue: json['colorValue'] is int
+          ? (json['colorValue'] as int) | 0xFF000000
+          : null,
       status: parseEnum(
         StudyStatus.values,
         json['status'],
@@ -301,6 +313,8 @@ class StudyPlannerController extends ChangeNotifier {
     String description = '',
     int minutes = 30,
     StudyTechnique technique = StudyTechnique.custom,
+    int? focusBlocks,
+    int? colorValue,
   }) {
     final session = StudySession(
       id: const Uuid().v4(),
@@ -309,6 +323,8 @@ class StudyPlannerController extends ChangeNotifier {
       scheduledAt: scheduledAt,
       minutes: minutes.clamp(1, 1440).toInt(),
       technique: technique,
+      focusBlocks: focusBlocks,
+      colorValue: colorValue,
     );
     if (!isLoaded || error != null) {
       throw StateError('Study planner storage is not available.');
@@ -325,6 +341,9 @@ class StudyPlannerController extends ChangeNotifier {
     required DateTime scheduledAt,
     required int minutes,
     required StudyTechnique technique,
+    int? focusBlocks,
+    int? colorValue,
+    bool updateColor = false,
   }) {
     final session = _find(id);
     if (session.status != StudyStatus.planned) {
@@ -335,6 +354,12 @@ class StudyPlannerController extends ChangeNotifier {
     session.scheduledAt = scheduledAt;
     session.minutes = minutes.clamp(1, 1440).toInt();
     session.technique = technique;
+    session.focusBlocks = (focusBlocks ?? technique.rounds)
+        .clamp(1, 12)
+        .toInt();
+    if (updateColor) {
+      session.colorValue = colorValue;
+    }
     _changed();
   }
 
@@ -466,7 +491,7 @@ class StudyPlannerController extends ChangeNotifier {
         transitions++ < 100) {
       final boundary = current.deadline!;
       if (current.phase == StudyPhase.focus &&
-          current.round < current.technique.rounds) {
+          current.round < current.focusBlocks) {
         current.phase = StudyPhase.breakTime;
         current.remainingSeconds = current.technique.breakMinutes * 60;
         current.deadline = boundary.add(

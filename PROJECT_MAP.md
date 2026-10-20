@@ -371,7 +371,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1779 linii)
+### `lib/features/library/presentation/library_screen.dart` (1754 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -524,7 +524,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 
 ## 6a. Planer nauki (bez migracji SQLite)
 
-- `lib/features/planner/state/study_planner_controller.dart` (537):
+- `lib/features/planner/state/study_planner_controller.dart` (562):
   `StudySession`, `StudyTechnique`, `StudyStatus`, `StudyPlannerController`.
   Jeden stan Provider + ChangeNotifier, trwały `study_planner.json` przez
   cross-platform `text_storage`. Timery liczone względem deadline,
@@ -533,13 +533,21 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   `AppSaveCoordinator`. Pominięta ocena zamyka sesję i zapisuje ją
   bez oceny w historii (także po ponownym uruchomieniu); starsze sesje
   pozostawione w stanie review są przenoszone do historii bez ponagleń.
-  Powiadomienia tylko wewnątrz działającej aplikacji.
+  Sesje zapisują 1–12 bloków Smart i opcjonalny kolor karty.
+  Starsze zapisy otrzymują domyślne wartości techniki oraz brak koloru.
+  Czas i przejścia timerów używają liczby wybranych bloków;
+  zakończenie sesji otwiera ocenę bez dolnego SnackBara.
   Wynik wczytywania po dispose jest ignorowany: bez powiadomienia, timera
   ani zapisu odzyskanej historii.
-  10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
-  152: `StudyPlannerController`; 232: `load`; 298: `create`;
-  366: `start`; 528: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (655):
+  10: `StudyTechnique`;
+  42: `StudyStatus`;
+  46: `StudySession`;
+  164: `StudyPlannerController`;
+  244: `load`;
+  310: `create`;
+  391: `start`;
+  553: `flush`.
+- `lib/features/planner/presentation/study_timer_widgets.dart` (754):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -553,30 +561,39 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   skalowany do wąskiego panelu. Powiększony padding pionowy timera
   (20 px u góry, 22 px na dole) oraz odstęp pod Ready (30 px)
   zwiększają wysokość całego bloku mimo niższych przycisków.
-  Upcoming pokazuje wszystkie sesje w osobno przewijanej liście
-  z limitem wysokości; zachowuje wygląd kart kalendarza i przycisk Start.
+  Upcoming pokazuje wszystkie sesje w osobno przewijanej liście,
+  również podczas aktywnej sesji zamiast przycisków Start/Smart.
+  Nowe i edytowane sesje (także z kalendarza) mogą mieć indywidualny
+  kolor z tych samych palet, Recent i edytora HEX co foldery.
+  Formularz Smart umożliwia wybór liczby bloków 1–12.
+  Ocena ma nagłówek „Great job! Time's up.”.
   W trakcie sesji Resume/Pause oraz Stop mają tę samą wysokość 32 px,
   kontur i promień 12 px co przyciski Start/Smart.
   Selektor techniki w formularzu `isExpanded` mieści się w wąskim dialogu.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
-  24: `studyRatingStars`; 31: `openStudyPlanner`;
-  37: `showStudySessionEditor`; 57: `showStudyRating`;
-  345: `StudyTimerCard`; 607: `CompactStudyTimer`.
-- `lib/features/planner/presentation/study_action_theme.dart` (144):
+  32: `studyRatingStars`;
+  39: `openStudyPlanner`;
+  45: `showStudySessionEditor`;
+  65: `showStudyRating`;
+  430: `StudyTimerCard`;
+  705: `CompactStudyTimer`.
+- `lib/features/planner/presentation/study_action_theme.dart` (161):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
   zawartość ikon i tekstu oraz promień 12 px selektora Today/Week/Month;
-  wspólne tło i obrys kart planowanych sesji w kalendarzu i timerze;
+  wspólne tło i obrys kart planowanych sesji w kalendarzu i timerze,
+  z opcjonalnym odcieniem wybranego koloru;
   subtelny beż tylko dla wyróżnianych akcji; pozostałe przyciski bez ciemnego
   wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
-  84: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1268):
+  101: `StudyActionTheme`.
+- `lib/features/planner/presentation/planner_screen.dart` (1272):
   `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
+  Wybrany kolor sesji jest nakładką nad tłem karty w Week/Today/Month.
   W Week i Month bieżący dzień ma umiarkowanie ciemniejsze tło,
   z 50% warstwą odcienia motywu na tle zwykłej komórki.
   Today zachowuje normalne tło i większy odstęp godziny od karty sesji.
@@ -594,12 +611,14 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   w równym rzędzie.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px; Month na wąskim ekranie listę.
-  16: `CalendarMode`; 43: `PlannerScreen`;
+  16: `CalendarMode`;
+  43: `PlannerScreen`;
   50: `_PlannerScreenState`;
-  910: `_HourlyDaySchedule`;
-  1048: `_WeekTimeGrid` — wspólna oś.
+  914: `_HourlyDaySchedule`;
+  1052: `_WeekTimeGrid` — wspólna oś.
 - `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów.
-- `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
+- `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
+  zgodność starszych sesji, reset koloru, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
   i ochrona uszkodzonych danych; sukces/błąd wczytywania po dispose.
 - `test/study_planner_widget_test.dart`: szerokości 50/50, odstępy
@@ -607,7 +626,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   środkowanie ikon i etykiet, wspólną wysokość 32 px planera i timera
   i większy padding timera,
   ciemniejsze ukończone sesje
-  z obrysem w kolorze tekstu w obu motywach, przyciski kalendarza o
+  z obrysem w kolorze tekstu w obu motywach, liczbę bloków Smart,
+  kolory New/Edit w kalendarzu, ukrycie Start/Smart podczas sesji i
+  nagłówek oceny; przyciski kalendarza o
   tej samej wysokości i zaokrągleniu selektora, zgodność kart Upcoming
   z kalendarzem w obu motywach, brak separatorów i działanie Start,
   dni granicznych miesiąca, łagodne zaznaczenie Week/Month,
@@ -1053,7 +1074,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   regresja widoczności ikon i dekoracji w obu motywach, kontur Lucide,
   responsywna siatka 1–5 kolumn, odrębne kolory hover/press oraz
   geometria menu po lewej od nazw folderów, notatek i boardów.
-- `test/merged_ui_integration_test.dart`: wspólny motyw katalogu/planera,
+- `test/merged_ui_integration_test.dart`: brak dolnego SnackBara po
+  zakończeniu sesji, zachowanie dialogu oceny, wspólny motyw katalogu/planera,
   wysokość i 1 px separator nagłówka planera i ustawień w obu motywach,
   dostęp do Settings przez katalog, ustawienia pustej biblioteki, nocne miniatury bez mutacji danych i repaint
   po zmianie motywu, kontrast planera/timera, pozycja menu względem

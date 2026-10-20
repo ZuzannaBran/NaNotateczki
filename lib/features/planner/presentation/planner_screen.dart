@@ -298,7 +298,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
         : StudyActionStyles.plannedSessionColor(theme);
     final tile = Material(
       key: ValueKey('planner-session-tile:${session.id}'),
-      color: color,
+      color: StudyActionStyles.sessionCardColor(
+        theme,
+        session.colorValue,
+        baseColor: color,
+      ),
       shape: StudyActionStyles.sessionCardShape(scheme),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),

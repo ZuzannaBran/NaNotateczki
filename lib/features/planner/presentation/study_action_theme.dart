@@ -40,6 +40,23 @@ class StudyActionStyles {
       ? theme.colorScheme.surfaceContainerHighest
       : theme.colorScheme.surface;
 
+  static Color sessionCardColor(
+    ThemeData theme,
+    int? colorValue, {
+    Color? baseColor,
+  }) {
+    final base = baseColor ?? plannedSessionColor(theme);
+    if (colorValue == null) {
+      return base;
+    }
+    return Color.alphaBlend(
+      Color(colorValue).withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.45 : 0.32,
+      ),
+      base,
+    );
+  }
+
   static RoundedRectangleBorder sessionCardShape(ColorScheme colors) =>
       RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),

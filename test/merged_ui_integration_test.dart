@@ -433,6 +433,31 @@ void main() {
     await app.close(tester);
   });
 
+  testWidgets('timer completion opens rating without bottom snackbar', (
+    tester,
+  ) async {
+    final app = await _pumpApp(tester);
+    final session = app.planner.create(
+      title: 'Finished lesson',
+      scheduledAt: DateTime.now(),
+    );
+    app.planner.start(session.id);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('sidebar-start-session')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('sidebar-timer-stop')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SnackBar), findsNothing);
+    expect(
+      find.byKey(const ValueKey('study-finished-title')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Skip rating'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SnackBar), findsNothing);
+    await app.close(tester);
+  });
+
   testWidgets('sidebar timer and session form use live touch sensitivity', (
     tester,
   ) async {

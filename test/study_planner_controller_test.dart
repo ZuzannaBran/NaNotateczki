@@ -156,6 +156,99 @@ void main() {
     restored.dispose();
   });
 
+  test(
+    'smart blocks and colour persist and control focus transitions',
+    () async {
+      await planner.load();
+      final item = planner.create(
+        title: 'Custom Pomodoro',
+        scheduledAt: now,
+        technique: StudyTechnique.pomodoro,
+        focusBlocks: 2,
+        colorValue: 0xFF7491C4,
+      );
+      expect(item.focusBlocks, 2);
+      expect(item.totalFocusMinutes, 50);
+      expect(item.colorValue, 0xFF7491C4);
+
+      planner.start(item.id);
+      now = now.add(const Duration(minutes: 25));
+      planner.tick();
+      expect(item.phase, StudyPhase.breakTime);
+      now = now.add(const Duration(minutes: 5));
+      planner.tick();
+      expect(item.round, 2);
+      expect(item.phase, StudyPhase.focus);
+      now = now.add(const Duration(minutes: 25));
+      planner.tick();
+      expect(item.status, StudyStatus.review);
+
+      await planner.flush();
+      final restored = StudyPlannerController(
+        autoTick: false,
+        clock: () => now,
+        read: (key) async => storage[key],
+        write: (key, value) async {
+          storage[key] = value;
+        },
+      );
+      await restored.load();
+      expect(restored.sessions.single.focusBlocks, 2);
+      expect(restored.sessions.single.colorValue, 0xFF7491C4);
+      await restored.flush();
+      restored.dispose();
+    },
+  );
+
+  test('editing blocks and clearing a session colour persists', () async {
+    await planner.load();
+    final item = planner.create(
+      title: 'Edit colours',
+      scheduledAt: now,
+      technique: StudyTechnique.focus50,
+      colorValue: 0xFF264B91,
+    );
+    planner.edit(
+      item.id,
+      title: item.title,
+      description: item.description,
+      scheduledAt: item.scheduledAt,
+      minutes: item.minutes,
+      technique: StudyTechnique.focus50,
+      focusBlocks: 3,
+      colorValue: null,
+      updateColor: true,
+    );
+    expect(item.focusBlocks, 3);
+    expect(item.colorValue, isNull);
+    await planner.flush();
+    final saved = jsonDecode(
+      storage[StudyPlannerController.storageKey]!,
+    ) as Map<String, dynamic>;
+    final session = (saved['sessions'] as List).single as Map;
+    expect(session['focusBlocks'], 3);
+    expect(session['colorValue'], isNull);
+  });
+
+  test('legacy sessions retain technique default blocks', () async {
+    final legacy = StudySession(
+      id: 'legacy',
+      title: 'Old session',
+      scheduledAt: now,
+      minutes: 30,
+      technique: StudyTechnique.pomodoro,
+    ).toJson()
+      ..remove('focusBlocks')
+      ..remove('colorValue');
+    storage[StudyPlannerController.storageKey] = jsonEncode({
+      'version': 1,
+      'sessions': [legacy],
+    });
+    await planner.load();
+    expect(planner.sessions.single.focusBlocks, 4);
+    expect(planner.sessions.single.colorValue, isNull);
+  });
+
   test('smart Pomodoro advances focus, breaks and four rounds', () async {
     await planner.load();
     final item = planner.create(

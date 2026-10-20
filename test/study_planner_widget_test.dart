@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:program/core/theme/app_theme.dart';
+import 'package:program/core/widgets/app_header_divider.dart';
+import 'package:program/features/editor/state/ink_color_presets.dart';
 import 'package:program/features/planner/presentation/planner_screen.dart';
 import 'package:program/features/planner/presentation/study_action_theme.dart';
 import 'package:program/features/planner/presentation/study_timer_widgets.dart';
@@ -451,6 +453,141 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('running sidebar hides start actions but keeps upcoming', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final running = planner.create(
+      title: 'Active focus',
+      scheduledAt: DateTime.now(),
+    );
+    final later = planner.create(
+      title: 'Next lesson',
+      scheduledAt: DateTime.now().add(const Duration(days: 1)),
+    );
+    planner.start(running.id);
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: Scaffold(body: StudyTimerCard())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('sidebar-start-session')), findsNothing);
+    expect(find.byKey(const ValueKey('sidebar-smart-session')), findsNothing);
+    expect(find.text('Upcoming'), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('sidebar-upcoming-card:${later.id}')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('sidebar-timer-stop')));
+    await tester.pumpAndSettle();
+    final heading = find.byKey(const ValueKey('study-finished-title'));
+    expect(heading, findsOneWidget);
+    expect(
+      tester.widget<Text>(heading).style,
+      AppHeaderDivider.titleStyle,
+    );
+    expect(find.byType(SnackBar), findsNothing);
+    await tester.tap(find.text('Skip rating'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('calendar new and edit forms persist chosen colour', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const PlannerScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('planner-new-session')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('study-session-colour')), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Session name'),
+      'Coloured session',
+    );
+    await tester.tap(find.byKey(const ValueKey('study-session-colour')));
+    await tester.pumpAndSettle();
+    final first = InkColorPreset.blue.colors.first;
+    final swatch = find.byKey(
+      ValueKey('color-picker-palette-blue-${first.toARGB32()}'),
+    );
+    expect(swatch, findsOneWidget);
+    await tester.tap(swatch);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final item = planner.sessions.single;
+    expect(item.colorValue, first.toARGB32());
+    final calendar = find.byKey(
+      ValueKey('planner-session-tile:${item.id}'),
+    );
+    final theme = Theme.of(tester.element(calendar));
+    expect(
+      tester.widget<Material>(calendar).color,
+      StudyActionStyles.sessionCardColor(theme, first.toARGB32()),
+    );
+
+    await tester.tap(calendar);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('study-session-colour-reset')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('study-session-colour-reset')));
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(item.colorValue, isNull);
+    await planner.flush();
+  });
+
+  testWidgets('smart session lets user set focus block count', (tester) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: PlannerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('planner-smart-session')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('study-focus-blocks')), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Session name'),
+      'Two blocks',
+    );
+    await tester.tap(find.byKey(const ValueKey('study-focus-blocks')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('2').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save & start'));
+    await tester.pumpAndSettle();
+    expect(planner.active?.focusBlocks, 2);
+    expect(planner.active?.technique, StudyTechnique.pomodoro);
+    await planner.flush();
+  });
+
   testWidgets('sidebar timer starts pauses and rates a session', (
     tester,
   ) async {
@@ -492,7 +629,7 @@ void main() {
     expect(planner.active?.status, StudyStatus.paused);
     await tester.tap(find.byTooltip('Stop session'));
     await tester.pumpAndSettle();
-    expect(find.text('Rate your productivity'), findsOneWidget);
+    expect(find.byKey(const ValueKey('study-finished-title')), findsOneWidget);
     expect(find.byIcon(Icons.star_border_rounded), findsNWidgets(5));
     expect(find.text('5'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('productivity-5')));
@@ -522,7 +659,7 @@ void main() {
     );
     await tester.tap(find.byTooltip('Stop session'));
     await tester.pumpAndSettle();
-    expect(find.text('Rate your productivity'), findsOneWidget);
+    expect(find.byKey(const ValueKey('study-finished-title')), findsOneWidget);
 
     await tester.tap(find.text('Skip rating'));
     await tester.pumpAndSettle();
@@ -561,7 +698,7 @@ void main() {
     expect(planner.pendingReviews, isEmpty);
     expect(planner.history.single.id, item.id);
     expect(planner.history.single.productivity, isNull);
-    expect(find.text('Rate your productivity'), findsNothing);
+    expect(find.byKey(const ValueKey('study-finished-title')), findsNothing);
     await planner.flush();
   });
 
