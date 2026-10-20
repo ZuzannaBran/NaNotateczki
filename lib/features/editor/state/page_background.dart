@@ -65,5 +65,8 @@ String backgroundPrefsKeyForKind(NotebookKind kind) {
   return switch (kind) {
     NotebookKind.notebook => 'notebook',
     NotebookKind.board => 'board',
+    NotebookKind.planner => throw UnsupportedError(
+      'Planner items do not have editor background preferences.',
+    ),
   };
 }

@@ -79,6 +79,9 @@ class EditorController extends ChangeNotifier {
   static const Duration _inkSaveDebounceDelay = Duration(seconds: 2);
 
   EditorController({required this.repository, required this.notebook}) {
+    if (notebook.kind == NotebookKind.planner) {
+      throw UnsupportedError('Planner items do not use the drawing editor.');
+    }
     pages = notebook.pages;
     currentPageIndex = 0;
     AppSaveCoordinator.instance.register(
@@ -184,6 +187,9 @@ class EditorController extends ChangeNotifier {
     return switch (kind) {
       NotebookKind.notebook => defaultNotebookBackground,
       NotebookKind.board => defaultBoardBackground,
+      NotebookKind.planner => throw UnsupportedError(
+        'Planner items do not use page background settings.',
+      ),
     };
   }
 
@@ -936,6 +942,10 @@ class EditorController extends ChangeNotifier {
         defaultNotebookBackground = settings;
       case NotebookKind.board:
         defaultBoardBackground = settings;
+      case NotebookKind.planner:
+        throw UnsupportedError(
+          'Planner items do not use page background settings.',
+        );
     }
     _dirtyBackgroundDefaultKinds.add(kind);
     _schedulePrefsSave();

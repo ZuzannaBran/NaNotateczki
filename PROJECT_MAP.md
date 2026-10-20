@@ -712,6 +712,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   brak placeholdera nazwy i wyśrodkowanie oceny,
   brak overflow selektora techniki,
   margines dolny i oceny kalendarza.
+- `test/planner_editor_isolation_test.dart`: planner nie ma klucza preferencji
+  tła, notebook i board zachowują dotychczasowe klucze.
 - `test/planner_calendar_layout_test.dart`: regresje grupowania i
   pozycjonowania równoległych sesji Day/Week (w tym sesji przechodzących
   przez północ) oraz obrysu zaokrąglonych ramek Week/Month.

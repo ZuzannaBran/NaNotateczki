@@ -156,6 +156,17 @@ Manual checks on desktop and mobile, in both light and dark themes:
 5. Restart the app and verify that tasks persist. Restore a local backup
    and confirm that the planner and its tasks are recovered.
 
+## Planner editor isolation (October 2026)
+
+Regression: `test/planner_editor_isolation_test.dart` checks that planner
+items cannot instantiate the drawing editor or use notebook/board
+background preference keys. This test has not been run in this environment.
+
+Manual check: create a planner in a folder and open it; verify that
+the task checklist appears instead of the drawing toolbar. Open an
+existing notebook and board after closing the planner, and confirm their
+drawing and page-background settings are unchanged.
+
 ## Platform coverage
 
 | Platform | Logic/widget | Native app | Build | Input/peripherals |
