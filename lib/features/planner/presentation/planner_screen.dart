@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -37,6 +38,23 @@ class PlannerScreen extends StatefulWidget {
 class _PlannerScreenState extends State<PlannerScreen> {
   CalendarMode _mode = CalendarMode.week;
   DateTime _anchor = DateUtils.dateOnly(DateTime.now());
+  late final Timer _timeRefresh;
+
+  @override
+  void initState() {
+    super.initState();
+    _timeRefresh = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timeRefresh.cancel();
+    super.dispose();
+  }
 
   TouchNavigationScrollPhysics get _navigationPhysics =>
       TouchNavigationScrollPhysics(
@@ -356,11 +374,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
         },
         builder: (context, candidates, rejected) {
           return Container(
+            key: ValueKey(
+              'planner-day-cell-${day.year}-${day.month}-${day.day}',
+            ),
             decoration: BoxDecoration(
               color: candidates.isNotEmpty
                   ? scheme.primaryContainer
                   : today
-                  ? scheme.surfaceContainerLow
+                  ? Theme.of(context).brightness == Brightness.dark
+                        ? scheme.surface
+                        : scheme.surfaceContainerHighest
                   : scheme.surfaceContainerLowest,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
@@ -409,7 +432,31 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                if (compact || _mode == CalendarMode.week)
+                if (_mode != CalendarMode.month)
+                  Expanded(
+                    child: _HourlyDaySchedule(
+                      key: ValueKey(
+                        'planner-hourly-${day.year}-${day.month}-${day.day}',
+                      ),
+                      day: day,
+                      now: DateTime.now(),
+                      sessions: items,
+                      compact: compact,
+                      physics: _navigationPhysics,
+                      buildTile: (item) =>
+                          _sessionTile(item, compact: compact),
+                      onPlanAt: (hour) => showStudySessionEditor(
+                        context,
+                        scheduledAt: DateTime(
+                          day.year,
+                          day.month,
+                          day.day,
+                          hour,
+                        ),
+                      ),
+                    ),
+                  )
+                else
                   Expanded(
                     child: ListView(
                       physics: _navigationPhysics,
@@ -435,13 +482,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                           ),
                       ],
                     ),
-                  )
-                else
-                  for (final item in items)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: _sessionTile(item, compact: compact),
-                    ),
+                  ),
               ],
             ),
           );
@@ -453,15 +494,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
   Widget _calendar(List<StudySession> sessions) {
     final days = _visibleDays();
     if (_mode == CalendarMode.today) {
-      return ListView(
-        physics: _navigationPhysics,
+      return Padding(
         padding: const EdgeInsets.all(18),
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 400),
-            child: _dayCell(days.first, sessions),
-          ),
-        ],
+        child: _dayCell(days.first, sessions),
       );
     }
 
@@ -833,4 +868,141 @@ class _PlannerScreenState extends State<PlannerScreen> {
       },
     );
   }
+}
+
+class _HourlyDaySchedule extends StatefulWidget {
+  const _HourlyDaySchedule({
+    required this.day,
+    required this.now,
+    required this.sessions,
+    required this.compact,
+    required this.physics,
+    required this.buildTile,
+    required this.onPlanAt,
+    super.key,
+  });
+
+  final DateTime day;
+  final DateTime now;
+  final List<StudySession> sessions;
+  final bool compact;
+  final ScrollPhysics physics;
+  final Widget Function(StudySession) buildTile;
+  final ValueChanged<int> onPlanAt;
+
+  @override
+  State<_HourlyDaySchedule> createState() => _HourlyDayScheduleState();
+}
+
+class _HourlyDayScheduleState extends State<_HourlyDaySchedule> {
+  static const double _hourHeight = 64;
+  late final ScrollController _scrollController;
+
+  bool get _isToday => DateUtils.isSameDay(widget.day, widget.now);
+
+  String get _dateKey =>
+      '${widget.day.year}-${widget.day.month}-${widget.day.day}';
+
+  @override
+  void initState() {
+    super.initState();
+    final focusHour = DateUtils.isSameDay(widget.day, widget.now)
+        ? widget.now.hour
+        : widget.sessions.isNotEmpty
+        ? widget.sessions.first.scheduledAt.hour
+        : 8;
+    _scrollController = ScrollController(
+      initialScrollOffset: math.max(0, focusHour - 2) * _hourHeight,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Widget _hourRow(int hour) {
+    final scheme = Theme.of(context).colorScheme;
+    final sessions = widget.sessions.where(
+      (session) => session.scheduledAt.hour == hour,
+    );
+    final currentHour = _isToday && widget.now.hour == hour;
+    final minuteFraction =
+        (widget.now.minute + widget.now.second / 60) / 60;
+    return Stack(
+      key: ValueKey('planner-hour-row-$_dateKey-$hour'),
+      children: [
+        if (currentHour)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Align(
+                alignment: Alignment(0, minuteFraction * 2 - 1),
+                child: Container(
+                  key: ValueKey('planner-now-line-$_dateKey'),
+                  width: double.infinity,
+                  height: 2,
+                  color: scheme.onSurface.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
+          ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: scheme.outlineVariant.withValues(alpha: 0.65),
+                width: 0.7,
+              ),
+            ),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: _hourHeight),
+            child: InkWell(
+              onTap: () => widget.onPlanAt(hour),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 7, 3, 7),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: widget.compact ? 34 : 42,
+                      child: Text(
+                        '${hour.toString().padLeft(2, '0')}:00',
+                        style: TextStyle(
+                          fontSize: AppTypography.small,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final session in sessions)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 5),
+                              child: widget.buildTile(session),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    key: ValueKey('planner-hour-list-$_dateKey'),
+    controller: _scrollController,
+    physics: widget.physics,
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    children: [for (var hour = 0; hour < 24; hour++) _hourRow(hour)],
+  );
 }

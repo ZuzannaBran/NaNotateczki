@@ -569,10 +569,14 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   84: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (836):
+- `lib/features/planner/presentation/planner_screen.dart` (1007):
   `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
+  Dzisiejszy dzień ma ciemniejsze tło w obu motywach, także w Month.
+  Today i Week mają przewijane 24 godziny z cienkimi separatorami,
+  sesjami w godzinie planu i wyraźniejszą linią bieżącej minuty
+  (aktualizacja co minutę); Month zachowuje zwykłe kafelki.
   Daty i opisy mają czteropoziomową typografię interfejsu.
   Miesiąc generuje tylko niezbędne 4–6 tygodni; komórki dni granicznych
   innych miesięcy pozostają widoczne z opacity 0.5; pomocniczy napis
@@ -598,7 +602,8 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   tej samej wysokości i zaokrągleniu selektora, zgodność kart Upcoming
   z kalendarzem w obu motywach, brak separatorów i działanie Start,
   przygaszenie dni z
-  innych miesięcy i brak tekstu instruktażowego, brak overflow
+  innych miesięcy, ciemniejsze tło dzisiaj oraz 24-godzinne podziałki
+  Today/Week z linią bieżącej minuty w obu motywach, brak overflow
   selektora techniki w wąskim oknie, margines dolny i oceny kalendarza.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
   tygodnia we wszystkich widokach i po zmianie daty; 4/5/6 tygodni

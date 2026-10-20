@@ -49,6 +49,109 @@ void main() {
     await planner.flush();
   });
 
+  for (final darkMode in [false, true]) {
+    testWidgets('today has darker cells and hour grid, dark=$darkMode', (
+      tester,
+    ) async {
+      final planner = await loadPlanner();
+      await tester.binding.setSurfaceSize(const Size(1440, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final now = DateTime.now();
+      final other = DateTime(
+        now.year,
+        now.month,
+        now.day + (now.weekday == DateTime.sunday ? -1 : 1),
+      );
+      final session = planner.create(
+        title: 'Timed lesson',
+        scheduledAt: DateTime(now.year, now.month, now.day, now.hour),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: MaterialApp(
+            theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+            home: const PlannerScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      String dateKey(DateTime day) =>
+          '${day.year}-${day.month}-${day.day}';
+      final currentDate = dateKey(now);
+      final cell = find.byKey(ValueKey('planner-day-cell-$currentDate'));
+      final otherCell = find.byKey(
+        ValueKey('planner-day-cell-${dateKey(other)}'),
+      );
+      final todayColor = (tester.widget<Container>(cell).decoration!
+              as BoxDecoration)
+          .color!;
+      final otherColor = (tester.widget<Container>(otherCell).decoration!
+              as BoxDecoration)
+          .color!;
+      expect(
+        todayColor,
+        darkMode
+            ? Theme.of(tester.element(cell)).colorScheme.surface
+            : Theme.of(tester.element(cell))
+                .colorScheme.surfaceContainerHighest,
+      );
+      expect(
+        todayColor.computeLuminance(),
+        lessThan(otherColor.computeLuminance()),
+      );
+
+      void expectClockGrid() {
+        final grid = find.byKey(
+          ValueKey('planner-hour-list-$currentDate'),
+        );
+        expect(grid, findsOneWidget);
+        expect(
+          tester.widget<ListView>(grid).childrenDelegate.estimatedChildCount,
+          24,
+        );
+        expect(
+          find.byKey(ValueKey('planner-now-line-$currentDate')),
+          findsOneWidget,
+        );
+        final hourRow = find.byKey(
+          ValueKey('planner-hour-row-$currentDate-${now.hour}'),
+        );
+        expect(hourRow, findsOneWidget);
+        expect(
+          find.descendant(
+            of: hourRow,
+            matching: find.byKey(
+              ValueKey('planner-session-tile:${session.id}'),
+            ),
+          ),
+          findsOneWidget,
+        );
+      }
+
+      expectClockGrid();
+      await tester.tap(find.text('Today').last);
+      await tester.pumpAndSettle();
+      expectClockGrid();
+
+      await tester.tap(find.text('Month'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(ValueKey('planner-day-cell-$currentDate')),
+        findsOneWidget,
+      );
+      expect(find.byKey(ValueKey('planner-now-line-$currentDate')), findsNothing);
+      expect(
+        find.byKey(ValueKey('planner-hour-list-$currentDate')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('phone planner uses vertical days and compact actions', (
     tester,
   ) async {
@@ -243,8 +346,10 @@ void main() {
       expect(find.text('Biology review'), findsWidgets);
       expect(find.text('Physics revision'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Next'));
-      await tester.pumpAndSettle();
+      if (now.weekday == DateTime.sunday) {
+        await tester.tap(find.byTooltip('Next'));
+        await tester.pumpAndSettle();
+      }
 
       final calendar = find.byKey(
         ValueKey('planner-session-tile:${first.id}'),
