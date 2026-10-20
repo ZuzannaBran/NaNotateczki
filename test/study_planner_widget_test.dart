@@ -266,10 +266,9 @@ void main() {
             expect(overlay, isNull);
           } else {
             expect(overlay, isA<BoxDecoration>());
-            expect(
-              (overlay! as BoxDecoration).border!.right.width,
-              1,
-            );
+            final overlayBorder =
+                (overlay! as BoxDecoration).border! as Border;
+            expect(overlayBorder.right.width, 1);
           }
         }
       }
@@ -377,12 +376,14 @@ void main() {
       final lastColumn = tester.widget<Container>(monthCell(seventh));
       expect(firstCell.margin, EdgeInsets.zero);
       expect(lastColumn.margin, EdgeInsets.zero);
-      final firstBorder = firstCell.decoration! as BoxDecoration;
-      final seventhBorder = lastColumn.decoration! as BoxDecoration;
+      final firstBorder =
+          (firstCell.decoration! as BoxDecoration).border! as Border;
+      final seventhBorder =
+          (lastColumn.decoration! as BoxDecoration).border! as Border;
       expect(firstBorder.borderRadius, isNull);
       expect(seventhBorder.borderRadius, isNull);
-      expect(firstBorder.border!.right.width, 1);
-      expect(firstBorder.border!.bottom.width, 1);
+      expect(firstBorder.right.width, 1);
+      expect(firstBorder.bottom.width, 1);
       final adjacentDay = start[1];
       final secondRowDay = start[7];
       expect(
@@ -393,8 +394,8 @@ void main() {
         tester.getRect(monthCell(first)).bottom,
         closeTo(tester.getRect(monthCell(secondRowDay)).top, 0.1),
       );
-      expect(seventhBorder.border!.right, BorderSide.none);
-      expect(seventhBorder.border!.bottom.width, 1);
+      expect(seventhBorder.right, BorderSide.none);
+      expect(seventhBorder.bottom.width, 1);
       expect(tester.takeException(), isNull);
     });
   }
@@ -450,10 +451,11 @@ void main() {
         outerColor.computeLuminance(),
         greaterThan(innerColor.computeLuminance()),
       );
-      expect(
-        (outerCell.decoration! as BoxDecoration).border!.right,
-        (innerCell.decoration! as BoxDecoration).border!.right,
-      );
+      final outerBorder =
+          (outerCell.decoration! as BoxDecoration).border! as Border;
+      final innerBorder =
+          (innerCell.decoration! as BoxDecoration).border! as Border;
+      expect(outerBorder.right, innerBorder.right);
       expect(tester.takeException(), isNull);
     });
   }
