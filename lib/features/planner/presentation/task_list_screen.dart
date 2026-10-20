@@ -21,15 +21,15 @@ Color plannerTaskBackground(
 }) {
   final color = darkMode
       ? switch (tone) {
-          PlannerTaskTone.undated => AppColors.darkCanvas,
-          PlannerTaskTone.upcoming => AppColors.darkPaper,
-          PlannerTaskTone.overdue => AppColors.darkActive,
+          PlannerTaskTone.undated => AppColors.darkActive,
+          PlannerTaskTone.upcoming => AppColors.darkCanvas,
+          PlannerTaskTone.overdue => AppColors.darkPaper,
           PlannerTaskTone.completed => AppColors.darkCanvas,
         }
       : switch (tone) {
-          PlannerTaskTone.undated => AppColors.background,
+          PlannerTaskTone.undated => AppColors.divider,
           PlannerTaskTone.upcoming => AppColors.toolbar,
-          PlannerTaskTone.overdue => AppColors.divider,
+          PlannerTaskTone.overdue => AppColors.background,
           PlannerTaskTone.completed => AppColors.background,
         };
   if (!completed) {
