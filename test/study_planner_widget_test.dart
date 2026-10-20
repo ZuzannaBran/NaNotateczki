@@ -152,7 +152,7 @@ void main() {
         findsOneWidget,
       );
       expect(start.height, StudyActionStyles.sessionButtonHeight);
-      expect(start.height, 36);
+      expect(start.height, 32);
       expect(start.height, closeTo(smart.height, 0.1));
       expect(
         tester.widget<Padding>(
@@ -568,8 +568,8 @@ void main() {
       tester.getSize(create).height,
       StudyActionStyles.sessionButtonHeight,
     );
-    expect(tester.getSize(smart).height, 36);
-    expect(tester.getSize(create).height, 36);
+    expect(tester.getSize(smart).height, 32);
+    expect(tester.getSize(create).height, 32);
     expect(
       find.descendant(
         of: smart,

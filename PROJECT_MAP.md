@@ -544,8 +544,8 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Nagłówek bocznego timera nie ma ikony zegara, a napis `Study timer`
   używa typografii nagłówka `Projects`. Ikona kalendarza pozostaje.
   Przyciski `Start session` i `Smart` w panelu bocznym wypełniają
-  po połowie dostępnej szerokości z odstępem 8 px, wysokością 40 px
-  i promieniem 12 px; przyciski mają 36 px wysokości,
+  po połowie dostępnej szerokości z odstępem 8 px
+  i promieniem 12 px; przyciski mają 32 px wysokości,
   bez zmiany rozmiaru tekstu.
   ikony Play i Smart z podpisami są centrowane jako jeden blok,
   skalowany do wąskiego panelu. Powiększony padding pionowy timera
@@ -579,7 +579,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Long-press usunięty. Osobne przyciski
   Settings i Study history usunięto – historia pozostaje w kalendarzu,
   a globalne ustawienia w katalogu. Smart/New session mają wspólne
-  style z timerem i wysokość 36 px; poniżej 760 px leżą pod nagłówkiem
+  style z timerem i wysokość 32 px; poniżej 760 px leżą pod nagłówkiem
   w równym rzędzie.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px, Week/Month na wąskim ekranie listę.
@@ -591,7 +591,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   i ochrona uszkodzonych danych; sukces/błąd wczytywania po dispose.
 - `test/study_planner_widget_test.dart`: szerokości 50/50, odstępy
   i zaokrąglenia przycisków timera przy panelach 240/320 px;
-  środkowanie ikon i etykiet, wspólną wysokość 36 px planera i timera
+  środkowanie ikon i etykiet, wspólną wysokość 32 px planera i timera
   i większy padding timera,
   ciemniejsze ukończone sesje
   z obrysem w kolorze tekstu w obu motywach, przyciski kalendarza o
