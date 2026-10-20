@@ -61,11 +61,7 @@ class StudyActionStyles {
       child: Row(
         key: contentKey,
         mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18),
-          const SizedBox(width: 4),
-          Text(label),
-        ],
+        children: [Icon(icon, size: 18), const SizedBox(width: 4), Text(label)],
       ),
     ),
   );

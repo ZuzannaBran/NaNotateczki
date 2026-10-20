@@ -21,11 +21,8 @@ List<DateTime> monthCalendarDays(DateTime month) {
   final firstMonday = DateTime(first.year, first.month, 1 - leadingDays);
   return List.generate(
     dayCount,
-    (index) => DateTime(
-      firstMonday.year,
-      firstMonday.month,
-      firstMonday.day + index,
-    ),
+    (index) =>
+        DateTime(firstMonday.year, firstMonday.month, firstMonday.day + index),
   );
 }
 
@@ -343,7 +340,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
   }) {
     final scheme = Theme.of(context).colorScheme;
     final today = _isSameDate(day, DateTime.now());
-    final inMonth = _mode != CalendarMode.month ||
+    final inMonth =
+        _mode != CalendarMode.month ||
         (day.month == _anchor.month && day.year == _anchor.year);
     final items =
         sessions.where((s) => _isSameDate(s.scheduledAt, day)).toList()
@@ -401,7 +399,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         visualDensity: VisualDensity.compact,
                         onPressed: () => showStudySessionEditor(
                           context,
-                          scheduledAt: DateTime(day.year, day.month, day.day, 9),
+                          scheduledAt: DateTime(
+                            day.year,
+                            day.month,
+                            day.day,
+                            9,
+                          ),
                         ),
                       ),
                   ],

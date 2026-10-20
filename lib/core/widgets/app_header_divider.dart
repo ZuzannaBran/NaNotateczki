@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+
 /// The same one-pixel divider used below all top app bars.
 class AppHeaderDivider extends StatelessWidget {
   const AppHeaderDivider({super.key});
