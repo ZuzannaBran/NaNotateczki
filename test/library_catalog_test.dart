@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
+import 'package:program/core/theme/app_typography.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
@@ -210,6 +211,10 @@ void main() {
     expect(folderCoverRect.top - folderMenuRect.bottom, lessThan(12));
     expect(tester.widget<Text>(folderLabel).textAlign, TextAlign.left);
     expect(tester.widget<Text>(folderLabel).overflow, TextOverflow.ellipsis);
+    expect(
+      tester.widget<Text>(folderLabel).style?.fontSize,
+      AppTypography.folder,
+    );
     await tester.tap(folderTile);
     await tester.pumpAndSettle();
 
@@ -246,6 +251,10 @@ void main() {
       );
       final menuRect = tester.getRect(documentMenu);
       final labelRect = tester.getRect(documentLabel);
+      expect(
+        tester.widget<Text>(documentLabel).style?.fontSize,
+        AppTypography.document,
+      );
       final areaRect = tester.getRect(previewArea);
       expect(menuRect.left, closeTo(areaRect.left + 4, 1));
       expect(labelRect.left, greaterThan(menuRect.right));

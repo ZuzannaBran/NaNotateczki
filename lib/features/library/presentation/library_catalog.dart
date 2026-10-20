@@ -7,6 +7,7 @@ import 'package:path_drawing/path_drawing.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
@@ -730,6 +731,9 @@ class _CatalogTile extends StatelessWidget {
                     textAlign: TextAlign.left,
                     style: TextStyle(
                       color: scheme.onSurface,
+                      fontSize: previewAspectRatio == null
+                          ? AppTypography.folder
+                          : AppTypography.document,
                       fontWeight: FontWeight.w500,
                     ),
                   ),

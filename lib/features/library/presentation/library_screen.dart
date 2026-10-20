@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/input/soft_keyboard.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/storage/app_save_coordinator.dart';
@@ -848,7 +849,7 @@ class _NameInputDialogState extends State<_NameInputDialog> {
 enum _TreeRowAction { editCover, rename, delete }
 
 const TextStyle _sidebarTextStyle = TextStyle(
-  fontSize: 14,
+  fontSize: AppTypography.document,
   height: 1.2,
   letterSpacing: -0.05,
 );
@@ -1164,7 +1165,7 @@ class _EmptyLibraryTree extends StatelessWidget {
               'Create a folder or note to get started.',
               style: _sidebarTextStyle.copyWith(
                 color: colorScheme.onSurfaceVariant,
-                fontSize: 12.5,
+                fontSize: AppTypography.small,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1256,6 +1257,7 @@ class _FolderTreeRow extends StatelessWidget {
                     folder,
                     style: _sidebarTextStyle.copyWith(
                       color: colorScheme.onSurface,
+                      fontSize: AppTypography.folder,
                       fontWeight: FontWeight.w500,
                     ),
                     maxLines: 1,

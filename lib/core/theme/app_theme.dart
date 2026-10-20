@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_typography.dart';
 
 class AppTheme {
   static ThemeData dark() {
@@ -30,7 +31,7 @@ class AppTheme {
           outline: AppColors.darkOutline,
           outlineVariant: AppColors.darkOutline,
         );
-    return ThemeData(
+    final theme = ThemeData(
       brightness: Brightness.dark,
       fontFamily: 'Georgia',
       fontFamilyFallback: const ['Times New Roman', 'Noto Serif', 'serif'],
@@ -56,6 +57,7 @@ class AppTheme {
         linearTrackColor: AppColors.darkActive,
       ),
     );
+    return AppTypography.apply(theme);
   }
 
   static ThemeData light({
@@ -86,7 +88,7 @@ class AppTheme {
           outlineVariant: AppColors.divider,
         );
 
-    return ThemeData(
+    final theme = ThemeData(
       fontFamily: 'Georgia',
       fontFamilyFallback: const ['Times New Roman', 'Noto Serif', 'serif'],
       colorScheme: colorScheme,
@@ -116,5 +118,6 @@ class AppTheme {
         linearTrackColor: AppColors.toolbar,
       ),
     );
+    return AppTypography.apply(theme);
   }
 }

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
+import 'package:program/core/theme/app_typography.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/editor_settings_screen.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
@@ -15,6 +16,42 @@ import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 void main() {
+  test('both themes use the four interface text sizes', () {
+    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+      final t = theme.textTheme;
+      final sizes = [
+        t.displayLarge?.fontSize,
+        t.displayMedium?.fontSize,
+        t.displaySmall?.fontSize,
+        t.headlineLarge?.fontSize,
+        t.headlineMedium?.fontSize,
+        t.headlineSmall?.fontSize,
+        t.titleLarge?.fontSize,
+        t.titleMedium?.fontSize,
+        t.titleSmall?.fontSize,
+        t.bodyLarge?.fontSize,
+        t.bodyMedium?.fontSize,
+        t.bodySmall?.fontSize,
+        t.labelLarge?.fontSize,
+        t.labelMedium?.fontSize,
+        t.labelSmall?.fontSize,
+      ];
+      expect(
+        sizes.toSet(),
+        {
+          AppTypography.heading,
+          AppTypography.folder,
+          AppTypography.document,
+          AppTypography.small,
+        },
+      );
+      expect(t.titleLarge?.fontSize, AppTypography.heading);
+      expect(t.titleMedium?.fontSize, AppTypography.folder);
+      expect(t.bodyMedium?.fontSize, AppTypography.document);
+      expect(t.bodySmall?.fontSize, AppTypography.small);
+    }
+  });
+
   test('dark palette matches the Visual reference', () {
     final theme = AppTheme.dark();
     expect(theme.brightness, Brightness.dark);

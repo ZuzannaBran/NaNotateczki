@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
@@ -285,7 +286,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 maxLines: compact ? 2 : 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: compact ? 11 : 13,
+                  fontSize: compact ? AppTypography.small : AppTypography.document,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -301,7 +302,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       ? 'Not started'
                       : session.technique.label,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: AppTypography.small,
                     color: scheme.onSurfaceVariant,
                   ),
                 ),
@@ -384,7 +385,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: compact ? 12 : 15,
+                          fontSize: compact ? AppTypography.small : AppTypography.document,
                           fontWeight: today ? FontWeight.bold : FontWeight.w500,
                           color: inMonth
                               ? scheme.onSurface
@@ -549,7 +550,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
   }
 
   Widget _smartButton() => SizedBox(
-    height: 44,
+    height: StudyActionStyles.sessionButtonHeight,
     child: OutlinedButton(
       key: const ValueKey('planner-smart-session'),
       style: StudyActionStyles.sessionOutlined(),
@@ -567,7 +568,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
   );
 
   Widget _newSessionButton() => SizedBox(
-    height: 44,
+    height: StudyActionStyles.sessionButtonHeight,
     child: FilledButton(
       key: const ValueKey('planner-new-session'),
       style: StudyActionStyles.sessionPrimary(Theme.of(context)),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_typography.dart';
 
 /// The same one-pixel divider used below all top app bars.
 class AppHeaderDivider extends StatelessWidget {
@@ -9,7 +10,7 @@ class AppHeaderDivider extends StatelessWidget {
   static const double toolbarHeight = kToolbarHeight;
   static const double thickness = 1;
   static const TextStyle titleStyle = TextStyle(
-    fontSize: 18,
+    fontSize: AppTypography.heading,
     fontWeight: FontWeight.w600,
     height: 1.2,
     letterSpacing: -0.05,

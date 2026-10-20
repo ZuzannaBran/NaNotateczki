@@ -91,6 +91,8 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
   bez modyfikowania zapisanych kresek. 50: `AppColors`.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
+- `lib/core/theme/app_typography.dart`: cztery rozmiary tekstu interfejsu
+  (18/16/14/12 px); tekst w edytowanych dokumentach pozostaje niezależny.
 - `lib/core/theme/app_theme.dart`: `AppTheme.light` i `AppTheme.dark`
   z kontrastowymi kontrolkami i nagłówkami. Tekstowe i konturowe
   przyciski jasnego motywu używają `onSurface` zamiast bladego akcentu.
@@ -384,7 +386,8 @@ a wybór dokumentu uruchamia edytor. Powrót z edytora wymusza flush
 niezapisanych zmian przed ponownym wczytaniem miniatur. Lista folderów
 i plików wykorzystuje ustawioną czułość dotyku. Folder i aktywny dokument
 mają miękkie, zaokrąglone zaznaczenie; sidebar używa kompaktowej typografii
-Georgia i jasnej neutralnej powierzchni panelu. Panel można zwijać i zmieniać
+Georgia, foldery 16 px, notatki/boardy 14 px, oraz jasnej neutralnej
+powierzchni panelu. Panel można zwijać i zmieniać
 jego szerokość. Nagłówek `Projects` ma 56 px, tak jak górne paski
 katalogu, notebooka i boarda; jeden separator w nadrzędnym `Stack`
 biegnie przez całą szerokość na wysokości 56 px także po zwinięciu panelu.
@@ -541,7 +544,8 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Nagłówek bocznego timera nie ma ikony zegara, a napis `Study timer`
   używa typografii nagłówka `Projects`. Ikona kalendarza pozostaje.
   Przyciski `Start session` i `Smart` w panelu bocznym wypełniają
-  po połowie dostępnej szerokości z odstępem 8 px i promieniem 12 px;
+  po połowie dostępnej szerokości z odstępem 8 px, wysokością 40 px
+  i promieniem 12 px;
   ikony Play i Smart z podpisami są centrowane jako jeden blok,
   skalowany do wąskiego panelu. Zwiększone są odstępy pionowe pod tekstem
   Ready i odliczaniem oraz padding timera.
@@ -564,23 +568,26 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
+  Daty i opisy mają czteropoziomową typografię interfejsu.
   Miesiąc generuje tylko niezbędne 4–6 tygodni; komórki dni granicznych
   innych miesięcy pozostają widoczne z opacity 0.5; pomocniczy napis
   Long-press usunięty. Osobne przyciski
   Settings i Study history usunięto – historia pozostaje w kalendarzu,
   a globalne ustawienia w katalogu. Smart/New session mają wspólne
-  style z timerem i wysokość 44 px; poniżej 760 px leżą pod nagłówkiem
+  style z timerem i wysokość 40 px; poniżej 760 px leżą pod nagłówkiem
   w równym rzędzie.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px, Week/Month na wąskim ekranie listę.
   13: `CalendarMode`; 15: `PlannerScreen`;
   22: `_PlannerScreenState`.
+- `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
   i ochrona uszkodzonych danych; sukces/błąd wczytywania po dispose.
 - `test/study_planner_widget_test.dart`: szerokości 50/50, odstępy
   i zaokrąglenia przycisków timera przy panelach 240/320 px;
-  środkowanie etykiet i ikon przycisków, ciemniejsze ukończone sesje
+  środkowanie ikon i etykiet, wspólną wysokość 40 px planera i timera,
+  ciemniejsze ukończone sesje
   z obrysem w kolorze tekstu w obu motywach, przyciski kalendarza o
   tej samej wysokości i zaokrągleniu selektora, przygaszenie dni z
   innych miesięcy i brak tekstu instruktażowego, brak overflow
@@ -1011,7 +1018,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
   poziomego.
 - `test/library_controller_test.dart` (33)
-- `test/library_catalog_test.dart` (971): kolor dominujący, serializacja
+- `test/library_catalog_test.dart` (971): rozmiary nazw folderów
+  i dokumentów, kolor dominujący, serializacja
   stylu okładek, start katalogu, siatka notatek/boardów,
   brak palety w nagłówku folderu i edycja przez menu boczne,
   siatka dokumentów 1–5 kolumn, wspólna szerokość i górna krawędź

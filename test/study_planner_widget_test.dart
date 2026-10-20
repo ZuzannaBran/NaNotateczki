@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:program/core/theme/app_theme.dart';
 import 'package:program/features/planner/presentation/planner_screen.dart';
+import 'package:program/features/planner/presentation/study_action_theme.dart';
 import 'package:program/features/planner/presentation/study_timer_widgets.dart';
 import 'package:program/features/planner/state/study_planner_controller.dart';
 
@@ -150,6 +151,7 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(start.height, StudyActionStyles.sessionButtonHeight);
       expect(start.height, closeTo(smart.height, 0.1));
       expect(start.top, closeTo(smart.top, 0.1));
       expect(start.left, closeTo(timer.left + 14, 0.1));
@@ -466,8 +468,14 @@ void main() {
     );
     expect(tester.getSize(smart).width, closeTo(148, 0.1));
     expect(tester.getSize(create).width, closeTo(148, 0.1));
-    expect(tester.getSize(smart).height, 44);
-    expect(tester.getSize(create).height, 44);
+    expect(
+      tester.getSize(smart).height,
+      StudyActionStyles.sessionButtonHeight,
+    );
+    expect(
+      tester.getSize(create).height,
+      StudyActionStyles.sessionButtonHeight,
+    );
     expect(
       find.descendant(
         of: smart,

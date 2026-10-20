@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
 import '../../../notebook/domain/text_block.dart';
 import '../../state/editor_controller.dart';
 import 'editor_toolbar.dart';
@@ -224,7 +225,7 @@ class TextEditToolbar extends StatelessWidget {
               value: font,
               child: Text(
                 font == _themeFontKey ? 'Georgia' : font,
-                style: const TextStyle(fontSize: 13),
+                style: const TextStyle(fontSize: AppTypography.document),
               ),
             ),
           )
@@ -248,7 +249,7 @@ class TextEditToolbar extends StatelessWidget {
           .map(
             (size) => DropdownMenuItem<int>(
               value: size,
-              child: Text('$size', style: const TextStyle(fontSize: 13)),
+              child: Text('$size', style: const TextStyle(fontSize: AppTypography.document)),
             ),
           )
           .toList(),

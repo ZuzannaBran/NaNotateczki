@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
@@ -381,14 +382,14 @@ class StudyTimerCard extends StatelessWidget {
               Text(
                 active.title,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: AppTypography.small),
               ),
               const SizedBox(height: 4),
               Text(
                 studyDuration(planner.secondsLeft(active)),
                 key: const ValueKey('study-countdown'),
                 style: const TextStyle(
-                  fontSize: 30,
+                  fontSize: AppTypography.heading,
                   fontWeight: FontWeight.w600,
                   fontFeatures: [FontFeature.tabularFigures()],
                 ),
@@ -399,7 +400,7 @@ class StudyTimerCard extends StatelessWidget {
                   ' · ${active.round}/${active.technique.rounds}',
                   style: TextStyle(
                     color: colors.onSurfaceVariant,
-                    fontSize: 12,
+                    fontSize: AppTypography.small,
                   ),
                 ),
               const SizedBox(height: 20),
@@ -437,11 +438,12 @@ class StudyTimerCard extends StatelessWidget {
             ] else ...[
               Text(
                 'Ready for your next focus session?',
-                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+                style: TextStyle(fontSize: AppTypography.small, color: colors.onSurfaceVariant),
               ),
               const SizedBox(height: 24),
             ],
-            IntrinsicHeight(
+            SizedBox(
+              height: StudyActionStyles.sessionButtonHeight,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -494,7 +496,7 @@ class StudyTimerCard extends StatelessWidget {
               const Divider(height: 16),
               Text(
                 'Upcoming',
-                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+                style: TextStyle(fontSize: AppTypography.small, color: colors.onSurfaceVariant),
               ),
               for (final item in next)
                 ListTile(
@@ -509,7 +511,7 @@ class StudyTimerCard extends StatelessWidget {
                   subtitle: Text(
                     '${item.scheduledAt.day}/${item.scheduledAt.month}'
                     ' · ${studyClock(item.scheduledAt)}',
-                    style: const TextStyle(fontSize: 11),
+                    style: const TextStyle(fontSize: AppTypography.small),
                   ),
                   trailing: IconButton(
                     tooltip: 'Start scheduled session',
@@ -523,7 +525,7 @@ class StudyTimerCard extends StatelessWidget {
             if (planner.error != null)
               Text(
                 planner.error!,
-                style: TextStyle(fontSize: 11, color: colors.error),
+                style: TextStyle(fontSize: AppTypography.small, color: colors.error),
               ),
           ],
         ),
@@ -569,7 +571,7 @@ class CompactStudyTimer extends StatelessWidget {
                       : studyDuration(planner.secondsLeft(active)),
                   key: const ValueKey('compact-study-timer'),
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: AppTypography.document,
                     fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),
