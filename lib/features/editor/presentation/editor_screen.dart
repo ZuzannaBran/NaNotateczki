@@ -103,6 +103,14 @@ class _EditorScreenState extends State<EditorScreen> {
 
   double get _effectivePageScale => _pageScale * _responsivePageScale;
 
+  bool _usesNativePageScroll(EditorController controller) {
+    return !controller.tool.isInk &&
+        !controller.isObjectTransformActive &&
+        !_isViewportNavigating &&
+        !_panZoomSessionActive &&
+        _pageScale <= 1.001;
+  }
+
   double get _touchNavigationGain =>
       context.read<AppPreferencesController?>()?.touchNavigationSensitivity ??
       1.0;
@@ -586,7 +594,8 @@ class _EditorScreenState extends State<EditorScreen> {
     if (!_isNavigationPointerKind(event.kind)) {
       return;
     }
-    if (event.scrollDelta == Offset.zero) {
+    if (event.scrollDelta == Offset.zero ||
+        _usesNativePageScroll(context.read<EditorController>())) {
       return;
     }
     // Linux trackpads often emit scroll signals for two-finger panning.
@@ -675,16 +684,26 @@ class _EditorScreenState extends State<EditorScreen> {
       maxX = 0.0;
     }
 
+    // A manual pan starts at the current scroll position. Without this
+    // offset, zooming in halfway through a notebook prevents reaching
+    // its first pages until the user zooms out again.
+    final scrollOffset =
+        !_usesNativePageScroll(context.read<EditorController>()) &&
+            _scrollController.hasClients
+        ? _scrollController.position.pixels
+        : 0.0;
     final downwardPanLimit =
         _firstPageInset + math.min(160.0, viewportSize.height * 0.25);
     late final double minY;
     late final double maxY;
     if (contentHeight <= viewportSize.height) {
-      minY = 0.0;
-      maxY = math.max(downwardPanLimit, viewportSize.height - contentHeight);
+      minY = scrollOffset;
+      maxY =
+          scrollOffset +
+          math.max(downwardPanLimit, viewportSize.height - contentHeight);
     } else {
-      minY = viewportSize.height - contentHeight;
-      maxY = downwardPanLimit;
+      minY = viewportSize.height - contentHeight + scrollOffset;
+      maxY = downwardPanLimit + scrollOffset;
     }
 
     final clampedX = pan.dx.clamp(minX, maxX).toDouble();
@@ -1113,20 +1132,17 @@ class _EditorScreenState extends State<EditorScreen> {
                   _pagePan.dy,
                 );
               }
-              final clipScale = fitToWidthScale;
-              final clipSize = Size(
-                docWorldSize.width * clipScale,
-                docWorldSize.height * clipScale,
-              );
               final documentClipHeight =
-                  clipSize.height + math.max(0.0, _pagePan.dy);
+                  (docWorldSize.height * effectivePageScale) +
+                  math.max(0.0, _pagePan.dy);
               final viewportSize = Size(
                 maxPageWidth,
                 math.max(1.0, constraints.maxHeight - (_topBottomPadding * 2)),
               );
               final documentContentSize = Size(
                 viewportSize.width,
-                documentClipHeight + (_addPageFooterHeight * clipScale),
+                documentClipHeight +
+                    (_addPageFooterHeight * effectivePageScale),
               );
               final zoomPercent = (effectivePageScale * 100).round();
               final visibleDocumentRect = _visibleDocumentRect(
@@ -1172,15 +1188,11 @@ class _EditorScreenState extends State<EditorScreen> {
                       child: SingleChildScrollView(
                         key: const ValueKey('notebook-document-scroll'),
                         controller: _scrollController,
-                        physics:
-                            (controller.tool.isInk ||
-                                controller.isObjectTransformActive ||
-                                _isViewportNavigating ||
-                                _pageScale > 1.001)
-                            ? const NeverScrollableScrollPhysics()
-                            : TouchNavigationScrollPhysics(
+                        physics: _usesNativePageScroll(controller)
+                            ? TouchNavigationScrollPhysics(
                                 sensitivity: touchNavigationGain,
-                              ),
+                              )
+                            : const NeverScrollableScrollPhysics(),
                         padding: EdgeInsets.fromLTRB(
                           leftPageMargin,
                           _topBottomPadding,

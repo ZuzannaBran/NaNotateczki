@@ -786,6 +786,10 @@ viewport strony zaczyna się przy x=116 i kończy 56 px przed prawą krawędzią
 Zoom i pan działają wewnątrz tego pasa, ale podczas aktywnego move/resize
 obiektu viewport jest zamrożony: custom pan/zoom jest ignorowany, a pionowy
 `SingleChildScrollView` przechodzi na `NeverScrollableScrollPhysics`.
+Powiększony dokument zachowuje rzeczywistą wysokość scrolla; ręczny pionowy
+pan uwzględnia bieżący offset przewinięcia, dzięki czemu można wrócić
+do pierwszej i ostatniej strony bez zmiany zoomu. Kółko/trackpad obsługuje
+albo natywny scroll, albo pan canvasa, nigdy obydwa jednocześnie.
 Gesty pan palcem oraz przewijanie stron i minimapy respektują czułość
 nawigacji; zoom i gesty narzędzi pozostają bez zmian.
 Po zakończeniu transformacji normalna nawigacja wraca. Stronę można przesuwać
@@ -1202,7 +1206,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
   minimapa na krótkim ekranie, regulacja scrolla stron i interaktywność
-  narzędzi; test tap/dwuklik/przytrzymanie szybkiego koloru, otwarcia
+  narzędzi; powiększony wielostronicowy notatnik przewija się od środka
+  do obu końców bez utknięcia; test tap/dwuklik/przytrzymanie szybkiego koloru, otwarcia
   selektora i zapisu nowego koloru.
 - `test/editor_toolbar_color_picker_test.dart`: dark/light picker, odwrócone
   Recent i wartości RGB/HEX, suwak i zapis z zachowaniem koloru wizualnego,

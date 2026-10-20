@@ -1,6 +1,5 @@
-import 'dart:ui' show PointerDeviceKind;
-
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -128,6 +127,115 @@ void main() {
     controller.setTool(DrawingTool.highlighter);
     await tester.pump();
     expect(_documentTranslationX(tester), closeTo(translatedX, 0.001));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    preferences.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await database.close();
+  });
+
+  testWidgets('zoomed notebook can scroll to either end from a middle page', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: _notebook(pageCount: 7),
+    );
+    controller.setTool(DrawingTool.edit);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
+          ],
+          child: const EditorScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final scrollView = tester.widget<SingleChildScrollView>(
+      find.byKey(const ValueKey('notebook-document-scroll')),
+    );
+    final scroll = scrollView.controller!;
+    scroll.jumpTo(scroll.position.maxScrollExtent / 2);
+    await tester.pump();
+    expect(scroll.offset, greaterThan(1000));
+
+    const viewportKey = ValueKey('notebook-page-viewport');
+    final viewport = find.byKey(viewportKey);
+    final pointer = tester.getTopLeft(viewport) + const Offset(240, 230);
+    final firstFinger = await tester.createGesture(
+      kind: PointerDeviceKind.touch,
+      pointer: 31,
+    );
+    final secondFinger = await tester.createGesture(
+      kind: PointerDeviceKind.touch,
+      pointer: 32,
+    );
+    await firstFinger.down(pointer + const Offset(-40, 0));
+    await secondFinger.down(pointer + const Offset(40, 0));
+    await tester.pump();
+    await firstFinger.moveBy(const Offset(-60, 0));
+    await tester.pump();
+    await secondFinger.moveBy(const Offset(60, 0));
+    await tester.pump();
+    await firstFinger.up();
+    await secondFinger.up();
+    await tester.pump();
+
+    expect(_documentScale(tester), greaterThan(1.001));
+    final scaledDocumentHeight =
+        _documentLayoutSize(tester).height * _documentScale(tester);
+    expect(
+      _pageViewportSize(tester).height,
+      greaterThanOrEqualTo(scaledDocumentHeight - 0.01),
+    );
+
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: pointer,
+        scrollDelta: const Offset(0, -100000),
+      ),
+    );
+    await tester.pump();
+    expect(
+      _documentTopLeft(tester).dy,
+      greaterThanOrEqualTo(tester.getTopLeft(viewport).dy - 1),
+    );
+
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: pointer,
+        scrollDelta: const Offset(0, 100000),
+      ),
+    );
+    await tester.pump();
+    final documentBottom = _documentPoint(
+      tester,
+      Offset(0, _documentLayoutSize(tester).height),
+    ).dy;
+    expect(
+      documentBottom,
+      greaterThanOrEqualTo(
+        tester.getBottomLeft(
+              find.byKey(const ValueKey('notebook-canvas-area')),
+            ).dy -
+            40,
+      ),
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
@@ -408,7 +516,7 @@ void _expectOverviewSideGapsEqual(WidgetTester tester) {
   expect(rightGap, closeTo(leftGap, 0.001));
 }
 
-Notebook _notebook() {
+Notebook _notebook({int pageCount = 1}) {
   final now = DateTime(2026);
   return Notebook(
     uid: 'responsive-layout',
@@ -417,15 +525,16 @@ Notebook _notebook() {
     folder: 'Tests',
     createdAt: now,
     updatedAt: now,
-    pages: [
-      NotePage(
-        id: 'page-1',
-        title: 'Page 1',
+    pages: List.generate(
+      pageCount,
+      (index) => NotePage(
+        id: 'page-${index + 1}',
+        title: 'Page ${index + 1}',
         textBlocks: const [],
         imageBlocks: const [],
         inkStrokes: const [],
         isBookmarked: false,
       ),
-    ],
+    ),
   );
 }
