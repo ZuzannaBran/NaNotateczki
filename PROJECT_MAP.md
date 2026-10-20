@@ -361,7 +361,10 @@ wybranych kolorów w zgodnym wstecznie `library_folders.json`
 nie zmienia schematu SQLite. Wspólne `library_folders.json` przechowuje
   również zadania plannerów (`plannerTasks`); dlatego lokalny backup
   obejmuje ich treść bez migracji Drift. Każde zadanie ma UID, tytuł,
-  stan odhaczenia oraz opcjonalny deadline i godzinę. Zapisy tekstu są
+  stan odhaczenia oraz opcjonalny deadline i godzinę. Opcja
+  "Completed last" (domyślnie aktywna) zapisuje kolejność ukończonych
+  zadań dla każdego planera bez zmiany kolejności utrwalonej listy.
+  Zapisy tekstu są
   grupowane krótkim debounce; `AppSaveCoordinator` opróżnia kolejkę przed
   zamknięciem. Usuwanie folderu lub planera usuwa jego zadania.
   Wybór dokumentu synchronizuje
@@ -539,8 +542,12 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   `PlannerTaskTone`, deadline z opcjonalną godziną; serializacja.
 - `lib/features/planner/presentation/task_list_screen.dart`:
   zaokrąglony canvas listy zadań, checkbox, edycja nazw, wybór daty/godziny,
-  usuwanie oraz pełnoszerokie separatory. Kolory pochodzą ze współdzielonego
-  `AppColors.blueColorSet` i odzwierciedlają status zadania.
+  usuwanie oraz pełnoszerokie separatory. Kolory statusów są wyłącznie
+  beżowymi/neutralnymi odcieniami `AppColors` dla aktualnego motywu:
+  bez deadline'u ("Recent"), upcoming i overdue; ukończone zadania
+  mają przygaszone tło i tekst. Przełącznik "Completed last" zapisuje wybór
+  osobno dla planera. Przyciski deadline'u wyrównują się do prawej i zawijają
+  w wąskich oknach, bez wyśrodkowywania po zmianie daty.
 
 
 - `lib/features/planner/state/study_planner_controller.dart` (566):
@@ -1141,7 +1148,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   testowej bazy następuje rzeczywisty zapis.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
-- `test/library_planner_test.dart`: tworzenie, zapis i odczyt zadań,
+- `test/library_planner_test.dart`: kolory beżowe, przejrzystość statusu
+  ukończenia, zapis opcji "Completed last", wyrównanie daty i kontrolek
+  po zmianie terminu oraz responsywność układu; tworzenie, zapis i odczyt zadań,
   edycja, usuwanie, opcjonalny deadline, kolor statusów oraz widget canvasu.
 - `test/study_planner_controller_test.dart` i
   `test/study_planner_widget_test.dart`: wydarzenia kalendarza bez timera,

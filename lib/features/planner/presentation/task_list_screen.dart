@@ -13,6 +13,35 @@ import '../../notebook/domain/notebook.dart';
 import '../state/planner_task.dart';
 import 'study_timer_widgets.dart';
 
+/// Keeps planner tasks within the application's warm beige palette.
+Color plannerTaskBackground(
+  PlannerTaskTone tone, {
+  required bool darkMode,
+  bool completed = false,
+}) {
+  final color = darkMode
+      ? switch (tone) {
+          PlannerTaskTone.undated => AppColors.darkCanvas,
+          PlannerTaskTone.upcoming => AppColors.darkPaper,
+          PlannerTaskTone.overdue => AppColors.darkActive,
+          PlannerTaskTone.completed => AppColors.darkCanvas,
+        }
+      : switch (tone) {
+          PlannerTaskTone.undated => AppColors.background,
+          PlannerTaskTone.upcoming => AppColors.toolbar,
+          PlannerTaskTone.overdue => AppColors.divider,
+          PlannerTaskTone.completed => AppColors.background,
+        };
+  if (!completed) {
+    return color;
+  }
+  return Color.alphaBlend(
+    color.withValues(alpha: 0.42),
+    darkMode ? AppColors.darkToolbar : AppColors.paper,
+  );
+}
+
+
 class TaskListScreen extends StatelessWidget {
   const TaskListScreen({
     required this.planner,
@@ -70,15 +99,37 @@ class TaskListScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: FilledButton.icon(
-                          key: const ValueKey('planner-add-task'),
-                          onPressed: () =>
-                              unawaited(library.addPlannerTask(planner.uid)),
-                          icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text('Add task'),
-                        ),
+                      Row(
+                        children: [
+                          Switch.adaptive(
+                            key: const ValueKey('planner-completed-last'),
+                            value: library.plannerCompletedLast(planner.uid),
+                            onChanged: (value) => unawaited(
+                              library.setPlannerCompletedLast(
+                                planner.uid,
+                                value,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Expanded(
+                            child: Text(
+                              'Completed last',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppTypography.small,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            key: const ValueKey('planner-add-task'),
+                            onPressed: () =>
+                                unawaited(library.addPlannerTask(planner.uid)),
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: const Text('Add task'),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       DecoratedBox(
@@ -244,22 +295,19 @@ class _PlannerTaskRowState extends State<_PlannerTaskRow> {
   Widget build(BuildContext context) {
     final task = widget.task;
     final darkMode = Theme.of(context).brightness == Brightness.dark;
-    final base = switch (task.toneAt(DateTime.now())) {
-      PlannerTaskTone.upcoming => AppColors.blueColorSet[1],
-      PlannerTaskTone.overdue => AppColors.blueColorSet[2],
-      PlannerTaskTone.completed || PlannerTaskTone.undated =>
-        AppColors.blueColorSet[0],
-    };
-    final background = AppColors.displayInkColor(base, darkMode: darkMode);
-    final ink = ThemeData.estimateBrightnessForColor(background) ==
-            Brightness.dark
-        ? Colors.white
-        : AppColors.inkBlack;
+    final background = plannerTaskBackground(
+      task.toneAt(DateTime.now()),
+      darkMode: darkMode,
+      completed: task.completed,
+    );
+    final ink = (darkMode ? AppColors.darkText : AppColors.inkBlack)
+        .withValues(alpha: task.completed ? 0.7 : 1);
     final library = context.read<LibraryController>();
 
     final deadlineControls = <Widget>[
       if (task.deadline != null)
-        Flexible(
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 210),
           child: Container(
             key: ValueKey('planner-task-deadline:${task.id}'),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -339,7 +387,7 @@ class _PlannerTaskRowState extends State<_PlannerTaskRow> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 620;
+          final narrow = constraints.maxWidth < 760;
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -397,7 +445,19 @@ class _PlannerTaskRowState extends State<_PlannerTaskRow> {
                       ),
                     ),
                   ),
-                  if (!narrow) ...deadlineControls,
+                  if (!narrow)
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 2,
+                          runSpacing: 2,
+                          children: deadlineControls,
+                        ),
+                      ),
+                    ),
                   IconButton(
                     key: ValueKey('planner-task-delete:${task.id}'),
                     tooltip: 'Delete task',
@@ -413,9 +473,15 @@ class _PlannerTaskRowState extends State<_PlannerTaskRow> {
               if (narrow)
                 Padding(
                   padding: const EdgeInsets.only(left: 50),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: deadlineControls,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 2,
+                      runSpacing: 2,
+                      children: deadlineControls,
+                    ),
                   ),
                 ),
             ],

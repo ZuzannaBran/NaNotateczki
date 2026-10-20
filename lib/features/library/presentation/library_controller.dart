@@ -93,6 +93,7 @@ class LibraryController extends ChangeNotifier {
       <String, FolderCoverStyle>{};
   final List<Color> _recentCoverColors = <Color>[];
   final Map<String, List<PlannerTask>> _plannerTasks = {};
+  final Map<String, bool> _plannerCompletedLast = {};
   Timer? _taskSaveTimer;
   bool _taskSaveDirty = false;
   int _taskWritesPending = 0;
@@ -440,6 +441,7 @@ class LibraryController extends ChangeNotifier {
     for (final item in items) {
       if (item.folder == trimmed) {
         _plannerTasks.remove(item.uid);
+        _plannerCompletedLast.remove(item.uid);
       }
     }
     items = items.where((item) => item.folder != trimmed).toList();
@@ -459,8 +461,27 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<PlannerTask> plannerTasks(String uid) =>
-      List.unmodifiable(_plannerTasks[uid] ?? const <PlannerTask>[]);
+  List<PlannerTask> plannerTasks(String uid) {
+    final tasks = _plannerTasks[uid] ?? const <PlannerTask>[];
+    if (!plannerCompletedLast(uid)) {
+      return List.unmodifiable(tasks);
+    }
+    return List.unmodifiable([
+      ...tasks.where((task) => !task.completed),
+      ...tasks.where((task) => task.completed),
+    ]);
+  }
+
+  bool plannerCompletedLast(String uid) => _plannerCompletedLast[uid] ?? true;
+
+  Future<void> setPlannerCompletedLast(String uid, bool value) async {
+    if (plannerCompletedLast(uid) == value) {
+      return;
+    }
+    _plannerCompletedLast[uid] = value;
+    notifyListeners();
+    _schedulePlannerTaskSave();
+  }
 
   Future<PlannerTask> addPlannerTask(String uid) async {
     if (!items.any(
@@ -572,7 +593,9 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> deleteItem(String uid) async {
     await repository.deleteNotebook(uid);
-    if (_plannerTasks.remove(uid) != null) {
+    final removedTasks = _plannerTasks.remove(uid) != null;
+    final removedSetting = _plannerCompletedLast.remove(uid) != null;
+    if (removedTasks || removedSetting) {
       await _saveFolders();
     }
     items = items.where((item) => item.uid != uid).toList();
@@ -816,6 +839,15 @@ class LibraryController extends ChangeNotifier {
       _folderCovers.clear();
       _recentCoverColors.clear();
       _plannerTasks.clear();
+      _plannerCompletedLast.clear();
+      if (decoded is Map && decoded['plannerCompletedLast'] is Map) {
+        final savedOrder = decoded['plannerCompletedLast'] as Map;
+        for (final entry in savedOrder.entries) {
+          if (entry.key is String && entry.value is bool) {
+            _plannerCompletedLast[entry.key as String] = entry.value as bool;
+          }
+        }
+      }
       if (decoded is Map && decoded['plannerTasks'] is Map) {
         final savedTasks = decoded['plannerTasks'] as Map;
         for (final entry in savedTasks.entries) {
@@ -868,6 +900,7 @@ class LibraryController extends ChangeNotifier {
           for (final entry in _plannerTasks.entries)
             entry.key: entry.value.map((task) => task.toJson()).toList(),
         },
+        'plannerCompletedLast': _plannerCompletedLast,
       };
       await writeStoredText(_foldersFileName, jsonEncode(payload));
       repository.onChanged?.call(const <NotebookRepositoryChange>[]);

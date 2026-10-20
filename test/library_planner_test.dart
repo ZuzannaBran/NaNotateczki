@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:program/core/storage/text_storage.dart';
+import 'package:program/core/theme/app_colors.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
@@ -62,6 +63,41 @@ void main() {
     expect(PlannerTask.fromJson({'title': 'Bad'}), isNull);
   });
 
+  test('planner rows use beige tones and fade completed tasks', () {
+    expect(
+      plannerTaskBackground(PlannerTaskTone.undated, darkMode: false),
+      AppColors.background,
+    );
+    expect(
+      plannerTaskBackground(PlannerTaskTone.upcoming, darkMode: false),
+      AppColors.toolbar,
+    );
+    expect(
+      plannerTaskBackground(PlannerTaskTone.overdue, darkMode: false),
+      AppColors.divider,
+    );
+    expect(
+      plannerTaskBackground(PlannerTaskTone.undated, darkMode: true),
+      AppColors.darkCanvas,
+    );
+    expect(
+      plannerTaskBackground(
+        PlannerTaskTone.completed,
+        darkMode: false,
+        completed: true,
+      ),
+      isNot(AppColors.background),
+    );
+    expect(
+      plannerTaskBackground(
+        PlannerTaskTone.completed,
+        darkMode: true,
+        completed: true,
+      ),
+      isNot(AppColors.darkCanvas),
+    );
+  });
+
   test('planner tasks survive reload, updates and deletion', () async {
     final db = NotesDatabase(NativeDatabase.memory());
     final repository = NotebookRepository(db);
@@ -110,6 +146,23 @@ void main() {
     expect(result.completed, isTrue);
     expect(result.deadlineHasTime, isTrue);
     expect(result.deadline!.hour, 17);
+    expect(restored.plannerCompletedLast(planner.uid), isTrue);
+
+    final second = await restored.addPlannerTask(planner.uid);
+    expect(
+      restored.plannerTasks(planner.uid).map((task) => task.id).toList(),
+      [second.id, result.id],
+    );
+    await restored.setPlannerCompletedLast(planner.uid, false);
+    expect(
+      restored.plannerTasks(planner.uid).map((task) => task.id).toList(),
+      [result.id, second.id],
+    );
+    await restored.flushPlannerTasks();
+    final withSavedSetting = newLibrary();
+    await withSavedSetting.initialize();
+    expect(withSavedSetting.plannerCompletedLast(planner.uid), isFalse);
+    withSavedSetting.dispose();
 
     await restored.updatePlannerTask(
       planner.uid,
@@ -120,6 +173,7 @@ void main() {
     expect(restored.plannerTasks(planner.uid).single.deadline, isNull);
 
     await restored.removePlannerTask(planner.uid, result.id);
+    await restored.removePlannerTask(planner.uid, second.id);
     await restored.flushPlannerTasks();
     expect(restored.plannerTasks(planner.uid), isEmpty);
 
@@ -166,6 +220,10 @@ void main() {
       findsNothing,
     );
 
+    final deleteButton = find.byKey(
+      ValueKey('planner-task-delete:${task.id}'),
+    );
+    final originalDeleteRight = tester.getTopRight(deleteButton).dx;
     await tester.enterText(
       find.byKey(ValueKey('planner-task-name:${task.id}')),
       'Read chapter',
@@ -181,6 +239,20 @@ void main() {
     expect(
       find.byKey(ValueKey('planner-task-deadline:${task.id}')),
       findsOneWidget,
+    );
+    expect(
+      tester.getTopRight(deleteButton).dx,
+      closeTo(originalDeleteRight, 1),
+    );
+    await tester.binding.setSurfaceSize(const Size(370, 800));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(ValueKey('planner-task-date:${task.id}')), findsOneWidget);
+    expect(
+      tester.getTopRight(deleteButton).dx,
+      greaterThan(tester.getTopRight(
+        find.byKey(ValueKey('planner-task-date:${task.id}')),
+      ).dx),
     );
 
     await tester.tap(
