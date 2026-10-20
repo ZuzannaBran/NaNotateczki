@@ -318,7 +318,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 maxLines: compact ? 2 : 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: compact ? AppTypography.small : AppTypography.document,
+                  fontSize: compact
+                      ? AppTypography.small
+                      : AppTypography.document,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -370,6 +372,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
     DateTime day,
     List<StudySession> sessions, {
     bool compact = false,
+    int? monthColumn,
+    bool lastMonthRow = false,
   }) {
     final scheme = Theme.of(context).colorScheme;
     final today = _isSameDate(day, DateTime.now());
@@ -381,7 +385,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
           ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
 
     return Opacity(
-      opacity: inMonth ? 1 : 0.5,
+      opacity: inMonth || monthColumn != null ? 1 : 0.5,
       child: DragTarget<StudySession>(
         onWillAcceptWithDetails: (details) =>
             details.data.status == StudyStatus.planned,
@@ -400,105 +404,126 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       Theme.of(context),
                       highlighted: today && _mode != CalendarMode.today,
                     ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: today ? scheme.outline : scheme.outlineVariant,
-              ),
+              borderRadius: monthColumn == null
+                  ? BorderRadius.circular(14)
+                  : null,
+              border: monthColumn == null
+                  ? Border.all(
+                      color: today ? scheme.outline : scheme.outlineVariant,
+                    )
+                  : Border(
+                      right: monthColumn == 6
+                          ? BorderSide.none
+                          : BorderSide(color: scheme.outlineVariant),
+                      bottom: lastMonthRow
+                          ? BorderSide.none
+                          : BorderSide(color: scheme.outlineVariant),
+                    ),
             ),
-            margin: const EdgeInsets.all(3),
+            margin: monthColumn == null
+                ? const EdgeInsets.all(3)
+                : EdgeInsets.zero,
             padding: EdgeInsets.all(compact ? 6 : 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _dayLabel(day),
-                        key: ValueKey(
-                          'planner-day-label-${day.year}-${day.month}-${day.day}',
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: compact ? AppTypography.small : AppTypography.document,
-                          fontWeight: today ? FontWeight.bold : FontWeight.w500,
-                          color: inMonth
-                              ? scheme.onSurface
-                              : scheme.onSurfaceVariant,
+            child: Opacity(
+              opacity: !inMonth && monthColumn != null ? 0.5 : 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _dayLabel(day),
+                          key: ValueKey(
+                            'planner-day-label-${day.year}-'
+                            '${day.month}-${day.day}',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: compact
+                                ? AppTypography.small
+                                : AppTypography.document,
+                            fontWeight: today
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: inMonth
+                                ? scheme.onSurface
+                                : scheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
-                    ),
-                    if (!compact)
-                      IconButton(
-                        tooltip: 'Plan on this day',
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => showStudySessionEditor(
+                      if (!compact)
+                        IconButton(
+                          tooltip: 'Plan on this day',
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => showStudySessionEditor(
+                            context,
+                            scheduledAt: DateTime(
+                              day.year,
+                              day.month,
+                              day.day,
+                              9,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  if (_mode != CalendarMode.month)
+                    Expanded(
+                      child: _HourlyDaySchedule(
+                        key: ValueKey(
+                          'planner-hourly-${day.year}-${day.month}-${day.day}',
+                        ),
+                        day: day,
+                        now: DateTime.now(),
+                        sessions: items,
+                        compact: compact,
+                        physics: _navigationPhysics,
+                        buildTile: (item) =>
+                            _sessionTile(item, compact: compact),
+                        onPlanAt: (hour) => showStudySessionEditor(
                           context,
                           scheduledAt: DateTime(
                             day.year,
                             day.month,
                             day.day,
-                            9,
+                            hour,
                           ),
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                if (_mode != CalendarMode.month)
-                  Expanded(
-                    child: _HourlyDaySchedule(
-                      key: ValueKey(
-                        'planner-hourly-${day.year}-${day.month}-${day.day}',
-                      ),
-                      day: day,
-                      now: DateTime.now(),
-                      sessions: items,
-                      compact: compact,
-                      physics: _navigationPhysics,
-                      buildTile: (item) =>
-                          _sessionTile(item, compact: compact),
-                      onPlanAt: (hour) => showStudySessionEditor(
-                        context,
-                        scheduledAt: DateTime(
-                          day.year,
-                          day.month,
-                          day.day,
-                          hour,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: ListView(
-                      physics: _navigationPhysics,
-                      padding: EdgeInsets.zero,
-                      children: [
-                        for (final item in items)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 5),
-                            child: _sessionTile(item, compact: compact),
-                          ),
-                        if (items.isEmpty)
-                          InkWell(
-                            onTap: () => showStudySessionEditor(
-                              context,
-                              scheduledAt: DateTime(
-                                day.year,
-                                day.month,
-                                day.day,
-                                9,
-                              ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView(
+                        physics: _navigationPhysics,
+                        padding: EdgeInsets.zero,
+                        children: [
+                          for (final item in items)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 5),
+                              child: _sessionTile(item, compact: compact),
                             ),
-                            child: const SizedBox(height: 45),
-                          ),
-                      ],
+                          if (items.isEmpty)
+                            InkWell(
+                              onTap: () => showStudySessionEditor(
+                                context,
+                                scheduledAt: DateTime(
+                                  day.year,
+                                  day.month,
+                                  day.day,
+                                  9,
+                                ),
+                              ),
+                              child: const SizedBox(height: 45),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           );
         },
@@ -564,14 +589,30 @@ class _PlannerScreenState extends State<PlannerScreen> {
             final compactDays = days
                 .where((day) => day.month == _anchor.month)
                 .toList();
-            return ListView.builder(
-              key: const ValueKey('mobile-planner-days'),
-              physics: _navigationPhysics,
-              padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
-              itemCount: compactDays.length,
-              itemBuilder: (context, index) => SizedBox(
-                height: 168,
-                child: _dayCell(compactDays[index], sessions),
+            return Container(
+              key: const ValueKey('planner-mobile-month-surface'),
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              child: ListView.builder(
+                key: const ValueKey('mobile-planner-days'),
+                physics: _navigationPhysics,
+                padding: EdgeInsets.zero,
+                itemCount: compactDays.length,
+                itemBuilder: (context, index) => SizedBox(
+                  height: 168,
+                  child: _dayCell(
+                    compactDays[index],
+                    sessions,
+                    monthColumn: 6,
+                    lastMonthRow: index == compactDays.length - 1,
+                  ),
+                ),
               ),
             );
           }
@@ -610,18 +651,52 @@ class _PlannerScreenState extends State<PlannerScreen> {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: days.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 7,
-                            childAspectRatio: 1.1,
+                    Container(
+                      key: const ValueKey('planner-month-grid-surface'),
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerLowest,
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                      ),
+                      foregroundDecoration: BoxDecoration(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                        border: Border(
+                          left: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
                           ),
-                      itemBuilder: (context, i) =>
-                          _dayCell(days[i], sessions, compact: true),
+                          right: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                          bottom: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                      ),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: days.length,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 7,
+                              childAspectRatio: 1.1,
+                            ),
+                        itemBuilder: (context, i) => _dayCell(
+                          days[i],
+                          sessions,
+                          compact: true,
+                          monthColumn: i % 7,
+                          lastMonthRow: i >= days.length - 7,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -731,7 +806,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
                               Expanded(
                                 child: Text(
                                   '${planner.active!.title} · '
-                                  '${studyDuration(planner.secondsLeft(planner.active!))}',
+                                  '${studyDuration(
+                                    planner.secondsLeft(planner.active!),
+                                  )}',
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -1019,7 +1096,7 @@ class _HourlyDayScheduleState extends State<_HourlyDaySchedule> {
                     SizedBox(
                       width: widget.compact ? 34 : 42,
                       child: FractionalTranslation(
-                        translation: const Offset(0, -1),
+                        translation: const Offset(0, -0.5),
                         child: Text(
                           '${hour.toString().padLeft(2, '0')}:00',
                           style: TextStyle(
@@ -1079,7 +1156,10 @@ class _CalendarHeaderStrip extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+        ),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Row(
@@ -1278,7 +1358,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             child: Align(
               alignment: Alignment.topLeft,
               child: FractionalTranslation(
-                translation: const Offset(0, -0.5),
+                translation: Offset.zero,
                 child: Padding(
                   padding: const EdgeInsets.only(left: 2),
                   child: Text(
@@ -1316,7 +1396,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
           key: const ValueKey('planner-week-hours'),
           controller: _controller,
           physics: widget.physics,
-          padding: const EdgeInsets.fromLTRB(0, 10, 0, 4),
+          padding: EdgeInsets.zero,
           children: [
             for (var hour = 0; hour < 24; hour++) _hourRow(hour),
           ],

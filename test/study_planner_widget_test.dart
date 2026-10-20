@@ -88,7 +88,13 @@ void main() {
           ).first,
         );
         final decoration = container.decoration! as BoxDecoration;
-        expect(decoration.borderRadius, BorderRadius.circular(12));
+        expect(
+          decoration.borderRadius,
+          const BorderRadius.only(
+            topLeft: Radius.circular(12),
+            topRight: Radius.circular(12),
+          ),
+        );
         expect(container.clipBehavior, Clip.antiAlias);
         final rowFinder = find.descendant(
           of: finder,
@@ -124,8 +130,15 @@ void main() {
       expect(label, findsOneWidget);
       expect(hourCell, findsOneWidget);
       expect(
-        tester.getRect(label).center.dy,
-        closeTo(tester.getRect(hourCell).top, 3),
+        tester.getRect(label).top,
+        closeTo(tester.getRect(hourCell).top, 2),
+      );
+      final hourlyList = find.byKey(
+        const ValueKey('planner-week-hours'),
+      );
+      expect(
+        tester.getRect(weekHeader).bottom,
+        closeTo(tester.getRect(hourlyList).top, 0.1),
       );
 
       await tester.tap(find.text('Today').last);
@@ -141,8 +154,8 @@ void main() {
       );
       expect(hourText, findsOneWidget);
       expect(
-        tester.getRect(hourText).center.dy,
-        closeTo(tester.getRect(row).top, 3),
+        tester.getRect(hourText).top,
+        closeTo(tester.getRect(row).top, 2),
       );
 
       await tester.tap(find.text('Month'));
@@ -154,6 +167,56 @@ void main() {
       expect(tester.getRect(monthHeader).left, closeTo(18, 0.1));
       expect(tester.getRect(monthHeader).right, closeTo(1422, 0.1));
       verifyStrip(monthHeader);
+      final monthGrid = find.byKey(
+        const ValueKey('planner-month-grid-surface'),
+      );
+      expect(monthGrid, findsOneWidget);
+      expect(
+        tester.getRect(monthHeader).bottom,
+        closeTo(tester.getRect(monthGrid).top, 0.1),
+      );
+      final gridSurface = tester.widget<Container>(monthGrid);
+      final decoration = gridSurface.decoration! as BoxDecoration;
+      expect(
+        decoration.borderRadius,
+        const BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
+      );
+      expect(gridSurface.clipBehavior, Clip.antiAlias);
+      final start = monthCalendarDays(DateTime(now.year, now.month));
+      final first = start.first;
+      final seventh = start[6];
+
+      Finder monthCell(DateTime day) => find.byKey(
+        ValueKey(
+          'planner-day-cell-${day.year}-${day.month}-${day.day}',
+        ),
+      );
+
+      final firstCell = tester.widget<Container>(monthCell(first));
+      final lastColumn = tester.widget<Container>(monthCell(seventh));
+      expect(firstCell.margin, EdgeInsets.zero);
+      expect(lastColumn.margin, EdgeInsets.zero);
+      final firstBorder = firstCell.decoration! as BoxDecoration;
+      final seventhBorder = lastColumn.decoration! as BoxDecoration;
+      expect(firstBorder.borderRadius, isNull);
+      expect(seventhBorder.borderRadius, isNull);
+      expect(firstBorder.border!.right.width, 1);
+      expect(firstBorder.border!.bottom.width, 1);
+      final adjacentDay = start[1];
+      final secondRowDay = start[7];
+      expect(
+        tester.getRect(monthCell(first)).right,
+        closeTo(tester.getRect(monthCell(adjacentDay)).left, 0.1),
+      );
+      expect(
+        tester.getRect(monthCell(first)).bottom,
+        closeTo(tester.getRect(monthCell(secondRowDay)).top, 0.1),
+      );
+      expect(seventhBorder.border!.right, BorderSide.none);
+      expect(seventhBorder.border!.bottom.width, 1);
       expect(tester.takeException(), isNull);
     });
   }
@@ -177,6 +240,25 @@ void main() {
       const ValueKey('planner-week-header-strip'),
     );
     expect(tester.getRect(header).left, closeTo(70, 0.1));
+    expect(
+      tester.getRect(header).bottom,
+      closeTo(
+        tester.getRect(
+          find.byKey(const ValueKey('planner-week-hours')),
+        ).top,
+        0.1,
+      ),
+    );
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+    final unifiedList = find.byKey(
+      const ValueKey('planner-mobile-month-surface'),
+    );
+    expect(unifiedList, findsOneWidget);
+    expect(
+      tester.widget<Container>(unifiedList).clipBehavior,
+      Clip.antiAlias,
+    );
     expect(tester.takeException(), isNull);
   });
 

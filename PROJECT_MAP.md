@@ -589,7 +589,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1327):
+- `lib/features/planner/presentation/planner_screen.dart` (1407):
   `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
@@ -599,11 +599,14 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Today zachowuje normalne tło i większy odstęp godziny od karty sesji.
   Week to jedna przewijana pionowo siatka 24 godzin z pojedynczym pasem
   godzin po lewej stronie; wąskie ekrany przewijają siatkę poziomo.
-  Week i Month mają po 18 px marginesów bocznych, a ich nagłówki tworzą
-  wspólny pasek z narożnikami 12 px oraz separatorami siedmiu kolumn.
-  Godziny w Today/Week są wyśrodkowane pionowo na kreskach początku
-  godziny, bez odsunięcia w dół. Tylko bieżąca minuta ma wyróżnioną
-  linię czasu. Month zachowuje kafelki. Czas aktualizuje się co minutę.
+  Week i Month mają marginesy boczne 18 px i wspólny pasek nagłówka
+  z zaokrąglonymi tylko górnymi rogami (12 px) i ostrymi dolnymi.
+  Pasek styka się bez odstępu z siatką; godziny Today/Week zaczynają
+  się górną krawędzią tekstu przy odpowiedniej linii godzinowej.
+  Month ma wspólne tło z pionowymi i poziomymi separatorami 1 px,
+  bez osobnych ramek i odstępów między dniami. Węższy Month pozostaje
+  listą na jednolitym tle z separatorami. Linia aktualnej minuty jest
+  wyróżniona. Czas aktualizuje się co minutę.
   Daty i opisy mają czteropoziomową typografię interfejsu.
   Miesiąc generuje tylko niezbędne 4–6 tygodni; komórki dni granicznych
   innych miesięcy pozostają widoczne z opacity 0.5; pomocniczy napis
@@ -617,9 +620,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   16: `CalendarMode`;
   43: `PlannerScreen`;
   50: `_PlannerScreenState`;
-  924: `_HourlyDaySchedule`;
-  1066: `_CalendarHeaderStrip`;
-  1108: `_WeekTimeGrid` — wspólna oś.
+  1001: `_HourlyDaySchedule`;
+  1143: `_CalendarHeaderStrip`;
+  1188: `_WeekTimeGrid` — wspólna oś.
 - `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów.
 - `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
   zgodność starszych sesji, reset koloru, resume, pauza, konflikt
@@ -638,7 +641,8 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   dni granicznych miesiąca, łagodne zaznaczenie Week/Month,
   brak zaznaczenia Today i większy odstęp od sesji, wspólną oś godzin Week,
   linię aktualnego czasu, boczne marginesy Week/Month, jednolite
-  nagłówki z separatorami i wyrównanie etykiet godzin do siatki,
+  nagłówki styczne z siatką, ostre dolne rogi, górne wyrównanie
+  etykiet godzin, jednolite tło Month oraz separatory zamiast ramek,
   osobny scroll Upcoming, limit wysokości listy,
   spójne przyciski włączonego timera, brak overflow selektora techniki,
   margines dolny i oceny kalendarza.
