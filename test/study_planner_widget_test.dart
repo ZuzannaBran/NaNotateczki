@@ -50,13 +50,12 @@ void main() {
   });
 
   for (final darkMode in [false, true]) {
-    testWidgets('today has darker cells and hour grid, dark=$darkMode', (
+    testWidgets('today normal; week and month lightly shaded, dark=$darkMode', (
       tester,
     ) async {
       final planner = await loadPlanner();
       await tester.binding.setSurfaceSize(const Size(1440, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-
       final now = DateTime.now();
       final other = DateTime(
         now.year,
@@ -79,83 +78,96 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      String dateKey(DateTime day) =>
-          '${day.year}-${day.month}-${day.day}';
-      final currentDate = dateKey(now);
-      final cell = find.byKey(ValueKey('planner-day-cell-$currentDate'));
+      String keyDate(DateTime date) =>
+          '${date.year}-${date.month}-${date.day}';
+      final todayKey = keyDate(now);
+      final cell = find.byKey(ValueKey('planner-day-cell-$todayKey'));
       final otherCell = find.byKey(
-        ValueKey('planner-day-cell-${dateKey(other)}'),
+        ValueKey('planner-day-cell-${keyDate(other)}'),
       );
-      final todayColor = (tester.widget<Container>(cell).decoration!
-              as BoxDecoration)
-          .color!;
-      final otherColor = (tester.widget<Container>(otherCell).decoration!
-              as BoxDecoration)
-          .color!;
-      expect(
-        todayColor,
-        darkMode
-            ? Theme.of(tester.element(cell)).colorScheme.surface
-            : Theme.of(tester.element(cell))
-                .colorScheme.surfaceContainerHighest,
+      final theme = Theme.of(tester.element(cell));
+      Color cellColor(Finder finder) =>
+          (tester.widget<Container>(finder).decoration! as BoxDecoration)
+              .color!;
+      final base = theme.colorScheme.surfaceContainerLowest;
+      final shade = darkMode
+          ? theme.colorScheme.surface
+          : theme.colorScheme.surfaceContainerHighest;
+      final expected = Color.alphaBlend(
+        shade.withValues(alpha: 0.5),
+        base,
       );
+      expect(cellColor(cell), expected);
+      expect(cellColor(otherCell), base);
       expect(
-        todayColor.computeLuminance(),
-        lessThan(otherColor.computeLuminance()),
+        cellColor(cell).computeLuminance(),
+        lessThan(cellColor(otherCell).computeLuminance()),
       );
 
-      void expectClockGrid() {
-        final grid = find.byKey(
-          ValueKey('planner-hour-list-$currentDate'),
-        );
-        expect(grid, findsOneWidget);
-        expect(
-          tester.widget<ListView>(grid).childrenDelegate.estimatedChildCount,
-          24,
-        );
-        expect(
-          find.byKey(ValueKey('planner-now-line-$currentDate')),
-          findsOneWidget,
-        );
-        final hourRow = find.byKey(
-          ValueKey('planner-hour-row-$currentDate-${now.hour}'),
-        );
-        expect(hourRow, findsOneWidget);
-        expect(
-          find.descendant(
-            of: hourRow,
-            matching: find.byKey(
-              ValueKey('planner-session-tile:${session.id}'),
-            ),
-          ),
-          findsOneWidget,
-        );
-      }
-
-      expectClockGrid();
-      await tester.tap(find.text('Today').last);
-      await tester.pumpAndSettle();
-      expectClockGrid();
-
-      await tester.tap(find.text('Month'));
-      await tester.pumpAndSettle();
+      final week = find.byKey(const ValueKey('planner-week-time-grid'));
+      expect(week, findsOneWidget);
+      expect(find.byKey(const ValueKey('planner-week-hours')), findsOneWidget);
       expect(
-        find.byKey(ValueKey('planner-day-cell-$currentDate')),
+        tester.widget<ListView>(
+          find.byKey(const ValueKey('planner-week-hours')),
+        ).childrenDelegate.estimatedChildCount,
+        24,
+      );
+      expect(
+        find.byKey(ValueKey('planner-week-hour-label-${now.hour}')),
         findsOneWidget,
       );
       expect(
-        find.byKey(ValueKey('planner-now-line-$currentDate')),
+        find.byKey(ValueKey('planner-week-now-line-$todayKey')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey('planner-week-cell-$todayKey-${now.hour}')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey('planner-hour-list-$todayKey')),
         findsNothing,
       );
       expect(
-        find.byKey(ValueKey('planner-hour-list-$currentDate')),
-        findsNothing,
+        find.byKey(ValueKey('planner-session-tile:${session.id}')),
+        findsOneWidget,
       );
+
+      await tester.tap(find.text('Today').last);
+      await tester.pumpAndSettle();
+      expect(cellColor(cell), base);
+      final grid = find.byKey(ValueKey('planner-hour-list-$todayKey'));
+      expect(grid, findsOneWidget);
+      expect(
+        find.byKey(ValueKey('planner-now-line-$todayKey')),
+        findsOneWidget,
+      );
+      final hour = find.byKey(
+        ValueKey('planner-hour-row-$todayKey-${now.hour}'),
+      );
+      final time = find.descendant(
+        of: hour,
+        matching: find.text(
+          '${now.hour.toString().padLeft(2, '0')}:00',
+        ),
+      );
+      final tile = find.byKey(ValueKey('planner-session-tile:${session.id}'));
+      expect(
+        tester.getRect(tile).left - tester.getRect(time).right,
+        greaterThan(22),
+      );
+
+      await tester.tap(find.text('Month'));
+      await tester.pumpAndSettle();
+      expect(cellColor(cell), expected);
+      expect(find.byKey(ValueKey('planner-now-line-$todayKey')), findsNothing);
+      expect(find.byKey(const ValueKey('planner-week-hours')), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
 
-  testWidgets('phone planner uses vertical days and compact actions', (
+  testWidgets('phone planner uses shared week axis and compact actions', (
     tester,
   ) async {
     final planner = await loadPlanner();
@@ -170,7 +182,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('mobile-planner-days')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('planner-week-time-grid')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('mobile-planner-days')), findsNothing);
     expect(find.byTooltip('Planner actions'), findsNothing);
     expect(find.byKey(const ValueKey('planner-smart-session')), findsOneWidget);
     expect(find.byKey(const ValueKey('planner-new-session')), findsOneWidget);
@@ -376,6 +392,65 @@ void main() {
     });
   }
 
+  testWidgets('upcoming scrolls independently beyond half of folder area', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(600, 1300));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final sessions = [
+      for (var i = 0; i < 14; i++)
+        planner.create(
+          title: 'Upcoming $i',
+          scheduledAt: tomorrow.add(Duration(hours: i)),
+        ),
+    ];
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 300,
+                child: StudyTimerCard(upcomingMaxHeight: 140),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final region = find.byKey(
+      const ValueKey('sidebar-upcoming-height-cap'),
+    );
+    expect(tester.getSize(region).height, lessThanOrEqualTo(140));
+    final scroll = find.byKey(const ValueKey('sidebar-upcoming-scroll'));
+    expect(scroll, findsOneWidget);
+    expect(planner.upcoming.length, 14);
+    expect(
+      find.byKey(ValueKey('sidebar-upcoming-card:${sessions.first.id}')),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(ValueKey('sidebar-upcoming-card:${sessions.last.id}')),
+      120,
+      scrollable: find.descendant(
+        of: scroll,
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(
+      find.byKey(ValueKey('sidebar-upcoming-card:${sessions.last.id}')),
+      findsOneWidget,
+    );
+    expect(tester.getSize(region).height, lessThanOrEqualTo(140));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('sidebar timer starts pauses and rates a session', (
     tester,
   ) async {
@@ -397,6 +472,20 @@ void main() {
     await tester.tap(find.text('Save & start'));
     await tester.pumpAndSettle();
     expect(planner.active?.title, 'History lesson');
+
+    final toggle = find.byKey(const ValueKey('sidebar-timer-toggle'));
+    final stop = find.byKey(const ValueKey('sidebar-timer-stop'));
+    expect(
+      tester.getSize(toggle).height,
+      StudyActionStyles.sessionButtonHeight,
+    );
+    expect(tester.getSize(stop).height, StudyActionStyles.sessionButtonHeight);
+    final shape = tester.widget<OutlinedButton>(toggle).style!.shape!
+        .resolve(<WidgetState>{});
+    final stopShape = tester.widget<OutlinedButton>(stop).style!.shape!
+        .resolve(<WidgetState>{});
+    expect(shape, StudyActionStyles.sessionButtonShape);
+    expect(stopShape, StudyActionStyles.sessionButtonShape);
 
     await tester.tap(find.text('Pause'));
     await tester.pumpAndSettle();

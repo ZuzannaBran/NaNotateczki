@@ -343,7 +343,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
 }
 
 class StudyTimerCard extends StatelessWidget {
-  const StudyTimerCard({super.key});
+  const StudyTimerCard({super.key, this.upcomingMaxHeight = 200});
+
+  final double upcomingMaxHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -352,7 +354,7 @@ class StudyTimerCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final active = planner.active;
-    final next = planner.upcoming.take(2).toList();
+    final next = planner.upcoming;
     final colors = Theme.of(context).colorScheme;
     return StudyActionTheme(
       child: Padding(
@@ -404,36 +406,51 @@ class StudyTimerCard extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: active.status == StudyStatus.running
-                          ? planner.pause
-                          : planner.resume,
-                      icon: Icon(
-                        active.status == StudyStatus.running
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                      ),
-                      label: Text(
-                        active.status == StudyStatus.running
-                            ? 'Pause'
-                            : 'Resume',
+              SizedBox(
+                height: StudyActionStyles.sessionButtonHeight,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        key: const ValueKey('sidebar-timer-toggle'),
+                        style: StudyActionStyles.sessionOutlined(),
+                        onPressed: active.status == StudyStatus.running
+                            ? planner.pause
+                            : planner.resume,
+                        child: StudyActionStyles.sessionButtonContent(
+                          icon: active.status == StudyStatus.running
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          label: active.status == StudyStatus.running
+                              ? 'Pause'
+                              : 'Resume',
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.outlined(
-                    tooltip: 'Stop session',
-                    onPressed: () {
-                      if (planner.stop()) {
-                        showStudyRating(context, active);
-                      }
-                    },
-                    icon: const Icon(Icons.stop_rounded),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 42,
+                      child: Tooltip(
+                        message: 'Stop session',
+                        child: OutlinedButton(
+                          key: const ValueKey('sidebar-timer-stop'),
+                          style: StudyActionStyles.sessionOutlined().copyWith(
+                            padding: const WidgetStatePropertyAll(
+                              EdgeInsets.zero,
+                            ),
+                          ),
+                          onPressed: () {
+                            if (planner.stop()) {
+                              showStudyRating(context, active);
+                            }
+                          },
+                          child: const Icon(Icons.stop_rounded, size: 18),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ] else ...[
               Text(
@@ -502,60 +519,78 @@ class StudyTimerCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              for (final item in next)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Material(
-                    key: ValueKey('sidebar-upcoming-card:${item.id}'),
-                    color: StudyActionStyles.plannedSessionColor(
-                      Theme.of(context),
-                    ),
-                    shape: StudyActionStyles.sessionCardShape(colors),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(9, 5, 2, 5),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  item.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: AppTypography.document,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+              ConstrainedBox(
+                key: const ValueKey('sidebar-upcoming-height-cap'),
+                constraints: BoxConstraints(maxHeight: upcomingMaxHeight),
+                child: ListView(
+                  key: const ValueKey('sidebar-upcoming-scroll'),
+                  shrinkWrap: true,
+                  primary: false,
+                  physics: TouchNavigationScrollPhysics(
+                    sensitivity: context
+                            .watch<AppPreferencesController?>()
+                            ?.touchNavigationSensitivity ??
+                        1.0,
+                  ),
+                  padding: EdgeInsets.zero,
+                  children: [
+                    for (final item in next)
+                      Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Material(
+                        key: ValueKey('sidebar-upcoming-card:${item.id}'),
+                        color: StudyActionStyles.plannedSessionColor(
+                          Theme.of(context),
+                        ),
+                        shape: StudyActionStyles.sessionCardShape(colors),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(9, 5, 2, 5),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      item.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: AppTypography.document,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      '${item.scheduledAt.day}/${item.scheduledAt.month}'
+                                      ' · ${studyClock(item.scheduledAt)}',
+                                      style: TextStyle(
+                                        fontSize: AppTypography.small,
+                                        color: colors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  '${item.scheduledAt.day}/${item.scheduledAt.month}'
-                                  ' · ${studyClock(item.scheduledAt)}',
-                                  style: TextStyle(
-                                    fontSize: AppTypography.small,
-                                    color: colors.onSurfaceVariant,
-                                  ),
+                              ),
+                              IconButton(
+                                tooltip: 'Start scheduled session',
+                                icon: const Icon(
+                                  Icons.play_arrow_rounded,
+                                  size: 18,
                                 ),
-                              ],
-                            ),
+                                onPressed: active == null
+                                    ? () => planner.start(item.id)
+                                    : null,
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            tooltip: 'Start scheduled session',
-                            icon: const Icon(
-                              Icons.play_arrow_rounded,
-                              size: 18,
-                            ),
-                            onPressed: active == null
-                                ? () => planner.start(item.id)
-                                : null,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
+              ),
             ],
             if (planner.error != null)
               Text(

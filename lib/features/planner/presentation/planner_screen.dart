@@ -15,6 +15,18 @@ import 'study_timer_widgets.dart';
 
 enum CalendarMode { today, week, month }
 
+Color plannerDaySurface(ThemeData theme, {required bool highlighted}) {
+  final colors = theme.colorScheme;
+  final base = colors.surfaceContainerLowest;
+  if (!highlighted) {
+    return base;
+  }
+  final shade = theme.brightness == Brightness.dark
+      ? colors.surface
+      : colors.surfaceContainerHighest;
+  return Color.alphaBlend(shade.withValues(alpha: 0.5), base);
+}
+
 List<DateTime> monthCalendarDays(DateTime month) {
   final first = DateTime(month.year, month.month);
   final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
@@ -380,11 +392,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
             decoration: BoxDecoration(
               color: candidates.isNotEmpty
                   ? scheme.primaryContainer
-                  : today
-                  ? Theme.of(context).brightness == Brightness.dark
-                        ? scheme.surface
-                        : scheme.surfaceContainerHighest
-                  : scheme.surfaceContainerLowest,
+                  : plannerDaySurface(
+                      Theme.of(context),
+                      highlighted: today && _mode != CalendarMode.today,
+                    ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: today ? scheme.outline : scheme.outlineVariant,
@@ -493,6 +504,40 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   Widget _calendar(List<StudySession> sessions) {
     final days = _visibleDays();
+    if (_mode == CalendarMode.week) {
+      return LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: _navigationPhysics,
+          child: SizedBox(
+            width: math.max(1050.0, constraints.maxWidth),
+            child: _WeekTimeGrid(
+              key: ValueKey(
+                'planner-week-${days.first.year}-'
+                '${days.first.month}-${days.first.day}',
+              ),
+              days: days,
+              now: DateTime.now(),
+              sessions: sessions,
+              physics: _navigationPhysics,
+              dayLabel: _dayLabel,
+              buildTile: (session) => _sessionTile(session, compact: true),
+              onPlanAt: (day, hour) => showStudySessionEditor(
+                context,
+                scheduledAt: DateTime(
+                  day.year,
+                  day.month,
+                  day.day,
+                  hour,
+                ),
+              ),
+              onMove: (id, day) =>
+                  context.read<StudyPlannerController>().move(id, day),
+            ),
+          ),
+        ),
+      );
+    }
     if (_mode == CalendarMode.today) {
       return Padding(
         padding: const EdgeInsets.all(18),
@@ -500,7 +545,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
       );
     }
 
-    final minimumWidth = _mode == CalendarMode.week ? 1050.0 : 980.0;
+    const minimumWidth = 980.0;
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 960) {
@@ -526,15 +571,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
           physics: _navigationPhysics,
           child: SizedBox(
             width: width,
-            child: _mode == CalendarMode.week
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final day in days)
-                        Expanded(child: _dayCell(day, sessions)),
-                    ],
-                  )
-                : SingleChildScrollView(
+            child: SingleChildScrollView(
                     physics: _navigationPhysics,
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                     child: Column(
@@ -975,6 +1012,7 @@ class _HourlyDayScheduleState extends State<_HourlyDaySchedule> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 22),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1004,5 +1042,227 @@ class _HourlyDayScheduleState extends State<_HourlyDaySchedule> {
     physics: widget.physics,
     padding: const EdgeInsets.symmetric(vertical: 4),
     children: [for (var hour = 0; hour < 24; hour++) _hourRow(hour)],
+  );
+}
+
+class _WeekTimeGrid extends StatefulWidget {
+  const _WeekTimeGrid({
+    required this.days,
+    required this.now,
+    required this.sessions,
+    required this.physics,
+    required this.dayLabel,
+    required this.buildTile,
+    required this.onPlanAt,
+    required this.onMove,
+    super.key,
+  });
+
+  final List<DateTime> days;
+  final DateTime now;
+  final List<StudySession> sessions;
+  final ScrollPhysics physics;
+  final String Function(DateTime) dayLabel;
+  final Widget Function(StudySession) buildTile;
+  final void Function(DateTime, int) onPlanAt;
+  final void Function(String, DateTime) onMove;
+
+  @override
+  State<_WeekTimeGrid> createState() => _WeekTimeGridState();
+}
+
+class _WeekTimeGridState extends State<_WeekTimeGrid> {
+  static const double _hourHeight = 64;
+  static const double _axisWidth = 52;
+  late final ScrollController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final includesToday = widget.days.any(
+      (date) => DateUtils.isSameDay(date, widget.now),
+    );
+    final focusHour = includesToday
+        ? widget.now.hour
+        : widget.sessions.isNotEmpty
+        ? widget.sessions.first.scheduledAt.hour
+        : 8;
+    _controller = ScrollController(
+      initialScrollOffset: math.max(0, focusHour - 2) * _hourHeight,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _dayKey(DateTime day) =>
+      '${day.year}-${day.month}-${day.day}';
+
+  Widget _header(DateTime day) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isToday = DateUtils.isSameDay(day, widget.now);
+    return Container(
+      key: ValueKey('planner-day-cell-${_dayKey(day)}'),
+      margin: const EdgeInsets.all(3),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      decoration: BoxDecoration(
+        color: plannerDaySurface(theme, highlighted: isToday),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isToday ? scheme.outline : scheme.outlineVariant,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              widget.dayLabel(day),
+              key: ValueKey('planner-day-label-${_dayKey(day)}'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: AppTypography.small,
+                fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Plan on this day',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            onPressed: () => widget.onPlanAt(day, 9),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hourCell(DateTime day, int hour) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dateKey = _dayKey(day);
+    final isToday = DateUtils.isSameDay(day, widget.now);
+    final nowHour = isToday && widget.now.hour == hour;
+    final atHour = widget.sessions.where(
+      (session) =>
+          DateUtils.isSameDay(session.scheduledAt, day) &&
+          session.scheduledAt.hour == hour,
+    );
+    final fraction =
+        (widget.now.minute + widget.now.second / 60) / 60;
+    return DragTarget<StudySession>(
+      onWillAcceptWithDetails: (details) =>
+          details.data.status == StudyStatus.planned,
+      onAcceptWithDetails: (details) =>
+          widget.onMove(details.data.id, day),
+      builder: (context, candidates, rejected) => Container(
+        key: ValueKey('planner-week-cell-$dateKey-$hour'),
+        constraints: const BoxConstraints(minHeight: _hourHeight),
+        decoration: BoxDecoration(
+          color: candidates.isNotEmpty
+              ? scheme.primaryContainer
+              : plannerDaySurface(theme, highlighted: isToday),
+          border: Border(
+            top: BorderSide(
+              width: 0.7,
+              color: scheme.outlineVariant.withValues(alpha: 0.65),
+            ),
+          ),
+        ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 7, 4, 7),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final item in atHour)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: widget.buildTile(item),
+                    ),
+                  if (atHour.isEmpty)
+                    InkWell(
+                      onTap: () => widget.onPlanAt(day, hour),
+                      child: const SizedBox(height: 49),
+                    ),
+                ],
+              ),
+            ),
+            if (nowHour)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Align(
+                    alignment: Alignment(0, fraction * 2 - 1),
+                    child: Container(
+                      key: ValueKey('planner-week-now-line-$dateKey'),
+                      width: double.infinity,
+                      height: 2,
+                      color: scheme.onSurface.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hourRow(int hour) {
+    final scheme = Theme.of(context).colorScheme;
+    return IntrinsicHeight(
+      child: Row(
+        key: ValueKey('planner-week-hour-row-$hour'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: _axisWidth,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8, left: 2),
+              child: Text(
+                '${hour.toString().padLeft(2, '0')}:00',
+                key: ValueKey('planner-week-hour-label-$hour'),
+                style: TextStyle(
+                  fontSize: AppTypography.small,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          for (final day in widget.days)
+            Expanded(child: _hourCell(day, hour)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    key: const ValueKey('planner-week-time-grid'),
+    children: [
+      Row(
+        children: [
+          const SizedBox(width: _axisWidth),
+          for (final day in widget.days) Expanded(child: _header(day)),
+        ],
+      ),
+      Expanded(
+        child: ListView(
+          key: const ValueKey('planner-week-hours'),
+          controller: _controller,
+          physics: widget.physics,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          children: [
+            for (var hour = 0; hour < 24; hour++) _hourRow(hour),
+          ],
+        ),
+      ),
+    ],
   );
 }

@@ -371,7 +371,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1729 linii)
+### `lib/features/library/presentation/library_screen.dart` (1779 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -402,8 +402,10 @@ maksymalnie 45% obszaru między nagłówkiem a paskiem konta;
 separatory folderów/timera i paska konta używają `AppHeaderDivider`,
 na desktopie sięgają przez 12 px uchwytu do prawej krawędzi sidebaru.
 Pionowy separator uchwytu korzysta z tego samego koloru motywu.
-Przy małym oknie timer przewija się niezależnie, a drzewko folderów
-wykorzystuje pozostałą wysokość. Działa również w mobilnym drawerze.
+Upcoming ma osobne przewijanie i limit 25% obszaru roboczego sidebaru,
+niższy niż połowa dostępnego miejsca na foldery. Cały timer nadal
+nie przekracza 45% tego obszaru. Przy małym oknie timer przewija się
+niezależnie, a drzewko folderów wykorzystuje pozostałą wysokość. Działa również w mobilnym drawerze.
 Po zwinięciu panelu
 `CompactStudyTimer` wyświetla się obok Settings w AppBar katalogu,
 notebooka lub boarda. `_openCatalogSettings` otwiera wspólne ustawienia
@@ -537,7 +539,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
   152: `StudyPlannerController`; 232: `load`; 298: `create`;
   366: `start`; 528: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (620):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (655):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -551,14 +553,16 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   skalowany do wąskiego panelu. Powiększony padding pionowy timera
   (20 px u góry, 22 px na dole) oraz odstęp pod Ready (30 px)
   zwiększają wysokość całego bloku mimo niższych przycisków.
-  Upcoming pokazuje zaplanowane sesje na kartach identycznych jak w
-  kalendarzu, bez linii separatorów, z zachowanym startem sesji.
+  Upcoming pokazuje wszystkie sesje w osobno przewijanej liście
+  z limitem wysokości; zachowuje wygląd kart kalendarza i przycisk Start.
+  W trakcie sesji Resume/Pause oraz Stop mają tę samą wysokość 32 px,
+  kontur i promień 12 px co przyciski Start/Smart.
   Selektor techniki w formularzu `isExpanded` mieści się w wąskim dialogu.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
   24: `studyRatingStars`; 31: `openStudyPlanner`;
   37: `showStudySessionEditor`; 57: `showStudyRating`;
-  345: `StudyTimerCard`; 572: `CompactStudyTimer`.
+  345: `StudyTimerCard`; 607: `CompactStudyTimer`.
 - `lib/features/planner/presentation/study_action_theme.dart` (144):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
@@ -569,14 +573,17 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   84: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1007):
+- `lib/features/planner/presentation/planner_screen.dart` (1268):
   `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
-  Dzisiejszy dzień ma ciemniejsze tło w obu motywach, także w Month.
-  Today i Week mają przewijane 24 godziny z cienkimi separatorami,
-  sesjami w godzinie planu i wyraźniejszą linią bieżącej minuty
-  (aktualizacja co minutę); Month zachowuje zwykłe kafelki.
+  W Week i Month bieżący dzień ma umiarkowanie ciemniejsze tło,
+  z 50% warstwą odcienia motywu na tle zwykłej komórki.
+  Today zachowuje normalne tło i większy odstęp godziny od karty sesji.
+  Week to jedna przewijana pionowo siatka 24 godzin z pojedynczym pasem
+  godzin po lewej stronie; wąskie ekrany przewijają siatkę poziomo.
+  Tylko aktywna godzina bieżącego dnia ma wyróżnioną linię czasu.
+  Month zachowuje kafelki. Czas aktualizuje się co minutę.
   Daty i opisy mają czteropoziomową typografię interfejsu.
   Miesiąc generuje tylko niezbędne 4–6 tygodni; komórki dni granicznych
   innych miesięcy pozostają widoczne z opacity 0.5; pomocniczy napis
@@ -586,9 +593,11 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   style z timerem i wysokość 32 px; poniżej 760 px leżą pod nagłówkiem
   w równym rzędzie.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
-  Nagłówek ma 56 px i linię 1 px, Week/Month na wąskim ekranie listę.
-  13: `CalendarMode`; 15: `PlannerScreen`;
-  22: `_PlannerScreenState`; 873: `_HourlyDaySchedule` — przewijane godziny.
+  Nagłówek ma 56 px i linię 1 px; Month na wąskim ekranie listę.
+  16: `CalendarMode`; 43: `PlannerScreen`;
+  50: `_PlannerScreenState`;
+  910: `_HourlyDaySchedule`;
+  1048: `_WeekTimeGrid` — wspólna oś.
 - `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
@@ -601,10 +610,11 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   z obrysem w kolorze tekstu w obu motywach, przyciski kalendarza o
   tej samej wysokości i zaokrągleniu selektora, zgodność kart Upcoming
   z kalendarzem w obu motywach, brak separatorów i działanie Start,
-  przygaszenie dni z
-  innych miesięcy, ciemniejsze tło dzisiaj oraz 24-godzinne podziałki
-  Today/Week z linią bieżącej minuty w obu motywach, brak overflow
-  selektora techniki w wąskim oknie, margines dolny i oceny kalendarza.
+  dni granicznych miesiąca, łagodne zaznaczenie Week/Month,
+  brak zaznaczenia Today i większy odstęp od sesji, wspólną oś godzin Week,
+  linię aktualnego czasu, osobny scroll Upcoming, limit wysokości listy,
+  spójne przyciski włączonego timera, brak overflow selektora techniki,
+  margines dolny i oceny kalendarza.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
   tygodnia we wszystkich widokach i po zmianie daty; 4/5/6 tygodni
   miesiąca z zachowaniem dni przejściowych; osobny krok CI.

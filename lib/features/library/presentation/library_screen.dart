@@ -956,14 +956,14 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final timerMaxHeight =
-            math.max(
-              0.0,
-              constraints.maxHeight -
-                  _LibraryScreenState._navigationHeaderHeight * 2 -
-                  AppHeaderDivider.thickness * 2,
-            ) *
-            0.45;
+        final availableHeight = math.max(
+          0.0,
+          constraints.maxHeight -
+              _LibraryScreenState._navigationHeaderHeight * 2 -
+              AppHeaderDivider.thickness * 2,
+        );
+        final timerMaxHeight = availableHeight * 0.45;
+        final upcomingMaxHeight = availableHeight * 0.25;
         return DecoratedBox(
           decoration: BoxDecoration(color: colorScheme.surfaceContainerLowest),
           child: Column(
@@ -1025,7 +1025,9 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                   physics: TouchNavigationScrollPhysics(
                     sensitivity: touchNavigationGain,
                   ),
-                  child: const StudyTimerCard(),
+                  child: StudyTimerCard(
+                    upcomingMaxHeight: upcomingMaxHeight,
+                  ),
                 ),
               ),
               SizedBox(
