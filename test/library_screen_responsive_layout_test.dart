@@ -100,21 +100,52 @@ void main() {
     expect(find.byKey(const ValueKey('mobile-navigation-open')), findsNothing);
 
     final studyToggle = find.byKey(const ValueKey('study-panel-toggle'));
+    final folderToggle = find.byKey(
+      const ValueKey('library-navigation-toggle'),
+    );
     final studyDivider = find.byKey(const ValueKey('sidebar-timer-divider'));
     expect(studyToggle, findsOneWidget);
     expect(find.byKey(const ValueKey('sidebar-timer-region')), findsOneWidget);
+
+    expect(tester.getSize(studyToggle), const Size(44, 24));
+    expect(tester.getSize(folderToggle), const Size(24, 44));
     expect(
-      tester.getCenter(studyToggle).dy,
-      closeTo(tester.getTopLeft(studyDivider).dy, 1),
+      tester.getBottomLeft(studyToggle).dy,
+      closeTo(tester.getTopLeft(studyDivider).dy, 0.1),
+    );
+    final studyMaterial = tester.widget<Material>(studyToggle);
+    final folderMaterial = tester.widget<Material>(folderToggle);
+    expect(studyMaterial.color, folderMaterial.color);
+    expect(studyMaterial.elevation, folderMaterial.elevation);
+    expect(studyMaterial.shadowColor, folderMaterial.shadowColor);
+    final studyShape = studyMaterial.shape! as RoundedRectangleBorder;
+    final folderShape = folderMaterial.shape! as RoundedRectangleBorder;
+    expect(studyShape.side, folderShape.side);
+    expect(
+      studyShape.borderRadius,
+      const BorderRadius.only(
+        topLeft: Radius.circular(12),
+        topRight: Radius.circular(12),
+      ),
+    );
+    expect(find.byTooltip('Hide study planner'), findsOneWidget);
+
+    await tester.tapAt(
+      tester.getTopLeft(studyToggle) + const Offset(22, 4),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('sidebar-timer-region')), findsNothing);
+    expect(find.byKey(const ValueKey('sidebar-account-divider')), findsNothing);
+    expect(find.byTooltip('Show study planner'), findsOneWidget);
+    expect(
+      tester.getBottomLeft(studyToggle).dy,
+      closeTo(tester.getTopLeft(studyDivider).dy, 0.1),
     );
     await tester.tap(studyToggle);
     await tester.pump();
-    expect(find.byKey(const ValueKey('sidebar-timer-region')), findsNothing);
+    expect(find.byKey(const ValueKey('sidebar-timer-region')), findsOneWidget);
     expect(find.byKey(const ValueKey('sidebar-account-divider')),
         findsOneWidget);
-    await tester.tap(studyToggle);
-    await tester.pump();
-    expect(find.byKey(const ValueKey('sidebar-timer-region')), findsOneWidget);
 
     await tester.binding.setSurfaceSize(const Size(959, 700));
     await tester.pump();

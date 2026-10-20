@@ -39,6 +39,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   static const double _navigationHeaderHeight = AppHeaderDivider.toolbarHeight;
   static const double _editorToolbarAreaHeight = 72;
   static const double _toggleTabHeight = 44;
+  static const double _toggleTabWidth = 24;
 
   bool _showLeftNavigation = true;
   bool _showCatalog = true;
@@ -981,104 +982,70 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
               ),
               const SizedBox(height: 1),
               Expanded(
-                child: controller.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : folders.isEmpty
-                    ? _EmptyLibraryTree(onCreate: _handleCreateAction)
-                    : ListView(
-                        key: const ValueKey('library-file-scroll'),
-                        physics: TouchNavigationScrollPhysics(
-                          sensitivity: touchNavigationGain,
-                        ),
-                        padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
-                        children: [
-                          for (final folder in folders) _buildFolder(folder),
-                        ],
-                      ),
-              ),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _SidebarSpanDivider(
-                        dividerKey: const ValueKey('sidebar-timer-divider'),
-                        extendBy: dividerExtension,
-                      ),
-                      if (_showStudyPanel)
-                        ConstrainedBox(
-                          constraints: BoxConstraints(maxHeight: timerMaxHeight),
-                          child: SingleChildScrollView(
-                            key: const ValueKey('sidebar-timer-region'),
-                            physics: TouchNavigationScrollPhysics(
-                              sensitivity: touchNavigationGain,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      child: controller.isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : folders.isEmpty
+                          ? _EmptyLibraryTree(onCreate: _handleCreateAction)
+                          : ListView(
+                              key: const ValueKey('library-file-scroll'),
+                              physics: TouchNavigationScrollPhysics(
+                                sensitivity: touchNavigationGain,
+                              ),
+                              padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+                              children: [
+                                for (final folder in folders)
+                                  _buildFolder(folder),
+                              ],
                             ),
-                            child: StudyTimerCard(
-                              upcomingMaxHeight: upcomingMaxHeight,
-                            ),
-                          ),
-                        )
-                      else
-                        const SizedBox(height: 22),
-                    ],
-                  ),
-                  Positioned(
-                    right: 8,
-                    top: -22,
-                    child: Material(
-                      key: const ValueKey('study-panel-toggle'),
-                      color: colorScheme.surface,
-                      elevation: 8,
-                      shadowColor: Colors.black54,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
-                        ),
-                        side: BorderSide(
-                          color: colorScheme.outlineVariant
-                              .withValues(alpha: 0.6),
-                        ),
-                      ),
-                      child: InkWell(
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
-                        ),
-                        onTap: () => setState(
-                          () => _showStudyPanel = !_showStudyPanel,
-                        ),
-                        child: Tooltip(
-                          message: _showStudyPanel
-                              ? 'Hide study planner'
-                              : 'Show study planner',
-                          child: SizedBox(
-                            width: 24,
-                            height: _LibraryScreenState._toggleTabHeight,
-                            child: Icon(
-                              _showStudyPanel
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.keyboard_arrow_down,
-                              size: 18,
-                            ),
-                          ),
-                        ),
+                    ),
+                    Positioned(
+                      right: 8,
+                      bottom: 0,
+                      child: _LeftZoneToggleTab(
+                        expanded: _showStudyPanel,
+                        studyPanel: true,
+                        onPressed: () {
+                          setState(() {
+                            _showStudyPanel = !_showStudyPanel;
+                          });
+                        },
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              _SidebarSpanDivider(
+                dividerKey: const ValueKey('sidebar-timer-divider'),
+                extendBy: dividerExtension,
+              ),
+              if (_showStudyPanel)
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: timerMaxHeight),
+                  child: SingleChildScrollView(
+                    key: const ValueKey('sidebar-timer-region'),
+                    physics: TouchNavigationScrollPhysics(
+                      sensitivity: touchNavigationGain,
+                    ),
+                    child: StudyTimerCard(
+                      upcomingMaxHeight: upcomingMaxHeight,
+                    ),
+                  ),
+                ),
               SizedBox(
                 key: const ValueKey('sidebar-account-slot'),
                 width: double.infinity,
                 height: _LibraryScreenState._navigationHeaderHeight,
                 child: Column(
                   children: [
-                    _SidebarSpanDivider(
-                      dividerKey: const ValueKey('sidebar-account-divider'),
-                      extendBy: dividerExtension,
-                    ),
+                    if (_showStudyPanel)
+                      _SidebarSpanDivider(
+                        dividerKey: const ValueKey('sidebar-account-divider'),
+                        extendBy: dividerExtension,
+                      ),
                     const Spacer(),
                   ],
                 ),
@@ -1783,50 +1750,70 @@ class _LeftZoneToggleTab extends StatelessWidget {
     required this.expanded,
     required this.onPressed,
     this.toolbar = false,
+    this.studyPanel = false,
     this.hideShadow = false,
   });
 
   final bool expanded;
   final VoidCallback onPressed;
   final bool toolbar;
+  final bool studyPanel;
   final bool hideShadow;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final radius = studyPanel
+        ? const BorderRadius.only(
+            topLeft: Radius.circular(12),
+            topRight: Radius.circular(12),
+          )
+        : const BorderRadius.only(
+            topRight: Radius.circular(12),
+            bottomRight: Radius.circular(12),
+          );
     return Material(
       key: ValueKey(
-        toolbar ? 'editor-toolbar-toggle' : 'library-navigation-toggle',
+        studyPanel
+            ? 'study-panel-toggle'
+            : toolbar
+            ? 'editor-toolbar-toggle'
+            : 'library-navigation-toggle',
       ),
       color: theme.colorScheme.surface,
       elevation: hideShadow ? 0 : 8,
       shadowColor: hideShadow ? Colors.transparent : Colors.black54,
       shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(12),
-          bottomRight: Radius.circular(12),
-        ),
+        borderRadius: radius,
         side: BorderSide(
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
         ),
       ),
       child: InkWell(
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(12),
-          bottomRight: Radius.circular(12),
-        ),
+        borderRadius: radius,
         onTap: onPressed,
         child: Tooltip(
-          message: toolbar
+          message: studyPanel
+              ? (expanded ? 'Hide study planner' : 'Show study planner')
+              : toolbar
               ? (expanded ? 'Hide toolbar' : 'Show toolbar')
               : (expanded ? 'Hide projects' : 'Show projects'),
           child: SizedBox(
-            width: 24,
-            height: _LibraryScreenState._toggleTabHeight,
-            child: Icon(
-              expanded ? Icons.chevron_left : Icons.chevron_right,
-              size: 18,
-            ),
+            width: studyPanel
+                ? _LibraryScreenState._toggleTabHeight
+                : _LibraryScreenState._toggleTabWidth,
+            height: studyPanel
+                ? _LibraryScreenState._toggleTabWidth
+                : _LibraryScreenState._toggleTabHeight,
+            child: studyPanel
+                ? Transform.rotate(
+                    angle: expanded ? math.pi / 2 : -math.pi / 2,
+                    child: const Icon(Icons.chevron_left, size: 18),
+                  )
+                : Icon(
+                    expanded ? Icons.chevron_left : Icons.chevron_right,
+                    size: 18,
+                  ),
           ),
         ),
       ),

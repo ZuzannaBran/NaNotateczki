@@ -382,7 +382,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1836 linii)
+### `lib/features/library/presentation/library_screen.dart` (1823 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -413,9 +413,16 @@ maksymalnie 45% obszaru między nagłówkiem a paskiem konta;
 separatory folderów/timera i paska konta używają `AppHeaderDivider`,
 na desktopie sięgają przez 12 px uchwytu do prawej krawędzi sidebaru.
 Pionowy separator uchwytu korzysta z tego samego koloru motywu.
-Panel timera ma własny przycisk zwijania przy poziomym separatorze
-(`study-panel-toggle`); po ukryciu lista folderów odzyskuje miejsce.
-Przy ponownym rozwinięciu zachowuje osobny scroll.
+Panel timera ma poziomy przycisk `study-panel-toggle` (44 × 24 px)
+z ikoną obróconego chevrona góra/dół, zaokrągloną górą i ostrym dołem
+stykającym się z poziomym separatorem. Współdzieli kolor, obrys i cień
+z przyciskiem folderów, ale jest obrócony o 90 stopni. Zakładka
+znajduje się wewnątrz `Stack` listy folderów, dzięki czemu całe
+24 px wysokości jest klikalne, także po zwinięciu timera. Zwinięcie
+zwraca miejsce liście bez pustego paska i podwójnego separatora.
+Przy ponownym rozwinięciu timer zachowuje osobny scroll.
+Bez lokalnego Fluttera: sprawdź ręcznie górne 4 px przycisku, ostre dolne
+rogi, kontakt z separatorem oraz przełączanie w obu motywach.
 Upcoming ma osobne przewijanie i limit 25% obszaru roboczego sidebaru,
 niższy niż połowa dostępnego miejsca na foldery. Cały timer nadal
 nie przekracza 45% tego obszaru. Przy małym oknie timer przewija się
@@ -465,15 +472,15 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
 - 25: `LibraryScreen`; 32: `_LibraryScreenState`;
   506: `_openCatalogSettings`;
   841: `_CreateMenuButton`;
-  881: `_LibraryTreePane` (`_LibraryTreePaneState` 906);
-  1156: `_FolderTreeRow`;
-  1254: `_LibraryTreeItemRow`;
-  1357: `_sidebarMenuShape`;
-  1371: `_SidebarMenuShadowPainter`;
-  1407: `_showSidebarMenu`;
-  1520: `_TreeRowActions`;
-  1670: `_LibraryWorkspace`;
-  1781: `_LeftZoneToggleTab`.
+  882: `_LibraryTreePane` (`_LibraryTreePaneState` 907);
+  1196: `_FolderTreeRow`;
+  1295: `_LibraryTreeItemRow`;
+  1400: `_sidebarMenuShape`;
+  1414: `_SidebarMenuShadowPainter`;
+  1450: `_showSidebarMenu`;
+  1563: `_TreeRowActions`;
+  1637: `_LibraryWorkspace`;
+  1748: `_LeftZoneToggleTab` (również przycisk timera).
 
 ### `lib/features/library/presentation/library_catalog.dart` (1158 linii)
 
@@ -1253,7 +1260,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   wspólny `AppHeaderDivider` nad timerem,
   i aktualizacja mnożnika przewijania plików bez restartu; geometria,
   kolor i obsługa menu
-  folderu, notebooka oraz boarda, a także menu dodawania (4 pozycje,
+  folderu, notebooka oraz boarda, a także poziomą zakładkę timera
+  (obrócone wymiary, styczne proste dolne rogi, ten sam cień i obrys,
+  pełny hit-test w obu stanach) i menu dodawania (4 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
   stykanie menu z prawą granicą całego sidebaru (w tym resize handle),
