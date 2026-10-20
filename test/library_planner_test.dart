@@ -66,7 +66,7 @@ void main() {
   test('planner rows use beige tones and fade completed tasks', () {
     expect(
       plannerTaskBackground(PlannerTaskTone.undated, darkMode: false),
-      AppColors.background,
+      AppColors.divider,
     );
     expect(
       plannerTaskBackground(PlannerTaskTone.upcoming, darkMode: false),
@@ -74,11 +74,19 @@ void main() {
     );
     expect(
       plannerTaskBackground(PlannerTaskTone.overdue, darkMode: false),
-      AppColors.divider,
+      AppColors.background,
     );
     expect(
       plannerTaskBackground(PlannerTaskTone.undated, darkMode: true),
+      AppColors.darkActive,
+    );
+    expect(
+      plannerTaskBackground(PlannerTaskTone.upcoming, darkMode: true),
       AppColors.darkCanvas,
+    );
+    expect(
+      plannerTaskBackground(PlannerTaskTone.overdue, darkMode: true),
+      AppColors.darkPaper,
     );
     expect(
       plannerTaskBackground(
