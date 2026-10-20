@@ -143,7 +143,10 @@ void main() {
         find.byKey(ValueKey('planner-day-cell-$currentDate')),
         findsOneWidget,
       );
-      expect(find.byKey(ValueKey('planner-now-line-$currentDate')), findsNothing);
+      expect(
+        find.byKey(ValueKey('planner-now-line-$currentDate')),
+        findsNothing,
+      );
       expect(
         find.byKey(ValueKey('planner-hour-list-$currentDate')),
         findsNothing,

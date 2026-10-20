@@ -588,7 +588,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px, Week/Month na wąskim ekranie listę.
   13: `CalendarMode`; 15: `PlannerScreen`;
-  22: `_PlannerScreenState`.
+  22: `_PlannerScreenState`; 873: `_HourlyDaySchedule` — przewijane godziny.
 - `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów.
 - `test/study_planner_controller_test.dart`: zapis, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
