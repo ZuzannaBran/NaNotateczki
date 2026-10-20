@@ -421,8 +421,9 @@ w dół przy rozwiniętym panelu (przycisk wyżej), a w górę po zwinięciu.
 Przycisk zachowuje zaokrągloną górę i ostry dół
 stykającym się z poziomym separatorem. Współdzieli kolor i obrys
 z przyciskiem folderów. Zamiast mocniejszego, pojedynczego BoxShadow używa standardowego
-profilu kElevationToShadow[8]. Każda warstwa zachowuje kolor, rozmycie
-i spread, a przesunięcie pionowe zmienia na poziome (w prawo).
+profilu kElevationToShadow[8]. Każda warstwa zachowuje rozmycie
+i spread; jej alfa wynosi 30% poprzedniej wartości, a przesunięcie
+pionowe zmienia się na poziome (w prawo).
 Material ma elevation 0, więc nie powstaje drugi cień. Zakładka
 znajduje się wewnątrz `Stack` listy folderów, dzięki czemu całe
 24 px wysokości jest klikalne, także po zwinięciu timera. Zwinięcie
@@ -1279,7 +1280,7 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   folderu, notebooka oraz boarda, a także poziomą zakładkę timera
   (pozycja po lewej, strzałki dół/góra, obrócone wymiary,
   proste dolne rogi stykające się z separatorem, ten sam profil
-  cienia elevation 8 skierowany w prawo bez zwiększania krycia,
+  cienia elevation 8 skierowany w prawo z alfą zmniejszoną do 30%,
   wspólny obrys i pełny hit-test w obu stanach)
   i menu dodawania (4 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości

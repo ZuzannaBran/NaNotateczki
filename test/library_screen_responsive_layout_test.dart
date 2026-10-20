@@ -141,7 +141,11 @@ void main() {
       expect(shifted.offset, Offset(original.offset.dy, 0));
       expect(shifted.blurRadius, original.blurRadius);
       expect(shifted.spreadRadius, original.spreadRadius);
-      expect(shifted.color, original.color);
+      expect(
+        shifted.color,
+        original.color.withValues(alpha: original.color.a * 0.3),
+      );
+      expect(shifted.color.a, lessThan(original.color.a));
     }
     final studyShape = studyMaterial.shape! as RoundedRectangleBorder;
     final folderShape = folderMaterial.shape! as RoundedRectangleBorder;

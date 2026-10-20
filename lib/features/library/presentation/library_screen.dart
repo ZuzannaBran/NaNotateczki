@@ -1828,6 +1828,9 @@ class _LeftZoneToggleTab extends StatelessWidget {
               .map(
                 (shadow) => shadow.copyWith(
                   offset: Offset(shadow.offset.dy, 0),
+                  color: shadow.color.withValues(
+                    alpha: shadow.color.a * 0.3,
+                  ),
                 ),
               )
               .toList(growable: false);
