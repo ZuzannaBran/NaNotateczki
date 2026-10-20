@@ -21,6 +21,152 @@ void main() {
     return planner;
   }
 
+  test('scheduled session spans the correct minutes including breaks', () {
+    final day = DateTime(2026, 10, 20);
+    final halfHour = StudySession(
+      id: 'half',
+      title: 'Half hour',
+      scheduledAt: DateTime(2026, 10, 20, 15, 45),
+      minutes: 30,
+    );
+    final span = calendarTimeSpan(halfHour, day)!;
+    expect(span.top, closeTo(15.75 * 64, 0.001));
+    expect(span.height, closeTo(32, 0.001));
+    expect(span.top + span.height, closeTo(16.25 * 64, 0.001));
+
+    final smart = StudySession(
+      id: 'smart',
+      title: 'Pomodoro',
+      scheduledAt: DateTime(2026, 10, 20, 12, 30),
+      minutes: 30,
+      technique: StudyTechnique.pomodoro,
+      focusBlocks: 3,
+    );
+    expect(smart.scheduledDurationMinutes, 85);
+    expect(
+      calendarTimeSpan(smart, day)!.height,
+      closeTo(85 * 64 / 60, 0.001),
+    );
+    final midnight = StudySession(
+      id: 'next',
+      title: 'Late session',
+      scheduledAt: DateTime(2026, 10, 20, 23, 45),
+      minutes: 30,
+    );
+    expect(calendarTimeSpan(midnight, day)!.height, closeTo(16, 0.001));
+    final nextDay = calendarTimeSpan(
+      midnight,
+      DateTime(2026, 10, 21),
+    )!;
+    expect(nextDay.top, 0);
+    expect(nextDay.height, closeTo(16, 0.001));
+  });
+
+  testWidgets('minute-precise geometry agrees in Week and Day', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month, now.day);
+    final session = planner.create(
+      title: 'Quarter past',
+      scheduledAt: DateTime(day.year, day.month, day.day, 15, 45),
+      minutes: 30,
+    );
+    final key = '${day.year}-${day.month}-${day.day}';
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: PlannerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final weekly = find.byKey(
+      ValueKey('planner-time-position:${session.id}-$key'),
+    );
+    final week15 = find.byKey(ValueKey('planner-week-cell-$key-15'));
+    final week16 = find.byKey(ValueKey('planner-week-cell-$key-16'));
+    expect(weekly, findsOneWidget);
+    expect(
+      tester.getRect(weekly).top - tester.getRect(week15).top,
+      closeTo(48, 0.1),
+    );
+    expect(
+      tester.getRect(weekly).bottom - tester.getRect(week16).top,
+      closeTo(16, 0.1),
+    );
+    await tester.tap(find.text('Day').last);
+    await tester.pumpAndSettle();
+    final daily = find.byKey(
+      ValueKey('planner-time-position:${session.id}'),
+    );
+    final day15 = find.byKey(ValueKey('planner-hour-row-$key-15'));
+    final day16 = find.byKey(ValueKey('planner-hour-row-$key-16'));
+    expect(daily, findsOneWidget);
+    expect(
+      tester.getRect(daily).top - tester.getRect(day15).top,
+      closeTo(48, 0.1),
+    );
+    expect(
+      tester.getRect(daily).bottom - tester.getRect(day16).top,
+      closeTo(16, 0.1),
+    );
+    expect(tester.takeException(), isNull);
+    await planner.flush();
+  });
+
+  testWidgets('week and month cells open selected Day', (tester) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: PlannerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final today = DateUtils.dateOnly(DateTime.now());
+    final mon = DateTime(
+      today.year,
+      today.month,
+      today.day - today.weekday + 1,
+    );
+    final tue = DateTime(mon.year, mon.month, mon.day + 1);
+    String key(DateTime date) =>
+        '${date.year}-${date.month}-${date.day}';
+    await tester.tap(find.byKey(ValueKey('planner-day-label-${key(tue)}')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(ValueKey('planner-hour-list-${key(tue)}')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+    final target = DateTime(today.year, today.month, 12);
+    final targetLabel = find.byKey(
+      ValueKey('planner-day-label-${key(target)}'),
+    );
+    await tester.ensureVisible(targetLabel);
+    await tester.tap(targetLabel);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(ValueKey('planner-hour-list-${key(target)}')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Week'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Day').last);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(ValueKey('planner-hour-list-${key(today)}')),
+      findsOneWidget,
+    );
+    await planner.flush();
+  });
+
   testWidgets('calendar changes between today week and month', (tester) async {
     final planner = await loadPlanner();
     await tester.binding.setSurfaceSize(const Size(1440, 900));
@@ -44,7 +190,7 @@ void main() {
     await tester.tap(find.text('Month'));
     await tester.pumpAndSettle();
     expect(find.textContaining(RegExp(r'^Mon \d+$')), findsWidgets);
-    await tester.tap(find.text('Today').last);
+    await tester.tap(find.text('Day').last);
     await tester.pumpAndSettle();
     expect(find.textContaining('Calculus'), findsWidgets);
     expect(tester.takeException(), isNull);
@@ -78,6 +224,16 @@ void main() {
       expect(
         tester.getRect(weekHeader).left - tester.getRect(grid).left,
         closeTo(52, 0.1),
+      );
+      final bottomCorners = tester.widget<ClipRRect>(
+        find.byKey(const ValueKey('planner-week-bottom-corners')),
+      );
+      expect(
+        bottomCorners.borderRadius,
+        const BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
       );
 
       void verifyStrip(Finder finder) {
@@ -163,7 +319,7 @@ void main() {
         tester.getRect(hourlyList),
       );
 
-      await tester.tap(find.text('Today').last);
+      await tester.tap(find.text('Day').last);
       await tester.pumpAndSettle();
       final row = find.byKey(
         ValueKey('planner-hour-row-$dayKey-${now.hour}'),
@@ -339,7 +495,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(position.pixels, greaterThan(firstOffset));
 
-    await tester.tap(find.text('Today').last);
+    await tester.tap(find.text('Day').last);
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('planner-scrollbar-free')),
@@ -471,7 +627,7 @@ void main() {
         tester.widget<ListView>(
           find.byKey(const ValueKey('planner-week-hours')),
         ).childrenDelegate.estimatedChildCount,
-        24,
+        1,
       );
       expect(
         find.byKey(ValueKey('planner-week-hour-label-${now.hour}')),
@@ -494,7 +650,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.text('Today').last);
+      await tester.tap(find.text('Day').last);
       await tester.pumpAndSettle();
       expect(cellColor(cell), base);
       final grid = find.byKey(ValueKey('planner-hour-list-$todayKey'));
@@ -849,6 +1005,11 @@ void main() {
       tester.widget<Text>(heading).style,
       AppHeaderDivider.titleStyle,
     );
+    expect(tester.widget<Text>(heading).textAlign, TextAlign.center);
+    expect(
+      find.ancestor(of: heading, matching: find.byType(Center)),
+      findsWidgets,
+    );
     expect(find.byType(SnackBar), findsNothing);
     await tester.tap(find.text('Skip rating'));
     await tester.pumpAndSettle();
@@ -874,6 +1035,15 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('planner-new-session')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('study-session-colour')), findsOneWidget);
+    final nameInput = tester.widget<TextField>(
+      find.widgetWithText(TextField, 'Session name'),
+    );
+    final descriptionInput = tester.widget<TextField>(
+      find.widgetWithText(TextField, 'Description'),
+    );
+    expect(nameInput.decoration!.hintText, isNull);
+    expect(nameInput.decoration!.labelText, 'Session name');
+    expect(descriptionInput.decoration!.labelText, 'Description');
     await tester.enterText(
       find.widgetWithText(TextField, 'Session name'),
       'Coloured session',

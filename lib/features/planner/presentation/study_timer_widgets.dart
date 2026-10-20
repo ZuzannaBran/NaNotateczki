@@ -16,7 +16,8 @@ import 'planner_screen.dart';
 import 'study_action_theme.dart';
 
 String studyClock(DateTime time) =>
-    '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    '${time.hour.toString().padLeft(2, '0')}:'
+    '${time.minute.toString().padLeft(2, '0')}';
 
 String studyDuration(int seconds) {
   final safe = seconds < 0 ? 0 : seconds;
@@ -24,9 +25,12 @@ String studyDuration(int seconds) {
   final minutes = (safe ~/ 60) % 60;
   final remainder = safe % 60;
   if (hours > 0) {
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${remainder.toString().padLeft(2, '0')}';
+    return '${hours.toString().padLeft(2, '0')}:'
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${remainder.toString().padLeft(2, '0')}';
   }
-  return '${minutes.toString().padLeft(2, '0')}:${remainder.toString().padLeft(2, '0')}';
+  return '${minutes.toString().padLeft(2, '0')}:'
+      '${remainder.toString().padLeft(2, '0')}';
 }
 
 String studyRatingStars(int? rating) {
@@ -69,10 +73,13 @@ Future<void> showStudyRating(BuildContext context, StudySession session) async {
     context: context,
     builder: (dialogContext) => StudyActionTheme(
       child: AlertDialog(
-        title: const Text(
-          "Great job! Time's up.",
-          key: ValueKey('study-finished-title'),
-          style: AppHeaderDivider.titleStyle,
+        title: const Center(
+          child: Text(
+            "Great job! Time's up.",
+            key: ValueKey('study-finished-title'),
+            textAlign: TextAlign.center,
+            style: AppHeaderDivider.titleStyle,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -305,7 +312,6 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                 maxLength: 100,
                 decoration: const InputDecoration(
                   labelText: 'Session name',
-                  hintText: 'e.g. Chemistry revision',
                 ),
               ),
               TextField(
@@ -659,7 +665,8 @@ class StudyTimerCard extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
-                                      '${item.scheduledAt.day}/${item.scheduledAt.month}'
+                                      '${item.scheduledAt.day}/'
+                                      '${item.scheduledAt.month}'
                                       ' · ${studyClock(item.scheduledAt)}',
                                       style: TextStyle(
                                         fontSize: AppTypography.small,

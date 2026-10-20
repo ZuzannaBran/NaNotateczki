@@ -84,6 +84,10 @@ class StudySession {
       ? minutes
       : technique.focusMinutes * focusBlocks;
 
+  int get scheduledDurationMinutes => technique == StudyTechnique.custom
+      ? minutes
+      : totalFocusMinutes + (focusBlocks - 1) * technique.breakMinutes;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,

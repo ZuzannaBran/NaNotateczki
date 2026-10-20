@@ -24,7 +24,7 @@ void main() {
                   TextButton(onPressed: () {}, child: const Text('Text')),
                   SegmentedButton<int>(
                     segments: const [
-                      ButtonSegment(value: 0, label: Text('Today')),
+                      ButtonSegment(value: 0, label: Text('Day')),
                       ButtonSegment(value: 1, label: Text('Week')),
                     ],
                     selected: const {0},
@@ -41,7 +41,7 @@ void main() {
         'Primary',
         'Outline',
         'Text',
-        'Today',
+        'Day',
         'Week',
         'Technique',
       ]) {
@@ -92,6 +92,8 @@ void main() {
       StudyActionStyles.primaryColor,
       isNot(StudyActionStyles.secondaryColor),
     );
+    expect(StudyActionStyles.primaryColor, AppColors.divider);
+    expect(StudyActionStyles.borderColor, AppColors.divider);
     expect(
       scopedTheme.textButtonTheme.style!.foregroundColor!.resolve(
         <WidgetState>{},

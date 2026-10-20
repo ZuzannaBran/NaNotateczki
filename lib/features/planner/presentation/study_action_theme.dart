@@ -4,9 +4,9 @@ import '../../../core/theme/app_colors.dart';
 
 /// Muted actions retain the app palette and typography in both visual modes.
 class StudyActionStyles {
-  static const Color primaryColor = Color(0xFFC4BBAF);
-  static const Color secondaryColor = Color(0xFFE4E2DD);
-  static const Color borderColor = Color(0xFFB3AB9F);
+  static const Color primaryColor = AppColors.divider;
+  static const Color secondaryColor = AppColors.toolbar;
+  static const Color borderColor = AppColors.divider;
   static const double sessionButtonHeight = 32;
   static const sessionButtonShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -64,6 +64,7 @@ class StudyActionStyles {
       );
 
   static ButtonStyle primary(ThemeData theme) => FilledButton.styleFrom(
+    overlayColor: theme.colorScheme.outline.withValues(alpha: 0.16),
     backgroundColor: background(theme, selected: true),
     foregroundColor: foreground(theme),
     textStyle: theme.textTheme.labelLarge!.copyWith(
@@ -125,6 +126,7 @@ class StudyActionTheme extends StatelessWidget {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             foregroundColor: foreground,
+            overlayColor: theme.colorScheme.outline.withValues(alpha: 0.16),
             side: BorderSide(color: outline),
             textStyle: labelStyle,
           ),

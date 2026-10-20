@@ -15,6 +15,32 @@ import 'study_timer_widgets.dart';
 
 enum CalendarMode { today, week, month }
 
+class CalendarTimeSpan {
+  const CalendarTimeSpan({required this.top, required this.height});
+
+  final double top;
+  final double height;
+}
+
+CalendarTimeSpan? calendarTimeSpan(
+  StudySession session,
+  DateTime day, {
+  double hourHeight = 64,
+}) {
+  final start = DateTime(day.year, day.month, day.day);
+  final minutes = session.scheduledAt.difference(start).inMinutes;
+  final endMinutes = minutes + session.scheduledDurationMinutes;
+  if (minutes >= 1440 || endMinutes <= 0) {
+    return null;
+  }
+  final visibleStart = math.max(0, minutes);
+  final visibleEnd = math.min(1440, endMinutes);
+  return CalendarTimeSpan(
+    top: visibleStart * hourHeight / 60,
+    height: (visibleEnd - visibleStart) * hourHeight / 60,
+  );
+}
+
 Color plannerDaySurface(ThemeData theme, {required bool highlighted}) {
   final colors = theme.colorScheme;
   final base = colors.surfaceContainerLowest;
@@ -105,6 +131,22 @@ class _PlannerScreenState extends State<PlannerScreen> {
       count,
       (i) => DateTime(first.year, first.month, first.day + i),
     );
+  }
+
+  void _openDay(DateTime day) {
+    setState(() {
+      _mode = CalendarMode.today;
+      _anchor = DateUtils.dateOnly(day);
+    });
+  }
+
+  void _selectMode(CalendarMode mode) {
+    setState(() {
+      _mode = mode;
+      if (mode == CalendarMode.today) {
+        _anchor = DateUtils.dateOnly(DateTime.now());
+      }
+    });
   }
 
   void _navigate(int direction) {
@@ -291,7 +333,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
     }
   }
 
-  Widget _sessionTile(StudySession session, {bool compact = false}) {
+  Widget _sessionTile(
+    StudySession session, {
+    bool compact = false,
+    bool timeline = false,
+  }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final planner = context.read<StudyPlannerController>();
@@ -317,14 +363,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: () => _sessionOptions(session),
         child: Padding(
-          padding: EdgeInsets.all(compact ? 6 : 9),
+          padding: timeline
+              ? const EdgeInsets.symmetric(horizontal: 6, vertical: 1)
+              : EdgeInsets.all(compact ? 6 : 9),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 '${studyClock(session.scheduledAt)}  ${session.title}',
-                maxLines: compact ? 2 : 3,
+                maxLines: timeline ? 1 : (compact ? 2 : 3),
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: compact
@@ -377,6 +425,28 @@ class _PlannerScreenState extends State<PlannerScreen> {
     );
   }
 
+  Widget _timelineTile(StudySession session, double height) {
+    if (height < 19) {
+      final theme = Theme.of(context);
+      return Material(
+        key: ValueKey('planner-session-tile:${session.id}'),
+        color: StudyActionStyles.sessionCardColor(
+          theme,
+          session.colorValue,
+        ),
+        shape: StudyActionStyles.sessionCardShape(theme.colorScheme),
+        child: InkWell(
+          onTap: () => _sessionOptions(session),
+          borderRadius: BorderRadius.circular(12),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: _sessionTile(session, compact: true, timeline: true),
+    );
+  }
+
   Widget _dayCell(
     DateTime day,
     List<StudySession> sessions, {
@@ -406,6 +476,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
             key: ValueKey(
               'planner-day-cell-${day.year}-${day.month}-${day.day}',
             ),
+            clipBehavior: monthColumn == null
+                ? Clip.antiAlias
+                : Clip.none,
             decoration: BoxDecoration(
               color: candidates.isNotEmpty
                   ? scheme.primaryContainer
@@ -437,49 +510,52 @@ class _PlannerScreenState extends State<PlannerScreen> {
             padding: EdgeInsets.all(compact ? 6 : 12),
             child: Opacity(
               opacity: !inMonth && monthColumn != null ? 0.5 : 1,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _dayLabel(day),
-                          key: ValueKey(
-                            'planner-day-label-${day.year}-'
-                            '${day.month}-${day.day}',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: compact
-                                ? AppTypography.small
-                                : AppTypography.document,
-                            fontWeight: today
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            color: inMonth
-                                ? scheme.onSurface
-                                : scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      if (!compact)
-                        IconButton(
-                          tooltip: 'Plan on this day',
-                          icon: const Icon(Icons.add_rounded, size: 18),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => showStudySessionEditor(
-                            context,
-                            scheduledAt: DateTime(
-                              day.year,
-                              day.month,
-                              day.day,
-                              9,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => _openDay(day),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _dayLabel(day),
+                            key: ValueKey(
+                              'planner-day-label-${day.year}-'
+                              '${day.month}-${day.day}',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: compact
+                                  ? AppTypography.small
+                                  : AppTypography.document,
+                              fontWeight: today
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
+                              color: inMonth
+                                  ? scheme.onSurface
+                                  : scheme.onSurfaceVariant,
                             ),
                           ),
                         ),
-                    ],
+                        if (!compact)
+                          IconButton(
+                            tooltip: 'Plan on this day',
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => showStudySessionEditor(
+                              context,
+                              scheduledAt: DateTime(
+                                day.year,
+                                day.month,
+                                day.day,
+                                9,
+                              ),
+                            ),
+                          ),
+                      ],
                   ),
                   const SizedBox(height: 6),
                   if (_mode != CalendarMode.month)
@@ -490,11 +566,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         ),
                         day: day,
                         now: DateTime.now(),
-                        sessions: items,
+                        sessions: sessions,
                         compact: compact,
                         physics: _navigationPhysics,
-                        buildTile: (item) =>
-                            _sessionTile(item, compact: compact),
+                        buildTile: _timelineTile,
                         onPlanAt: (hour) => showStudySessionEditor(
                           context,
                           scheduledAt: DateTime(
@@ -519,21 +594,14 @@ class _PlannerScreenState extends State<PlannerScreen> {
                             ),
                           if (items.isEmpty)
                             InkWell(
-                              onTap: () => showStudySessionEditor(
-                                context,
-                                scheduledAt: DateTime(
-                                  day.year,
-                                  day.month,
-                                  day.day,
-                                  9,
-                                ),
-                              ),
+                              onTap: () => _openDay(day),
                               child: const SizedBox(height: 45),
                             ),
                         ],
                       ),
                     ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
@@ -563,10 +631,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 sessions: sessions,
                 physics: _navigationPhysics,
                 dayLabel: _dayLabel,
-                buildTile: (session) => _sessionTile(
-                  session,
-                  compact: true,
-                ),
+                buildTile: _timelineTile,
+                onOpenDay: _openDay,
                 onPlanAt: (day, hour) => showStudySessionEditor(
                   context,
                   scheduledAt: DateTime(
@@ -910,7 +976,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                             segments: const [
                               ButtonSegment(
                                 value: CalendarMode.today,
-                                label: Text('Today'),
+                                label: Text('Day'),
                               ),
                               ButtonSegment(
                                 value: CalendarMode.week,
@@ -923,7 +989,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                             ],
                             selected: {_mode},
                             onSelectionChanged: (next) =>
-                                setState(() => _mode = next.first),
+                                _selectMode(next.first),
                           ),
                         ],
                       ),
@@ -974,7 +1040,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                                 segments: const [
                                   ButtonSegment(
                                     value: CalendarMode.today,
-                                    label: Text('Today'),
+                                    label: Text('Day'),
                                   ),
                                   ButtonSegment(
                                     value: CalendarMode.week,
@@ -987,7 +1053,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                                 ],
                                 selected: {_mode},
                                 onSelectionChanged: (next) =>
-                                    setState(() => _mode = next.first),
+                                    _selectMode(next.first),
                               ),
                             ],
                           ),
@@ -1034,7 +1100,7 @@ class _HourlyDaySchedule extends StatefulWidget {
   final List<StudySession> sessions;
   final bool compact;
   final ScrollPhysics physics;
-  final Widget Function(StudySession) buildTile;
+  final Widget Function(StudySession, double) buildTile;
   final ValueChanged<int> onPlanAt;
 
   @override
@@ -1043,9 +1109,8 @@ class _HourlyDaySchedule extends StatefulWidget {
 
 class _HourlyDayScheduleState extends State<_HourlyDaySchedule> {
   static const double _hourHeight = 64;
+  static const double _axisWidth = 64;
   late final ScrollController _scrollController;
-
-  bool get _isToday => DateUtils.isSameDay(widget.day, widget.now);
 
   String get _dateKey =>
       '${widget.day.year}-${widget.day.month}-${widget.day.day}';
@@ -1053,10 +1118,15 @@ class _HourlyDayScheduleState extends State<_HourlyDaySchedule> {
   @override
   void initState() {
     super.initState();
+    final visible = widget.sessions.where(
+      (session) => calendarTimeSpan(session, widget.day) != null,
+    ).toList()
+      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
     final focusHour = DateUtils.isSameDay(widget.day, widget.now)
         ? widget.now.hour
-        : widget.sessions.isNotEmpty
-        ? widget.sessions.first.scheduledAt.hour
+        : visible.isNotEmpty
+        ? (calendarTimeSpan(visible.first, widget.day)!.top / _hourHeight)
+              .floor()
         : 8;
     _scrollController = ScrollController(
       initialScrollOffset: math.max(0, focusHour - 2) * _hourHeight,
@@ -1071,93 +1141,91 @@ class _HourlyDayScheduleState extends State<_HourlyDaySchedule> {
 
   Widget _hourRow(int hour) {
     final scheme = Theme.of(context).colorScheme;
-    final sessions = widget.sessions.where(
-      (session) => session.scheduledAt.hour == hour,
-    );
-    final currentHour = _isToday && widget.now.hour == hour;
-    final minuteFraction =
-        (widget.now.minute + widget.now.second / 60) / 60;
-    return Stack(
+    return SizedBox(
       key: ValueKey('planner-hour-row-$_dateKey-$hour'),
+      height: _hourHeight,
+      child: Row(
+        children: [
+          SizedBox(
+            width: _axisWidth,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 2),
+              child: Text(
+                '${hour.toString().padLeft(2, '0')}:00',
+                style: TextStyle(
+                  fontSize: AppTypography.small,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: scheme.outlineVariant.withValues(alpha: 0.65),
+                    width: 0.7,
+                  ),
+                ),
+              ),
+              child: InkWell(onTap: () => widget.onPlanAt(hour)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = widget.now;
+    final isToday = DateUtils.isSameDay(now, widget.day);
+    return ListView(
+      key: ValueKey('planner-hour-list-$_dateKey'),
+      controller: _scrollController,
+      physics: widget.physics,
+      padding: EdgeInsets.zero,
       children: [
-        if (currentHour)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Align(
-                alignment: Alignment(0, minuteFraction * 2 - 1),
-                child: Container(
+        SizedBox(
+          height: 24 * _hourHeight,
+          child: Stack(
+            children: [
+              Column(
+                children: [for (var hour = 0; hour < 24; hour++)
+      _hourRow(hour)],
+              ),
+              for (final session in widget.sessions)
+                if (calendarTimeSpan(session, widget.day) case final span?)
+                  Positioned(
+                    key: ValueKey('planner-time-position:${session.id}'),
+                    top: span.top,
+                    left: _axisWidth,
+                    right: 4,
+                    height: span.height,
+                    child: widget.buildTile(session, span.height),
+                  ),
+              if (isToday)
+                Positioned(
                   key: ValueKey('planner-now-line-$_dateKey'),
-                  width: double.infinity,
+                  top: (now.hour * 60 + now.minute) * _hourHeight / 60,
+                  left: _axisWidth,
+                  right: 0,
                   height: 2,
-                  color: scheme.onSurface.withValues(alpha: 0.8),
+                  child: ColoredBox(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.8),
+                  ),
                 ),
-              ),
-            ),
-          ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: scheme.outlineVariant.withValues(alpha: 0.65),
-                width: 0.7,
-              ),
-            ),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: _hourHeight),
-            child: InkWell(
-              onTap: () => widget.onPlanAt(hour),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 7, 3, 7),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: widget.compact ? 34 : 42,
-                      child: FractionalTranslation(
-                        translation: const Offset(0, -0.5),
-                        child: Text(
-                          '${hour.toString().padLeft(2, '0')}:00',
-                          style: TextStyle(
-                            fontSize: AppTypography.small,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 22),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final session in sessions)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 5),
-                              child: widget.buildTile(session),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            ],
           ),
         ),
       ],
     );
   }
-
-  @override
-  Widget build(BuildContext context) => ListView(
-    key: ValueKey('planner-hour-list-$_dateKey'),
-    controller: _scrollController,
-    physics: widget.physics,
-    padding: const EdgeInsets.fromLTRB(0, 10, 0, 4),
-    children: [for (var hour = 0; hour < 24; hour++) _hourRow(hour)],
-  );
 }
-
 
 class _CalendarHeaderStrip extends StatelessWidget {
   const _CalendarHeaderStrip({
@@ -1214,6 +1282,7 @@ class _WeekTimeGrid extends StatefulWidget {
     required this.buildTile,
     required this.onPlanAt,
     required this.onMove,
+    required this.onOpenDay,
     super.key,
   });
 
@@ -1222,9 +1291,10 @@ class _WeekTimeGrid extends StatefulWidget {
   final List<StudySession> sessions;
   final ScrollPhysics physics;
   final String Function(DateTime) dayLabel;
-  final Widget Function(StudySession) buildTile;
+  final Widget Function(StudySession, double) buildTile;
   final void Function(DateTime, int) onPlanAt;
   final void Function(String, DateTime) onMove;
+  final ValueChanged<DateTime> onOpenDay;
 
   @override
   State<_WeekTimeGrid> createState() => _WeekTimeGridState();
@@ -1267,44 +1337,37 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
       key: ValueKey('planner-day-cell-${_dayKey(day)}'),
       padding: const EdgeInsets.symmetric(horizontal: 5),
       color: plannerDaySurface(theme, highlighted: isToday),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              widget.dayLabel(day),
-              key: ValueKey('planner-day-label-${_dayKey(day)}'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: AppTypography.small,
-                fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+      child: InkWell(
+        onTap: () => widget.onOpenDay(day),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                widget.dayLabel(day),
+                key: ValueKey('planner-day-label-${_dayKey(day)}'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: AppTypography.small,
+                  fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                ),
               ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Plan on this day',
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.add_rounded, size: 18),
-            onPressed: () => widget.onPlanAt(day, 9),
-          ),
-        ],
+            IconButton(
+              tooltip: 'Plan on this day',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              onPressed: () => widget.onPlanAt(day, 9),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _hourCell(DateTime day, int hour) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     final dateKey = _dayKey(day);
-    final isToday = DateUtils.isSameDay(day, widget.now);
-    final nowHour = isToday && widget.now.hour == hour;
-    final atHour = widget.sessions.where(
-      (session) =>
-          DateUtils.isSameDay(session.scheduledAt, day) &&
-          session.scheduledAt.hour == hour,
-    );
-    final fraction =
-        (widget.now.minute + widget.now.second / 60) / 60;
     return DragTarget<StudySession>(
       onWillAcceptWithDetails: (details) =>
           details.data.status == StudyStatus.planned,
@@ -1312,11 +1375,14 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
           widget.onMove(details.data.id, day),
       builder: (context, candidates, rejected) => Container(
         key: ValueKey('planner-week-cell-$dateKey-$hour'),
-        constraints: const BoxConstraints(minHeight: _hourHeight),
+        height: _hourHeight,
         decoration: BoxDecoration(
           color: candidates.isNotEmpty
               ? scheme.primaryContainer
-              : plannerDaySurface(theme, highlighted: isToday),
+              : plannerDaySurface(
+                  Theme.of(context),
+                  highlighted: DateUtils.isSameDay(day, widget.now),
+                ),
           border: Border(
             top: BorderSide(
               width: 0.7,
@@ -1324,52 +1390,17 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             ),
           ),
         ),
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 7, 4, 7),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final item in atHour)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: widget.buildTile(item),
-                    ),
-                  if (atHour.isEmpty)
-                    InkWell(
-                      onTap: () => widget.onPlanAt(day, hour),
-                      child: const SizedBox(height: 49),
-                    ),
-                ],
-              ),
-            ),
-            if (nowHour)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Align(
-                    alignment: Alignment(0, fraction * 2 - 1),
-                    child: Container(
-                      key: ValueKey('planner-week-now-line-$dateKey'),
-                      width: double.infinity,
-                      height: 2,
-                      color: scheme.onSurface.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        child: InkWell(onTap: () => widget.onOpenDay(day)),
       ),
     );
   }
 
   Widget _hourRow(int hour) {
     final scheme = Theme.of(context).colorScheme;
-    return IntrinsicHeight(
+    return SizedBox(
+      key: ValueKey('planner-week-hour-row-$hour'),
+      height: _hourHeight,
       child: Row(
-        key: ValueKey('planner-week-hour-row-$hour'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
@@ -1421,20 +1452,89 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
         ),
       ),
       Expanded(
-        child: CustomPaint(
-          key: const ValueKey('planner-week-column-lines'),
-          foregroundPainter: _WeekColumnLinesPainter(
-            axisWidth: _axisWidth,
-            color: Theme.of(context).colorScheme.outlineVariant,
+        child: ClipRRect(
+          key: const ValueKey('planner-week-bottom-corners'),
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(12),
+            bottomRight: Radius.circular(12),
           ),
-          child: ListView(
-            key: const ValueKey('planner-week-hours'),
-            controller: _controller,
-            physics: widget.physics,
-            padding: EdgeInsets.zero,
-            children: [
-              for (var hour = 0; hour < 24; hour++) _hourRow(hour),
-            ],
+          child: CustomPaint(
+            key: const ValueKey('planner-week-column-lines'),
+            foregroundPainter: _WeekColumnLinesPainter(
+              axisWidth: _axisWidth,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+            child: ListView(
+              key: const ValueKey('planner-week-hours'),
+              controller: _controller,
+              physics: widget.physics,
+              padding: EdgeInsets.zero,
+              children: [
+                SizedBox(
+                  height: 24 * _hourHeight,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columnWidth =
+                          (constraints.maxWidth - _axisWidth) / 7;
+                      return Stack(
+                        children: [
+                          Column(
+                            children: [
+                              for (var hour = 0; hour < 24; hour++)
+                                _hourRow(hour),
+                            ],
+                          ),
+                          for (var column = 0; column < 7; column++)
+                            for (final session in widget.sessions)
+                              if (calendarTimeSpan(
+                                session,
+                                widget.days[column],
+                              ) case final span?)
+                                Positioned(
+                                  key: ValueKey(
+                                    'planner-time-position:${session.id}-'
+                                    '${_dayKey(widget.days[column])}',
+                                  ),
+                                  left: _axisWidth + columnWidth * column + 4,
+                                  width: columnWidth - 8,
+                                  top: span.top,
+                                  height: span.height,
+                                  child: widget.buildTile(
+                                    session,
+                                    span.height,
+                                  ),
+                                ),
+                          for (var column = 0; column < 7; column++)
+                            if (DateUtils.isSameDay(
+                              widget.days[column],
+                              widget.now,
+                            ))
+                              Positioned(
+                                key: ValueKey(
+                                  'planner-week-now-line-'
+                                  '${_dayKey(widget.days[column])}',
+                                ),
+                                left: _axisWidth + columnWidth * column,
+                                width: columnWidth,
+                                top: (widget.now.hour * 60 +
+                                        widget.now.minute) *
+                                    _hourHeight /
+                                    60,
+                                height: 2,
+                                child: ColoredBox(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.8),
+                                ),
+                              ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

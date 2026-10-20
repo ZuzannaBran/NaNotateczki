@@ -414,7 +414,7 @@ void main() {
     expect(folders.physics, isA<TouchNavigationScrollPhysics>());
     expect((folders.physics! as TouchNavigationScrollPhysics).sensitivity, 1.8);
     await _openPlanner(tester);
-    await tester.tap(find.text('Today').last);
+    await tester.tap(find.text('Day').last);
     await tester.pumpAndSettle();
     final list = find.byType(ListView);
     expect(list, findsOneWidget);

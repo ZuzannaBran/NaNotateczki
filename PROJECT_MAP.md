@@ -524,7 +524,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 
 ## 6a. Planer nauki (bez migracji SQLite)
 
-- `lib/features/planner/state/study_planner_controller.dart` (562):
+- `lib/features/planner/state/study_planner_controller.dart` (566):
   `StudySession`, `StudyTechnique`, `StudyStatus`, `StudyPlannerController`.
   Jeden stan Provider + ChangeNotifier, trwały `study_planner.json` przez
   cross-platform `text_storage`. Timery liczone względem deadline,
@@ -535,7 +535,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   pozostawione w stanie review są przenoszone do historii bez ponagleń.
   Sesje zapisują 1–12 bloków Smart i opcjonalny kolor karty.
   Starsze zapisy otrzymują domyślne wartości techniki oraz brak koloru.
-  Czas i przejścia timerów używają liczby wybranych bloków;
+  Czas i przejścia timerów używają liczby wybranych bloków.
+  Czas zajmowany w kalendarzu zawiera także przerwy pomiędzy blokami,
+  bez przerwy po ostatnim bloku;
   zakończenie sesji otwiera ocenę bez dolnego SnackBara.
   Wynik wczytywania po dispose jest ignorowany: bez powiadomienia, timera
   ani zapisu odzyskanej historii.
@@ -547,7 +549,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   310: `create`;
   391: `start`;
   553: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (754):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (761):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -566,39 +568,47 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Nowe i edytowane sesje (także z kalendarza) mogą mieć indywidualny
   kolor z tych samych palet, Recent i edytora HEX co foldery.
   Formularz Smart umożliwia wybór liczby bloków 1–12.
-  Ocena ma nagłówek „Great job! Time's up.”.
+  Ocena ma wyśrodkowany nagłówek „Great job! Time's up.”.
+  Pole Session name, analogicznie do Description, nie ma przykładowego
+  placeholdera.
   W trakcie sesji Resume/Pause oraz Stop mają tę samą wysokość 32 px,
   kontur i promień 12 px co przyciski Start/Smart.
   Selektor techniki w formularzu `isExpanded` mieści się w wąskim dialogu.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
-  32: `studyRatingStars`;
-  39: `openStudyPlanner`;
-  45: `showStudySessionEditor`;
-  65: `showStudyRating`;
-  430: `StudyTimerCard`;
-  705: `CompactStudyTimer`.
-- `lib/features/planner/presentation/study_action_theme.dart` (161):
+  36: `studyRatingStars`;
+  43: `openStudyPlanner`;
+  49: `showStudySessionEditor`;
+  69: `showStudyRating`;
+  437: `StudyTimerCard`;
+  713: `CompactStudyTimer`.
+- `lib/features/planner/presentation/study_action_theme.dart` (163):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
   zawartość ikon i tekstu oraz promień 12 px selektora Today/Week/Month;
   wspólne tło i obrys kart planowanych sesji w kalendarzu i timerze,
   z opcjonalnym odcieniem wybranego koloru;
-  subtelny beż tylko dla wyróżnianych akcji; pozostałe przyciski bez ciemnego
-  wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
+  zaznaczenie przycisków Start/Smart i Day/Week/Month oraz ich
+  obrys korzystają z globalnego koloru AppColors.divider, nie
+  z ręcznie przypisanego brązu; pozostałe przyciski zachowują tło
+  z globalnej palety. Tryb ciemny używa globalnej palety,
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1474):
-  `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
+- `lib/features/planner/presentation/planner_screen.dart` (1574):
+  `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
+  Day domyślnie otwiera aktualny dzień, a kliknięcie pola Week/Month
+  przechodzi do wybranej daty. Przyciski + zachowują tworzenie sesji.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
   Wybrany kolor sesji jest nakładką nad tłem karty w Week/Today/Month.
   W Week i Month bieżący dzień ma umiarkowanie ciemniejsze tło,
   z 50% warstwą odcienia motywu na tle zwykłej komórki.
-  Today zachowuje normalne tło i większy odstęp godziny od karty sesji.
-  Week to jedna przewijana pionowo siatka 24 godzin z pojedynczym pasem
-  godzin po lewej stronie; wąskie ekrany przewijają siatkę poziomo.
+  Day zachowuje normalne tło. Day i Week mają stałą siatkę godzin
+  (64 px/h) i bloki pozycjonowane według dokładnej minuty rozpoczęcia
+  i całkowitego czasu sesji (w Smart również z przerwami), z podziałem
+  na dwa dni przy przekroczeniu północy. Week ma wspólną oś godzin
+  po lewej; wąskie ekrany przewijają siatkę poziomo.
   Week i Month mają marginesy boczne 18 px i wspólny pasek nagłówka
   z zaokrąglonymi tylko górnymi rogami (12 px) i ostrymi dolnymi.
   Pasek styka się bez odstępu z siatką; godziny Today/Week zaczynają
@@ -621,13 +631,20 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px; Month na wąskim ekranie listę.
   16: `CalendarMode`;
-  43: `PlannerScreen`;
-  50: `_PlannerScreenState`;
-  1020: `_HourlyDaySchedule`;
-  1162: `_CalendarHeaderStrip`;
-  1207: `_WeekTimeGrid` — wspólna oś;
-  1445: `_WeekColumnLinesPainter`
-  — linie kolumn w całej widocznej wysokości.
+  18: `CalendarTimeSpan`;
+  25: `calendarTimeSpan`;
+  78: `PlannerScreen`;
+  85: `_PlannerScreenState`;
+  1086: `_HourlyDaySchedule`;
+  1230: `_CalendarHeaderStrip`;
+  1275: `_WeekTimeGrid`;
+  1545: `_WeekColumnLinesPainter`.
+  Ręczny scenariusz przy braku Fluttera: 15:45/30 min powinno
+  zajmować końcową ćwiartkę godziny 15 i pierwszą ćwiartkę godziny 16
+  w Day i Week; Smart 3 × 25 min z przerwami 5 min zajmuje 85 min;
+  kliknięcie w tydzień/miesiąc wybiera dzień, a zakładka Day
+  przywraca dzisiaj. Sprawdź zaokrąglone dolne rogi, kolor przycisków
+  i wyśrodkowany komunikat zakończenia sesji.
 - `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów.
 - `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
   zgodność starszych sesji, reset koloru, resume, pauza, konflikt
@@ -646,12 +663,17 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   dni granicznych miesiąca, łagodne zaznaczenie Week/Month,
   brak zaznaczenia Today i większy odstęp od sesji, wspólną oś godzin Week,
   linię aktualnego czasu, boczne marginesy Week/Month, jednolite
-  nagłówki styczne z siatką, ostre dolne rogi, górne wyrównanie
-  etykiet godzin, pełnowysokie linie między dniami Week i przedłużenie
+  nagłówki styczne z siatką, ostre dolne rogi, zaokrąglone dolne
+  narożniki siatki, minutowe pozycjonowanie bloków (z czasem przerw),
+  kliknięcie Week/Month do wybranego Day i reset Day do dzisiejszej
+  daty, górne wyrównanie etykiet i pełnowysokie linie Week oraz
   poziomych linii do etykiet, brak scrollbarów bez blokowania gestów,
   jaśniejsze tła dni spoza miesiąca w obu motywach,
   osobny scroll Upcoming, limit wysokości listy,
-  spójne przyciski włączonego timera, brak overflow selektora techniki,
+  spójne przyciski włączonego timera, aktualną paletę zaznaczeń,
+  skalowanie Smart i przecinających granicę godziny/doby sesji,
+  brak placeholdera nazwy i wyśrodkowanie oceny,
+  brak overflow selektora techniki,
   margines dolny i oceny kalendarza.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
   tygodnia we wszystkich widokach i po zmianie daty; 4/5/6 tygodni

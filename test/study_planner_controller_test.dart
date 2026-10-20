@@ -169,6 +169,7 @@ void main() {
       );
       expect(item.focusBlocks, 2);
       expect(item.totalFocusMinutes, 50);
+    expect(item.scheduledDurationMinutes, 55);
       expect(item.colorValue, 0xFF7491C4);
 
       planner.start(item.id);

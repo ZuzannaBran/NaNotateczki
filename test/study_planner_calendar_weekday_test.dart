@@ -95,7 +95,7 @@ void main() {
       expectCalendarLabel(tester, date, '${shortWeekday(date)} ${date.day}');
     }
 
-    await tester.tap(find.text('Today').last);
+    await tester.tap(find.text('Day').last);
     await tester.pumpAndSettle();
     const months = [
       'January',
