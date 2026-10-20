@@ -595,7 +595,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1588):
+- `lib/features/planner/presentation/planner_screen.dart` (1770):
   `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
   Day domyślnie otwiera aktualny dzień, a kliknięcie pola Week/Month
   przechodzi do wybranej daty. Przyciski + zachowują tworzenie sesji.
@@ -632,15 +632,21 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   w równym rzędzie.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px; Month na wąskim ekranie listę.
-  16: `CalendarMode`;
-  18: `CalendarTimeSpan`;
-  25: `calendarTimeSpan`;
-  78: `PlannerScreen`;
-  85: `_PlannerScreenState`;
-  1086: `_HourlyDaySchedule`;
-  1230: `_CalendarHeaderStrip`;
-  1276: `_WeekTimeGrid`;
-  1538: `_WeekColumnLinesPainter`.
+  16: `CalendarMode`; 18: `CalendarTimeSpan`;
+  25: `calendarTimeSpan`; 44: `CalendarSessionPlacement`;
+  59: `calendarSessionPlacements`; 157: `PlannerScreen`;
+  164: `_PlannerScreenState`;
+  1160: `_HourlyDaySchedule`; 1329: `_CalendarHeaderStrip`;
+  1375: `_CalendarBorderFrame`; 1398: `_WeekTimeGrid`;
+  1694: `_WeekTableClipper`; 1720: `_WeekColumnLinesPainter`.
+  `_WeekTimeGrid`: pełnowysokie separatory i wspólna ramka na
+  wierzchu siatki; clip uwzględnia lewą granicę tabeli obok osi godzin.
+  `calendarSessionPlacements` przydziela niekolidujące kolumny blokom
+  Day/Week według widocznych przedziałów czasowych, także przy sesjach
+  przez północ; grupy bez konfliktu zachowują pełną szerokość.
+  Week i Month rysują ciągły obrys z zaokrąglonymi narożnikami
+  nad zawartością komórek (zamiast odcinanych odcinków ramki).
+  `_WeekColumnLinesPainter`: kolory dni i pionowe separatory.
   Nowa kontrola ręczna: przewiń Week pionowo i sprawdź pełną wysokość
   wypełnienia bieżącego dnia oraz separatorów od górnej do dolnej granicy
   obszaru. Linie godzin nie powinny wychodzić poza tabelę. Przytrzymaj
@@ -683,6 +689,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   brak placeholdera nazwy i wyśrodkowanie oceny,
   brak overflow selektora techniki,
   margines dolny i oceny kalendarza.
+- `test/planner_calendar_layout_test.dart`: regresje grupowania i
+  pozycjonowania równoległych sesji Day/Week (w tym sesji przechodzących
+  przez północ) oraz obrysu zaokrąglonych ramek Week/Month.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
   tygodnia we wszystkich widokach i po zmianie daty; 4/5/6 tygodni
   miesiąca z zachowaniem dni przejściowych; osobny krok CI.

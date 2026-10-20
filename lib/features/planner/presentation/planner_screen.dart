@@ -41,6 +41,85 @@ CalendarTimeSpan? calendarTimeSpan(
   );
 }
 
+class CalendarSessionPlacement {
+  const CalendarSessionPlacement({
+    required this.session,
+    required this.span,
+    required this.lane,
+    required this.laneCount,
+  });
+
+  final StudySession session;
+  final CalendarTimeSpan span;
+  final int lane;
+  final int laneCount;
+}
+
+/// Positions concurrent sessions in separate columns.
+List<CalendarSessionPlacement> calendarSessionPlacements(
+  List<StudySession> sessions,
+  DateTime day,
+) {
+  final visible = <(StudySession, CalendarTimeSpan)>[];
+  for (final session in sessions) {
+    final span = calendarTimeSpan(session, day);
+    if (span != null && span.height > 0) {
+      visible.add((session, span));
+    }
+  }
+  visible.sort((a, b) {
+    final byTime = a.$2.top.compareTo(b.$2.top);
+    if (byTime != 0) {
+      return byTime;
+    }
+    final byDuration = b.$2.height.compareTo(a.$2.height);
+    return byDuration != 0 ? byDuration : a.$1.id.compareTo(b.$1.id);
+  });
+
+  final placements = <CalendarSessionPlacement>[];
+  var start = 0;
+  while (start < visible.length) {
+    var endIndex = start + 1;
+    var lastEnd = visible[start].$2.top + visible[start].$2.height;
+    while (endIndex < visible.length &&
+        visible[endIndex].$2.top < lastEnd) {
+      lastEnd = math.max(
+        lastEnd,
+        visible[endIndex].$2.top + visible[endIndex].$2.height,
+      );
+      endIndex++;
+    }
+
+    final laneEnds = <double>[];
+    final lanes = <int>[];
+    for (var index = start; index < endIndex; index++) {
+      final span = visible[index].$2;
+      var lane = 0;
+      while (lane < laneEnds.length && laneEnds[lane] > span.top) {
+        lane++;
+      }
+      if (lane == laneEnds.length) {
+        laneEnds.add(span.top + span.height);
+      } else {
+        laneEnds[lane] = span.top + span.height;
+      }
+      lanes.add(lane);
+    }
+    for (var index = start; index < endIndex; index++) {
+      placements.add(
+        CalendarSessionPlacement(
+          session: visible[index].$1,
+          span: visible[index].$2,
+          lane: lanes[index - start],
+          laneCount: laneEnds.length,
+        ),
+      );
+    }
+    start = endIndex;
+  }
+  return placements;
+}
+
 Color plannerDaySurface(ThemeData theme, {required bool highlighted}) {
   final colors = theme.colorScheme;
   final base = colors.surfaceContainerLowest;
@@ -492,9 +571,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   ? BorderRadius.circular(14)
                   : null,
               border: monthColumn == null
-                  ? Border.all(
-                      color: today ? scheme.outline : scheme.outlineVariant,
-                    )
+                  ? null
                   : Border(
                       right: monthColumn == 6
                           ? BorderSide.none
@@ -504,6 +581,14 @@ class _PlannerScreenState extends State<PlannerScreen> {
                           : BorderSide(color: scheme.outlineVariant),
                     ),
             ),
+            foregroundDecoration: monthColumn == null
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: today ? scheme.outline : scheme.outlineVariant,
+                    ),
+                  )
+                : null,
             margin: monthColumn == null
                 ? const EdgeInsets.all(3)
                 : EdgeInsets.zero,
@@ -672,6 +757,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(12),
+              ),
+              foregroundDecoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: Theme.of(context).colorScheme.outlineVariant,
                 ),
@@ -704,78 +792,64 @@ class _PlannerScreenState extends State<PlannerScreen> {
               child: SingleChildScrollView(
                 physics: _navigationPhysics,
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
-                child: Column(
-                  children: [
-                    _CalendarHeaderStrip(
-                      key: const ValueKey('planner-month-header-strip'),
-                      days: [
-                        for (final name in const [
-                          'Mon',
-                          'Tue',
-                          'Wed',
-                          'Thu',
-                          'Fri',
-                          'Sat',
-                          'Sun',
-                        ])
-                          Center(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: AppTypography.small,
+                child: _CalendarBorderFrame(
+                  key: const ValueKey('planner-month-frame'),
+                  child: Column(
+                    children: [
+                      _CalendarHeaderStrip(
+                        key: const ValueKey('planner-month-header-strip'),
+                        days: [
+                          for (final name in const [
+                            'Mon',
+                            'Tue',
+                            'Wed',
+                            'Thu',
+                            'Fri',
+                            'Sat',
+                            'Sun',
+                          ])
+                            Center(
+                              child: Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: AppTypography.small,
+                                ),
                               ),
                             ),
+                        ],
+                      ),
+                      Container(
+                        key: const ValueKey('planner-month-grid-surface'),
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerLowest,
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(12),
+                            bottomRight: Radius.circular(12),
                           ),
-                      ],
-                    ),
-                    Container(
-                      key: const ValueKey('planner-month-grid-surface'),
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerLowest,
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
+                        ),
+                        child: GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: days.length,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 7,
+                                childAspectRatio: 1.1,
+                              ),
+                          itemBuilder: (context, i) => _dayCell(
+                            days[i],
+                            sessions,
+                            compact: true,
+                            monthColumn: i % 7,
+                            lastMonthRow: i >= days.length - 7,
+                          ),
                         ),
                       ),
-                      foregroundDecoration: BoxDecoration(
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
-                        ),
-                        border: Border(
-                          left: BorderSide(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                          right: BorderSide(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                          bottom: BorderSide(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                        ),
-                      ),
-                      child: GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: days.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 7,
-                              childAspectRatio: 1.1,
-                            ),
-                        itemBuilder: (context, i) => _dayCell(
-                          days[i],
-                          sessions,
-                          compact: true,
-                          monthColumn: i % 7,
-                          lastMonthRow: i >= days.length - 7,
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1181,6 +1255,10 @@ class _HourlyDayScheduleState extends State<_HourlyDaySchedule> {
   Widget build(BuildContext context) {
     final now = widget.now;
     final isToday = DateUtils.isSameDay(now, widget.day);
+    final placements = calendarSessionPlacements(
+      widget.sessions,
+      widget.day,
+    );
     return ListView(
       key: ValueKey('planner-hour-list-$_dateKey'),
       controller: _scrollController,
@@ -1189,42 +1267,63 @@ class _HourlyDayScheduleState extends State<_HourlyDaySchedule> {
       children: [
         SizedBox(
           height: 24 * _hourHeight,
-          child: Stack(
-            children: [
-              Column(
-                children: [for (var hour = 0; hour < 24; hour++)
-      _hourRow(hour)],
-              ),
-              for (final session in widget.sessions)
-                if (calendarTimeSpan(session, widget.day) case final span?)
-                  Positioned(
-                    key: ValueKey('planner-time-position:${session.id}'),
-                    top: span.top,
-                    left: _axisWidth,
-                    right: 4,
-                    height: span.height,
-                    child: widget.buildTile(session, span.height),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final usableWidth = math.max(
+                0.0,
+                constraints.maxWidth - _axisWidth - 4,
+              );
+              return Stack(
+                children: [
+                  Column(
+                    children: [
+                      for (var hour = 0; hour < 24; hour++) _hourRow(hour),
+                    ],
                   ),
-              if (isToday)
-                Positioned(
-                  key: ValueKey('planner-now-line-$_dateKey'),
-                  top: (now.hour * 60 + now.minute) * _hourHeight / 60,
-                  left: _axisWidth,
-                  right: 0,
-                  height: 2,
-                  child: ColoredBox(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.8),
-                  ),
-                ),
-            ],
+                  for (final placement in placements)
+                    Positioned(
+                      key: ValueKey(
+                        'planner-time-position:${placement.session.id}',
+                      ),
+                      top: placement.span.top,
+                      left: _axisWidth +
+                          usableWidth * placement.lane /
+                              placement.laneCount +
+                          (placement.lane == 0 ? 0 : 2),
+                      width: math.max(
+                        0.0,
+                        usableWidth / placement.laneCount -
+                            (placement.lane == 0 ? 0 : 2),
+                      ),
+                      height: placement.span.height,
+                      child: widget.buildTile(
+                        placement.session,
+                        placement.span.height,
+                      ),
+                    ),
+                  if (isToday)
+                    Positioned(
+                      key: ValueKey('planner-now-line-$_dateKey'),
+                      top: (now.hour * 60 + now.minute) * _hourHeight / 60,
+                      left: _axisWidth,
+                      right: 0,
+                      height: 2,
+                      child: ColoredBox(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.8),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ],
     );
   }
+
 }
 
 class _CalendarHeaderStrip extends StatelessWidget {
@@ -1269,6 +1368,29 @@ class _CalendarHeaderStrip extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _CalendarBorderFrame extends StatelessWidget {
+  const _CalendarBorderFrame({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: child,
     );
   }
 }
@@ -1423,116 +1545,176 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context) => Stack(
     key: const ValueKey('planner-week-time-grid'),
     children: [
-      Padding(
-        padding: const EdgeInsets.only(left: _axisWidth),
-        child: _CalendarHeaderStrip(
-          key: const ValueKey('planner-week-header-strip'),
-          days: [for (final day in widget.days) _header(day)],
-        ),
-      ),
-      Expanded(
-        child: ClipRRect(
-          key: const ValueKey('planner-week-bottom-corners'),
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(12),
-            bottomRight: Radius.circular(12),
-          ),
-          child: CustomPaint(
-            key: const ValueKey('planner-week-column-lines'),
-            painter: _WeekColumnLinesPainter(
-              axisWidth: _axisWidth,
-              color: Theme.of(context).colorScheme.outlineVariant,
-              baseColor: plannerDaySurface(
-                Theme.of(context),
-                highlighted: false,
-              ),
-              todayColor: plannerDaySurface(
-                Theme.of(context),
-                highlighted: true,
-              ),
-              todayIndex: widget.days.indexWhere(
-                (day) => DateUtils.isSameDay(day, widget.now),
-              ),
+      Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: _axisWidth),
+            child: _CalendarHeaderStrip(
+              key: const ValueKey('planner-week-header-strip'),
+              days: [for (final day in widget.days) _header(day)],
             ),
-            child: ListView(
-              key: const ValueKey('planner-week-hours'),
-              controller: _controller,
-              physics: widget.physics,
-              padding: EdgeInsets.zero,
-              children: [
-                SizedBox(
-                  height: 24 * _hourHeight,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final columnWidth =
-                          (constraints.maxWidth - _axisWidth) / 7;
-                      return Stack(
-                        children: [
-                          Column(
-                            children: [
-                              for (var hour = 0; hour < 24; hour++)
-                                _hourRow(hour),
-                            ],
-                          ),
-                          for (var column = 0; column < 7; column++)
-                            for (final session in widget.sessions)
-                              if (calendarTimeSpan(
-                                session,
-                                widget.days[column],
-                              ) case final span?)
-                                Positioned(
-                                  key: ValueKey(
-                                    'planner-time-position:${session.id}-'
-                                    '${_dayKey(widget.days[column])}',
-                                  ),
-                                  left: _axisWidth + columnWidth * column + 4,
-                                  width: columnWidth - 8,
-                                  top: span.top,
-                                  height: span.height,
-                                  child: widget.buildTile(
-                                    session,
-                                    span.height,
-                                  ),
+          ),
+          Expanded(
+            child: ClipRRect(
+              key: const ValueKey('planner-week-bottom-corners'),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+              child: ClipPath(
+                clipper: const _WeekTableClipper(axisWidth: _axisWidth),
+                child: CustomPaint(
+                  key: const ValueKey('planner-week-column-lines'),
+                  painter: _WeekColumnLinesPainter(
+                    axisWidth: _axisWidth,
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    baseColor: plannerDaySurface(
+                      Theme.of(context),
+                      highlighted: false,
+                    ),
+                    todayColor: plannerDaySurface(
+                      Theme.of(context),
+                      highlighted: true,
+                    ),
+                    todayIndex: widget.days.indexWhere(
+                      (day) => DateUtils.isSameDay(day, widget.now),
+                    ),
+                  ),
+                  child: ListView(
+                    key: const ValueKey('planner-week-hours'),
+                    controller: _controller,
+                    physics: widget.physics,
+                    padding: EdgeInsets.zero,
+                    children: [
+                      SizedBox(
+                        height: 24 * _hourHeight,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final columnWidth =
+                                (constraints.maxWidth - _axisWidth) / 7;
+                            final layouts = [
+                              for (final day in widget.days)
+                                calendarSessionPlacements(widget.sessions, day),
+                            ];
+                            return Stack(
+                              children: [
+                                Column(
+                                  children: [
+                                    for (var hour = 0; hour < 24; hour++)
+                                      _hourRow(hour),
+                                  ],
                                 ),
-                          for (var column = 0; column < 7; column++)
-                            if (DateUtils.isSameDay(
-                              widget.days[column],
-                              widget.now,
-                            ))
-                              Positioned(
-                                key: ValueKey(
-                                  'planner-week-now-line-'
-                                  '${_dayKey(widget.days[column])}',
-                                ),
-                                left: _axisWidth + columnWidth * column,
-                                width: columnWidth,
-                                top: (widget.now.hour * 60 +
-                                        widget.now.minute) *
-                                    _hourHeight /
-                                    60,
-                                height: 2,
-                                child: ColoredBox(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface
-                                      .withValues(alpha: 0.8),
-                                ),
-                              ),
-                        ],
-                      );
-                    },
+                                for (var column = 0; column < 7; column++)
+                                  for (final placement in layouts[column])
+                                    Positioned(
+                                      key: ValueKey(
+                                        'planner-time-position:'
+                                        '${placement.session.id}-'
+                                        '${_dayKey(widget.days[column])}',
+                                      ),
+                                      left: _axisWidth +
+                                          columnWidth * column +
+                                          4 +
+                                          (columnWidth - 8) *
+                                              placement.lane /
+                                              placement.laneCount +
+                                          (placement.lane == 0 ? 0 : 2),
+                                      width: math.max(
+                                        0.0,
+                                        (columnWidth - 8) /
+                                                placement.laneCount -
+                                            (placement.lane == 0 ? 0 : 2),
+                                      ),
+                                      top: placement.span.top,
+                                      height: placement.span.height,
+                                      child: widget.buildTile(
+                                        placement.session,
+                                        placement.span.height,
+                                      ),
+                                    ),
+                                for (var column = 0; column < 7; column++)
+                                  if (DateUtils.isSameDay(
+                                    widget.days[column],
+                                    widget.now,
+                                  ))
+                                    Positioned(
+                                      key: ValueKey(
+                                        'planner-week-now-line-'
+                                        '${_dayKey(widget.days[column])}',
+                                      ),
+                                      left: _axisWidth +
+                                          columnWidth * column,
+                                      width: columnWidth,
+                                      top: (widget.now.hour * 60 +
+                                              widget.now.minute) *
+                                          _hourHeight /
+                                          60,
+                                      height: 2,
+                                      child: ColoredBox(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.8),
+                                      ),
+                                    ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      Positioned.fill(
+        left: _axisWidth,
+        child: IgnorePointer(
+          child: Container(
+            key: const ValueKey('planner-week-frame-outline'),
+            foregroundDecoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
           ),
         ),
       ),
     ],
   );
+}
+
+class _WeekTableClipper extends CustomClipper<Path> {
+  const _WeekTableClipper({required this.axisWidth});
+
+  final double axisWidth;
+
+  @override
+  Path getClip(Size size) => Path()
+    ..addRect(Rect.fromLTWH(0, 0, axisWidth, size.height))
+    ..addRRect(
+      RRect.fromRectAndCorners(
+        Rect.fromLTWH(
+          axisWidth,
+          0,
+          size.width - axisWidth,
+          size.height,
+        ),
+        bottomLeft: const Radius.circular(12),
+        bottomRight: const Radius.circular(12),
+      ),
+    );
+
+  @override
+  bool shouldReclip(covariant _WeekTableClipper oldClipper) =>
+      oldClipper.axisWidth != axisWidth;
 }
 
 class _WeekColumnLinesPainter extends CustomPainter {
