@@ -110,6 +110,17 @@ void main() {
     expect(tester.getSize(studyToggle), const Size(44, 24));
     expect(tester.getSize(folderToggle), const Size(24, 44));
     expect(
+      tester.getTopLeft(studyToggle).dx,
+      closeTo(tester.getTopLeft(studyDivider).dx + 8, 0.1),
+    );
+    final chevron = find.byKey(
+      const ValueKey('study-panel-chevron-rotation'),
+    );
+    expect(
+      tester.widget<Transform>(chevron).transform.entry(1, 0),
+      closeTo(-1, 0.001),
+    );
+    expect(
       tester.getBottomLeft(studyToggle).dy,
       closeTo(tester.getTopLeft(studyDivider).dy, 0.1),
     );
@@ -137,6 +148,14 @@ void main() {
     expect(find.byKey(const ValueKey('sidebar-timer-region')), findsNothing);
     expect(find.byKey(const ValueKey('sidebar-account-divider')), findsNothing);
     expect(find.byTooltip('Show study planner'), findsOneWidget);
+    expect(
+      tester.widget<Transform>(chevron).transform.entry(1, 0),
+      closeTo(1, 0.001),
+    );
+    expect(
+      tester.getTopLeft(studyToggle).dx,
+      closeTo(tester.getTopLeft(studyDivider).dx + 8, 0.1),
+    );
     expect(
       tester.getBottomLeft(studyToggle).dy,
       closeTo(tester.getTopLeft(studyDivider).dy, 0.1),

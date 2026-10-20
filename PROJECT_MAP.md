@@ -382,7 +382,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1823 linii)
+### `lib/features/library/presentation/library_screen.dart` (1824 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -414,7 +414,9 @@ separatory folderów/timera i paska konta używają `AppHeaderDivider`,
 na desktopie sięgają przez 12 px uchwytu do prawej krawędzi sidebaru.
 Pionowy separator uchwytu korzysta z tego samego koloru motywu.
 Panel timera ma poziomy przycisk `study-panel-toggle` (44 × 24 px)
-z ikoną obróconego chevrona góra/dół, zaokrągloną górą i ostrym dołem
+po lewej stronie separatora (margines 8 px). Chevron jest skierowany
+w dół przy rozwiniętym panelu (przycisk wyżej), a w górę po zwinięciu.
+Przycisk zachowuje zaokrągloną górę i ostry dół
 stykającym się z poziomym separatorem. Współdzieli kolor, obrys i cień
 z przyciskiem folderów, ale jest obrócony o 90 stopni. Zakładka
 znajduje się wewnątrz `Stack` listy folderów, dzięki czemu całe
@@ -1261,7 +1263,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   i aktualizacja mnożnika przewijania plików bez restartu; geometria,
   kolor i obsługa menu
   folderu, notebooka oraz boarda, a także poziomą zakładkę timera
-  (obrócone wymiary, styczne proste dolne rogi, ten sam cień i obrys,
+  (pozycja po lewej, strzałki dół/góra, obrócone wymiary,
+  proste dolne rogi stykające się z separatorem, ten sam cień i obrys,
   pełny hit-test w obu stanach) i menu dodawania (4 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,

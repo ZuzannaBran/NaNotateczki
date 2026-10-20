@@ -1003,7 +1003,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                             ),
                     ),
                     Positioned(
-                      right: 8,
+                      left: 8,
                       bottom: 0,
                       child: _LeftZoneToggleTab(
                         expanded: _showStudyPanel,
@@ -1807,7 +1807,8 @@ class _LeftZoneToggleTab extends StatelessWidget {
                 : _LibraryScreenState._toggleTabHeight,
             child: studyPanel
                 ? Transform.rotate(
-                    angle: expanded ? math.pi / 2 : -math.pi / 2,
+                    key: const ValueKey('study-panel-chevron-rotation'),
+                    angle: expanded ? -math.pi / 2 : math.pi / 2,
                     child: const Icon(Icons.chevron_left, size: 18),
                   )
                 : Icon(
