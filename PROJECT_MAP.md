@@ -382,7 +382,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1824 linii)
+### `lib/features/library/presentation/library_screen.dart` (1843 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -417,8 +417,10 @@ Panel timera ma poziomy przycisk `study-panel-toggle` (44 × 24 px)
 po lewej stronie separatora (margines 8 px). Chevron jest skierowany
 w dół przy rozwiniętym panelu (przycisk wyżej), a w górę po zwinięciu.
 Przycisk zachowuje zaokrągloną górę i ostry dół
-stykającym się z poziomym separatorem. Współdzieli kolor, obrys i cień
-z przyciskiem folderów, ale jest obrócony o 90 stopni. Zakładka
+stykającym się z poziomym separatorem. Współdzieli kolor i obrys
+z przyciskiem folderów. Zamiast cienia Material w dół używa
+BoxShadow o przesunięciu (6, 0) i blur 8, dzięki czemu cień pada
+w prawo. Zakładka
 znajduje się wewnątrz `Stack` listy folderów, dzięki czemu całe
 24 px wysokości jest klikalne, także po zwinięciu timera. Zwinięcie
 zwraca miejsce liście bez pustego paska i podwójnego separatora.
@@ -1264,8 +1266,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   kolor i obsługa menu
   folderu, notebooka oraz boarda, a także poziomą zakładkę timera
   (pozycja po lewej, strzałki dół/góra, obrócone wymiary,
-  proste dolne rogi stykające się z separatorem, ten sam cień i obrys,
-  pełny hit-test w obu stanach) i menu dodawania (4 pozycje,
+  proste dolne rogi stykające się z separatorem, cień przesunięty
+  poziomo w prawo, wspólny obrys i pełny hit-test w obu stanach)
+  i menu dodawania (4 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
   stykanie menu z prawą granicą całego sidebaru (w tym resize handle),

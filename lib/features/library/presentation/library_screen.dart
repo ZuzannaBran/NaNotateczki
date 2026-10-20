@@ -1772,7 +1772,7 @@ class _LeftZoneToggleTab extends StatelessWidget {
             topRight: Radius.circular(12),
             bottomRight: Radius.circular(12),
           );
-    return Material(
+    final tab = Material(
       key: ValueKey(
         studyPanel
             ? 'study-panel-toggle'
@@ -1781,7 +1781,7 @@ class _LeftZoneToggleTab extends StatelessWidget {
             : 'library-navigation-toggle',
       ),
       color: theme.colorScheme.surface,
-      elevation: hideShadow ? 0 : 8,
+      elevation: studyPanel || hideShadow ? 0 : 8,
       shadowColor: hideShadow ? Colors.transparent : Colors.black54,
       shape: RoundedRectangleBorder(
         borderRadius: radius,
@@ -1818,6 +1818,25 @@ class _LeftZoneToggleTab extends StatelessWidget {
           ),
         ),
       ),
+    );
+    if (!studyPanel) {
+      return tab;
+    }
+    return DecoratedBox(
+      key: const ValueKey('study-panel-shadow'),
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: hideShadow
+            ? const []
+            : const [
+                BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 8,
+                  offset: Offset(6, 0),
+                ),
+              ],
+      ),
+      child: tab,
     );
   }
 }

@@ -127,8 +127,16 @@ void main() {
     final studyMaterial = tester.widget<Material>(studyToggle);
     final folderMaterial = tester.widget<Material>(folderToggle);
     expect(studyMaterial.color, folderMaterial.color);
-    expect(studyMaterial.elevation, folderMaterial.elevation);
+    expect(studyMaterial.elevation, 0);
+    expect(folderMaterial.elevation, 8);
     expect(studyMaterial.shadowColor, folderMaterial.shadowColor);
+    final shadow = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('study-panel-shadow')),
+    ).decoration as BoxDecoration;
+    expect(shadow.boxShadow, hasLength(1));
+    expect(shadow.boxShadow!.single.offset, const Offset(6, 0));
+    expect(shadow.boxShadow!.single.blurRadius, 8);
+    expect(shadow.boxShadow!.single.color, Colors.black54);
     final studyShape = studyMaterial.shape! as RoundedRectangleBorder;
     final folderShape = folderMaterial.shape! as RoundedRectangleBorder;
     expect(studyShape.side, folderShape.side);
@@ -148,6 +156,10 @@ void main() {
     expect(find.byKey(const ValueKey('sidebar-timer-region')), findsNothing);
     expect(find.byKey(const ValueKey('sidebar-account-divider')), findsNothing);
     expect(find.byTooltip('Show study planner'), findsOneWidget);
+    final collapsedShadow = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('study-panel-shadow')),
+    ).decoration as BoxDecoration;
+    expect(collapsedShadow.boxShadow!.single.offset, const Offset(6, 0));
     expect(
       tester.widget<Transform>(chevron).transform.entry(1, 0),
       closeTo(1, 0.001),
