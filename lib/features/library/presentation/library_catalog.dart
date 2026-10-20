@@ -577,7 +577,7 @@ class _FolderTile extends StatelessWidget {
         key: ValueKey('catalog-folder-cover:$name'),
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: theme.colorScheme.outlineVariant.withValues(
               alpha: darkMode ? 0.30 : 0.22,
@@ -712,7 +712,7 @@ class _PlannerDocumentPreview extends StatelessWidget {
   }
 }
 
-const _catalogPreviewRadius = BorderRadius.all(Radius.circular(24));
+const _catalogPreviewRadius = BorderRadius.all(Radius.circular(12));
 
 class _CatalogTile extends StatelessWidget {
   const _CatalogTile({

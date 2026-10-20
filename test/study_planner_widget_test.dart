@@ -85,6 +85,108 @@ void main() {
     await planner.flush();
   });
 
+  testWidgets('timer has bottom gap only without upcoming sessions', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(
+          home: Scaffold(body: StudyTimerCard()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final panel = find.byKey(const ValueKey('study-timer-card'));
+    expect(
+      tester.widget<Padding>(panel).padding,
+      const EdgeInsets.fromLTRB(14, 20, 14, 16),
+    );
+    final start = find.byKey(const ValueKey('sidebar-start-session'));
+    expect(
+      tester.getRect(panel).bottom - tester.getRect(start).bottom,
+      closeTo(16, 0.1),
+    );
+
+    final planned = planner.create(
+      title: 'Upcoming check',
+      scheduledAt: DateTime.now().add(const Duration(days: 1)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Padding>(panel).padding,
+      const EdgeInsets.fromLTRB(14, 20, 14, 0),
+    );
+    final card = find.byKey(ValueKey('sidebar-upcoming-card:${planned.id}'));
+    expect(card, findsOneWidget);
+    expect(
+      tester.getRect(panel).bottom - tester.getRect(card).bottom,
+      closeTo(0, 0.1),
+    );
+  });
+
+  for (final kind in StudyEntryKind.values) {
+    testWidgets('name and description stay fixed while editing $kind', (
+      tester,
+    ) async {
+      final planner = await loadPlanner();
+      await tester.binding.setSurfaceSize(const Size(1440, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: const MaterialApp(home: PlannerScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openCalendarEntry(tester, kind);
+
+      final nameLabel = find.byKey(
+        const ValueKey('study-entry-name-label'),
+      );
+      final descriptionLabel = find.byKey(
+        const ValueKey('study-entry-description-label'),
+      );
+      final nameField = find.byKey(const ValueKey('study-entry-name-field'));
+      final descriptionField = find.byKey(
+        const ValueKey('study-entry-description-field'),
+      );
+      final nameLocation = tester.getTopLeft(nameLabel);
+      final descriptionLocation = tester.getTopLeft(descriptionLabel);
+      final nameStyle = tester.widget<Text>(nameLabel).style;
+      final descriptionStyle = tester.widget<Text>(descriptionLabel).style;
+      expect(nameStyle?.fontSize, descriptionStyle?.fontSize);
+      for (final field in [nameField, descriptionField]) {
+        final input = tester.widget<TextField>(field);
+        expect(input.decoration?.labelText, isNull);
+        expect(
+          input.decoration?.floatingLabelBehavior,
+          FloatingLabelBehavior.never,
+        );
+      }
+      await tester.enterText(nameField, 'Planning');
+      await tester.pumpAndSettle();
+      await tester.enterText(descriptionField, 'Fixed text');
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(nameLabel), nameLocation);
+      expect(tester.getTopLeft(descriptionLabel), descriptionLocation);
+      expect(
+        tester.widget<Text>(nameLabel).style?.fontSize,
+        nameStyle?.fontSize,
+      );
+      expect(
+        tester.widget<Text>(descriptionLabel).style?.fontSize,
+        descriptionStyle?.fontSize,
+      );
+      expect(find.text('Name'), findsOneWidget);
+      expect(find.text('Description'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('new calendar event is editable and never starts a timer', (
     tester,
   ) async {
@@ -138,8 +240,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('New event'), findsOneWidget);
     expect(find.text('Study technique'), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('event-all-day')));
+    final allDayTile = find.byKey(const ValueKey('event-all-day'));
+    final checkbox = find.descendant(
+      of: allDayTile,
+      matching: find.byType(Checkbox),
+    );
+    expect(checkbox, findsOneWidget);
+    expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+    await tester.tap(allDayTile);
     await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(checkbox).value, isTrue);
     expect(find.text('Duration (minutes)'), findsNothing);
     expect(find.byKey(const ValueKey('event-repeat')), findsOneWidget);
     await tester.enterText(find.byType(TextField).first, 'All-day meeting');
@@ -944,9 +1054,9 @@ void main() {
         tester.widget<Padding>(
           find.byKey(const ValueKey('study-timer-card')),
         ).padding,
-        const EdgeInsets.fromLTRB(14, 20, 14, 0),
+        const EdgeInsets.fromLTRB(14, 20, 14, 16),
       );
-      expect(timer.bottom - start.bottom, closeTo(0, 0.1));
+      expect(timer.bottom - start.bottom, closeTo(16, 0.1));
       expect(
         start.top -
             tester.getRect(

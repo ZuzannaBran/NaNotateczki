@@ -391,7 +391,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   autofocus: true,
                   maxLength: 100,
                   decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                    floatingLabelBehavior: FloatingLabelBehavior.never,
                     counterText: '',
                   ),
                 ),
@@ -406,7 +409,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   maxLines: 3,
                   maxLength: 500,
                   decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                    floatingLabelBehavior: FloatingLabelBehavior.never,
                     counterText: '',
                   ),
                 ),
@@ -419,7 +425,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                     initialValue: _technique,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
                     ),
                     items: [
                       for (final method in StudyTechnique.values)
@@ -449,7 +457,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                     controller: _minutes,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
                     ),
                   ),
                 )
@@ -463,7 +473,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                       initialValue: _focusBlocks,
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
                       ),
                       items: [
                         for (var blocks = 1; blocks <= 12; blocks++)
@@ -528,12 +540,18 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
               ),
               if (_kind == StudyEntryKind.event) ...[
                 const SizedBox(height: 10),
-                SwitchListTile.adaptive(
+                CheckboxListTile(
                   key: const ValueKey('event-all-day'),
+                  controlAffinity: ListTileControlAffinity.leading,
                   contentPadding: EdgeInsets.zero,
+                  dense: true,
                   title: const Text('All day'),
                   value: _allDay,
-                  onChanged: (value) => setState(() => _allDay = value),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _allDay = value);
+                    }
+                  },
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -564,7 +582,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                     initialValue: _repeat,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
                     ),
                     items: const [
                       DropdownMenuItem(
@@ -603,7 +623,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                       initialValue: _repeatEvery.clamp(1, 12).toInt(),
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
                       ),
                       items: [
                         for (var interval = 1; interval <= 12; interval++)
@@ -656,7 +678,7 @@ class StudyTimerCard extends StatelessWidget {
     return StudyActionTheme(
       child: Padding(
         key: const ValueKey('study-timer-card'),
-        padding: const EdgeInsets.fromLTRB(14, 20, 14, 0),
+        padding: EdgeInsets.fromLTRB(14, 20, 14, next.isEmpty ? 16 : 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,

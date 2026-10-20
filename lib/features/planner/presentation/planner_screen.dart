@@ -616,7 +616,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       highlighted: today && _mode != CalendarMode.today,
                     ),
               borderRadius: monthColumn == null
-                  ? BorderRadius.circular(14)
+                  ? BorderRadius.circular(12)
                   : null,
               border: monthColumn == null
                   ? null
@@ -631,7 +631,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
             ),
             foregroundDecoration: monthColumn == null
                 ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: today ? scheme.outline : scheme.outlineVariant,
                     ),

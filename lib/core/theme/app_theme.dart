@@ -4,6 +4,10 @@ import 'app_colors.dart';
 import 'app_typography.dart';
 
 class AppTheme {
+  static const roundedShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.all(Radius.circular(12)),
+  );
+
   static ThemeData dark() {
     const foreground = AppColors.darkText;
     const background = AppColors.darkBackground;
@@ -41,6 +45,26 @@ class AppTheme {
       canvasColor: surface,
       dividerColor: AppColors.darkOutline,
       useMaterial3: true,
+      dialogTheme: const DialogThemeData(shape: roundedShape),
+      cardTheme: const CardThemeData(shape: roundedShape),
+      popupMenuTheme: const PopupMenuThemeData(shape: roundedShape),
+      inputDecorationTheme: const InputDecorationThemeData(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(shape: roundedShape),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(shape: roundedShape),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(shape: roundedShape),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(shape: roundedShape),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: surface,
         foregroundColor: foreground,
@@ -94,11 +118,31 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
       useMaterial3: true,
+      dialogTheme: const DialogThemeData(shape: roundedShape),
+      cardTheme: const CardThemeData(shape: roundedShape),
+      popupMenuTheme: const PopupMenuThemeData(shape: roundedShape),
+      inputDecorationTheme: const InputDecorationThemeData(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(shape: roundedShape),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(shape: roundedShape),
+      ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: AppColors.inkBlack),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.inkBlack,
+          shape: roundedShape,
+        ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(foregroundColor: AppColors.inkBlack),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.inkBlack,
+          shape: roundedShape,
+        ),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.toolbar,

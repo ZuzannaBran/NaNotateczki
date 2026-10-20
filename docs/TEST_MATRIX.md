@@ -152,7 +152,7 @@ Manual checks on desktop and mobile, in both light and dark themes:
    deadline, then delete the task. The deadline cell only appears if set.
 4. Future deadline = medium blue, overdue unfinished = light blue,
    completed = dark blue, no deadline = dark blue. Check legible contrast
-   and full-length separators inside the 24 px rounded board.
+   and full-length separators inside the 12 px rounded board.
 5. Restart the app and verify that tasks persist. Restore a local backup
    and confirm that the planner and its tasks are recovered.
 
@@ -584,3 +584,21 @@ Layouts depend on available logical viewport width, not the operating system:
 compact navigation below 960 dp and desktop sidebar at 960 dp or above.
 System UI insets use Flutter `SafeArea`/`MediaQuery`; do not disable Android
 edge-to-edge, and do not assume iOS devices share the same status bar height.
+
+## Calendar and timer UI: manual check (October 2026)
+
+1. Pull the latest `dev` branch and fully restart the Flutter app.
+   Open Calendar, then use a day cell's + to add a study session.
+2. Click Name, type several characters, click Description, and enter multiline
+   text. Both headings must remain above their fields with unchanged position,
+   size and font. Repeat with New event and editing an existing entry.
+3. In New event, tick and untick the square All day checkbox. Duration and
+   time controls should react to its value. Save and reopen to verify it.
+4. With no upcoming sessions, the sidebar timer must have 16 px below the
+   Start session and Smart buttons before the lower separator. After adding
+   an upcoming session, the list must end without extra bottom padding.
+5. Inspect the task canvas, folder/document cards, dialog corners, calendar
+   days and notebook/board toolbars in both themes. Rectangular surfaces
+   must use 12 px rounding; color swatches and circular handles stay round.
+6. Check small-screen calendar/event dialog and desktop resizing for
+   clipped controls, title shifting or overflowing action rows.

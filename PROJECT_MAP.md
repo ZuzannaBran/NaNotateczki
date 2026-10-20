@@ -96,6 +96,8 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 - `lib/core/theme/app_theme.dart`: `AppTheme.light` i `AppTheme.dark`
   z kontrastowymi kontrolkami i nagłówkami. Tekstowe i konturowe
   przyciski jasnego motywu używają `onSurface` zamiast bladego akcentu.
+  Wspólny promień 12 px dla prostokątnych przycisków, kart, dialogów,
+  menu i pól formularza. Okrągłe próbki kolorów i uchwyty bez zmian.
   5: `AppTheme`.
 
 ### Wejście i preferencje
@@ -506,7 +508,7 @@ Okładki folderów mają ponownie delikatne, wektorowe ikony Lucide
 (`FolderCoverIcon`, `FolderCoverStrokePainter`), z konturem 1,25 px
 i wygładzonymi krawędziami. Dekoracje na okładce (serce, gwiazdka,
 kwiat, błysk) można ponownie wybierać z poziomu edytora folderu.
-Kafelki mają promień 24 px i neutralne tło; zapisany kolor modyfikuje
+Kafelki mają promień 12 px i neutralne tło; zapisany kolor modyfikuje
 kolor ikon, nie powoduje automatycznego podświetlania całej okładki.
 Hover i press są nakładkami na `Ink` przyciętymi przez `Material`.
 Dialog edycji okładki otwiera się natychmiast; próbki Recent pochodzą
@@ -529,7 +531,7 @@ Kafelki planerów pokazują własny podgląd zadań i checkboxów.
   Notatki mają pionowy podgląd pierwszej strony (820×1160), boardy kwadratowy
 podgląd dopasowany do granic obiektów z pierwszej strony. Miniatury rysują
 ink, tekst oraz dostępne obrazy bez uruchamiania edytora.
-Wspólny `_catalogPreviewRadius` (24 px) określa narożniki cienia,
+Wspólny `_catalogPreviewRadius` (12 px) określa narożniki cienia,
 przycinającego `Material`, papieru i `ClipRRect`. Zewnętrzny
 `DecoratedBox` rysuje miękki cień przed klipowaniem, więc cień pozostaje
 widoczny również przy zaokrąglonych rogach folderów i dokumentów.
@@ -562,7 +564,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
 - `lib/features/planner/state/planner_task.dart`: `PlannerTask`,
   `PlannerTaskTone`, deadline z opcjonalną godziną; serializacja.
 - `lib/features/planner/presentation/task_list_screen.dart`:
-  zaokrąglony canvas listy zadań, checkbox, edycja nazw, wybór daty/godziny,
+  canvas listy zadań z promieniem 12 px, checkbox, edycja nazw, wybór daty/godziny,
   usuwanie oraz pełnoszerokie separatory. Kolory statusów są wyłącznie
   beżowymi/neutralnymi odcieniami `AppColors` dla aktualnego motywu:
   bez deadline'u ("Recent"), upcoming i overdue; zaległe mają
@@ -602,7 +604,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 45: `StudyRepeat`; 51: `StudySession`;
   219: `StudyPlannerController`; 282: `calendarEntries`;
   432: `load`; 498: `create`; 537: `edit`; 779: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (977):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (999):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -619,17 +621,19 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   Upcoming pokazuje wyłącznie sesje nauki w osobno przewijanej liście,
   również podczas aktywnej sesji zamiast przycisków Start/Smart.
   Formularz wydarzeń pokazuje datę, czas, długość, kolor, opis,
-  zakres dat, cały dzień i regułę powtarzania; nie pokazuje
+  zakres dat, checkbox All day i regułę powtarzania; nie pokazuje
   ustawień timera ani bloków Focus. Karty Upcoming w sidebarze
   mają obrys jasnobeżowy `AppColors.toolbar` zamiast koloru tekstu
-  (bez zmiany obrysów w kalendarzu). Dolny padding panelu wynosi 0.
+  (bez zmiany obrysów w kalendarzu). Dolny padding timera to 16 px,
+  gdy Upcoming jest puste, albo 0 px, gdy istnieją nadchodzące sesje.
   Nowe i edytowane sesje (także z kalendarza) mogą mieć indywidualny
   kolor z tych samych palet, Recent i edytora HEX co foldery.
   Formularz Smart umożliwia wybór liczby bloków 1–12.
   Ocena ma wyśrodkowany nagłówek „Great job! Time's up.”.
   Pola Name, Description, Study technique, Duration, Focus blocks i Repeat
-  używają stałych etykiet nad obramowanymi polami, bez pływających podpisów
-  i przykładowych placeholderów.
+  używają stałych etykiet nad obramowanymi polami. Name i Description
+  mają jawnie wyłączone pływające etykiety; test sprawdza pozycję
+  i wielkość nagłówków po wpisaniu treści sesji oraz wydarzenia.
   W trakcie sesji Resume/Pause oraz Stop mają tę samą wysokość 32 px,
   kontur i promień 12 px co przyciski Start/Smart.
   Selektor techniki w formularzu `isExpanded` mieści się w wąskim dialogu.
@@ -639,8 +643,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   43: `openStudyPlanner`;
   49: `showStudySessionEditor`;
   69: `showStudyRating`;
-  337: `_labeledField` (statyczne etykiety formularza);
-  642: `StudyTimerCard`; 928: `CompactStudyTimer`.
+  337: `_labeledField` (stałe etykiety formularza);
+  664: `StudyTimerCard`; 950: `CompactStudyTimer`.
 - `lib/features/planner/presentation/study_action_theme.dart` (163):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
@@ -723,7 +727,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   kliknięcie w tydzień/miesiąc wybiera dzień, a zakładka Day
   przywraca dzisiaj. Sprawdź zaokrąglone dolne rogi, kolor przycisków
   i wyśrodkowany komunikat zakończenia sesji.
-- `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów.
+- `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów
+  i standardowe promienie 12 px prostokątnych kontrolek.
 - `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
   zgodność starszych sesji, reset koloru, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
@@ -749,6 +754,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   jaśniejsze tła dni spoza miesiąca w obu motywach,
   osobny scroll Upcoming, limit wysokości listy,
   brak górnych przycisków w obu rozmiarach, dodawanie przez plus,
+  stałe nagłówki Name i Description podczas pisania,
+  checkbox All day oraz warunkowe dolne odstępy timera,
   stałe etykiety formularzy Name/Description, spójne przyciski
   włączonego timera, aktualną paletę zaznaczeń,
   skalowanie Smart i przecinających granicę godziny/doby sesji,
@@ -1120,7 +1127,7 @@ board bez przesuwania. Rysik, zoom i transformacje obiektów są
 niezależne od tego ustawienia.
 Board ma stały boczny odstęp 16 px, ale nie ma marginesu u góry,
 więc zawartość można swobodnie przesuwać za toolbar. Obszar roboczy
-ma proste górne rogi i zaokrąglone dolne rogi (16 px) zarówno w dekoracji,
+ma proste górne rogi i zaokrąglone dolne rogi (12 px) zarówno w dekoracji,
 jak i w klipowaniu zawartości. Nagłówek ma
 wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 

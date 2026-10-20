@@ -101,8 +101,9 @@ class TaskListScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       DecoratedBox(
+                        key: const ValueKey('planner-tasks-surface'),
                         decoration: const BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.circular(24)),
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
                           boxShadow: [
                             BoxShadow(
                               color: AppColors.shadow,
@@ -112,7 +113,7 @@ class TaskListScreen extends StatelessWidget {
                           ],
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(12),
                           child: Material(
                             color: surface,
                             child: tasks.isEmpty

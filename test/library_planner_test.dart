@@ -360,6 +360,21 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(TaskListScreen), findsOneWidget);
+    final tasksSurface = find.byKey(const ValueKey('planner-tasks-surface'));
+    final box = tester.widget<DecoratedBox>(tasksSurface);
+    expect(
+      (box.decoration as BoxDecoration).borderRadius,
+      BorderRadius.circular(12),
+    );
+    final clip = find.descendant(
+      of: tasksSurface,
+      matching: find.byType(ClipRRect),
+    );
+    expect(
+      tester.widget<ClipRRect>(clip).borderRadius,
+      BorderRadius.circular(12),
+    );
+
     expect(find.byKey(const ValueKey('planner-completed-last')), findsNothing);
 
     final title = find.byKey(const ValueKey('workspace-document-title'));

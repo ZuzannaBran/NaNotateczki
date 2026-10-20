@@ -51,7 +51,7 @@ class EditorToolbar extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: Theme.of(
                       context,

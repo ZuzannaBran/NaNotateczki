@@ -593,7 +593,7 @@ void main() {
         find.descendant(of: tile, matching: find.byType(Ink)),
       );
       final decoration = ink.decoration! as BoxDecoration;
-      expect(decoration.borderRadius, BorderRadius.circular(24));
+      expect(decoration.borderRadius, BorderRadius.circular(12));
       final idleColor = isDark ? AppColors.darkPaper : AppColors.paper;
       expect(decoration.color, idleColor);
       final plainTile = find.byKey(
@@ -611,12 +611,12 @@ void main() {
         find.descendant(of: preview, matching: find.byType(Material)).first,
       );
       expect(material.clipBehavior, Clip.antiAlias);
-      expect(material.borderRadius, BorderRadius.circular(24));
+      expect(material.borderRadius, BorderRadius.circular(12));
 
       final inkWell = tester.widget<InkWell>(
         find.descendant(of: preview, matching: find.byType(InkWell)).first,
       );
-      expect(inkWell.borderRadius, BorderRadius.circular(24));
+      expect(inkWell.borderRadius, BorderRadius.circular(12));
       expect(inkWell.overlayColor!.resolve({}), Colors.transparent);
       expect(
         inkWell.overlayColor!.resolve({WidgetState.hovered}),
@@ -929,7 +929,7 @@ void main() {
         expect(shadow, findsOneWidget);
         final decoration =
             tester.widget<DecoratedBox>(shadow).decoration as BoxDecoration;
-        expect(decoration.borderRadius, BorderRadius.circular(24));
+        expect(decoration.borderRadius, BorderRadius.circular(12));
         expect(decoration.boxShadow, hasLength(1));
         expect(decoration.boxShadow!.single.color, AppColors.shadow);
         expect(decoration.boxShadow!.single.blurRadius, 9);
@@ -937,7 +937,7 @@ void main() {
         final material = tester.widget<Material>(
           find.descendant(of: shadow, matching: find.byType(Material)).first,
         );
-        expect(material.borderRadius, BorderRadius.circular(24));
+        expect(material.borderRadius, BorderRadius.circular(12));
         expect(material.clipBehavior, Clip.antiAlias);
 
         final paper = find.descendant(
@@ -947,7 +947,7 @@ void main() {
         expect(paper, findsOneWidget);
         final paperDecoration =
             tester.widget<DecoratedBox>(paper).decoration as BoxDecoration;
-        expect(paperDecoration.borderRadius, BorderRadius.circular(24));
+        expect(paperDecoration.borderRadius, BorderRadius.circular(12));
         expect(paperDecoration.boxShadow, isNull);
         expect(
           paperDecoration.color,
@@ -956,7 +956,7 @@ void main() {
         final contentClip = tester.widget<ClipRRect>(
           find.descendant(of: paper, matching: find.byType(ClipRRect)).first,
         );
-        expect(contentClip.borderRadius, BorderRadius.circular(24));
+        expect(contentClip.borderRadius, BorderRadius.circular(12));
       }
 
       await tester.pumpWidget(catalog(null));
@@ -968,7 +968,7 @@ void main() {
       expect(folderShadow, findsOneWidget);
       final folderDecoration =
           tester.widget<DecoratedBox>(folderShadow).decoration as BoxDecoration;
-      expect(folderDecoration.borderRadius, BorderRadius.circular(24));
+      expect(folderDecoration.borderRadius, BorderRadius.circular(12));
       expect(folderDecoration.boxShadow, hasLength(1));
       expect(tester.takeException(), isNull);
     }

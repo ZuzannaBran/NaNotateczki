@@ -64,7 +64,7 @@ class TextEditToolbar extends StatelessWidget {
               ),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: Theme.of(
                     context,
@@ -260,7 +260,7 @@ class TextEditToolbar extends StatelessWidget {
     return Tooltip(
       message: 'Text color',
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         onTap: () async {
           final targetBlockId = block.id;
           final updated = await EditorToolbar.pickColor(

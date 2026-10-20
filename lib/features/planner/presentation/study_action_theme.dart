@@ -64,6 +64,7 @@ class StudyActionStyles {
       );
 
   static ButtonStyle primary(ThemeData theme) => FilledButton.styleFrom(
+    shape: sessionButtonShape,
     overlayColor: theme.colorScheme.outline.withValues(alpha: 0.16),
     backgroundColor: background(theme, selected: true),
     foregroundColor: foreground(theme),
@@ -119,12 +120,14 @@ class StudyActionTheme extends StatelessWidget {
         ),
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
+            shape: StudyActionStyles.sessionButtonShape,
             foregroundColor: foreground,
             textStyle: labelStyle,
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
+            shape: StudyActionStyles.sessionButtonShape,
             foregroundColor: foreground,
             overlayColor: theme.colorScheme.outline.withValues(alpha: 0.16),
             side: BorderSide(color: outline),

@@ -16,6 +16,29 @@ import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 void main() {
+  test('both themes use 12px corners on rectangular controls', () {
+    const corners = BorderRadius.all(Radius.circular(12));
+    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+      final dialog = theme.dialogTheme.shape! as RoundedRectangleBorder;
+      final card = theme.cardTheme.shape! as RoundedRectangleBorder;
+      final menu = theme.popupMenuTheme.shape! as RoundedRectangleBorder;
+      expect(dialog.borderRadius, corners);
+      expect(card.borderRadius, corners);
+      expect(menu.borderRadius, corners);
+      for (final style in [
+        theme.filledButtonTheme.style,
+        theme.elevatedButtonTheme.style,
+        theme.outlinedButtonTheme.style,
+        theme.textButtonTheme.style,
+      ]) {
+        final shape = style!.shape!.resolve({})! as RoundedRectangleBorder;
+        expect(shape.borderRadius, corners);
+      }
+      final field = theme.inputDecorationTheme.border! as OutlineInputBorder;
+      expect(field.borderRadius, corners);
+    }
+  });
+
   test('both themes use the four interface text sizes', () {
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {
       final t = theme.textTheme;
