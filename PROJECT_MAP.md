@@ -544,8 +544,9 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   zaokrąglony canvas listy zadań, checkbox, edycja nazw, wybór daty/godziny,
   usuwanie oraz pełnoszerokie separatory. Kolory statusów są wyłącznie
   beżowymi/neutralnymi odcieniami `AppColors` dla aktualnego motywu:
-  bez deadline'u ("Recent"), upcoming i overdue; ukończone zadania
-  mają przygaszone tło i tekst. Przełącznik "Completed last" zapisuje wybór
+  bez deadline'u ("Recent"), upcoming i overdue; zaległe mają
+  najjaśniejszy, nadchodzące pośredni, a "Recent" najciemniejszy
+  odcień w obu motywach. Ukończone zadania mają przygaszone tło i tekst. Przełącznik "Completed last" zapisuje wybór
   osobno dla planera. Przyciski deadline'u wyrównują się do prawej i zawijają
   w wąskich oknach, bez wyśrodkowywania po zmianie daty.
 
