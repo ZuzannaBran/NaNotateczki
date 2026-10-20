@@ -589,7 +589,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1272):
+- `lib/features/planner/presentation/planner_screen.dart` (1327):
   `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
@@ -599,8 +599,11 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Today zachowuje normalne tło i większy odstęp godziny od karty sesji.
   Week to jedna przewijana pionowo siatka 24 godzin z pojedynczym pasem
   godzin po lewej stronie; wąskie ekrany przewijają siatkę poziomo.
-  Tylko aktywna godzina bieżącego dnia ma wyróżnioną linię czasu.
-  Month zachowuje kafelki. Czas aktualizuje się co minutę.
+  Week i Month mają po 18 px marginesów bocznych, a ich nagłówki tworzą
+  wspólny pasek z narożnikami 12 px oraz separatorami siedmiu kolumn.
+  Godziny w Today/Week są wyśrodkowane pionowo na kreskach początku
+  godziny, bez odsunięcia w dół. Tylko bieżąca minuta ma wyróżnioną
+  linię czasu. Month zachowuje kafelki. Czas aktualizuje się co minutę.
   Daty i opisy mają czteropoziomową typografię interfejsu.
   Miesiąc generuje tylko niezbędne 4–6 tygodni; komórki dni granicznych
   innych miesięcy pozostają widoczne z opacity 0.5; pomocniczy napis
@@ -614,8 +617,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   16: `CalendarMode`;
   43: `PlannerScreen`;
   50: `_PlannerScreenState`;
-  914: `_HourlyDaySchedule`;
-  1052: `_WeekTimeGrid` — wspólna oś.
+  ${line(planner,"class _HourlyDaySchedule")}: `_HourlyDaySchedule`;
+  ${line(planner,"class _CalendarHeaderStrip")}: `_CalendarHeaderStrip`;
+  ${line(planner,"class _WeekTimeGrid")}: `_WeekTimeGrid` — wspólna oś.
 - `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów.
 - `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
   zgodność starszych sesji, reset koloru, resume, pauza, konflikt
@@ -633,7 +637,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   z kalendarzem w obu motywach, brak separatorów i działanie Start,
   dni granicznych miesiąca, łagodne zaznaczenie Week/Month,
   brak zaznaczenia Today i większy odstęp od sesji, wspólną oś godzin Week,
-  linię aktualnego czasu, osobny scroll Upcoming, limit wysokości listy,
+  linię aktualnego czasu, boczne marginesy Week/Month, jednolite
+  nagłówki z separatorami i wyrównanie etykiet godzin do siatki,
+  osobny scroll Upcoming, limit wysokości listy,
   spójne przyciski włączonego timera, brak overflow selektora techniki,
   margines dolny i oceny kalendarza.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni

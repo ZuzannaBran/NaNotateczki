@@ -52,6 +52,135 @@ void main() {
   });
 
   for (final darkMode in [false, true]) {
+    testWidgets('week and month headers share inset segmented bar, '
+        'dark=$darkMode', (tester) async {
+      final planner = await loadPlanner();
+      await tester.binding.setSurfaceSize(const Size(1440, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: MaterialApp(
+            theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+            home: const PlannerScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final grid = find.byKey(const ValueKey('planner-week-time-grid'));
+      final weekHeader = find.byKey(
+        const ValueKey('planner-week-header-strip'),
+      );
+      expect(weekHeader, findsOneWidget);
+      expect(tester.getRect(grid).left, closeTo(18, 0.1));
+      expect(tester.getRect(grid).right, closeTo(1422, 0.1));
+      expect(
+        tester.getRect(weekHeader).left - tester.getRect(grid).left,
+        closeTo(52, 0.1),
+      );
+
+      void verifyStrip(Finder finder) {
+        final container = tester.widget<Container>(
+          find.descendant(
+            of: finder,
+            matching: find.byType(Container),
+          ).first,
+        );
+        final decoration = container.decoration! as BoxDecoration;
+        expect(decoration.borderRadius, BorderRadius.circular(12));
+        expect(container.clipBehavior, Clip.antiAlias);
+        final rowFinder = find.descendant(
+          of: finder,
+          matching: find.byType(Row),
+        );
+        final row = tester.widget<Row>(rowFinder.first);
+        expect(row.children.length, 7);
+        for (var index = 0; index < 7; index++) {
+          final segment = (row.children[index] as Expanded).child
+              as Container;
+          final overlay = segment.foregroundDecoration;
+          if (index == 6) {
+            expect(overlay, isNull);
+          } else {
+            expect(overlay, isA<BoxDecoration>());
+            expect(
+              (overlay! as BoxDecoration).border!.right.width,
+              1,
+            );
+          }
+        }
+      }
+
+      verifyStrip(weekHeader);
+      final now = DateTime.now();
+      final dayKey = '${now.year}-${now.month}-${now.day}';
+      final label = find.byKey(
+        ValueKey('planner-week-hour-label-${now.hour}'),
+      );
+      final hourCell = find.byKey(
+        ValueKey('planner-week-cell-$dayKey-${now.hour}'),
+      );
+      expect(label, findsOneWidget);
+      expect(hourCell, findsOneWidget);
+      expect(
+        tester.getRect(label).center.dy,
+        closeTo(tester.getRect(hourCell).top, 3),
+      );
+
+      await tester.tap(find.text('Today').last);
+      await tester.pumpAndSettle();
+      final row = find.byKey(
+        ValueKey('planner-hour-row-$dayKey-${now.hour}'),
+      );
+      final hourText = find.descendant(
+        of: row,
+        matching: find.text(
+          '${now.hour.toString().padLeft(2, '0')}:00',
+        ),
+      );
+      expect(hourText, findsOneWidget);
+      expect(
+        tester.getRect(hourText).center.dy,
+        closeTo(tester.getRect(row).top, 3),
+      );
+
+      await tester.tap(find.text('Month'));
+      await tester.pumpAndSettle();
+      final monthHeader = find.byKey(
+        const ValueKey('planner-month-header-strip'),
+      );
+      expect(monthHeader, findsOneWidget);
+      expect(tester.getRect(monthHeader).left, closeTo(18, 0.1));
+      expect(tester.getRect(monthHeader).right, closeTo(1422, 0.1));
+      verifyStrip(monthHeader);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('narrow week keeps side padding while hours scroll', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: PlannerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final week = find.byKey(const ValueKey('planner-week-time-grid'));
+    expect(tester.getRect(week).left, closeTo(18, 0.1));
+    final header = find.byKey(
+      const ValueKey('planner-week-header-strip'),
+    );
+    expect(tester.getRect(header).left, closeTo(70, 0.1));
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final darkMode in [false, true]) {
     testWidgets('today normal; week and month lightly shaded, dark=$darkMode', (
       tester,
     ) async {
