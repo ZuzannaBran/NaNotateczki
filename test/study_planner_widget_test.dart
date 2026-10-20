@@ -22,6 +22,26 @@ void main() {
     return planner;
   }
 
+  Future<void> openCalendarEntry(
+    WidgetTester tester,
+    StudyEntryKind kind,
+  ) async {
+    await tester.tap(find.text('Day').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Plan on this day').first);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        ValueKey(
+          kind == StudyEntryKind.event
+              ? 'calendar-add-event'
+              : 'calendar-add-session',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('upcoming shows only sessions with a light beige outline', (
     tester,
   ) async {
@@ -78,8 +98,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('planner-new-event')));
-    await tester.pumpAndSettle();
+    await openCalendarEntry(tester, StudyEntryKind.event);
     expect(find.text('New event'), findsOneWidget);
     expect(find.text('Study technique'), findsNothing);
     expect(find.byKey(const ValueKey('event-all-day')), findsOneWidget);
@@ -108,7 +127,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('planner-new-session')));
+    await tester.tap(find.text('Day').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Plan on this day').first);
     await tester.pumpAndSettle();
     expect(find.text('Add to calendar'), findsOneWidget);
     expect(find.byKey(const ValueKey('calendar-add-event')), findsOneWidget);
@@ -309,7 +330,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Study planner'), findsOneWidget);
+    expect(find.text('Calendar'), findsOneWidget);
     expect(find.textContaining('Calculus'), findsWidgets);
 
     await tester.tap(find.text('Month'));
@@ -831,8 +852,9 @@ void main() {
     );
     expect(find.byKey(const ValueKey('mobile-planner-days')), findsNothing);
     expect(find.byTooltip('Planner actions'), findsNothing);
-    expect(find.byKey(const ValueKey('planner-smart-session')), findsOneWidget);
-    expect(find.byKey(const ValueKey('planner-new-session')), findsOneWidget);
+    expect(find.byKey(const ValueKey('planner-smart-session')), findsNothing);
+    expect(find.byKey(const ValueKey('planner-new-session')), findsNothing);
+    expect(find.byKey(const ValueKey('planner-new-event')), findsNothing);
     expect(find.byTooltip('Previous'), findsOneWidget);
     expect(find.byTooltip('Next'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -849,10 +871,7 @@ void main() {
 
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('planner-new-session')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('calendar-add-session')));
-    await tester.pumpAndSettle();
+    await openCalendarEntry(tester, StudyEntryKind.session);
     expect(tester.takeException(), isNull);
     expect(find.text('Name'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
@@ -1161,24 +1180,41 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('planner-new-session')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('calendar-add-session')));
-    await tester.pumpAndSettle();
+    await openCalendarEntry(tester, StudyEntryKind.session);
     expect(find.byKey(const ValueKey('study-session-colour')), findsOneWidget);
     final nameInput = tester.widget<TextField>(
-      find.widgetWithText(TextField, 'Name'),
+      find.byKey(const ValueKey('study-entry-name-field')),
     );
     final descriptionInput = tester.widget<TextField>(
-      find.widgetWithText(TextField, 'Description'),
+      find.byKey(const ValueKey('study-entry-description-field')),
     );
-    expect(nameInput.decoration!.hintText, isNull);
-    expect(nameInput.decoration!.labelText, 'Name');
-    expect(descriptionInput.decoration!.labelText, 'Description');
+    expect(nameInput.decoration!.labelText, isNull);
+    expect(descriptionInput.decoration!.labelText, isNull);
+    final nameLabel = find.byKey(const ValueKey('study-entry-name-label'));
+    final descriptionLabel = find.byKey(
+      const ValueKey('study-entry-description-label'),
+    );
+    expect(find.text('Name'), findsOneWidget);
+    expect(find.text('Description'), findsOneWidget);
+    expect(
+      tester.getTopLeft(nameLabel).dy,
+      lessThan(tester.getTopLeft(
+        find.byKey(const ValueKey('study-entry-name-field')),
+      ).dy),
+    );
+    expect(
+      tester.getTopLeft(descriptionLabel).dy,
+      lessThan(tester.getTopLeft(
+        find.byKey(const ValueKey('study-entry-description-field')),
+      ).dy),
+    );
     await tester.enterText(
-      find.widgetWithText(TextField, 'Name'),
+      find.byKey(const ValueKey('study-entry-name-field')),
       'Coloured session',
     );
+    await tester.pumpAndSettle();
+    expect(find.text('Name'), findsOneWidget);
+    expect(find.text('Description'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('study-session-colour')));
     await tester.pumpAndSettle();
     final first = InkColorPreset.blue.colors.first;
@@ -1224,16 +1260,16 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<StudyPlannerController>.value(
         value: planner,
-        child: const MaterialApp(home: PlannerScreen()),
+        child: const MaterialApp(home: Scaffold(body: StudyTimerCard())),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('planner-smart-session')));
+    await tester.tap(find.byKey(const ValueKey('sidebar-smart-session')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('study-focus-blocks')), findsOneWidget);
     await tester.enterText(
-      find.widgetWithText(TextField, 'Name'),
+      find.byKey(const ValueKey('study-entry-name-field')),
       'Two blocks',
     );
     await tester.tap(find.byKey(const ValueKey('study-focus-blocks')));
@@ -1262,7 +1298,7 @@ void main() {
     await tester.tap(find.text('Start session'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextField, 'Name'),
+      find.byKey(const ValueKey('study-entry-name-field')),
       'History lesson',
     );
     await tester.tap(find.text('Save & start'));
@@ -1517,7 +1553,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('calendar buttons match sidebar styling and bottom spacing', (
+  testWidgets('calendar has no extra action bar on desktop or phone', (
     tester,
   ) async {
     final planner = await loadPlanner();
@@ -1530,88 +1566,40 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-
-    final smart = find.byKey(const ValueKey('planner-smart-session'));
-    final create = find.byKey(const ValueKey('planner-new-session'));
-    final shape = tester
-        .widget<OutlinedButton>(smart)
-        .style!
-        .shape!
-        .resolve(<WidgetState>{});
-    final filledShape = tester
-        .widget<FilledButton>(create)
-        .style!
-        .shape!
+    expect(find.text('Calendar'), findsOneWidget);
+    for (final key in [
+      'planner-smart-session',
+      'planner-new-session',
+      'planner-new-event',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsNothing);
+    }
+    final mode = find.byType(SegmentedButton<CalendarMode>);
+    final theme = Theme.of(tester.element(mode));
+    final shape = theme.segmentedButtonTheme.style!.shape!
         .resolve(<WidgetState>{});
     expect(
       (shape! as RoundedRectangleBorder).borderRadius,
       const BorderRadius.all(Radius.circular(12)),
     );
-    expect(
-      (filledShape! as RoundedRectangleBorder).borderRadius,
-      const BorderRadius.all(Radius.circular(12)),
-    );
-    expect(tester.getSize(smart).width, closeTo(148, 0.1));
-    expect(tester.getSize(create).width, closeTo(148, 0.1));
-    expect(
-      tester.getSize(smart).height,
-      StudyActionStyles.sessionButtonHeight,
-    );
-    expect(
-      tester.getSize(create).height,
-      StudyActionStyles.sessionButtonHeight,
-    );
-    expect(tester.getSize(smart).height, 32);
-    expect(tester.getSize(create).height, 32);
-    expect(
-      find.descendant(
-        of: smart,
-        matching: find.byIcon(Icons.auto_awesome_rounded),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: create, matching: find.byIcon(Icons.add_rounded)),
-      findsOneWidget,
-    );
-    final smartContent = find.byKey(
-      const ValueKey('planner-smart-session-content'),
-    );
-    final newContent = find.byKey(
-      const ValueKey('planner-new-session-content'),
-    );
-    expect(
-      tester.getCenter(smartContent).dx,
-      closeTo(tester.getCenter(smart).dx, 1),
-    );
-    expect(
-      tester.getCenter(newContent).dx,
-      closeTo(tester.getCenter(create).dx, 1),
-    );
-    final calendarMode = find.byType(SegmentedButton<CalendarMode>);
-    final calendarTheme = Theme.of(tester.element(calendarMode));
-    final modeShape = calendarTheme.segmentedButtonTheme.style!.shape!
-        .resolve(<WidgetState>{});
-    expect(
-      (modeShape! as RoundedRectangleBorder).borderRadius,
-      const BorderRadius.all(Radius.circular(12)),
-    );
-    expect(find.textContaining('Long-press'), findsNothing);
-    expect(find.textContaining('Tap any session'), findsNothing);
     final bottomGap = find.byKey(const ValueKey('planner-calendar-bottom-gap'));
     expect(tester.getSize(bottomGap).height, 24);
-    expect(
-      tester.getBottomLeft(bottomGap).dy,
-      closeTo(tester.getBottomLeft(find.byType(PlannerScreen)).dy, 1),
-    );
     expect(find.byTooltip('Settings'), findsNothing);
     expect(find.byTooltip('Study history'), findsNothing);
-
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpAndSettle();
-    expect(tester.getSize(smart).width, closeTo(116.7, 1));
-    expect(tester.getSize(create).width, closeTo(116.7, 1));
-    expect(tester.getRect(smart).top, closeTo(tester.getRect(create).top, 1));
+    for (final key in [
+      'planner-smart-session',
+      'planner-new-session',
+      'planner-new-event',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsNothing);
+    }
+    await openCalendarEntry(tester, StudyEntryKind.event);
+    expect(find.text('Name'), findsOneWidget);
+    expect(find.text('Description'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 }

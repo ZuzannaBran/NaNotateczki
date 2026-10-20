@@ -334,6 +334,31 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
     Navigator.pop(context);
   }
 
+  Widget _labeledField({
+    required String label,
+    required Widget child,
+    Key? labelKey,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            key: labelKey,
+            style: const TextStyle(
+              fontSize: AppTypography.document,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -357,77 +382,104 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextField(
-                controller: _title,
-                autofocus: true,
-                maxLength: 100,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
+              _labeledField(
+                label: 'Name',
+                labelKey: const ValueKey('study-entry-name-label'),
+                child: TextField(
+                  key: const ValueKey('study-entry-name-field'),
+                  controller: _title,
+                  autofocus: true,
+                  maxLength: 100,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    counterText: '',
+                  ),
                 ),
               ),
-              TextField(
-                controller: _description,
-                maxLines: 3,
-                maxLength: 500,
-                decoration: const InputDecoration(labelText: 'Description'),
+              _labeledField(
+                label: 'Description',
+                labelKey: const ValueKey('study-entry-description-label'),
+                child: TextField(
+                  key: const ValueKey('study-entry-description-field'),
+                  controller: _description,
+                  minLines: 3,
+                  maxLines: 3,
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    counterText: '',
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               if (_kind == StudyEntryKind.session)
-                DropdownButtonFormField<StudyTechnique>(
-                initialValue: _technique,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Study technique'),
-                items: [
-                  for (final method in StudyTechnique.values)
-                    DropdownMenuItem(value: method, child: Text(method.label)),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _technique = value;
-                      _focusBlocks = value.rounds;
-                    });
-                  }
-                },
-              ),
-              if ((_kind == StudyEntryKind.event && !_allDay) ||
-                  (_kind == StudyEntryKind.session &&
-                      _technique == StudyTechnique.custom))
-                TextField(
-                  controller: _minutes,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: _kind == StudyEntryKind.event
-                        ? 'Duration (minutes)'
-                        : 'Minutes',
-                  ),
-                )
-              else if (_kind == StudyEntryKind.session) ...[
-                const SizedBox(height: 12),
-                KeyedSubtree(
-                  key: ValueKey('blocks-for-${_technique.name}'),
-                  child: DropdownButtonFormField<int>(
-                    key: const ValueKey('study-focus-blocks'),
-                    initialValue: _focusBlocks,
+                _labeledField(
+                  label: 'Study technique',
+                  child: DropdownButtonFormField<StudyTechnique>(
+                    initialValue: _technique,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Focus blocks',
+                      border: OutlineInputBorder(),
                     ),
                     items: [
-                      for (var blocks = 1; blocks <= 12; blocks++)
+                      for (final method in StudyTechnique.values)
                         DropdownMenuItem(
-                          value: blocks,
-                          child: Text('$blocks'),
+                          value: method,
+                          child: Text(method.label),
                         ),
                     ],
                     onChanged: (value) {
                       if (value != null) {
-                        setState(() => _focusBlocks = value);
+                        setState(() {
+                          _technique = value;
+                          _focusBlocks = value.rounds;
+                        });
                       }
                     },
                   ),
                 ),
-                const SizedBox(height: 8),
+              if ((_kind == StudyEntryKind.event && !_allDay) ||
+                  (_kind == StudyEntryKind.session &&
+                      _technique == StudyTechnique.custom))
+                _labeledField(
+                  label: _kind == StudyEntryKind.event
+                      ? 'Duration (minutes)'
+                      : 'Minutes',
+                  child: TextField(
+                    controller: _minutes,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                )
+              else if (_kind == StudyEntryKind.session) ...[
+                _labeledField(
+                  label: 'Focus blocks',
+                  child: KeyedSubtree(
+                    key: ValueKey('blocks-for-${_technique.name}'),
+                    child: DropdownButtonFormField<int>(
+                      key: const ValueKey('study-focus-blocks'),
+                      initialValue: _focusBlocks,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        for (var blocks = 1; blocks <= 12; blocks++)
+                          DropdownMenuItem(
+                            value: blocks,
+                            child: Text('$blocks'),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _focusBlocks = value);
+                        }
+                      },
+                    ),
+                  ),
+                ),
                 Text(
                   '${_technique.focusMinutes}-min focus; '
                   '${_technique.breakMinutes}-min breaks',
@@ -505,61 +557,68 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<StudyRepeat>(
-                  key: const ValueKey('event-repeat'),
-                  initialValue: _repeat,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Repeat'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: StudyRepeat.none,
-                      child: Text('Does not repeat'),
+                _labeledField(
+                  label: 'Repeat',
+                  child: DropdownButtonFormField<StudyRepeat>(
+                    key: const ValueKey('event-repeat'),
+                    initialValue: _repeat,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
                     ),
-                    DropdownMenuItem(
-                      value: StudyRepeat.daily,
-                      child: Text('Daily'),
-                    ),
-                    DropdownMenuItem(
-                      value: StudyRepeat.weekly,
-                      child: Text('Weekly'),
-                    ),
-                    DropdownMenuItem(
-                      value: StudyRepeat.monthly,
-                      child: Text('Monthly'),
-                    ),
-                    DropdownMenuItem(
-                      value: StudyRepeat.yearly,
-                      child: Text('Yearly'),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _repeat = value);
-                    }
-                  },
-                ),
-                if (_repeat != StudyRepeat.none) ...[
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<int>(
-                    key: const ValueKey('event-repeat-every'),
-                    initialValue: _repeatEvery.clamp(1, 12).toInt(),
-                    decoration: InputDecoration(
-                      labelText: 'Repeat every (${_repeat.name})',
-                    ),
-                    items: [
-                      for (var interval = 1; interval <= 12; interval++)
-                        DropdownMenuItem(
-                          value: interval,
-                          child: Text('$interval'),
-                        ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: StudyRepeat.none,
+                        child: Text('Does not repeat'),
+                      ),
+                      DropdownMenuItem(
+                        value: StudyRepeat.daily,
+                        child: Text('Daily'),
+                      ),
+                      DropdownMenuItem(
+                        value: StudyRepeat.weekly,
+                        child: Text('Weekly'),
+                      ),
+                      DropdownMenuItem(
+                        value: StudyRepeat.monthly,
+                        child: Text('Monthly'),
+                      ),
+                      DropdownMenuItem(
+                        value: StudyRepeat.yearly,
+                        child: Text('Yearly'),
+                      ),
                     ],
                     onChanged: (value) {
                       if (value != null) {
-                        setState(() => _repeatEvery = value);
+                        setState(() => _repeat = value);
                       }
                     },
                   ),
-                ],
+                ),
+                if (_repeat != StudyRepeat.none)
+                  _labeledField(
+                    label: 'Repeat every (${_repeat.name})',
+                    child: DropdownButtonFormField<int>(
+                      key: const ValueKey('event-repeat-every'),
+                      initialValue: _repeatEvery.clamp(1, 12).toInt(),
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        for (var interval = 1; interval <= 12; interval++)
+                          DropdownMenuItem(
+                            value: interval,
+                            child: Text('$interval'),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _repeatEvery = value);
+                        }
+                      },
+                    ),
+                  ),
               ],
             ],
           ),

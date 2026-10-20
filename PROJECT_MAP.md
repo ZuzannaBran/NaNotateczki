@@ -627,8 +627,9 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   kolor z tych samych palet, Recent i edytora HEX co foldery.
   Formularz Smart umożliwia wybór liczby bloków 1–12.
   Ocena ma wyśrodkowany nagłówek „Great job! Time's up.”.
-  Pole Session name, analogicznie do Description, nie ma przykładowego
-  placeholdera.
+  Pola Name, Description, Study technique, Duration, Focus blocks i Repeat
+  używają stałych etykiet nad obramowanymi polami, bez pływających podpisów
+  i przykładowych placeholderów.
   W trakcie sesji Resume/Pause oraz Stop mają tę samą wysokość 32 px,
   kontur i promień 12 px co przyciski Start/Smart.
   Selektor techniki w formularzu `isExpanded` mieści się w wąskim dialogu.
@@ -690,9 +691,9 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   innych miesięcy pozostają widoczne z opacity 0.5; pomocniczy napis
   Long-press usunięty. Osobne przyciski
   Settings i Study history usunięto – historia pozostaje w kalendarzu,
-  a globalne ustawienia w katalogu. Smart/New session mają wspólne
-  style z timerem i wysokość 32 px; poniżej 760 px leżą pod nagłówkiem
-  w równym rzędzie.
+  a globalne ustawienia w katalogu. Smart session, Add i New event usunięto z nagłówka
+  i widoku wąskiego; dodawanie działa przez plus w kalendarzu, a Smart
+  i Start session przez boczny timer. Tytuł nagłówka to Calendar.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px; Month na wąskim ekranie listę.
   16: `CalendarMode`; 18: `CalendarTimeSpan`;
@@ -747,7 +748,9 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   poziomych linii do etykiet, brak scrollbarów bez blokowania gestów,
   jaśniejsze tła dni spoza miesiąca w obu motywach,
   osobny scroll Upcoming, limit wysokości listy,
-  spójne przyciski włączonego timera, aktualną paletę zaznaczeń,
+  brak górnych przycisków w obu rozmiarach, dodawanie przez plus,
+  stałe etykiety formularzy Name/Description, spójne przyciski
+  włączonego timera, aktualną paletę zaznaczeń,
   skalowanie Smart i przecinających granicę godziny/doby sesji,
   brak placeholdera nazwy i wyśrodkowanie oceny,
   brak overflow selektora techniki,

@@ -904,62 +904,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
     );
   }
 
-  Widget _smartButton() => SizedBox(
-    height: StudyActionStyles.sessionButtonHeight,
-    child: OutlinedButton(
-      key: const ValueKey('planner-smart-session'),
-      style: StudyActionStyles.sessionOutlined(),
-      onPressed: () => showStudySessionEditor(
-        context,
-        technique: StudyTechnique.pomodoro,
-        startAfterSave: true,
-      ),
-      child: StudyActionStyles.sessionButtonContent(
-        icon: Icons.auto_awesome_rounded,
-        label: 'Smart session',
-        contentKey: const ValueKey('planner-smart-session-content'),
-      ),
-    ),
-  );
-
-  Widget _newEventButton() => SizedBox(
-    height: StudyActionStyles.sessionButtonHeight,
-    child: OutlinedButton(
-      key: const ValueKey('planner-new-event'),
-      style: StudyActionStyles.sessionOutlined(),
-      onPressed: () => showStudySessionEditor(
-        context,
-        kind: StudyEntryKind.event,
-      ),
-      child: StudyActionStyles.sessionButtonContent(
-        icon: Icons.event_outlined,
-        label: 'New event',
-        contentKey: const ValueKey('planner-new-event-content'),
-      ),
-    ),
-  );
-
-  Widget _newSessionButton() => SizedBox(
-    height: StudyActionStyles.sessionButtonHeight,
-    child: FilledButton(
-      key: const ValueKey('planner-new-session'),
-      style: StudyActionStyles.sessionPrimary(Theme.of(context)),
-      onPressed: () => _chooseEntryType(DateTime.now()),
-      child: StudyActionStyles.sessionButtonContent(
-        icon: Icons.add_rounded,
-        label: 'Add',
-        contentKey: const ValueKey('planner-new-session-content'),
-      ),
-    ),
-  );
-
   @override
   Widget build(BuildContext context) {
     final planner = context.watch<StudyPlannerController>();
     final colors = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final narrow = constraints.maxWidth < 760;
         final compactCalendar = constraints.maxWidth < 960;
         return StudyActionTheme(
           child: Scaffold(
@@ -969,7 +919,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               scrolledUnderElevation: 0,
               surfaceTintColor: Colors.transparent,
               title: const Text(
-                'Study planner',
+                'Calendar',
                 style: AppHeaderDivider.titleStyle,
               ),
               leading: IconButton(
@@ -977,35 +927,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () => Navigator.pop(context),
               ),
-              actions: [
-                if (!narrow) ...[
-                  SizedBox(width: 148, child: _smartButton()),
-                  const SizedBox(width: 8),
-                  SizedBox(width: 148, child: _newSessionButton()),
-                  const SizedBox(width: 8),
-                  SizedBox(width: 148, child: _newEventButton()),
-                ],
-                const SizedBox(width: 16),
-              ],
             ),
             body: SafeArea(
               top: false,
               child: Column(
                 children: [
                   const AppHeaderDivider(),
-                  if (narrow)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                      child: Row(
-                        children: [
-                          Expanded(child: _smartButton()),
-                          const SizedBox(width: 8),
-                          Expanded(child: _newSessionButton()),
-                          const SizedBox(width: 8),
-                          Expanded(child: _newEventButton()),
-                        ],
-                      ),
-                    ),
                   if (planner.active != null ||
                       planner.pendingReviews.isNotEmpty)
                     Material(

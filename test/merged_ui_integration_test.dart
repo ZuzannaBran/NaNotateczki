@@ -103,7 +103,7 @@ void main() {
 
       final referencePixel = await _renderedHeaderPixel(tester);
       await _openPlanner(tester);
-      expectAlignedHeader('Study planner');
+      expectAlignedHeader('Calendar');
       expect(await _renderedHeaderPixel(tester), referencePixel);
 
       expect(find.byTooltip('Settings'), findsNothing);
@@ -122,7 +122,7 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       await _openPlanner(tester);
-      expectAlignedHeader('Study planner');
+      expectAlignedHeader('Calendar');
       await tester.tap(find.byTooltip('Back to notes'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
