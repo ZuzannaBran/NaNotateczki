@@ -904,6 +904,7 @@ class _LibraryTreePane extends StatefulWidget {
 }
 
 class _LibraryTreePaneState extends State<_LibraryTreePane> {
+  bool _showStudyPanel = true;
   final Set<String> _collapsedFolders = <String>{};
 
   Future<bool> _moveItemToFolder(String uid, String folder) async {
@@ -995,21 +996,78 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                         ],
                       ),
               ),
-              _SidebarSpanDivider(
-                dividerKey: const ValueKey('sidebar-timer-divider'),
-                extendBy: dividerExtension,
-              ),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: timerMaxHeight),
-                child: SingleChildScrollView(
-                  key: const ValueKey('sidebar-timer-region'),
-                  physics: TouchNavigationScrollPhysics(
-                    sensitivity: touchNavigationGain,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _SidebarSpanDivider(
+                        dividerKey: const ValueKey('sidebar-timer-divider'),
+                        extendBy: dividerExtension,
+                      ),
+                      if (_showStudyPanel)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxHeight: timerMaxHeight),
+                          child: SingleChildScrollView(
+                            key: const ValueKey('sidebar-timer-region'),
+                            physics: TouchNavigationScrollPhysics(
+                              sensitivity: touchNavigationGain,
+                            ),
+                            child: StudyTimerCard(
+                              upcomingMaxHeight: upcomingMaxHeight,
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox(height: 22),
+                    ],
                   ),
-                  child: StudyTimerCard(
-                    upcomingMaxHeight: upcomingMaxHeight,
+                  Positioned(
+                    right: 8,
+                    top: -22,
+                    child: Material(
+                      key: const ValueKey('study-panel-toggle'),
+                      color: colorScheme.surface,
+                      elevation: 8,
+                      shadowColor: Colors.black54,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                        side: BorderSide(
+                          color: colorScheme.outlineVariant
+                              .withValues(alpha: 0.6),
+                        ),
+                      ),
+                      child: InkWell(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                        onTap: () => setState(
+                          () => _showStudyPanel = !_showStudyPanel,
+                        ),
+                        child: Tooltip(
+                          message: _showStudyPanel
+                              ? 'Hide study planner'
+                              : 'Show study planner',
+                          child: SizedBox(
+                            width: 24,
+                            height: _LibraryScreenState._toggleTabHeight,
+                            child: Icon(
+                              _showStudyPanel
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
               SizedBox(
                 key: const ValueKey('sidebar-account-slot'),

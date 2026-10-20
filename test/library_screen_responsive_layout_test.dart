@@ -99,6 +99,23 @@ void main() {
     );
     expect(find.byKey(const ValueKey('mobile-navigation-open')), findsNothing);
 
+    final studyToggle = find.byKey(const ValueKey('study-panel-toggle'));
+    final studyDivider = find.byKey(const ValueKey('sidebar-timer-divider'));
+    expect(studyToggle, findsOneWidget);
+    expect(find.byKey(const ValueKey('sidebar-timer-region')), findsOneWidget);
+    expect(
+      tester.getCenter(studyToggle).dy,
+      closeTo(tester.getTopLeft(studyDivider).dy, 1),
+    );
+    await tester.tap(studyToggle);
+    await tester.pump();
+    expect(find.byKey(const ValueKey('sidebar-timer-region')), findsNothing);
+    expect(find.byKey(const ValueKey('sidebar-account-divider')),
+        findsOneWidget);
+    await tester.tap(studyToggle);
+    await tester.pump();
+    expect(find.byKey(const ValueKey('sidebar-timer-region')), findsOneWidget);
+
     await tester.binding.setSurfaceSize(const Size(959, 700));
     await tester.pump();
 
@@ -1006,7 +1023,7 @@ void main() {
     );
     expect(
       tester.widget<Padding>(timer).padding,
-      const EdgeInsets.fromLTRB(14, 16, 14, 18),
+      const EdgeInsets.fromLTRB(14, 20, 14, 0),
     );
     expect(tester.getSize(account).height, AppHeaderDivider.toolbarHeight);
     expect(

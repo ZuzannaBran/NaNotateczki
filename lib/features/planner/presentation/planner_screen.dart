@@ -27,8 +27,15 @@ CalendarTimeSpan? calendarTimeSpan(
   DateTime day, {
   double hourHeight = 64,
 }) {
-  final start = DateTime(day.year, day.month, day.day);
-  final minutes = session.scheduledAt.difference(start).inMinutes;
+  final start = DateTime.utc(day.year, day.month, day.day);
+  final begins = DateTime.utc(
+    session.scheduledAt.year,
+    session.scheduledAt.month,
+    session.scheduledAt.day,
+    session.scheduledAt.hour,
+    session.scheduledAt.minute,
+  );
+  final minutes = begins.difference(start).inMinutes;
   final endMinutes = minutes + session.scheduledDurationMinutes;
   if (minutes >= 1440 || endMinutes <= 0) {
     return null;
@@ -303,6 +310,38 @@ class _PlannerScreenState extends State<PlannerScreen> {
   bool _isSameDate(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  Future<void> _chooseEntryType(DateTime date) async {
+    final kind = await showDialog<StudyEntryKind>(
+      context: context,
+      builder: (dialogContext) => StudyActionTheme(
+        child: SimpleDialog(
+          title: const Text('Add to calendar'),
+          children: [
+            SimpleDialogOption(
+              key: const ValueKey('calendar-add-event'),
+              onPressed: () =>
+                  Navigator.pop(dialogContext, StudyEntryKind.event),
+              child: const Text('Event'),
+            ),
+            SimpleDialogOption(
+              key: const ValueKey('calendar-add-session'),
+              onPressed: () =>
+                  Navigator.pop(dialogContext, StudyEntryKind.session),
+              child: const Text('Study session'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (kind != null && mounted) {
+      await showStudySessionEditor(
+        context,
+        scheduledAt: date,
+        kind: kind,
+      );
+    }
+  }
+
   Future<void> _sessionOptions(StudySession session) async {
     final planner = context.read<StudyPlannerController>();
     await showDialog<void>(
@@ -347,7 +386,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               TextButton(
                 onPressed: () {
                   Navigator.pop(dialogContext);
-                  showStudySessionEditor(context, session: session);
+                  showStudySessionEditor(context, session: planner.originalFor(session));
                 },
                 child: const Text('Edit'),
               ),
@@ -411,7 +450,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
       ),
     );
     if (confirmed == true && mounted) {
-      context.read<StudyPlannerController>().delete(session.id);
+      context.read<StudyPlannerController>().delete(session.seriesId ?? session.id);
     }
   }
 
@@ -453,7 +492,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '${studyClock(session.scheduledAt)}  ${session.title}',
+                '${session.allDay ? 'All day' : studyClock(session.scheduledAt)}'
+                '  ${session.title}',
                 maxLines: timeline ? 1 : (compact ? 2 : 3),
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -487,7 +527,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
         ),
       ),
     );
-    if (session.status != StudyStatus.planned) {
+    if (session.status != StudyStatus.planned ||
+        (session.kind == StudyEntryKind.event &&
+            session.repeat != StudyRepeat.none)) {
       return tile;
     }
     return LongPressDraggable<StudySession>(
@@ -544,14 +586,15 @@ class _PlannerScreenState extends State<PlannerScreen> {
         _mode != CalendarMode.month ||
         (day.month == _anchor.month && day.year == _anchor.year);
     final items =
-        sessions.where((s) => _isSameDate(s.scheduledAt, day)).toList()
+        sessions.where((s) => calendarTimeSpan(s, day) != null).toList()
           ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
 
     return Opacity(
       opacity: inMonth || monthColumn != null ? 1 : 0.5,
       child: DragTarget<StudySession>(
         onWillAcceptWithDetails: (details) =>
-            details.data.status == StudyStatus.planned,
+            details.data.status == StudyStatus.planned &&
+            details.data.repeat == StudyRepeat.none,
         onAcceptWithDetails: (details) {
           context.read<StudyPlannerController>().move(details.data.id, day);
         },
@@ -635,9 +678,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                             tooltip: 'Plan on this day',
                             icon: const Icon(Icons.add_rounded, size: 18),
                             visualDensity: VisualDensity.compact,
-                            onPressed: () => showStudySessionEditor(
-                              context,
-                              scheduledAt: DateTime(
+                            onPressed: () => _chooseEntryType(
+                              DateTime(
                                 day.year,
                                 day.month,
                                 day.day,
@@ -660,9 +702,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         compact: compact,
                         physics: _navigationPhysics,
                         buildTile: _timelineTile,
-                        onPlanAt: (hour) => showStudySessionEditor(
-                          context,
-                          scheduledAt: DateTime(
+                        onPlanAt: (hour) => _chooseEntryType(
+                          DateTime(
                             day.year,
                             day.month,
                             day.day,
@@ -723,9 +764,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 dayLabel: _dayLabel,
                 buildTile: _timelineTile,
                 onOpenDay: _openDay,
-                onPlanAt: (day, hour) => showStudySessionEditor(
-                  context,
-                  scheduledAt: DateTime(
+                onPlanAt: (day, hour) => _chooseEntryType(
+                  DateTime(
                     day.year,
                     day.month,
                     day.day,
@@ -904,10 +944,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
     child: FilledButton(
       key: const ValueKey('planner-new-session'),
       style: StudyActionStyles.sessionPrimary(Theme.of(context)),
-      onPressed: () => showStudySessionEditor(context),
+      onPressed: () => _chooseEntryType(DateTime.now()),
       child: StudyActionStyles.sessionButtonContent(
         icon: Icons.add_rounded,
-        label: 'New session',
+        label: 'Add',
         contentKey: const ValueKey('planner-new-session-content'),
       ),
     ),
@@ -1166,7 +1206,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       behavior: ScrollConfiguration.of(
                         context,
                       ).copyWith(scrollbars: false),
-                      child: _calendar(planner.sessions),
+                      child: _calendar(
+                        planner.calendarEntries(
+                          _visibleDays().first,
+                          _visibleDays().last,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(
@@ -1519,7 +1564,8 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     final dateKey = _dayKey(day);
     return DragTarget<StudySession>(
       onWillAcceptWithDetails: (details) =>
-          details.data.status == StudyStatus.planned,
+          details.data.status == StudyStatus.planned &&
+          details.data.repeat == StudyRepeat.none,
       onAcceptWithDetails: (details) =>
           widget.onMove(details.data.id, day),
       builder: (context, candidates, rejected) => Container(

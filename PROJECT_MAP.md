@@ -382,7 +382,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
   706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1754 linii)
+### `lib/features/library/presentation/library_screen.dart` (1836 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -413,6 +413,9 @@ maksymalnie 45% obszaru między nagłówkiem a paskiem konta;
 separatory folderów/timera i paska konta używają `AppHeaderDivider`,
 na desktopie sięgają przez 12 px uchwytu do prawej krawędzi sidebaru.
 Pionowy separator uchwytu korzysta z tego samego koloru motywu.
+Panel timera ma własny przycisk zwijania przy poziomym separatorze
+(`study-panel-toggle`); po ukryciu lista folderów odzyskuje miejsce.
+Przy ponownym rozwinięciu zachowuje osobny scroll.
 Upcoming ma osobne przewijanie i limit 25% obszaru roboczego sidebaru,
 niższy niż połowa dostępnego miejsca na foldery. Cały timer nadal
 nie przekracza 45% tego obszaru. Przy małym oknie timer przewija się
@@ -462,15 +465,15 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
 - 25: `LibraryScreen`; 32: `_LibraryScreenState`;
   506: `_openCatalogSettings`;
   841: `_CreateMenuButton`;
-  884: `_LibraryTreePane`;
+  881: `_LibraryTreePane` (`_LibraryTreePaneState` 906);
   1156: `_FolderTreeRow`;
   1254: `_LibraryTreeItemRow`;
   1357: `_sidebarMenuShape`;
   1371: `_SidebarMenuShadowPainter`;
   1407: `_showSidebarMenu`;
   1520: `_TreeRowActions`;
-  1594: `_LibraryWorkspace`;
-  1675: `_LeftZoneToggleTab`.
+  1670: `_LibraryWorkspace`;
+  1781: `_LeftZoneToggleTab`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1158 linii)
 
@@ -562,9 +565,14 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   w wąskich oknach, bez wyśrodkowywania po zmianie daty.
 
 
-- `lib/features/planner/state/study_planner_controller.dart` (566):
-  `StudySession`, `StudyEntryKind` (session/event), `StudyTechnique`,
-  `StudyStatus`, `StudyPlannerController`.
+- `lib/features/planner/state/study_planner_controller.dart` (789):
+  `StudySession`, `StudyEntryKind` (session/event),
+  `StudyRepeat` (daily, weekly, monthly, yearly), `StudyTechnique`,
+  `StudyStatus`, `StudyPlannerController`. Wydarzenia mają zakres dni,
+  całodniowość i powtarzanie z odstępem 1–365 jednostek.
+  `calendarEntries` generuje widoczne wystąpienia bez dublowania zapisów,
+  a `originalFor` pozwala edytować całą serię. Wydarzenia nie trafiają
+  do listy `upcoming`, która obejmuje tylko sesje.
   Jeden stan Provider + ChangeNotifier, trwały `study_planner.json` przez
   cross-platform `text_storage`. Timery liczone względem deadline,
   odtwarzanie po restarcie, Pomodoro 25/5, Focus 50/10, Deep 90/20,
@@ -580,15 +588,10 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   zakończenie sesji otwiera ocenę bez dolnego SnackBara.
   Wynik wczytywania po dispose jest ignorowany: bez powiadomienia, timera
   ani zapisu odzyskanej historii.
-  10: `StudyTechnique`;
-  42: `StudyStatus`;
-  46: `StudySession`;
-  164: `StudyPlannerController`;
-  244: `load`;
-  310: `create`;
-  391: `start`;
-  553: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (761):
+  10: `StudyTechnique`; 45: `StudyRepeat`; 51: `StudySession`;
+  219: `StudyPlannerController`; 282: `calendarEntries`;
+  432: `load`; 498: `create`; 537: `edit`; 779: `flush`.
+- `lib/features/planner/presentation/study_timer_widgets.dart` (918):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -600,10 +603,15 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   bez zmiany rozmiaru tekstu.
   ikony Play i Smart z podpisami są centrowane jako jeden blok,
   skalowany do wąskiego panelu. Powiększony padding pionowy timera
-  (20 px u góry, 22 px na dole) oraz odstęp pod Ready (30 px)
+  (20 px u góry, 0 px na dole) oraz odstęp pod Ready (30 px)
   zwiększają wysokość całego bloku mimo niższych przycisków.
-  Upcoming pokazuje wszystkie sesje w osobno przewijanej liście,
+  Upcoming pokazuje wyłącznie sesje nauki w osobno przewijanej liście,
   również podczas aktywnej sesji zamiast przycisków Start/Smart.
+  Formularz wydarzeń pokazuje datę, czas, długość, kolor, opis,
+  zakres dat, cały dzień i regułę powtarzania; nie pokazuje
+  ustawień timera ani bloków Focus. Karty Upcoming w sidebarze
+  mają obrys jasnobeżowy `AppColors.toolbar` zamiast koloru tekstu
+  (bez zmiany obrysów w kalendarzu). Dolny padding panelu wynosi 0.
   Nowe i edytowane sesje (także z kalendarza) mogą mieć indywidualny
   kolor z tych samych palet, Recent i edytora HEX co foldery.
   Formularz Smart umożliwia wybór liczby bloków 1–12.
@@ -619,8 +627,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   43: `openStudyPlanner`;
   49: `showStudySessionEditor`;
   69: `showStudyRating`;
-  437: `StudyTimerCard`;
-  713: `CompactStudyTimer`.
+  583: `StudyTimerCard`;
+  869: `CompactStudyTimer`.
 - `lib/features/planner/presentation/study_action_theme.dart` (163):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
@@ -634,13 +642,15 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1770):
+- `lib/features/planner/presentation/planner_screen.dart` (1843):
   `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
   Wydarzenia są wspólnymi wpisami kalendarza bez możliwości uruchomienia
   timera, ze wspólnym opisem, kolorem, czasem, edycją i przenoszeniem.
-  Upcoming umożliwia edycję wydarzeń zamiast uruchomienia timera.
+  Kalendarz rozwija wydarzenia cykliczne oraz wielodniowe,
+  a każde `+` rozpoczyna od wyboru Event / Study session.
+  Edycja lub usunięcie wystąpienia cyklicznego dotyczy całej serii.
   Day domyślnie otwiera aktualny dzień, a kliknięcie pola Week/Month
-  przechodzi do wybranej daty. Przyciski + zachowują tworzenie sesji.
+  przechodzi do wybranej daty. Wszystkie przyciski + otwierają wybór typu.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
   Wybrany kolor sesji jest nakładką nad tłem karty w Week/Today/Month.
@@ -678,9 +688,9 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   25: `calendarTimeSpan`; 44: `CalendarSessionPlacement`;
   59: `calendarSessionPlacements`; 157: `PlannerScreen`;
   164: `_PlannerScreenState`;
-  1160: `_HourlyDaySchedule`; 1329: `_CalendarHeaderStrip`;
-  1375: `_CalendarBorderFrame`; 1398: `_WeekTimeGrid`;
-  1694: `_WeekTableClipper`; 1720: `_WeekColumnLinesPainter`.
+  1231: `_HourlyDaySchedule`; 1400: `_CalendarHeaderStrip`;
+  1446: `_CalendarBorderFrame`; 1469: `_WeekTimeGrid`;
+  1766: `_WeekTableClipper`; 1792: `_WeekColumnLinesPainter`.
   `_WeekTimeGrid`: pełnowysokie separatory i wspólna ramka na
   wierzchu siatki; clip uwzględnia lewą granicę tabeli obok osi godzin.
   `calendarSessionPlacements` przydziela niekolidujące kolumny blokom
@@ -1168,6 +1178,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   edycja, usuwanie, opcjonalny deadline, kolor statusów oraz widget canvasu.
 - `test/study_planner_controller_test.dart` i
   `test/study_planner_widget_test.dart`: wydarzenia kalendarza bez timera,
+  powtarzanie, wydarzenia wielodniowe, brak wydarzeń w Upcoming,
+  jasne obramowanie w sidebarze i wybór typu przez plus,
   wspólny zapis, edycja, usuwanie i zgodność starych wpisów.
 - `test/library_sidebar_drag_drop_test.dart`: trwałe przenoszenie notatek i
   boardów między folderami, walidacja celu, zachowanie wyboru, przeciąganie

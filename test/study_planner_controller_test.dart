@@ -106,6 +106,112 @@ void main() {
     restored.dispose();
   });
 
+  test('recurring events appear only in calendar and persist as one series',
+      () async {
+    await planner.load();
+    final event = planner.create(
+      kind: StudyEntryKind.event,
+      title: 'Wednesday lecture',
+      scheduledAt: DateTime(2026, 10, 21, 13),
+      minutes: 90,
+      repeat: StudyRepeat.weekly,
+      repeatEvery: 2,
+    );
+    expect(planner.upcoming, isEmpty);
+    final entries = planner.calendarEntries(
+      DateTime(2026, 10, 20),
+      DateTime(2026, 11, 20),
+    );
+    expect(entries.map((entry) => entry.scheduledAt.day), [21, 4, 18]);
+    expect(entries.map((entry) => entry.scheduledAt.weekday).toSet(), {
+      DateTime.wednesday,
+    });
+    expect(entries.map((entry) => entry.id).toSet().length, 3);
+    expect(planner.originalFor(entries.last).id, event.id);
+
+    await planner.flush();
+    final restored = StudyPlannerController(
+      autoTick: false,
+      clock: () => now,
+      read: (key) async => storage[key],
+      write: (key, value) async {},
+    );
+    await restored.load();
+    expect(restored.sessions, hasLength(1));
+    expect(restored.sessions.single.repeat, StudyRepeat.weekly);
+    expect(restored.sessions.single.repeatEvery, 2);
+    expect(
+      restored.calendarEntries(DateTime(2026, 11, 4),
+          DateTime(2026, 11, 4)),
+      hasLength(1),
+    );
+    restored.dispose();
+  });
+
+  test('all-day and multi-day events cover every occupied calendar day',
+      () async {
+    await planner.load();
+    final allDay = planner.create(
+      kind: StudyEntryKind.event,
+      title: 'Conference',
+      scheduledAt: DateTime(2026, 10, 20),
+      minutes: 1440,
+      allDay: true,
+      eventEndDate: DateTime(2026, 10, 22),
+    );
+    expect(allDay.scheduledDurationMinutes, 3 * 1440);
+    expect(
+      planner.calendarEntries(DateTime(2026, 10, 21),
+          DateTime(2026, 10, 21)).single.id,
+      allDay.id,
+    );
+    expect(
+      planner.calendarEntries(DateTime(2026, 10, 23),
+          DateTime(2026, 10, 23)),
+      isEmpty,
+    );
+    final evening = planner.create(
+      kind: StudyEntryKind.event,
+      title: 'Hackathon',
+      scheduledAt: DateTime(2026, 10, 25, 23, 30),
+      minutes: 60,
+      eventEndDate: DateTime(2026, 10, 26),
+    );
+    expect(evening.scheduledDurationMinutes, 1500);
+    expect(
+      planner.calendarEntries(DateTime(2026, 10, 26),
+          DateTime(2026, 10, 26)).single.id,
+      evening.id,
+    );
+    await planner.flush();
+    final serialized = jsonDecode(
+      storage[StudyPlannerController.storageKey]!,
+    ) as Map<String, dynamic>;
+    expect((serialized['sessions'] as List), hasLength(2));
+    expect((serialized['sessions'] as List).first['allDay'], isTrue);
+    expect(
+      StudySession.fromJson(
+        (serialized['sessions'] as List).first as Map<String, dynamic>,
+      ).eventEndDate,
+      DateTime(2026, 10, 22),
+    );
+  });
+
+  test('old event values without recurrence default to single-day',
+      () {
+    final event = StudySession.fromJson({
+      'id': 'old-event',
+      'kind': 'event',
+      'title': 'Meeting',
+      'scheduledAt': now.toIso8601String(),
+      'minutes': 40,
+    });
+    expect(event.allDay, isFalse);
+    expect(event.eventEndDate, isNull);
+    expect(event.repeat, StudyRepeat.none);
+    expect(event.repeatEvery, 1);
+  });
+
   test('old sessions without kind remain regular sessions', () {
     final legacy = StudySession.fromJson({
       'id': 'legacy',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
 import 'package:program/core/widgets/app_header_divider.dart';
 import 'package:program/features/editor/state/ink_color_presets.dart';
@@ -21,14 +22,19 @@ void main() {
     return planner;
   }
 
-  testWidgets('upcoming calendar event offers editing instead of timer', (
+  testWidgets('upcoming shows only sessions with a light beige outline', (
     tester,
   ) async {
     final planner = await loadPlanner();
+    final date = DateTime.now().add(const Duration(days: 1));
     final event = planner.create(
       kind: StudyEntryKind.event,
       title: 'Museum visit',
-      scheduledAt: DateTime.now().add(const Duration(days: 1)),
+      scheduledAt: date,
+    );
+    final session = planner.create(
+      title: 'Revision',
+      scheduledAt: date,
     );
     await tester.pumpWidget(
       ChangeNotifierProvider<StudyPlannerController>.value(
@@ -39,12 +45,23 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Start scheduled session'), findsNothing);
-    await tester.tap(find.byTooltip('Edit event'));
-    await tester.pumpAndSettle();
-    expect(find.text('Edit event'), findsOneWidget);
-    expect(planner.active, isNull);
+    expect(planner.upcoming, hasLength(1));
+    expect(find.text('Museum visit'), findsNothing);
+    expect(find.text('Revision'), findsOneWidget);
+    expect(find.byTooltip('Edit event'), findsNothing);
     expect(planner.start(event.id), isFalse);
+
+    final card = tester.widget<Material>(
+      find.byKey(ValueKey('sidebar-upcoming-card:${session.id}')),
+    );
+    expect(
+      (card.shape! as RoundedRectangleBorder).side.color,
+      AppColors.toolbar,
+    );
+    final panel = tester.widget<Padding>(
+      find.byKey(const ValueKey('study-timer-card')),
+    );
+    expect(panel.padding, const EdgeInsets.fromLTRB(14, 20, 14, 0));
     await planner.flush();
   });
 
@@ -65,6 +82,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('New event'), findsOneWidget);
     expect(find.text('Study technique'), findsNothing);
+    expect(find.byKey(const ValueKey('event-all-day')), findsOneWidget);
+    expect(find.byKey(const ValueKey('event-end-date')), findsOneWidget);
+    expect(find.byKey(const ValueKey('event-repeat')), findsOneWidget);
+    expect(find.text('Focus blocks'), findsNothing);
     await tester.enterText(find.byType(TextField).first, 'Lecture');
     await tester.tap(find.text('Save').last);
     await tester.pumpAndSettle();
@@ -72,6 +93,57 @@ void main() {
     expect(planner.active, isNull);
     expect(planner.start(planner.sessions.single.id), isFalse);
     await planner.flush();
+  });
+
+  testWidgets('calendar plus asks for event or study session', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: PlannerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('planner-new-session')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add to calendar'), findsOneWidget);
+    expect(find.byKey(const ValueKey('calendar-add-event')), findsOneWidget);
+    expect(find.byKey(const ValueKey('calendar-add-session')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('calendar-add-event')));
+    await tester.pumpAndSettle();
+    expect(find.text('New event'), findsOneWidget);
+    expect(find.text('Study technique'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('event-all-day')));
+    await tester.pumpAndSettle();
+    expect(find.text('Duration (minutes)'), findsNothing);
+    expect(find.byKey(const ValueKey('event-repeat')), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'All-day meeting');
+    await tester.tap(find.text('Save').last);
+    await tester.pumpAndSettle();
+    expect(planner.sessions.single.allDay, isTrue);
+    expect(planner.sessions.single.kind, StudyEntryKind.event);
+    expect(planner.active, isNull);
+  });
+
+  test('all-day calendar blocks do not shift at daylight saving time', () {
+    final event = StudySession(
+      id: 'dst',
+      kind: StudyEntryKind.event,
+      title: 'Holiday',
+      scheduledAt: DateTime(2026, 10, 25),
+      minutes: 1440,
+      allDay: true,
+    );
+    expect(event.scheduledDurationMinutes, 1440);
+    expect(
+      calendarTimeSpan(event, DateTime(2026, 10, 25))!.height,
+      closeTo(24 * 64, 0.001),
+    );
+    expect(calendarTimeSpan(event, DateTime(2026, 10, 26)), isNull);
   });
 
   test('scheduled session spans the correct minutes including breaks', () {
@@ -779,8 +851,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('planner-new-session')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('calendar-add-session')));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Session name'), findsOneWidget);
+    expect(find.text('Name'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Settings'), findsNothing);
@@ -851,9 +925,9 @@ void main() {
         tester.widget<Padding>(
           find.byKey(const ValueKey('study-timer-card')),
         ).padding,
-        const EdgeInsets.fromLTRB(14, 20, 14, 22),
+        const EdgeInsets.fromLTRB(14, 20, 14, 0),
       );
-      expect(timer.bottom - start.bottom, closeTo(22, 0.1));
+      expect(timer.bottom - start.bottom, closeTo(0, 0.1));
       expect(
         start.top -
             tester.getRect(
@@ -1089,18 +1163,20 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('planner-new-session')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('calendar-add-session')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('study-session-colour')), findsOneWidget);
     final nameInput = tester.widget<TextField>(
-      find.widgetWithText(TextField, 'Session name'),
+      find.widgetWithText(TextField, 'Name'),
     );
     final descriptionInput = tester.widget<TextField>(
       find.widgetWithText(TextField, 'Description'),
     );
     expect(nameInput.decoration!.hintText, isNull);
-    expect(nameInput.decoration!.labelText, 'Session name');
+    expect(nameInput.decoration!.labelText, 'Name');
     expect(descriptionInput.decoration!.labelText, 'Description');
     await tester.enterText(
-      find.widgetWithText(TextField, 'Session name'),
+      find.widgetWithText(TextField, 'Name'),
       'Coloured session',
     );
     await tester.tap(find.byKey(const ValueKey('study-session-colour')));
@@ -1157,7 +1233,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('study-focus-blocks')), findsOneWidget);
     await tester.enterText(
-      find.widgetWithText(TextField, 'Session name'),
+      find.widgetWithText(TextField, 'Name'),
       'Two blocks',
     );
     await tester.tap(find.byKey(const ValueKey('study-focus-blocks')));
@@ -1186,7 +1262,7 @@ void main() {
     await tester.tap(find.text('Start session'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextField, 'Session name'),
+      find.widgetWithText(TextField, 'Name'),
       'History lesson',
     );
     await tester.tap(find.text('Save & start'));
@@ -1533,8 +1609,8 @@ void main() {
 
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpAndSettle();
-    expect(tester.getSize(smart).width, closeTo(179, 1));
-    expect(tester.getSize(create).width, closeTo(179, 1));
+    expect(tester.getSize(smart).width, closeTo(116.7, 1));
+    expect(tester.getSize(create).width, closeTo(116.7, 1));
     expect(tester.getRect(smart).top, closeTo(tester.getRect(create).top, 1));
     expect(tester.takeException(), isNull);
   });

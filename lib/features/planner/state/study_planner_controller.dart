@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
@@ -41,6 +42,8 @@ extension StudyTechniqueDetails on StudyTechnique {
 
 enum StudyEntryKind { session, event }
 
+enum StudyRepeat { none, daily, weekly, monthly, yearly }
+
 enum StudyStatus { planned, running, paused, review, completed }
 
 enum StudyPhase { focus, breakTime }
@@ -64,6 +67,11 @@ class StudySession {
     this.startedAt,
     this.finishedAt,
     this.productivity,
+    this.allDay = false,
+    this.eventEndDate,
+    this.repeat = StudyRepeat.none,
+    this.repeatEvery = 1,
+    this.seriesId,
   }) : focusBlocks = (focusBlocks ?? technique.rounds).clamp(1, 12).toInt();
 
   final String id;
@@ -83,14 +91,37 @@ class StudySession {
   DateTime? startedAt;
   DateTime? finishedAt;
   int? productivity;
+  bool allDay;
+  DateTime? eventEndDate;
+  StudyRepeat repeat;
+  int repeatEvery;
+  final String? seriesId;
 
   int get totalFocusMinutes => technique == StudyTechnique.custom
       ? minutes
       : technique.focusMinutes * focusBlocks;
 
-  int get scheduledDurationMinutes => technique == StudyTechnique.custom
-      ? minutes
-      : totalFocusMinutes + (focusBlocks - 1) * technique.breakMinutes;
+  int get scheduledDurationMinutes {
+    if (kind == StudyEntryKind.event) {
+      final last = eventEndDate ?? scheduledAt;
+      final days = DateTime.utc(last.year, last.month, last.day)
+          .difference(DateTime.utc(
+            scheduledAt.year,
+            scheduledAt.month,
+            scheduledAt.day,
+          )).inDays;
+      if (allDay) {
+        return (days + 1) * 1440;
+      }
+      if (eventEndDate != null) {
+        return days * 1440 + minutes;
+      }
+      return minutes;
+    }
+    return technique == StudyTechnique.custom
+        ? minutes
+        : totalFocusMinutes + (focusBlocks - 1) * technique.breakMinutes;
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -110,6 +141,10 @@ class StudySession {
     'startedAt': startedAt?.toIso8601String(),
     'finishedAt': finishedAt?.toIso8601String(),
     'productivity': productivity,
+    'allDay': kind == StudyEntryKind.event && allDay,
+    'eventEndDate': eventEndDate?.toIso8601String(),
+    'repeat': repeat.name,
+    'repeatEvery': repeatEvery,
   };
 
   static StudySession fromJson(Map<String, dynamic> json) {
@@ -168,6 +203,12 @@ class StudySession {
       productivity: json['productivity'] is num
           ? (json['productivity'] as num).toInt().clamp(1, 5).toInt()
           : null,
+      allDay: json['allDay'] == true,
+      eventEndDate: date(json['eventEndDate']),
+      repeat: parseEnum(StudyRepeat.values, json['repeat'], StudyRepeat.none),
+      repeatEvery: ((json['repeatEvery'] as num?)?.toInt() ?? 1)
+          .clamp(1, 365)
+          .toInt(),
     );
   }
 }
@@ -223,6 +264,7 @@ class StudyPlannerController extends ChangeNotifier {
     final list = _sessions
         .where(
           (s) =>
+              s.kind == StudyEntryKind.session &&
               s.status == StudyStatus.planned &&
               !s.scheduledAt.isBefore(
                 DateTime(_clock().year, _clock().month, _clock().day),
@@ -231,6 +273,138 @@ class StudyPlannerController extends ChangeNotifier {
         .toList();
     list.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
     return list;
+  }
+
+  StudySession originalFor(StudySession entry) =>
+      _find(entry.seriesId ?? entry.id);
+
+  /// Generates visible event occurrences without duplicating persisted data.
+  List<StudySession> calendarEntries(DateTime first, DateTime last) {
+    final start = DateTime(first.year, first.month, first.day);
+    final end = DateTime(last.year, last.month, last.day + 1);
+    final result = <StudySession>[];
+
+    DateTime wallClock(DateTime time) => DateTime.utc(
+      time.year,
+      time.month,
+      time.day,
+      time.hour,
+      time.minute,
+    );
+
+    bool visible(StudySession entry) {
+      final began = wallClock(entry.scheduledAt);
+      return began.isBefore(wallClock(end)) &&
+          began.add(Duration(minutes: entry.scheduledDurationMinutes))
+              .isAfter(wallClock(start));
+    }
+
+    for (final session in _sessions) {
+      if (session.kind != StudyEntryKind.event ||
+          session.repeat == StudyRepeat.none) {
+        if (visible(session)) {
+          result.add(session);
+        }
+        continue;
+      }
+
+      final startDay = DateTime.utc(
+        session.scheduledAt.year,
+        session.scheduledAt.month,
+        session.scheduledAt.day,
+      );
+      final windowDay = DateTime.utc(start.year, start.month, start.day);
+      final daysBefore = windowDay.difference(startDay).inDays;
+      final spanDays = (session.scheduledDurationMinutes + 1439) ~/ 1440;
+      final earlier = math.max(0, daysBefore - spanDays - 1);
+      final every = session.repeatEvery.clamp(1, 365).toInt();
+      final index = switch (session.repeat) {
+        StudyRepeat.daily => earlier ~/ every,
+        StudyRepeat.weekly => earlier ~/ (7 * every),
+        StudyRepeat.monthly => math.max(
+          0,
+          ((start.year - session.scheduledAt.year) * 12 +
+                      start.month -
+                      session.scheduledAt.month -
+                      2) ~/
+              every,
+        ),
+        StudyRepeat.yearly => math.max(
+          0,
+          (start.year - session.scheduledAt.year - 2) ~/ every,
+        ),
+        StudyRepeat.none => 0,
+      };
+      for (var i = index; i < index + 128; i++) {
+        final at = _repeatDate(session.scheduledAt, session.repeat, every, i);
+        if (!at.isBefore(end)) {
+          break;
+        }
+        final occurrence = i == 0
+            ? session
+            : StudySession(
+                id: '${session.id}@${at.toIso8601String()}',
+                seriesId: session.id,
+                kind: StudyEntryKind.event,
+                title: session.title,
+                description: session.description,
+                scheduledAt: at,
+                minutes: session.minutes,
+                allDay: session.allDay,
+                eventEndDate: session.eventEndDate == null
+                    ? null
+                    : DateTime(
+                        at.year,
+                        at.month,
+                        at.day +
+                            DateTime.utc(
+                              session.eventEndDate!.year,
+                              session.eventEndDate!.month,
+                              session.eventEndDate!.day,
+                            ).difference(startDay).inDays,
+                      ),
+                repeat: session.repeat,
+                repeatEvery: every,
+                colorValue: session.colorValue,
+              );
+        if (visible(occurrence)) {
+          result.add(occurrence);
+        }
+      }
+    }
+    return result;
+  }
+
+  static DateTime _repeatDate(
+    DateTime date,
+    StudyRepeat repeat,
+    int every,
+    int index,
+  ) {
+    if (repeat == StudyRepeat.daily || repeat == StudyRepeat.weekly) {
+      return DateTime(
+        date.year,
+        date.month,
+        date.day + index * every * (repeat == StudyRepeat.weekly ? 7 : 1),
+        date.hour,
+        date.minute,
+      );
+    }
+    final year = repeat == StudyRepeat.yearly
+        ? date.year + every * index
+        : date.year;
+    final month = repeat == StudyRepeat.monthly
+        ? date.month + every * index
+        : date.month;
+    final first = DateTime(year, month);
+    final lastDay = DateTime(first.year, first.month + 1, 0).day;
+    return DateTime(
+      first.year,
+      first.month,
+      math.min(lastDay, date.day),
+      date.hour,
+      date.minute,
+    );
   }
 
   List<StudySession> get history =>
@@ -330,6 +504,10 @@ class StudyPlannerController extends ChangeNotifier {
     int? focusBlocks,
     int? colorValue,
     StudyEntryKind kind = StudyEntryKind.session,
+    bool allDay = false,
+    DateTime? eventEndDate,
+    StudyRepeat repeat = StudyRepeat.none,
+    int repeatEvery = 1,
   }) {
     final session = StudySession(
       id: const Uuid().v4(),
@@ -343,6 +521,10 @@ class StudyPlannerController extends ChangeNotifier {
       technique: technique,
       focusBlocks: focusBlocks,
       colorValue: colorValue,
+      allDay: kind == StudyEntryKind.event && allDay,
+      eventEndDate: kind == StudyEntryKind.event ? eventEndDate : null,
+      repeat: kind == StudyEntryKind.event ? repeat : StudyRepeat.none,
+      repeatEvery: repeatEvery.clamp(1, 365).toInt(),
     );
     if (!isLoaded || error != null) {
       throw StateError('Study planner storage is not available.');
@@ -362,6 +544,10 @@ class StudyPlannerController extends ChangeNotifier {
     int? focusBlocks,
     int? colorValue,
     bool updateColor = false,
+    bool allDay = false,
+    DateTime? eventEndDate,
+    StudyRepeat repeat = StudyRepeat.none,
+    int repeatEvery = 1,
   }) {
     final session = _find(id);
     if (session.status != StudyStatus.planned) {
@@ -374,6 +560,12 @@ class StudyPlannerController extends ChangeNotifier {
     session.scheduledAt = scheduledAt;
     session.minutes = minutes.clamp(1, 1440).toInt();
     session.technique = technique;
+    if (session.kind == StudyEntryKind.event) {
+      session.allDay = allDay;
+      session.eventEndDate = eventEndDate;
+      session.repeat = repeat;
+      session.repeatEvery = repeatEvery.clamp(1, 365).toInt();
+    }
     session.focusBlocks = (focusBlocks ?? technique.rounds)
         .clamp(1, 12)
         .toInt();
@@ -388,6 +580,12 @@ class StudyPlannerController extends ChangeNotifier {
     if (session.status != StudyStatus.planned) {
       return;
     }
+    final difference = DateTime.utc(date.year, date.month, date.day)
+        .difference(DateTime.utc(
+          session.scheduledAt.year,
+          session.scheduledAt.month,
+          session.scheduledAt.day,
+        )).inDays;
     session.scheduledAt = DateTime(
       date.year,
       date.month,
@@ -395,6 +593,11 @@ class StudyPlannerController extends ChangeNotifier {
       session.scheduledAt.hour,
       session.scheduledAt.minute,
     );
+    final last = session.eventEndDate;
+    if (last != null) {
+      session.eventEndDate =
+          DateTime(last.year, last.month, last.day + difference);
+    }
     _changed();
   }
 

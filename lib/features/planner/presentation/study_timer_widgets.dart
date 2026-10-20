@@ -161,6 +161,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
   late StudyTechnique _technique;
   late StudyEntryKind _kind;
   late int _focusBlocks;
+  late bool _allDay;
+  DateTime? _endDate;
+  late StudyRepeat _repeat;
+  late int _repeatEvery;
   Color? _color;
   late DateTime _date;
 
@@ -171,6 +175,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
     _kind = session?.kind ?? widget.kind;
     _technique = session?.technique ?? widget.technique;
     _focusBlocks = session?.focusBlocks ?? _technique.rounds;
+    _allDay = session?.allDay ?? false;
+    _endDate = session?.eventEndDate;
+    _repeat = session?.repeat ?? StudyRepeat.none;
+    _repeatEvery = session?.repeatEvery ?? 1;
     _color = session == null || session.colorValue == null
         ? null
         : Color(session.colorValue!);
@@ -196,6 +204,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
       lastDate: DateTime(2100),
     );
     if (picked != null && mounted) {
+      if (_endDate != null &&
+          _endDate!.isBefore(DateTime(picked.year, picked.month, picked.day))) {
+        _endDate = null;
+      }
       setState(
         () => _date = DateTime(
           picked.year,
@@ -205,6 +217,19 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
           _date.minute,
         ),
       );
+    }
+  }
+
+  Future<void> _pickEndDate() async {
+    final first = DateTime(_date.year, _date.month, _date.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _endDate ?? first,
+      firstDate: first,
+      lastDate: DateTime(2100),
+    );
+    if (picked != null && mounted) {
+      setState(() => _endDate = picked);
     }
   }
 
@@ -249,7 +274,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
   void _save() {
     final planner = context.read<StudyPlannerController>();
     final minutes = int.tryParse(_minutes.text);
-    if (_technique == StudyTechnique.custom &&
+    if ((_kind == StudyEntryKind.event
+            ? !_allDay
+            : _technique == StudyTechnique.custom) &&
         (minutes == null || minutes < 1 || minutes > 1440)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Duration must be 1–1440 minutes.')),
@@ -257,13 +284,22 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
       return;
     }
     final session = widget.session;
+    final isEvent = _kind == StudyEntryKind.event;
+    final scheduledAt = isEvent && _allDay
+        ? DateTime(_date.year, _date.month, _date.day)
+        : _date;
+    final duration = isEvent && _allDay ? 1440 : (minutes ?? 30);
     if (session == null) {
       final created = planner.create(
         title: _title.text,
         description: _description.text,
-        scheduledAt: _date,
+        scheduledAt: scheduledAt,
         kind: _kind,
-        minutes: minutes ?? 30,
+        minutes: duration,
+        allDay: isEvent && _allDay,
+        eventEndDate: isEvent ? _endDate : null,
+        repeat: isEvent ? _repeat : StudyRepeat.none,
+        repeatEvery: _repeatEvery,
         technique: _technique,
         focusBlocks: _focusBlocks,
         colorValue: _color?.toARGB32(),
@@ -280,8 +316,12 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
         session.id,
         title: _title.text,
         description: _description.text,
-        scheduledAt: _date,
-        minutes: minutes ?? 30,
+        scheduledAt: scheduledAt,
+        minutes: duration,
+        allDay: isEvent && _allDay,
+        eventEndDate: isEvent ? _endDate : null,
+        repeat: isEvent ? _repeat : StudyRepeat.none,
+        repeatEvery: _repeatEvery,
         technique: _technique,
         focusBlocks: _focusBlocks,
         colorValue: _color?.toARGB32(),
@@ -350,14 +390,19 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   }
                 },
               ),
-              if (_kind == StudyEntryKind.event ||
-                  _technique == StudyTechnique.custom)
+              if ((_kind == StudyEntryKind.event && !_allDay) ||
+                  (_kind == StudyEntryKind.session &&
+                      _technique == StudyTechnique.custom))
                 TextField(
                   controller: _minutes,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Minutes'),
+                  decoration: InputDecoration(
+                    labelText: _kind == StudyEntryKind.event
+                        ? 'Duration (minutes)'
+                        : 'Minutes',
+                  ),
                 )
-              else ...[
+              else if (_kind == StudyEntryKind.session) ...[
                 const SizedBox(height: 12),
                 KeyedSubtree(
                   key: ValueKey('blocks-for-${_technique.name}'),
@@ -421,13 +466,101 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                       '${_date.year}',
                     ),
                   ),
-                  OutlinedButton.icon(
+                  if (_kind == StudyEntryKind.session || !_allDay)
+                    OutlinedButton.icon(
                     onPressed: _pickTime,
                     icon: const Icon(Icons.schedule, size: 18),
                     label: Text(studyClock(_date)),
                   ),
                 ],
               ),
+              if (_kind == StudyEntryKind.event) ...[
+                const SizedBox(height: 10),
+                SwitchListTile.adaptive(
+                  key: const ValueKey('event-all-day'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('All day'),
+                  value: _allDay,
+                  onChanged: (value) => setState(() => _allDay = value),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      key: const ValueKey('event-end-date'),
+                      onPressed: _pickEndDate,
+                      icon: const Icon(Icons.date_range_outlined, size: 18),
+                      label: Text(_endDate == null
+                          ? 'End date (optional)'
+                          : '${_endDate!.day}.${_endDate!.month}.'
+                            '${_endDate!.year}'),
+                    ),
+                    if (_endDate != null)
+                      TextButton(
+                        onPressed: () => setState(() => _endDate = null),
+                        child: const Text('Single day'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<StudyRepeat>(
+                  key: const ValueKey('event-repeat'),
+                  initialValue: _repeat,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Repeat'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: StudyRepeat.none,
+                      child: Text('Does not repeat'),
+                    ),
+                    DropdownMenuItem(
+                      value: StudyRepeat.daily,
+                      child: Text('Daily'),
+                    ),
+                    DropdownMenuItem(
+                      value: StudyRepeat.weekly,
+                      child: Text('Weekly'),
+                    ),
+                    DropdownMenuItem(
+                      value: StudyRepeat.monthly,
+                      child: Text('Monthly'),
+                    ),
+                    DropdownMenuItem(
+                      value: StudyRepeat.yearly,
+                      child: Text('Yearly'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _repeat = value);
+                    }
+                  },
+                ),
+                if (_repeat != StudyRepeat.none) ...[
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int>(
+                    key: const ValueKey('event-repeat-every'),
+                    initialValue: _repeatEvery.clamp(1, 12).toInt(),
+                    decoration: InputDecoration(
+                      labelText: 'Repeat every (${_repeat.name})',
+                    ),
+                    items: [
+                      for (var interval = 1; interval <= 12; interval++)
+                        DropdownMenuItem(
+                          value: interval,
+                          child: Text('$interval'),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _repeatEvery = value);
+                      }
+                    },
+                  ),
+                ],
+              ],
             ],
           ),
         ),
@@ -464,7 +597,7 @@ class StudyTimerCard extends StatelessWidget {
     return StudyActionTheme(
       child: Padding(
         key: const ValueKey('study-timer-card'),
-        padding: const EdgeInsets.fromLTRB(14, 20, 14, 22),
+        padding: const EdgeInsets.fromLTRB(14, 20, 14, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -650,14 +783,24 @@ class StudyTimerCard extends StatelessWidget {
                       ),
                     for (final item in next)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                      child: Material(
+                        padding: EdgeInsets.only(
+                          bottom: item == next.last ? 0 : 8,
+                        ),
+                        child: Material(
                         key: ValueKey('sidebar-upcoming-card:${item.id}'),
                         color: StudyActionStyles.sessionCardColor(
                           Theme.of(context),
                           item.colorValue,
                         ),
-                        shape: StudyActionStyles.sessionCardShape(colors),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: Theme.of(context).brightness ==
+                                    Brightness.dark
+                                ? colors.outlineVariant
+                                : AppColors.toolbar,
+                          ),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(9, 5, 2, 5),
                           child: Row(
@@ -690,21 +833,12 @@ class StudyTimerCard extends StatelessWidget {
                                 ),
                               ),
                               IconButton(
-                                tooltip: item.kind == StudyEntryKind.event
-                                    ? 'Edit event'
-                                    : 'Start scheduled session',
-                                icon: Icon(
-                                  item.kind == StudyEntryKind.event
-                                      ? Icons.event_outlined
-                                      : Icons.play_arrow_rounded,
+                                tooltip: 'Start scheduled session',
+                                icon: const Icon(
+                                  Icons.play_arrow_rounded,
                                   size: 18,
                                 ),
-                                onPressed: item.kind == StudyEntryKind.event
-                                    ? () => showStudySessionEditor(
-                                        context,
-                                        session: item,
-                                      )
-                                    : active == null
+                                onPressed: active == null
                                     ? () => planner.start(item.id)
                                     : null,
                               ),
