@@ -176,6 +176,83 @@ void main() {
     }
   });
 
+  for (final darkMode in [false, true]) {
+    testWidgets('upcoming cards match calendar without lines, dark=$darkMode', (
+      tester,
+    ) async {
+      final planner = await loadPlanner();
+      await tester.binding.setSurfaceSize(const Size(1440, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final now = DateTime.now();
+      final tomorrow = DateTime(now.year, now.month, now.day + 1, 12);
+      final first = planner.create(
+        title: 'Biology review',
+        scheduledAt: tomorrow,
+      );
+      final second = planner.create(
+        title: 'Physics revision',
+        scheduledAt: tomorrow.add(const Duration(hours: 1)),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: MaterialApp(
+            theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+            home: Scaffold(
+              body: Row(
+                children: [
+                  const SizedBox(width: 280, child: StudyTimerCard()),
+                  const Expanded(child: PlannerScreen()),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final timer = find.byKey(const ValueKey('study-timer-card'));
+      expect(
+        find.descendant(of: timer, matching: find.byType(Divider)),
+        findsNothing,
+      );
+      final upcoming = find.byKey(
+        ValueKey('sidebar-upcoming-card:${first.id}'),
+      );
+      expect(upcoming, findsOneWidget);
+      expect(
+        find.byKey(ValueKey('sidebar-upcoming-card:${second.id}')),
+        findsOneWidget,
+      );
+      expect(find.text('Biology review'), findsWidgets);
+      expect(find.text('Physics revision'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Next'));
+      await tester.pumpAndSettle();
+
+      final calendar = find.byKey(
+        ValueKey('planner-session-tile:${first.id}'),
+      );
+      expect(calendar, findsOneWidget);
+      final sidebarMaterial = tester.widget<Material>(upcoming);
+      final calendarMaterial = tester.widget<Material>(calendar);
+      expect(sidebarMaterial.color, calendarMaterial.color);
+      expect(sidebarMaterial.shape, calendarMaterial.shape);
+
+      await tester.tap(
+        find.descendant(
+          of: upcoming,
+          matching: find.byTooltip('Start scheduled session'),
+        ),
+      );
+      await tester.pump();
+      expect(planner.active?.id, first.id);
+      expect(tester.takeException(), isNull);
+      await planner.flush();
+    });
+  }
+
   testWidgets('sidebar timer starts pauses and rates a session', (
     tester,
   ) async {

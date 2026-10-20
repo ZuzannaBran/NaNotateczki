@@ -493,32 +493,67 @@ class StudyTimerCard extends StatelessWidget {
               ),
             ),
             if (next.isNotEmpty) ...[
-              const Divider(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'Upcoming',
-                style: TextStyle(fontSize: AppTypography.small, color: colors.onSurfaceVariant),
+                style: TextStyle(
+                  fontSize: AppTypography.small,
+                  color: colors.onSurfaceVariant,
+                ),
               ),
+              const SizedBox(height: 8),
               for (final item in next)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  title: Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    '${item.scheduledAt.day}/${item.scheduledAt.month}'
-                    ' · ${studyClock(item.scheduledAt)}',
-                    style: const TextStyle(fontSize: AppTypography.small),
-                  ),
-                  trailing: IconButton(
-                    tooltip: 'Start scheduled session',
-                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                    onPressed: active == null
-                        ? () => planner.start(item.id)
-                        : null,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    key: ValueKey('sidebar-upcoming-card:${item.id}'),
+                    color: StudyActionStyles.plannedSessionColor(
+                      Theme.of(context),
+                    ),
+                    shape: StudyActionStyles.sessionCardShape(colors),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(9, 5, 2, 5),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  item.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: AppTypography.document,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${item.scheduledAt.day}/${item.scheduledAt.month}'
+                                  ' · ${studyClock(item.scheduledAt)}',
+                                  style: TextStyle(
+                                    fontSize: AppTypography.small,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Start scheduled session',
+                            icon: const Icon(
+                              Icons.play_arrow_rounded,
+                              size: 18,
+                            ),
+                            onPressed: active == null
+                                ? () => planner.start(item.id)
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
             ],

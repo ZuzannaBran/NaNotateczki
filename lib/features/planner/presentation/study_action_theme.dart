@@ -34,6 +34,18 @@ class StudyActionStyles {
       ? theme.colorScheme.outline
       : borderColor;
 
+
+  static Color plannedSessionColor(ThemeData theme) =>
+      theme.brightness == Brightness.dark
+      ? theme.colorScheme.surfaceContainerHighest
+      : theme.colorScheme.surface;
+
+  static RoundedRectangleBorder sessionCardShape(ColorScheme colors) =>
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colors.onSurface),
+      );
+
   static ButtonStyle primary(ThemeData theme) => FilledButton.styleFrom(
     backgroundColor: background(theme, selected: true),
     foregroundColor: foreground(theme),

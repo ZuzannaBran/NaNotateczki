@@ -253,25 +253,23 @@ class _PlannerScreenState extends State<PlannerScreen> {
   }
 
   Widget _sessionTile(StudySession session, {bool compact = false}) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final planner = context.read<StudyPlannerController>();
     final done = session.status == StudyStatus.completed;
     final reviewing = session.status == StudyStatus.review;
-    final darkMode = Theme.of(context).brightness == Brightness.dark;
+    final darkMode = theme.brightness == Brightness.dark;
     final color = reviewing
         ? scheme.tertiaryContainer
         : done
         ? (darkMode
               ? scheme.surfaceContainerLowest
               : scheme.surfaceContainerHighest)
-        : (darkMode ? scheme.surfaceContainerHighest : scheme.surface);
+        : StudyActionStyles.plannedSessionColor(theme);
     final tile = Material(
       key: ValueKey('planner-session-tile:${session.id}'),
       color: color,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: scheme.onSurface),
-      ),
+      shape: StudyActionStyles.sessionCardShape(scheme),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _sessionOptions(session),

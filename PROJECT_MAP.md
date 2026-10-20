@@ -537,7 +537,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 42: `StudyStatus`; 46: `StudySession`;
   152: `StudyPlannerController`; 232: `load`; 298: `create`;
   366: `start`; 528: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (573):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (620):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -549,22 +549,25 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   ikony Play i Smart z podpisami są centrowane jako jeden blok,
   skalowany do wąskiego panelu. Zwiększone są odstępy pionowe pod tekstem
   Ready i odliczaniem oraz padding timera.
+  Upcoming pokazuje zaplanowane sesje na kartach identycznych jak w
+  kalendarzu, bez linii separatorów, z zachowanym startem sesji.
   Selektor techniki w formularzu `isExpanded` mieści się w wąskim dialogu.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
   24: `studyRatingStars`; 31: `openStudyPlanner`;
   37: `showStudySessionEditor`; 57: `showStudyRating`;
-  343: `StudyTimerCard`; 525: `CompactStudyTimer`.
-- `lib/features/planner/presentation/study_action_theme.dart` (113):
+  345: `StudyTimerCard`; 572: `CompactStudyTimer`.
+- `lib/features/planner/presentation/study_action_theme.dart` (144):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
   zawartość ikon i tekstu oraz promień 12 px selektora Today/Week/Month;
+  wspólne tło i obrys kart planowanych sesji w kalendarzu i timerze;
   subtelny beż tylko dla wyróżnianych akcji; pozostałe przyciski bez ciemnego
   wypełnienia w jasnym motywie. Tryb ciemny używa globalnej palety,
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
-  57: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (812):
+  84: `StudyActionTheme`.
+- `lib/features/planner/presentation/planner_screen.dart` (836):
   `PlannerScreen` – kalendarz Today/Week/Month, przeciąganie i edycja.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
@@ -589,7 +592,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   środkowanie ikon i etykiet, wspólną wysokość 40 px planera i timera,
   ciemniejsze ukończone sesje
   z obrysem w kolorze tekstu w obu motywach, przyciski kalendarza o
-  tej samej wysokości i zaokrągleniu selektora, przygaszenie dni z
+  tej samej wysokości i zaokrągleniu selektora, zgodność kart Upcoming
+  z kalendarzem w obu motywach, brak separatorów i działanie Start,
+  przygaszenie dni z
   innych miesięcy i brak tekstu instruktażowego, brak overflow
   selektora techniki w wąskim oknie, margines dolny i oceny kalendarza.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
