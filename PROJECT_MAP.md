@@ -660,7 +660,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1770):
+- `lib/features/planner/presentation/planner_screen.dart` (1756):
   `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
   Wydarzenia są wspólnymi wpisami kalendarza bez możliwości uruchomienia
   timera, ze wspólnym opisem, kolorem, czasem, edycją i przenoszeniem.
@@ -700,15 +700,18 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   a globalne ustawienia w katalogu. Smart session, Add i New event usunięto z nagłówka
   i widoku wąskiego; dodawanie działa przez plus w kalendarzu, a Smart
   i Start session przez boczny timer. Tytuł nagłówka to Calendar.
+  Pasek nawigacji pokazuje wyłącznie bieżącą datę lub zakres Week/Month,
+  bez osobnego przycisku Today, w układzie wąskim i szerokim;
+  strzałki do przechodzenia między okresami pozostają.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px; Month na wąskim ekranie listę.
   16: `CalendarMode`; 18: `CalendarTimeSpan`;
   25: `calendarTimeSpan`; 44: `CalendarSessionPlacement`;
   59: `calendarSessionPlacements`; 157: `PlannerScreen`;
   164: `_PlannerScreenState`;
-  1158: `_HourlyDaySchedule`; 1327: `_CalendarHeaderStrip`;
-  1373: `_CalendarBorderFrame`; 1396: `_WeekTimeGrid`;
-  1693: `_WeekTableClipper`; 1719: `_WeekColumnLinesPainter`.
+  1144: `_HourlyDaySchedule`; 1313: `_CalendarHeaderStrip`;
+  1359: `_CalendarBorderFrame`; 1382: `_WeekTimeGrid`;
+  1679: `_WeekTableClipper`; 1705: `_WeekColumnLinesPainter`.
   `_WeekTimeGrid`: pełnowysokie separatory i wspólna ramka na
   wierzchu siatki; clip uwzględnia lewą granicę tabeli obok osi godzin.
   `calendarSessionPlacements` przydziela niekolidujące kolumny blokom
@@ -756,6 +759,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   jaśniejsze tła dni spoza miesiąca w obu motywach,
   osobny scroll Upcoming, limit wysokości listy,
   brak górnych przycisków w obu rozmiarach, dodawanie przez plus,
+  brak stałego Today w nawigacji oraz aktualizację nagłówka okresu
+  po przejściu między datami (desktop i telefon),
   stałe nagłówki Name i Description podczas pisania,
   checkbox All day oraz warunkowe dolne odstępy timera,
   stałe etykiety formularzy Name/Description, spójne przyciski

@@ -1016,6 +1016,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                               Expanded(
                                 child: Text(
                                   _heading(),
+                                  key: const ValueKey('planner-period-heading'),
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
                                   style: Theme.of(
@@ -1027,14 +1028,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
                                 tooltip: 'Next',
                                 icon: const Icon(Icons.chevron_right),
                                 onPressed: () => _navigate(1),
-                              ),
-                              TextButton(
-                                onPressed: () => setState(
-                                  () => _anchor = DateUtils.dateOnly(
-                                    DateTime.now(),
-                                  ),
-                                ),
-                                child: const Text('Today'),
                               ),
                             ],
                           ),
@@ -1084,18 +1077,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
                                 icon: const Icon(Icons.chevron_right),
                                 onPressed: () => _navigate(1),
                               ),
-                              TextButton(
-                                onPressed: () => setState(
-                                  () => _anchor = DateUtils.dateOnly(
-                                    DateTime.now(),
-                                  ),
-                                ),
-                                child: const Text('Today'),
-                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   _heading(),
+                                  key: const ValueKey('planner-period-heading'),
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(
                                     context,

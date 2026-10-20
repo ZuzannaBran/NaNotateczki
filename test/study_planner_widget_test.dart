@@ -1663,6 +1663,49 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final width in [390.0, 1440.0]) {
+    testWidgets('calendar header displays only selected period at $width', (
+      tester,
+    ) async {
+      final planner = await loadPlanner();
+      await tester.binding.setSurfaceSize(Size(width, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: const MaterialApp(home: PlannerScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final heading = find.byKey(const ValueKey('planner-period-heading'));
+      String currentPeriod() => tester.widget<Text>(heading).data!;
+
+      expect(heading, findsOneWidget);
+      expect(find.text('Today'), findsNothing);
+      final initialWeek = currentPeriod();
+      expect(initialWeek, contains('–'));
+      await tester.tap(find.byTooltip('Next'));
+      await tester.pumpAndSettle();
+      expect(currentPeriod(), isNot(initialWeek));
+      expect(find.text('Today'), findsNothing);
+
+      await tester.tap(find.text('Day').last);
+      await tester.pumpAndSettle();
+      final day = currentPeriod();
+      expect(day, contains(DateTime.now().year.toString()));
+      await tester.tap(find.byTooltip('Previous'));
+      await tester.pumpAndSettle();
+      expect(currentPeriod(), isNot(day));
+
+      await tester.tap(find.text('Month'));
+      await tester.pumpAndSettle();
+      expect(currentPeriod(), contains(DateTime.now().year.toString()));
+      expect(find.text('Today'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('calendar has no extra action bar on desktop or phone', (
     tester,
   ) async {
