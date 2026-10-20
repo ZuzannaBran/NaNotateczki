@@ -1250,6 +1250,7 @@ class _CalendarHeaderStrip extends StatelessWidget {
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var index = 0; index < days.length; index++)
             Expanded(
@@ -1379,10 +1380,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
         decoration: BoxDecoration(
           color: candidates.isNotEmpty
               ? scheme.primaryContainer
-              : plannerDaySurface(
-                  Theme.of(context),
-                  highlighted: DateUtils.isSameDay(day, widget.now),
-                ),
+              : Colors.transparent,
           border: Border(
             top: BorderSide(
               width: 0.7,
@@ -1405,32 +1403,16 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
         children: [
           SizedBox(
             width: _axisWidth,
-            child: Stack(
-              children: [
-                Positioned(
-                  left: 36,
-                  right: 0,
-                  top: 0,
-                  child: SizedBox(
-                    key: ValueKey('planner-week-hour-connector-$hour'),
-                    height: 0.7,
-                    child: ColoredBox(
-                      color: scheme.outlineVariant.withValues(alpha: 0.65),
-                    ),
-                  ),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 2),
+              child: Text(
+                '${hour.toString().padLeft(2, '0')}:00',
+                key: ValueKey('planner-week-hour-label-$hour'),
+                style: TextStyle(
+                  fontSize: AppTypography.small,
+                  color: scheme.onSurfaceVariant,
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 2),
-                  child: Text(
-                    '${hour.toString().padLeft(2, '0')}:00',
-                    key: ValueKey('planner-week-hour-label-$hour'),
-                    style: TextStyle(
-                      fontSize: AppTypography.small,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
           for (final day in widget.days)
@@ -1460,9 +1442,20 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
           ),
           child: CustomPaint(
             key: const ValueKey('planner-week-column-lines'),
-            foregroundPainter: _WeekColumnLinesPainter(
+            painter: _WeekColumnLinesPainter(
               axisWidth: _axisWidth,
               color: Theme.of(context).colorScheme.outlineVariant,
+              baseColor: plannerDaySurface(
+                Theme.of(context),
+                highlighted: false,
+              ),
+              todayColor: plannerDaySurface(
+                Theme.of(context),
+                highlighted: true,
+              ),
+              todayIndex: widget.days.indexWhere(
+                (day) => DateUtils.isSameDay(day, widget.now),
+              ),
             ),
             child: ListView(
               key: const ValueKey('planner-week-hours'),
@@ -1546,10 +1539,16 @@ class _WeekColumnLinesPainter extends CustomPainter {
   const _WeekColumnLinesPainter({
     required this.axisWidth,
     required this.color,
+    required this.baseColor,
+    required this.todayColor,
+    required this.todayIndex,
   });
 
   final double axisWidth;
   final Color color;
+  final Color baseColor;
+  final Color todayColor;
+  final int todayIndex;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1557,6 +1556,17 @@ class _WeekColumnLinesPainter extends CustomPainter {
       ..color = color
       ..strokeWidth = 1;
     final dayWidth = (size.width - axisWidth) / 7;
+    for (var index = 0; index < 7; index++) {
+      canvas.drawRect(
+        Rect.fromLTWH(
+          axisWidth + index * dayWidth,
+          0,
+          dayWidth,
+          size.height,
+        ),
+        Paint()..color = index == todayIndex ? todayColor : baseColor,
+      );
+    }
     for (var index = 0; index <= 7; index++) {
       final x = axisWidth + dayWidth * index;
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
@@ -1570,5 +1580,9 @@ class _WeekColumnLinesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WeekColumnLinesPainter oldDelegate) =>
-      oldDelegate.axisWidth != axisWidth || oldDelegate.color != color;
+      oldDelegate.axisWidth != axisWidth ||
+      oldDelegate.color != color ||
+      oldDelegate.baseColor != baseColor ||
+      oldDelegate.todayColor != todayColor ||
+      oldDelegate.todayIndex != todayIndex;
 }

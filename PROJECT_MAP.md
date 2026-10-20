@@ -595,7 +595,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1574):
+- `lib/features/planner/presentation/planner_screen.dart` (1588):
   `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
   Day domyślnie otwiera aktualny dzień, a kliknięcie pola Week/Month
   przechodzi do wybranej daty. Przyciski + zachowują tworzenie sesji.
@@ -616,8 +616,10 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   Month ma wspólne tło z pionowymi i poziomymi separatorami 1 px,
   bez osobnych ramek i odstępów między dniami; pola z sąsiednich miesięcy
   mają jaśniejsze tło z palety motywu, nie tylko przygaszony tekst.
-  Week rysuje separator między kolumnami na pełną widoczną wysokość,
-  a poziome kreski zaczynają się tuż za etykietą godziny po lewej.
+  Week rysuje ciągłe pionowe separatory i pełnowysokie tła kolumn
+  na warstwie siatki, niezależnie od scrollowania wierszy godzin.
+  Linie poziome kończą się na lewej granicy tabeli, bez przedłużeń
+  do etykiet godzin. Segmenty nagłówka wypełniają jego wysokość.
   Today, Week i Month nie pokazują pasków przewijania, ale zachowują
   gesty dotykowe i przewijanie myszy. Czas aktualizuje się co minutę.
   Daty i opisy mają czteropoziomową typografię interfejsu.
@@ -637,8 +639,14 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   85: `_PlannerScreenState`;
   1086: `_HourlyDaySchedule`;
   1230: `_CalendarHeaderStrip`;
-  1275: `_WeekTimeGrid`;
-  1545: `_WeekColumnLinesPainter`.
+  1276: `_WeekTimeGrid`;
+  1538: `_WeekColumnLinesPainter`.
+  Nowa kontrola ręczna: przewiń Week pionowo i sprawdź pełną wysokość
+  wypełnienia bieżącego dnia oraz separatorów od górnej do dolnej granicy
+  obszaru. Linie godzin nie powinny wychodzić poza tabelę. Przytrzymaj
+  i przesuń widok palcem, sprawdź też jasny i ciemny motyw. Testy
+  w study_planner_widget_test.dart są pominięte w tym commicie zgodnie
+  z decyzją użytkownika i nadal wymagają dostosowania.
   Ręczny scenariusz przy braku Fluttera: 15:45/30 min powinno
   zajmować końcową ćwiartkę godziny 15 i pierwszą ćwiartkę godziny 16
   w Day i Week; Smart 3 × 25 min z przerwami 5 min zajmuje 85 min;
