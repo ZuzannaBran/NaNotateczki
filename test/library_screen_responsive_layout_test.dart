@@ -133,10 +133,16 @@ void main() {
     final shadow = tester.widget<DecoratedBox>(
       find.byKey(const ValueKey('study-panel-shadow')),
     ).decoration as BoxDecoration;
-    expect(shadow.boxShadow, hasLength(1));
-    expect(shadow.boxShadow!.single.offset, const Offset(6, 0));
-    expect(shadow.boxShadow!.single.blurRadius, 8);
-    expect(shadow.boxShadow!.single.color, Colors.black54);
+    final originalShadows = kElevationToShadow[8]!;
+    expect(shadow.boxShadow, hasLength(originalShadows.length));
+    for (var i = 0; i < originalShadows.length; i++) {
+      final original = originalShadows[i];
+      final shifted = shadow.boxShadow![i];
+      expect(shifted.offset, Offset(original.offset.dy, 0));
+      expect(shifted.blurRadius, original.blurRadius);
+      expect(shifted.spreadRadius, original.spreadRadius);
+      expect(shifted.color, original.color);
+    }
     final studyShape = studyMaterial.shape! as RoundedRectangleBorder;
     final folderShape = folderMaterial.shape! as RoundedRectangleBorder;
     expect(studyShape.side, folderShape.side);
@@ -159,7 +165,7 @@ void main() {
     final collapsedShadow = tester.widget<DecoratedBox>(
       find.byKey(const ValueKey('study-panel-shadow')),
     ).decoration as BoxDecoration;
-    expect(collapsedShadow.boxShadow!.single.offset, const Offset(6, 0));
+    expect(collapsedShadow.boxShadow, orderedEquals(shadow.boxShadow!));
     expect(
       tester.widget<Transform>(chevron).transform.entry(1, 0),
       closeTo(1, 0.001),

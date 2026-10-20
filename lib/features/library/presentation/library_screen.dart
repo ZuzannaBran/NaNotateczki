@@ -1822,19 +1822,20 @@ class _LeftZoneToggleTab extends StatelessWidget {
     if (!studyPanel) {
       return tab;
     }
+    final shadows = hideShadow
+        ? const <BoxShadow>[]
+        : kElevationToShadow[8]!
+              .map(
+                (shadow) => shadow.copyWith(
+                  offset: Offset(shadow.offset.dy, 0),
+                ),
+              )
+              .toList(growable: false);
     return DecoratedBox(
       key: const ValueKey('study-panel-shadow'),
       decoration: BoxDecoration(
         borderRadius: radius,
-        boxShadow: hideShadow
-            ? const []
-            : const [
-                BoxShadow(
-                  color: Colors.black54,
-                  blurRadius: 8,
-                  offset: Offset(6, 0),
-                ),
-              ],
+        boxShadow: shadows,
       ),
       child: tab,
     );

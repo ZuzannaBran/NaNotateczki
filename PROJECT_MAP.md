@@ -420,9 +420,10 @@ po lewej stronie separatora (margines 8 px). Chevron jest skierowany
 w dół przy rozwiniętym panelu (przycisk wyżej), a w górę po zwinięciu.
 Przycisk zachowuje zaokrągloną górę i ostry dół
 stykającym się z poziomym separatorem. Współdzieli kolor i obrys
-z przyciskiem folderów. Zamiast cienia Material w dół używa
-BoxShadow o przesunięciu (6, 0) i blur 8, dzięki czemu cień pada
-w prawo. Zakładka
+z przyciskiem folderów. Zamiast mocniejszego, pojedynczego BoxShadow używa standardowego
+profilu kElevationToShadow[8]. Każda warstwa zachowuje kolor, rozmycie
+i spread, a przesunięcie pionowe zmienia na poziome (w prawo).
+Material ma elevation 0, więc nie powstaje drugi cień. Zakładka
 znajduje się wewnątrz `Stack` listy folderów, dzięki czemu całe
 24 px wysokości jest klikalne, także po zwinięciu timera. Zwinięcie
 zwraca miejsce liście bez pustego paska i podwójnego separatora.
@@ -1276,8 +1277,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   kolor i obsługa menu
   folderu, notebooka oraz boarda, a także poziomą zakładkę timera
   (pozycja po lewej, strzałki dół/góra, obrócone wymiary,
-  proste dolne rogi stykające się z separatorem, cień przesunięty
-  poziomo w prawo, wspólny obrys i pełny hit-test w obu stanach)
+  proste dolne rogi stykające się z separatorem, ten sam profil
+  cienia elevation 8 skierowany w prawo bez zwiększania krycia,
+  wspólny obrys i pełny hit-test w obu stanach)
   i menu dodawania (4 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
