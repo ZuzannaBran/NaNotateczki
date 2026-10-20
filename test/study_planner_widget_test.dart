@@ -152,7 +152,22 @@ void main() {
         findsOneWidget,
       );
       expect(start.height, StudyActionStyles.sessionButtonHeight);
+      expect(start.height, 36);
       expect(start.height, closeTo(smart.height, 0.1));
+      expect(
+        tester.widget<Padding>(
+          find.byKey(const ValueKey('study-timer-card')),
+        ).padding,
+        const EdgeInsets.fromLTRB(14, 20, 14, 22),
+      );
+      expect(timer.bottom - start.bottom, closeTo(22, 0.1));
+      expect(
+        start.top -
+            tester.getRect(
+              find.text('Ready for your next focus session?'),
+            ).bottom,
+        closeTo(30, 0.1),
+      );
       expect(start.top, closeTo(smart.top, 0.1));
       expect(start.left, closeTo(timer.left + 14, 0.1));
       expect(smart.right, closeTo(timer.right - 14, 0.1));
@@ -553,6 +568,8 @@ void main() {
       tester.getSize(create).height,
       StudyActionStyles.sessionButtonHeight,
     );
+    expect(tester.getSize(smart).height, 36);
+    expect(tester.getSize(create).height, 36);
     expect(
       find.descendant(
         of: smart,

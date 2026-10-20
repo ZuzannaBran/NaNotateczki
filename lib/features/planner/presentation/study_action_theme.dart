@@ -7,13 +7,13 @@ class StudyActionStyles {
   static const Color primaryColor = Color(0xFFC4BBAF);
   static const Color secondaryColor = Color(0xFFE4E2DD);
   static const Color borderColor = Color(0xFFB3AB9F);
-  static const double sessionButtonHeight = 40;
+  static const double sessionButtonHeight = 36;
   static const sessionButtonShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.all(Radius.circular(12)),
   );
   static const sessionButtonPadding = EdgeInsets.symmetric(
     horizontal: 8,
-    vertical: 10,
+    vertical: 6,
   );
 
   static Color background(ThemeData theme, {bool selected = false}) {

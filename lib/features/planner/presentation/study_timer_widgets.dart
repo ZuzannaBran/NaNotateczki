@@ -357,7 +357,7 @@ class StudyTimerCard extends StatelessWidget {
     return StudyActionTheme(
       child: Padding(
         key: const ValueKey('study-timer-card'),
-        padding: const EdgeInsets.fromLTRB(14, 16, 14, 18),
+        padding: const EdgeInsets.fromLTRB(14, 20, 14, 22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -440,7 +440,7 @@ class StudyTimerCard extends StatelessWidget {
                 'Ready for your next focus session?',
                 style: TextStyle(fontSize: AppTypography.small, color: colors.onSurfaceVariant),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 30),
             ],
             SizedBox(
               height: StudyActionStyles.sessionButtonHeight,
