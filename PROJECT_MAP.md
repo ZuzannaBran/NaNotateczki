@@ -602,7 +602,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 45: `StudyRepeat`; 51: `StudySession`;
   219: `StudyPlannerController`; 282: `calendarEntries`;
   432: `load`; 498: `create`; 537: `edit`; 779: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (918):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (977):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -639,8 +639,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   43: `openStudyPlanner`;
   49: `showStudySessionEditor`;
   69: `showStudyRating`;
-  583: `StudyTimerCard`;
-  869: `CompactStudyTimer`.
+  337: `_labeledField` (statyczne etykiety formularza);
+  642: `StudyTimerCard`; 928: `CompactStudyTimer`.
 - `lib/features/planner/presentation/study_action_theme.dart` (163):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
@@ -654,7 +654,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1843):
+- `lib/features/planner/presentation/planner_screen.dart` (1770):
   `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
   Wydarzenia są wspólnymi wpisami kalendarza bez możliwości uruchomienia
   timera, ze wspólnym opisem, kolorem, czasem, edycją i przenoszeniem.
@@ -700,9 +700,9 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   25: `calendarTimeSpan`; 44: `CalendarSessionPlacement`;
   59: `calendarSessionPlacements`; 157: `PlannerScreen`;
   164: `_PlannerScreenState`;
-  1231: `_HourlyDaySchedule`; 1400: `_CalendarHeaderStrip`;
-  1446: `_CalendarBorderFrame`; 1469: `_WeekTimeGrid`;
-  1766: `_WeekTableClipper`; 1792: `_WeekColumnLinesPainter`.
+  1158: `_HourlyDaySchedule`; 1327: `_CalendarHeaderStrip`;
+  1373: `_CalendarBorderFrame`; 1396: `_WeekTimeGrid`;
+  1693: `_WeekTableClipper`; 1719: `_WeekColumnLinesPainter`.
   `_WeekTimeGrid`: pełnowysokie separatory i wspólna ramka na
   wierzchu siatki; clip uwzględnia lewą granicę tabeli obok osi godzin.
   `calendarSessionPlacements` przydziela niekolidujące kolumny blokom
