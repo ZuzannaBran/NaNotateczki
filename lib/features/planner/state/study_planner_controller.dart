@@ -39,6 +39,8 @@ extension StudyTechniqueDetails on StudyTechnique {
   };
 }
 
+enum StudyEntryKind { session, event }
+
 enum StudyStatus { planned, running, paused, review, completed }
 
 enum StudyPhase { focus, breakTime }
@@ -49,6 +51,7 @@ class StudySession {
     required this.title,
     required this.scheduledAt,
     required this.minutes,
+    this.kind = StudyEntryKind.session,
     this.description = '',
     this.technique = StudyTechnique.custom,
     int? focusBlocks,
@@ -64,6 +67,7 @@ class StudySession {
   }) : focusBlocks = (focusBlocks ?? technique.rounds).clamp(1, 12).toInt();
 
   final String id;
+  final StudyEntryKind kind;
   String title;
   String description;
   DateTime scheduledAt;
@@ -90,6 +94,7 @@ class StudySession {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'kind': kind.name,
     'title': title,
     'description': description,
     'scheduledAt': scheduledAt.toIso8601String(),
@@ -130,6 +135,11 @@ class StudySession {
     );
     return StudySession(
       id: json['id'] as String,
+      kind: parseEnum(
+        StudyEntryKind.values,
+        json['kind'],
+        StudyEntryKind.session,
+      ),
       title: (json['title'] as String?) ?? 'Study session',
       description: (json['description'] as String?) ?? '',
       scheduledAt: planned,
@@ -319,10 +329,14 @@ class StudyPlannerController extends ChangeNotifier {
     StudyTechnique technique = StudyTechnique.custom,
     int? focusBlocks,
     int? colorValue,
+    StudyEntryKind kind = StudyEntryKind.session,
   }) {
     final session = StudySession(
       id: const Uuid().v4(),
-      title: title.trim().isEmpty ? 'Study session' : title.trim(),
+      kind: kind,
+      title: title.trim().isEmpty
+          ? (kind == StudyEntryKind.event ? 'Event' : 'Study session')
+          : title.trim(),
       description: description.trim(),
       scheduledAt: scheduledAt,
       minutes: minutes.clamp(1, 1440).toInt(),
@@ -399,6 +413,9 @@ class StudyPlannerController extends ChangeNotifier {
       return false;
     }
     final session = _find(id);
+    if (session.kind == StudyEntryKind.event) {
+      return false;
+    }
     if (session.status == StudyStatus.paused) {
       return resume();
     }

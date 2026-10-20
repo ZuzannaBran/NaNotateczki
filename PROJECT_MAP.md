@@ -525,7 +525,8 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
 ## 6a. Planer nauki (bez migracji SQLite)
 
 - `lib/features/planner/state/study_planner_controller.dart` (566):
-  `StudySession`, `StudyTechnique`, `StudyStatus`, `StudyPlannerController`.
+  `StudySession`, `StudyEntryKind` (session/event), `StudyTechnique`,
+  `StudyStatus`, `StudyPlannerController`.
   Jeden stan Provider + ChangeNotifier, trwały `study_planner.json` przez
   cross-platform `text_storage`. Timery liczone względem deadline,
   odtwarzanie po restarcie, Pomodoro 25/5, Focus 50/10, Deep 90/20,
@@ -597,6 +598,8 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   101: `StudyActionTheme`.
 - `lib/features/planner/presentation/planner_screen.dart` (1770):
   `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
+  Wydarzenia są wspólnymi wpisami kalendarza bez możliwości uruchomienia
+  timera, ze wspólnym opisem, kolorem, czasem, edycją i przenoszeniem.
   Day domyślnie otwiera aktualny dzień, a kliknięcie pola Week/Month
   przechodzi do wybranej daty. Przyciski + zachowują tworzenie sesji.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
@@ -1116,6 +1119,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   testowej bazy następuje rzeczywisty zapis.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
+- `test/study_planner_controller_test.dart` i
+  `test/study_planner_widget_test.dart`: wydarzenia kalendarza bez timera,
+  wspólny zapis, edycja, usuwanie i zgodność starych wpisów.
 - `test/library_sidebar_drag_drop_test.dart`: trwałe przenoszenie notatek i
   boardów między folderami, walidacja celu, zachowanie wyboru, przeciąganie
   na zwinięty folder i rozwinięcie go po upuszczeniu; zgodność szerokości

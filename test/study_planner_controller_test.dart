@@ -67,6 +67,55 @@ void main() {
     );
   }
 
+  test('calendar event shares editing and persistence but cannot start', () async {
+    await planner.load();
+    final event = planner.create(
+      kind: StudyEntryKind.event,
+      title: 'Exam',
+      scheduledAt: DateTime(2026, 10, 10, 9),
+      minutes: 90,
+      description: 'Room 2',
+    );
+    expect(planner.start(event.id), isFalse);
+    expect(planner.active, isNull);
+    planner.move(event.id, DateTime(2026, 10, 11));
+    planner.edit(
+      event.id,
+      title: 'Exam changed',
+      description: 'Room 3',
+      scheduledAt: DateTime(2026, 10, 11, 9),
+      minutes: 120,
+      technique: StudyTechnique.custom,
+    );
+    await planner.flush();
+    final restored = StudyPlannerController(
+      autoTick: false,
+      clock: () => now,
+      read: (key) async => storage[key],
+      write: (key, value) async { storage[key] = value; },
+    );
+    await restored.load();
+    expect(restored.sessions.single.kind, StudyEntryKind.event);
+    expect(restored.sessions.single.title, 'Exam changed');
+    expect(restored.sessions.single.minutes, 120);
+    expect(restored.sessions.single.description, 'Room 3');
+    expect(restored.start(event.id), isFalse);
+    restored.delete(event.id);
+    expect(restored.sessions, isEmpty);
+    await restored.flush();
+    restored.dispose();
+  });
+
+  test('old sessions without kind remain regular sessions', () {
+    final legacy = StudySession.fromJson({
+      'id': 'legacy',
+      'title': 'Legacy',
+      'scheduledAt': now.toIso8601String(),
+      'minutes': 45,
+    });
+    expect(legacy.kind, StudyEntryKind.session);
+  });
+
   test('planned session can be edited, moved and persisted', () async {
     await planner.load();
     final item = planner.create(

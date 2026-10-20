@@ -21,6 +21,32 @@ void main() {
     return planner;
   }
 
+  testWidgets('new calendar event is editable and never starts a timer', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(home: PlannerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('planner-new-event')));
+    await tester.pumpAndSettle();
+    expect(find.text('New event'), findsOneWidget);
+    expect(find.text('Study technique'), findsNothing);
+    await tester.enterText(find.byType(TextField).first, 'Lecture');
+    await tester.tap(find.text('Save').last);
+    await tester.pumpAndSettle();
+    expect(planner.sessions.single.kind, StudyEntryKind.event);
+    expect(planner.active, isNull);
+    expect(planner.start(planner.sessions.single.id), isFalse);
+    await planner.flush();
+  });
+
   test('scheduled session spans the correct minutes including breaks', () {
     final day = DateTime(2026, 10, 20);
     final halfHour = StudySession(

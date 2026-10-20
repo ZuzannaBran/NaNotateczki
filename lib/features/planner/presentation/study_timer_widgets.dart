@@ -50,6 +50,7 @@ Future<void> showStudySessionEditor(
   BuildContext context, {
   StudySession? session,
   DateTime? scheduledAt,
+  StudyEntryKind kind = StudyEntryKind.session,
   StudyTechnique technique = StudyTechnique.custom,
   bool startAfterSave = false,
 }) async {
@@ -59,6 +60,7 @@ Future<void> showStudySessionEditor(
       child: _StudySessionDialog(
         session: session,
         scheduledAt: scheduledAt,
+        kind: kind,
         technique: technique,
         startAfterSave: startAfterSave,
       ),
@@ -137,12 +139,14 @@ class _StudySessionDialog extends StatefulWidget {
   const _StudySessionDialog({
     this.session,
     this.scheduledAt,
+    required this.kind,
     required this.technique,
     required this.startAfterSave,
   });
 
   final StudySession? session;
   final DateTime? scheduledAt;
+  final StudyEntryKind kind;
   final StudyTechnique technique;
   final bool startAfterSave;
 
@@ -155,6 +159,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
   late final TextEditingController _description;
   late final TextEditingController _minutes;
   late StudyTechnique _technique;
+  late StudyEntryKind _kind;
   late int _focusBlocks;
   Color? _color;
   late DateTime _date;
@@ -163,6 +168,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
   void initState() {
     super.initState();
     final session = widget.session;
+    _kind = session?.kind ?? widget.kind;
     _technique = session?.technique ?? widget.technique;
     _focusBlocks = session?.focusBlocks ?? _technique.rounds;
     _color = session == null || session.colorValue == null
@@ -256,12 +262,15 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
         title: _title.text,
         description: _description.text,
         scheduledAt: _date,
+        kind: _kind,
         minutes: minutes ?? 30,
         technique: _technique,
         focusBlocks: _focusBlocks,
         colorValue: _color?.toARGB32(),
       );
-      if (widget.startAfterSave && !planner.start(created.id)) {
+      if (_kind == StudyEntryKind.session &&
+          widget.startAfterSave &&
+          !planner.start(created.id)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Finish the current timer first.')),
         );
@@ -290,7 +299,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
     final scheme = Theme.of(context).colorScheme;
     return AlertDialog(
       title: Text(
-        widget.session == null ? 'New study session' : 'Edit session',
+        widget.session == null
+            ? (_kind == StudyEntryKind.event ? 'New event' : 'New study session')
+            : (_kind == StudyEntryKind.event ? 'Edit event' : 'Edit session'),
       ),
       content: SizedBox(
         width: 400,
@@ -311,7 +322,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                 autofocus: true,
                 maxLength: 100,
                 decoration: const InputDecoration(
-                  labelText: 'Session name',
+                  labelText: 'Name',
                 ),
               ),
               TextField(
@@ -321,7 +332,8 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                 decoration: const InputDecoration(labelText: 'Description'),
               ),
               const SizedBox(height: 8),
-              DropdownButtonFormField<StudyTechnique>(
+              if (_kind == StudyEntryKind.session)
+                DropdownButtonFormField<StudyTechnique>(
                 initialValue: _technique,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Study technique'),
@@ -338,7 +350,8 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   }
                 },
               ),
-              if (_technique == StudyTechnique.custom)
+              if (_kind == StudyEntryKind.event ||
+                  _technique == StudyTechnique.custom)
                 TextField(
                   controller: _minutes,
                   keyboardType: TextInputType.number,

@@ -322,7 +322,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   '${studyClock(session.scheduledAt)}',
                 ),
                 const SizedBox(height: 6),
-                Text(session.technique.label),
+                Text(session.kind == StudyEntryKind.event
+                    ? 'Event'
+                    : session.technique.label),
                 if (session.description.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(session.description),
@@ -349,7 +351,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 },
                 child: const Text('Edit'),
               ),
-            if (session.status == StudyStatus.planned)
+            if (session.kind == StudyEntryKind.session &&
+                session.status == StudyStatus.planned)
               FilledButton(
                 style: StudyActionStyles.primary(Theme.of(context)),
                 onPressed: planner.active == null
@@ -470,6 +473,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       : session.status == StudyStatus.planned &&
                             session.scheduledAt.isBefore(DateTime.now())
                       ? 'Not started'
+                      : session.kind == StudyEntryKind.event
+                      ? 'Event'
                       : session.technique.label,
                   style: TextStyle(
                     fontSize: AppTypography.small,
@@ -877,6 +882,23 @@ class _PlannerScreenState extends State<PlannerScreen> {
     ),
   );
 
+  Widget _newEventButton() => SizedBox(
+    height: StudyActionStyles.sessionButtonHeight,
+    child: OutlinedButton(
+      key: const ValueKey('planner-new-event'),
+      style: StudyActionStyles.sessionOutlined(),
+      onPressed: () => showStudySessionEditor(
+        context,
+        kind: StudyEntryKind.event,
+      ),
+      child: StudyActionStyles.sessionButtonContent(
+        icon: Icons.event_outlined,
+        label: 'New event',
+        contentKey: const ValueKey('planner-new-event-content'),
+      ),
+    ),
+  );
+
   Widget _newSessionButton() => SizedBox(
     height: StudyActionStyles.sessionButtonHeight,
     child: FilledButton(
@@ -920,6 +942,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   SizedBox(width: 148, child: _smartButton()),
                   const SizedBox(width: 8),
                   SizedBox(width: 148, child: _newSessionButton()),
+                  const SizedBox(width: 8),
+                  SizedBox(width: 148, child: _newEventButton()),
                 ],
                 const SizedBox(width: 16),
               ],
@@ -937,6 +961,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
                           Expanded(child: _smartButton()),
                           const SizedBox(width: 8),
                           Expanded(child: _newSessionButton()),
+                          const SizedBox(width: 8),
+                          Expanded(child: _newEventButton()),
                         ],
                       ),
                     ),
