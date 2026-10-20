@@ -19,6 +19,7 @@ import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/presentation/notebook_screen.dart';
 import '../../planner/presentation/study_timer_widgets.dart';
+import '../../planner/presentation/task_list_screen.dart';
 import '../../planner/state/study_planner_controller.dart';
 import 'library_catalog.dart';
 import 'library_controller.dart';
@@ -527,6 +528,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     return switch (kind) {
       NotebookKind.notebook => controller.createNotebook(),
       NotebookKind.board => controller.createBoard(),
+      NotebookKind.planner => controller.createPlanner(),
     };
   }
 
@@ -845,6 +847,7 @@ class _CreateMenuButton extends StatelessWidget {
           (_CreateAction.folder, 'New folder'),
           (_CreateAction.notebook, 'New notebook'),
           (_CreateAction.board, 'New board'),
+          (_CreateAction.planner, 'New planner'),
         ])
           PopupMenuItem<_CreateAction>(
             value: value,
@@ -1104,6 +1107,9 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
       case _CreateAction.board:
         widget.onCreate(NotebookKind.board);
         return;
+      case _CreateAction.planner:
+        widget.onCreate(NotebookKind.planner);
+        return;
     }
   }
 }
@@ -1275,9 +1281,11 @@ class _LibraryTreeItemRow extends StatelessWidget {
 
   Widget _buildRow(BuildContext context, {required bool dragging, Key? key}) {
     final colorScheme = Theme.of(context).colorScheme;
-    final icon = item.kind == NotebookKind.board
-        ? Icons.dashboard_outlined
-        : Icons.description_outlined;
+    final icon = switch (item.kind) {
+      NotebookKind.board => Icons.dashboard_outlined,
+      NotebookKind.notebook => Icons.description_outlined,
+      NotebookKind.planner => Icons.checklist_rounded,
+    };
     final draggingColor = Color.alphaBlend(
       colorScheme.onSurface.withValues(alpha: 0.10),
       colorScheme.surfaceContainerHighest,
@@ -1621,7 +1629,16 @@ class _LibraryWorkspace extends StatelessWidget {
     if (item == null) {
       return const EmptyState(
         title: 'Pick an item',
-        message: 'Select a notebook or board from the list.',
+        message: 'Select a notebook, board or planner from the list.',
+      );
+    }
+
+    if (item!.kind == NotebookKind.planner) {
+      return TaskListScreen(
+        key: ValueKey('${item!.uid}:${item!.folder}'),
+        planner: item!,
+        showCompactTimer: showCompactTimer,
+        onOpenNavigation: onOpenNavigation,
       );
     }
 
@@ -1647,7 +1664,7 @@ class _LibraryWorkspace extends StatelessWidget {
   }
 }
 
-enum _CreateAction { folder, notebook, board }
+enum _CreateAction { folder, notebook, board, planner }
 
 class _SidebarSpanDivider extends StatelessWidget {
   const _SidebarSpanDivider({this.dividerKey, this.extendBy = 0});

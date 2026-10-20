@@ -21,6 +21,33 @@ void main() {
     return planner;
   }
 
+  testWidgets('upcoming calendar event offers editing instead of timer', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    final event = planner.create(
+      kind: StudyEntryKind.event,
+      title: 'Museum visit',
+      scheduledAt: DateTime.now().add(const Duration(days: 1)),
+    );
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: const MaterialApp(
+          home: Scaffold(body: StudyTimerCard()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Start scheduled session'), findsNothing);
+    await tester.tap(find.byTooltip('Edit event'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit event'), findsOneWidget);
+    expect(planner.active, isNull);
+    expect(planner.start(event.id), isFalse);
+    await planner.flush();
+  });
+
   testWidgets('new calendar event is editable and never starts a timer', (
     tester,
   ) async {

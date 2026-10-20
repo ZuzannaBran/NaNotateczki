@@ -132,6 +132,30 @@ Automated shape checks also verify the shared 24 px radius and outer
 shadow for folder, notebook, and board previews in both themes.
 A visual check is still needed on a running Flutter UI.
 
+## Calendar events and folder task planner (October 2026)
+
+The regression tests for these features are
+`test/study_planner_controller_test.dart`,
+`test/study_planner_widget_test.dart`,
+`test/library_planner_test.dart`, and the sidebar creation-menu tests.
+Their execution has not been verified in this change.
+
+Manual checks on desktop and mobile, in both light and dark themes:
+
+1. Create an Event in the calendar; set its name, description, color,
+   date, hour and duration. Move, edit and delete it. Confirm Upcoming
+   offers Edit event, never starts a timer, and the event survives restart.
+2. Create a Planner within a folder. Rename it, move it to another folder
+   and reopen it; the task list and catalog preview must follow the item.
+3. Add a task, type its name, tick/untick the checkbox. Set a date without
+   an hour, optionally add/change/remove the hour, remove the entire
+   deadline, then delete the task. The deadline cell only appears if set.
+4. Future deadline = medium blue, overdue unfinished = light blue,
+   completed = dark blue, no deadline = dark blue. Check legible contrast
+   and full-length separators inside the 24 px rounded board.
+5. Restart the app and verify that tasks persist. Restore a local backup
+   and confirm that the planner and its tasks are recovered.
+
 ## Platform coverage
 
 | Platform | Logic/widget | Native app | Build | Input/peripherals |

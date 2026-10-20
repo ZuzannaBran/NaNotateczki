@@ -26,6 +26,12 @@ class LibraryItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBoard = item.kind == NotebookKind.board;
+    final isPlanner = item.kind == NotebookKind.planner;
+    final itemIcon = isPlanner
+        ? Icons.checklist_rounded
+        : isBoard
+        ? Icons.dashboard_outlined
+        : Icons.menu_book;
     const iconSize = 44.0;
     const tileHeight = 72.0;
     if (iconOnly) {
@@ -40,7 +46,7 @@ class LibraryItemCard extends StatelessWidget {
           title: Align(
             alignment: Alignment.centerLeft,
             child: _ItemKindIcon(
-              icon: isBoard ? Icons.dashboard_outlined : Icons.menu_book,
+              icon: itemIcon,
               size: iconSize,
             ),
           ),
@@ -58,7 +64,7 @@ class LibraryItemCard extends StatelessWidget {
           context,
         ).colorScheme.primary.withValues(alpha: 0.08),
         leading: _ItemKindIcon(
-          icon: isBoard ? Icons.dashboard_outlined : Icons.menu_book,
+          icon: itemIcon,
           size: iconSize,
         ),
         title: Text(
@@ -68,7 +74,11 @@ class LibraryItemCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          isBoard ? 'Board' : '${item.pages.length} pages',
+          isPlanner
+              ? 'Planner'
+              : isBoard
+              ? 'Board'
+              : '${item.pages.length} pages',
           style: Theme.of(context).textTheme.bodySmall,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,

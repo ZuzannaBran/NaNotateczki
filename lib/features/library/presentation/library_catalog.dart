@@ -20,6 +20,7 @@ import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../planner/presentation/study_timer_widgets.dart';
+import '../../planner/state/planner_task.dart';
 import 'library_controller.dart';
 
 /// Finds the most frequently used ink/text color in a folder.
@@ -626,7 +627,87 @@ class _DocumentTile extends StatelessWidget {
         }
       },
       previewAspectRatio: item.kind == NotebookKind.board ? 1 : 0.72,
-      child: _DocumentPreview(item: item),
+      child: item.kind == NotebookKind.planner
+          ? _PlannerDocumentPreview(
+              tasks: context.watch<LibraryController>().plannerTasks(item.uid),
+            )
+          : _DocumentPreview(item: item),
+    );
+  }
+}
+
+class _PlannerDocumentPreview extends StatelessWidget {
+  const _PlannerDocumentPreview({required this.tasks});
+
+  final List<PlannerTask> tasks;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final paper = theme.brightness == Brightness.dark
+        ? AppColors.darkCanvas
+        : AppColors.paper;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: paper,
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: _catalogPreviewRadius,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'TASKS',
+              style: TextStyle(
+                fontSize: AppTypography.small,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            for (final task in tasks.take(7))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      task.completed
+                          ? Icons.check_box_outlined
+                          : Icons.check_box_outline_blank_rounded,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        task.title.isEmpty ? 'New task' : task.title,
+                        style: TextStyle(
+                          fontSize: AppTypography.document,
+                          color: scheme.onSurface,
+                          decoration:
+                              task.completed ? TextDecoration.lineThrough : null,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (tasks.isEmpty)
+              Text(
+                'Add your first task',
+                style: TextStyle(
+                  fontSize: AppTypography.document,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

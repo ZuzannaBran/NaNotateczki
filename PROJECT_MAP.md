@@ -279,8 +279,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - `lib/features/notebook/domain/notebook.dart` (42): dokument i jego strony.
   4: `Notebook`.
-- `lib/features/notebook/domain/notebook_kind.dart` (12): notebook lub board
-  oraz bezpieczny zapis indeksu.
+- `lib/features/notebook/domain/notebook_kind.dart`: notebook, board lub
+  planner, z niezmienionymi indeksami starych typów.
   1: `NotebookKind`; 3: `NotebookKindValue`.
 - `lib/features/notebook/domain/note_page.dart` (39): zawartość strony.
   5: `NotePage`.
@@ -330,6 +330,8 @@ i zachowuje obrazy inline.
 
 - 23: `DataIntegrityIncidentHandler`; 30: `NotebookRepositoryChange`;
   45: `RepositoryChangeHandler`; 55: `NotebookRepository`.
+- `createPlanner`: nowy typ wpisu bazujący na istniejącym schemacie
+  SQLite i pustej stronie technicznej; lista zadań zapisywana osobno.
 - 81: `waitForPendingSaves`; 141: `fetchNotebooks`;
   518: `saveNotebook`; zapis stron jest bezpośrednio dalej.
 - 1499: `_readPage`; 1561: `_persistLegacyEraserPages` — migracja masek,
@@ -348,7 +350,7 @@ mobilnej, bez zmiany modelu dokumentu.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart` (793 linie)
+### `lib/features/library/presentation/library_controller.dart`
 
 Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
 Przenoszenie notebooków i boardów między folderami zapisuje tylko metadane
@@ -356,7 +358,13 @@ w SQLite; aktywny dokument zachowuje zaznaczenie w nowym folderze.
 Zapisuje kształt, indywidualny kolor ikony okładki i ostatnie 12
 wybranych kolorów w zgodnym wstecznie `library_folders.json`
 (legacy lista nazw lub obiekt z `folders`, `covers` i `recentCoverColors`);
-nie zmienia schematu SQLite. Wybór dokumentu synchronizuje
+nie zmienia schematu SQLite. Wspólne `library_folders.json` przechowuje
+  również zadania plannerów (`plannerTasks`); dlatego lokalny backup
+  obejmuje ich treść bez migracji Drift. Każde zadanie ma UID, tytuł,
+  stan odhaczenia oraz opcjonalny deadline i godzinę. Zapisy tekstu są
+  grupowane krótkim debounce; `AppSaveCoordinator` opróżnia kolejkę przed
+  zamknięciem. Usuwanie folderu lub planera usuwa jego zadania.
+  Wybór dokumentu synchronizuje
 też aktywny folder, dzięki czemu drzewko biblioteki zaznacza folder i notatkę
 jednocześnie. Asynchroniczny start
 nie powiadamia słuchaczy po usunięciu kontrolera. Zapis samych folderów
@@ -444,6 +452,8 @@ i przywracane natychmiast po zamknięciu;
 2 px łącznik koloru panelu maskuje linię graniczną. Menu folderu zawiera także
 edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon.
 
+- Menu dodawania oferuje Folder, Notebook, Board i Planner.
+  Planner otwiera `TaskListScreen` zamiast kontrolera edytora.
 - 25: `LibraryScreen`; 32: `_LibraryScreenState`;
   506: `_openCatalogSettings`;
   841: `_CreateMenuButton`;
@@ -496,7 +506,8 @@ bez czekania na dysk, a wspólna historia Recent doładowuje się asynchroniczni
 oba elementy są wyrównane do lewej krawędzi okładki/podglądu i mieszczą
 się w jego szerokości. Podpis przylega bliżej miniatury (odstęp 2 px),
 a długie nazwy są obcinane wielokropkiem.
-Notatki mają pionowy podgląd pierwszej strony (820×1160), boardy kwadratowy
+Kafelki planerów pokazują własny podgląd zadań i checkboxów.
+  Notatki mają pionowy podgląd pierwszej strony (820×1160), boardy kwadratowy
 podgląd dopasowany do granic obiektów z pierwszej strony. Miniatury rysują
 ink, tekst oraz dostępne obrazy bez uruchamiania edytora.
 Wspólny `_catalogPreviewRadius` (24 px) określa narożniki cienia,
@@ -518,11 +529,19 @@ Siatka reaguje na wspólną czułość dotyku.
 
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
-Karta notebooka/boarda z menu zmiany nazwy i usuwania.
+Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
 
 - 8: `LibraryItemCard`; 110: `_ItemKindIcon`.
 
-## 6a. Planer nauki (bez migracji SQLite)
+## 6a. Planer nauki i listy zadań (bez migracji SQLite)
+
+- `lib/features/planner/state/planner_task.dart`: `PlannerTask`,
+  `PlannerTaskTone`, deadline z opcjonalną godziną; serializacja.
+- `lib/features/planner/presentation/task_list_screen.dart`:
+  zaokrąglony canvas listy zadań, checkbox, edycja nazw, wybór daty/godziny,
+  usuwanie oraz pełnoszerokie separatory. Kolory pochodzą ze współdzielonego
+  `AppColors.blueColorSet` i odzwierciedlają status zadania.
+
 
 - `lib/features/planner/state/study_planner_controller.dart` (566):
   `StudySession`, `StudyEntryKind` (session/event), `StudyTechnique`,
@@ -600,6 +619,7 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
   Wydarzenia są wspólnymi wpisami kalendarza bez możliwości uruchomienia
   timera, ze wspólnym opisem, kolorem, czasem, edycją i przenoszeniem.
+  Upcoming umożliwia edycję wydarzeń zamiast uruchomienia timera.
   Day domyślnie otwiera aktualny dzień, a kliknięcie pola Week/Month
   przechodzi do wybranej daty. Przyciski + zachowują tworzenie sesji.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
@@ -1119,6 +1139,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   testowej bazy następuje rzeczywisty zapis.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
+- `test/library_planner_test.dart`: tworzenie, zapis i odczyt zadań,
+  edycja, usuwanie, opcjonalny deadline, kolor statusów oraz widget canvasu.
 - `test/study_planner_controller_test.dart` i
   `test/study_planner_widget_test.dart`: wydarzenia kalendarza bez timera,
   wspólny zapis, edycja, usuwanie i zgodność starych wpisów.
@@ -1194,7 +1216,7 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   wspólny `AppHeaderDivider` nad timerem,
   i aktualizacja mnożnika przewijania plików bez restartu; geometria,
   kolor i obsługa menu
-  folderu, notebooka oraz boarda, a także menu dodawania (3 pozycje,
+  folderu, notebooka oraz boarda, a także menu dodawania (4 pozycje,
   wyrównanie do panelu i jednostronne zaokrąglenia), zgodność wielkości
   czcionki menu z nazwami dokumentów, brak ikon w menu dodawania,
   stykanie menu z prawą granicą całego sidebaru (w tym resize handle),

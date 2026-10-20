@@ -47,10 +47,15 @@ typedef RepositoryChangeHandler =
     void Function(Iterable<NotebookRepositoryChange> changes);
 
 class PortableBackupData {
-  const PortableBackupData({required this.notebooks, required this.folders});
+  const PortableBackupData({
+    required this.notebooks,
+    required this.folders,
+    this.plannerTasks = const <String, dynamic>{},
+  });
 
   final List<Notebook> notebooks;
   final List<String> folders;
+  final Map<String, dynamic> plannerTasks;
 }
 
 class NotebookRepository {
@@ -475,6 +480,30 @@ class NotebookRepository {
 
     await saveNotebook(board);
     return board;
+  }
+
+  Future<Notebook> createPlanner({String? title, String? folder}) async {
+    final now = DateTime.now();
+    final planner = Notebook(
+      uid: _uuid.v4(),
+      title: title ?? 'New Planner',
+      kind: NotebookKind.planner,
+      folder: folder ?? 'Notes',
+      createdAt: now,
+      updatedAt: now,
+      pages: [
+        NotePage(
+          id: _uuid.v4(),
+          title: 'Tasks',
+          textBlocks: <TextBlock>[],
+          imageBlocks: <ImageBlock>[],
+          inkStrokes: <InkStroke>[],
+          isBookmarked: false,
+        ),
+      ],
+    );
+    await saveNotebook(planner);
+    return planner;
   }
 
   Future<Notebook?> getNotebook(String uid) async {
@@ -1249,6 +1278,7 @@ class NotebookRepository {
   Map<String, dynamic> encodePortableBackup(
     List<Notebook> items, {
     required Iterable<String> folders,
+    Map<String, dynamic> plannerTasks = const <String, dynamic>{},
   }) {
     final notebooks = encodeSelfContainedBackup(items);
     final normalizedFolders =
@@ -1264,6 +1294,7 @@ class NotebookRepository {
     final payload = <String, dynamic>{
       'folders': normalizedFolders,
       'notebooks': notebooks,
+      if (plannerTasks.isNotEmpty) 'plannerTasks': plannerTasks,
     };
     final checksum = sha256
         .convert(utf8.encode(jsonEncode(payload)))
@@ -1325,6 +1356,12 @@ class NotebookRepository {
       throw const FormatException('Malformed backup payload.');
     }
 
+    final rawPlannerTasks = payload['plannerTasks'];
+    if (rawPlannerTasks != null &&
+        (rawPlannerTasks is! Map<String, dynamic> ||
+            rawPlannerTasks.values.any((tasks) => tasks is! List))) {
+      throw const FormatException('Malformed planner task backup.');
+    }
     final notebooks = decodeBackupStrict(rawNotebooks);
     final folders =
         <String>{
@@ -1338,7 +1375,13 @@ class NotebookRepository {
           final lower = a.toLowerCase().compareTo(b.toLowerCase());
           return lower != 0 ? lower : a.compareTo(b);
         });
-    return PortableBackupData(notebooks: notebooks, folders: folders);
+    return PortableBackupData(
+      notebooks: notebooks,
+      folders: folders,
+      plannerTasks: rawPlannerTasks == null
+          ? const <String, dynamic>{}
+          : rawPlannerTasks as Map<String, dynamic>,
+    );
   }
 
   static Map<String, dynamic> encodeNotebook(Notebook notebook) =>

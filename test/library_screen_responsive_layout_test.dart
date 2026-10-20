@@ -551,15 +551,18 @@ void main() {
     final createEntries = find.byWidgetPredicate(
       (widget) => widget is PopupMenuItem && widget.height == 36,
     );
-    expect(createEntries, findsNWidgets(3));
+    expect(createEntries, findsNWidgets(4));
     expect(find.text('New folder'), findsOneWidget);
     expect(find.text('New notebook'), findsOneWidget);
     expect(find.text('New board'), findsOneWidget);
+    expect(find.text('New planner'), findsOneWidget);
     expect(
       find.descendant(of: createEntries, matching: find.byType(Icon)),
       findsNothing,
     );
-    for (final label in ['New folder', 'New notebook', 'New board']) {
+    for (final label in [
+      'New folder', 'New notebook', 'New board', 'New planner',
+    ]) {
       expect(
         tester.widget<Text>(find.text(label)).style?.fontSize,
         treeFontSize,
@@ -621,7 +624,7 @@ void main() {
     final bridgeRect = tester.getRect(shadowBridge);
     expect(bridgeRect.left, closeTo(sidebarRight - 2, 1));
     expect(bridgeRect.right, closeTo(sidebarRight + 150, 1));
-    expect(bridgeRect.height, closeTo(114, 1));
+    expect(bridgeRect.height, closeTo(150, 1));
 
     await tester.tap(find.text('New folder'));
     await tester.pumpAndSettle();

@@ -367,7 +367,9 @@ class StudyPlannerController extends ChangeNotifier {
     if (session.status != StudyStatus.planned) {
       return;
     }
-    session.title = title.trim().isEmpty ? 'Study session' : title.trim();
+    session.title = title.trim().isEmpty
+        ? (session.kind == StudyEntryKind.event ? 'Event' : 'Study session')
+        : title.trim();
     session.description = description.trim();
     session.scheduledAt = scheduledAt;
     session.minutes = minutes.clamp(1, 1440).toInt();

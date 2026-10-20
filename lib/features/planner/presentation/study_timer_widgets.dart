@@ -690,12 +690,21 @@ class StudyTimerCard extends StatelessWidget {
                                 ),
                               ),
                               IconButton(
-                                tooltip: 'Start scheduled session',
-                                icon: const Icon(
-                                  Icons.play_arrow_rounded,
+                                tooltip: item.kind == StudyEntryKind.event
+                                    ? 'Edit event'
+                                    : 'Start scheduled session',
+                                icon: Icon(
+                                  item.kind == StudyEntryKind.event
+                                      ? Icons.event_outlined
+                                      : Icons.play_arrow_rounded,
                                   size: 18,
                                 ),
-                                onPressed: active == null
+                                onPressed: item.kind == StudyEntryKind.event
+                                    ? () => showStudySessionEditor(
+                                        context,
+                                        session: item,
+                                      )
+                                    : active == null
                                     ? () => planner.start(item.id)
                                     : null,
                               ),

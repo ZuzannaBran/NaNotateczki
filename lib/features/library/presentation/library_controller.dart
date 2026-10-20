@@ -1,17 +1,22 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show Color;
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/error/app_error_log.dart';
+import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
 import '../../../data/backup/local_backup_service.dart';
 import '../../../data/sync/cloud_sync_service.dart';
 import '../../editor/state/ink_color_presets.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
+import '../../notebook/domain/notebook_kind.dart';
+import '../../planner/state/planner_task.dart';
 
 enum FolderCoverShape { folder, star, heart, flower, sparkle }
 
@@ -54,7 +59,13 @@ class LibraryController extends ChangeNotifier {
     this.wasReset = false,
     this.freshFile = false,
     this.resetReason,
-  });
+  }) {
+    AppSaveCoordinator.instance.register(
+      this,
+      hasPendingWork: () => _taskSaveDirty || _taskWritesPending > 0,
+      flush: flushPlannerTasks,
+    );
+  }
 
   final NotebookRepository repository;
   final CloudSyncService cloudSyncService;
@@ -81,6 +92,11 @@ class LibraryController extends ChangeNotifier {
   final Map<String, FolderCoverStyle> _folderCovers =
       <String, FolderCoverStyle>{};
   final List<Color> _recentCoverColors = <Color>[];
+  final Map<String, List<PlannerTask>> _plannerTasks = {};
+  Timer? _taskSaveTimer;
+  bool _taskSaveDirty = false;
+  int _taskWritesPending = 0;
+  Future<void> _lastTaskSave = Future<void>.value();
 
   List<Color> get recentCoverColors => List.unmodifiable(_recentCoverColors);
   Notebook? _activeNotebook;
@@ -119,6 +135,11 @@ class LibraryController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    AppSaveCoordinator.instance.unregister(this);
+    if (_taskSaveDirty) {
+      unawaited(flushPlannerTasks());
+    }
+    _taskSaveTimer?.cancel();
     super.dispose();
   }
 
@@ -416,6 +437,11 @@ class LibraryController extends ChangeNotifier {
       await repository.deleteNotebook(item.uid);
     }
 
+    for (final item in items) {
+      if (item.folder == trimmed) {
+        _plannerTasks.remove(item.uid);
+      }
+    }
     items = items.where((item) => item.folder != trimmed).toList();
     if (selectedFolder == trimmed) {
       selectedFolder = folderNames.isEmpty ? '' : folderNames.first;
@@ -431,6 +457,93 @@ class LibraryController extends ChangeNotifier {
     }
     await _saveFolders();
     notifyListeners();
+  }
+
+  List<PlannerTask> plannerTasks(String uid) =>
+      List.unmodifiable(_plannerTasks[uid] ?? const <PlannerTask>[]);
+
+  Future<PlannerTask> addPlannerTask(String uid) async {
+    if (!items.any(
+      (item) => item.uid == uid && item.kind == NotebookKind.planner,
+    )) {
+      throw ArgumentError.value(uid, 'uid', 'Planner not found');
+    }
+    final task = PlannerTask(id: const Uuid().v4(), title: '');
+    _plannerTasks.putIfAbsent(uid, () => <PlannerTask>[]).add(task);
+    notifyListeners();
+    _schedulePlannerTaskSave();
+    return task;
+  }
+
+  Future<void> updatePlannerTask(
+    String uid,
+    String taskId, {
+    String? title,
+    bool? completed,
+    DateTime? deadline,
+    bool clearDeadline = false,
+    bool? deadlineHasTime,
+  }) async {
+    final list = _plannerTasks[uid];
+    if (list == null) {
+      return;
+    }
+    final index = list.indexWhere((task) => task.id == taskId);
+    if (index < 0) {
+      return;
+    }
+    list[index] = list[index].copyWith(
+      title: title,
+      completed: completed,
+      deadline: deadline,
+      clearDeadline: clearDeadline,
+      deadlineHasTime: deadlineHasTime,
+    );
+    notifyListeners();
+    _schedulePlannerTaskSave();
+  }
+
+  Future<void> removePlannerTask(String uid, String taskId) async {
+    final list = _plannerTasks[uid];
+    if (list == null) {
+      return;
+    }
+    list.removeWhere((task) => task.id == taskId);
+    notifyListeners();
+    _schedulePlannerTaskSave();
+  }
+
+  void _schedulePlannerTaskSave() {
+    _taskSaveDirty = true;
+    _taskSaveTimer?.cancel();
+    _taskSaveTimer = Timer(const Duration(milliseconds: 300), () {
+      unawaited(flushPlannerTasks());
+    });
+  }
+
+  Future<void> flushPlannerTasks() async {
+    _taskSaveTimer?.cancel();
+    _taskSaveTimer = null;
+    if (_taskSaveDirty) {
+      _taskSaveDirty = false;
+      _taskWritesPending++;
+      _lastTaskSave = _saveFolders().whenComplete(() {
+        _taskWritesPending--;
+      });
+    }
+    await _lastTaskSave;
+  }
+
+  Future<Notebook> createPlanner() async {
+    final planner = await repository.createPlanner(
+      folder: _targetFolderForNewItem(),
+    );
+    items = [planner, ...items];
+    selectedFolder = planner.folder;
+    selectedItemId = planner.uid;
+    _activeNotebook = planner;
+    notifyListeners();
+    return planner;
   }
 
   Future<Notebook> createNotebook() async {
@@ -459,6 +572,9 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> deleteItem(String uid) async {
     await repository.deleteNotebook(uid);
+    if (_plannerTasks.remove(uid) != null) {
+      await _saveFolders();
+    }
     items = items.where((item) => item.uid != uid).toList();
     if (selectedItemId == uid) {
       selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
@@ -576,6 +692,10 @@ class LibraryController extends ChangeNotifier {
     final payload = repository.encodePortableBackup(
       current,
       folders: folderNames,
+      plannerTasks: {
+        for (final entry in _plannerTasks.entries)
+          entry.key: entry.value.map((task) => task.toJson()).toList(),
+      },
     );
     try {
       await temporary.writeAsString(jsonEncode(payload), flush: true);
@@ -596,7 +716,20 @@ class LibraryController extends ChangeNotifier {
     }
     final content = await file.readAsString();
     final decoded = repository.decodePortableBackup(jsonDecode(content));
+    final recoveredTasks = <String, List<PlannerTask>>{};
+    for (final entry in decoded.plannerTasks.entries) {
+      final entries = entry.value;
+      if (entries is! List) {
+        throw const FormatException('Malformed planner task backup.');
+      }
+      final tasks = entries.map(PlannerTask.fromJson).toList();
+      if (tasks.any((task) => task == null)) {
+        throw const FormatException('Malformed planner task entry.');
+      }
+      recoveredTasks[entry.key] = tasks.cast<PlannerTask>();
+    }
     await repository.importNotebooksAtomically(decoded.notebooks);
+    _plannerTasks.addAll(recoveredTasks);
     _folders.addAll(decoded.folders);
     await _saveFolders();
     await loadItems();
@@ -682,6 +815,20 @@ class LibraryController extends ChangeNotifier {
         );
       _folderCovers.clear();
       _recentCoverColors.clear();
+      _plannerTasks.clear();
+      if (decoded is Map && decoded['plannerTasks'] is Map) {
+        final savedTasks = decoded['plannerTasks'] as Map;
+        for (final entry in savedTasks.entries) {
+          if (entry.key is! String || entry.value is! List) {
+            continue;
+          }
+          final restored = (entry.value as List)
+              .map(PlannerTask.fromJson)
+              .whereType<PlannerTask>()
+              .toList();
+          _plannerTasks[entry.key as String] = restored;
+        }
+      }
       if (decoded is Map && decoded['recentCoverColors'] is List) {
         _recentCoverColors.addAll(
           (decoded['recentCoverColors'] as List)
@@ -717,6 +864,10 @@ class LibraryController extends ChangeNotifier {
           for (final entry in _folderCovers.entries)
             entry.key: entry.value.toJson(),
         },
+        'plannerTasks': {
+          for (final entry in _plannerTasks.entries)
+            entry.key: entry.value.map((task) => task.toJson()).toList(),
+        },
       };
       await writeStoredText(_foldersFileName, jsonEncode(payload));
       repository.onChanged?.call(const <NotebookRepositoryChange>[]);
@@ -735,6 +886,12 @@ class LibraryController extends ChangeNotifier {
 
   bool _matches(Notebook notebook, String query) {
     if (notebook.title.toLowerCase().contains(query)) {
+      return true;
+    }
+    if (_plannerTasks[notebook.uid]?.any(
+          (task) => task.title.toLowerCase().contains(query),
+        ) ??
+        false) {
       return true;
     }
     for (final page in notebook.pages) {
