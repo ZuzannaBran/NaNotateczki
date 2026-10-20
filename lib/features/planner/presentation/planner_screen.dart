@@ -27,6 +27,15 @@ Color plannerDaySurface(ThemeData theme, {required bool highlighted}) {
   return Color.alphaBlend(shade.withValues(alpha: 0.5), base);
 }
 
+Color plannerOutsideMonthSurface(ThemeData theme) {
+  final scheme = theme.colorScheme;
+  final base = plannerDaySurface(theme, highlighted: false);
+  final lighter = theme.brightness == Brightness.dark
+      ? scheme.surfaceContainerHighest
+      : scheme.surface;
+  return Color.lerp(base, lighter, 0.6)!;
+}
+
 List<DateTime> monthCalendarDays(DateTime month) {
   final first = DateTime(month.year, month.month);
   final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
@@ -400,6 +409,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
             decoration: BoxDecoration(
               color: candidates.isNotEmpty
                   ? scheme.primaryContainer
+                  : !inMonth
+                  ? plannerOutsideMonthSurface(Theme.of(context))
                   : plannerDaySurface(
                       Theme.of(context),
                       highlighted: today && _mode != CalendarMode.today,
@@ -983,7 +994,15 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         ),
                       ),
                     ),
-                  Expanded(child: _calendar(planner.sessions)),
+                  Expanded(
+                    child: ScrollConfiguration(
+                      key: const ValueKey('planner-scrollbar-free'),
+                      behavior: ScrollConfiguration.of(
+                        context,
+                      ).copyWith(scrollbars: false),
+                      child: _calendar(planner.sessions),
+                    ),
+                  ),
                   const SizedBox(
                     key: ValueKey('planner-calendar-bottom-gap'),
                     height: 24,
@@ -1355,11 +1374,21 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
         children: [
           SizedBox(
             width: _axisWidth,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: FractionalTranslation(
-                translation: Offset.zero,
-                child: Padding(
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 36,
+                  right: 0,
+                  top: 0,
+                  child: SizedBox(
+                    key: ValueKey('planner-week-hour-connector-$hour'),
+                    height: 0.7,
+                    child: ColoredBox(
+                      color: scheme.outlineVariant.withValues(alpha: 0.65),
+                    ),
+                  ),
+                ),
+                Padding(
                   padding: const EdgeInsets.only(left: 2),
                   child: Text(
                     '${hour.toString().padLeft(2, '0')}:00',
@@ -1370,7 +1399,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
           for (final day in widget.days)
@@ -1392,16 +1421,54 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
         ),
       ),
       Expanded(
-        child: ListView(
-          key: const ValueKey('planner-week-hours'),
-          controller: _controller,
-          physics: widget.physics,
-          padding: EdgeInsets.zero,
-          children: [
-            for (var hour = 0; hour < 24; hour++) _hourRow(hour),
-          ],
+        child: CustomPaint(
+          key: const ValueKey('planner-week-column-lines'),
+          foregroundPainter: _WeekColumnLinesPainter(
+            axisWidth: _axisWidth,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          child: ListView(
+            key: const ValueKey('planner-week-hours'),
+            controller: _controller,
+            physics: widget.physics,
+            padding: EdgeInsets.zero,
+            children: [
+              for (var hour = 0; hour < 24; hour++) _hourRow(hour),
+            ],
+          ),
         ),
       ),
     ],
   );
+}
+
+class _WeekColumnLinesPainter extends CustomPainter {
+  const _WeekColumnLinesPainter({
+    required this.axisWidth,
+    required this.color,
+  });
+
+  final double axisWidth;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    final dayWidth = (size.width - axisWidth) / 7;
+    for (var index = 0; index <= 7; index++) {
+      final x = axisWidth + dayWidth * index;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    canvas.drawLine(
+      Offset(axisWidth, size.height),
+      Offset(size.width, size.height),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _WeekColumnLinesPainter oldDelegate) =>
+      oldDelegate.axisWidth != axisWidth || oldDelegate.color != color;
 }

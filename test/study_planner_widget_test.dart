@@ -140,6 +140,28 @@ void main() {
         tester.getRect(weekHeader).bottom,
         closeTo(tester.getRect(hourlyList).top, 0.1),
       );
+      final connector = find.byKey(
+        ValueKey('planner-week-hour-connector-${now.hour}'),
+      );
+      expect(connector, findsOneWidget);
+      expect(
+        tester.getRect(connector).right,
+        closeTo(tester.getRect(hourCell).left, 0.1),
+      );
+      expect(
+        tester.getRect(connector).left,
+        greaterThan(tester.getRect(label).right),
+      );
+      final columnLines = find.byKey(
+        const ValueKey('planner-week-column-lines'),
+      );
+      expect(columnLines, findsOneWidget);
+      final painter = tester.widget<CustomPaint>(columnLines);
+      expect(painter.foregroundPainter, isNotNull);
+      expect(
+        tester.getRect(columnLines),
+        tester.getRect(hourlyList),
+      );
 
       await tester.tap(find.text('Today').last);
       await tester.pumpAndSettle();
@@ -220,6 +242,131 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  for (final darkMode in [false, true]) {
+    testWidgets('out-of-month cells use lighter background, dark=$darkMode', (
+      tester,
+    ) async {
+      final planner = await loadPlanner();
+      await tester.binding.setSurfaceSize(const Size(1440, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: MaterialApp(
+            theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+            home: const PlannerScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Month'));
+      await tester.pumpAndSettle();
+
+      var month = DateTime.now();
+      var days = monthCalendarDays(month);
+      if (days.every((date) => date.month == month.month)) {
+        await tester.tap(find.byTooltip('Next'));
+        await tester.pumpAndSettle();
+        month = DateTime(month.year, month.month + 1);
+        days = monthCalendarDays(month);
+      }
+      final other = days.firstWhere(
+        (date) => date.month != month.month,
+      );
+      final inside = days.firstWhere(
+        (date) => date.month == month.month &&
+            !DateUtils.isSameDay(date, DateTime.now()),
+      );
+      Finder dayCell(DateTime date) => find.byKey(
+        ValueKey(
+          'planner-day-cell-${date.year}-${date.month}-${date.day}',
+        ),
+      );
+
+      final outerCell = tester.widget<Container>(dayCell(other));
+      final innerCell = tester.widget<Container>(dayCell(inside));
+      final theme = Theme.of(tester.element(dayCell(other)));
+      final outerColor = (outerCell.decoration! as BoxDecoration).color!;
+      final innerColor = (innerCell.decoration! as BoxDecoration).color!;
+      expect(outerColor, plannerOutsideMonthSurface(theme));
+      expect(
+        outerColor.computeLuminance(),
+        greaterThan(innerColor.computeLuminance()),
+      );
+      expect(
+        (outerCell.decoration! as BoxDecoration).border!.right,
+        (innerCell.decoration! as BoxDecoration).border!.right,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('calendar hides vertical scrollbar without blocking touch', (
+    tester,
+  ) async {
+    final planner = await loadPlanner();
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ChangeNotifierProvider<StudyPlannerController>.value(
+        value: planner,
+        child: MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.windows),
+          home: const PlannerScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final config = find.byKey(const ValueKey('planner-scrollbar-free'));
+    expect(config, findsOneWidget);
+    expect(
+      find.descendant(
+        of: config,
+        matching: find.byType(RawScrollbar),
+      ),
+      findsNothing,
+    );
+
+    final hours = find.byKey(const ValueKey('planner-week-hours'));
+    final scrollable = find.descendant(
+      of: hours,
+      matching: find.byType(Scrollable),
+    );
+    final position = tester.state<ScrollableState>(scrollable).position;
+    final firstOffset = position.pixels;
+    await tester.drag(hours, const Offset(0, -150));
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(firstOffset));
+
+    await tester.tap(find.text('Today').last);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('planner-scrollbar-free')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: config,
+        matching: find.byType(RawScrollbar),
+      ),
+      findsNothing,
+    );
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('planner-scrollbar-free')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: config,
+        matching: find.byType(RawScrollbar),
+      ),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('narrow week keeps side padding while hours scroll', (
     tester,
