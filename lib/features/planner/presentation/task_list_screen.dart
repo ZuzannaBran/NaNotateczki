@@ -8,6 +8,7 @@ import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_header_divider.dart';
+import '../../../core/widgets/workspace_document_app_bar.dart';
 import '../../library/presentation/library_controller.dart';
 import '../../notebook/domain/notebook.dart';
 import '../state/planner_task.dart';
@@ -19,8 +20,9 @@ Color plannerTaskBackground(
   required bool darkMode,
   bool completed = false,
 }) {
+  final resolvedTone = completed ? PlannerTaskTone.completed : tone;
   final color = darkMode
-      ? switch (tone) {
+      ? switch (resolvedTone) {
           PlannerTaskTone.undated => AppColors.darkActive,
           PlannerTaskTone.upcoming => AppColors.darkCanvas,
           PlannerTaskTone.overdue => AppColors.darkPaper,
@@ -45,12 +47,14 @@ Color plannerTaskBackground(
 class TaskListScreen extends StatelessWidget {
   const TaskListScreen({
     required this.planner,
+    required this.onSettings,
     this.showCompactTimer = false,
     this.onOpenNavigation,
     super.key,
   });
 
   final Notebook planner;
+  final VoidCallback onSettings;
   final bool showCompactTimer;
   final VoidCallback? onOpenNavigation;
 
@@ -68,20 +72,12 @@ class TaskListScreen extends StatelessWidget {
         1.0;
 
     return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: AppHeaderDivider.toolbarHeight,
-        automaticallyImplyLeading: false,
-        title: Text(planner.title, style: AppHeaderDivider.titleStyle),
-        leading: onOpenNavigation == null
-            ? null
-            : IconButton(
-                tooltip: 'Open folders',
-                icon: const Icon(Icons.menu_rounded),
-                onPressed: onOpenNavigation,
-              ),
-        actions: [
+      appBar: WorkspaceDocumentAppBar(
+        title: planner.title,
+        onSettings: onSettings,
+        onOpenNavigation: onOpenNavigation,
+        extraActions: [
           if (showCompactTimer) const CompactStudyTimer(),
-          const SizedBox(width: 12),
         ],
       ),
       body: Column(
@@ -99,37 +95,23 @@ class TaskListScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Switch.adaptive(
-                            key: const ValueKey('planner-completed-last'),
-                            value: library.plannerCompletedLast(planner.uid),
-                            onChanged: (value) => unawaited(
-                              library.setPlannerCompletedLast(
-                                planner.uid,
-                                value,
-                              ),
-                            ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.icon(
+                          key: const ValueKey('planner-add-task'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: theme.brightness == Brightness.dark
+                                ? AppColors.darkPaper
+                                : AppColors.toolbar,
+                            foregroundColor: theme.brightness == Brightness.dark
+                                ? AppColors.darkText
+                                : AppColors.inkBlack,
                           ),
-                          const SizedBox(width: 4),
-                          const Expanded(
-                            child: Text(
-                              'Completed last',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: AppTypography.small,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          FilledButton.icon(
-                            key: const ValueKey('planner-add-task'),
-                            onPressed: () =>
-                                unawaited(library.addPlannerTask(planner.uid)),
-                            icon: const Icon(Icons.add_rounded, size: 18),
-                            label: const Text('Add task'),
-                          ),
-                        ],
+                          onPressed: () =>
+                              unawaited(library.addPlannerTask(planner.uid)),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Add task'),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       DecoratedBox(

@@ -15,7 +15,7 @@ import 'package:provider/provider.dart';
 import '../../../core/diagnostics/board_scene_perf_tracker.dart';
 import '../../../core/input/app_preferences_controller.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/app_header_divider.dart';
+import '../../../core/widgets/workspace_document_app_bar.dart';
 import '../../editor/presentation/editor_commands.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
 import '../../editor/presentation/widgets/busy_overlay.dart';
@@ -521,7 +521,6 @@ class _BoardScreenState extends State<BoardScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
-    final useWideTitleInset = MediaQuery.sizeOf(context).width >= 600;
     final activeTextBlockId = controller.activeTextBlockId;
     final activeTextBlock = activeTextBlockId == null
         ? null
@@ -743,32 +742,12 @@ class _BoardScreenState extends State<BoardScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: AppHeaderDivider.toolbarHeight,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        titleSpacing: useWideTitleInset ? 44 : null,
-        leading: widget.onOpenNavigation == null
-            ? null
-            : IconButton(
-                key: const ValueKey('mobile-navigation-open'),
-                tooltip: 'Open navigation',
-                icon: const Icon(Icons.menu_rounded),
-                onPressed: widget.onOpenNavigation,
-              ),
-        title: Text(
-          widget.title ?? controller.notebook.title,
-          style: AppHeaderDivider.titleStyle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        actions: [
+      appBar: WorkspaceDocumentAppBar(
+        title: widget.title ?? controller.notebook.title,
+        onOpenNavigation: widget.onOpenNavigation,
+        onSettings: _openSettings,
+        extraActions: [
           if (widget.showCompactTimer) const CompactStudyTimer(),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Settings',
-            onPressed: _openSettings,
-          ),
         ],
       ),
       body: Stack(

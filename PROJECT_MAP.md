@@ -362,8 +362,8 @@ nie zmienia schematu SQLite. Wspólne `library_folders.json` przechowuje
   również zadania plannerów (`plannerTasks`); dlatego lokalny backup
   obejmuje ich treść bez migracji Drift. Każde zadanie ma UID, tytuł,
   stan odhaczenia oraz opcjonalny deadline i godzinę. Opcja
-  "Completed last" (domyślnie aktywna) zapisuje kolejność ukończonych
-  zadań dla każdego planera bez zmiany kolejności utrwalonej listy.
+  Odhaczone zadania są zawsze prezentowane na dole, bez zmiany
+  kolejności danych; historyczny "plannerCompletedLast" jest ignorowany.
   Zapisy tekstu są
   grupowane krótkim debounce; `AppSaveCoordinator` opróżnia kolejkę przed
   zamknięciem. Usuwanie folderu lub planera usuwa jego zadania.
@@ -457,6 +457,8 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
 
 - Menu dodawania oferuje Folder, Notebook, Board i Planner.
   Planner otwiera `TaskListScreen` zamiast kontrolera edytora.
+  Ustawienia katalogu i planera nie tworzą `EditorController` dla
+  `NotebookKind.planner`, aby nie zgłaszać `UnsupportedError`.
 - 25: `LibraryScreen`; 32: `_LibraryScreenState`;
   506: `_openCatalogSettings`;
   841: `_CreateMenuButton`;
@@ -530,6 +532,11 @@ Siatka reaguje na wspólną czułość dotyku.
   873: `_PagePreviewPainter`;
   945: `showFolderCoverEditor`.
 
+- `lib/core/widgets/workspace_document_app_bar.dart`: wspólny pasek
+  tytułu notatnika, boarda i planera (56 px), z marginesem chroniącym
+  przed lewymi strzałkami, mobilną nawigacją i akcją Settings.
+  6: `WorkspaceDocumentAppBar`.
+
 ### `lib/features/library/presentation/widgets/library_item_card.dart` (132 linie)
 
 Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
@@ -546,8 +553,11 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   beżowymi/neutralnymi odcieniami `AppColors` dla aktualnego motywu:
   bez deadline'u ("Recent"), upcoming i overdue; zaległe mają
   najjaśniejszy, nadchodzące pośredni, a "Recent" najciemniejszy
-  odcień w obu motywach. Ukończone zadania mają przygaszone tło i tekst. Przełącznik "Completed last" zapisuje wybór
-  osobno dla planera. Przyciski deadline'u wyrównują się do prawej i zawijają
+  odcień w obu motywach. Wszystkie odhaczone zadania, także wcześniej
+  zaległe i bez deadline'u, mają ten sam przygaszony kolor i są na dole.
+  Przycisk Add task używa jaśniejszego beżu AppColors.toolbar.
+  Planer współdzieli nagłówek z edytorami i ma globalne ustawienia.
+  Przyciski deadline'u wyrównują się do prawej i zawijają
   w wąskich oknach, bez wyśrodkowywania po zmianie daty.
 
 
@@ -1149,9 +1159,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   testowej bazy następuje rzeczywisty zapis.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
-- `test/library_planner_test.dart`: kolory beżowe, przejrzystość statusu
-  ukończenia, zapis opcji "Completed last", wyrównanie daty i kontrolek
-  po zmianie terminu oraz responsywność układu; tworzenie, zapis i odczyt zadań,
+- `test/library_planner_test.dart`: beżowe kolory, wspólny odcień dla
+  wszystkich odhaczonych, automatyczne sortowanie również ze starym
+  ustawieniem, jasny Add task, poprawność nagłówka i bezpieczne Settings;
+  wyrównanie daty i kontrolek, responsywność, zapis i odczyt zadań,
   edycja, usuwanie, opcjonalny deadline, kolor statusów oraz widget canvasu.
 - `test/study_planner_controller_test.dart` i
   `test/study_planner_widget_test.dart`: wydarzenia kalendarza bez timera,

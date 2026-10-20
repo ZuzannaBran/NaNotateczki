@@ -16,11 +16,11 @@ class PlannerTask {
   final bool deadlineHasTime;
 
   PlannerTaskTone toneAt(DateTime now) {
-    if (deadline == null) {
-      return PlannerTaskTone.undated;
-    }
     if (completed) {
       return PlannerTaskTone.completed;
+    }
+    if (deadline == null) {
+      return PlannerTaskTone.undated;
     }
     final due = deadlineHasTime
         ? deadline!

@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
+import 'package:program/features/editor/presentation/editor_settings_screen.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
+import 'package:program/features/library/presentation/library_screen.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:program/features/planner/presentation/task_list_screen.dart';
@@ -45,8 +48,10 @@ void main() {
     );
 
     expect(undated.toneAt(now), PlannerTaskTone.undated);
-    expect(undated.copyWith(completed: true).toneAt(now),
-        PlannerTaskTone.undated);
+    expect(
+      undated.copyWith(completed: true).toneAt(now),
+      PlannerTaskTone.completed,
+    );
     expect(upcoming.toneAt(now), PlannerTaskTone.upcoming);
     expect(late.toneAt(now), PlannerTaskTone.overdue);
     expect(done.toneAt(now), PlannerTaskTone.completed);
@@ -87,6 +92,30 @@ void main() {
     expect(
       plannerTaskBackground(PlannerTaskTone.overdue, darkMode: true),
       AppColors.darkPaper,
+    );
+    expect(
+      plannerTaskBackground(
+        PlannerTaskTone.overdue,
+        darkMode: false,
+        completed: true,
+      ),
+      plannerTaskBackground(
+        PlannerTaskTone.completed,
+        darkMode: false,
+        completed: true,
+      ),
+    );
+    expect(
+      plannerTaskBackground(
+        PlannerTaskTone.undated,
+        darkMode: true,
+        completed: true,
+      ),
+      plannerTaskBackground(
+        PlannerTaskTone.completed,
+        darkMode: true,
+        completed: true,
+      ),
     );
     expect(
       plannerTaskBackground(
@@ -154,23 +183,44 @@ void main() {
     expect(result.completed, isTrue);
     expect(result.deadlineHasTime, isTrue);
     expect(result.deadline!.hour, 17);
-    expect(restored.plannerCompletedLast(planner.uid), isTrue);
-
     final second = await restored.addPlannerTask(planner.uid);
     expect(
-      restored.plannerTasks(planner.uid).map((task) => task.id).toList(),
+      restored.plannerTasks(planner.uid).map((item) => item.id).toList(),
       [second.id, result.id],
     );
-    await restored.setPlannerCompletedLast(planner.uid, false);
+    await restored.flushPlannerTasks();
+    final saved = jsonDecode(
+      (await readStoredText('library_folders.json'))!,
+    ) as Map<String, dynamic>;
+    saved['plannerCompletedLast'] = {planner.uid: false};
+    await writeStoredText('library_folders.json', jsonEncode(saved));
+
+    final legacy = newLibrary();
+    await legacy.initialize();
     expect(
-      restored.plannerTasks(planner.uid).map((task) => task.id).toList(),
+      legacy.plannerTasks(planner.uid).map((item) => item.id).toList(),
+      [second.id, result.id],
+    );
+    legacy.dispose();
+
+    await restored.updatePlannerTask(
+      planner.uid,
+      result.id,
+      completed: false,
+    );
+    expect(
+      restored.plannerTasks(planner.uid).map((item) => item.id).toList(),
       [result.id, second.id],
     );
-    await restored.flushPlannerTasks();
-    final withSavedSetting = newLibrary();
-    await withSavedSetting.initialize();
-    expect(withSavedSetting.plannerCompletedLast(planner.uid), isFalse);
-    withSavedSetting.dispose();
+    await restored.updatePlannerTask(
+      planner.uid,
+      result.id,
+      completed: true,
+    );
+    expect(
+      restored.plannerTasks(planner.uid).map((item) => item.id).toList(),
+      [second.id, result.id],
+    );
 
     await restored.updatePlannerTask(
       planner.uid,
@@ -178,7 +228,12 @@ void main() {
       clearDeadline: true,
     );
     await restored.flushPlannerTasks();
-    expect(restored.plannerTasks(planner.uid).single.deadline, isNull);
+    expect(
+      restored.plannerTasks(planner.uid)
+          .firstWhere((item) => item.id == result.id)
+          .deadline,
+      isNull,
+    );
 
     await restored.removePlannerTask(planner.uid, result.id);
     await restored.removePlannerTask(planner.uid, second.id);
@@ -215,11 +270,24 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<LibraryController>.value(
         value: library,
-        child: MaterialApp(home: TaskListScreen(planner: planner)),
+        child: MaterialApp(
+          home: TaskListScreen(
+            planner: planner,
+            onSettings: () {},
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
     expect(find.text('No tasks yet. Add your first task.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('planner-completed-last')), findsNothing);
+    final addButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('planner-add-task')),
+    );
+    expect(
+      addButton.style!.backgroundColor!.resolve({}),
+      AppColors.toolbar,
+    );
     await tester.tap(find.byKey(const ValueKey('planner-add-task')));
     await tester.pumpAndSettle();
     final task = library.plannerTasks(planner.uid).single;
@@ -278,4 +346,71 @@ void main() {
     library.dispose();
     await db.close();
   });
+  testWidgets('planner header stays aligned and settings avoid editor', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final db = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(db);
+    final planner = await repository.createPlanner(
+      title: 'New Planner',
+      folder: 'Planner folder',
+    );
+    final library = LibraryController(
+      repository,
+      CloudSyncService(repository),
+      LocalBackupService(repository),
+    );
+    await library.loadItems();
+    final preferences = AppPreferencesController();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<LibraryController>.value(value: library),
+          ChangeNotifierProvider<AppPreferencesController>.value(
+            value: preferences,
+          ),
+          Provider<NotebookRepository>.value(value: repository),
+        ],
+        child: const MaterialApp(home: LibraryScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(ValueKey('library-tree-item:${planner.uid}')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskListScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('planner-completed-last')), findsNothing);
+
+    final title = find.byKey(const ValueKey('workspace-document-title'));
+    final toggle = find.byKey(const ValueKey('library-navigation-toggle'));
+    expect(
+      tester.getTopLeft(title).dx,
+      greaterThan(tester.getRect(toggle).right),
+    );
+    expect(find.byTooltip('Settings'), findsOneWidget);
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EditorSettingsScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('projects-home')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EditorSettingsScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    library.dispose();
+    preferences.dispose();
+    await db.close();
+  });
+
 }

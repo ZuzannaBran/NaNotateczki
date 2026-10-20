@@ -420,6 +420,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       showToolbar: _showEditorToolbar,
       showCompactTimer: showCompactTimer,
       onOpenNavigation: onOpenNavigation,
+      onSettings: _openCatalogSettings,
     );
   }
 
@@ -500,15 +501,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final notebook =
         library.selectedItem() ??
         (library.items.isEmpty ? null : library.items.first);
+    final editorNotebook =
+        notebook?.kind == NotebookKind.planner ? null : notebook;
     final repository = context.read<NotebookRepository>();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => notebook == null
+        builder: (_) => editorNotebook == null
             ? const EditorSettingsScreen()
             : ChangeNotifierProvider(
                 create: (_) => EditorController(
                   repository: repository,
-                  notebook: notebook,
+                  notebook: editorNotebook,
                 ),
                 child: const EditorSettingsScreen(),
               ),
@@ -1611,6 +1614,7 @@ class _LibraryWorkspace extends StatelessWidget {
     required this.item,
     required this.showToolbar,
     required this.showCompactTimer,
+    required this.onSettings,
     this.onOpenNavigation,
     super.key,
   });
@@ -1618,6 +1622,7 @@ class _LibraryWorkspace extends StatelessWidget {
   final Notebook? item;
   final bool showToolbar;
   final bool showCompactTimer;
+  final VoidCallback onSettings;
   final VoidCallback? onOpenNavigation;
 
   @override
@@ -1639,6 +1644,7 @@ class _LibraryWorkspace extends StatelessWidget {
         planner: item!,
         showCompactTimer: showCompactTimer,
         onOpenNavigation: onOpenNavigation,
+        onSettings: onSettings,
       );
     }
 
