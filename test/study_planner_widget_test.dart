@@ -352,9 +352,10 @@ void main() {
       final doneColor = tester.widget<Material>(done).color!;
       final upcomingColor = tester.widget<Material>(upcoming).color!;
       for (final tile in [done, upcoming]) {
-        final border = tester.widget<Material>(tile).shape;
-        expect(border, isA<RoundedRectangleBorder>());
-        expect((border! as RoundedRectangleBorder).side.color, scheme.onSurface);
+        final shape = tester.widget<Material>(tile).shape;
+        expect(shape, isA<RoundedRectangleBorder>());
+        final border = shape! as RoundedRectangleBorder;
+        expect(border.side.color, scheme.onSurface);
         expect(border.side.width, 1);
       }
       expect(
