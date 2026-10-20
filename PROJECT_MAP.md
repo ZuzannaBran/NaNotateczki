@@ -161,8 +161,8 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
 - `lib/core/widgets/app_header_divider.dart`: wspólny 1 px separator nagłówka
   w ekranie głównym, planerze i ustawieniach. Wspólna wysokość paska to
   56 px, styl tytułu to 18 px i waga 600 jak Projects we wszystkich ekranach.
-  Kolor linii w jasnym motywie: AppColors.paper (kolor canvy), wyraźnie
-  jaśniejszy od paneli; w ciemnym outlineVariant 45% na
+  Kolor linii w jasnym motywie: AppColors.divider (#CFCCC5),
+  jak pasek suwaka; w ciemnym outlineVariant 45% na
   surfaceContainerLowest. W planerze i ustawieniach linia jest pierwszym
   elementem body bez zwiększania wysokości AppBar.
   4: `AppHeaderDivider`; 7: `colorOf`.

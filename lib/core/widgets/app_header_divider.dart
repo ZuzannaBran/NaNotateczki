@@ -17,7 +17,7 @@ class AppHeaderDivider extends StatelessWidget {
 
   static Color colorOf(BuildContext context) {
     if (Theme.of(context).brightness == Brightness.light) {
-      return AppColors.paper;
+      return AppColors.divider;
     }
     final scheme = Theme.of(context).colorScheme;
     return Color.alphaBlend(

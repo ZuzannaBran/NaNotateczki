@@ -167,6 +167,7 @@ void main() {
       expect(separator, Rect.fromLTWH(0, appBar.bottom, 1200, 1));
 
       final expectedColor = AppHeaderDivider.colorOf(tester.element(divider));
+      expect(expectedColor, const Color(0xFFCFCCC5));
       expect(tester.widget<ColoredBox>(divider).color, expectedColor);
       // The title is intentionally hidden with the collapsed sidebar.
       final projectsTitle = find.text('Projects');

@@ -70,7 +70,7 @@ void main() {
                 scheme.outlineVariant.withValues(alpha: 0.45),
                 scheme.surfaceContainerLowest,
               )
-            : AppColors.paper,
+            : AppColors.divider,
       );
       expect(
         libraryColor,
