@@ -617,9 +617,9 @@ Karta notebooka/boarda z menu zmiany nazwy i usuwania.
   16: `CalendarMode`;
   43: `PlannerScreen`;
   50: `_PlannerScreenState`;
-  ${line(planner,"class _HourlyDaySchedule")}: `_HourlyDaySchedule`;
-  ${line(planner,"class _CalendarHeaderStrip")}: `_CalendarHeaderStrip`;
-  ${line(planner,"class _WeekTimeGrid")}: `_WeekTimeGrid` — wspólna oś.
+  924: `_HourlyDaySchedule`;
+  1066: `_CalendarHeaderStrip`;
+  1108: `_WeekTimeGrid` — wspólna oś.
 - `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów.
 - `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
   zgodność starszych sesji, reset koloru, resume, pauza, konflikt
