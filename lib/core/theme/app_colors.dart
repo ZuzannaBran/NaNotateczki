@@ -75,21 +75,21 @@ class AppColors {
   static const shadow = Color(0x22000000);
   static const divider = Color(0xFFCFCCC5);
 
-  // Shared canvas and folder cover preset colors.
+  // Shared ink presets: two writing colors and one highlighter color.
   static const blueColorSet = <Color>[
-    Color(0xFF2A3851),
-    Color(0xFFA1B2CE),
-    Color(0xFFD0D8E7),
+    Color(0xFF1A2130),
+    Color(0xFF3A4E6F),
+    Color(0xFF4B6493),
   ];
   static const pinkColorSet = <Color>[
-    Color(0xFF583240),
-    Color(0xFFCCA4B2),
-    Color(0xFFE9D8DE),
+    Color(0xFF3A212B),
+    Color(0xFF6C3C4D),
+    Color(0xFF8E5066),
   ];
   static const greenColorSet = <Color>[
-    Color(0xFF2C443A),
-    Color(0xFF9BBFB0),
-    Color(0xFFD0E1DA),
+    Color(0xFF1F3027),
+    Color(0xFF476E5E),
+    Color(0xFF5D927D),
   ];
 
   static const inkPalette = <Color>[
