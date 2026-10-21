@@ -20,10 +20,12 @@ import '../../../../core/widgets/resizable_frame.dart';
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/image_block.dart';
 import '../../../notebook/domain/note_page.dart';
+import '../../../notebook/domain/notebook_kind.dart';
 import '../../../notebook/domain/text_block.dart';
 import 'text_hud_block.dart';
 import '../interaction/object_transform_engine.dart';
 import 'object_transform_hud.dart';
+import 'shape_edit_overlay.dart';
 import '../../state/editor_controller.dart';
 
 const Color _lassoAccentColor = AppColors.inkBlack;
@@ -59,6 +61,12 @@ class PageOverlay extends StatelessWidget {
     final tool = controller.tool;
     final activeTextId = controller.activeTextBlockId;
     final activeImageId = controller.activeImageBlockId;
+    final activeShapeId = controller.activeShapePageIndex == effectivePageIndex
+        ? controller.activeShapeStrokeId
+        : null;
+    final activeShape = activeShapeId == null
+        ? null
+        : controller.shapeStrokeOnPage(effectivePageIndex, activeShapeId);
     final lassoSelection =
         controller.lassoSelection?.pageIndex == effectivePageIndex
         ? controller.lassoSelection
@@ -73,6 +81,10 @@ class PageOverlay extends StatelessWidget {
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onTapDown: (details) async {
+                  if (controller.activeShapeStrokeId != null) {
+                    controller.finishShapeEdit();
+                    return;
+                  }
                   if (tool == DrawingTool.text) {
                     if (controller.activeTextBlockId != null) {
                       controller.setTool(DrawingTool.pen);
@@ -178,6 +190,19 @@ class PageOverlay extends StatelessWidget {
                   worldOrigin: worldOrigin,
                   interactionEnabled: interactionEnabled,
                 ),
+          if (renderActive && activeShape != null)
+            Positioned.fill(
+              child: ShapeEditOverlay(
+                key: ValueKey('shape-hud-${activeShape.id}'),
+                controller: controller,
+                stroke: activeShape,
+                pageIndex: effectivePageIndex,
+                origin: controller.notebook.kind == NotebookKind.board
+                    ? worldOrigin
+                    : Offset.zero,
+                interactionEnabled: interactionEnabled,
+              ),
+            ),
           if (renderActive && lassoSelection != null)
             _LassoSelectionWidget(
               selection: lassoSelection,
