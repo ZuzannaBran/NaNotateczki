@@ -161,9 +161,12 @@ void main() {
   });
 
 
-  testWidgets('font size menu includes small and large frame sizes', (
+  testWidgets('font size menu is attached, compact and scrollable', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     final database = NotesDatabase(NativeDatabase.memory());
     final controller = EditorController(
       repository: NotebookRepository(database),
@@ -172,6 +175,7 @@ void main() {
     controller.addTextBlock(const Offset(40, 50));
     controller.setTool(DrawingTool.text);
     final block = controller.pages.single.textBlocks.single;
+
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -179,17 +183,63 @@ void main() {
         ),
       ),
     );
-    final dropdown = tester.widget<DropdownButton<int>>(
-      find.byType(DropdownButton<int>),
+
+    final button = find.byKey(
+      const ValueKey('text-font-size-menu-button'),
     );
-    final sizes = dropdown.items!.map((item) => item.value).toList();
+    final popupButton = tester.widget<PopupMenuButton<int>>(button);
+    final sizes = popupButton
+        .itemBuilder(tester.element(button))
+        .map((item) => (item as PopupMenuItem<int>).value)
+        .toList();
     expect(sizes, containsAll([8, 9, 10, 11, 96, 112, 128, 192]));
-    dropdown.onChanged!(8);
-    await tester.pump();
+
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+
+    final menu = find.ancestor(
+      of: find.text('8').last,
+      matching: find.byType(Material),
+    ).first;
+    final menuRect = tester.getRect(menu);
+    final toolbarRect = tester.getRect(
+      find.byKey(const ValueKey('text-toolbar-panel')),
+    );
+    expect(menuRect.top, closeTo(toolbarRect.bottom, 1));
+    expect(menuRect.height, lessThanOrEqualTo(280));
+    expect(menuRect.width, 72);
+
+    final shape = tester.widget<Material>(menu).shape;
+    expect(shape, isA<RoundedRectangleBorder>());
+    expect(
+      (shape! as RoundedRectangleBorder).borderRadius,
+      const BorderRadius.only(
+        bottomLeft: Radius.circular(12),
+        bottomRight: Radius.circular(12),
+      ),
+    );
+
+    final scrollable = find.descendant(
+      of: menu,
+      matching: find.byType(Scrollable),
+    );
+    expect(scrollable, findsOneWidget);
+
+    await tester.tap(find.text('8').last);
+    await tester.pumpAndSettle();
     expect(controller.pages.single.textBlocks.single.fontSize, 8);
-    dropdown.onChanged!(192);
-    await tester.pump();
+
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('192').last,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('192').last);
+    await tester.pumpAndSettle();
     expect(controller.pages.single.textBlocks.single.fontSize, 192);
+
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     await database.close();

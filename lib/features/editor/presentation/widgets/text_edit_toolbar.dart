@@ -122,7 +122,7 @@ class TextEditToolbar extends StatelessWidget {
                     const SizedBox(width: 6),
                     _fontDropdown(currentFont),
                     const SizedBox(width: 8),
-                    _sizeDropdown(currentSize),
+                    _sizeDropdown(context, currentSize),
                     const SizedBox(width: 8),
                     _colorPicker(context),
                     const SizedBox(width: 8),
@@ -244,29 +244,62 @@ class TextEditToolbar extends StatelessWidget {
     );
   }
 
-  Widget _sizeDropdown(int currentSize) {
+  Widget _sizeDropdown(BuildContext context, int currentSize) {
     final values = <int>{..._fontSizes, currentSize}.toList()..sort();
 
-    return DropdownButton<int>(
-      value: currentSize,
-      isDense: true,
-      onChanged: (next) {
-        if (next == null) {
-          return;
-        }
-        editorController.updateActiveTextStyle(fontSize: next.toDouble());
+    return PopupMenuButton<int>(
+      key: const ValueKey('text-font-size-menu-button'),
+      tooltip: 'Font size',
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 3),
+      constraints: const BoxConstraints(
+        minWidth: 72,
+        maxWidth: 72,
+        maxHeight: 280,
+      ),
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      padding: EdgeInsets.zero,
+      onSelected: (size) {
+        editorController.updateActiveTextStyle(fontSize: size.toDouble());
       },
-      items: values
+      itemBuilder: (context) => values
           .map(
-            (size) => DropdownMenuItem<int>(
+            (size) => PopupMenuItem<int>(
               value: size,
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                '$size',
-                style: const TextStyle(fontSize: AppTypography.document),
+                '${size}',
+                style: TextStyle(
+                  fontSize: AppTypography.document,
+                  fontWeight: size == currentSize
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                ),
               ),
             ),
           )
           .toList(),
+      child: SizedBox(
+        height: 48,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${currentSize}',
+              style: const TextStyle(fontSize: AppTypography.document),
+            ),
+            const Icon(Icons.arrow_drop_down, size: 20),
+          ],
+        ),
+      ),
     );
   }
 

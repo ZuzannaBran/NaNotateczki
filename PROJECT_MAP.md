@@ -991,9 +991,11 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   14: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
   406: selektor kształtu; 534: `_colorDot`; 581: `pickColor`;
   952: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (369):
+- lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (402):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
-  `EditableText`. Selektor czcionki obejmuje rozmiary 8–192.
+  `EditableText`. Selektor czcionki obejmuje rozmiary 8–192; krótkie menu (do 280 px)
+  otwiera się tuż pod dolną krawędzią paska i przewija pionowo, z prostą
+  górną krawędzią i zaokrąglonymi dolnymi rogami.
   Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
   ID bloku przez czas jego otwarcia, nawet przy utracie aktywnego zaznaczenia. Obsługuje realne formatowanie całego bloku: bold, italic,
   underline, strike, font, rozmiar, kolor, wyrównanie, reset stylu i usunięcie.
@@ -1347,7 +1349,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   selektora kolorów na głównym navigatorze.
 - `test/page_overlay_text_gestures_test.dart`: porównanie pozycji znaków,
   wierszy i ramki przed edycją, podczas niej i po niej (oba motywy),
-  zachowanie Quill dla mieszanego formatowania, rozmiary 8–192;
+  zachowanie Quill dla mieszanego formatowania, rozmiary 8–192,
+  położenie, wysokość, przewijanie i kształt menu rozmiarów czcionki;
   blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
