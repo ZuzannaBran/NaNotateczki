@@ -843,6 +843,11 @@ ale zmienione ręcznie próbki pozostają nienaruszone.
   290: `setViewTransform`.
 - 362–498: operacje `*OnPage` używane przez canvasy/overlaye.
 - 507–899: narzędzia, aktywne elementy, lasso i preferencje; 559: `setTool`;
+  kształt po narysowaniu lub rozpoznaniu przechodzi na tymczasowe
+  `edit` (`startShapeEdit`), a tap poza figurą przywraca poprzednie
+  narzędzie (`finishShapeEdit`). Podgląd i commit transformacji ink
+  korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
+  oraz pojedyncze undo/redo.
   592: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
 - 1278: `undo`; 1291: `redo`; 1363: `toggleBookmark`;
   1369: operacje tekstowe; 1439: `updateActiveTextStyle` — blokowe
@@ -1043,6 +1048,13 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   konfigurowalne przez `ObjectTransformHudStyle`.
   13: `ObjectTransformHudStyle`; 54: `ObjectTransformHud`;
   106: `_ObjectTransformHudState`; 591: `_ObjectTransformFramePainter`.
+- `lib/features/editor/presentation/widgets/shape_edit_overlay.dart`:
+  `ShapeEditGeometry` udostępnia dwa uchwyty dla linii/strzałki, trzy
+  dla trójkąta i strzałki blokowej oraz cztery dla
+  prostokąta/kwadratu/elipsy/koła. `ShapeEditOverlay` przechwytuje
+  gesty wyłącznie w obszarze figury/uchwytów, blokuje viewport podczas
+  przesuwania i zmiany rozmiaru, zapisuje transformację jako undo/redo.
+
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (588):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`;
   Delete usuwa obiekt tylko przy pustym tekście, w przeciwnym razie
@@ -1382,6 +1394,10 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   proste górne i zaokrąglone dolne rogi canvasa oraz zgodność klipu,
   zachowanie viewportu po schowaniu narzędzi, kolor nagłówka i porównanie
   szybkości przesuwania palcem dla 0.5× i 2.0×.
+- `test/shape_edit_test.dart`: regresje liczby uchwytów, zmian
+  geometrii figur, proporcji kwadratu/koła, przesuwania, hit-testu,
+  undo/redo oraz tymczasowego Move z powrotem do narzędzia
+  w notebooku i boardzie.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
