@@ -276,7 +276,7 @@ class TextEditToolbar extends StatelessWidget {
               height: 36,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                '${size}',
+                '$size',
                 style: TextStyle(
                   fontSize: AppTypography.document,
                   fontWeight: size == currentSize
@@ -293,7 +293,7 @@ class TextEditToolbar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${currentSize}',
+              '$currentSize',
               style: const TextStyle(fontSize: AppTypography.document),
             ),
             const Icon(Icons.arrow_drop_down, size: 20),
