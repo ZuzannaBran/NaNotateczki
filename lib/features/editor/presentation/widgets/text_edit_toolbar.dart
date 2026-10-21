@@ -23,6 +23,10 @@ class TextEditToolbar extends StatelessWidget {
     'Impact',
   ];
   static const List<int> _fontSizes = [
+    8,
+    9,
+    10,
+    11,
     12,
     14,
     16,
@@ -35,7 +39,14 @@ class TextEditToolbar extends StatelessWidget {
     48,
     64,
     72,
+    80,
+    88,
     96,
+    112,
+    128,
+    144,
+    160,
+    192,
   ];
 
   final EditorController editorController;

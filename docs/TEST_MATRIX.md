@@ -602,3 +602,21 @@ edge-to-edge, and do not assume iOS devices share the same status bar height.
    must use 12 px rounding; color swatches and circular handles stay round.
 6. Check small-screen calendar/event dialog and desktop resizing for
    clipped controls, title shifting or overflowing action rows.
+
+## Text edit/preview: device matrix (October 2026)
+
+Automated Flutter widget tests in `test/page_overlay_text_gestures_test.dart`
+compare font metrics and text bounds during repeated mode switches in light
+and dark themes and verify font size values 8–192. They cannot verify system
+font substitution, keyboard IME behavior or physical display scaling.
+
+Manual checks on Linux, Windows, macOS, Chrome, Android and iOS/iPadOS:
+
+1. Add short and wrapped multiline text in a notebook and on a board.
+   Observe glyph position, line breaks and size before editing.
+2. Double click/tap to edit, type, leave editing and repeat. The text must
+   not jump, resize or reflow at zoom 50%, 100% and 200%, in both themes.
+3. Choose 8, 9, 10, 11, 96, 128 and 192; resize by a corner handle and
+   verify that the toolbar still shows the current value.
+4. Repeat with physical and on-screen keyboards, OS text scaling and
+   legacy mixed-color formatting. Save/reopen the notebook and board.

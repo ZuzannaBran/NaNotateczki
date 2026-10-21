@@ -160,6 +160,41 @@ void main() {
     await database.close();
   });
 
+
+  testWidgets('font size menu includes small and large frame sizes', (
+    tester,
+  ) async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: _notebook(),
+    );
+    controller.addTextBlock(const Offset(40, 50));
+    controller.setTool(DrawingTool.text);
+    final block = controller.pages.single.textBlocks.single;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TextEditToolbar(editorController: controller, block: block),
+        ),
+      ),
+    );
+    final dropdown = tester.widget<DropdownButton<int>>(
+      find.byType(DropdownButton<int>),
+    );
+    final sizes = dropdown.items!.map((item) => item.value).toList();
+    expect(sizes, containsAll([8, 9, 10, 11, 96, 112, 128, 192]));
+    dropdown.onChanged!(8);
+    await tester.pump();
+    expect(controller.pages.single.textBlocks.single.fontSize, 8);
+    dropdown.onChanged!(192);
+    await tester.pump();
+    expect(controller.pages.single.textBlocks.single.fontSize, 192);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
+
   testWidgets('text color picker updates the chosen block after focus loss', (
     tester,
   ) async {
@@ -651,6 +686,118 @@ void main() {
       AppColors.displayInkColor(firstColor, darkMode: true),
     );
 
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    preferences.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await database.close();
+  });
+
+
+  testWidgets('text stays in place across editing and preview in both themes', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 850));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
+    final notebook = _notebook();
+    final block = TextBlock(
+      id: 'stable-text-layout',
+      text: 'The same text stays in place across two lines of writing.',
+      position: const Offset(60, 90),
+      fontSize: 22,
+      color: const Color(0xFF243B54),
+      width: 310,
+      deltaJson: jsonEncode([
+        {
+          'insert': 'The same text stays in place across two lines of writing.',
+          'attributes': {'size': '22', 'color': '#243B54'},
+        },
+        {'insert': '\n'},
+      ]),
+    );
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: notebook.copyWith(
+        pages: [notebook.pages.single.copyWith(textBlocks: [block])],
+      ),
+    );
+    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: MultiProvider(
+            providers: [
+              ChangeNotifierProvider<AppPreferencesController>.value(
+                value: preferences,
+              ),
+              ChangeNotifierProvider<EditorController>.value(
+                value: controller,
+              ),
+            ],
+            child: Scaffold(
+              body: SizedBox(
+                width: 650,
+                height: 620,
+                child: Consumer<EditorController>(
+                  builder: (context, editor, _) => PageOverlay(
+                    controller: editor,
+                    renderBackground: false,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      controller.setTool(DrawingTool.edit);
+      controller.clearActiveTextBlock();
+      await tester.pump();
+      await tester.pump();
+      final passive = tester.widget<quill.QuillEditor>(
+        find.byType(quill.QuillEditor).first,
+      );
+      final passiveStyle = passive.config.customStyles!.paragraph!.style;
+      final passiveRect = tester.getRect(find.byType(quill.QuillEditor).first);
+      expect(passiveStyle.fontFamily, 'Georgia');
+      expect(passiveStyle.fontSize, block.fontSize);
+      expect(passiveStyle.height, 1.25);
+      for (var iteration = 0; iteration < 2; iteration++) {
+        controller.setTool(DrawingTool.text);
+        controller.setActiveTextBlock(block.id, null);
+        await tester.pump();
+        await tester.pump();
+        final editable = tester.widget<EditableText>(
+          find.byType(EditableText).first,
+        );
+        final activeRect = tester.getRect(find.byType(EditableText).first);
+        expect(editable.style.fontFamily, passiveStyle.fontFamily);
+        expect(editable.style.fontSize, passiveStyle.fontSize);
+        expect(editable.style.height, passiveStyle.height);
+        expect(activeRect.left, closeTo(passiveRect.left, 1.5));
+        expect(activeRect.top, closeTo(passiveRect.top, 1.5));
+        expect(activeRect.height, closeTo(passiveRect.height, 3));
+        expect(
+          controller.findTextBlockById(block.id)!.position,
+          block.position,
+        );
+        expect(
+          controller.findTextBlockById(block.id)!.fontSize,
+          block.fontSize,
+        );
+        controller.setTool(DrawingTool.edit);
+        controller.clearActiveTextBlock();
+        await tester.pump();
+        await tester.pump();
+        expect(
+          tester.getRect(find.byType(quill.QuillEditor).first),
+          passiveRect,
+        );
+      }
+    }
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     preferences.dispose();

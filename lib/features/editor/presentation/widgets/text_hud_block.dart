@@ -38,7 +38,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
   static const double _minTextWidth = 72;
   static const double _maxTextWidth = 1200;
   static const double _minTextFontSize = 8;
-  static const double _maxTextFontSize = 96;
+  static const double _maxTextFontSize = 192;
 
   final GlobalKey _contentKey = GlobalKey();
   late final TextEditingController _textController;
@@ -155,7 +155,9 @@ class _TextHudBlockState extends State<TextHudBlock> {
           width: widget.block.width,
           constraints: const BoxConstraints(minHeight: _frameMinHeight),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-          color: Colors.transparent,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.transparent, width: 1.2),
+          ),
           child: IgnorePointer(
             ignoring: !isEditing,
             child: CallbackShortcuts(
@@ -347,45 +349,8 @@ class _TextHudBlockState extends State<TextHudBlock> {
     });
   }
 
-  _TextHudStyle _styleFor(TextBlock block, double fontSize) {
-    final inline = _firstInlineAttributes(block.deltaJson);
-    final paragraph = _firstParagraphAttributes(block.deltaJson);
-    final align = paragraph['align']?.toString();
-    final rawInlineColor = inline['color'];
-    final textColor = rawInlineColor is String
-        ? _parseColor(rawInlineColor) ?? block.color
-        : block.color;
-    final decorations = <TextDecoration>[
-      if (inline['underline'] == true) TextDecoration.underline,
-      if (inline['strike'] == true) TextDecoration.lineThrough,
-    ];
-
-    return _TextHudStyle(
-      textStyle: TextStyle(
-        color: AppColors.displayInkColor(
-          textColor,
-          darkMode: Theme.of(context).brightness == Brightness.dark,
-        ),
-        fontSize: fontSize,
-        fontFamily: inline['font']?.toString(),
-        fontWeight: inline['bold'] == true
-            ? FontWeight.bold
-            : FontWeight.normal,
-        fontStyle: inline['italic'] == true
-            ? FontStyle.italic
-            : FontStyle.normal,
-        decoration: decorations.isEmpty
-            ? TextDecoration.none
-            : TextDecoration.combine(decorations),
-        height: 1.25,
-      ),
-      textAlign: switch (align) {
-        'center' => TextAlign.center,
-        'right' => TextAlign.right,
-        'justify' => TextAlign.justify,
-        _ => TextAlign.left,
-      },
-    );
+  TextBlockAppearance _styleFor(TextBlock block, double fontSize) {
+    return textBlockAppearance(context, block, fontSize: fontSize);
   }
 
   Map<String, dynamic> _firstInlineAttributes(String? deltaJson) {
@@ -520,26 +485,101 @@ class _TextHudBlockState extends State<TextHudBlock> {
     }
   }
 
-  Color? _parseColor(String value) {
-    if (!value.startsWith('#')) {
-      return null;
-    }
-    final hex = value.substring(1);
-    if (hex.length != 6 && hex.length != 8) {
-      return null;
-    }
-    final parsed = int.tryParse(hex.length == 6 ? 'ff$hex' : hex, radix: 16);
-    return parsed == null ? null : Color(parsed);
-  }
-
   String _colorToHex(Color color) {
     final value = color.toARGB32().toRadixString(16).padLeft(8, '0');
     return '#${value.substring(2)}';
   }
 }
 
-class _TextHudStyle {
-  const _TextHudStyle({required this.textStyle, required this.textAlign});
+TextBlockAppearance textBlockAppearance(
+  BuildContext context,
+  TextBlock block, {
+  double? fontSize,
+}) {
+  Map<String, dynamic> firstAttributes({required bool paragraph}) {
+    final source = block.deltaJson;
+    if (source == null || source.trim().isEmpty) {
+      return const <String, dynamic>{};
+    }
+    try {
+      final decoded = jsonDecode(source);
+      if (decoded is! List) {
+        return const <String, dynamic>{};
+      }
+      for (final raw in decoded) {
+        if (raw is! Map) {
+          continue;
+        }
+        final op = Map<String, dynamic>.from(raw);
+        final insert = op['insert'];
+        if (insert is! String ||
+            (paragraph
+                ? !insert.contains('\n')
+                : insert.replaceAll('\n', '').isEmpty)) {
+          continue;
+        }
+        final attrs = op['attributes'];
+        return attrs is Map
+            ? Map<String, dynamic>.from(attrs)
+            : const <String, dynamic>{};
+      }
+    } catch (_) {
+      return const <String, dynamic>{};
+    }
+    return const <String, dynamic>{};
+  }
+
+  final inline = firstAttributes(paragraph: false);
+  final paragraph = firstAttributes(paragraph: true);
+  final colorValue = inline['color'];
+  Color? inlineColor;
+  if (colorValue is String && colorValue.startsWith('#')) {
+    final hex = colorValue.substring(1);
+    if (hex.length == 6 || hex.length == 8) {
+      final value = int.tryParse(
+        hex.length == 6 ? 'ff$hex' : hex,
+        radix: 16,
+      );
+      if (value != null) {
+        inlineColor = Color(value);
+      }
+    }
+  }
+  final decorations = <TextDecoration>[
+    if (inline['underline'] == true) TextDecoration.underline,
+    if (inline['strike'] == true) TextDecoration.lineThrough,
+  ];
+  return TextBlockAppearance(
+    textStyle: TextStyle(
+      color: AppColors.displayInkColor(
+        inlineColor ?? block.color,
+        darkMode: Theme.of(context).brightness == Brightness.dark,
+      ),
+      fontSize: fontSize ?? block.fontSize,
+      fontFamily: inline['font']?.toString() ?? 'Georgia',
+      fontWeight:
+          inline['bold'] == true ? FontWeight.bold : FontWeight.normal,
+      fontStyle:
+          inline['italic'] == true ? FontStyle.italic : FontStyle.normal,
+      decoration: decorations.isEmpty
+          ? TextDecoration.none
+          : TextDecoration.combine(decorations),
+      height: 1.25,
+    ),
+    textAlign: switch (paragraph['align']?.toString()) {
+      'center' => TextAlign.center,
+      'right' => TextAlign.right,
+      'justify' => TextAlign.justify,
+      _ => TextAlign.left,
+    },
+  );
+}
+
+class TextBlockAppearance {
+  const TextBlockAppearance({
+    required this.textStyle,
+    required this.textAlign,
+  });
 
   final TextStyle textStyle;
   final TextAlign textAlign;

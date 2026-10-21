@@ -991,9 +991,10 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   14: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
   406: selektor kształtu; 534: `_colorDot`; 581: `pickColor`;
   952: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (353):
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (369):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
-  `EditableText`. Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
+  `EditableText`. Selektor czcionki obejmuje rozmiary 8–192.
+  Wybór koloru używa wspólnego dialogu narzędzi i zachowuje
   ID bloku przez czas jego otwarcia, nawet przy utracie aktywnego zaznaczenia. Obsługuje realne formatowanie całego bloku: bold, italic,
   underline, strike, font, rozmiar, kolor, wyrównanie, reset stylu i usunięcie.
   Listy oraz formatowanie tylko zaznaczonego fragmentu są celowo pominięte,
@@ -1031,7 +1032,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   konfigurowalne przez `ObjectTransformHudStyle`.
   13: `ObjectTransformHudStyle`; 54: `ObjectTransformHud`;
   106: `_ObjectTransformHudState`; 591: `_ObjectTransformFramePainter`.
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (546):
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (588):
   aktywny `TextBlock` renderowany przez Flutter `EditableText`;
   Delete usuwa obiekt tylko przy pustym tekście, w przeciwnym razie
   pozostaje natywną edycją tekstu (znak po prawej stronie kursora). ramka,
@@ -1042,7 +1043,11 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   i używa tej treści jako snapshotu resize, więc zmiana rozmiaru ani anulowanie
   gestu nie przywracają starszego tekstu. Kolor aktywnego tekstu jest
   wyznaczany z pierwszego formatowanego fragmentu Delta (lub bloku),
-  a jego jasność odwracana w dark mode. Nieaktywne teksty używają
+  a jego jasność odwracana w dark mode. Funkcja `textBlockAppearance`
+  współdzieli metryki czcionki obu trybów. Aktywny tekst i podgląd Quill
+  używają wspólnych metryk czcionki (Georgia, wysokość 1.25), dopasowanych
+  wcięć i obramowania; granica skalowania ramką to 8–192.
+  Nieaktywne teksty używają
   starego Quilla jako fallback.
 
 ### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4201 linii)
@@ -1083,12 +1088,13 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2916 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (2935 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
 oraz wspólny `ObjectTransformHud` dla move/resize/scale. Nieaktywne teksty
-korzystają z Quilla; w dark mode dostają osobną, wyłącznie odczytową kopię
+korzystają z Quilla ze spójnym stylem i odstępami jak aktywny edytor;
+w dark mode dostają osobną, wyłącznie odczytową kopię
 Delta z odwróconymi kolorami wszystkich fragmentów tekstu. Oryginalny
 `QuillController` i zapisane Delta pozostają bez zmian. Aktywne obrazy/PDF
 korzystają z tego samego `ObjectTransformHud`; obrót jest wyłączony, rogi skalują, boki zachowują
@@ -1337,7 +1343,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   zestawu w edytorze i pojedynczego koloru w folderze w obu motywach
   oraz zachowanie zagnieżdżonego motywu podczas asynchronicznego otwarcia
   selektora kolorów na głównym navigatorze.
-- `test/page_overlay_text_gestures_test.dart` (679): blokowy toolbar
+- `test/page_overlay_text_gestures_test.dart`: regresja metryk tekstu przy
+  przełączaniu edycja/podgląd (oba motywy), zakres czcionek 8–192;
+  blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
   blokadę viewportu oraz brak zmian pan/zoom kontrolera podczas resize;

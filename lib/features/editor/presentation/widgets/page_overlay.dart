@@ -548,7 +548,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   static const double _minTextWidth = 72.0;
   static const double _maxTextWidth = 1200.0;
   static const double _minTextFontSize = 8.0;
-  static const double _maxTextFontSize = 96.0;
+  static const double _maxTextFontSize = 192.0;
   static const double _transformHandleTapSize = 36.0;
   static const double _cornerHandleSize = 12.0;
   static const double _sideHandleWidth = 6.0;
@@ -622,6 +622,18 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     final canTransform = !controller.tool.isInk && widget.interactionEnabled;
     final canDoubleTapEdit = widget.interactionEnabled;
     final darkMode = Theme.of(context).brightness == Brightness.dark;
+    final typography = textBlockAppearance(context, widget.block);
+    final paragraphStyle = quill.DefaultTextBlockStyle(
+      typography.textStyle.copyWith(
+        fontWeight: FontWeight.normal,
+        fontStyle: FontStyle.normal,
+        decoration: TextDecoration.none,
+      ),
+      quill.HorizontalSpacing.zero,
+      quill.VerticalSpacing.zero,
+      quill.VerticalSpacing.zero,
+      null,
+    );
     _quillController.readOnly = !(isActive && canEdit);
     _scheduleFrameMeasure();
 
@@ -689,6 +701,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                     child: Container(
                       key: _textContentKey,
                       width: widget.block.width,
+                      constraints: const BoxConstraints(minHeight: 44),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
                         vertical: 3,
@@ -736,6 +749,11 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                           padding: EdgeInsets.zero,
                           autoFocus: false,
                           expands: false,
+                          customStyles: quill.DefaultStyles(
+                            paragraph: paragraphStyle,
+                            lineHeightNormal: paragraphStyle,
+                            align: paragraphStyle,
+                          ),
                           // ignore: experimental_member_use
                           onKeyPressed: (event, node) =>
                               _handleKeyPressed(event),
