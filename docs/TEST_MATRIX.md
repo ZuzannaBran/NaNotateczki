@@ -27,6 +27,35 @@ a platform as tested until its actual Actions job succeeds.
 - The desktop matrix also runs merged catalog/planner UI, typography and
   planner lifecycle regressions directly on Linux, Windows and macOS.
 
+## Shape placement and temporary Move (October 2026)
+
+Automated regression source: `test/shape_edit_test.dart` covers shape
+handles, geometric resizing, moving, hit testing, undo/redo and restoring the
+previous tool on both notebook and board. It must be executed before claiming
+a passing platform result.
+
+Manual checks on Linux, Windows, macOS, Android, iOS/iPadOS and web:
+
+1. Choose each shape from the toolbar and draw it. The editor should switch
+   to Move, select the new shape and show two endpoint handles for lines and
+   thin arrows, three vertex handles for triangles, four corner handles for
+   rectangles/squares, four axis handles for ellipses/circles and three
+   controls for block arrows.
+2. Drag inside a closed shape or along a line to move the entire object.
+   Drag each handle to modify its geometry; squares and circles must keep
+   equal width and height. Use stylus, mouse and touch where supported.
+3. Draw Pen/Highlighter ink and hold to snap a straight line, rectangle or
+   ellipse. Releasing must select the recognized shape in Move. Tapping
+   outside it must restore Pen/Highlighter, or the original toolbar shape.
+4. Undo/redo shape moves and edits, then save/reopen: geometry, colors and
+   tool type must persist. Repeat at 50%, 100% and 200% zoom.
+5. While dragging a handle, confirm the document viewport does not pan or
+   scroll. Outside the selected shape, ordinary navigation must work.
+6. Verify ordinary pen strokes, lasso, eraser and text/image transforms are
+   unaffected. Repeat in light/dark modes, notebook and board.
+
+These checks are a manual test plan, not a claim of tests already run.
+
 ## Android finger-ink acceptance (October 2026)
 
 Automated regression: `test/android_finger_ink_test.dart` injects Android-like
