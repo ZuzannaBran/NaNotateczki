@@ -393,12 +393,12 @@ class _ShapeEditOverlayState extends State<ShapeEditOverlay> {
       onPointerUp: _onUp,
       onPointerCancel: (_) => _onCancel(),
       child: CustomPaint(
-        foregroundPainter: _ShapeHandlesPainter(
+        size: Size.infinite,
+        painter: _ShapeHandlesPainter(
           stroke: stroke,
           color: Theme.of(context).colorScheme.onSurface,
           interactive: widget.interactionEnabled,
         ),
-        child: const SizedBox.expand(),
       ),
     );
   }
