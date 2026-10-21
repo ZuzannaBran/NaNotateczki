@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart' as quill_delta;
@@ -291,6 +292,15 @@ class EditorController extends ChangeNotifier {
       return;
     }
     _isObjectTransformActive = false;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!_isDisposed) {
+          notifyListeners();
+        }
+      });
+      return;
+    }
     notifyListeners();
   }
 

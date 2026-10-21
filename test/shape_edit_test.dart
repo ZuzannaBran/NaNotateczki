@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/features/editor/presentation/widgets/object_transform_hud.dart';
 import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
 import 'package:program/features/editor/presentation/widgets/shape_edit_overlay.dart';
 import 'package:program/features/editor/state/editor_actions.dart';
@@ -301,4 +302,148 @@ void main() {
       expect(controller.tool, DrawingTool.highlighter);
     });
   }
+
+  testWidgets('disposing an active object HUD unlocks after the frame', (
+    tester,
+  ) async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: Notebook(
+        uid: 'object-hud-dispose',
+        title: 'Object HUD',
+        kind: NotebookKind.notebook,
+        folder: 'Tests',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        pages: [
+          _page(_shape(DrawingTool.line, const [
+            Offset.zero,
+            Offset(20, 0),
+          ])),
+        ],
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    Widget buildEditor({required bool showHud}) => MaterialApp(
+      home: ChangeNotifierProvider<EditorController>.value(
+        value: controller,
+        child: Builder(
+          builder: (context) {
+            context.watch<EditorController>();
+            return Scaffold(
+              body: AnimatedBuilder(
+                animation: controller,
+                builder: (context, _) => Stack(
+                  children: [
+                    if (showHud)
+                      ObjectTransformHud<int>(
+                        data: 1,
+                        rect: const Rect.fromLTWH(100, 150, 200, 100),
+                        rotation: 0,
+                        onPreview: (_, _) {},
+                        onCommit: (_, _) {},
+                        onTransformStart: controller.beginObjectTransform,
+                        onTransformEnd: controller.endObjectTransform,
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(buildEditor(showHud: true));
+    await tester.pump();
+    final gesture = await tester.startGesture(
+      tester.getCenter(
+        find.byKey(const ValueKey('object-transform-move-hit-zone')),
+      ),
+    );
+    await tester.pump();
+    expect(controller.isObjectTransformActive, isTrue);
+    controller.panBy(const Offset(20, 10));
+    expect(controller.viewPan, Offset.zero);
+
+    await tester.pumpWidget(buildEditor(showHud: false));
+    expect(tester.takeException(), isNull);
+    expect(controller.isObjectTransformActive, isFalse);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    controller.panBy(const Offset(20, 10));
+    expect(controller.viewPan, const Offset(20, 10));
+    await gesture.up();
+  });
+
+  testWidgets('disposing an active shape overlay does not notify in unmount', (
+    tester,
+  ) async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: Notebook(
+        uid: 'shape-hud-dispose',
+        title: 'Shape HUD',
+        kind: NotebookKind.notebook,
+        folder: 'Tests',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        pages: [
+          _page(_shape(DrawingTool.rectangle, const [
+            Offset(40, 50),
+            Offset(180, 50),
+            Offset(180, 130),
+            Offset(40, 130),
+            Offset(40, 50),
+          ])),
+        ],
+      ),
+    );
+    addTearDown(controller.dispose);
+    controller.setTool(DrawingTool.rectangle);
+    controller.startShapeEdit(0, 'shape');
+
+    Widget buildEditor({required bool showOverlay}) => MaterialApp(
+      home: ChangeNotifierProvider<EditorController>.value(
+        value: controller,
+        child: Builder(
+          builder: (context) {
+            context.watch<EditorController>();
+            return Scaffold(
+              body: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: 400,
+                  height: 400,
+                  child: showOverlay
+                      ? PageOverlay(controller: controller)
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(buildEditor(showOverlay: true));
+    await tester.pump();
+    final gesture = await tester.startGesture(const Offset(110, 90));
+    await tester.pump();
+    expect(controller.isObjectTransformActive, isTrue);
+
+    await tester.pumpWidget(buildEditor(showOverlay: false));
+    expect(tester.takeException(), isNull);
+    expect(controller.isObjectTransformActive, isFalse);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    controller.panBy(const Offset(15, 0));
+    expect(controller.viewPan, const Offset(15, 0));
+    await gesture.up();
+  });
 }

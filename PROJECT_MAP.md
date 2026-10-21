@@ -836,6 +836,9 @@ przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
 tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 `isObjectTransformActive` blokuje zmianę viewportu na czas move/resize ramki.
+Podczas usuwania aktywnego HUD-u lub overlayu figury flaga zwalniana jest
+synchronicznie, a powiadomienie słuchaczy jest odkładane do post-frame,
+jeśli trwa faza budowania/finalizacji drzewa. Callback sprawdza dispose.
 Trzy szybkie kolory domyślnie używają niebieskiego zestawu; kolory 0 i 1
 to tusze, a kolor 2 to marker. Wybór palety ustawia trzy próbki oraz
 domyślny kolor pióra (0) i markera (2). Starsze fabryczne zestawy
@@ -1403,7 +1406,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
 - `test/shape_edit_test.dart`: regresje liczby uchwytów, zmian
   geometrii figur, proporcji kwadratu/koła, przesuwania, hit-testu,
   undo/redo oraz tymczasowego Move z powrotem do narzędzia
-  w notebooku i boardzie.
+  w notebooku i boardzie; usuwanie aktywnej ramki obiektu i kształtu
+  w trakcie gestu bez wywoływania powiadomień podczas unmount.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
