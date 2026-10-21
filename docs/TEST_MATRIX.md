@@ -620,3 +620,24 @@ Manual checks on Linux, Windows, macOS, Chrome, Android and iOS/iPadOS:
    verify that the toolbar still shows the current value.
 4. Repeat with physical and on-screen keyboards, OS text scaling and
    legacy mixed-color formatting. Save/reopen the notebook and board.
+
+### Text wrap consistency on Linux and other platforms (21 October 2026)
+
+The widget regression now compares caret positions for nine character offsets
+in the same long, wrapped paragraph. The comparison is repeated across
+readonly preview, active editing and restored readonly preview, twice in both
+light and dark modes. Uniformly styled text uses read-only EditableText in
+preview and the same Flutter renderer for editing. Mixed rich-text documents
+retain Quill in preview, including per-run colors.
+
+Manual scenario (Linux first; repeat on Windows/macOS, Chrome, Android/iOS):
+
+1. Paste the paragraph beginning "The creativity is required from the author."
+   into a roughly 600 logical-pixel wide text box in a notebook and board.
+2. Before/during/after editing, compare the line break at "The product has to
+   be published" and the positions of the first and last characters.
+3. Repeat with keyboard input, resize handles, 50/100/200% zoom, light/dark
+   mode, device text scaling and save/reopen. No word should change lines
+   solely from entering or leaving editing.
+4. Check a legacy multi-color rich-text block: its independent colored
+   segments must still appear outside editing.

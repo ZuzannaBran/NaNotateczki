@@ -373,13 +373,15 @@ void main() {
     expect(controller.tool, DrawingTool.edit);
     expect(find.byType(TextHudBlock), findsNothing);
 
-    final inactiveEditor = find.byType(quill.QuillEditor);
+    final inactiveEditor = find.byType(EditableText);
     expect(inactiveEditor, findsOneWidget);
+    expect(tester.widget<EditableText>(inactiveEditor).readOnly, isTrue);
     final textPosition = tester.getCenter(inactiveEditor);
     await tester.tapAt(textPosition);
     await tester.pump(kDoubleTapTimeout + const Duration(milliseconds: 1));
 
     expect(controller.activeTextBlockId, isNotNull);
+    expect(controller.activeTextController, isNull);
     expect(controller.tool, DrawingTool.edit);
     expect(find.byType(TextHudBlock), findsOneWidget);
 
@@ -524,7 +526,7 @@ void main() {
     );
     await tester.pump();
 
-    final textEditors = find.byType(quill.QuillEditor);
+    final textEditors = find.byType(EditableText);
     expect(textEditors, findsWidgets);
     final textPosition = tester.getCenter(textEditors.first);
     final imageTarget = find.byKey(
@@ -696,7 +698,7 @@ void main() {
   });
 
 
-  testWidgets('text stays in place across editing and preview in both themes', (
+  testWidgets('text wrapping and glyph positions remain fixed', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1100, 850));
@@ -704,16 +706,26 @@ void main() {
     final database = NotesDatabase(NativeDatabase.memory());
     final preferences = AppPreferencesController();
     final notebook = _notebook();
+    const content =
+        'The creativity is required from the author. The motivation is '
+        'needed. Next the idea has to be created. The product has to be '
+        'published. Then the attention has to be given by the audience. '
+        'The feedback has to be given by users. The thing has to be '
+        'unique enough to make audience stay for the moment.';
     final block = TextBlock(
       id: 'stable-text-layout',
-      text: 'The same text stays in place across two lines of writing.',
+      text: content,
       position: const Offset(60, 90),
       fontSize: 22,
       color: const Color(0xFF243B54),
-      width: 310,
+      width: 600,
       deltaJson: jsonEncode([
         {
-          'insert': 'The same text stays in place across two lines of writing.',
+          'insert': content.substring(0, 65),
+          'attributes': {'size': '22', 'color': '#243B54'},
+        },
+        {
+          'insert': content.substring(65),
           'attributes': {'size': '22', 'color': '#243B54'},
         },
         {'insert': '\n'},
@@ -725,6 +737,8 @@ void main() {
         pages: [notebook.pages.single.copyWith(textBlocks: [block])],
       ),
     );
+    const characterOffsets = [0, 35, 60, 90, 120, 150, 180, 210, 240];
+
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {
       await tester.pumpWidget(
         MaterialApp(
@@ -757,29 +771,56 @@ void main() {
       controller.clearActiveTextBlock();
       await tester.pump();
       await tester.pump();
-      final passive = tester.widget<quill.QuillEditor>(
-        find.byType(quill.QuillEditor).first,
-      );
-      final passiveStyle = passive.config.customStyles!.paragraph!.style;
-      final passiveRect = tester.getRect(find.byType(quill.QuillEditor).first);
-      expect(passiveStyle.fontFamily, 'Georgia');
-      expect(passiveStyle.fontSize, block.fontSize);
-      expect(passiveStyle.height, 1.25);
+
+      final previewFinder = find.byType(EditableText);
+      expect(find.byType(quill.QuillEditor), findsNothing);
+      expect(previewFinder, findsOneWidget);
+      final preview = tester.widget<EditableText>(previewFinder);
+      expect(preview.readOnly, isTrue);
+      final previewRect = tester.getRect(previewFinder);
+      final previewRender =
+          tester.state<EditableTextState>(previewFinder).renderEditable;
+      final expectedCarets = characterOffsets
+          .map(
+            (offset) => previewRender.getLocalRectForCaret(
+              TextPosition(offset: offset),
+            ),
+          )
+          .toList();
+
       for (var iteration = 0; iteration < 2; iteration++) {
         controller.setTool(DrawingTool.text);
         controller.setActiveTextBlock(block.id, null);
         await tester.pump();
         await tester.pump();
-        final editable = tester.widget<EditableText>(
-          find.byType(EditableText).first,
-        );
-        final activeRect = tester.getRect(find.byType(EditableText).first);
-        expect(editable.style.fontFamily, passiveStyle.fontFamily);
-        expect(editable.style.fontSize, passiveStyle.fontSize);
-        expect(editable.style.height, passiveStyle.height);
-        expect(activeRect.left, closeTo(passiveRect.left, 1.5));
-        expect(activeRect.top, closeTo(passiveRect.top, 1.5));
-        expect(activeRect.height, closeTo(passiveRect.height, 3));
+
+        final editFinder = find.byType(EditableText);
+        expect(editFinder, findsOneWidget);
+        final edit = tester.widget<EditableText>(editFinder);
+        expect(edit.readOnly, isFalse);
+        expect(edit.style, preview.style);
+        final activeRect = tester.getRect(editFinder);
+        expect(activeRect.left, closeTo(previewRect.left, 0.1));
+        expect(activeRect.top, closeTo(previewRect.top, 0.1));
+        expect(activeRect.width, closeTo(previewRect.width, 0.1));
+        expect(activeRect.height, closeTo(previewRect.height, 0.1));
+        final editRender =
+            tester.state<EditableTextState>(editFinder).renderEditable;
+        for (var i = 0; i < characterOffsets.length; i++) {
+          final caret = editRender.getLocalRectForCaret(
+            TextPosition(offset: characterOffsets[i]),
+          );
+          expect(
+            caret.top,
+            closeTo(expectedCarets[i].top, 0.1),
+            reason: 'line changed at offset ' + characterOffsets[i].toString(),
+          );
+          expect(
+            caret.left,
+            closeTo(expectedCarets[i].left, 0.1),
+            reason: 'glyph moved at offset ' + characterOffsets[i].toString(),
+          );
+        }
         expect(
           controller.findTextBlockById(block.id)!.position,
           block.position,
@@ -788,14 +829,27 @@ void main() {
           controller.findTextBlockById(block.id)!.fontSize,
           block.fontSize,
         );
+
         controller.setTool(DrawingTool.edit);
         controller.clearActiveTextBlock();
         await tester.pump();
         await tester.pump();
-        expect(
-          tester.getRect(find.byType(quill.QuillEditor).first),
-          passiveRect,
-        );
+        expect(find.byType(quill.QuillEditor), findsNothing);
+        final restoredFinder = find.byType(EditableText);
+        final restoredRect = tester.getRect(restoredFinder);
+        expect(restoredRect.left, closeTo(previewRect.left, 0.1));
+        expect(restoredRect.top, closeTo(previewRect.top, 0.1));
+        expect(restoredRect.width, closeTo(previewRect.width, 0.1));
+        expect(restoredRect.height, closeTo(previewRect.height, 0.1));
+        final restoredRender =
+            tester.state<EditableTextState>(restoredFinder).renderEditable;
+        for (var i = 0; i < characterOffsets.length; i++) {
+          final caret = restoredRender.getLocalRectForCaret(
+            TextPosition(offset: characterOffsets[i]),
+          );
+          expect(caret.top, closeTo(expectedCarets[i].top, 0.1));
+          expect(caret.left, closeTo(expectedCarets[i].left, 0.1));
+        }
       }
     }
     await tester.pumpWidget(const SizedBox.shrink());

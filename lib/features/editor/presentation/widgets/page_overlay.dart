@@ -561,6 +561,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   bool _isMoveDragging = false;
   late quill.QuillController _quillController;
   quill.QuillController? _darkDisplayController;
+  late final TextEditingController _previewTextController;
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   StreamSubscription<quill.DocChange>? _docSubscription;
@@ -572,6 +573,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   @override
   void initState() {
     super.initState();
+    _previewTextController = TextEditingController(text: widget.block.text);
     _initQuill();
   }
 
@@ -584,6 +586,12 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   @override
   void didUpdateWidget(covariant _TextBlockWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_previewTextController.text != widget.block.text) {
+      _previewTextController.value = TextEditingValue(
+        text: widget.block.text,
+        selection: TextSelection.collapsed(offset: widget.block.text.length),
+      );
+    }
     final hasDeltaChange =
         widget.block.deltaJson != null &&
         widget.block.deltaJson != _lastDeltaJson;
@@ -609,6 +617,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _clearDarkDisplayController();
     _scrollController.dispose();
     _focusNode.dispose();
+    _previewTextController.dispose();
     _quillController.dispose();
     super.dispose();
   }
@@ -623,6 +632,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     final canDoubleTapEdit = widget.interactionEnabled;
     final darkMode = Theme.of(context).brightness == Brightness.dark;
     final typography = textBlockAppearance(context, widget.block);
+    final useEditablePreview = _hasUniformTextStyle(widget.block.deltaJson);
     final paragraphStyle = quill.DefaultTextBlockStyle(
       typography.textStyle.copyWith(
         fontWeight: FontWeight.normal,
@@ -653,7 +663,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       ignoring: !(canTransform || canDoubleTapEdit),
       child: Listener(
         onPointerUp: canTransform
-            ? (_) => _scheduleTextSelection(controller, canEdit)
+            ? (_) => _scheduleTextSelection(controller)
             : null,
         child: Opacity(
           opacity: widget.doubleTapOnly ? 0.0 : 1.0,
@@ -737,28 +747,45 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                               ]
                             : null,
                       ),
-                      child: quill.QuillEditor(
-                        controller: darkMode && !isActive
-                            ? (_darkDisplayController ??=
-                                  _createDarkDisplayController())
-                            : _quillController,
-                        focusNode: _focusNode,
-                        scrollController: _scrollController,
-                        config: quill.QuillEditorConfig(
-                          scrollable: false,
-                          padding: EdgeInsets.zero,
-                          autoFocus: false,
-                          expands: false,
-                          customStyles: quill.DefaultStyles(
-                            paragraph: paragraphStyle,
-                            lineHeightNormal: paragraphStyle,
-                            align: paragraphStyle,
-                          ),
-                          // ignore: experimental_member_use
-                          onKeyPressed: (event, node) =>
-                              _handleKeyPressed(event),
-                        ),
-                      ),
+                      child: useEditablePreview
+                          ? IgnorePointer(
+                              child: EditableText(
+                                controller: _previewTextController,
+                                focusNode: _focusNode,
+                                readOnly: true,
+                                enableInteractiveSelection: false,
+                                showCursor: false,
+                                style: typography.textStyle,
+                                cursorColor: Colors.transparent,
+                                backgroundCursorColor: Colors.transparent,
+                                textAlign: typography.textAlign,
+                                maxLines: null,
+                                minLines: 1,
+                                keyboardType: TextInputType.multiline,
+                              ),
+                            )
+                          : quill.QuillEditor(
+                              controller: darkMode && !isActive
+                                  ? (_darkDisplayController ??=
+                                        _createDarkDisplayController())
+                                  : _quillController,
+                              focusNode: _focusNode,
+                              scrollController: _scrollController,
+                              config: quill.QuillEditorConfig(
+                                scrollable: false,
+                                padding: EdgeInsets.zero,
+                                autoFocus: false,
+                                expands: false,
+                                customStyles: quill.DefaultStyles(
+                                  paragraph: paragraphStyle,
+                                  lineHeightNormal: paragraphStyle,
+                                  align: paragraphStyle,
+                                ),
+                                // ignore: experimental_member_use
+                                onKeyPressed: (event, node) =>
+                                    _handleKeyPressed(event),
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -804,6 +831,65 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         return positioned(lassoDelta, child!);
       },
     );
+  }
+
+  bool _hasUniformTextStyle(String? deltaJson) {
+    if (deltaJson == null || deltaJson.trim().isEmpty) {
+      return true;
+    }
+    try {
+      final operations = jsonDecode(deltaJson);
+      if (operations is! List) {
+        return false;
+      }
+      Map<String, dynamic>? firstInline;
+      String? firstAlignment;
+      for (final raw in operations) {
+        if (raw is! Map) {
+          return false;
+        }
+        final operation = Map<String, dynamic>.from(raw);
+        final insert = operation['insert'];
+        if (insert is! String) {
+          return false;
+        }
+        final attributes = operation['attributes'] is Map
+            ? Map<String, dynamic>.from(operation['attributes'] as Map)
+            : <String, dynamic>{};
+        const supported = {
+          'size',
+          'color',
+          'font',
+          'bold',
+          'italic',
+          'underline',
+          'strike',
+          'align',
+        };
+        if (attributes.keys.any((key) => !supported.contains(key))) {
+          return false;
+        }
+        if (insert.contains('\n')) {
+          final alignment = attributes['align']?.toString() ?? 'left';
+          if (firstAlignment != null && firstAlignment != alignment) {
+            return false;
+          }
+          firstAlignment = alignment;
+        }
+        if (insert.replaceAll('\n', '').isEmpty) {
+          continue;
+        }
+        attributes.remove('align');
+        if (firstInline == null) {
+          firstInline = attributes;
+        } else if (!mapEquals(firstInline, attributes)) {
+          return false;
+        }
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Widget _transformFrame({
@@ -927,12 +1013,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     if (controller.tool != DrawingTool.text) {
       controller.setTool(DrawingTool.text);
     }
-    controller.setActiveTextBlock(widget.block.id, _quillController);
-    _focusNode.requestFocus();
-    requestSoftKeyboardForFocus(context, _focusNode);
+    controller.setActiveTextBlock(widget.block.id, null);
   }
 
-  void _scheduleTextSelection(EditorController controller, bool canEdit) {
+  void _scheduleTextSelection(EditorController controller) {
     _selectionTimer?.cancel();
     _selectionTimer = Timer(kDoubleTapTimeout, () {
       if (!mounted) {
@@ -942,14 +1026,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         controller.setCurrentPage(widget.pageIndex);
       }
       controller.markTextTap();
-      controller.setActiveTextBlock(
-        widget.block.id,
-        canEdit ? _quillController : null,
-      );
-      if (canEdit) {
-        _focusNode.requestFocus();
-        requestSoftKeyboardForFocus(context, _focusNode);
-      }
+      controller.setActiveTextBlock(widget.block.id, null);
     });
   }
 

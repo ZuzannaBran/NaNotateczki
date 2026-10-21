@@ -1088,14 +1088,16 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (2935 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (3012 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
 oraz wspólny `ObjectTransformHud` dla move/resize/scale. Nieaktywne teksty
-korzystają z Quilla ze spójnym stylem i odstępami jak aktywny edytor;
-w dark mode dostają osobną, wyłącznie odczytową kopię
-Delta z odwróconymi kolorami wszystkich fragmentów tekstu. Oryginalny
+dla jednolicie sformatowanego tekstu korzystają z tego samego
+`EditableText` w trybie tylko do odczytu, dzięki czemu zachowują identyczne
+łamanie wierszy i pozycje znaków. Tekst o mieszanym formatowaniu nadal
+korzysta z Quilla; w dark mode dostaje odczytową kopię Delta z odwróconymi
+kolorami wszystkich fragmentów. Oryginalny
 `QuillController` i zapisane Delta pozostają bez zmian. Aktywne obrazy/PDF
 korzystają z tego samego `ObjectTransformHud`; obrót jest wyłączony, rogi skalują, boki zachowują
 crop, a lasso/ink pozostają poza tym silnikiem. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
@@ -1343,8 +1345,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   zestawu w edytorze i pojedynczego koloru w folderze w obu motywach
   oraz zachowanie zagnieżdżonego motywu podczas asynchronicznego otwarcia
   selektora kolorów na głównym navigatorze.
-- `test/page_overlay_text_gestures_test.dart`: regresja metryk tekstu przy
-  przełączaniu edycja/podgląd (oba motywy), zakres czcionek 8–192;
+- `test/page_overlay_text_gestures_test.dart`: porównanie pozycji znaków,
+  wierszy i ramki przed edycją, podczas niej i po niej (oba motywy),
+  zachowanie Quill dla mieszanego formatowania, rozmiary 8–192;
   blokowy toolbar
   tekstu, układ uchwytów i odwracanie kolorów starych bloków rich text
   w jasnym/ciemnym motywie bez modyfikowania zapisanych Delta,
@@ -1353,8 +1356,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   tryb tekstu ignoruje obrazy pod kursorem, a resize nie gubi zmian;
   w trybach ink kliknięcia przechodzą przez tekst i obrazy/PDF; test
   wskazuje rzeczywisty cel dotyku obrazu, a nie wyliczoną pozycję;
-  trafia w konkretny QuillEditor, gdy aktywna i nieaktywna warstwa
-  tekstowa renderują dwa widgety;
+  trafia w aktywny lub nieaktywny renderer tekstu, a oba warianty
+  ignorują dotyk w trybie ink;
   regresja selektora koloru tekstu po utracie zaznaczenia oraz undo/redo;
   Delete usuwa znaki po prawej stronie kursora, nie usuwa niepustego
   bloku i usuwa cały obiekt dopiero po wyczyszczeniu tekstu
