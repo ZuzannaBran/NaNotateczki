@@ -85,6 +85,29 @@ class RemoveInkStrokesAction extends EditorAction {
   }
 }
 
+class UpdateInkStrokeAction extends EditorAction {
+  UpdateInkStrokeAction({required this.before, required this.after});
+
+  final InkStroke before;
+  final InkStroke after;
+
+  @override
+  NotePage apply(NotePage page) => page.copyWith(
+    inkStrokes: [
+      for (final stroke in page.inkStrokes)
+        if (stroke.id == after.id) after else stroke,
+    ],
+  );
+
+  @override
+  NotePage revert(NotePage page) => page.copyWith(
+    inkStrokes: [
+      for (final stroke in page.inkStrokes)
+        if (stroke.id == before.id) before else stroke,
+    ],
+  );
+}
+
 class DeleteInkStrokesAction extends EditorAction {
   DeleteInkStrokesAction._(this._removed);
 
