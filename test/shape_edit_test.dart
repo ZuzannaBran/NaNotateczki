@@ -1,7 +1,10 @@
 import 'dart:ui';
 
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/widgets/shape_edit_overlay.dart';
 import 'package:program/features/editor/state/editor_actions.dart';
@@ -171,6 +174,89 @@ void main() {
   });
 
   for (final kind in [NotebookKind.notebook, NotebookKind.board]) {
+
+    testWidgets('shape overlay moves, resizes and exits on outside tap '
+        'in $kind', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 650));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final page = _page(_shape(
+        DrawingTool.rectangle,
+        const [
+          Offset(40, 50), Offset(180, 50), Offset(180, 130),
+          Offset(40, 130), Offset(40, 50),
+        ],
+      ));
+      final now = DateTime(2026);
+      final controller = EditorController(
+        repository: repository,
+        notebook: Notebook(
+          uid: 'overlay-${kind.name}',
+          title: 'Shape canvas',
+          kind: kind,
+          folder: 'Tests',
+          createdAt: now,
+          updatedAt: now,
+          pages: [page],
+        ),
+      );
+      addTearDown(controller.dispose);
+      controller.setTool(DrawingTool.rectangle);
+      controller.startShapeEdit(0, 'shape');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChangeNotifierProvider<EditorController>.value(
+              value: controller,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: 400,
+                  height: 400,
+                  child: PageOverlay(controller: controller),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byKey(const ValueKey('shape-hud-shape')), findsOneWidget);
+
+      await tester.dragFrom(
+        const Offset(110, 90),
+        const Offset(30, 20),
+      );
+      await tester.pump();
+      expect(controller.shapeStrokeOnPage(0, 'shape')!.points.first.toOffset(),
+          const Offset(70, 70));
+      expect(controller.isObjectTransformActive, isFalse);
+      controller.undo();
+      expect(controller.shapeStrokeOnPage(0, 'shape')!.points.first.toOffset(),
+          const Offset(40, 50));
+      controller.redo();
+      expect(controller.shapeStrokeOnPage(0, 'shape')!.points.first.toOffset(),
+          const Offset(70, 70));
+
+      await tester.dragFrom(
+        const Offset(210, 150),
+        const Offset(35, 20),
+      );
+      await tester.pump();
+      final bounds = ShapeEditGeometry.bounds(
+        controller.shapeStrokeOnPage(0, 'shape')!,
+      );
+      expect(bounds.width, closeTo(175, 0.001));
+      expect(bounds.height, closeTo(100, 0.001));
+
+      await tester.tapAt(const Offset(320, 320));
+      await tester.pump();
+      expect(controller.activeShapeStrokeId, isNull);
+      expect(controller.tool, DrawingTool.rectangle);
+    });
+
     test('shape selects Move and restores previous tool in $kind', () async {
       final database = NotesDatabase(NativeDatabase.memory());
       addTearDown(database.close);
