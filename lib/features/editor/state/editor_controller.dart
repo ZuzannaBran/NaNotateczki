@@ -144,6 +144,9 @@ class EditorController extends ChangeNotifier {
   int? _activeTextEditPageIndex;
   TextBlock? _activeTextEditBefore;
   String? activeImageBlockId;
+  String? activeShapeStrokeId;
+  int? activeShapePageIndex;
+  DrawingTool? _toolBeforeShapeEdit;
   LassoSelection? lassoSelection;
   final ValueNotifier<Offset> lassoDragDelta = ValueNotifier(Offset.zero);
   _ElementClipboardItem? _elementClipboard;
@@ -561,6 +564,9 @@ class EditorController extends ChangeNotifier {
   }
 
   void setTool(DrawingTool newTool) {
+    activeShapeStrokeId = null;
+    activeShapePageIndex = null;
+    _toolBeforeShapeEdit = null;
     tool = newTool;
     if (newTool.isEraser) {
       lastEraserTool = newTool;
@@ -577,6 +583,70 @@ class EditorController extends ChangeNotifier {
     }
     lassoSelection = null;
     notifyListeners();
+  }
+
+  void startShapeEdit(int pageIndex, String strokeId) {
+    final shape = shapeStrokeOnPage(pageIndex, strokeId);
+    if (shape == null || !shape.tool.isShape) {
+      return;
+    }
+    final previousTool = _toolBeforeShapeEdit ?? tool;
+    setTool(DrawingTool.edit);
+    _toolBeforeShapeEdit = previousTool;
+    activeShapePageIndex = pageIndex;
+    activeShapeStrokeId = strokeId;
+    notifyListeners();
+  }
+
+  void finishShapeEdit() {
+    final previousTool = _toolBeforeShapeEdit;
+    if (previousTool == null) {
+      return;
+    }
+    setTool(previousTool);
+  }
+
+  InkStroke? shapeStrokeOnPage(int pageIndex, String id) {
+    if (pageIndex < 0 || pageIndex >= pages.length) {
+      return null;
+    }
+    for (final stroke in pages[pageIndex].inkStrokes) {
+      if (stroke.id == id) {
+        return stroke;
+      }
+    }
+    return null;
+  }
+
+  void previewShapeStrokeOnPage(int pageIndex, InkStroke stroke) {
+    if (shapeStrokeOnPage(pageIndex, stroke.id) == null) {
+      return;
+    }
+    _ensurePageSelected(pageIndex);
+    _updatePage(currentPage.copyWith(
+      inkStrokes: [
+        for (final item in currentPage.inkStrokes)
+          if (item.id == stroke.id) stroke else item,
+      ],
+    ));
+    _touchInkPageRevision(currentPage.id);
+  }
+
+  void commitShapeStrokeOnPage(
+    int pageIndex,
+    InkStroke before,
+    InkStroke after,
+  ) {
+    if (before.id != after.id ||
+        listEquals(
+          before.points.map((point) => point.toOffset()).toList(),
+          after.points.map((point) => point.toOffset()).toList(),
+        )) {
+      return;
+    }
+    _ensurePageSelected(pageIndex);
+    _applyInkAction(UpdateInkStrokeAction(before: before, after: after));
+    _scheduleSave();
   }
 
   void setActiveTextBlock(String? blockId, quill.QuillController? controller) {
@@ -1296,6 +1366,9 @@ class EditorController extends ChangeNotifier {
     _redoActions.add(action);
     _notifyHistoryChanged();
     _updatePage(updated);
+    if (action is UpdateInkStrokeAction) {
+      _touchInkPageRevision(updated.id);
+    }
     _save();
   }
 
@@ -1311,6 +1384,9 @@ class EditorController extends ChangeNotifier {
     _undoActions.add(action);
     _notifyHistoryChanged();
     _updatePage(updated);
+    if (action is UpdateInkStrokeAction) {
+      _touchInkPageRevision(updated.id);
+    }
     _save();
   }
 
@@ -1364,6 +1440,9 @@ class EditorController extends ChangeNotifier {
     }
     if (currentPageIndex == index) {
       return;
+    }
+    if (activeShapeStrokeId != null) {
+      finishShapeEdit();
     }
     _commitActiveTextEdit();
     activeTextBlockId = null;
@@ -2752,8 +2831,12 @@ class EditorController extends ChangeNotifier {
       for (var i = 0; i < pages.length; i++)
         if (i == currentPageIndex) updated else pages[i],
     ];
+    _touchInkPageRevision(updated.id);
+  }
+
+  void _touchInkPageRevision(String pageId) {
     final pageRevision = _inkPageRevisions.putIfAbsent(
-      updated.id,
+      pageId,
       () => ValueNotifier<int>(0),
     );
     pageRevision.value++;
