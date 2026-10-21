@@ -85,7 +85,9 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 ### Motyw
 
 - `lib/core/theme/app_colors.dart`: jasna paleta i trzy współdzielone
-  zestawy Blue/Pink/Green dla canvasu oraz okładek; tryb ciemny:
+  zestawy Blue/Pink/Green dla canvasu oraz okładek: dwa tusze i marker
+  (Blue #1A2130/#3A4E6F/#4B6493, Pink #3A212B/#6C3C4D/#8E5066,
+  Green #1F3027/#476E5E/#5D927D); tryb ciemny:
   tło #2D2E2B, panele #3A3B39, aktywne #4A4B48, kartka/panele #5A5B57,
   ciemniejszy canvas notatek #50514D, tekst #EEECE6. `displayInkColor` odwraca jasność HSL wszystkich odcieni,
   zachowując hue, saturację i alpha (czerń↔biel, jasny błękit↔ciemny).
@@ -743,6 +745,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   i wyśrodkowany komunikat zakończenia sesji.
 - `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów
   i standardowe promienie 12 px prostokątnych kontrolek.
+- `test/ink_color_presets_test.dart`: zatwierdzone kolory trzech palet,
+  transformacja HSL w dark mode, domyślny Blue oraz marker z trzeciej próbki.
 - `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
   zgodność starszych sesji, reset koloru, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
@@ -832,10 +836,11 @@ przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
 tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 `isObjectTransformActive` blokuje zmianę viewportu na czas move/resize ramki.
-Trzy szybkie kolory domyślnie używają niebieskiego zestawu; wybór palety
-jednocześnie ustawia trzy próbki i aktywne domyślne kolory pióra/markera.
-Stare fabryczne czarny–czerwony–zielony są migrowane do niebieskiego,
-ale zmienione ręcznie próbki pozostają nienaruszone.
+Trzy szybkie kolory domyślnie używają niebieskiego zestawu; kolory 0 i 1
+to tusze, a kolor 2 to marker. Wybór palety ustawia trzy próbki oraz
+domyślny kolor pióra (0) i markera (2). Starsze fabryczne zestawy
+i zapisane poprzednie Blue/Pink/Green są migrowane do nowych wartości,
+ale ręcznie zmienione kolory pozostają nienaruszone.
 
 - 37: `LassoSelection`; 76: `EditorController`;
   197: `flushPendingSaves`; 952: `applyInkColorPreset`.
@@ -857,7 +862,8 @@ ale zmienione ręcznie próbki pozostają nienaruszone.
   2824: `_scheduleSave`; 2845: `_saveDirtyPages`; 2867: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
-  `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`.
+  `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`
+  w kolejności tusz 1, tusz 2, marker.
   `SharedRecentColors` udostępnia wspólną, serializowaną historię do 12
   kolorów pisaka, tekstu i okładek, z migracją `editor_prefs.json`.
   `resetPendingForTests` izoluje oczekujące operacje między testami FakeAsync.
