@@ -110,7 +110,7 @@ class EditorController extends ChangeNotifier {
   PageBackgroundSettings defaultBoardBackground =
       const PageBackgroundSettings();
   Color penColor = InkColorPreset.blue.colors[0];
-  Color highlighterColor = InkColorPreset.blue.colors[1];
+  Color highlighterColor = InkColorPreset.blue.colors[2];
   Color get inkColor =>
       tool == DrawingTool.highlighter ? highlighterColor : penColor;
   double inkStrokeWidth = 2.5;
@@ -1029,14 +1029,14 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Replaces the three quick swatches and the default pen/marker colors.
+  /// Replaces two writing swatches, the marker swatch and active ink colors.
   void applyInkColorPreset(InkColorPreset preset) {
     final colors = preset.colors;
     quickColors
       ..clear()
       ..addAll(colors);
     penColor = colors[0];
-    highlighterColor = colors[1];
+    highlighterColor = colors[2];
     _schedulePrefsSave();
     notifyListeners();
   }
@@ -1157,18 +1157,64 @@ class EditorController extends ChangeNotifier {
             .map((item) => _colorFromHex(item?.toString()))
             .whereType<Color>()
             .toList();
+        const previousPresets = <InkColorPreset, List<Color>>{
+          InkColorPreset.blue: [
+            Color(0xFF2A3851),
+            Color(0xFFA1B2CE),
+            Color(0xFFD0D8E7),
+          ],
+          InkColorPreset.pink: [
+            Color(0xFF583240),
+            Color(0xFFCCA4B2),
+            Color(0xFFE9D8DE),
+          ],
+          InkColorPreset.green: [
+            Color(0xFF2C443A),
+            Color(0xFF9BBFB0),
+            Color(0xFFD0E1DA),
+          ],
+        };
+        InkColorPreset? previousPreset;
+        List<Color>? previousColors;
+        for (final entry in previousPresets.entries) {
+          if (mapped.length == 3 &&
+              mapped[0] == entry.value[0] &&
+              mapped[1] == entry.value[1] &&
+              mapped[2] == entry.value[2]) {
+            previousPreset = entry.key;
+            previousColors = entry.value;
+            break;
+          }
+        }
         final isLegacyDefaults =
             mapped.length == 3 &&
             mapped[0] == const Color(0xFF1E1E1E) &&
             mapped[1] == const Color(0xFFD32F2F) &&
             mapped[2] == const Color(0xFF2E7D32);
-        if (isLegacyDefaults) {
+        if (previousPreset != null && previousColors != null) {
+          migratedQuickColors = true;
+          quickColors
+            ..clear()
+            ..addAll(previousPreset.colors);
+          if (penParsed != null) {
+            final index = previousColors.indexOf(penParsed);
+            if (index != -1) {
+              penColor = previousPreset.colors[index];
+            }
+          }
+          if (highlighterParsed == previousColors[1] ||
+              highlighterParsed == previousColors[2]) {
+            highlighterColor = previousPreset.colors[2];
+          } else if (highlighterParsed == previousColors[0]) {
+            highlighterColor = previousPreset.colors[0];
+          }
+        } else if (isLegacyDefaults) {
           migratedQuickColors = true;
           if (penParsed == const Color(0xFF1E2A40)) {
             penColor = InkColorPreset.blue.colors[0];
           }
           if (highlighterParsed == const Color(0xFF536783)) {
-            highlighterColor = InkColorPreset.blue.colors[1];
+            highlighterColor = InkColorPreset.blue.colors[2];
           }
         } else if (mapped.isNotEmpty) {
           quickColors
