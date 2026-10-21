@@ -863,12 +863,12 @@ void main() {
           expect(
             caret.top,
             closeTo(expectedCarets[i].top, 0.1),
-            reason: 'line changed at offset ' + characterOffsets[i].toString(),
+            reason: 'line changed at offset ${characterOffsets[i]}',
           );
           expect(
             caret.left,
             closeTo(expectedCarets[i].left, 0.1),
-            reason: 'glyph moved at offset ' + characterOffsets[i].toString(),
+            reason: 'glyph moved at offset ${characterOffsets[i]}',
           );
         }
         expect(
