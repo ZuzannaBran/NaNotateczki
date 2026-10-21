@@ -1349,8 +1349,11 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         _resetCurrent();
         return;
       }
-      _addCurrentStroke(controller, pageIndex, tool);
+      final strokeId = _addCurrentStroke(controller, pageIndex, tool);
       _resetCurrent();
+      if (strokeId != null) {
+        controller.startShapeEdit(pageIndex, strokeId);
+      }
       return;
     }
     if (tool == DrawingTool.eraserStroke) {
@@ -1389,6 +1392,26 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     }
     if (_tryCommitScratchErase(controller, pageIndex, tool)) {
       _resetCurrent();
+      return;
+    }
+    final recognizedShape = _snappedStraight
+        ? DrawingTool.line
+        : _snappedRect
+        ? DrawingTool.rectangle
+        : _snappedEllipse
+        ? DrawingTool.ellipse
+        : null;
+    if (recognizedShape != null) {
+      final strokeId = _addCurrentStroke(
+        controller,
+        pageIndex,
+        recognizedShape,
+        widthOverride: _effectiveStrokeWidth(tool, controller.inkStrokeWidth),
+      );
+      _resetCurrent();
+      if (strokeId != null) {
+        controller.startShapeEdit(pageIndex, strokeId);
+      }
       return;
     }
     if (tool == DrawingTool.lasso) {
@@ -1488,14 +1511,16 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     _addCurrentStroke(controller, pageIndex, tool);
   }
 
-  void _addCurrentStroke(
+  String? _addCurrentStroke(
     EditorController controller,
     int pageIndex,
     DrawingTool tool, {
     List<InkPoint>? pointsOverride,
+    double? widthOverride,
   }) {
     final points = List<InkPoint>.from(pointsOverride ?? _currentPoints);
-    final width = _effectiveStrokeWidth(tool, controller.inkStrokeWidth);
+    final width = widthOverride ??
+        _effectiveStrokeWidth(tool, controller.inkStrokeWidth);
     String? strokeId;
     if (widget.pageIndex != null) {
       strokeId = controller.addInkStrokeOnPage(
@@ -1520,6 +1545,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         tool: tool,
       );
     }
+    return strokeId;
   }
 
   void _retainCommittedStroke({
@@ -2815,8 +2841,11 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         _resetCurrent();
         return;
       }
-      _addCurrentStroke(controller, pageIndex, tool);
+      final strokeId = _addCurrentStroke(controller, pageIndex, tool);
       _resetCurrent();
+      if (strokeId != null) {
+        controller.startShapeEdit(pageIndex, strokeId);
+      }
       return;
     }
     if (tool == DrawingTool.eraserStroke) {
@@ -2860,6 +2889,26 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       return;
     }
     final pageLocalPoints = _toPageLocalPoints(_currentPoints, pageIndex);
+    final recognizedShape = _snappedStraight
+        ? DrawingTool.line
+        : _snappedRect
+        ? DrawingTool.rectangle
+        : _snappedEllipse
+        ? DrawingTool.ellipse
+        : null;
+    if (recognizedShape != null) {
+      final strokeId = _addCurrentStroke(
+        controller,
+        pageIndex,
+        recognizedShape,
+        widthOverride: _effectiveStrokeWidth(tool, controller.inkStrokeWidth),
+      );
+      _resetCurrent();
+      if (strokeId != null) {
+        controller.startShapeEdit(pageIndex, strokeId);
+      }
+      return;
+    }
     if (tool == DrawingTool.lasso) {
       controller.selectWithLasso(
         pageLocalPoints.map((p) => p.toOffset()).toList(),
@@ -2969,14 +3018,16 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     _addCurrentStroke(controller, pageIndex, tool);
   }
 
-  void _addCurrentStroke(
+  String? _addCurrentStroke(
     EditorController controller,
     int pageIndex,
     DrawingTool tool, {
     List<InkPoint>? pointsOverride,
+    double? widthOverride,
   }) {
     final overlayPoints = List<InkPoint>.from(pointsOverride ?? _currentPoints);
-    final width = _effectiveStrokeWidth(tool, controller.inkStrokeWidth);
+    final width = widthOverride ??
+        _effectiveStrokeWidth(tool, controller.inkStrokeWidth);
     final strokeId = controller.addInkStrokeOnPage(
       pageIndex,
       _toPageLocalPoints(overlayPoints, pageIndex),
@@ -2992,6 +3043,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         tool: tool,
       );
     }
+    return strokeId;
   }
 
   void _retainCommittedStroke({
