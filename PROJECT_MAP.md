@@ -917,8 +917,10 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
   1706: `_ProjectMiniMapOverlay`; 1999: Listener kliknięć minimapy;
   2125: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
 
-### `lib/features/editor/presentation/editor_commands.dart` (170 linii)
+### `lib/features/editor/presentation/editor_commands.dart` (172 linie)
 
+Skróty dokumentu są wyłączone podczas pisania w aktywnym bloku tekstu,
+aby nie przechwytywały Delete ani skrótów schowka.
 Komendy importu, kopiowania i eksportu; przy starcie zadania zapisu
 przekazują aktualny `Theme.brightness` do wspólnego renderera PDF/PNG.
 
@@ -1029,8 +1031,10 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   konfigurowalne przez `ObjectTransformHudStyle`.
   13: `ObjectTransformHudStyle`; 54: `ObjectTransformHud`;
   106: `_ObjectTransformHudState`; 591: `_ObjectTransformFramePainter`.
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (530):
-  aktywny `TextBlock` renderowany przez Flutter `EditableText`; ramka,
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (546):
+  aktywny `TextBlock` renderowany przez Flutter `EditableText`;
+  Delete usuwa obiekt tylko przy pustym tekście, w przeciwnym razie
+  pozostaje natywną edycją tekstu (znak po prawej stronie kursora). ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
   jest wyłączony. Podczas edycji treści uchwyty resize i osobny grabber move
   pozostają aktywne, a środek ramki przepuszcza gesty do `EditableText`.
@@ -1343,7 +1347,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   wskazuje rzeczywisty cel dotyku obrazu, a nie wyliczoną pozycję;
   trafia w konkretny QuillEditor, gdy aktywna i nieaktywna warstwa
   tekstowa renderują dwa widgety;
-  regresja selektora koloru tekstu po utracie zaznaczenia oraz undo/redo
+  regresja selektora koloru tekstu po utracie zaznaczenia oraz undo/redo;
+  Delete usuwa znaki po prawej stronie kursora, nie usuwa niepustego
+  bloku i usuwa cały obiekt dopiero po wyczyszczeniu tekstu
 - `test/lasso_selection_action_bar_test.dart`: kompaktowy pasek lassa,
   kontrast i kolor przycisków w obu motywach oraz działanie kopiuj/usuń.
 - `test/board_scene_bounds_test.dart`: stały układ współrzędnych

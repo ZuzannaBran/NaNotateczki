@@ -101,7 +101,9 @@ class EditorCommandShortcuts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!enabled) {
+    if (!enabled ||
+        (commands.controller.tool == DrawingTool.text &&
+            commands.controller.activeTextBlockId != null)) {
       return child;
     }
     return Shortcuts(

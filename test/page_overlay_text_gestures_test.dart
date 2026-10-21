@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,7 @@ import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/features/editor/presentation/editor_commands.dart';
 import 'package:program/features/editor/presentation/interaction/object_transform_engine.dart';
 import 'package:program/features/editor/presentation/widgets/object_transform_hud.dart';
 import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
@@ -648,6 +650,105 @@ void main() {
       activeText.style.color,
       AppColors.displayInkColor(firstColor, darkMode: true),
     );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    preferences.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await database.close();
+  });
+
+  testWidgets('Delete edits text to the right and removes only empty blocks', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
+    final notebook = _notebook();
+    final block = TextBlock(
+      id: 'delete-shortcut-text',
+      text: 'AB',
+      position: const Offset(40, 80),
+      width: 260,
+      fontSize: 22,
+      color: const Color(0xFF1E1E1E),
+    );
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: notebook.copyWith(
+        pages: [notebook.pages.single.copyWith(textBlocks: [block])],
+      ),
+    );
+    controller.setTool(DrawingTool.text);
+    controller.setActiveTextBlock(block.id, null);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
+          ],
+          child: Builder(
+            builder: (context) {
+              final current = context.watch<EditorController>();
+              return EditorCommandShortcuts(
+                enabled: current.activeTextController == null,
+                commands: EditorCommands(
+                  context: context,
+                  controller: current,
+                  insertPosition: () => Offset.zero,
+                  runBusy: <T>(Future<T> Function() action) => action(),
+                ),
+                child: Scaffold(
+                  body: SizedBox(
+                    width: 600,
+                    height: 500,
+                    child: PageOverlay(
+                      controller: current,
+                      renderBackground: false,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    EditableText editable() =>
+        tester.widget<EditableText>(find.byType(EditableText));
+    expect(editable().focusNode.hasFocus, isTrue);
+
+    editable().controller.selection = const TextSelection.collapsed(offset: 2);
+    await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+    await tester.pump();
+    expect(controller.pages.single.textBlocks.single.text, 'AB');
+
+    editable().controller.selection = const TextSelection.collapsed(offset: 0);
+    await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+    await tester.pump();
+    expect(controller.pages.single.textBlocks.single.text, 'B');
+
+    editable().controller.selection = const TextSelection.collapsed(offset: 1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    await tester.pump();
+    expect(controller.pages.single.textBlocks.single.text, '');
+    expect(controller.pages.single.textBlocks, hasLength(1));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+    await tester.pump();
+    expect(controller.pages.single.textBlocks, isEmpty);
+    expect(controller.activeTextBlockId, isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();

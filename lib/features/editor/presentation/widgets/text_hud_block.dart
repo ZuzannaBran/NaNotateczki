@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
 
 import '../../../../core/input/soft_keyboard.dart';
@@ -157,23 +158,35 @@ class _TextHudBlockState extends State<TextHudBlock> {
           color: Colors.transparent,
           child: IgnorePointer(
             ignoring: !isEditing,
-            child: EditableText(
-              controller: _textController,
-              focusNode: _focusNode,
-              readOnly: !isEditing,
-              style: style.textStyle,
-              cursorColor: Theme.of(context).colorScheme.primary,
-              backgroundCursorColor: Colors.grey,
-              textAlign: style.textAlign,
-              maxLines: null,
-              minLines: 1,
-              keyboardType: TextInputType.multiline,
-              textInputAction: TextInputAction.newline,
-              selectionColor: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.24),
-              showSelectionHandles: isEditing,
-              onChanged: _onTextChanged,
+            child: CallbackShortcuts(
+              bindings: isEditing && _textController.text.isEmpty
+                  ? <ShortcutActivator, VoidCallback>{
+                      const SingleActivator(LogicalKeyboardKey.delete): () {
+                        widget.controller.deleteTextBlockOnPage(
+                          widget.pageIndex,
+                          widget.block.id,
+                        );
+                      },
+                    }
+                  : const <ShortcutActivator, VoidCallback>{},
+              child: EditableText(
+                controller: _textController,
+                focusNode: _focusNode,
+                readOnly: !isEditing,
+                style: style.textStyle,
+                cursorColor: Theme.of(context).colorScheme.primary,
+                backgroundCursorColor: Colors.grey,
+                textAlign: style.textAlign,
+                maxLines: null,
+                minLines: 1,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
+                selectionColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.24),
+                showSelectionHandles: isEditing,
+                onChanged: _onTextChanged,
+              ),
             ),
           ),
         ),
@@ -237,6 +250,9 @@ class _TextHudBlockState extends State<TextHudBlock> {
       plainText: value,
       deltaJson: deltaJson,
     );
+    if (widget.block.text.isEmpty != value.isEmpty) {
+      setState(() {});
+    }
     _scheduleMetrics();
   }
 

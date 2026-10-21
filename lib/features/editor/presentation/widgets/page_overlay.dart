@@ -1227,15 +1227,15 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       _toggleList('unchecked');
       return KeyEventResult.handled;
     }
-    if (event.logicalKey == LogicalKeyboardKey.delete) {
+    if (event.logicalKey == LogicalKeyboardKey.delete &&
+        _quillController.document.length <= 1 &&
+        _editorController.tool == DrawingTool.text &&
+        _editorController.activeTextBlockId == widget.block.id) {
       _editorController.deleteTextBlockOnPage(
         widget.pageIndex,
         widget.block.id,
       );
       return KeyEventResult.handled;
-    }
-    if (event.logicalKey != LogicalKeyboardKey.backspace) {
-      return null;
     }
     return null;
   }
