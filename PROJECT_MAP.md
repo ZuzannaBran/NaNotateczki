@@ -56,7 +56,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (684 linii)
+### `lib/app/app_scope.dart` (688 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -68,6 +68,8 @@ obowiązkowego zamknięcia. Zwykły backup nie wyświetla wskaźnika
 postępu, ale podczas zamykania blokujący spinner nadal chroni zapis.
 Scheduler w trybie exit nie czeka na idle rysika i nie porzuca zmian
 po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
+`AppScrollBehavior` ukrywa automatyczne scrollbary we wszystkich stanach
+aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 `AppUiScale` skaluje cały widok (także touch hit-test) oraz logiczny
 `MediaQuery` bez zmiany geometrii zapisanych notatek i boardów.
 
@@ -113,6 +115,9 @@ po błędzie. Motyw jasny/ciemny jest nakładany reaktywnie z preferencji.
   8: `DeviceInputMode`;
   27:
   `AppPreferencesController`.
+- `lib/core/input/app_scroll_behavior.dart`: globalnie ukrywa paski
+  przewijania na desktopie i urządzeniach dotykowych bez zmiany gestów,
+  kółka myszy ani fizyki przewijania. `AppScrollBehavior`.
 - `lib/core/input/touch_navigation_scroll_physics.dart` (24):
   mnożnik dystansu scrolla i próg startu drag listy plików i stron,
   bez ingerencji w rysowanie czy transformację obiektów.
@@ -1374,6 +1379,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
+- `test/app_scroll_behavior_test.dart`: brak pasków przewijania w całej
+  aplikacji na desktopie przy zachowaniu przewijania dotykiem i kółkiem.
 - `test/widget_test.dart` (20)
 - `test/dark_mode_theme_test.dart` (209): paleta dark, odwracanie jasności
   wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual,

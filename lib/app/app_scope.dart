@@ -10,6 +10,7 @@ import '../core/diagnostics/frame_timing_tracker.dart';
 import '../core/diagnostics/optimization_log.dart';
 import '../core/error/app_error_log.dart';
 import '../core/input/app_preferences_controller.dart';
+import '../core/input/app_scroll_behavior.dart';
 import '../core/input/ink_activity_tracker.dart';
 import '../core/storage/app_save_coordinator.dart';
 import '../core/theme/app_theme.dart';
@@ -151,6 +152,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           }
           return MaterialApp(
             debugShowCheckedModeBanner: false,
+            scrollBehavior: const AppScrollBehavior(),
             title: 'Notatek',
             theme: AppTheme.light(),
             home: _StartupErrorScreen(error: snapshot.error!),
@@ -159,6 +161,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
         if (!snapshot.hasData) {
           return const MaterialApp(
+            scrollBehavior: AppScrollBehavior(),
             home: Scaffold(body: Center(child: CircularProgressIndicator())),
           );
         }
@@ -204,6 +207,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           ],
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
+            scrollBehavior: const AppScrollBehavior(),
             title: 'Notatek',
             theme: AppTheme.light(),
             home: const LibraryScreen(),
