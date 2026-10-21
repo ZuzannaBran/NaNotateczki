@@ -358,6 +358,7 @@ class _PlannerTaskRowState extends State<_PlannerTaskRow> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Checkbox(
                       key: ValueKey('planner-task-check:${task.id}'),
@@ -375,54 +376,53 @@ class _PlannerTaskRowState extends State<_PlannerTaskRow> {
                     ),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: TextField(
-                        key: ValueKey('planner-task-name:${task.id}'),
-                        controller: _title,
-                        autofocus: task.title.isEmpty,
-                        maxLines: 1,
-                        maxLength: 200,
-                        style: TextStyle(
-                          color: ink,
-                          fontSize: AppTypography.document,
-                          decoration: task.completed
-                              ? TextDecoration.lineThrough
-                              : null,
-                          decorationColor: ink,
-                        ),
-                        cursorColor: ink,
-                        decoration: InputDecoration(
-                          hintText: 'Task name',
-                          hintStyle: TextStyle(
-                            color: ink.withValues(alpha: 0.68),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: TextField(
+                          key: ValueKey('planner-task-name:${task.id}'),
+                          controller: _title,
+                          autofocus: task.title.isEmpty,
+                          keyboardType: TextInputType.multiline,
+                          textInputAction: TextInputAction.newline,
+                          minLines: 1,
+                          maxLines: null,
+                          maxLength: 200,
+                          style: TextStyle(
+                            color: ink,
+                            fontSize: AppTypography.document,
+                            decoration: task.completed
+                                ? TextDecoration.lineThrough
+                                : null,
+                            decorationColor: ink,
                           ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          isDense: true,
-                          counterText: '',
-                          filled: false,
-                        ),
-                        onChanged: (value) => unawaited(
-                          library.updatePlannerTask(
-                            widget.plannerUid,
-                            task.id,
-                            title: value,
+                          cursorColor: ink,
+                          decoration: InputDecoration(
+                            hintText: 'Task name',
+                            hintStyle: TextStyle(
+                              color: ink.withValues(alpha: 0.68),
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            isDense: true,
+                            counterText: '',
+                            filled: false,
+                          ),
+                          onChanged: (value) => unawaited(
+                            library.updatePlannerTask(
+                              widget.plannerUid,
+                              task.id,
+                              title: value,
+                            ),
                           ),
                         ),
                       ),
                     ),
+                    const SizedBox(width: 12),
                     if (!narrow)
-                      Flexible(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Wrap(
-                            alignment: WrapAlignment.end,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 2,
-                            runSpacing: 2,
-                            children: deadlineControls,
-                          ),
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: deadlineControls,
                       ),
                     IconButton(
                       key: ValueKey('planner-task-delete:${task.id}'),

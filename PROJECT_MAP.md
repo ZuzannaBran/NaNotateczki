@@ -581,8 +581,12 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   dla całego wiersza (tekstu, ikon, checkboxa i tła), i są na dole.
   Przycisk Add task używa jaśniejszego beżu AppColors.toolbar.
   Planer współdzieli nagłówek z edytorami i ma globalne ustawienia.
-  Przyciski deadline'u wyrównują się do prawej i zawijają
-  w wąskich oknach, bez wyśrodkowywania po zmianie daty.
+  Tekst zadania zawija się automatycznie, zwiększając wysokość tylko
+  własnego wiersza, z checkboxem i akcjami wyrównanymi do góry.
+  Na szerokich ekranach pole tekstowe kończy się 12 px przed blokiem
+  faktycznie widocznych kontrolek; margines po prawej jest taki sam.
+  W wąskich oknach przyciski deadline'u pozostają poniżej tytułu,
+  wyrównane do prawej, a usuwanie pozostaje w górnym wierszu.
 
 
 - `lib/features/planner/state/study_planner_controller.dart` (789):
@@ -1221,7 +1225,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   zgodność Recent i ukończonych z paskiem folderów, `Opacity` całego
   odhaczonego wiersza, automatyczne sortowanie również ze starym
   ustawieniem, jasny Add task, poprawność nagłówka i bezpieczne Settings;
-  wyrównanie daty i kontrolek, responsywność, zapis i odczyt zadań,
+  wyrównanie daty i kontrolek, wielowierszowe zadania bez przesuwania
+  checkboxa i symetryczne odstępy od zmiennego bloku akcji,
+  responsywność, zapis i odczyt zadań,
   edycja, usuwanie, opcjonalny deadline, kolor statusów oraz widget canvasu;
   ikonę planera (kwadrat z tikiem) w drzewie folderów.
 - `test/study_planner_controller_test.dart` i

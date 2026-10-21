@@ -248,23 +248,70 @@ void main() {
     );
     await tester.pump();
     expect(library.plannerTasks(planner.uid).single.title, 'Read chapter');
+
+    final taskName = find.byKey(ValueKey('planner-task-name:${task.id}'));
+    final taskCheckbox = find.byKey(ValueKey('planner-task-check:${task.id}'));
+    final dateButton = find.byKey(ValueKey('planner-task-date:${task.id}'));
+    final shortRowHeight = tester.getSize(row).height;
+    final checkboxTop =
+        tester.getTopLeft(taskCheckbox).dy - tester.getTopLeft(row).dy;
+    final trailingMargin =
+        tester.getTopRight(row).dx - tester.getTopRight(deleteButton).dx;
+    expect(
+      tester.getTopLeft(dateButton).dx - tester.getTopRight(taskName).dx,
+      closeTo(trailingMargin, 1),
+    );
+
     await library.updatePlannerTask(
       planner.uid,
       task.id,
       deadline: DateTime.now().add(const Duration(days: 1)),
+      deadlineHasTime: true,
     );
     await tester.pump();
-    expect(
-      find.byKey(ValueKey('planner-task-deadline:${task.id}')),
-      findsOneWidget,
+    final deadline = find.byKey(
+      ValueKey('planner-task-deadline:${task.id}'),
     );
+    expect(deadline, findsOneWidget);
     expect(
       tester.getTopRight(deleteButton).dx,
       closeTo(originalDeleteRight, 1),
     );
+    expect(
+      tester.getTopLeft(deadline).dx - tester.getTopRight(taskName).dx,
+      closeTo(trailingMargin, 1),
+    );
+
+    final longTitle = List.filled(7, 'Read and review the notes').join(' ');
+    await tester.enterText(taskName, longTitle);
+    await tester.pump();
+    expect(library.plannerTasks(planner.uid).single.title, longTitle);
+    expect(tester.widget<TextField>(taskName).maxLines, isNull);
+    expect(tester.getSize(row).height, greaterThan(shortRowHeight));
+    expect(
+      tester.getTopLeft(taskCheckbox).dy - tester.getTopLeft(row).dy,
+      closeTo(checkboxTop, 1),
+    );
+    expect(
+      tester.getTopLeft(deadline).dx - tester.getTopRight(taskName).dx,
+      closeTo(trailingMargin, 1),
+    );
+
     await tester.binding.setSurfaceSize(const Size(370, 800));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+    expect(tester.getSize(row).height, greaterThan(shortRowHeight));
+    expect(
+      tester.getTopLeft(taskCheckbox).dy - tester.getTopLeft(row).dy,
+      closeTo(checkboxTop, 1),
+    );
+    expect(
+      tester.getTopLeft(deleteButton).dx - tester.getTopRight(taskName).dx,
+      closeTo(
+        tester.getTopRight(row).dx - tester.getTopRight(deleteButton).dx,
+        1,
+      ),
+    );
     expect(
       find.byKey(ValueKey('planner-task-date:${task.id}')),
       findsOneWidget,
