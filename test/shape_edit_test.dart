@@ -215,7 +215,12 @@ void main() {
                 child: SizedBox(
                   width: 400,
                   height: 400,
-                  child: PageOverlay(controller: controller),
+                  child: Builder(
+                    builder: (context) {
+                      context.watch<EditorController>();
+                      return PageOverlay(controller: controller);
+                    },
+                  ),
                 ),
               ),
             ),
