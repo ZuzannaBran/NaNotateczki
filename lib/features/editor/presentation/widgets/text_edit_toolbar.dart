@@ -249,7 +249,10 @@ class TextEditToolbar extends StatelessWidget {
           .map(
             (size) => DropdownMenuItem<int>(
               value: size,
-              child: Text('$size', style: const TextStyle(fontSize: AppTypography.document)),
+              child: Text(
+                '$size',
+                style: const TextStyle(fontSize: AppTypography.document),
+              ),
             ),
           )
           .toList(),

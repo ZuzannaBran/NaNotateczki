@@ -365,7 +365,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
     return AlertDialog(
       title: Text(
         widget.session == null
-            ? (_kind == StudyEntryKind.event ? 'New event' : 'New study session')
+            ? (_kind == StudyEntryKind.event
+                  ? 'New event'
+                  : 'New study session')
             : (_kind == StudyEntryKind.event ? 'Edit event' : 'Edit session'),
       ),
       content: SizedBox(
@@ -474,8 +476,8 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                       isExpanded: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                        ),
                       ),
                       items: [
                         for (var blocks = 1; blocks <= 12; blocks++)
@@ -508,9 +510,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                     onPressed: _pickColor,
                     icon: Icon(
                       Icons.palette_outlined,
-                      color: _color == null
-                          ? scheme.onSurface
-                          : _color!,
+                      color: _color == null ? scheme.onSurface : _color!,
                       size: 18,
                     ),
                     label: const Text('Colour'),
@@ -532,10 +532,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   ),
                   if (_kind == StudyEntryKind.session || !_allDay)
                     OutlinedButton.icon(
-                    onPressed: _pickTime,
-                    icon: const Icon(Icons.schedule, size: 18),
-                    label: Text(studyClock(_date)),
-                  ),
+                      onPressed: _pickTime,
+                      icon: const Icon(Icons.schedule, size: 18),
+                      label: Text(studyClock(_date)),
+                    ),
                 ],
               ),
               if (_kind == StudyEntryKind.event) ...[
@@ -562,10 +562,12 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                       key: const ValueKey('event-end-date'),
                       onPressed: _pickEndDate,
                       icon: const Icon(Icons.date_range_outlined, size: 18),
-                      label: Text(_endDate == null
-                          ? 'End date (optional)'
-                          : '${_endDate!.day}.${_endDate!.month}.'
-                            '${_endDate!.year}'),
+                      label: Text(
+                        _endDate == null
+                            ? 'End date (optional)'
+                            : '${_endDate!.day}.${_endDate!.month}.'
+                                  '${_endDate!.year}',
+                      ),
                     ),
                     if (_endDate != null)
                       TextButton(
@@ -624,8 +626,8 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                       isExpanded: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                        ),
                       ),
                       items: [
                         for (var interval = 1; interval <= 12; interval++)
@@ -850,7 +852,8 @@ class StudyTimerCard extends StatelessWidget {
                   shrinkWrap: true,
                   primary: false,
                   physics: TouchNavigationScrollPhysics(
-                    sensitivity: context
+                    sensitivity:
+                        context
                             .watch<AppPreferencesController?>()
                             ?.touchNavigationSensitivity ??
                         1.0,
@@ -868,66 +871,68 @@ class StudyTimerCard extends StatelessWidget {
                           bottom: item == next.last ? 0 : 8,
                         ),
                         child: Material(
-                        key: ValueKey('sidebar-upcoming-card:${item.id}'),
-                        color: StudyActionStyles.sessionCardColor(
-                          Theme.of(context),
-                          item.colorValue,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: Theme.of(context).brightness ==
-                                    Brightness.dark
-                                ? colors.outlineVariant
-                                : AppColors.toolbar,
+                          key: ValueKey('sidebar-upcoming-card:${item.id}'),
+                          color: StudyActionStyles.sessionCardColor(
+                            Theme.of(context),
+                            item.colorValue,
                           ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(9, 5, 2, 5),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      item.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: AppTypography.document,
-                                        fontWeight: FontWeight.w600,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? colors.outlineVariant
+                                  : AppColors.toolbar,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(9, 5, 2, 5),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        item.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: AppTypography.document,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      '${item.scheduledAt.day}/'
-                                      '${item.scheduledAt.month}'
-                                      ' · ${studyClock(item.scheduledAt)}',
-                                      style: TextStyle(
-                                        fontSize: AppTypography.small,
-                                        color: colors.onSurfaceVariant,
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        '${item.scheduledAt.day}/'
+                                        '${item.scheduledAt.month}'
+                                        ' · ${studyClock(item.scheduledAt)}',
+                                        style: TextStyle(
+                                          fontSize: AppTypography.small,
+                                          color: colors.onSurfaceVariant,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              IconButton(
-                                tooltip: 'Start scheduled session',
-                                icon: const Icon(
-                                  Icons.play_arrow_rounded,
-                                  size: 18,
+                                IconButton(
+                                  tooltip: 'Start scheduled session',
+                                  icon: const Icon(
+                                    Icons.play_arrow_rounded,
+                                    size: 18,
+                                  ),
+                                  onPressed: active == null
+                                      ? () => planner.start(item.id)
+                                      : null,
                                 ),
-                                onPressed: active == null
-                                    ? () => planner.start(item.id)
-                                    : null,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),

@@ -502,8 +502,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final notebook =
         library.selectedItem() ??
         (library.items.isEmpty ? null : library.items.first);
-    final editorNotebook =
-        notebook?.kind == NotebookKind.planner ? null : notebook;
+    final editorNotebook = notebook?.kind == NotebookKind.planner
+        ? null
+        : notebook;
     final repository = context.read<NotebookRepository>();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -1030,9 +1031,7 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                     physics: TouchNavigationScrollPhysics(
                       sensitivity: touchNavigationGain,
                     ),
-                    child: StudyTimerCard(
-                      upcomingMaxHeight: upcomingMaxHeight,
-                    ),
+                    child: StudyTimerCard(upcomingMaxHeight: upcomingMaxHeight),
                   ),
                 ),
               SizedBox(
@@ -1828,18 +1827,13 @@ class _LeftZoneToggleTab extends StatelessWidget {
               .map(
                 (shadow) => shadow.copyWith(
                   offset: Offset(shadow.offset.dy, 0),
-                  color: shadow.color.withValues(
-                    alpha: shadow.color.a * 0.3,
-                  ),
+                  color: shadow.color.withValues(alpha: shadow.color.a * 0.3),
                 ),
               )
               .toList(growable: false);
     return DecoratedBox(
       key: const ValueKey('study-panel-shadow'),
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: shadows,
-      ),
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: shadows),
       child: tab,
     );
   }

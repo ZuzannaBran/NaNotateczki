@@ -113,9 +113,7 @@ void main() {
       tester.getTopLeft(studyToggle).dx,
       closeTo(tester.getTopLeft(studyDivider).dx + 8, 0.1),
     );
-    final chevron = find.byKey(
-      const ValueKey('study-panel-chevron-rotation'),
-    );
+    final chevron = find.byKey(const ValueKey('study-panel-chevron-rotation'));
     expect(
       tester.widget<Transform>(chevron).transform.entry(1, 0),
       closeTo(-1, 0.001),
@@ -130,9 +128,13 @@ void main() {
     expect(studyMaterial.elevation, 0);
     expect(folderMaterial.elevation, 8);
     expect(studyMaterial.shadowColor, folderMaterial.shadowColor);
-    final shadow = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('study-panel-shadow')),
-    ).decoration as BoxDecoration;
+    final shadow =
+        tester
+                .widget<DecoratedBox>(
+                  find.byKey(const ValueKey('study-panel-shadow')),
+                )
+                .decoration
+            as BoxDecoration;
     final originalShadows = kElevationToShadow[8]!;
     expect(shadow.boxShadow, hasLength(originalShadows.length));
     for (var i = 0; i < originalShadows.length; i++) {
@@ -159,16 +161,18 @@ void main() {
     );
     expect(find.byTooltip('Hide study planner'), findsOneWidget);
 
-    await tester.tapAt(
-      tester.getTopLeft(studyToggle) + const Offset(22, 4),
-    );
+    await tester.tapAt(tester.getTopLeft(studyToggle) + const Offset(22, 4));
     await tester.pump();
     expect(find.byKey(const ValueKey('sidebar-timer-region')), findsNothing);
     expect(find.byKey(const ValueKey('sidebar-account-divider')), findsNothing);
     expect(find.byTooltip('Show study planner'), findsOneWidget);
-    final collapsedShadow = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('study-panel-shadow')),
-    ).decoration as BoxDecoration;
+    final collapsedShadow =
+        tester
+                .widget<DecoratedBox>(
+                  find.byKey(const ValueKey('study-panel-shadow')),
+                )
+                .decoration
+            as BoxDecoration;
     expect(collapsedShadow.boxShadow, orderedEquals(shadow.boxShadow!));
     expect(
       tester.widget<Transform>(chevron).transform.entry(1, 0),
@@ -185,8 +189,10 @@ void main() {
     await tester.tap(studyToggle);
     await tester.pump();
     expect(find.byKey(const ValueKey('sidebar-timer-region')), findsOneWidget);
-    expect(find.byKey(const ValueKey('sidebar-account-divider')),
-        findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('sidebar-account-divider')),
+      findsOneWidget,
+    );
 
     await tester.binding.setSurfaceSize(const Size(959, 700));
     await tester.pump();
@@ -650,7 +656,10 @@ void main() {
       findsNothing,
     );
     for (final label in [
-      'New folder', 'New notebook', 'New board', 'New planner',
+      'New folder',
+      'New notebook',
+      'New board',
+      'New planner',
     ]) {
       expect(
         tester.widget<Text>(find.text(label)).style?.fontSize,

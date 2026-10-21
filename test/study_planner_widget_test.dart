@@ -52,16 +52,11 @@ void main() {
       title: 'Museum visit',
       scheduledAt: date,
     );
-    final session = planner.create(
-      title: 'Revision',
-      scheduledAt: date,
-    );
+    final session = planner.create(title: 'Revision', scheduledAt: date);
     await tester.pumpWidget(
       ChangeNotifierProvider<StudyPlannerController>.value(
         value: planner,
-        child: const MaterialApp(
-          home: Scaffold(body: StudyTimerCard()),
-        ),
+        child: const MaterialApp(home: Scaffold(body: StudyTimerCard())),
       ),
     );
     await tester.pumpAndSettle();
@@ -92,9 +87,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<StudyPlannerController>.value(
         value: planner,
-        child: const MaterialApp(
-          home: Scaffold(body: StudyTimerCard()),
-        ),
+        child: const MaterialApp(home: Scaffold(body: StudyTimerCard())),
       ),
     );
     await tester.pumpAndSettle();
@@ -142,9 +135,7 @@ void main() {
       await tester.pumpAndSettle();
       await openCalendarEntry(tester, kind);
 
-      final nameLabel = find.byKey(
-        const ValueKey('study-entry-name-label'),
-      );
+      final nameLabel = find.byKey(const ValueKey('study-entry-name-label'));
       final descriptionLabel = find.byKey(
         const ValueKey('study-entry-description-label'),
       );
@@ -216,9 +207,7 @@ void main() {
     await planner.flush();
   });
 
-  testWidgets('calendar plus asks for event or study session', (
-    tester,
-  ) async {
+  testWidgets('calendar plus asks for event or study session', (tester) async {
     final planner = await loadPlanner();
     await tester.binding.setSurfaceSize(const Size(1440, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -299,10 +288,7 @@ void main() {
       focusBlocks: 3,
     );
     expect(smart.scheduledDurationMinutes, 85);
-    expect(
-      calendarTimeSpan(smart, day)!.height,
-      closeTo(85 * 64 / 60, 0.001),
-    );
+    expect(calendarTimeSpan(smart, day)!.height, closeTo(85 * 64 / 60, 0.001));
     final midnight = StudySession(
       id: 'next',
       title: 'Late session',
@@ -310,17 +296,12 @@ void main() {
       minutes: 30,
     );
     expect(calendarTimeSpan(midnight, day)!.height, closeTo(16, 0.001));
-    final nextDay = calendarTimeSpan(
-      midnight,
-      DateTime(2026, 10, 21),
-    )!;
+    final nextDay = calendarTimeSpan(midnight, DateTime(2026, 10, 21))!;
     expect(nextDay.top, 0);
     expect(nextDay.height, closeTo(16, 0.001));
   });
 
-  testWidgets('minute-precise geometry agrees in Week and Day', (
-    tester,
-  ) async {
+  testWidgets('minute-precise geometry agrees in Week and Day', (tester) async {
     final planner = await loadPlanner();
     await tester.binding.setSurfaceSize(const Size(1440, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -355,9 +336,7 @@ void main() {
     );
     await tester.tap(find.text('Day').last);
     await tester.pumpAndSettle();
-    final daily = find.byKey(
-      ValueKey('planner-time-position:${session.id}'),
-    );
+    final daily = find.byKey(ValueKey('planner-time-position:${session.id}'));
     final day15 = find.byKey(ValueKey('planner-hour-row-$key-15'));
     final day16 = find.byKey(ValueKey('planner-hour-row-$key-16'));
     expect(daily, findsOneWidget);
@@ -391,8 +370,7 @@ void main() {
       today.day - today.weekday + 1,
     );
     final tue = DateTime(mon.year, mon.month, mon.day + 1);
-    String key(DateTime date) =>
-        '${date.year}-${date.month}-${date.day}';
+    String key(DateTime date) => '${date.year}-${date.month}-${date.day}';
     await tester.tap(find.byKey(ValueKey('planner-day-label-${key(tue)}')));
     await tester.pumpAndSettle();
     expect(
@@ -494,10 +472,7 @@ void main() {
 
       void verifyStrip(Finder finder) {
         final container = tester.widget<Container>(
-          find.descendant(
-            of: finder,
-            matching: find.byType(Container),
-          ).first,
+          find.descendant(of: finder, matching: find.byType(Container)).first,
         );
         final decoration = container.decoration! as BoxDecoration;
         expect(
@@ -515,15 +490,13 @@ void main() {
         final row = tester.widget<Row>(rowFinder.first);
         expect(row.children.length, 7);
         for (var index = 0; index < 7; index++) {
-          final segment = (row.children[index] as Expanded).child
-              as Container;
+          final segment = (row.children[index] as Expanded).child as Container;
           final overlay = segment.foregroundDecoration;
           if (index == 6) {
             expect(overlay, isNull);
           } else {
             expect(overlay, isA<BoxDecoration>());
-            final overlayBorder =
-                (overlay! as BoxDecoration).border! as Border;
+            final overlayBorder = (overlay! as BoxDecoration).border! as Border;
             expect(overlayBorder.right.width, 1);
           }
         }
@@ -532,9 +505,7 @@ void main() {
       verifyStrip(weekHeader);
       final now = DateTime.now();
       final dayKey = '${now.year}-${now.month}-${now.day}';
-      final label = find.byKey(
-        ValueKey('planner-week-hour-label-${now.hour}'),
-      );
+      final label = find.byKey(ValueKey('planner-week-hour-label-${now.hour}'));
       final hourCell = find.byKey(
         ValueKey('planner-week-cell-$dayKey-${now.hour}'),
       );
@@ -544,9 +515,7 @@ void main() {
         tester.getRect(label).top,
         closeTo(tester.getRect(hourCell).top, 2),
       );
-      final hourlyList = find.byKey(
-        const ValueKey('planner-week-hours'),
-      );
+      final hourlyList = find.byKey(const ValueKey('planner-week-hours'));
       expect(
         tester.getRect(weekHeader).bottom,
         closeTo(tester.getRect(hourlyList).top, 0.1),
@@ -569,27 +538,17 @@ void main() {
       expect(columnLines, findsOneWidget);
       final painter = tester.widget<CustomPaint>(columnLines);
       expect(painter.foregroundPainter, isNotNull);
-      expect(
-        tester.getRect(columnLines),
-        tester.getRect(hourlyList),
-      );
+      expect(tester.getRect(columnLines), tester.getRect(hourlyList));
 
       await tester.tap(find.text('Day').last);
       await tester.pumpAndSettle();
-      final row = find.byKey(
-        ValueKey('planner-hour-row-$dayKey-${now.hour}'),
-      );
+      final row = find.byKey(ValueKey('planner-hour-row-$dayKey-${now.hour}'));
       final hourText = find.descendant(
         of: row,
-        matching: find.text(
-          '${now.hour.toString().padLeft(2, '0')}:00',
-        ),
+        matching: find.text('${now.hour.toString().padLeft(2, '0')}:00'),
       );
       expect(hourText, findsOneWidget);
-      expect(
-        tester.getRect(hourText).top,
-        closeTo(tester.getRect(row).top, 2),
-      );
+      expect(tester.getRect(hourText).top, closeTo(tester.getRect(row).top, 2));
 
       await tester.tap(find.text('Month'));
       await tester.pumpAndSettle();
@@ -623,9 +582,7 @@ void main() {
       final seventh = start[6];
 
       Finder monthCell(DateTime day) => find.byKey(
-        ValueKey(
-          'planner-day-cell-${day.year}-${day.month}-${day.day}',
-        ),
+        ValueKey('planner-day-cell-${day.year}-${day.month}-${day.day}'),
       );
 
       final firstCell = tester.widget<Container>(monthCell(first));
@@ -684,17 +641,14 @@ void main() {
         month = DateTime(month.year, month.month + 1);
         days = monthCalendarDays(month);
       }
-      final other = days.firstWhere(
-        (date) => date.month != month.month,
-      );
+      final other = days.firstWhere((date) => date.month != month.month);
       final inside = days.firstWhere(
-        (date) => date.month == month.month &&
+        (date) =>
+            date.month == month.month &&
             !DateUtils.isSameDay(date, DateTime.now()),
       );
       Finder dayCell(DateTime date) => find.byKey(
-        ValueKey(
-          'planner-day-cell-${date.year}-${date.month}-${date.day}',
-        ),
+        ValueKey('planner-day-cell-${date.year}-${date.month}-${date.day}'),
       );
 
       final outerCell = tester.widget<Container>(dayCell(other));
@@ -735,10 +689,7 @@ void main() {
     final config = find.byKey(const ValueKey('planner-scrollbar-free'));
     expect(config, findsOneWidget);
     expect(
-      find.descendant(
-        of: config,
-        matching: find.byType(RawScrollbar),
-      ),
+      find.descendant(of: config, matching: find.byType(RawScrollbar)),
       findsNothing,
     );
 
@@ -760,10 +711,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: config,
-        matching: find.byType(RawScrollbar),
-      ),
+      find.descendant(of: config, matching: find.byType(RawScrollbar)),
       findsNothing,
     );
     await tester.tap(find.text('Month'));
@@ -773,10 +721,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: config,
-        matching: find.byType(RawScrollbar),
-      ),
+      find.descendant(of: config, matching: find.byType(RawScrollbar)),
       findsNothing,
     );
     expect(tester.takeException(), isNull);
@@ -797,16 +742,12 @@ void main() {
     await tester.pumpAndSettle();
     final week = find.byKey(const ValueKey('planner-week-time-grid'));
     expect(tester.getRect(week).left, closeTo(18, 0.1));
-    final header = find.byKey(
-      const ValueKey('planner-week-header-strip'),
-    );
+    final header = find.byKey(const ValueKey('planner-week-header-strip'));
     expect(tester.getRect(header).left, closeTo(70, 0.1));
     expect(
       tester.getRect(header).bottom,
       closeTo(
-        tester.getRect(
-          find.byKey(const ValueKey('planner-week-hours')),
-        ).top,
+        tester.getRect(find.byKey(const ValueKey('planner-week-hours'))).top,
         0.1,
       ),
     );
@@ -816,10 +757,7 @@ void main() {
       const ValueKey('planner-mobile-month-surface'),
     );
     expect(unifiedList, findsOneWidget);
-    expect(
-      tester.widget<Container>(unifiedList).clipBehavior,
-      Clip.antiAlias,
-    );
+    expect(tester.widget<Container>(unifiedList).clipBehavior, Clip.antiAlias);
     expect(tester.takeException(), isNull);
   });
 
@@ -852,8 +790,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      String keyDate(DateTime date) =>
-          '${date.year}-${date.month}-${date.day}';
+      String keyDate(DateTime date) => '${date.year}-${date.month}-${date.day}';
       final todayKey = keyDate(now);
       final cell = find.byKey(ValueKey('planner-day-cell-$todayKey'));
       final otherCell = find.byKey(
@@ -867,10 +804,7 @@ void main() {
       final shade = darkMode
           ? theme.colorScheme.surface
           : theme.colorScheme.surfaceContainerHighest;
-      final expected = Color.alphaBlend(
-        shade.withValues(alpha: 0.5),
-        base,
-      );
+      final expected = Color.alphaBlend(shade.withValues(alpha: 0.5), base);
       expect(cellColor(cell), expected);
       expect(cellColor(otherCell), base);
       expect(
@@ -882,9 +816,10 @@ void main() {
       expect(week, findsOneWidget);
       expect(find.byKey(const ValueKey('planner-week-hours')), findsOneWidget);
       expect(
-        tester.widget<ListView>(
-          find.byKey(const ValueKey('planner-week-hours')),
-        ).childrenDelegate.estimatedChildCount,
+        tester
+            .widget<ListView>(find.byKey(const ValueKey('planner-week-hours')))
+            .childrenDelegate
+            .estimatedChildCount,
         1,
       );
       expect(
@@ -899,10 +834,7 @@ void main() {
         find.byKey(ValueKey('planner-week-cell-$todayKey-${now.hour}')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(ValueKey('planner-hour-list-$todayKey')),
-        findsNothing,
-      );
+      expect(find.byKey(ValueKey('planner-hour-list-$todayKey')), findsNothing);
       expect(
         find.byKey(ValueKey('planner-session-tile:${session.id}')),
         findsOneWidget,
@@ -922,9 +854,7 @@ void main() {
       );
       final time = find.descendant(
         of: hour,
-        matching: find.text(
-          '${now.hour.toString().padLeft(2, '0')}:00',
-        ),
+        matching: find.text('${now.hour.toString().padLeft(2, '0')}:00'),
       );
       final tile = find.byKey(ValueKey('planner-session-tile:${session.id}'));
       expect(
@@ -1051,17 +981,17 @@ void main() {
       expect(start.height, 32);
       expect(start.height, closeTo(smart.height, 0.1));
       expect(
-        tester.widget<Padding>(
-          find.byKey(const ValueKey('study-timer-card')),
-        ).padding,
+        tester
+            .widget<Padding>(find.byKey(const ValueKey('study-timer-card')))
+            .padding,
         const EdgeInsets.fromLTRB(14, 20, 14, 16),
       );
       expect(timer.bottom - start.bottom, closeTo(16, 0.1));
       expect(
         start.top -
-            tester.getRect(
-              find.text('Ready for your next focus session?'),
-            ).bottom,
+            tester
+                .getRect(find.text('Ready for your next focus session?'))
+                .bottom,
         closeTo(30, 0.1),
       );
       expect(start.top, closeTo(smart.top, 0.1));
@@ -1144,9 +1074,7 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      final calendar = find.byKey(
-        ValueKey('planner-session-tile:${first.id}'),
-      );
+      final calendar = find.byKey(ValueKey('planner-session-tile:${first.id}'));
       expect(calendar, findsOneWidget);
       final sidebarMaterial = tester.widget<Material>(upcoming);
       final calendarMaterial = tester.widget<Material>(calendar);
@@ -1198,9 +1126,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final region = find.byKey(
-      const ValueKey('sidebar-upcoming-height-cap'),
-    );
+    final region = find.byKey(const ValueKey('sidebar-upcoming-height-cap'));
     expect(tester.getSize(region).height, lessThanOrEqualTo(140));
     final scroll = find.byKey(const ValueKey('sidebar-upcoming-scroll'));
     expect(scroll, findsOneWidget);
@@ -1259,10 +1185,7 @@ void main() {
     await tester.pumpAndSettle();
     final heading = find.byKey(const ValueKey('study-finished-title'));
     expect(heading, findsOneWidget);
-    expect(
-      tester.widget<Text>(heading).style,
-      AppHeaderDivider.titleStyle,
-    );
+    expect(tester.widget<Text>(heading).style, AppHeaderDivider.titleStyle);
     expect(tester.widget<Text>(heading).textAlign, TextAlign.center);
     expect(
       find.ancestor(of: heading, matching: find.byType(Center)),
@@ -1308,15 +1231,21 @@ void main() {
     expect(find.text('Description'), findsOneWidget);
     expect(
       tester.getTopLeft(nameLabel).dy,
-      lessThan(tester.getTopLeft(
-        find.byKey(const ValueKey('study-entry-name-field')),
-      ).dy),
+      lessThan(
+        tester
+            .getTopLeft(find.byKey(const ValueKey('study-entry-name-field')))
+            .dy,
+      ),
     );
     expect(
       tester.getTopLeft(descriptionLabel).dy,
-      lessThan(tester.getTopLeft(
-        find.byKey(const ValueKey('study-entry-description-field')),
-      ).dy),
+      lessThan(
+        tester
+            .getTopLeft(
+              find.byKey(const ValueKey('study-entry-description-field')),
+            )
+            .dy,
+      ),
     );
     await tester.enterText(
       find.byKey(const ValueKey('study-entry-name-field')),
@@ -1339,9 +1268,7 @@ void main() {
 
     final item = planner.sessions.single;
     expect(item.colorValue, first.toARGB32());
-    final calendar = find.byKey(
-      ValueKey('planner-session-tile:${item.id}'),
-    );
+    final calendar = find.byKey(ValueKey('planner-session-tile:${item.id}'));
     final theme = Theme.of(tester.element(calendar));
     expect(
       tester.widget<Material>(calendar).color,
@@ -1422,9 +1349,15 @@ void main() {
       StudyActionStyles.sessionButtonHeight,
     );
     expect(tester.getSize(stop).height, StudyActionStyles.sessionButtonHeight);
-    final shape = tester.widget<OutlinedButton>(toggle).style!.shape!
+    final shape = tester
+        .widget<OutlinedButton>(toggle)
+        .style!
+        .shape!
         .resolve(<WidgetState>{});
-    final stopShape = tester.widget<OutlinedButton>(stop).style!.shape!
+    final stopShape = tester
+        .widget<OutlinedButton>(stop)
+        .style!
+        .shape!
         .resolve(<WidgetState>{});
     expect(shape, StudyActionStyles.sessionButtonShape);
     expect(stopShape, StudyActionStyles.sessionButtonShape);
@@ -1649,15 +1582,23 @@ void main() {
     expect(outsideLabel, findsOneWidget);
     expect(insideLabel, findsOneWidget);
     expect(
-      tester.widget<Opacity>(
-        find.ancestor(of: outsideLabel, matching: find.byType(Opacity)).first,
-      ).opacity,
+      tester
+          .widget<Opacity>(
+            find
+                .ancestor(of: outsideLabel, matching: find.byType(Opacity))
+                .first,
+          )
+          .opacity,
       0.5,
     );
     expect(
-      tester.widget<Opacity>(
-        find.ancestor(of: insideLabel, matching: find.byType(Opacity)).first,
-      ).opacity,
+      tester
+          .widget<Opacity>(
+            find
+                .ancestor(of: insideLabel, matching: find.byType(Opacity))
+                .first,
+          )
+          .opacity,
       1,
     );
     expect(tester.takeException(), isNull);
@@ -1729,8 +1670,9 @@ void main() {
     }
     final mode = find.byType(SegmentedButton<CalendarMode>);
     final theme = Theme.of(tester.element(mode));
-    final shape = theme.segmentedButtonTheme.style!.shape!
-        .resolve(<WidgetState>{});
+    final shape = theme.segmentedButtonTheme.style!.shape!.resolve(
+      <WidgetState>{},
+    );
     expect(
       (shape! as RoundedRectangleBorder).borderRadius,
       const BorderRadius.all(Radius.circular(12)),

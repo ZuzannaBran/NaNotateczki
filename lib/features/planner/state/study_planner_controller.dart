@@ -105,11 +105,10 @@ class StudySession {
     if (kind == StudyEntryKind.event) {
       final last = eventEndDate ?? scheduledAt;
       final days = DateTime.utc(last.year, last.month, last.day)
-          .difference(DateTime.utc(
-            scheduledAt.year,
-            scheduledAt.month,
-            scheduledAt.day,
-          )).inDays;
+          .difference(
+            DateTime.utc(scheduledAt.year, scheduledAt.month, scheduledAt.day),
+          )
+          .inDays;
       if (allDay) {
         return (days + 1) * 1440;
       }
@@ -182,8 +181,7 @@ class StudySession {
           .clamp(1, 1440)
           .toInt(),
       technique: technique,
-      focusBlocks: (json['focusBlocks'] as num?)?.toInt() ??
-          technique.rounds,
+      focusBlocks: (json['focusBlocks'] as num?)?.toInt() ?? technique.rounds,
       colorValue: json['colorValue'] is int
           ? (json['colorValue'] as int) | 0xFF000000
           : null,
@@ -284,18 +282,14 @@ class StudyPlannerController extends ChangeNotifier {
     final end = DateTime(last.year, last.month, last.day + 1);
     final result = <StudySession>[];
 
-    DateTime wallClock(DateTime time) => DateTime.utc(
-      time.year,
-      time.month,
-      time.day,
-      time.hour,
-      time.minute,
-    );
+    DateTime wallClock(DateTime time) =>
+        DateTime.utc(time.year, time.month, time.day, time.hour, time.minute);
 
     bool visible(StudySession entry) {
       final began = wallClock(entry.scheduledAt);
       return began.isBefore(wallClock(end)) &&
-          began.add(Duration(minutes: entry.scheduledDurationMinutes))
+          began
+              .add(Duration(minutes: entry.scheduledDurationMinutes))
               .isAfter(wallClock(start));
     }
 
@@ -324,9 +318,9 @@ class StudyPlannerController extends ChangeNotifier {
         StudyRepeat.monthly => math.max(
           0,
           ((start.year - session.scheduledAt.year) * 12 +
-                      start.month -
-                      session.scheduledAt.month -
-                      2) ~/
+                  start.month -
+                  session.scheduledAt.month -
+                  2) ~/
               every,
         ),
         StudyRepeat.yearly => math.max(
@@ -581,11 +575,14 @@ class StudyPlannerController extends ChangeNotifier {
       return;
     }
     final difference = DateTime.utc(date.year, date.month, date.day)
-        .difference(DateTime.utc(
-          session.scheduledAt.year,
-          session.scheduledAt.month,
-          session.scheduledAt.day,
-        )).inDays;
+        .difference(
+          DateTime.utc(
+            session.scheduledAt.year,
+            session.scheduledAt.month,
+            session.scheduledAt.day,
+          ),
+        )
+        .inDays;
     session.scheduledAt = DateTime(
       date.year,
       date.month,
@@ -595,8 +592,11 @@ class StudyPlannerController extends ChangeNotifier {
     );
     final last = session.eventEndDate;
     if (last != null) {
-      session.eventEndDate =
-          DateTime(last.year, last.month, last.day + difference);
+      session.eventEndDate = DateTime(
+        last.year,
+        last.month,
+        last.day + difference,
+      );
     }
     _changed();
   }

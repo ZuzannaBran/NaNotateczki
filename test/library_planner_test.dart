@@ -40,9 +40,7 @@ void main() {
       deadline: DateTime(2026, 10, 19),
     );
     final done = late.copyWith(completed: true);
-    final todayAllDay = upcoming.copyWith(
-      deadline: DateTime(2026, 10, 20),
-    );
+    final todayAllDay = upcoming.copyWith(deadline: DateTime(2026, 10, 20));
     final timed = upcoming.copyWith(
       deadline: DateTime(2026, 10, 20, 15),
       deadlineHasTime: true,
@@ -62,10 +60,7 @@ void main() {
       PlannerTask.fromJson(upcoming.toJson())!.deadline,
       upcoming.deadline,
     );
-    expect(
-      upcoming.copyWith(clearDeadline: true).deadlineHasTime,
-      isFalse,
-    );
+    expect(upcoming.copyWith(clearDeadline: true).deadlineHasTime, isFalse);
     expect(PlannerTask.fromJson({'title': 'Bad'}), isNull);
   });
 
@@ -120,7 +115,8 @@ void main() {
       await repository.fetchNotebooks(),
       folders: library.folderNames,
       plannerTasks: {
-        planner.uid: library.plannerTasks(planner.uid)
+        planner.uid: library
+            .plannerTasks(planner.uid)
             .map((item) => item.toJson())
             .toList(),
       },
@@ -128,9 +124,9 @@ void main() {
     final decoded = repository.decodePortableBackup(portable);
     expect(decoded.plannerTasks.containsKey(planner.uid), isTrue);
     expect((decoded.plannerTasks[planner.uid] as List), hasLength(1));
-    final payload = jsonDecode((await readStoredText(
-      'library_folders.json',
-    ))!) as Map<String, dynamic>;
+    final payload =
+        jsonDecode((await readStoredText('library_folders.json'))!)
+            as Map<String, dynamic>;
     expect((payload['plannerTasks'] as Map)[planner.uid], hasLength(1));
 
     final restored = newLibrary();
@@ -142,43 +138,35 @@ void main() {
     expect(result.deadlineHasTime, isTrue);
     expect(result.deadline!.hour, 17);
     final second = await restored.addPlannerTask(planner.uid);
-    expect(
-      restored.plannerTasks(planner.uid).map((item) => item.id).toList(),
-      [second.id, result.id],
-    );
+    expect(restored.plannerTasks(planner.uid).map((item) => item.id).toList(), [
+      second.id,
+      result.id,
+    ]);
     await restored.flushPlannerTasks();
-    final saved = jsonDecode(
-      (await readStoredText('library_folders.json'))!,
-    ) as Map<String, dynamic>;
+    final saved =
+        jsonDecode((await readStoredText('library_folders.json'))!)
+            as Map<String, dynamic>;
     saved['plannerCompletedLast'] = {planner.uid: false};
     await writeStoredText('library_folders.json', jsonEncode(saved));
 
     final legacy = newLibrary();
     await legacy.initialize();
-    expect(
-      legacy.plannerTasks(planner.uid).map((item) => item.id).toList(),
-      [second.id, result.id],
-    );
+    expect(legacy.plannerTasks(planner.uid).map((item) => item.id).toList(), [
+      second.id,
+      result.id,
+    ]);
     legacy.dispose();
 
-    await restored.updatePlannerTask(
-      planner.uid,
+    await restored.updatePlannerTask(planner.uid, result.id, completed: false);
+    expect(restored.plannerTasks(planner.uid).map((item) => item.id).toList(), [
       result.id,
-      completed: false,
-    );
-    expect(
-      restored.plannerTasks(planner.uid).map((item) => item.id).toList(),
-      [result.id, second.id],
-    );
-    await restored.updatePlannerTask(
-      planner.uid,
+      second.id,
+    ]);
+    await restored.updatePlannerTask(planner.uid, result.id, completed: true);
+    expect(restored.plannerTasks(planner.uid).map((item) => item.id).toList(), [
+      second.id,
       result.id,
-      completed: true,
-    );
-    expect(
-      restored.plannerTasks(planner.uid).map((item) => item.id).toList(),
-      [second.id, result.id],
-    );
+    ]);
 
     await restored.updatePlannerTask(
       planner.uid,
@@ -187,7 +175,8 @@ void main() {
     );
     await restored.flushPlannerTasks();
     expect(
-      restored.plannerTasks(planner.uid)
+      restored
+          .plannerTasks(planner.uid)
           .firstWhere((item) => item.id == result.id)
           .deadline,
       isNull,
@@ -230,10 +219,7 @@ void main() {
         value: library,
         child: MaterialApp(
           theme: AppTheme.light(),
-          home: TaskListScreen(
-            planner: planner,
-            onSettings: () {},
-          ),
+          home: TaskListScreen(planner: planner, onSettings: () {}),
         ),
       ),
     );
@@ -243,10 +229,7 @@ void main() {
     final addButton = tester.widget<FilledButton>(
       find.byKey(const ValueKey('planner-add-task')),
     );
-    expect(
-      addButton.style!.backgroundColor!.resolve({}),
-      AppColors.toolbar,
-    );
+    expect(addButton.style!.backgroundColor!.resolve({}), AppColors.toolbar);
     await tester.tap(find.byKey(const ValueKey('planner-add-task')));
     await tester.pumpAndSettle();
     final task = library.plannerTasks(planner.uid).single;
@@ -257,9 +240,7 @@ void main() {
       findsNothing,
     );
 
-    final deleteButton = find.byKey(
-      ValueKey('planner-task-delete:${task.id}'),
-    );
+    final deleteButton = find.byKey(ValueKey('planner-task-delete:${task.id}'));
     final originalDeleteRight = tester.getTopRight(deleteButton).dx;
     await tester.enterText(
       find.byKey(ValueKey('planner-task-name:${task.id}')),
@@ -284,12 +265,17 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(370, 800));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.byKey(ValueKey('planner-task-date:${task.id}')), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('planner-task-date:${task.id}')),
+      findsOneWidget,
+    );
     expect(
       tester.getTopRight(deleteButton).dx,
-      greaterThan(tester.getTopRight(
-        find.byKey(ValueKey('planner-task-date:${task.id}')),
-      ).dx),
+      greaterThan(
+        tester
+            .getTopRight(find.byKey(ValueKey('planner-task-date:${task.id}')))
+            .dx,
+      ),
     );
 
     await library.updatePlannerTask(
@@ -300,21 +286,14 @@ void main() {
     await tester.pump();
     expect(tester.widget<Container>(row).color, AppColors.paper);
 
-    await tester.tap(
-      find.byKey(ValueKey('planner-task-check:${task.id}')),
-    );
+    await tester.tap(find.byKey(ValueKey('planner-task-check:${task.id}')));
     await tester.pump();
     expect(library.plannerTasks(planner.uid).single.completed, isTrue);
     expect(tester.widget<Container>(row).color, AppColors.toolbar);
-    final rowOpacity = find.ancestor(
-      of: row,
-      matching: find.byType(Opacity),
-    );
+    final rowOpacity = find.ancestor(of: row, matching: find.byType(Opacity));
     expect(rowOpacity, findsOneWidget);
     expect(tester.widget<Opacity>(rowOpacity).opacity, 0.6);
-    await tester.tap(
-      find.byKey(ValueKey('planner-task-delete:${task.id}')),
-    );
+    await tester.tap(find.byKey(ValueKey('planner-task-delete:${task.id}')));
     await tester.pump();
     expect(library.plannerTasks(planner.uid), isEmpty);
     await library.flushPlannerTasks();
@@ -355,9 +334,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final plannerRow = find.byKey(
-      ValueKey('library-tree-item:${planner.uid}'),
-    );
+    final plannerRow = find.byKey(ValueKey('library-tree-item:${planner.uid}'));
     expect(
       find.descendant(
         of: plannerRow,
@@ -418,5 +395,4 @@ void main() {
     preferences.dispose();
     await db.close();
   });
-
 }

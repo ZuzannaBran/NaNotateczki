@@ -15,18 +15,14 @@ import '../state/planner_task.dart';
 import 'study_timer_widgets.dart';
 
 /// Uses the folder sidebar color for Recent and completed tasks.
-Color plannerTaskBackground(
-  PlannerTaskTone tone, {
-  required ThemeData theme,
-}) {
+Color plannerTaskBackground(PlannerTaskTone tone, {required ThemeData theme}) {
   final darkMode = theme.brightness == Brightness.dark;
   return switch (tone) {
-    PlannerTaskTone.undated || PlannerTaskTone.completed =>
-      theme.colorScheme.surfaceContainerLowest,
+    PlannerTaskTone.undated ||
+    PlannerTaskTone.completed => theme.colorScheme.surfaceContainerLowest,
     PlannerTaskTone.upcoming =>
       darkMode ? AppColors.darkCanvas : AppColors.background,
-    PlannerTaskTone.overdue =>
-      darkMode ? AppColors.darkPaper : AppColors.paper,
+    PlannerTaskTone.overdue => darkMode ? AppColors.darkPaper : AppColors.paper,
   };
 }
 
@@ -53,7 +49,8 @@ class TaskListScreen extends StatelessWidget {
         ? AppColors.darkCanvas
         : AppColors.paper;
     final navigationSensitivity =
-        context.watch<AppPreferencesController?>()
+        context
+            .watch<AppPreferencesController?>()
             ?.touchNavigationSensitivity ??
         1.0;
 
@@ -62,9 +59,7 @@ class TaskListScreen extends StatelessWidget {
         title: planner.title,
         onSettings: onSettings,
         onOpenNavigation: onOpenNavigation,
-        extraActions: [
-          if (showCompactTimer) const CompactStudyTimer(),
-        ],
+        extraActions: [if (showCompactTimer) const CompactStudyTimer()],
       ),
       body: Column(
         children: [
@@ -133,7 +128,11 @@ class TaskListScreen extends StatelessWidget {
                                   )
                                 : Column(
                                     children: [
-                                      for (var i = 0; i < tasks.length; i++) ...[
+                                      for (
+                                        var i = 0;
+                                        i < tasks.length;
+                                        i++
+                                      ) ...[
                                         _PlannerTaskRow(
                                           key: ValueKey(
                                             'planner-task-${tasks[i].id}',
@@ -290,10 +289,7 @@ class _PlannerTaskRowState extends State<_PlannerTaskRow> {
               '${task.deadlineHasTime ? ' ${TimeOfDay.fromDateTime(task.deadline!).format(context)}' : ''}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: ink,
-                fontSize: AppTypography.small,
-              ),
+              style: TextStyle(color: ink, fontSize: AppTypography.small),
             ),
           ),
         ),

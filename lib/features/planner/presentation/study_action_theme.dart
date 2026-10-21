@@ -34,7 +34,6 @@ class StudyActionStyles {
       ? theme.colorScheme.outline
       : borderColor;
 
-
   static Color plannedSessionColor(ThemeData theme) =>
       theme.brightness == Brightness.dark
       ? theme.colorScheme.surfaceContainerHighest
@@ -50,9 +49,9 @@ class StudyActionStyles {
       return base;
     }
     return Color.alphaBlend(
-      Color(colorValue).withValues(
-        alpha: theme.brightness == Brightness.dark ? 0.45 : 0.32,
-      ),
+      Color(
+        colorValue,
+      ).withValues(alpha: theme.brightness == Brightness.dark ? 0.45 : 0.32),
       base,
     );
   }

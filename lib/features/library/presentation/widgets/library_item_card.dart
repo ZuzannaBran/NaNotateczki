@@ -45,10 +45,7 @@ class LibraryItemCard extends StatelessWidget {
           ).colorScheme.primary.withValues(alpha: 0.08),
           title: Align(
             alignment: Alignment.centerLeft,
-            child: _ItemKindIcon(
-              icon: itemIcon,
-              size: iconSize,
-            ),
+            child: _ItemKindIcon(icon: itemIcon, size: iconSize),
           ),
           onTap: onTap,
         ),
@@ -63,10 +60,7 @@ class LibraryItemCard extends StatelessWidget {
         selectedTileColor: Theme.of(
           context,
         ).colorScheme.primary.withValues(alpha: 0.08),
-        leading: _ItemKindIcon(
-          icon: itemIcon,
-          size: iconSize,
-        ),
+        leading: _ItemKindIcon(icon: itemIcon, size: iconSize),
         title: Text(
           item.title,
           style: Theme.of(context).textTheme.bodyLarge,

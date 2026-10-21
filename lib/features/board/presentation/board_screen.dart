@@ -746,9 +746,7 @@ class _BoardScreenState extends State<BoardScreen> {
         title: widget.title ?? controller.notebook.title,
         onOpenNavigation: widget.onOpenNavigation,
         onSettings: _openSettings,
-        extraActions: [
-          if (widget.showCompactTimer) const CompactStudyTimer(),
-        ],
+        extraActions: [if (widget.showCompactTimer) const CompactStudyTimer()],
       ),
       body: Stack(
         children: [

@@ -687,8 +687,9 @@ class _PlannerDocumentPreview extends StatelessWidget {
                         style: TextStyle(
                           fontSize: AppTypography.document,
                           color: scheme.onSurface,
-                          decoration:
-                              task.completed ? TextDecoration.lineThrough : null,
+                          decoration: task.completed
+                              ? TextDecoration.lineThrough
+                              : null,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

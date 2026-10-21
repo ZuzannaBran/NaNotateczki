@@ -448,10 +448,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('sidebar-timer-stop')));
     await tester.pumpAndSettle();
     expect(find.byType(SnackBar), findsNothing);
-    expect(
-      find.byKey(const ValueKey('study-finished-title')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('study-finished-title')), findsOneWidget);
     await tester.tap(find.text('Skip rating'));
     await tester.pumpAndSettle();
     expect(find.byType(SnackBar), findsNothing);

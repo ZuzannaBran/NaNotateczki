@@ -55,10 +55,7 @@ void main() {
       scheduledAt: DateTime(2026, 10, 21, 0, 15),
       minutes: 45,
     );
-    final placements = calendarSessionPlacements(
-      [overnight, early],
-      nextDay,
-    );
+    final placements = calendarSessionPlacements([overnight, early], nextDay);
     expect(placements.length, 2);
     expect(placements.map((item) => item.laneCount), [2, 2]);
     expect(placements.first.span.top, 0);

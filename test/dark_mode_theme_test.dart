@@ -59,15 +59,12 @@ void main() {
         t.labelMedium?.fontSize,
         t.labelSmall?.fontSize,
       ];
-      expect(
-        sizes.toSet(),
-        {
-          AppTypography.heading,
-          AppTypography.folder,
-          AppTypography.document,
-          AppTypography.small,
-        },
-      );
+      expect(sizes.toSet(), {
+        AppTypography.heading,
+        AppTypography.folder,
+        AppTypography.document,
+        AppTypography.small,
+      });
       expect(t.titleLarge?.fontSize, AppTypography.heading);
       expect(t.titleMedium?.fontSize, AppTypography.folder);
       expect(t.bodyMedium?.fontSize, AppTypography.document);

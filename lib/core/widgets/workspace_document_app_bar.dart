@@ -24,8 +24,8 @@ class WorkspaceDocumentAppBar extends StatelessWidget
 
   @override
   Widget build(BuildContext context) {
-    final titleSpacing = onOpenNavigation == null ||
-            MediaQuery.sizeOf(context).width >= 600
+    final titleSpacing =
+        onOpenNavigation == null || MediaQuery.sizeOf(context).width >= 600
         ? 44.0
         : null;
     return AppBar(

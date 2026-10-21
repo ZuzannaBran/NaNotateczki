@@ -230,9 +230,11 @@ void main() {
     expect(
       documentBottom,
       greaterThanOrEqualTo(
-        tester.getBottomLeft(
-              find.byKey(const ValueKey('notebook-canvas-area')),
-            ).dy -
+        tester
+                .getBottomLeft(
+                  find.byKey(const ValueKey('notebook-canvas-area')),
+                )
+                .dy -
             40,
       ),
     );
