@@ -17,6 +17,11 @@ class InkStroke {
   final double width;
   final DrawingTool tool;
 
+  /// Snapped highlighter shapes retain translucency in their saved color.
+  bool get usesHighlighterStrokeCap =>
+      tool == DrawingTool.highlighter ||
+      (tool.isShape && color.a <= 0.5);
+
   InkStroke copyWith({
     String? id,
     List<InkPoint>? points,

@@ -111,9 +111,8 @@ class EditorController extends ChangeNotifier {
   PageBackgroundSettings defaultBoardBackground =
       const PageBackgroundSettings();
   Color penColor = InkColorPreset.blue.colors[0];
-  Color highlighterColor = InkColorPreset.blue.colors[2];
-  Color get inkColor =>
-      tool == DrawingTool.highlighter ? highlighterColor : penColor;
+  Color get highlighterColor => penColor;
+  Color get inkColor => penColor;
   double inkStrokeWidth = 2.5;
   final List<Color> quickColors = List.of(InkColorPreset.blue.colors);
   final List<Color> recentColors = <Color>[];
@@ -518,12 +517,14 @@ class EditorController extends ChangeNotifier {
     List<InkPoint> points, {
     double? widthOverride,
     DrawingTool? toolOverride,
+    Color? colorOverride,
   }) {
     _ensurePageSelected(pageIndex);
     return addInkStroke(
       points,
       widthOverride: widthOverride,
       toolOverride: toolOverride,
+      colorOverride: colorOverride,
     );
   }
 
@@ -954,11 +955,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void setColor(Color newColor) {
-    if (tool == DrawingTool.highlighter) {
-      highlighterColor = newColor;
-    } else {
-      penColor = newColor;
-    }
+    penColor = newColor;
     _addRecentColor(newColor);
     _schedulePrefsSave();
     notifyListeners();
@@ -1039,14 +1036,13 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Replaces two writing swatches, the marker swatch and active ink colors.
+  /// Replaces the three shared swatches and selects their first color.
   void applyInkColorPreset(InkColorPreset preset) {
     final colors = preset.colors;
     quickColors
       ..clear()
       ..addAll(colors);
     penColor = colors[0];
-    highlighterColor = colors[2];
     _schedulePrefsSave();
     notifyListeners();
   }
@@ -1096,12 +1092,7 @@ class EditorController extends ChangeNotifier {
 
       final penParsed = _colorFromHex(penHex);
       final highlighterParsed = _colorFromHex(highlighterHex);
-      if (penParsed != null) {
-        penColor = penParsed;
-      }
-      if (highlighterParsed != null) {
-        highlighterColor = highlighterParsed;
-      }
+      penColor = penParsed ?? highlighterParsed ?? penColor;
       final shouldPersistDrawingColorDefaults =
           penParsed == null || highlighterParsed == null;
       final textParsed = _colorFromHex(lastTextHex);
@@ -1169,6 +1160,23 @@ class EditorController extends ChangeNotifier {
             .toList();
         const previousPresets = <InkColorPreset, List<Color>>{
           InkColorPreset.blue: [
+            Color(0xFF1A2130),
+            Color(0xFF3A4E6F),
+            Color(0xFF4B6493),
+          ],
+          InkColorPreset.pink: [
+            Color(0xFF3A212B),
+            Color(0xFF6C3C4D),
+            Color(0xFF8E5066),
+          ],
+          InkColorPreset.green: [
+            Color(0xFF1F3027),
+            Color(0xFF476E5E),
+            Color(0xFF5D927D),
+          ],
+        };
+        const earlierPresets = <InkColorPreset, List<Color>>{
+          InkColorPreset.blue: [
             Color(0xFF2A3851),
             Color(0xFFA1B2CE),
             Color(0xFFD0D8E7),
@@ -1186,7 +1194,10 @@ class EditorController extends ChangeNotifier {
         };
         InkColorPreset? previousPreset;
         List<Color>? previousColors;
-        for (final entry in previousPresets.entries) {
+        for (final entry in [
+          ...previousPresets.entries,
+          ...earlierPresets.entries,
+        ]) {
           if (mapped.length == 3 &&
               mapped[0] == entry.value[0] &&
               mapped[1] == entry.value[1] &&
@@ -1212,19 +1223,20 @@ class EditorController extends ChangeNotifier {
               penColor = previousPreset.colors[index];
             }
           }
-          if (highlighterParsed == previousColors[1] ||
-              highlighterParsed == previousColors[2]) {
-            highlighterColor = previousPreset.colors[2];
-          } else if (highlighterParsed == previousColors[0]) {
-            highlighterColor = previousPreset.colors[0];
+          if (penParsed == null && highlighterParsed != null) {
+            final index = previousColors.indexOf(highlighterParsed);
+            if (index != -1) {
+              penColor = previousPreset.colors[index];
+            }
           }
         } else if (isLegacyDefaults) {
           migratedQuickColors = true;
           if (penParsed == const Color(0xFF1E2A40)) {
             penColor = InkColorPreset.blue.colors[0];
           }
-          if (highlighterParsed == const Color(0xFF536783)) {
-            highlighterColor = InkColorPreset.blue.colors[2];
+          if (penParsed == null &&
+              highlighterParsed == const Color(0xFF536783)) {
+            penColor = InkColorPreset.blue.colors[0];
           }
         } else if (mapped.isNotEmpty) {
           quickColors
@@ -1285,7 +1297,7 @@ class EditorController extends ChangeNotifier {
       final payload = <String, dynamic>{
         'inkColor': _colorToHex(penColor),
         'penColor': _colorToHex(penColor),
-        'highlighterColor': _colorToHex(highlighterColor),
+        'highlighterColor': _colorToHex(penColor),
         'quickColors': quickColors.map(_colorToHex).toList(),
         'recentColors': recentColors.map(_colorToHex).toList(),
         'lastTextColor': _colorToHex(lastTextColor),
@@ -2538,6 +2550,7 @@ class EditorController extends ChangeNotifier {
     List<InkPoint> points, {
     double? widthOverride,
     DrawingTool? toolOverride,
+    Color? colorOverride,
   }) {
     if (points.isEmpty) {
       return null;
@@ -2552,7 +2565,7 @@ class EditorController extends ChangeNotifier {
     final stroke = InkStroke(
       id: _uuid.v4(),
       points: points,
-      color: inkColor,
+      color: colorOverride ?? inkColor,
       width: widthOverride ?? baseWidth,
       tool: strokeTool,
     );

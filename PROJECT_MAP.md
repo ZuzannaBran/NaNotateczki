@@ -85,9 +85,10 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 ### Motyw
 
 - `lib/core/theme/app_colors.dart`: jasna paleta i trzy współdzielone
-  zestawy Blue/Pink/Green dla canvasu oraz okładek: dwa tusze i marker
-  (Blue #1A2130/#3A4E6F/#4B6493, Pink #3A212B/#6C3C4D/#8E5066,
-  Green #1F3027/#476E5E/#5D927D); tryb ciemny:
+  zestawy Blue/Pink/Green dla canvasu oraz okładek: trzy wspólne odcienie
+  ciemny/średni/jasny, dostępne dla pióra i zakreślacza
+  (Blue #1A2130/#7798C0/#ACBED8, Pink #3A212B/#A9788A/#DAB5C2,
+  Green #1F3027/#76A58D/#B0D2BF); tryb ciemny:
   tło #2D2E2B, panele #3A3B39, aktywne #4A4B48, kartka/panele #5A5B57,
   ciemniejszy canvas notatek #50514D, tekst #EEECE6. `displayInkColor` odwraca jasność HSL wszystkich odcieni,
   zachowując hue, saturację i alpha (czerń↔biel, jasny błękit↔ciemny).
@@ -296,8 +297,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/drawing_tool.dart` (43): enum narzędzi i
   klasyfikacja eraser/shape/ink.
   1: `DrawingTool`; 21: `DrawingToolX`.
-- `lib/features/notebook/domain/ink_stroke.dart` (49): stroke i punkt z
-  naciskiem.
+- `lib/features/notebook/domain/ink_stroke.dart` (55): stroke i punkt z
+  naciskiem; `usesHighlighterStrokeCap` rozpoznaje półprzezroczyste
+  geometryczne kształty uzyskane przez przytrzymanie zakreślacza.
   5: `InkStroke`; 37: `InkPoint`.
 - `lib/features/notebook/domain/ink_spatial_index.dart` (125): cache'owany
   indeks siatkowy kandydatów do hit-testu.
@@ -745,7 +747,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   i wyśrodkowany komunikat zakończenia sesji.
 - `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów
   i standardowe promienie 12 px prostokątnych kontrolek.
-- `test/ink_color_presets_test.dart`: zatwierdzone kolory trzech palet,
+- `test/ink_color_presets_test.dart`: odcienie trzech palet, wspólny
+  wybór koloru dla pióra i zakreślacza,
   transformacja HSL w dark mode, domyślny Blue oraz marker z trzeciej próbki.
 - `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
   zgodność starszych sesji, reset koloru, resume, pauza, konflikt
@@ -839,11 +842,11 @@ tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
 Podczas usuwania aktywnego HUD-u lub overlayu figury flaga zwalniana jest
 synchronicznie, a powiadomienie słuchaczy jest odkładane do post-frame,
 jeśli trwa faza budowania/finalizacji drzewa. Callback sprawdza dispose.
-Trzy szybkie kolory domyślnie używają niebieskiego zestawu; kolory 0 i 1
-to tusze, a kolor 2 to marker. Wybór palety ustawia trzy próbki oraz
-domyślny kolor pióra (0) i markera (2). Starsze fabryczne zestawy
-i zapisane poprzednie Blue/Pink/Green są migrowane do nowych wartości,
-ale ręcznie zmienione kolory pozostają nienaruszone.
+Trzy szybkie kolory domyślnie używają niebieskiego zestawu; wszystkie
+próbki wybierają ten sam kolor dla pióra i zakreślacza, bez przypisania
+odcienia do narzędzia. Wybór palety wybiera pierwszy kolor. Wcześniejsze
+fabryczne Blue/Pink/Green są migrowane, a ręcznie zmienione kolory pozostają
+nienaruszone. Rozpoznane po przytrzymaniu linie nie włączają Move.
 
 - 37: `LassoSelection`; 76: `EditorController`;
   197: `flushPendingSaves`; 952: `applyInkColorPreset`.
@@ -866,7 +869,8 @@ ale ręcznie zmienione kolory pozostają nienaruszone.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`
-  w kolejności tusz 1, tusz 2, marker.
+  w kolejności ciemny, średni, jasny; obydwa narzędzia korzystają z jednej
+  aktywnej próbki.
   `SharedRecentColors` udostępnia wspólną, serializowaną historię do 12
   kolorów pisaka, tekstu i okładek, z migracją `editor_prefs.json`.
   `resetPendingForTests` izoluje oczekujące operacje między testami FakeAsync.
@@ -1086,6 +1090,9 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
 
 Dwa świadomie osobne canvasy ink, wspólna geometria rozpoznawania gestów,
 lasso, handoff aktywnej kreski i pomiary wydajności.
+  Rozpoznana po przytrzymaniu linia zostaje w aktywnym narzędziu bez Move,
+  a figury z zakreślacza zachowują szerokość, półprzezroczystość i końcówki
+  przy podglądzie, zapisie i eksporcie.
 Promień kontaktu Androida nie jest wiarygodnym kryterium rozróżnienia
 palca i dłoni. Gdy tryb Off zezwala na rysowanie palcem, pojedynczy
 kontakt jest przyjmowany niezależnie od radiusMajor/radiusMinor;
@@ -1403,7 +1410,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   proste górne i zaokrąglone dolne rogi canvasa oraz zgodność klipu,
   zachowanie viewportu po schowaniu narzędzi, kolor nagłówka i porównanie
   szybkości przesuwania palcem dla 0.5× i 2.0×.
-- `test/shape_edit_test.dart`: regresje liczby uchwytów, zmian
+- `test/shape_edit_test.dart`: regresje przytrzymanej linii bez Move
+  i zachowania stylu zakreślacza w notebooku i boardzie, liczby uchwytów, zmian
   geometrii figur, proporcji kwadratu/koła, przesuwania, hit-testu,
   undo/redo oraz tymczasowego Move z powrotem do narzędzia
   w notebooku i boardzie; usuwanie aktywnej ramki obiektu i kształtu

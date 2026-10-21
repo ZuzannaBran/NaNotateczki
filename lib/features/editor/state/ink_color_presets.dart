@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/storage/text_storage.dart';
 import '../../../core/theme/app_colors.dart';
 
-/// Matching pen, highlighter and light-accent colors for quick swatches.
+/// Three ink tones, available to both pen and highlighter.
 enum InkColorPreset {
   blue,
   pink,

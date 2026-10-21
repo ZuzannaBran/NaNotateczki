@@ -500,7 +500,7 @@ void _drawSavedStroke(
   }
 
   final paint = Paint()
-    ..strokeCap = stroke.tool == DrawingTool.highlighter
+    ..strokeCap = stroke.usesHighlighterStrokeCap
         ? StrokeCap.square
         : StrokeCap.round
     ..strokeJoin = StrokeJoin.round
@@ -518,7 +518,7 @@ void _drawSavedStroke(
       ..color = (darkMode ? AppColors.darkText : _lassoAccentColor).withValues(
         alpha: 0.22,
       )
-      ..strokeCap = stroke.tool == DrawingTool.highlighter
+      ..strokeCap = stroke.usesHighlighterStrokeCap
           ? StrokeCap.square
           : StrokeCap.round
       ..strokeJoin = StrokeJoin.round
@@ -1407,9 +1407,12 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         pageIndex,
         recognizedShape,
         widthOverride: _effectiveStrokeWidth(tool, controller.inkStrokeWidth),
+        colorOverride: tool == DrawingTool.highlighter
+            ? controller.inkColor.withValues(alpha: controller.inkColor.a * 0.5)
+            : null,
       );
       _resetCurrent();
-      if (strokeId != null) {
+      if (strokeId != null && recognizedShape != DrawingTool.line) {
         controller.startShapeEdit(pageIndex, strokeId);
       }
       return;
@@ -1517,6 +1520,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     DrawingTool tool, {
     List<InkPoint>? pointsOverride,
     double? widthOverride,
+    Color? colorOverride,
   }) {
     final points = List<InkPoint>.from(pointsOverride ?? _currentPoints);
     final width = widthOverride ??
@@ -1528,12 +1532,14 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         points,
         widthOverride: width,
         toolOverride: tool,
+        colorOverride: colorOverride,
       );
     } else {
       strokeId = controller.addInkStroke(
         points,
         widthOverride: width,
         toolOverride: tool,
+        colorOverride: colorOverride,
       );
     }
     if (strokeId != null) {
@@ -1543,6 +1549,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         points: points,
         width: width,
         tool: tool,
+        colorOverride: colorOverride,
       );
     }
     return strokeId;
@@ -1554,6 +1561,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     required List<InkPoint> points,
     required double width,
     required DrawingTool tool,
+    Color? colorOverride,
   }) {
     final pageId = controller.pages[pageIndex].id;
     _committedOverlayStrokes.add(
@@ -1561,7 +1569,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         pageId: pageId,
         targetRevision: controller.inkRevisionForPage(pageId).value,
         points: points,
-        color: controller.inkColor,
+        color: colorOverride ?? controller.inkColor,
         width: width,
         tool: tool,
       ),
@@ -2902,9 +2910,12 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         pageIndex,
         recognizedShape,
         widthOverride: _effectiveStrokeWidth(tool, controller.inkStrokeWidth),
+        colorOverride: tool == DrawingTool.highlighter
+            ? controller.inkColor.withValues(alpha: controller.inkColor.a * 0.5)
+            : null,
       );
       _resetCurrent();
-      if (strokeId != null) {
+      if (strokeId != null && recognizedShape != DrawingTool.line) {
         controller.startShapeEdit(pageIndex, strokeId);
       }
       return;
@@ -3024,6 +3035,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     DrawingTool tool, {
     List<InkPoint>? pointsOverride,
     double? widthOverride,
+    Color? colorOverride,
   }) {
     final overlayPoints = List<InkPoint>.from(pointsOverride ?? _currentPoints);
     final width = widthOverride ??
@@ -3033,6 +3045,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
       _toPageLocalPoints(overlayPoints, pageIndex),
       widthOverride: width,
       toolOverride: tool,
+      colorOverride: colorOverride,
     );
     if (strokeId != null) {
       _retainCommittedStroke(
@@ -3041,6 +3054,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         points: overlayPoints,
         width: width,
         tool: tool,
+        colorOverride: colorOverride,
       );
     }
     return strokeId;
@@ -3052,6 +3066,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     required List<InkPoint> points,
     required double width,
     required DrawingTool tool,
+    Color? colorOverride,
   }) {
     final pageId = controller.pages[pageIndex].id;
     _committedOverlayStrokes.add(
@@ -3059,7 +3074,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         pageId: pageId,
         targetRevision: controller.inkRevisionForPage(pageId).value,
         points: points,
-        color: controller.inkColor,
+        color: colorOverride ?? controller.inkColor,
         width: width,
         tool: tool,
       ),
@@ -4108,7 +4123,8 @@ class _InkOverlayPainter extends CustomPainter {
     }
 
     final paint = Paint()
-      ..strokeCap = tool == DrawingTool.highlighter
+      ..strokeCap = tool == DrawingTool.highlighter ||
+              (tool.isShape && color.a <= 0.5)
           ? StrokeCap.square
           : StrokeCap.round
       ..strokeJoin = StrokeJoin.round

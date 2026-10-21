@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/features/editor/presentation/widgets/drawing_canvas.dart';
 import 'package:program/features/editor/presentation/widgets/object_transform_hud.dart';
 import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
 import 'package:program/features/editor/presentation/widgets/shape_edit_overlay.dart';
@@ -173,6 +174,88 @@ void main() {
   });
 
   for (final kind in [NotebookKind.notebook, NotebookKind.board]) {
+    testWidgets('holding a drawn line does not enter Move and preserves '
+        'highlighter styling in $kind', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(600, 600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final controller = EditorController(
+        repository: NotebookRepository(database),
+        notebook: Notebook(
+          uid: 'held-line-${kind.name}',
+          title: 'Held line',
+          kind: kind,
+          folder: 'Tests',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          pages: [
+            NotePage(
+              id: 'page',
+              title: 'Page',
+              textBlocks: const [],
+              imageBlocks: const [],
+              inkStrokes: const [],
+              isBookmarked: false,
+            ),
+          ],
+        ),
+      );
+      addTearDown(controller.dispose);
+      controller.setTool(DrawingTool.highlighter);
+      controller.setColor(const Color(0xFF7798C0));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChangeNotifierProvider<EditorController>.value(
+              value: controller,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: 400,
+                  height: 400,
+                  child: Builder(builder: (context) {
+                    context.watch<EditorController>();
+                    return kind == NotebookKind.board
+                        ? const DrawingCanvas(pageIndex: 0)
+                        : DocumentDrawingCanvas(
+                            pages: controller.pages,
+                            pageSize: const Size(400, 400),
+                            pageGap: 0,
+                          );
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        const Offset(60, 80),
+        kind: PointerDeviceKind.stylus,
+      );
+      await gesture.moveTo(const Offset(170, 80));
+      await tester.pump(const Duration(milliseconds: 1250));
+      await gesture.up();
+      await tester.pump();
+
+      final stroke = controller.pageAt(0).inkStrokes.single;
+      expect(stroke.tool, DrawingTool.line);
+      expect(stroke.width, 20);
+      expect(stroke.color.a, closeTo(0.5, 0.01));
+      expect(stroke.usesHighlighterStrokeCap, isTrue);
+      expect(controller.activeShapeStrokeId, isNull);
+      expect(controller.tool, DrawingTool.highlighter);
+
+      final resized = ShapeEditGeometry.resized(
+        stroke, 1, const Offset(15, 0),
+      );
+      expect(resized.color, stroke.color);
+      expect(resized.width, stroke.width);
+      expect(resized.usesHighlighterStrokeCap, isTrue);
+    });
+
 
     testWidgets('shape overlay moves, resizes and exits on outside tap '
         'in $kind', (tester) async {

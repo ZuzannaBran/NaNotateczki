@@ -553,7 +553,7 @@ class NotebookExportService {
       return;
     }
     final paint = Paint()
-      ..strokeCap = stroke.tool == DrawingTool.highlighter
+      ..strokeCap = stroke.usesHighlighterStrokeCap
           ? StrokeCap.square
           : StrokeCap.round
       ..strokeJoin = StrokeJoin.round
