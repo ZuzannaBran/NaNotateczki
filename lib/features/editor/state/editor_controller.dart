@@ -291,16 +291,16 @@ class EditorController extends ChangeNotifier {
       return;
     }
     _isObjectTransformActive = false;
-    if (SchedulerBinding.instance.schedulerPhase ==
-        SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (!_isDisposed) {
-          notifyListeners();
-        }
-      });
+    if (_isDisposed) {
       return;
     }
-    notifyListeners();
+    final binding = SchedulerBinding.instance;
+    binding.addPostFrameCallback((_) {
+      if (!_isDisposed) {
+        notifyListeners();
+      }
+    });
+    binding.ensureVisualUpdate();
   }
 
   void setViewTransform({Offset? pan, double? scale}) {
@@ -562,7 +562,7 @@ class EditorController extends ChangeNotifier {
       commitImageMoveOnPage(pageIndex, id, start, end);
       return;
     }
-    _moveImageBlockToPage(pageIndex, targetIndex, id, end);
+    _moveImageBlockToPage(pageIndex, targetIndex, id, start, end);
   }
 
   void commitImageResizeOnPage(
@@ -1428,6 +1428,14 @@ class EditorController extends ChangeNotifier {
       return;
     }
     final action = _undoActions.removeLast();
+    if (action is MoveImageBetweenPagesAction) {
+      _applyCrossPageImageMove(action, undo: true);
+      _redoActions.add(action);
+      _notifyHistoryChanged();
+      notifyListeners();
+      _save();
+      return;
+    }
     final before = currentPage;
     final updated = action.revert(before);
     _recordExpectedRemovals(action, before, updated, undo: true);
@@ -1446,6 +1454,14 @@ class EditorController extends ChangeNotifier {
       return;
     }
     final action = _redoActions.removeLast();
+    if (action is MoveImageBetweenPagesAction) {
+      _applyCrossPageImageMove(action, undo: false);
+      _undoActions.add(action);
+      _notifyHistoryChanged();
+      notifyListeners();
+      _save();
+      return;
+    }
     final before = currentPage;
     final updated = action.apply(before);
     _recordExpectedRemovals(action, before, updated);
@@ -2633,41 +2649,33 @@ class EditorController extends ChangeNotifier {
     int fromPageIndex,
     int toPageIndex,
     String id,
-    Offset position,
+    Offset start,
+    Offset end,
   ) {
-    if (fromPageIndex < 0 || fromPageIndex >= pages.length) {
+    if (fromPageIndex < 0 ||
+        fromPageIndex >= pages.length ||
+        toPageIndex < 0 ||
+        toPageIndex >= pages.length ||
+        fromPageIndex == toPageIndex) {
       return;
     }
-    if (toPageIndex < 0 || toPageIndex >= pages.length) {
-      return;
-    }
-    final fromPage = pages[fromPageIndex];
-    final blockIndex = fromPage.imageBlocks.indexWhere((item) => item.id == id);
-    if (blockIndex == -1) {
-      return;
-    }
-    final moved = fromPage.imageBlocks[blockIndex].copyWith(position: position);
-    final updatedFrom = fromPage.copyWith(
-      imageBlocks: fromPage.imageBlocks.where((item) => item.id != id).toList(),
+    final sourcePage = pages[fromPageIndex];
+    final imageIndex = sourcePage.imageBlocks.indexWhere(
+      (item) => item.id == id,
     );
-    final toPage = pages[toPageIndex];
-    final updatedTo = toPage.copyWith(
-      imageBlocks: [...toPage.imageBlocks, moved],
+    if (imageIndex == -1) {
+      return;
+    }
+    final image = sourcePage.imageBlocks[imageIndex];
+    _applyAction(
+      MoveImageBetweenPagesAction(
+        fromPageId: sourcePage.id,
+        toPageId: pages[toPageIndex].id,
+        originalIndex: imageIndex,
+        before: image.copyWith(position: start),
+        after: image.copyWith(position: end),
+      ),
     );
-    pages = [
-      for (var i = 0; i < pages.length; i++)
-        if (i == fromPageIndex)
-          updatedFrom
-        else if (i == toPageIndex)
-          updatedTo
-        else
-          pages[i],
-    ];
-    currentPageIndex = toPageIndex;
-    activeTextBlockId = null;
-    activeTextController = null;
-    activeImageBlockId = id;
-    notifyListeners();
     _save();
   }
 
@@ -2879,6 +2887,14 @@ class EditorController extends ChangeNotifier {
 
   void _applyAction(EditorAction action) {
     _commitActiveTextEdit();
+    if (action is MoveImageBetweenPagesAction) {
+      _applyCrossPageImageMove(action, undo: false);
+      _undoActions.add(action);
+      _redoActions.clear();
+      _notifyHistoryChanged();
+      notifyListeners();
+      return;
+    }
     final before = currentPage;
     final updated = action.apply(before);
     _recordExpectedRemovals(action, before, updated);
@@ -2886,6 +2902,18 @@ class EditorController extends ChangeNotifier {
     _redoActions.clear();
     _notifyHistoryChanged();
     _updatePage(updated);
+  }
+
+  void _applyCrossPageImageMove(
+    MoveImageBetweenPagesAction action, {
+    required bool undo,
+  }) {
+    pages = undo ? action.revertPages(pages) : action.applyPages(pages);
+    final pageId = undo ? action.fromPageId : action.toPageId;
+    currentPageIndex = pages.indexWhere((page) => page.id == pageId);
+    activeTextBlockId = null;
+    activeTextController = null;
+    activeImageBlockId = action.blockId;
   }
 
   void _applyInkAction(EditorAction action) {

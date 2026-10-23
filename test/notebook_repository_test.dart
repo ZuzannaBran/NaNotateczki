@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:drift/native.dart';
@@ -8,6 +9,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:program/core/diagnostics/data_integrity_log.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/drift/notes_database_connection.dart';
+import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/image_block.dart';
@@ -566,6 +568,155 @@ void main() {
 
     final saved = await repository.getNotebook(notebook.uid);
     expect(saved?.pages, hasLength(1));
+  });
+
+  test('moving an image across pages saves without a false incident '
+      'and supports undo/redo', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final incidents = <DataIntegrityIncident>[];
+    final repository = NotebookRepository(
+      database,
+      dataIntegrityIncidentHandler: (incident, _, _) async {
+        incidents.add(incident);
+      },
+    );
+    final initial = await repository.createNotebook();
+    final image = ImageBlock(
+      id: 'moved-image',
+      path: '',
+      ocrText: 'Kept OCR',
+      position: const Offset(20, 25),
+      width: 150,
+      height: 100,
+      bytes: Uint8List.fromList([1, 2, 3]),
+      imageExt: 'png',
+    );
+    final second = NotePage(
+      id: 'image-destination-page',
+      title: 'Destination',
+      textBlocks: const [],
+      imageBlocks: const [],
+      inkStrokes: const [],
+      isBookmarked: false,
+    );
+    final source = initial.copyWith(
+      updatedAt: initial.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        initial.pages.single.copyWith(imageBlocks: [image]),
+        second,
+      ],
+    );
+    expect(await repository.saveNotebook(source), isTrue);
+    final persisted = (await repository.getNotebook(initial.uid))!;
+    final controller = EditorController(
+      repository: repository,
+      notebook: persisted,
+    );
+    addTearDown(controller.dispose);
+    controller.updatePageLayout(
+      pageWidth: 820,
+      pageHeight: 500,
+      pageGap: 0,
+    );
+
+    final before = controller.pages.first.imageBlocks.single;
+    const end = Offset(30, 540);
+    controller.updateImageBlockOnPage(0, before.copyWith(position: end));
+    controller.finalizeImageMoveOnPage(
+      0,
+      before.id,
+      before.position,
+      end,
+    );
+    await controller.flushPendingSaves();
+    var saved = (await repository.getNotebook(initial.uid))!;
+    expect(saved.pages.first.imageBlocks, isEmpty);
+    expect(saved.pages.last.imageBlocks.single.id, before.id);
+    expect(saved.pages.last.imageBlocks.single.path, before.path);
+    expect(controller.canUndo, isTrue);
+    expect(incidents, isEmpty);
+
+    controller.undo();
+    await controller.flushPendingSaves();
+    saved = (await repository.getNotebook(initial.uid))!;
+    expect(saved.pages.first.imageBlocks.single.position, before.position);
+    expect(saved.pages.last.imageBlocks, isEmpty);
+    expect(incidents, isEmpty);
+
+    controller.redo();
+    await controller.flushPendingSaves();
+    saved = (await repository.getNotebook(initial.uid))!;
+    expect(saved.pages.first.imageBlocks, isEmpty);
+    expect(saved.pages.last.imageBlocks.single.position, end);
+    expect(incidents, isEmpty);
+  });
+
+  test('relocating an image never hides unrelated content loss', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final incidents = <DataIntegrityIncident>[];
+    final repository = NotebookRepository(
+      database,
+      dataIntegrityIncidentHandler: (incident, _, _) async {
+        incidents.add(incident);
+      },
+    );
+    final initial = await repository.createNotebook();
+    final stroke = InkStroke(
+      id: 'must-not-disappear',
+      points: const [InkPoint(dx: 2, dy: 3, pressure: 1)],
+      color: const Color(0xFF000000),
+      width: 2,
+      tool: DrawingTool.pen,
+    );
+    final image = ImageBlock(
+      id: 'relocated-image',
+      path: '',
+      ocrText: '',
+      position: const Offset(5, 10),
+      width: 100,
+      height: 100,
+      bytes: Uint8List.fromList([1, 2, 3]),
+      imageExt: 'png',
+    );
+    final source = initial.copyWith(
+      updatedAt: initial.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        initial.pages.single.copyWith(
+          inkStrokes: [stroke],
+          imageBlocks: [image],
+        ),
+        NotePage(
+          id: 'target-page',
+          title: 'Target',
+          textBlocks: const [],
+          imageBlocks: const [],
+          inkStrokes: const [],
+          isBookmarked: false,
+        ),
+      ],
+    );
+    expect(await repository.saveNotebook(source), isTrue);
+    final persisted = (await repository.getNotebook(initial.uid))!;
+    final moved = persisted.copyWith(
+      updatedAt: persisted.updatedAt.add(const Duration(seconds: 1)),
+      pages: [
+        persisted.pages.first.copyWith(
+          imageBlocks: [],
+          inkStrokes: [],
+        ),
+        persisted.pages.last.copyWith(
+          imageBlocks: [persisted.pages.first.imageBlocks.single],
+        ),
+      ],
+    );
+    expect(await repository.saveNotebook(moved), isTrue);
+    expect(incidents, hasLength(1));
+    expect(
+      incidents.single.reasons,
+      contains('page:${persisted.pages.first.id}:all_content_removed'),
+    );
   });
 
   test('suspicious full save records before and attempted evidence', () async {

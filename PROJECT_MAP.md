@@ -321,13 +321,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2361 linii)
+### `lib/features/notebook/data/notebook_repository.dart` (2494 linie)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. Zapis z edytora przekazuje identyfikatory elementów
-usuniętych jawnie przez akcję użytkownika; guard pomija jedynie udokumentowane
-ubycie, a niezgłoszone usunięcia i skrócenie istniejących danych nadal
-generują incydent. Jest też kanoniczną granicą migracji starego modelu
+usuniętych jawnie przez akcję użytkownika; guard rozpoznaje także przeniesienie
+tego samego obrazu z nienaruszoną zawartością na inną stronę. Nie pomija
+niezgłoszonych usunięć i skrócenia istniejących danych. Jest też kanoniczną granicą migracji starego modelu
 gumki: odczyt normalizuje legacy maski, a zdrowe strony są fizycznie
 przepisywane w SQLite bez eraser-stroke'ów i bez zmiany metadanych notebooka.
 Migracja korzysta z tej samej kolejki per UID co zwykłe zapisy, więc nie
@@ -799,9 +799,11 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
 
 ## 7. Stan edytora
 
-### `lib/features/editor/state/editor_actions.dart` (452 linii)
+### `lib/features/editor/state/editor_actions.dart` (563 linie)
 
-Akcje undo/redo; każda implementuje `apply(page)` i `revert(page)`.
+Akcje undo/redo dla pojedynczej strony oraz atomowa akcja przeniesienia
+obrazu między stronami (`MoveImageBetweenPagesAction`, operacje na liście
+stron) z zachowaniem identyfikatora i pierwotnego miejsca przy undo.
 Kasowanie gumką używa `DeleteInkStrokesAction`, która przechowuje tylko
 usunięte stroke'y i ich pierwotne indeksy zamiast pełnej kopii strony.
 
@@ -809,8 +811,9 @@ usunięte stroke'y i ich pierwotne indeksy zamiast pełnej kopii strony.
 - 13: dodawanie tekstu/obrazu/ink;
   88: destrukcyjne usuwanie ink.
 - 88–242: update/delete/move tekstu i obrazu.
-- 262: `MoveSelectionAction`; 318: `DeleteSelectionAction`;
-  354: `PasteSelectionAction`; 390: `OffsetPosition`.
+- 262: `MoveImageBetweenPagesAction`;
+  423: `MoveSelectionAction`; 479: `DeleteSelectionAction`;
+  515: `PasteSelectionAction`; 551: `OffsetPosition`.
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
 
@@ -826,7 +829,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (2923 linie)
+### `lib/features/editor/state/editor_controller.dart` (3199 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
@@ -1410,7 +1413,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   proste górne i zaokrąglone dolne rogi canvasa oraz zgodność klipu,
   zachowanie viewportu po schowaniu narzędzi, kolor nagłówka i porównanie
   szybkości przesuwania palcem dla 0.5× i 2.0×.
-- `test/shape_edit_test.dart`: regresje rozpoznanych po przytrzymaniu linii,
+- `test/shape_edit_test.dart`: brak synchronicznych powiadomień przy
+  kończeniu transformacji; regresje rozpoznanych po przytrzymaniu linii,
   prostokąta i elipsy bez Move dla pióra i zakreślacza w notebooku i boardzie,
   zachowanie stylu zakreślacza, liczby uchwytów, zmian
   geometrii figur, proporcji kwadratu/koła, przesuwania, hit-testu,
@@ -1478,6 +1482,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `test/production/backup_crash_recovery_test.dart`: symulacje awarii
   między rename manifestu, błędu dostępu do katalogu stron i przerwania
   backupu z zachowaniem starego kompletnego snapshotu.
+- `test/notebook_repository_test.dart`: przenoszenie obrazu między stronami
+  bez fałszywego incydentu, undo/redo i wykrywanie dodatkowej utraty
+  zawartości mimo poprawnego transferu.
 - `test/production/persistence_roundtrip_test.dart` (300): rich text z Delta,
   crop i bytes obrazów, dwie strony, dirty-page, równoległe zapisy, backup
   i przywrócenie do nowego SQLite; każdy test ma własny katalog dokumentów

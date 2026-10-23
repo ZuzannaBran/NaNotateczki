@@ -1067,11 +1067,16 @@ class NotebookRepository {
     Notebook attempted,
     Map<String, Set<String>> expectedRemovedIdsByPage,
   ) {
-    if (expectedRemovedIdsByPage.isEmpty ||
-        before.pages.length != attempted.pages.length) {
+    if (before.pages.length != attempted.pages.length) {
       return false;
     }
     final attemptedPages = {for (final page in attempted.pages) page.id: page};
+    final imagesById = <String, List<ImageBlock>>{};
+    for (final page in attempted.pages) {
+      for (final image in page.imageBlocks) {
+        imagesById.putIfAbsent(image.id, () => <ImageBlock>[]).add(image);
+      }
+    }
     var removed = false;
     for (final page in before.pages) {
       final next = attemptedPages[page.id];
@@ -1106,7 +1111,10 @@ class NotebookRepository {
       }
       for (final image in page.imageBlocks) {
         if (!nextImages.contains(image.id)) {
-          if (!approved.contains('image:${image.id}')) {
+          final candidates = imagesById[image.id] ?? const <ImageBlock>[];
+          final relocated = candidates.length == 1 &&
+              _sameImageContent(image, candidates.single);
+          if (!relocated && !approved.contains('image:${image.id}')) {
             return false;
           }
           removed = true;
@@ -1114,6 +1122,22 @@ class NotebookRepository {
       }
     }
     return removed;
+  }
+
+  bool _sameImageContent(ImageBlock before, ImageBlock after) {
+    return before.id == after.id &&
+        before.path == after.path &&
+        before.ocrText == after.ocrText &&
+        before.width == after.width &&
+        before.height == after.height &&
+        before.rotation == after.rotation &&
+        before.cropLeft == after.cropLeft &&
+        before.cropTop == after.cropTop &&
+        before.cropRight == after.cropRight &&
+        before.cropBottom == after.cropBottom &&
+        before.imageExt == after.imageExt &&
+        before.imageMime == after.imageMime &&
+        listEquals(before.bytes, after.bytes);
   }
 
   Future<void> _recordDataIntegrityIncident(

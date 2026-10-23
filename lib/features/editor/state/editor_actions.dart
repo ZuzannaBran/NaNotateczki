@@ -261,6 +261,94 @@ class MoveImageAction extends EditorAction {
   }
 }
 
+class MoveImageBetweenPagesAction extends EditorAction {
+  MoveImageBetweenPagesAction({
+    required this.fromPageId,
+    required this.toPageId,
+    required this.originalIndex,
+    required this.before,
+    required this.after,
+  });
+
+  final String fromPageId;
+  final String toPageId;
+  final int originalIndex;
+  final ImageBlock before;
+  final ImageBlock after;
+
+  String get blockId => before.id;
+
+  @override
+  NotePage apply(NotePage page) {
+    throw UnsupportedError('Cross-page move requires the whole notebook.');
+  }
+
+  @override
+  NotePage revert(NotePage page) {
+    throw UnsupportedError('Cross-page move requires the whole notebook.');
+  }
+
+  List<NotePage> applyPages(List<NotePage> pages) {
+    return _transfer(pages, fromPageId, toPageId, after);
+  }
+
+  List<NotePage> revertPages(List<NotePage> pages) {
+    return _transfer(
+      pages,
+      toPageId,
+      fromPageId,
+      before,
+      insertIndex: originalIndex,
+    );
+  }
+
+  List<NotePage> _transfer(
+    List<NotePage> pages,
+    String sourceId,
+    String destinationId,
+    ImageBlock image, {
+    int? insertIndex,
+  }) {
+    final sourceIndex = pages.indexWhere((page) => page.id == sourceId);
+    final targetIndex = pages.indexWhere((page) => page.id == destinationId);
+    if (sourceIndex == -1 ||
+        targetIndex == -1 ||
+        sourceIndex == targetIndex) {
+      throw StateError('Image move pages are no longer available.');
+    }
+    final source = pages[sourceIndex];
+    final destination = pages[targetIndex];
+    if (!source.imageBlocks.any((item) => item.id == blockId) ||
+        destination.imageBlocks.any((item) => item.id == blockId)) {
+      throw StateError('Image move would lose or duplicate an image.');
+    }
+    final updatedSource = source.copyWith(
+      imageBlocks: source.imageBlocks
+          .where((item) => item.id != blockId)
+          .toList(),
+    );
+    final updatedImages = List<ImageBlock>.of(destination.imageBlocks);
+    updatedImages.insert(
+      (insertIndex ?? updatedImages.length)
+          .clamp(0, updatedImages.length)
+          .toInt(),
+      image,
+    );
+    final updatedDestination = destination.copyWith(
+      imageBlocks: updatedImages,
+    );
+    return [
+      for (var i = 0; i < pages.length; i++)
+        if (i == sourceIndex)
+          updatedSource
+        else if (i == targetIndex)
+          updatedDestination
+        else
+          pages[i],
+    ];
+  }
+}
+
 class UpdateImageOcrAction extends EditorAction {
   UpdateImageOcrAction({
     required this.id,

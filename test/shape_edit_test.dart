@@ -499,6 +499,41 @@ void main() {
     });
   }
 
+  testWidgets('ending a transform never notifies synchronously', (
+    tester,
+  ) async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: Notebook(
+        uid: 'transform-end-notification',
+        title: 'Transform',
+        kind: NotebookKind.notebook,
+        folder: 'Tests',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        pages: [
+          _page(_shape(DrawingTool.line, const [
+            Offset.zero,
+            Offset(20, 0),
+          ])),
+        ],
+      ),
+    );
+    addTearDown(controller.dispose);
+    var notifications = 0;
+    controller.addListener(() => notifications++);
+    controller.beginObjectTransform();
+    notifications = 0;
+
+    controller.endObjectTransform();
+    expect(controller.isObjectTransformActive, isFalse);
+    expect(notifications, 0);
+    await tester.pump();
+    expect(notifications, 1);
+  });
+
   testWidgets('disposing an active object HUD unlocks after the frame', (
     tester,
   ) async {
