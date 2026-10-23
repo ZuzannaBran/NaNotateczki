@@ -265,7 +265,8 @@ void main() {
         DrawingTool.ellipse,
       ]) {
         testWidgets(
-          'held ${recognizedTool.name} keeps ${inkTool.name} tool in ${kind.name}',
+          'held ${recognizedTool.name} keeps ${inkTool.name} tool '
+          'in ${kind.name}',
           (tester) async {
             await tester.binding.setSurfaceSize(const Size(600, 600));
             addTearDown(() => tester.binding.setSurfaceSize(null));
