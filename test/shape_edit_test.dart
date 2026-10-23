@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +40,16 @@ NotePage _page(InkStroke stroke) => NotePage(
 void main() {
   useIsolatedNativeTestDocuments();
   useInMemoryTestTextStorage();
+
+  test('shape edit overlay must not import gestures directly', () {
+    final source = File(
+      'lib/features/editor/presentation/widgets/shape_edit_overlay.dart',
+    ).readAsStringSync();
+    expect(
+      source,
+      isNot(contains("import 'package:flutter/gestures.dart';")),
+    );
+  });
 
   test('line and arrow expose exactly two endpoint handles', () {
     final line = _shape(
