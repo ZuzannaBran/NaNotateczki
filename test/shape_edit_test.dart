@@ -259,6 +259,116 @@ void main() {
     });
 
 
+    for (final inkTool in [DrawingTool.pen, DrawingTool.highlighter]) {
+      for (final recognizedTool in [
+        DrawingTool.rectangle,
+        DrawingTool.ellipse,
+      ]) {
+        testWidgets(
+          'held ${recognizedTool.name} keeps ${inkTool.name} tool in ${kind.name}',
+          (tester) async {
+            await tester.binding.setSurfaceSize(const Size(600, 600));
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final database = NotesDatabase(NativeDatabase.memory());
+            addTearDown(database.close);
+            final controller = EditorController(
+              repository: NotebookRepository(database),
+              notebook: Notebook(
+                uid: 'held-${recognizedTool.name}-${inkTool.name}-${kind.name}',
+                title: 'Held shape',
+                kind: kind,
+                folder: 'Tests',
+                createdAt: DateTime(2026),
+                updatedAt: DateTime(2026),
+                pages: [
+                  NotePage(
+                    id: 'page',
+                    title: 'Page',
+                    textBlocks: const [],
+                    imageBlocks: const [],
+                    inkStrokes: const [],
+                    isBookmarked: false,
+                  ),
+                ],
+              ),
+            );
+            addTearDown(controller.dispose);
+            controller.setTool(inkTool);
+            controller.setColor(const Color(0xFF7798C0));
+            await tester.pumpWidget(
+              MaterialApp(
+                home: Scaffold(
+                  body: ChangeNotifierProvider<EditorController>.value(
+                    value: controller,
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: SizedBox(
+                        width: 400,
+                        height: 400,
+                        child: Builder(
+                          builder: (context) {
+                            context.watch<EditorController>();
+                            return kind == NotebookKind.board
+                                ? const DrawingCanvas(pageIndex: 0)
+                                : DocumentDrawingCanvas(
+                                    pages: controller.pages,
+                                    pageSize: const Size(400, 400),
+                                    pageGap: 0,
+                                  );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+
+            final path = recognizedTool == DrawingTool.rectangle
+                ? const <Offset>[
+                    Offset(70, 80),
+                    Offset(180, 80),
+                    Offset(180, 160),
+                    Offset(70, 160),
+                    Offset(70, 80),
+                  ]
+                : const <Offset>[
+                    Offset(120, 80),
+                    Offset(160, 90),
+                    Offset(180, 120),
+                    Offset(160, 150),
+                    Offset(120, 160),
+                    Offset(80, 150),
+                    Offset(60, 120),
+                    Offset(80, 90),
+                    Offset(120, 80),
+                  ];
+            final gesture = await tester.startGesture(
+              path.first,
+              kind: PointerDeviceKind.stylus,
+            );
+            for (final point in path.skip(1)) {
+              await gesture.moveTo(point);
+            }
+            await tester.pump(const Duration(milliseconds: 1250));
+            await gesture.up();
+            await tester.pump();
+
+            final stroke = controller.pageAt(0).inkStrokes.single;
+            expect(stroke.tool, recognizedTool);
+            expect(controller.tool, inkTool);
+            expect(controller.activeShapeStrokeId, isNull);
+            expect(controller.activeShapePageIndex, isNull);
+            if (inkTool == DrawingTool.highlighter) {
+              expect(stroke.width, 20);
+              expect(stroke.color.a, closeTo(0.5, 0.01));
+              expect(stroke.usesHighlighterStrokeCap, isTrue);
+            }
+          },
+        );
+      }
+    }
+
     testWidgets('shape overlay moves, resizes and exits on outside tap '
         'in $kind', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 650));

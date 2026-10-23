@@ -846,7 +846,7 @@ Trzy szybkie kolory domyślnie używają niebieskiego zestawu; wszystkie
 próbki wybierają ten sam kolor dla pióra i zakreślacza, bez przypisania
 odcienia do narzędzia. Wybór palety wybiera pierwszy kolor. Wcześniejsze
 fabryczne Blue/Pink/Green są migrowane, a ręcznie zmienione kolory pozostają
-nienaruszone. Rozpoznane po przytrzymaniu linie nie włączają Move.
+nienaruszone. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 - 37: `LassoSelection`; 76: `EditorController`;
   197: `flushPendingSaves`; 952: `applyInkColorPreset`.
@@ -1090,7 +1090,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
 
 Dwa świadomie osobne canvasy ink, wspólna geometria rozpoznawania gestów,
 lasso, handoff aktywnej kreski i pomiary wydajności.
-  Rozpoznana po przytrzymaniu linia zostaje w aktywnym narzędziu bez Move,
+  Kształty rozpoznane po przytrzymaniu pozostają w narzędziu bez Move,
   a figury z zakreślacza zachowują szerokość, półprzezroczystość i końcówki
   przy podglądzie, zapisie i eksporcie.
 Promień kontaktu Androida nie jest wiarygodnym kryterium rozróżnienia
@@ -1410,8 +1410,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   proste górne i zaokrąglone dolne rogi canvasa oraz zgodność klipu,
   zachowanie viewportu po schowaniu narzędzi, kolor nagłówka i porównanie
   szybkości przesuwania palcem dla 0.5× i 2.0×.
-- `test/shape_edit_test.dart`: regresje przytrzymanej linii bez Move
-  i zachowania stylu zakreślacza w notebooku i boardzie, liczby uchwytów, zmian
+- `test/shape_edit_test.dart`: regresje rozpoznanych po przytrzymaniu linii,
+  prostokąta i elipsy bez Move dla pióra i zakreślacza w notebooku i boardzie,
+  zachowanie stylu zakreślacza, liczby uchwytów, zmian
   geometrii figur, proporcji kwadratu/koła, przesuwania, hit-testu,
   undo/redo oraz tymczasowego Move z powrotem do narzędzia
   w notebooku i boardzie; usuwanie aktywnej ramki obiektu i kształtu

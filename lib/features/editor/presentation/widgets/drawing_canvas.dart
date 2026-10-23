@@ -1402,7 +1402,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
         ? DrawingTool.ellipse
         : null;
     if (recognizedShape != null) {
-      final strokeId = _addCurrentStroke(
+      _addCurrentStroke(
         controller,
         pageIndex,
         recognizedShape,
@@ -1412,9 +1412,6 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
             : null,
       );
       _resetCurrent();
-      if (strokeId != null && recognizedShape != DrawingTool.line) {
-        controller.startShapeEdit(pageIndex, strokeId);
-      }
       return;
     }
     if (tool == DrawingTool.lasso) {
@@ -2905,7 +2902,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
         ? DrawingTool.ellipse
         : null;
     if (recognizedShape != null) {
-      final strokeId = _addCurrentStroke(
+      _addCurrentStroke(
         controller,
         pageIndex,
         recognizedShape,
@@ -2915,9 +2912,6 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
             : null,
       );
       _resetCurrent();
-      if (strokeId != null && recognizedShape != DrawingTool.line) {
-        controller.startShapeEdit(pageIndex, strokeId);
-      }
       return;
     }
     if (tool == DrawingTool.lasso) {
