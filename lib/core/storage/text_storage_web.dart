@@ -1,9 +1,13 @@
 import 'package:web/web.dart' as web;
 
-Future<String?> readStoredText(String key) async {
+Future<String?> readStoredText(String key, {String? directoryPath}) async {
   return web.window.localStorage.getItem(key);
 }
 
-Future<void> writeStoredText(String key, String value) async {
+Future<void> writeStoredText(
+  String key,
+  String value, {
+  String? directoryPath,
+}) async {
   web.window.localStorage.setItem(key, value);
 }

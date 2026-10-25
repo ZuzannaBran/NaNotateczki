@@ -6,14 +6,24 @@ import 'text_storage_io.dart'
 Future<String?> Function(String key)? textStorageReadOverride;
 Future<void> Function(String key, String value)? textStorageWriteOverride;
 
-Future<String?> readStoredText(String key) {
-  final override = textStorageReadOverride;
-  return override != null ? override(key) : platform.readStoredText(key);
+Future<String?> readStoredText(String key, {String? directoryPath}) {
+  final override = directoryPath == null ? textStorageReadOverride : null;
+  return override != null
+      ? override(key)
+      : platform.readStoredText(key, directoryPath: directoryPath);
 }
 
-Future<void> writeStoredText(String key, String value) {
-  final override = textStorageWriteOverride;
+Future<void> writeStoredText(
+  String key,
+  String value, {
+  String? directoryPath,
+}) {
+  final override = directoryPath == null ? textStorageWriteOverride : null;
   return override != null
       ? override(key, value)
-      : platform.writeStoredText(key, value);
+      : platform.writeStoredText(
+          key,
+          value,
+          directoryPath: directoryPath,
+        );
 }

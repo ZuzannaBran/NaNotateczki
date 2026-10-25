@@ -594,12 +594,7 @@ class LocalBackupService {
       return readStoredText(_libraryFoldersFile);
     }
     final docs = await _documentsDirectory();
-    final file = File('${docs.path}/$_libraryFoldersFile');
-    await _recoverAtomicWrite(file);
-    if (!await file.exists()) {
-      return null;
-    }
-    return file.readAsString();
+    return readStoredText(_libraryFoldersFile, directoryPath: docs.path);
   }
 
   Future<void> _restoreFolders(_BackupSnapshotData data) async {
@@ -618,9 +613,10 @@ class LocalBackupService {
       return;
     }
     final docs = await _documentsDirectory();
-    await _atomicWriteString(
-      File('${docs.path}/$_libraryFoldersFile'),
+    await writeStoredText(
+      _libraryFoldersFile,
       content,
+      directoryPath: docs.path,
     );
   }
 

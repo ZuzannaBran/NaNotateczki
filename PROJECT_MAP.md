@@ -142,13 +142,14 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 - `lib/core/storage/app_save_coordinator.dart` (50): rejestr aktywnych
   edytorów i wspólny flush ich oczekujących zapisów przed zamknięciem.
   3: `AppSaveCoordinator`.
-- `lib/core/storage/text_storage.dart` (20): conditional import IO/web i
-  opcjonalne podmiany odczytu/zapisu na potrzeby testów widgetowych;
-  produkcja nadal używa platformowego storage.
-- `lib/core/storage/text_storage_io.dart` (82): małe pliki tekstowe w
-  dokumentach aplikacji; odczyty czekają na trwający zapis, a zapisy są serializowane per plik i atomowe przez
-  `.tmp`/`.previous` z odzyskiem po przerwanym zapisie.
-  8: `readStoredText`; 17: `writeStoredText`.
+- `lib/core/storage/text_storage.dart`: conditional import IO/web,
+  opcjonalne podmiany odczytu/zapisu dla testów oraz możliwość wskazania
+  katalogu natywnego (używana przez backup folderów); produkcja nadal
+  używa platformowego storage.
+- `lib/core/storage/text_storage_io.dart`: odczyty i zapisy małych
+  plików współdzielą kolejkę operacji per ścieżka; zapobiega ona
+  usuwaniu aktywnego `.tmp` przez równoległy odczyt backupu. Zapis
+  nadal jest atomowy przez `.tmp`/`.previous` z recovery.
 - `lib/core/storage/text_storage_web.dart` (9): odpowiednik w `localStorage`.
   3: `readStoredText`; 7: `writeStoredText`.
 - `lib/core/error/app_error_log.dart` (180): trwały bufor błędów z ostatnich
@@ -241,7 +242,9 @@ v6 zachowuje też metadane `library_folders.json` (okładki i Recent), obok
 listy `folders` zachowanej dla starszych kopii. Walidacja sumy kontrolnej
 uwzględnia opcjonalne `folderMetadata`, bez łamania starych manifestów.
 Restore starszych manifestów
-pozostaje zgodny. Web nadal zapisuje pełny snapshot w `localStorage`.
+pozostaje zgodny. Odczyt i odtwarzanie `library_folders.json` korzysta ze
+wspólnej, serializowanej warstwy text storage, tak jak zapis biblioteki.
+Web nadal zapisuje pełny snapshot w `localStorage`.
 
 - 19: `LocalBackupService`; 37: `waitUntilIdle`; 153: `snapshot`;
   84: `_pagesDir`.
@@ -1241,8 +1244,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/notebook_repository_test.dart`: zapis, migracja legacy gumek, kontrola
   uprawnionych usunięć i nieoczekiwanej utraty danych,
   migracja v1→v2 usuwająca dane Index tab bez utraty stron.
-- `test/local_backup_service_test.dart` (1443):
-  nowy i starszy format folderów, odtwarzanie okładek/Recent i backup
+- `test/local_backup_service_test.dart`:
+  nowy i starszy format folderów, odtwarzanie okładek/Recent, backup
+  i równoległy zapis folderów z wykonywaniem snapshotów.
 - `test/app_error_log_test.dart`: grupowanie powtarzalnych błędów
   i odczyt liczników z zachowaniem zgodności starych logów.
 - `test/editor_save_flush_test.dart` (63): wymuszenie dirty page save przed

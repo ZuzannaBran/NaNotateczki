@@ -3,35 +3,42 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
-final Map<String, Future<void>> _writeTails = <String, Future<void>>{};
+final Map<String, Future<void>> _operationTails = <String, Future<void>>{};
 
-Future<String?> readStoredText(String key) async {
-  final pendingWrite = _writeTails[key];
-  if (pendingWrite != null) {
-    await pendingWrite;
-  }
-  final file = await _fileForKey(key);
-  await _recoverAtomicWrite(file);
-  if (!await file.exists()) {
-    return null;
-  }
-  return file.readAsString();
-}
-
-Future<void> writeStoredText(String key, String value) async {
-  final previous = _writeTails[key] ?? Future<void>.value();
+Future<T> _withFileLock<T>(File file, Future<T> Function() action) async {
+  final path = file.absolute.path;
+  final previous = _operationTails[path] ?? Future<void>.value();
   final completion = Completer<void>();
-  _writeTails[key] = completion.future;
+  _operationTails[path] = completion.future;
   try {
     await previous;
-    final file = await _fileForKey(key);
-    await _atomicWriteString(file, value);
+    return await action();
   } finally {
     completion.complete();
-    if (identical(_writeTails[key], completion.future)) {
-      _writeTails.remove(key);
+    if (identical(_operationTails[path], completion.future)) {
+      _operationTails.remove(path);
     }
   }
+}
+
+Future<String?> readStoredText(String key, {String? directoryPath}) async {
+  final file = await _fileForKey(key, directoryPath: directoryPath);
+  return _withFileLock(file, () async {
+    await _recoverAtomicWrite(file);
+    if (!await file.exists()) {
+      return null;
+    }
+    return file.readAsString();
+  });
+}
+
+Future<void> writeStoredText(
+  String key,
+  String value, {
+  String? directoryPath,
+}) async {
+  final file = await _fileForKey(key, directoryPath: directoryPath);
+  await _withFileLock(file, () => _atomicWriteString(file, value));
 }
 
 Future<void> _atomicWriteString(File file, String content) async {
@@ -75,7 +82,8 @@ Future<void> _recoverAtomicWrite(File file) async {
   }
 }
 
-Future<File> _fileForKey(String key) async {
-  final dir = await getApplicationDocumentsDirectory();
-  return File('${dir.path}/$key');
+Future<File> _fileForKey(String key, {String? directoryPath}) async {
+  final path =
+      directoryPath ?? (await getApplicationDocumentsDirectory()).path;
+  return File('$path/$key');
 }
