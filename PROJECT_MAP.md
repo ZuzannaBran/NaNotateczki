@@ -324,10 +324,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 ### `lib/features/notebook/data/notebook_repository.dart` (2494 linie)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
-podejrzaną utratą danych. Zapis z edytora przekazuje identyfikatory elementów
-usuniętych jawnie przez akcję użytkownika; guard rozpoznaje także przeniesienie
-tego samego obrazu z nienaruszoną zawartością na inną stronę. Nie pomija
-niezgłoszonych usunięć i skrócenia istniejących danych. Jest też kanoniczną granicą migracji starego modelu
+podejrzaną utratą danych. Po zapisaniu dowodów podejrzany zapis
+jest blokowany wyjątkiem przed transakcją SQLite. Zapis z edytora
+przekazuje identyfikatory elementów usuniętych jawnie przez użytkownika;
+guard rozpoznaje przeniesienie obrazu po ID i tożsamości pliku/bajtów
+(bez porównywania geometrii i legacy OCR). Nie pomija niezgłoszonych
+usunięć i skrócenia istniejących danych. Jest też kanoniczną granicą migracji starego modelu
 gumki: odczyt normalizuje legacy maski, a zdrowe strony są fizycznie
 przepisywane w SQLite bez eraser-stroke'ów i bez zmiany metadanych notebooka.
 Migracja korzysta z tej samej kolejki per UID co zwykłe zapisy, więc nie
@@ -1482,9 +1484,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `test/production/backup_crash_recovery_test.dart`: symulacje awarii
   między rename manifestu, błędu dostępu do katalogu stron i przerwania
   backupu z zachowaniem starego kompletnego snapshotu.
-- `test/notebook_repository_test.dart`: przenoszenie obrazu między stronami
-  bez fałszywego incydentu, undo/redo i wykrywanie dodatkowej utraty
-  zawartości mimo poprawnego transferu.
+- `test/notebook_repository_test.dart`: przenoszenie i zmiana geometrii
+  obrazu między stronami bez fałszywego incydentu, undo/redo, blokowanie
+  podejrzanych full/page-level zapisów oraz weryfikacja danych SQLite.
 - `test/production/persistence_roundtrip_test.dart` (300): rich text z Delta,
   crop i bytes obrazów, dwie strony, dirty-page, równoległe zapisy, backup
   i przywrócenie do nowego SQLite; każdy test ma własny katalog dokumentów

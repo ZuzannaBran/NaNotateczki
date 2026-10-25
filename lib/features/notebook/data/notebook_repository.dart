@@ -1057,9 +1057,13 @@ class NotebookRepository {
     final handler = _dataIntegrityIncidentHandler;
     if (handler != null) {
       await handler(incident, before, attempted);
-      return;
+    } else {
+      await _recordDataIntegrityIncident(incident, before, attempted);
     }
-    await _recordDataIntegrityIncident(incident, before, attempted);
+    throw DataIntegrityProtectionException(
+      'Suspicious notebook save blocked after evidence was recorded. '
+      'incidentId=${incident.id}, notebookUid=${incident.notebookUid}',
+    );
   }
 
   bool _onlyExpectedContentWasRemoved(
@@ -1125,19 +1129,18 @@ class NotebookRepository {
   }
 
   bool _sameImageContent(ImageBlock before, ImageBlock after) {
-    return before.id == after.id &&
-        before.path == after.path &&
-        before.ocrText == after.ocrText &&
-        before.width == after.width &&
-        before.height == after.height &&
-        before.rotation == after.rotation &&
-        before.cropLeft == after.cropLeft &&
-        before.cropTop == after.cropTop &&
-        before.cropRight == after.cropRight &&
-        before.cropBottom == after.cropBottom &&
-        before.imageExt == after.imageExt &&
-        before.imageMime == after.imageMime &&
-        listEquals(before.bytes, after.bytes);
+    if (before.id != after.id) {
+      return false;
+    }
+    final beforeBytes = before.bytes;
+    final afterBytes = after.bytes;
+    if (beforeBytes != null &&
+        beforeBytes.isNotEmpty &&
+        afterBytes != null &&
+        afterBytes.isNotEmpty) {
+      return listEquals(beforeBytes, afterBytes);
+    }
+    return before.path.isNotEmpty && before.path == after.path;
   }
 
   Future<void> _recordDataIntegrityIncident(

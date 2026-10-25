@@ -133,6 +133,7 @@ class EditorController extends ChangeNotifier {
   final Set<String> _dirtyPageIds = <String>{};
   final Map<String, Set<String>> _expectedRemovedIdsByPage = {};
   bool _fullSavePending = false;
+  bool _integritySaveBlocked = false;
   bool _isDisposed = false;
 
   String? lastTextFontFamily;
@@ -225,6 +226,11 @@ class EditorController extends ChangeNotifier {
     }
 
     await repository.waitForPendingSaves();
+    if (_integritySaveBlocked) {
+      throw const DataIntegrityProtectionException(
+        'Notebook save is blocked by data integrity protection.',
+      );
+    }
     for (var attempt = 0; attempt < 3; attempt++) {
       if (_fullSavePending) {
         await _save();
@@ -232,6 +238,11 @@ class EditorController extends ChangeNotifier {
         await _saveDirtyPages();
       }
       await repository.waitForPendingSaves();
+      if (_integritySaveBlocked) {
+        throw const DataIntegrityProtectionException(
+          'Notebook save is blocked by data integrity protection.',
+        );
+      }
       if (!_fullSavePending && _dirtyPageIds.isEmpty) {
         return;
       }
@@ -3082,6 +3093,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void _scheduleSave({String? pageId}) {
+    _integritySaveBlocked = false;
     final dirtyPageId = pageId ?? currentPage.id;
     _dirtyPageIds.add(dirtyPageId);
     _armSaveTimer();
@@ -3106,6 +3118,7 @@ class EditorController extends ChangeNotifier {
     if (_dirtyPageIds.isEmpty) {
       return;
     }
+    _integritySaveBlocked = false;
     final pageIds = Set<String>.of(_dirtyPageIds);
     _dirtyPageIds.removeAll(pageIds);
     final expectedRemoved = _pendingExpectedRemovals(pageIds);
@@ -3123,6 +3136,13 @@ class EditorController extends ChangeNotifier {
         _dirtyPageIds.addAll(pageIds);
         _armSaveTimer();
       }
+    } on DataIntegrityProtectionException catch (error, stackTrace) {
+      _dirtyPageIds.addAll(pageIds);
+      _integritySaveBlocked = true;
+      debugPrint(
+        'EditorController._saveDirtyPages blocked: $error\n$stackTrace',
+      );
+      return;
     } catch (error, stackTrace) {
       _dirtyPageIds.addAll(pageIds);
       debugPrint(
@@ -3133,6 +3153,7 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> _save() async {
+    _integritySaveBlocked = false;
     _notebookSaveDebounce?.cancel();
     _notebookSaveDebounce = null;
     _fullSavePending = true;
@@ -3158,6 +3179,10 @@ class EditorController extends ChangeNotifier {
         _dirtyPageIds.clear();
         return;
       }
+    } on DataIntegrityProtectionException catch (error, stackTrace) {
+      _integritySaveBlocked = true;
+      debugPrint('EditorController._save blocked: $error\n$stackTrace');
+      return;
     } catch (error, stackTrace) {
       debugPrint('EditorController._save failed: $error\n$stackTrace');
     }

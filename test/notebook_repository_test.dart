@@ -585,7 +585,7 @@ void main() {
     final image = ImageBlock(
       id: 'moved-image',
       path: '',
-      ocrText: 'Kept OCR',
+      ocrText: '',
       position: const Offset(20, 25),
       width: 150,
       height: 100,
@@ -622,7 +622,16 @@ void main() {
 
     final before = controller.pages.first.imageBlocks.single;
     const end = Offset(30, 540);
-    controller.updateImageBlockOnPage(0, before.copyWith(position: end));
+    controller.updateImageBlockOnPage(
+      0,
+      before.copyWith(
+        position: end,
+        width: 125,
+        height: 85,
+        cropLeft: 0.1,
+        cropBottom: 0.9,
+      ),
+    );
     controller.finalizeImageMoveOnPage(
       0,
       before.id,
@@ -634,6 +643,8 @@ void main() {
     expect(saved.pages.first.imageBlocks, isEmpty);
     expect(saved.pages.last.imageBlocks.single.id, before.id);
     expect(saved.pages.last.imageBlocks.single.path, before.path);
+    expect(saved.pages.last.imageBlocks.single.width, 125);
+    expect(saved.pages.last.imageBlocks.single.cropLeft, 0.1);
     expect(controller.canUndo, isTrue);
     expect(incidents, isEmpty);
 
@@ -711,7 +722,14 @@ void main() {
         ),
       ],
     );
-    expect(await repository.saveNotebook(moved), isTrue);
+    await expectLater(
+      repository.saveNotebook(moved),
+      throwsA(isA<DataIntegrityProtectionException>()),
+    );
+    final preserved = (await repository.getNotebook(initial.uid))!;
+    expect(preserved.pages.first.inkStrokes, hasLength(1));
+    expect(preserved.pages.first.imageBlocks, hasLength(1));
+    expect(preserved.pages.last.imageBlocks, isEmpty);
     expect(incidents, hasLength(1));
     expect(
       incidents.single.reasons,
@@ -753,7 +771,14 @@ void main() {
       updatedAt: withContent.updatedAt.add(const Duration(seconds: 1)),
       pages: [withContent.pages.single.copyWith(inkStrokes: const [])],
     );
-    expect(await repository.saveNotebook(emptied), isTrue);
+    await expectLater(
+      repository.saveNotebook(emptied),
+      throwsA(isA<DataIntegrityProtectionException>()),
+    );
+    expect(
+      (await repository.getNotebook(notebook.uid))!.pages.single.inkStrokes,
+      hasLength(1),
+    );
 
     expect(incidents, hasLength(1));
     expect(incidents.single.operation, 'saveNotebook');
@@ -798,9 +823,13 @@ void main() {
       updatedAt: withContent.updatedAt.add(const Duration(seconds: 1)),
       pages: [emptiedPage],
     );
+    await expectLater(
+      repository.saveNotebookPages(emptied, {emptiedPage.id}),
+      throwsA(isA<DataIntegrityProtectionException>()),
+    );
     expect(
-      await repository.saveNotebookPages(emptied, {emptiedPage.id}),
-      isTrue,
+      (await repository.getNotebook(notebook.uid))!.pages.single.inkStrokes,
+      hasLength(1),
     );
 
     expect(incidents, hasLength(1));
@@ -916,14 +945,18 @@ void main() {
         pages: [source.pages.single.copyWith(inkStrokes: [])],
       );
 
-      expect(
-        await repository.saveNotebook(
+      await expectLater(
+        repository.saveNotebook(
           emptied,
           expectedRemovedIdsByPage: {
             source.pages.single.id: {'ink:approved'},
           },
         ),
-        isTrue,
+        throwsA(isA<DataIntegrityProtectionException>()),
+      );
+      expect(
+        (await repository.getNotebook(notebook.uid))!.pages.single.inkStrokes,
+        hasLength(2),
       );
       expect(incidents, hasLength(1));
       expect(incidents.single.reasons, contains('all_content_removed'));
