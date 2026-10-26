@@ -886,7 +886,7 @@ nienaruszone. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2438 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2464 linie)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px i korzysta z
 aktualnego tytułu przekazanego przez bibliotekę (fallback: kontroler);
@@ -940,7 +940,8 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 - 52: `_logicalPageWidth`; 99: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
 - 149: synchronizacja strony; 180: nawigacja do klikniętego obszaru.
-- 275–694: gesty pan/zoom, blokada viewportu i transformacje.
+- 275–694: gesty pan/zoom, blokada viewportu i transformacje;
+  dotyk aktywnego obrazu nie uruchamia menu kontekstowego canvasa.
 - 866–896: busy overlay, komendy importu/eksportu i clipboard oraz ustawienia.
 - 1017: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
@@ -948,8 +949,8 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 - 1045: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1541: `_PageViewportClipper`; 1599: `_PageFramePainter`;
-  1706: `_ProjectMiniMapOverlay`; 1999: Listener kliknięć minimapy;
+- 1609: `_PageViewportClipper`; 1667: `_PageFramePainter`;
+  1774: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
   2125: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_commands.dart` (172 linie)
@@ -1050,13 +1051,18 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   czemu działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
   6: `ObjectTransformKind`; 8: `ObjectTransformSnapshot`;
   24: `ObjectTransformEngine`; 263: `_ObjectTransformSession`.
-- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (645):
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (776):
   wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
   `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform`
   oraz wspólnego grabbera nad górną krawędzią do przesuwania obiektu.
   Grabber działa także wtedy, gdy środek ramki jest wyłączony z dragowania,
-  np. podczas aktywnej edycji tekstu. Dedykowane uchwyty używają surowych
-  pointer events zamiast rozpoznawania pan, więc reagują od pierwszego ruchu
+  np. podczas aktywnej edycji tekstu. Opcjonalne `pinchToResize` pozwala
+  obrazom/PDF obsługiwać dwa palce wewnątrz obiektu przez surowe kontakty,
+  bez udziału nawigacji viewportu. Skalowanie zachowuje proporcje,
+  ognisko gestu i jeden krok undo; pierwszy dotyk od razu blokuje
+  przejęcie gestu przez nadrzędny `Listener`.
+  Dedykowane uchwyty używają surowych pointer events zamiast rozpoznawania
+  pan, więc reagują od pierwszego ruchu
   bez systemowego touch slop. Niewidzialny hit-area skaluje się liniowo z
   rozmiarem ramki przez sqrt(width*height), z zakresem 32–80 px. Górne
   uchwyty resize oraz uchwyt move mają rozdzielone strefy dotyku dokładnie
@@ -1067,8 +1073,8 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   obiektu blokuje viewport dokładnie na czas move/resize; dispose aktywnego
   HUD-u również zwalnia blokadę. Kolor, rozmiary i grubość ramki są
   konfigurowalne przez `ObjectTransformHudStyle`.
-  13: `ObjectTransformHudStyle`; 54: `ObjectTransformHud`;
-  106: `_ObjectTransformHudState`; 591: `_ObjectTransformFramePainter`.
+  14: `ObjectTransformHudStyle`; 55: `ObjectTransformHud`;
+  109: `_ObjectTransformHudState`; 721: `_ObjectTransformFramePainter`.
 - `lib/features/editor/presentation/widgets/shape_edit_overlay.dart`:
   `ShapeEditGeometry` udostępnia dwa uchwyty dla linii/strzałki, trzy
   dla trójkąta i strzałki blokowej oraz cztery dla
@@ -1135,7 +1141,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (3012 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (3071 linii)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -1431,8 +1437,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   w notebooku i boardzie; usuwanie aktywnej ramki obiektu i kształtu
   w trakcie gestu bez wywoływania powiadomień podczas unmount.
 - `test/image_pdf_transform_regression_test.dart`: uchwyty poza kartką przy
-  125% zoom, 60 kolejnych aktualizacji pinch, granice i undo/redo dla
-  obrazu i strony PDF po imporcie.
+  125% zoom, powtarzane pinch, limity, undo/redo, rzeczywiste dwa kontakty
+  dotykowe w HUD-zie i pełnym ekranie notebooka, brak zmiany zoomu strony,
+  pomniejszenie i anulowanie gestu dla zdjęcia i strony PDF po imporcie.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)

@@ -332,6 +332,7 @@ class ActiveImageTransformHud extends StatelessWidget {
       rect: visibleRect,
       rotation: block.rotation,
       interactive: interactionEnabled,
+      pinchToResize: true,
       enabledHandles: const {...HandlePosition.values},
       resizeModeResolver: (handle) {
         return handle.isDiagonal ? ResizeMode.scale : ResizeMode.freeform;

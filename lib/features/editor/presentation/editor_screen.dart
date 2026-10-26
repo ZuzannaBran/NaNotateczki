@@ -1226,12 +1226,16 @@ class _EditorScreenState extends State<EditorScreen> {
                                         key: _canvasKey,
                                         behavior: HitTestBehavior.translucent,
                                         onPointerDown: (event) {
-                                          _startTouchContextMenuTimer(
-                                            event,
-                                            controller,
-                                            pageWorldSize,
-                                            controller.pages.length,
-                                          );
+                                          final transforming =
+                                              controller.isObjectTransformActive;
+                                          if (!transforming) {
+                                            _startTouchContextMenuTimer(
+                                              event,
+                                              controller,
+                                              pageWorldSize,
+                                              controller.pages.length,
+                                            );
+                                          }
                                           _onPointerDown(
                                             event,
                                             docWorldSize,

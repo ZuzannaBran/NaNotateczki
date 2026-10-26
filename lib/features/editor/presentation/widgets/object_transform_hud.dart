@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
@@ -65,6 +66,7 @@ class ObjectTransformHud<T> extends StatefulWidget {
     this.resizeClampingRectResolver,
     this.enabledHandles = const {...HandlePosition.values},
     this.draggable = true,
+    this.pinchToResize = false,
     this.interactive = true,
     this.showFrame = true,
     this.showHandles = true,
@@ -89,6 +91,7 @@ class ObjectTransformHud<T> extends StatefulWidget {
   final ObjectClampingRectResolver? resizeClampingRectResolver;
   final Set<HandlePosition> enabledHandles;
   final bool draggable;
+  final bool pinchToResize;
   final bool interactive;
   final bool showFrame;
   final bool showHandles;
@@ -110,6 +113,8 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   ObjectTransformSnapshot? _preview;
   T? _gestureData;
   int? _activeHandlePointer;
+  final Map<int, Offset> _touchPoints = <int, Offset>{};
+  bool _touchResized = false;
   double _screenScale = 1;
   bool _scaleMeasureScheduled = false;
 
@@ -197,6 +202,33 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   }
 
   Widget _buildBodyGesture(Rect rect, double rotation) {
+    final gestures = GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: widget.onTap,
+      onDoubleTap: widget.onDoubleTap,
+      onSecondaryTapDown: widget.onSecondaryTapDown,
+      onPanStart: (details) {
+        if (_touchPoints.isEmpty && !_engine.isActive) {
+          _beginMove(rect, rotation, details.globalPosition);
+        }
+      },
+      onPanUpdate: (details) {
+        if (_touchPoints.isEmpty) {
+          _updatePreview(details.globalPosition);
+        }
+      },
+      onPanEnd: (_) {
+        if (_touchPoints.isEmpty) {
+          _commitGesture();
+        }
+      },
+      onPanCancel: () {
+        if (_touchPoints.isEmpty) {
+          _cancelGesture();
+        }
+      },
+      child: const SizedBox.expand(),
+    );
     return Positioned(
       left: rect.left,
       top: rect.top,
@@ -205,25 +237,122 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       child: Transform.rotate(
         angle: rotation,
         alignment: Alignment.center,
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: widget.onTap,
-          onDoubleTap: widget.onDoubleTap,
-          onSecondaryTapDown: widget.onSecondaryTapDown,
-          onPanStart: (details) {
-            _beginMove(rect, rotation, details.globalPosition);
-          },
-          onPanUpdate: (details) {
-            _updatePreview(details.globalPosition);
-          },
-          onPanEnd: (_) {
-            _commitGesture();
-          },
-          onPanCancel: _cancelGesture,
-          child: const SizedBox.expand(),
-        ),
+        child: !widget.pinchToResize
+            ? gestures
+            : Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (event) {
+                  if (event.kind != PointerDeviceKind.touch ||
+                      _activeHandlePointer != null ||
+                      (_touchPoints.isEmpty && _engine.isActive)) {
+                    return;
+                  }
+                  if (_touchPoints.isEmpty) {
+                    _touchResized = false;
+                    _beginMove(rect, rotation, event.position);
+                  }
+                  _touchPoints[event.pointer] =
+                      _globalToLocal(event.position);
+                },
+                onPointerMove: (event) {
+                  if (event.kind == PointerDeviceKind.touch) {
+                    _updateTouch(event.pointer, event.position);
+                  }
+                },
+                onPointerUp: (event) {
+                  if (event.kind == PointerDeviceKind.touch) {
+                    _endTouch(event.pointer);
+                  }
+                },
+                onPointerCancel: (event) {
+                  if (_touchPoints.remove(event.pointer) != null) {
+                    _touchPoints.clear();
+                    _touchResized = false;
+                    _cancelGesture();
+                  }
+                },
+                child: gestures,
+              ),
       ),
     );
+  }
+
+  void _updateTouch(int pointer, Offset globalPosition) {
+    final previous = _touchPoints[pointer];
+    if (previous == null || !_engine.isActive) {
+      return;
+    }
+    final current = _globalToLocal(globalPosition);
+    final previousPositions = _touchPoints.values.toList(growable: false);
+    _touchPoints[pointer] = current;
+    final currentPositions = _touchPoints.values.toList(growable: false);
+    final previousRect = _preview?.rect ?? widget.rect;
+    var rect = previousRect;
+
+    if (currentPositions.length >= 2) {
+      final oldFocal = (previousPositions[0] + previousPositions[1]) / 2;
+      final newFocal = (currentPositions[0] + currentPositions[1]) / 2;
+      final oldDistance =
+          (previousPositions[0] - previousPositions[1]).distance;
+      final newDistance =
+          (currentPositions[0] - currentPositions[1]).distance;
+      final constraints =
+          widget.constraintsResolver?.call(HandlePosition.bottomRight) ??
+          widget.constraints;
+      final minimum = math.max(
+        constraints.minWidth / rect.width,
+        constraints.minHeight / rect.height,
+      );
+      final maximum = math.min(
+        constraints.maxWidth / rect.width,
+        constraints.maxHeight / rect.height,
+      );
+      final requested = oldDistance > 0.001
+          ? newDistance / oldDistance
+          : 1.0;
+      final factor = requested.clamp(
+        math.min(minimum, maximum),
+        math.max(minimum, maximum),
+      ).toDouble();
+      rect = Rect.fromCenter(
+        center: newFocal + (rect.center - oldFocal) * factor,
+        width: rect.width * factor,
+        height: rect.height * factor,
+      );
+      if ((factor - 1.0).abs() > 0.00001) {
+        _touchResized = true;
+      }
+    } else {
+      rect = rect.shift(current - previous);
+    }
+
+    if (rect == previousRect) {
+      return;
+    }
+    final preview = ObjectTransformSnapshot(
+      kind: _touchResized
+          ? ObjectTransformKind.resize
+          : ObjectTransformKind.move,
+      rect: rect,
+      rotation: widget.rotation,
+      handle: _touchResized ? HandlePosition.bottomRight : null,
+      resizeMode: _touchResized ? ResizeMode.scale : null,
+    );
+    setState(() => _preview = preview);
+    final data = _gestureData;
+    if (data != null) {
+      widget.onPreview(data, preview);
+    }
+  }
+
+  void _endTouch(int pointer) {
+    if (_touchPoints.remove(pointer) == null) {
+      return;
+    }
+    if (_touchPoints.isEmpty) {
+      _touchResized = false;
+      _commitGesture();
+    }
   }
 
   Widget _buildMoveHandle({
@@ -486,7 +615,8 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     if (!_engine.isActive) {
       return;
     }
-    final preview = _engine.end();
+    final enginePreview = _engine.end();
+    final preview = _preview ?? enginePreview;
     final data = _gestureData;
     _gestureData = null;
     if (preview != null && data != null) {

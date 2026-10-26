@@ -27,6 +27,34 @@ a platform as tested until its actual Actions job succeeds.
 - The desktop matrix also runs merged catalog/planner UI, typography and
   planner lifecycle regressions directly on Linux, Windows and macOS.
 
+## Image and imported PDF pinch gestures (October 2026)
+
+Synthetic pointer regression: `test/image_pdf_transform_regression_test.dart`
+sends two real Flutter touch contacts through the selected object HUD and
+full notebook viewport, alongside off-page handle, undo/redo, bounds,
+cancellation, zoom isolation and repeated-resize scenarios. PDF pages in
+the editor are represented by rasterized image blocks; this is not a native
+PDF-render throughput benchmark.
+
+Manual checks on touch-capable Linux/Windows laptops, Android and iPadOS:
+
+1. Insert a photo, select it in Edit mode and place two fingers **inside**
+   its selected frame. Spread to enlarge and pinch to reduce. The image
+   should respond while fingers move; the notebook itself must not zoom.
+2. Move the object with one finger, then use two; release one finger
+   before the other. Confirm there is no jump, stuck drag or scrolling lock.
+3. Import a multipage PDF and repeat on a page represented as an image;
+   drag the object partly outside notebook bounds and resize from handles.
+4. Repeat on a board and notebook at 50%, 100%, 125% and 200% zoom,
+   in portrait and landscape orientations. Verify consistent dimensions.
+5. Cancel a gesture (e.g. OS interruption), undo and redo the resize,
+   save/reopen, and verify that the prior geometry is restored.
+6. Without an active image selected, verify two-finger canvas pan/zoom
+   still works normally.
+
+These manual checks require physical touch hardware and are not recorded
+as passed until they are actually executed.
+
 ## Shape placement and temporary Move (October 2026)
 
 Automated regression source: `test/shape_edit_test.dart` covers shape
