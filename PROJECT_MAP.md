@@ -1147,7 +1147,10 @@ korzysta z Quilla; w dark mode dostaje odczytową kopię Delta z odwróconymi
 kolorami wszystkich fragmentów. Oryginalny
 `QuillController` i zapisane Delta pozostają bez zmian. Aktywne obrazy/PDF
 korzystają z tego samego `ObjectTransformHud`; obrót jest wyłączony, rogi skalują, boki zachowują
-crop, a lasso/ink pozostają poza tym silnikiem. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
+crop, a lasso/ink pozostają poza tym silnikiem.
+W notebooku aktywna ramka korzysta z pełnego viewportu, żeby uchwyty obrazów
+oraz stron PDF po imporcie reagowały również poza kartką. Pinch dwoma palcami
+skaluje wybrany obiekt z ograniczeniem rozmiaru 80–4096 × 60–4096 px. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
 tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
 tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
 mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
@@ -1427,6 +1430,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   undo/redo oraz tymczasowego Move z powrotem do narzędzia
   w notebooku i boardzie; usuwanie aktywnej ramki obiektu i kształtu
   w trakcie gestu bez wywoływania powiadomień podczas unmount.
+- `test/image_pdf_transform_regression_test.dart`: uchwyty poza kartką przy
+  125% zoom, 60 kolejnych aktualizacji pinch, granice i undo/redo dla
+  obrazu i strony PDF po imporcie.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)

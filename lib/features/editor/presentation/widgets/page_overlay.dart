@@ -42,6 +42,7 @@ class PageOverlay extends StatelessWidget {
     this.renderBackground = true,
     this.renderActive = true,
     this.renderInactive = true,
+    this.renderActiveImages = true,
     super.key,
   });
 
@@ -53,6 +54,7 @@ class PageOverlay extends StatelessWidget {
   final bool renderBackground;
   final bool renderActive;
   final bool renderInactive;
+  final bool renderActiveImages;
 
   @override
   Widget build(BuildContext context) {
@@ -179,10 +181,10 @@ class PageOverlay extends StatelessWidget {
                   isLassoSelected: false,
                   doubleTapOnly: true,
                 ),
-          if (renderActive)
+          if (renderActive && renderActiveImages)
             for (final block in effectivePage.imageBlocks)
               if (block.id == activeImageId)
-                _ActiveImageTransformHud(
+                ActiveImageTransformHud(
                   key: ValueKey('object-hud-image-${block.id}'),
                   controller: controller,
                   block: block,
@@ -230,6 +232,7 @@ class DocumentPageOverlay extends StatelessWidget {
     this.renderBackground = true,
     this.renderActive = true,
     this.renderInactive = true,
+    this.renderActiveImages = true,
     super.key,
   });
 
@@ -244,6 +247,7 @@ class DocumentPageOverlay extends StatelessWidget {
   final bool renderBackground;
   final bool renderActive;
   final bool renderInactive;
+  final bool renderActiveImages;
 
   @override
   Widget build(BuildContext context) {
@@ -269,6 +273,7 @@ class DocumentPageOverlay extends StatelessWidget {
               renderBackground: renderBackground,
               renderActive: renderActive,
               renderInactive: renderInactive,
+              renderActiveImages: renderActiveImages,
             ),
           ),
       ],
@@ -276,13 +281,15 @@ class DocumentPageOverlay extends StatelessWidget {
   }
 }
 
-class _ActiveImageTransformHud extends StatelessWidget {
-  const _ActiveImageTransformHud({
+class ActiveImageTransformHud extends StatelessWidget {
+  const ActiveImageTransformHud({
     required this.controller,
     required this.block,
     required this.pageIndex,
     required this.worldOrigin,
     required this.interactionEnabled,
+    this.viewportScale = 1,
+    this.viewportOffset = Offset.zero,
     super.key,
   });
 
@@ -291,10 +298,34 @@ class _ActiveImageTransformHud extends StatelessWidget {
   final int pageIndex;
   final Offset worldOrigin;
   final bool interactionEnabled;
+  final double viewportScale;
+  final Offset viewportOffset;
+
+  Rect _toViewport(Rect rect) => Rect.fromLTWH(
+    rect.left * viewportScale + viewportOffset.dx,
+    rect.top * viewportScale + viewportOffset.dy,
+    rect.width * viewportScale,
+    rect.height * viewportScale,
+  );
+
+  ObjectTransformSnapshot _toWorld(ObjectTransformSnapshot preview) {
+    return ObjectTransformSnapshot(
+      kind: preview.kind,
+      rect: Rect.fromLTWH(
+        (preview.rect.left - viewportOffset.dx) / viewportScale,
+        (preview.rect.top - viewportOffset.dy) / viewportScale,
+        preview.rect.width / viewportScale,
+        preview.rect.height / viewportScale,
+      ),
+      rotation: preview.rotation,
+      handle: preview.handle,
+      resizeMode: preview.resizeMode,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final visibleRect = _visibleImageRect(block, worldOrigin);
+    final visibleRect = _toViewport(_visibleImageRect(block, worldOrigin));
     return ObjectTransformHud<ImageBlock>(
       key: ValueKey('shared-image-hud-${block.id}'),
       data: block,
@@ -314,28 +345,30 @@ class _ActiveImageTransformHud extends StatelessWidget {
               .max(0.08, block.cropBottom - block.cropTop)
               .toDouble();
           return BoxConstraints(
-            minWidth: 80 * widthFactor,
-            maxWidth: 4096 * widthFactor,
-            minHeight: 60 * heightFactor,
-            maxHeight: 4096 * heightFactor,
+            minWidth: 80 * widthFactor * viewportScale,
+            maxWidth: 4096 * widthFactor * viewportScale,
+            minHeight: 60 * heightFactor * viewportScale,
+            maxHeight: 4096 * heightFactor * viewportScale,
           );
         }
         return BoxConstraints(
-          minWidth: math.max(1.0, block.width * 0.08).toDouble(),
-          maxWidth: block.width,
-          minHeight: math.max(1.0, block.height * 0.08).toDouble(),
-          maxHeight: block.height,
+          minWidth: math.max(1.0, block.width * 0.08) * viewportScale,
+          maxWidth: block.width * viewportScale,
+          minHeight: math.max(1.0, block.height * 0.08) * viewportScale,
+          maxHeight: block.height * viewportScale,
         );
       },
       resizeClampingRectResolver: (handle) {
         if (handle.isDiagonal) {
           return Rect.largest;
         }
-        return Rect.fromLTWH(
-          block.position.dx - worldOrigin.dx,
-          block.position.dy - worldOrigin.dy,
-          block.width,
-          block.height,
+        return _toViewport(
+          Rect.fromLTWH(
+            block.position.dx - worldOrigin.dx,
+            block.position.dy - worldOrigin.dy,
+            block.width,
+            block.height,
+          ),
         );
       },
       onTransformStart: controller.beginObjectTransform,
@@ -355,7 +388,7 @@ class _ActiveImageTransformHud extends StatelessWidget {
       onPreview: (before, preview) {
         controller.updateImageBlockOnPage(
           pageIndex,
-          _imageBlockFromTransform(before, preview, worldOrigin),
+          _imageBlockFromTransform(before, _toWorld(preview), worldOrigin),
         );
       },
       onCommit: (before, preview) {

@@ -897,6 +897,9 @@ class EditorController extends ChangeNotifier {
   bool get isPinchToScaleImageActive => _activeImageGestureBefore != null;
 
   void startPinchToScaleActiveImage() {
+    if (_activeImageGestureBefore != null) {
+      return;
+    }
     final activeId = activeImageBlockId;
     if (activeId != null) {
       _activeImageGestureBefore = findImageBlockById(activeId);
@@ -906,18 +909,48 @@ class EditorController extends ChangeNotifier {
   }
 
   void updatePinchToScaleActiveImage(double scaleDelta, Offset panDeltaWorld) {
-    if (_activeImageGestureBefore == null) return;
+    if (_activeImageGestureBefore == null ||
+        !scaleDelta.isFinite ||
+        scaleDelta <= 0 ||
+        !panDeltaWorld.dx.isFinite ||
+        !panDeltaWorld.dy.isFinite) {
+      return;
+    }
     final activeId = activeImageBlockId;
-    if (activeId == null) return;
+    if (activeId == null) {
+      return;
+    }
 
     final currentBlock = findImageBlockById(activeId);
-    if (currentBlock == null) return;
+    if (currentBlock == null ||
+        currentBlock.width <= 0 ||
+        currentBlock.height <= 0) {
+      return;
+    }
 
     final pageIndex = _pageIndexContainingImageBlock(activeId);
-    if (pageIndex == null) return;
+    if (pageIndex == null) {
+      return;
+    }
 
-    final newWidth = currentBlock.width * scaleDelta;
-    final newHeight = currentBlock.height * scaleDelta;
+    final minScale = math.max(
+      80 / currentBlock.width,
+      60 / currentBlock.height,
+    );
+    final maxScale = math.min(
+      4096 / currentBlock.width,
+      4096 / currentBlock.height,
+    );
+    if (minScale > maxScale) {
+      return;
+    }
+    final safeScale = scaleDelta.clamp(minScale, maxScale).toDouble();
+    if ((safeScale - 1).abs() < 0.000001 &&
+        panDeltaWorld == Offset.zero) {
+      return;
+    }
+    final newWidth = currentBlock.width * safeScale;
+    final newHeight = currentBlock.height * safeScale;
     final center = Offset(
       currentBlock.position.dx + currentBlock.width / 2,
       currentBlock.position.dy + currentBlock.height / 2,

@@ -1274,148 +1274,176 @@ class _EditorScreenState extends State<EditorScreen> {
                                               docWorldSize,
                                               viewportSize,
                                             ),
-                                        child: _buildTransformedDocumentLayer(
-                                          transformKey: const ValueKey(
-                                            'notebook-document-transform',
-                                          ),
-                                          transform: pageTransform,
-                                          worldSize: docWorldSize,
-                                          child: Stack(
-                                            children: [
-                                              for (
-                                                var i = visiblePageRange.start;
-                                                i < visiblePageRange.end;
-                                                i++
-                                              )
-                                                Positioned(
-                                                  left: 0,
-                                                  top: i * _pageExtent,
-                                                  width: pageWorldSize.width,
-                                                  height: pageWorldSize.height,
-                                                  child: IgnorePointer(
-                                                    child: Stack(
-                                                      fit: StackFit.expand,
-                                                      children: [
-                                                        DecoratedBox(
-                                                          decoration: BoxDecoration(
-                                                            color:
-                                                                Theme.of(
-                                                                      context,
-                                                                    ).brightness ==
-                                                                    Brightness
-                                                                        .dark
-                                                                ? AppColors
-                                                                      .darkCanvas
-                                                                : AppColors
-                                                                      .paper,
-                                                            boxShadow: const [
-                                                              BoxShadow(
-                                                                color: AppColors
-                                                                    .shadow,
-                                                                blurRadius: 14,
-                                                                offset: Offset(
-                                                                  0,
-                                                                  6,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                        PageBackgroundPaint(
-                                                          settings: controller
-                                                              .currentBackgroundSettings,
-                                                        ),
-                                                        Builder(
-                                                          builder: (context) {
-                                                            final visibility =
-                                                                _pageBoundaryVisibilityInDocument(
-                                                                  visibleDocumentRect:
-                                                                      visibleDocumentRect,
-                                                                  pageWorldSize:
-                                                                      pageWorldSize,
-                                                                  pageIndex: i,
-                                                                );
-                                                            return CustomPaint(
-                                                              painter: _PageFramePainter(
-                                                                showLeft:
-                                                                    visibility
-                                                                        .left,
-                                                                showTop:
-                                                                    visibility
-                                                                        .top,
-                                                                showRight:
-                                                                    visibility
-                                                                        .right,
-                                                                showBottom:
-                                                                    visibility
-                                                                        .bottom,
-                                                                highlightColor:
+                                        child: Stack(
+                                          children: [
+                                            _buildTransformedDocumentLayer(
+                                              transformKey: const ValueKey(
+                                                'notebook-document-transform',
+                                              ),
+                                              transform: pageTransform,
+                                              worldSize: docWorldSize,
+                                              child: Stack(
+                                                children: [
+                                                  for (
+                                                    var i = visiblePageRange.start;
+                                                    i < visiblePageRange.end;
+                                                    i++
+                                                  )
+                                                    Positioned(
+                                                      left: 0,
+                                                      top: i * _pageExtent,
+                                                      width: pageWorldSize.width,
+                                                      height: pageWorldSize.height,
+                                                      child: IgnorePointer(
+                                                        child: Stack(
+                                                          fit: StackFit.expand,
+                                                          children: [
+                                                            DecoratedBox(
+                                                              decoration: BoxDecoration(
+                                                                color:
                                                                     Theme.of(
                                                                           context,
-                                                                        )
-                                                                        .colorScheme
-                                                                        .primary
-                                                                        .withValues(
-                                                                          alpha:
-                                                                              0.75,
-                                                                        ),
+                                                                        ).brightness ==
+                                                                        Brightness
+                                                                            .dark
+                                                                    ? AppColors
+                                                                          .darkCanvas
+                                                                    : AppColors
+                                                                          .paper,
+                                                                boxShadow: const [
+                                                                  BoxShadow(
+                                                                    color: AppColors
+                                                                        .shadow,
+                                                                    blurRadius: 14,
+                                                                    offset: Offset(
+                                                                      0,
+                                                                      6,
+                                                                    ),
+                                                                  ),
+                                                                ],
                                                               ),
-                                                            );
-                                                          },
+                                                            ),
+                                                            PageBackgroundPaint(
+                                                              settings: controller
+                                                                  .currentBackgroundSettings,
+                                                            ),
+                                                            Builder(
+                                                              builder: (context) {
+                                                                final visibility =
+                                                                    _pageBoundaryVisibilityInDocument(
+                                                                      visibleDocumentRect:
+                                                                          visibleDocumentRect,
+                                                                      pageWorldSize:
+                                                                          pageWorldSize,
+                                                                      pageIndex: i,
+                                                                    );
+                                                                return CustomPaint(
+                                                                  painter: _PageFramePainter(
+                                                                    showLeft:
+                                                                        visibility
+                                                                            .left,
+                                                                    showTop:
+                                                                        visibility
+                                                                            .top,
+                                                                    showRight:
+                                                                        visibility
+                                                                            .right,
+                                                                    showBottom:
+                                                                        visibility
+                                                                            .bottom,
+                                                                    highlightColor:
+                                                                        Theme.of(
+                                                                              context,
+                                                                            )
+                                                                            .colorScheme
+                                                                            .primary
+                                                                            .withValues(
+                                                                              alpha:
+                                                                                  0.75,
+                                                                            ),
+                                                                  ),
+                                                                );
+                                                              },
+                                                            ),
+                                                          ],
                                                         ),
-                                                      ],
+                                                      ),
                                                     ),
+                                                  DocumentPageOverlay(
+                                                    controller: controller,
+                                                    interactionEnabled:
+                                                        !_isViewportNavigating,
+                                                    worldOrigin: Offset.zero,
+                                                    pages: controller.pages,
+                                                    pageSize: pageWorldSize,
+                                                    pageGap: _pageGap,
+                                                    firstPageIndex:
+                                                        visiblePageRange.start,
+                                                    lastPageIndex:
+                                                        visiblePageRange.end,
+                                                    renderBackground: true,
+                                                    renderInactive: true,
+                                                    renderActive: false,
                                                   ),
-                                                ),
-                                              DocumentPageOverlay(
-                                                controller: controller,
-                                                interactionEnabled:
-                                                    !_isViewportNavigating,
-                                                worldOrigin: Offset.zero,
-                                                pages: controller.pages,
-                                                pageSize: pageWorldSize,
-                                                pageGap: _pageGap,
-                                                firstPageIndex:
-                                                    visiblePageRange.start,
-                                                lastPageIndex:
-                                                    visiblePageRange.end,
-                                                renderBackground: true,
-                                                renderInactive: true,
-                                                renderActive: false,
+                                                  DocumentDrawingCanvas(
+                                                    allowMultiTouch: false,
+                                                    effectiveScale:
+                                                        effectivePageScale,
+                                                    interactionEnabled:
+                                                        !_isViewportNavigating,
+                                                    worldOrigin: Offset.zero,
+                                                    pages: controller.pages,
+                                                    pageSize: pageWorldSize,
+                                                    pageGap: _pageGap,
+                                                    firstPageIndex:
+                                                        visiblePageRange.start,
+                                                    lastPageIndex:
+                                                        visiblePageRange.end,
+                                                  ),
+                                                  DocumentPageOverlay(
+                                                    controller: controller,
+                                                    interactionEnabled:
+                                                        !_isViewportNavigating,
+                                                    worldOrigin: Offset.zero,
+                                                    pages: controller.pages,
+                                                    pageSize: pageWorldSize,
+                                                    pageGap: _pageGap,
+                                                    firstPageIndex:
+                                                        visiblePageRange.start,
+                                                    lastPageIndex:
+                                                        visiblePageRange.end,
+                                                    renderBackground: false,
+                                                    renderInactive: false,
+                                                    renderActive: true,
+                                                    renderActiveImages: false,
+                                                  ),
+                                                ],
                                               ),
-                                              DocumentDrawingCanvas(
-                                                allowMultiTouch: false,
-                                                effectiveScale:
-                                                    effectivePageScale,
-                                                interactionEnabled:
-                                                    !_isViewportNavigating,
-                                                worldOrigin: Offset.zero,
-                                                pages: controller.pages,
-                                                pageSize: pageWorldSize,
-                                                pageGap: _pageGap,
-                                                firstPageIndex:
-                                                    visiblePageRange.start,
-                                                lastPageIndex:
-                                                    visiblePageRange.end,
-                                              ),
-                                              DocumentPageOverlay(
-                                                controller: controller,
-                                                interactionEnabled:
-                                                    !_isViewportNavigating,
-                                                worldOrigin: Offset.zero,
-                                                pages: controller.pages,
-                                                pageSize: pageWorldSize,
-                                                pageGap: _pageGap,
-                                                firstPageIndex:
-                                                    visiblePageRange.start,
-                                                lastPageIndex:
-                                                    visiblePageRange.end,
-                                                renderBackground: false,
-                                                renderInactive: false,
-                                                renderActive: true,
-                                              ),
-                                            ],
-                                          ),
+                                            ),
+                                            for (var pageIndex =
+                                                    visiblePageRange.start;
+                                                pageIndex <
+                                                    visiblePageRange.end;
+                                                pageIndex++)
+                                              for (final image in controller
+                                                  .pages[pageIndex].imageBlocks)
+                                                if (image.id ==
+                                                    controller.activeImageBlockId)
+                                                  ActiveImageTransformHud(
+                                                    key: ValueKey(
+                                                      'notebook-viewport-image-${image.id}',
+                                                    ),
+                                                    controller: controller,
+                                                    block: image,
+                                                    pageIndex: pageIndex,
+                                                    worldOrigin: Offset.zero,
+                                                    interactionEnabled:
+                                                        !_isViewportNavigating,
+                                                    viewportScale:
+                                                        effectivePageScale,
+                                                    viewportOffset: _pagePan,
+                                                  ),
+                                          ],
                                         ),
                                       ),
                                     ),
