@@ -32,8 +32,11 @@ a platform as tested until its actual Actions job succeeds.
 Synthetic pointer regression: `test/image_pdf_transform_regression_test.dart`
 sends two real Flutter touch contacts through the selected object HUD and
 full notebook viewport, alongside off-page handle, undo/redo, bounds,
-cancellation, zoom isolation and repeated-resize scenarios. PDF pages in
-the editor are represented by rasterized image blocks; this is not a native
+cancellation, zoom isolation and repeated-resize scenarios. It also
+checks 35 consecutive pointer updates without notifying the entire editor,
+the transient picture preview before commit, and safe widget disposal while
+both fingers remain pressed (no repeated setState-after-dispose exceptions).
+PDF pages in the editor are rasterized image blocks; this is not a native
 PDF-render throughput benchmark.
 
 Manual checks on touch-capable Linux/Windows laptops, Android and iPadOS:
@@ -49,7 +52,11 @@ Manual checks on touch-capable Linux/Windows laptops, Android and iPadOS:
    in portrait and landscape orientations. Verify consistent dimensions.
 5. Cancel a gesture (e.g. OS interruption), undo and redo the resize,
    save/reopen, and verify that the prior geometry is restored.
-6. Without an active image selected, verify two-finger canvas pan/zoom
+6. Hold both fingers and perform 30–50 consecutive small resizes on
+   a large imported PDF page; the frame and pixels should track the
+   gesture smoothly without a frozen window or error flood. Deselect
+   the object or switch documents mid-touch; no setState-after-dispose.
+7. Without an active image selected, verify two-finger canvas pan/zoom
    still works normally.
 
 These manual checks require physical touch hardware and are not recorded

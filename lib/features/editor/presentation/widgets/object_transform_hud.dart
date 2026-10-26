@@ -120,7 +120,11 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
 
   @override
   void dispose() {
+    _touchPoints.clear();
+    _activeHandlePointer = null;
+    _gestureData = null;
     if (_engine.isActive) {
+      _engine.cancel();
       widget.onTransformEnd?.call();
     }
     super.dispose();
@@ -242,7 +246,8 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
             : Listener(
                 behavior: HitTestBehavior.translucent,
                 onPointerDown: (event) {
-                  if (event.kind != PointerDeviceKind.touch ||
+                  if (!mounted ||
+                      event.kind != PointerDeviceKind.touch ||
                       _activeHandlePointer != null ||
                       (_touchPoints.isEmpty && _engine.isActive)) {
                     return;
@@ -250,6 +255,9 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
                   if (_touchPoints.isEmpty) {
                     _touchResized = false;
                     _beginMove(rect, rotation, event.position);
+                  }
+                  if (!mounted || !_engine.isActive) {
+                    return;
                   }
                   _touchPoints[event.pointer] =
                       _globalToLocal(event.position);
@@ -265,6 +273,9 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
                   }
                 },
                 onPointerCancel: (event) {
+                  if (!mounted) {
+                    return;
+                  }
                   if (_touchPoints.remove(event.pointer) != null) {
                     _touchPoints.clear();
                     _touchResized = false;
@@ -278,6 +289,9 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   }
 
   void _updateTouch(int pointer, Offset globalPosition) {
+    if (!mounted) {
+      return;
+    }
     final previous = _touchPoints[pointer];
     if (previous == null || !_engine.isActive) {
       return;
@@ -346,7 +360,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   }
 
   void _endTouch(int pointer) {
-    if (_touchPoints.remove(pointer) == null) {
+    if (!mounted || _touchPoints.remove(pointer) == null) {
       return;
     }
     if (_touchPoints.isEmpty) {
@@ -566,13 +580,16 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   }
 
   void _beginMove(Rect rect, double rotation, Offset globalPosition) {
-    widget.onTransformStart?.call();
+    if (!mounted || _engine.isActive) {
+      return;
+    }
     _gestureData = widget.data;
     _engine.beginMove(
       rect: rect,
       rotation: rotation,
       pointer: _globalToLocal(globalPosition),
     );
+    widget.onTransformStart?.call();
   }
 
   void _beginResize(
@@ -581,7 +598,9 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     double rotation,
     Offset globalPosition,
   ) {
-    widget.onTransformStart?.call();
+    if (!mounted || _engine.isActive) {
+      return;
+    }
     _gestureData = widget.data;
     _engine.beginResize(
       rect: rect,
@@ -595,10 +614,11 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       clampingRect:
           widget.resizeClampingRectResolver?.call(handle) ?? Rect.largest,
     );
+    widget.onTransformStart?.call();
   }
 
   void _updatePreview(Offset globalPosition) {
-    if (!_engine.isActive) {
+    if (!mounted || !_engine.isActive) {
       return;
     }
     final preview = _engine.update(_globalToLocal(globalPosition));
@@ -612,7 +632,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   }
 
   void _commitGesture() {
-    if (!_engine.isActive) {
+    if (!mounted || !_engine.isActive) {
       return;
     }
     final enginePreview = _engine.end();
@@ -631,7 +651,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
   }
 
   void _cancelGesture() {
-    if (!_engine.isActive) {
+    if (!mounted || !_engine.isActive) {
       return;
     }
     _engine.cancel();

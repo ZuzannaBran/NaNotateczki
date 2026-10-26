@@ -182,9 +182,10 @@ void main() {
       await tester.pump();
 
       expect(
-        controller.pages.single.imageBlocks.single.width,
+        controller.imageTransformPreview.value?.width,
         greaterThan(200),
       );
+      expect(controller.pages.single.imageBlocks.single.width, 200);
       final newDocumentScale = tester
           .widget<Transform>(
             find.byKey(const ValueKey('notebook-document-transform')),
@@ -195,6 +196,11 @@ void main() {
       await first.up();
       await second.up();
       await tester.pump();
+      expect(
+        controller.pages.single.imageBlocks.single.width,
+        greaterThan(200),
+      );
+      expect(controller.imageTransformPreview.value, isNull);
       controller.undo();
       expect(controller.pages.single.imageBlocks.single.width, 200);
 
@@ -305,14 +311,19 @@ void main() {
       await first.moveBy(const Offset(-15, 0));
       await second.moveBy(const Offset(15, 0));
       await tester.pump();
-      final enlarged = controller.pages.single.imageBlocks.single;
-      expect(enlarged.width, greaterThan(200));
-      expect(enlarged.height, greaterThan(120));
-      expect(enlarged.width / enlarged.height, closeTo(5 / 3, 0.0001));
+      final preview = controller.imageTransformPreview.value;
+      expect(preview, isNotNull);
+      expect(preview!.width, greaterThan(200));
+      expect(preview.height, greaterThan(120));
+      expect(preview.width / preview.height, closeTo(5 / 3, 0.0001));
+      expect(controller.pages.single.imageBlocks.single.width, 200);
 
       await first.up();
       await second.up();
       await tester.pump();
+      final enlarged = controller.pages.single.imageBlocks.single;
+      expect(enlarged.width, greaterThan(200));
+      expect(controller.imageTransformPreview.value, isNull);
       expect(controller.isObjectTransformActive, isFalse);
       controller.undo();
       var restored = controller.pages.single.imageBlocks.single;
@@ -382,8 +393,12 @@ void main() {
       await pointer.moveBy(const Offset(20, 12));
       await tester.pump();
       expect(
-        controller.pages.single.imageBlocks.single.position,
+        controller.imageTransformPreview.value?.position,
         isNot(const Offset(790, 200)),
+      );
+      expect(
+        controller.pages.single.imageBlocks.single.position,
+        const Offset(790, 200),
       );
       await pointer.cancel();
       await tester.pump();
@@ -392,10 +407,131 @@ void main() {
         const Offset(790, 200),
       );
       expect(controller.isObjectTransformActive, isFalse);
+      expect(controller.imageTransformPreview.value, isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();
       await database.close();
     });
 
+    testWidgets('$source keeps frame alive during sustained pinch', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1300, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final database = NotesDatabase(NativeDatabase.memory());
+      final controller = _controller(database, source);
+      controller.setActiveImageBlock('page-image');
+      var rootNotifications = 0;
+      controller.addListener(() => rootNotifications++);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<EditorController>.value(
+            value: controller,
+            child: Scaffold(
+              body: Stack(
+                children: [
+                  Consumer<EditorController>(
+                    builder: (context, editor, _) =>
+                        ActiveImageTransformHud(
+                          controller: editor,
+                          block: editor.pages.single.imageBlocks.single,
+                          pageIndex: 0,
+                          worldOrigin: Offset.zero,
+                          interactionEnabled: true,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final first = await tester.startGesture(
+        const Offset(840, 260),
+        kind: PointerDeviceKind.touch,
+      );
+      final second = await tester.startGesture(
+        const Offset(920, 260),
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pump();
+      final countAfterStart = rootNotifications;
+      for (var i = 0; i < 35; i++) {
+        await first.moveBy(const Offset(1, 0));
+        await second.moveBy(const Offset(-1, 0));
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+        expect(controller.isObjectTransformActive, isTrue);
+        expect(rootNotifications, countAfterStart);
+        expect(controller.pages.single.imageBlocks.single.width, 200);
+      }
+      expect(controller.imageTransformPreview.value?.width, lessThan(200));
+      await first.up();
+      await second.up();
+      await tester.pump();
+      expect(controller.pages.single.imageBlocks.single.width, lessThan(200));
+      expect(controller.imageTransformPreview.value, isNull);
+      expect(controller.isObjectTransformActive, isFalse);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+      await database.close();
+    });
+
+    testWidgets('$source disposes safely during active multitouch', (
+      tester,
+    ) async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      final controller = _controller(database, source);
+      controller.setActiveImageBlock('page-image');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<EditorController>.value(
+            value: controller,
+            child: Scaffold(
+              body: Stack(
+                children: [
+                  ActiveImageTransformHud(
+                    controller: controller,
+                    block: controller.pages.single.imageBlocks.single,
+                    pageIndex: 0,
+                    worldOrigin: Offset.zero,
+                    interactionEnabled: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final first = await tester.startGesture(
+        const Offset(840, 260),
+        kind: PointerDeviceKind.touch,
+      );
+      final second = await tester.startGesture(
+        const Offset(920, 260),
+        kind: PointerDeviceKind.touch,
+      );
+      await first.moveBy(const Offset(10, 0));
+      await tester.pump();
+      expect(controller.isObjectTransformActive, isTrue);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      expect(controller.isObjectTransformActive, isFalse);
+      expect(controller.imageTransformPreview.value, isNull);
+      await first.moveBy(const Offset(-8, 0));
+      await second.moveBy(const Offset(8, 0));
+      await first.up();
+      await second.up();
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(controller.pages.single.imageBlocks.single.width, 200);
+
+      controller.dispose();
+      await database.close();
+    });
   }
 }
