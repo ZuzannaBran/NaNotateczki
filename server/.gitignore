@@ -1,0 +1,6 @@
+.env
+data/
+backups/
+web-dist/
+__pycache__/
+.pytest_cache/

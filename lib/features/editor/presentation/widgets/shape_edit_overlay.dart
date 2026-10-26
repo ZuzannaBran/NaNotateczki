@@ -33,12 +33,7 @@ class ShapeEditGeometry {
         return points.length > 1 ? [points.first, points[1]] : points;
       case DrawingTool.rectangle:
       case DrawingTool.square:
-        return [
-          rect.topLeft,
-          rect.topRight,
-          rect.bottomRight,
-          rect.bottomLeft,
-        ];
+        return [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
       case DrawingTool.triangle:
         return points.take(3).toList();
       case DrawingTool.ellipse:
@@ -69,11 +64,7 @@ class ShapeEditGeometry {
     );
   }
 
-  static InkStroke resized(
-    InkStroke stroke,
-    int handleIndex,
-    Offset delta,
-  ) {
+  static InkStroke resized(InkStroke stroke, int handleIndex, Offset delta) {
     final controlPoints = handles(stroke);
     if (handleIndex < 0 || handleIndex >= controlPoints.length) {
       return stroke;
@@ -105,9 +96,7 @@ class ShapeEditGeometry {
           ];
         }
       case DrawingTool.triangle:
-        points = [
-          ...stroke.points.take(3).map((point) => point.toOffset()),
-        ];
+        points = [...stroke.points.take(3).map((point) => point.toOffset())];
         points[handleIndex] = target;
         points.add(points.first);
       case DrawingTool.rectangle:
@@ -117,10 +106,12 @@ class ShapeEditGeometry {
         if (stroke.tool == DrawingTool.square) {
           final distance = corner - opposite;
           final extent = math.max(distance.dx.abs(), distance.dy.abs());
-          corner = opposite + Offset(
-            (distance.dx < 0 ? -1 : 1) * extent,
-            (distance.dy < 0 ? -1 : 1) * extent,
-          );
+          corner =
+              opposite +
+              Offset(
+                (distance.dx < 0 ? -1 : 1) * extent,
+                (distance.dy < 0 ? -1 : 1) * extent,
+              );
         }
         final updated = Rect.fromPoints(opposite, corner);
         points = _rectangle(updated);
@@ -141,9 +132,7 @@ class ShapeEditGeometry {
             left = math.min(target.dx, right - 2);
         }
         if (stroke.tool == DrawingTool.circle) {
-          final diameter = handleIndex.isEven
-              ? bottom - top
-              : right - left;
+          final diameter = handleIndex.isEven ? bottom - top : right - left;
           if (handleIndex.isEven) {
             left = rect.center.dx - diameter / 2;
             right = rect.center.dx + diameter / 2;
@@ -174,9 +163,7 @@ class ShapeEditGeometry {
         return stroke;
     }
     return stroke.copyWith(
-      points: [
-        for (final point in points) InkPoint.fromOffset(point, 1.0),
-      ],
+      points: [for (final point in points) InkPoint.fromOffset(point, 1.0)],
     );
   }
 
@@ -194,8 +181,8 @@ class ShapeEditGeometry {
     for (final item in points.skip(1)) {
       path.lineTo(item.dx, item.dy);
     }
-    final closed = stroke.tool != DrawingTool.line &&
-        stroke.tool != DrawingTool.arrow;
+    final closed =
+        stroke.tool != DrawingTool.line && stroke.tool != DrawingTool.arrow;
     if (closed) {
       path.close();
       if (path.contains(point)) {
@@ -209,9 +196,10 @@ class ShapeEditGeometry {
       final squared = segment.distanceSquared;
       final t = squared == 0
           ? 0.0
-          : (((point - a).dx * segment.dx +
-                    (point - a).dy * segment.dy) /
-                squared).clamp(0.0, 1.0).toDouble();
+          : (((point - a).dx * segment.dx + (point - a).dy * segment.dy) /
+                    squared)
+                .clamp(0.0, 1.0)
+                .toDouble();
       if ((point - (a + segment * t)).distance <= radius) {
         return true;
       }
@@ -290,10 +278,8 @@ class _ShapeEditOverlayState extends State<ShapeEditOverlay> {
   Offset? _start;
   InkStroke? _before;
 
-  InkStroke get _displayStroke => ShapeEditGeometry.moved(
-    widget.stroke,
-    -widget.origin,
-  );
+  InkStroke get _displayStroke =>
+      ShapeEditGeometry.moved(widget.stroke, -widget.origin);
 
   @override
   void dispose() {
@@ -431,11 +417,7 @@ class _ShapeHandlesPainter extends CustomPainter {
         ..strokeWidth = 1,
     );
     for (final point in ShapeEditGeometry.handles(stroke)) {
-      canvas.drawCircle(
-        point,
-        5.5,
-        Paint()..color = const Color(0xFFFAFAFA),
-      );
+      canvas.drawCircle(point, 5.5, Paint()..color = const Color(0xFFFAFAFA));
       canvas.drawCircle(
         point,
         5.5,

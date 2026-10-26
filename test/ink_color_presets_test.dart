@@ -45,9 +45,11 @@ void main() {
           .map((color) => HSLColor.fromColor(color).lightness)
           .toList();
       final dark = preset.colors
-          .map((color) => HSLColor.fromColor(
-                AppColors.displayInkColor(color, darkMode: true),
-              ).lightness)
+          .map(
+            (color) => HSLColor.fromColor(
+              AppColors.displayInkColor(color, darkMode: true),
+            ).lightness,
+          )
           .toList();
       expect(light[0], lessThan(light[1]));
       expect(light[1], lessThan(light[2]));
@@ -63,53 +65,55 @@ void main() {
     }
   });
 
-  test('pen and highlighter share any selected swatch across tool changes',
-      () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    final now = DateTime(2026);
-    final controller = EditorController(
-      repository: NotebookRepository(database),
-      notebook: Notebook(
-        uid: 'preset-test',
-        title: 'Preset test',
-        kind: NotebookKind.notebook,
-        folder: 'Tests',
-        createdAt: now,
-        updatedAt: now,
-        pages: [
-          NotePage(
-            id: 'page',
-            title: 'Page',
-            textBlocks: const [],
-            imageBlocks: const [],
-            inkStrokes: const [],
-            isBookmarked: false,
-          ),
-        ],
-      ),
-    );
+  test(
+    'pen and highlighter share any selected swatch across tool changes',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      final now = DateTime(2026);
+      final controller = EditorController(
+        repository: NotebookRepository(database),
+        notebook: Notebook(
+          uid: 'preset-test',
+          title: 'Preset test',
+          kind: NotebookKind.notebook,
+          folder: 'Tests',
+          createdAt: now,
+          updatedAt: now,
+          pages: [
+            NotePage(
+              id: 'page',
+              title: 'Page',
+              textBlocks: const [],
+              imageBlocks: const [],
+              inkStrokes: const [],
+              isBookmarked: false,
+            ),
+          ],
+        ),
+      );
 
-    try {
-      expect(controller.quickColors, InkColorPreset.blue.colors);
-      expect(controller.penColor, InkColorPreset.blue.colors[0]);
-      expect(controller.highlighterColor, InkColorPreset.blue.colors[0]);
+      try {
+        expect(controller.quickColors, InkColorPreset.blue.colors);
+        expect(controller.penColor, InkColorPreset.blue.colors[0]);
+        expect(controller.highlighterColor, InkColorPreset.blue.colors[0]);
 
-      for (final preset in InkColorPreset.values) {
-        controller.applyInkColorPreset(preset);
-        expect(controller.quickColors, preset.colors);
-        expect(controller.penColor, preset.colors[0]);
-        expect(controller.highlighterColor, preset.colors[0]);
-        controller.setColor(preset.colors[2]);
-        controller.setTool(DrawingTool.highlighter);
-        expect(controller.inkColor, preset.colors[2]);
-        controller.setColor(preset.colors[1]);
-        controller.setTool(DrawingTool.pen);
-        expect(controller.inkColor, preset.colors[1]);
-        expect(controller.highlighterColor, preset.colors[1]);
+        for (final preset in InkColorPreset.values) {
+          controller.applyInkColorPreset(preset);
+          expect(controller.quickColors, preset.colors);
+          expect(controller.penColor, preset.colors[0]);
+          expect(controller.highlighterColor, preset.colors[0]);
+          controller.setColor(preset.colors[2]);
+          controller.setTool(DrawingTool.highlighter);
+          expect(controller.inkColor, preset.colors[2]);
+          controller.setColor(preset.colors[1]);
+          controller.setTool(DrawingTool.pen);
+          expect(controller.inkColor, preset.colors[1]);
+          expect(controller.highlighterColor, preset.colors[1]);
+        }
+      } finally {
+        controller.dispose();
+        await database.close();
       }
-    } finally {
-      controller.dispose();
-      await database.close();
-    }
-  });
+    },
+  );
 }

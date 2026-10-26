@@ -5,9 +5,7 @@ import 'package:program/app/notes_app.dart';
 import 'package:program/core/input/app_scroll_behavior.dart';
 
 void main() {
-  testWidgets('app installs scrollbar-free behavior globally', (
-    tester,
-  ) async {
+  testWidgets('app installs scrollbar-free behavior globally', (tester) async {
     await tester.pumpWidget(const NotesApp());
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));

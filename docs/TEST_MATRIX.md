@@ -698,3 +698,34 @@ Manual scenario (Linux first; repeat on Windows/macOS, Chrome, Android/iOS):
    solely from entering or leaving editing.
 4. Check a legacy multi-color rich-text block: its independent colored
    segments must still appear outside editing.
+
+## Server backup and two-browser synchronization
+
+Automated local tests cover the app-data migration, HTTPS-only API
+configuration, authentication headers, complete backup v2, checksum handling,
+Argon2/JWT primitives, paginated reconciliation, concurrent backup dirtiness,
+image-path relocation, server-backup invariants and deployment boundaries.
+Before enabling a real account, run an isolated PostgreSQL instance and verify
+manually:
+
+1. Create accounts A and B. Confirm that B receives 404/403 for every
+   notebook, device, snapshot and download identifier belonging to A.
+2. Open the same account in two separate Chrome profiles. Select an explicit
+   initial policy, edit A and confirm B updates without reload. Repeat after
+   disabling Wi-Fi, sleeping the tab, restarting API and letting JWT expire.
+3. Edit the same document on both devices while offline. Confirm a `409`
+   creates a visible conflict copy and neither version disappears.
+4. Delete an uploaded document and a never-uploaded document. Confirm only the
+   uploaded one creates a tombstone and neither is resurrected after reconnect.
+5. Upload a snapshot containing rich text, ink, images, folders/tasks and study
+   sessions. Download it on an empty test profile, verify both SHA-256 layers,
+   restore it and compare counts/content.
+6. Interrupt upload before finalize, corrupt one byte, exceed 64 MiB and reuse
+   an idempotency key with another payload. All attempts must fail without
+   replacing the newest `verified` backup.
+7. Run `server/scripts/backup-server.sh` against a separate encrypted test
+   volume, verify its manifest, restore `postgres.dump` plus device snapshots
+   into an isolated stack and compare account/notebook/snapshot counts.
+
+These PostgreSQL/Cloudflare/two-browser scenarios are not marked as passed by
+the unit suite and require a configured test server.

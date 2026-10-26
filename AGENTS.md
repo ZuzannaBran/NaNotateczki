@@ -3,6 +3,9 @@
 Stały kontrakt dla agentów AI w tym repozytorium. Czytaj go na początku każdej
 sesji. Domyślny język komunikacji: polski.
 
+Struktura danych lokalnych, backupu i synchronizacji jest opisana w
+[data.md](data.md). Przeczytaj ją przed zmianą ścieżek, formatu danych albo API.
+
 ## 1. Najpierw mapa
 
 Przed czytaniem `lib/` otwórz [PROJECT_MAP.md](PROJECT_MAP.md): całość przy

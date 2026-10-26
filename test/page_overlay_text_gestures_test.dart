@@ -160,7 +160,6 @@ void main() {
     await database.close();
   });
 
-
   testWidgets('font size menu is attached, compact and scrollable', (
     tester,
   ) async {
@@ -184,9 +183,7 @@ void main() {
       ),
     );
 
-    final button = find.byKey(
-      const ValueKey('text-font-size-menu-button'),
-    );
+    final button = find.byKey(const ValueKey('text-font-size-menu-button'));
     final popupButton = tester.widget<PopupMenuButton<int>>(button);
     final sizes = popupButton
         .itemBuilder(tester.element(button))
@@ -197,10 +194,9 @@ void main() {
     await tester.tap(button);
     await tester.pumpAndSettle();
 
-    final menu = find.ancestor(
-      of: find.text('8').last,
-      matching: find.byType(Material),
-    ).first;
+    final menu = find
+        .ancestor(of: find.text('8').last, matching: find.byType(Material))
+        .first;
     final menuRect = tester.getRect(menu);
     final toolbarRect = tester.getRect(
       find.byKey(const ValueKey('text-toolbar-panel')),
@@ -747,10 +743,7 @@ void main() {
     await database.close();
   });
 
-
-  testWidgets('text wrapping and glyph positions remain fixed', (
-    tester,
-  ) async {
+  testWidgets('text wrapping and glyph positions remain fixed', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1100, 850));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final database = NotesDatabase(NativeDatabase.memory());
@@ -784,7 +777,9 @@ void main() {
     final controller = EditorController(
       repository: NotebookRepository(database),
       notebook: notebook.copyWith(
-        pages: [notebook.pages.single.copyWith(textBlocks: [block])],
+        pages: [
+          notebook.pages.single.copyWith(textBlocks: [block]),
+        ],
       ),
     );
     const characterOffsets = [0, 35, 60, 90, 120, 150, 180, 210, 240];
@@ -798,19 +793,15 @@ void main() {
               ChangeNotifierProvider<AppPreferencesController>.value(
                 value: preferences,
               ),
-              ChangeNotifierProvider<EditorController>.value(
-                value: controller,
-              ),
+              ChangeNotifierProvider<EditorController>.value(value: controller),
             ],
             child: Scaffold(
               body: SizedBox(
                 width: 650,
                 height: 620,
                 child: Consumer<EditorController>(
-                  builder: (context, editor, _) => PageOverlay(
-                    controller: editor,
-                    renderBackground: false,
-                  ),
+                  builder: (context, editor, _) =>
+                      PageOverlay(controller: editor, renderBackground: false),
                 ),
               ),
             ),
@@ -828,8 +819,9 @@ void main() {
       final preview = tester.widget<EditableText>(previewFinder);
       expect(preview.readOnly, isTrue);
       final previewRect = tester.getRect(previewFinder);
-      final previewRender =
-          tester.state<EditableTextState>(previewFinder).renderEditable;
+      final previewRender = tester
+          .state<EditableTextState>(previewFinder)
+          .renderEditable;
       final expectedCarets = characterOffsets
           .map(
             (offset) => previewRender.getLocalRectForCaret(
@@ -854,8 +846,9 @@ void main() {
         expect(activeRect.top, closeTo(previewRect.top, 0.1));
         expect(activeRect.width, closeTo(previewRect.width, 0.1));
         expect(activeRect.height, closeTo(previewRect.height, 0.1));
-        final editRender =
-            tester.state<EditableTextState>(editFinder).renderEditable;
+        final editRender = tester
+            .state<EditableTextState>(editFinder)
+            .renderEditable;
         for (var i = 0; i < characterOffsets.length; i++) {
           final caret = editRender.getLocalRectForCaret(
             TextPosition(offset: characterOffsets[i]),
@@ -891,8 +884,9 @@ void main() {
         expect(restoredRect.top, closeTo(previewRect.top, 0.1));
         expect(restoredRect.width, closeTo(previewRect.width, 0.1));
         expect(restoredRect.height, closeTo(previewRect.height, 0.1));
-        final restoredRender =
-            tester.state<EditableTextState>(restoredFinder).renderEditable;
+        final restoredRender = tester
+            .state<EditableTextState>(restoredFinder)
+            .renderEditable;
         for (var i = 0; i < characterOffsets.length; i++) {
           final caret = restoredRender.getLocalRectForCaret(
             TextPosition(offset: characterOffsets[i]),
@@ -931,7 +925,9 @@ void main() {
     final controller = EditorController(
       repository: NotebookRepository(database),
       notebook: notebook.copyWith(
-        pages: [notebook.pages.single.copyWith(textBlocks: [block])],
+        pages: [
+          notebook.pages.single.copyWith(textBlocks: [block]),
+        ],
       ),
     );
     controller.setTool(DrawingTool.text);

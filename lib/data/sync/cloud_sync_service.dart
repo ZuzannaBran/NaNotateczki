@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 
+import '../../core/storage/app_data_directory.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/notebook.dart';
 
@@ -130,7 +130,7 @@ class CloudSyncService {
   }
 
   Future<File> _configFile() async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = Directory(await getAppDataPath());
     return File('${dir.path}/$_configFileName');
   }
 }

@@ -9,6 +9,7 @@ import 'core/diagnostics/data_integrity_log.dart';
 import 'core/diagnostics/optimization_log.dart';
 import 'core/error/app_error_log.dart';
 import 'core/input/stylus_button_state.dart';
+import 'core/storage/app_data_directory.dart';
 
 ui.KeyDataCallback? _wrappedKeyDataHandler;
 ui.ErrorCallback? _wrappedPlatformErrorHandler;
@@ -43,6 +44,7 @@ void main() {
 
 Future<void> _runApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await prepareAppDataDirectory();
   await AppErrorLog.instance.load();
   await DataIntegrityLog.instance.load();
   await OptimizationLog.instance.load();

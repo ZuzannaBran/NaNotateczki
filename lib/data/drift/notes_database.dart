@@ -184,6 +184,7 @@ class NotesDatabase extends _$NotesDatabase {
         stage = DatabaseOpenStage.validation;
         database = NotesDatabase(connection.executor);
         await database.customSelect('select 1').getSingle();
+        await database._relocateImagePaths(connection);
         await validateIntegrity(database);
         return DatabaseOpenResult(
           database: database,
@@ -289,6 +290,20 @@ class NotesDatabase extends _$NotesDatabase {
 
   Future<void> clearRecoveryMarker() {
     return clearNotesDatabaseRecoveryMarker(_databaseFileName);
+  }
+
+  Future<void> _relocateImagePaths(NotesDatabaseConnection connection) async {
+    final legacy = connection.legacyImageDirectory;
+    final current = connection.imageDirectory;
+    if (legacy == null || current == null || legacy == current) {
+      return;
+    }
+    await customStatement(
+      'UPDATE image_block_rows '
+      'SET path = ? || substr(path, ?) '
+      'WHERE substr(path, 1, ?) = ?',
+      [current, legacy.length + 1, legacy.length, legacy],
+    );
   }
 
   Future<void> _validateIntegrity() async {

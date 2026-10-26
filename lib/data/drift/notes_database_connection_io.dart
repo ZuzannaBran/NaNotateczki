@@ -4,22 +4,32 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/storage/app_data_directory.dart';
+
 class NotesDatabaseConnection {
   NotesDatabaseConnection({
     required this.executor,
     required this.freshFile,
     this.recoveryPending = false,
     this.recoveryReason,
+    this.legacyImageDirectory,
+    this.imageDirectory,
   });
 
   final QueryExecutor executor;
   final bool freshFile;
   final bool recoveryPending;
   final String? recoveryReason;
+  final String? legacyImageDirectory;
+  final String? imageDirectory;
 }
 
 Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
-  final dir = await getApplicationDocumentsDirectory();
+  final documents = await getApplicationDocumentsDirectory();
+  final migration = await prepareAppDataDirectory(
+    legacyDocumentsPath: documents.path,
+  );
+  final dir = Directory(migration.dataPath);
   final file = File('${dir.path}/$name');
   final marker = _recoveryMarker(file);
   await _recoverRecoveryMarker(marker);
@@ -49,11 +59,16 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
     freshFile: freshFile,
     recoveryPending: recoveryPending,
     recoveryReason: recoveryReason,
+    legacyImageDirectory:
+        migration.conflictingPaths.any((path) => path.startsWith('images/'))
+        ? null
+        : '${documents.path}/images',
+    imageDirectory: '${dir.path}/images',
   );
 }
 
 Future<String?> quarantineNotesDatabase(String name) async {
-  final dir = await getApplicationDocumentsDirectory();
+  final dir = Directory(await getAppDataPath());
   final file = File('${dir.path}/$name');
   if (!await file.exists()) {
     return null;
@@ -103,7 +118,7 @@ Future<String?> quarantineNotesDatabase(String name) async {
 }
 
 Future<void> clearNotesDatabaseRecoveryMarker(String name) async {
-  final dir = await getApplicationDocumentsDirectory();
+  final dir = Directory(await getAppDataPath());
   final marker = _recoveryMarker(File('${dir.path}/$name'));
   await _recoverRecoveryMarker(marker);
   if (await marker.exists()) {

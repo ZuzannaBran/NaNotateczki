@@ -40,10 +40,7 @@ void main() {
       final metadata = <String, dynamic>{
         'folders': ['Notes', 'Folder $index'],
         'covers': {
-          'Folder $index': {
-            'shape': 'heart',
-            'iconColor': 0xFF123456,
-          },
+          'Folder $index': {'shape': 'heart', 'iconColor': 0xFF123456},
         },
         'plannerTasks': {
           'planner': [
@@ -80,21 +77,17 @@ void main() {
     );
     await service.snapshot([]);
 
-    final manifest = jsonDecode(
-      await File(
-        '${directory.path}/local_backup/manifest.json',
-      ).readAsString(),
-    ) as Map<String, dynamic>;
+    final manifest =
+        jsonDecode(
+              await File(
+                '${directory.path}/local_backup/manifest.json',
+              ).readAsString(),
+            )
+            as Map<String, dynamic>;
     expect(manifest['folderMetadata'], latestMetadata);
     expect(AppErrorLog.instance.length, errorsBefore);
-    expect(
-      await File('${directory.path}/$key.tmp').exists(),
-      isFalse,
-    );
-    expect(
-      await File('${directory.path}/$key.previous').exists(),
-      isFalse,
-    );
+    expect(await File('${directory.path}/$key.tmp').exists(), isFalse);
+    expect(await File('${directory.path}/$key.previous').exists(), isFalse);
   });
 
   test('unchanged notebook reuses its incremental backup', () async {

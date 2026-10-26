@@ -29,6 +29,7 @@ import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/text_block.dart';
 import '../../../core/input/ink_activity_tracker.dart';
 import '../../../core/storage/app_save_coordinator.dart';
+import '../../../core/storage/app_data_directory.dart';
 import '../../../core/storage/text_storage.dart';
 import 'editor_actions.dart';
 import 'input_mode.dart';
@@ -645,12 +646,14 @@ class EditorController extends ChangeNotifier {
       return;
     }
     _ensurePageSelected(pageIndex);
-    _updatePage(currentPage.copyWith(
-      inkStrokes: [
-        for (final item in currentPage.inkStrokes)
-          if (item.id == stroke.id) stroke else item,
-      ],
-    ));
+    _updatePage(
+      currentPage.copyWith(
+        inkStrokes: [
+          for (final item in currentPage.inkStrokes)
+            if (item.id == stroke.id) stroke else item,
+        ],
+      ),
+    );
     _touchInkPageRevision(currentPage.id);
   }
 
@@ -945,8 +948,7 @@ class EditorController extends ChangeNotifier {
       return;
     }
     final safeScale = scaleDelta.clamp(minScale, maxScale).toDouble();
-    if ((safeScale - 1).abs() < 0.000001 &&
-        panDeltaWorld == Offset.zero) {
+    if ((safeScale - 1).abs() < 0.000001 && panDeltaWorld == Offset.zero) {
       return;
     }
     final newWidth = currentBlock.width * safeScale;
@@ -1396,7 +1398,7 @@ class EditorController extends ChangeNotifier {
       }
     }
 
-    for (final kind in NotebookKind.values) {
+    for (final kind in const [NotebookKind.notebook, NotebookKind.board]) {
       final key = backgroundPrefsKeyForKind(kind);
       if (dirtyKinds.contains(kind) || !merged.containsKey(key)) {
         merged[key] = defaultBackgroundSettingsForKind(kind).toJson();
@@ -2747,7 +2749,7 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<Directory> _imagesDir() async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = Directory(await getAppDataPath());
     final imagesDir = Directory('${dir.path}/images');
     if (!await imagesDir.exists()) {
       await imagesDir.create(recursive: true);

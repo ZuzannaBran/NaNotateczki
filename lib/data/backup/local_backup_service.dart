@@ -5,9 +5,9 @@ import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../core/error/app_error_log.dart';
+import '../../core/storage/app_data_directory.dart';
 import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/image_block.dart';
@@ -20,8 +20,7 @@ class LocalBackupService {
   LocalBackupService(
     this.repository, {
     Future<Directory> Function()? documentsDirectory,
-  }) : _documentsDirectory =
-           documentsDirectory ?? getApplicationDocumentsDirectory;
+  }) : _documentsDirectory = documentsDirectory ?? _defaultDataDirectory;
 
   final NotebookRepository repository;
   final Future<Directory> Function() _documentsDirectory;
@@ -58,6 +57,10 @@ class LocalBackupService {
   static const _libraryFoldersFile = 'library_folders.json';
   static const _temporarySuffix = '.tmp';
   static const _previousSuffix = '.previous';
+
+  static Future<Directory> _defaultDataDirectory() async {
+    return Directory(await getAppDataPath());
+  }
 
   Future<Directory> _backupDir() async {
     final docs = await _documentsDirectory();

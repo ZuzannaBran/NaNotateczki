@@ -15,8 +15,13 @@ import '../core/input/ink_activity_tracker.dart';
 import '../core/storage/app_save_coordinator.dart';
 import '../core/theme/app_theme.dart';
 import '../data/backup/local_backup_service.dart';
+import '../data/backup/remote_backup_service.dart';
+import '../data/backup/remote_backup_scheduler.dart';
 import '../data/drift/notes_database.dart';
+import '../data/sync/account_session_controller.dart';
+import '../data/sync/api_client.dart';
 import '../data/sync/cloud_sync_service.dart';
+import '../data/sync/live_web_sync_service.dart';
 import '../features/library/presentation/library_controller.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notebook/data/notebook_repository.dart';
@@ -35,6 +40,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   NotebookRepository? _repository;
   LocalBackupService? _backupService;
   CloudSyncService? _cloudSync;
+  ApiClient? _apiClient;
+  AccountSessionController? _accountSession;
+  RemoteBackupService? _remoteBackupService;
+  RemoteBackupScheduler? _remoteBackupScheduler;
+  LiveWebSyncService? _liveSync;
+  LibraryController? _libraryController;
   _BackupScheduler? _backupScheduler;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
   Future<void>? _exitDrain;
@@ -52,6 +63,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _backupScheduler?.dispose();
+    _remoteBackupScheduler?.dispose();
+    _liveSync?.dispose();
+    _libraryController?.dispose();
+    _accountSession?.dispose();
+    _apiClient?.close();
     final backupService = _backupService;
     if (backupService != null) {
       unawaited(backupService.dispose());
@@ -171,18 +187,61 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             _repository ??
             NotebookRepository(
               result.database,
-              onChanged: (changes) =>
-                  _backupScheduler?.schedule(changes: changes),
+              onChanged: (changes) {
+                _backupScheduler?.schedule(changes: changes);
+                _remoteBackupScheduler?.markDirty();
+                _liveSync?.enqueue(changes);
+              },
             );
         _repository = repository;
         final backupService = _backupService ?? LocalBackupService(repository);
         _backupService = backupService;
         final cloudSync = _cloudSync ?? CloudSyncService(repository);
         _cloudSync = cloudSync;
+        final apiClient = _apiClient ?? ApiClient();
+        _apiClient = apiClient;
+        final accountSession =
+            _accountSession ?? AccountSessionController(apiClient);
+        _accountSession = accountSession;
+        final remoteBackup =
+            _remoteBackupService ??
+            RemoteBackupService(
+              repository: repository,
+              apiClient: apiClient,
+              session: accountSession,
+            );
+        _remoteBackupService = remoteBackup;
+        final remoteBackupScheduler =
+            _remoteBackupScheduler ??
+            RemoteBackupScheduler(
+              service: remoteBackup,
+              session: accountSession,
+            );
+        _remoteBackupScheduler = remoteBackupScheduler;
+        final liveSync =
+            _liveSync ??
+            LiveWebSyncService(
+              repository: repository,
+              apiClient: apiClient,
+              session: accountSession,
+            );
+        _liveSync = liveSync;
         _backupScheduler ??= _BackupScheduler(
           repository: repository,
           backupService: backupService,
         );
+        final libraryController =
+            _libraryController ??
+            LibraryController(
+              repository,
+              cloudSync,
+              backupService,
+              wasReset: result.wasReset,
+              freshFile: result.freshFile,
+              resetReason: result.resetReason,
+            );
+        _libraryController = libraryController;
+        liveSync.onRemoteApplied = libraryController.loadItems;
 
         return MultiProvider(
           providers: [
@@ -194,15 +253,16 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             ),
             Provider<NotebookRepository>.value(value: repository),
             Provider<LocalBackupService>.value(value: backupService),
-            ChangeNotifierProvider(
-              create: (_) => LibraryController(
-                repository,
-                cloudSync,
-                backupService,
-                wasReset: result.wasReset,
-                freshFile: result.freshFile,
-                resetReason: result.resetReason,
-              ),
+            ChangeNotifierProvider<AccountSessionController>.value(
+              value: accountSession,
+            ),
+            Provider<RemoteBackupService>.value(value: remoteBackup),
+            ChangeNotifierProvider<RemoteBackupScheduler>.value(
+              value: remoteBackupScheduler,
+            ),
+            ChangeNotifierProvider<LiveWebSyncService>.value(value: liveSync),
+            ChangeNotifierProvider<LibraryController>.value(
+              value: libraryController,
             ),
           ],
           child: MaterialApp(

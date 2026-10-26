@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'app_data_directory.dart';
 
 final Map<String, Future<void>> _operationTails = <String, Future<void>>{};
 
@@ -83,7 +83,10 @@ Future<void> _recoverAtomicWrite(File file) async {
 }
 
 Future<File> _fileForKey(String key, {String? directoryPath}) async {
-  final path =
-      directoryPath ?? (await getApplicationDocumentsDirectory()).path;
+  final path = directoryPath ?? await getAppDataPath();
+  final directory = Directory(path);
+  if (!await directory.exists()) {
+    await directory.create(recursive: true);
+  }
   return File('$path/$key');
 }

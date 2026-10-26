@@ -6,11 +6,11 @@ import 'dart:ui';
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/diagnostics/data_integrity_log.dart';
 import '../../../core/error/app_error_log.dart';
+import '../../../core/storage/app_data_directory.dart';
 import '../../../data/drift/notes_database.dart';
 import '../domain/drawing_tool.dart';
 import '../domain/image_block.dart';
@@ -101,7 +101,7 @@ class NotebookRepository {
     if (kIsWeb) {
       return 0;
     }
-    final docs = await getApplicationDocumentsDirectory();
+    final docs = Directory(await getAppDataPath());
     final imagesDir = Directory('${docs.path}/images');
     if (!await imagesDir.exists()) {
       return 0;
@@ -402,7 +402,7 @@ class NotebookRepository {
       return;
     }
     try {
-      final docs = await getApplicationDocumentsDirectory();
+      final docs = Directory(await getAppDataPath());
       final archiveDir = Directory('${docs.path}/deleted_notebooks');
       if (!await archiveDir.exists()) {
         await archiveDir.create(recursive: true);
@@ -969,7 +969,7 @@ class NotebookRepository {
       return block.copyWith(clearBytes: true);
     }
 
-    final docs = await getApplicationDocumentsDirectory();
+    final docs = Directory(await getAppDataPath());
     final imagesDir = Directory('${docs.path}/images');
     if (!await imagesDir.exists()) {
       await imagesDir.create(recursive: true);
@@ -1116,7 +1116,8 @@ class NotebookRepository {
       for (final image in page.imageBlocks) {
         if (!nextImages.contains(image.id)) {
           final candidates = imagesById[image.id] ?? const <ImageBlock>[];
-          final relocated = candidates.length == 1 &&
+          final relocated =
+              candidates.length == 1 &&
               _sameImageContent(image, candidates.single);
           if (!relocated && !approved.contains('image:${image.id}')) {
             return false;
@@ -1203,7 +1204,7 @@ class NotebookRepository {
     Notebook before,
     Notebook attempted,
   ) async {
-    final docs = await getApplicationDocumentsDirectory();
+    final docs = Directory(await getAppDataPath());
     final archiveDir = Directory('${docs.path}/data_integrity_incidents');
     if (!await archiveDir.exists()) {
       await archiveDir.create(recursive: true);

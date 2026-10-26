@@ -251,8 +251,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
                     _touchResized = false;
                     _beginMove(rect, rotation, event.position);
                   }
-                  _touchPoints[event.pointer] =
-                      _globalToLocal(event.position);
+                  _touchPoints[event.pointer] = _globalToLocal(event.position);
                 },
                 onPointerMove: (event) {
                   if (event.kind == PointerDeviceKind.touch) {
@@ -294,8 +293,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       final newFocal = (currentPositions[0] + currentPositions[1]) / 2;
       final oldDistance =
           (previousPositions[0] - previousPositions[1]).distance;
-      final newDistance =
-          (currentPositions[0] - currentPositions[1]).distance;
+      final newDistance = (currentPositions[0] - currentPositions[1]).distance;
       final constraints =
           widget.constraintsResolver?.call(HandlePosition.bottomRight) ??
           widget.constraints;
@@ -307,13 +305,10 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
         constraints.maxWidth / rect.width,
         constraints.maxHeight / rect.height,
       );
-      final requested = oldDistance > 0.001
-          ? newDistance / oldDistance
-          : 1.0;
-      final factor = requested.clamp(
-        math.min(minimum, maximum),
-        math.max(minimum, maximum),
-      ).toDouble();
+      final requested = oldDistance > 0.001 ? newDistance / oldDistance : 1.0;
+      final factor = requested
+          .clamp(math.min(minimum, maximum), math.max(minimum, maximum))
+          .toDouble();
       rect = Rect.fromCenter(
         center: newFocal + (rect.center - oldFocal) * factor,
         width: rect.width * factor,

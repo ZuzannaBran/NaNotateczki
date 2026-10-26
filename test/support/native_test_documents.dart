@@ -13,6 +13,9 @@ class _IsolatedDocumentsProvider extends PathProviderPlatform {
 
   @override
   Future<String?> getApplicationDocumentsPath() async => path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
 }
 
 void useIsolatedNativeTestDocuments() {

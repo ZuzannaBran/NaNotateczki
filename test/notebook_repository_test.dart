@@ -614,11 +614,7 @@ void main() {
       notebook: persisted,
     );
     addTearDown(controller.dispose);
-    controller.updatePageLayout(
-      pageWidth: 820,
-      pageHeight: 500,
-      pageGap: 0,
-    );
+    controller.updatePageLayout(pageWidth: 820, pageHeight: 500, pageGap: 0);
 
     final before = controller.pages.first.imageBlocks.single;
     const end = Offset(30, 540);
@@ -632,12 +628,7 @@ void main() {
         cropBottom: 0.9,
       ),
     );
-    controller.finalizeImageMoveOnPage(
-      0,
-      before.id,
-      before.position,
-      end,
-    );
+    controller.finalizeImageMoveOnPage(0, before.id, before.position, end);
     await controller.flushPendingSaves();
     var saved = (await repository.getNotebook(initial.uid))!;
     expect(saved.pages.first.imageBlocks, isEmpty);
@@ -713,10 +704,7 @@ void main() {
     final moved = persisted.copyWith(
       updatedAt: persisted.updatedAt.add(const Duration(seconds: 1)),
       pages: [
-        persisted.pages.first.copyWith(
-          imageBlocks: [],
-          inkStrokes: [],
-        ),
+        persisted.pages.first.copyWith(imageBlocks: [], inkStrokes: []),
         persisted.pages.last.copyWith(
           imageBlocks: [persisted.pages.first.imageBlocks.single],
         ),

@@ -8,6 +8,9 @@ Domyślny język komunikacji: polski. Nie zgaduj: gdy czegoś nie wiesz,
 sprawdź repozytorium, a pytaj tylko wtedy, gdy odpowiedź zmienia kierunek
 pracy.
 
+Przed zmianą zapisu, backupu lub synchronizacji przeczytaj
+[data.md](data.md), który opisuje obowiązującą strukturę i granice bezpieczeństwa.
+
 ## 1. Najpierw mapa
 
 Przed czytaniem `lib/` otwórz cały `PROJECT_MAP.md` przy pierwszym zadaniu w

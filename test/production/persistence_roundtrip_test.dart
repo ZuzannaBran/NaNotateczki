@@ -135,6 +135,9 @@ class _TestPathProvider extends PathProviderPlatform {
 
   @override
   Future<String?> getApplicationDocumentsPath() async => documentsPath;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => documentsPath;
 }
 
 void main() {
@@ -229,6 +232,13 @@ void main() {
     expect(persisted['quickColors'], ['#1f3027', '#76a58d', '#b0d2bf']);
     expect(persisted['penColor'], '#1f3027');
     expect(persisted['highlighterColor'], '#1f3027');
+    expect(
+      persisted['backgroundDefaults'],
+      allOf(
+        containsPair('notebook', isA<Map>()),
+        containsPair('board', isA<Map>()),
+      ),
+    );
   });
 
   test(
@@ -263,29 +273,31 @@ void main() {
     },
   );
 
-  test('latest factory swatches migrate without changing a selected shade',
-      () async {
-    await writeStoredText(
-      'editor_prefs.json',
-      jsonEncode({
-        'penColor': '#6c3c4d',
-        'highlighterColor': '#8e5066',
-        'quickColors': ['#3a212b', '#6c3c4d', '#8e5066'],
-      }),
-    );
-    final db = NotesDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final controller = EditorController(
-      repository: _repository(db),
-      notebook: _fixture(uid: 'palette-latest-migration'),
-    );
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(controller.quickColors, InkColorPreset.pink.colors);
-    expect(controller.inkColor, InkColorPreset.pink.colors[1]);
-    controller.setTool(DrawingTool.highlighter);
-    expect(controller.inkColor, InkColorPreset.pink.colors[1]);
-    controller.dispose();
-  });
+  test(
+    'latest factory swatches migrate without changing a selected shade',
+    () async {
+      await writeStoredText(
+        'editor_prefs.json',
+        jsonEncode({
+          'penColor': '#6c3c4d',
+          'highlighterColor': '#8e5066',
+          'quickColors': ['#3a212b', '#6c3c4d', '#8e5066'],
+        }),
+      );
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final controller = EditorController(
+        repository: _repository(db),
+        notebook: _fixture(uid: 'palette-latest-migration'),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(controller.quickColors, InkColorPreset.pink.colors);
+      expect(controller.inkColor, InkColorPreset.pink.colors[1]);
+      controller.setTool(DrawingTool.highlighter);
+      expect(controller.inkColor, InkColorPreset.pink.colors[1]);
+      controller.dispose();
+    },
+  );
 
   test('custom quick swatches survive startup unchanged', () async {
     await writeStoredText(

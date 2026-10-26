@@ -9,12 +9,16 @@ class NotesDatabaseConnection {
     required this.freshFile,
     this.recoveryPending = false,
     this.recoveryReason,
+    this.legacyImageDirectory,
+    this.imageDirectory,
   });
 
   final QueryExecutor executor;
   final bool freshFile;
   final bool recoveryPending;
   final String? recoveryReason;
+  final String? legacyImageDirectory;
+  final String? imageDirectory;
 }
 
 Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {

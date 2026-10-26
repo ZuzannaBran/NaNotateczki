@@ -76,16 +76,15 @@ void main() {
                 child: Stack(
                   children: [
                     Consumer<EditorController>(
-                      builder: (context, editor, _) =>
-                          ActiveImageTransformHud(
-                            controller: editor,
-                            block: editor.pages.single.imageBlocks.single,
-                            pageIndex: 0,
-                            worldOrigin: Offset.zero,
-                            interactionEnabled: true,
-                            viewportScale: 1.25,
-                            viewportOffset: const Offset(20, 0),
-                          ),
+                      builder: (context, editor, _) => ActiveImageTransformHud(
+                        controller: editor,
+                        block: editor.pages.single.imageBlocks.single,
+                        pageIndex: 0,
+                        worldOrigin: Offset.zero,
+                        interactionEnabled: true,
+                        viewportScale: 1.25,
+                        viewportOffset: const Offset(20, 0),
+                      ),
                     ),
                   ],
                 ),
@@ -140,9 +139,7 @@ void main() {
               ChangeNotifierProvider<AppPreferencesController>.value(
                 value: preferences,
               ),
-              ChangeNotifierProvider<EditorController>.value(
-                value: controller,
-              ),
+              ChangeNotifierProvider<EditorController>.value(value: controller),
             ],
             child: const EditorScreen(showToolbar: false),
           ),
@@ -154,12 +151,14 @@ void main() {
         find.byKey(const ValueKey('notebook-document-transform')),
       );
       final topLeft = tester.getTopLeft(viewport);
-      final firstPosition = topLeft +
+      final firstPosition =
+          topLeft +
           MatrixUtils.transformPoint(
             transform.transform,
             const Offset(850, 260),
           );
-      final secondPosition = topLeft +
+      final secondPosition =
+          topLeft +
           MatrixUtils.transformPoint(
             transform.transform,
             const Offset(930, 260),
@@ -360,14 +359,13 @@ void main() {
               body: Stack(
                 children: [
                   Consumer<EditorController>(
-                    builder: (context, editor, _) =>
-                        ActiveImageTransformHud(
-                          controller: editor,
-                          block: editor.pages.single.imageBlocks.single,
-                          pageIndex: 0,
-                          worldOrigin: Offset.zero,
-                          interactionEnabled: true,
-                        ),
+                    builder: (context, editor, _) => ActiveImageTransformHud(
+                      controller: editor,
+                      block: editor.pages.single.imageBlocks.single,
+                      pageIndex: 0,
+                      worldOrigin: Offset.zero,
+                      interactionEnabled: true,
+                    ),
                   ),
                 ],
               ),
@@ -396,6 +394,5 @@ void main() {
       controller.dispose();
       await database.close();
     });
-
   }
 }

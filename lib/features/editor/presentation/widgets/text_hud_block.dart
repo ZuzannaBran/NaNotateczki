@@ -536,10 +536,7 @@ TextBlockAppearance textBlockAppearance(
   if (colorValue is String && colorValue.startsWith('#')) {
     final hex = colorValue.substring(1);
     if (hex.length == 6 || hex.length == 8) {
-      final value = int.tryParse(
-        hex.length == 6 ? 'ff$hex' : hex,
-        radix: 16,
-      );
+      final value = int.tryParse(hex.length == 6 ? 'ff$hex' : hex, radix: 16);
       if (value != null) {
         inlineColor = Color(value);
       }
@@ -557,10 +554,8 @@ TextBlockAppearance textBlockAppearance(
       ),
       fontSize: fontSize ?? block.fontSize,
       fontFamily: inline['font']?.toString() ?? 'Georgia',
-      fontWeight:
-          inline['bold'] == true ? FontWeight.bold : FontWeight.normal,
-      fontStyle:
-          inline['italic'] == true ? FontStyle.italic : FontStyle.normal,
+      fontWeight: inline['bold'] == true ? FontWeight.bold : FontWeight.normal,
+      fontStyle: inline['italic'] == true ? FontStyle.italic : FontStyle.normal,
       decoration: decorations.isEmpty
           ? TextDecoration.none
           : TextDecoration.combine(decorations),
@@ -576,10 +571,7 @@ TextBlockAppearance textBlockAppearance(
 }
 
 class TextBlockAppearance {
-  const TextBlockAppearance({
-    required this.textStyle,
-    required this.textAlign,
-  });
+  const TextBlockAppearance({required this.textStyle, required this.textAlign});
 
   final TextStyle textStyle;
   final TextAlign textAlign;

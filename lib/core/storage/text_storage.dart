@@ -21,9 +21,5 @@ Future<void> writeStoredText(
   final override = directoryPath == null ? textStorageWriteOverride : null;
   return override != null
       ? override(key, value)
-      : platform.writeStoredText(
-          key,
-          value,
-          directoryPath: directoryPath,
-        );
+      : platform.writeStoredText(key, value, directoryPath: directoryPath);
 }

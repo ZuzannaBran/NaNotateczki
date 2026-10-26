@@ -1226,8 +1226,8 @@ class _EditorScreenState extends State<EditorScreen> {
                                         key: _canvasKey,
                                         behavior: HitTestBehavior.translucent,
                                         onPointerDown: (event) {
-                                          final transforming =
-                                              controller.isObjectTransformActive;
+                                          final transforming = controller
+                                              .isObjectTransformActive;
                                           if (!transforming) {
                                             _startTouchContextMenuTimer(
                                               event,
@@ -1289,15 +1289,18 @@ class _EditorScreenState extends State<EditorScreen> {
                                               child: Stack(
                                                 children: [
                                                   for (
-                                                    var i = visiblePageRange.start;
+                                                    var i =
+                                                        visiblePageRange.start;
                                                     i < visiblePageRange.end;
                                                     i++
                                                   )
                                                     Positioned(
                                                       left: 0,
                                                       top: i * _pageExtent,
-                                                      width: pageWorldSize.width,
-                                                      height: pageWorldSize.height,
+                                                      width:
+                                                          pageWorldSize.width,
+                                                      height:
+                                                          pageWorldSize.height,
                                                       child: IgnorePointer(
                                                         child: Stack(
                                                           fit: StackFit.expand,
@@ -1318,11 +1321,13 @@ class _EditorScreenState extends State<EditorScreen> {
                                                                   BoxShadow(
                                                                     color: AppColors
                                                                         .shadow,
-                                                                    blurRadius: 14,
-                                                                    offset: Offset(
-                                                                      0,
-                                                                      6,
-                                                                    ),
+                                                                    blurRadius:
+                                                                        14,
+                                                                    offset:
+                                                                        Offset(
+                                                                          0,
+                                                                          6,
+                                                                        ),
                                                                   ),
                                                                 ],
                                                               ),
@@ -1333,14 +1338,13 @@ class _EditorScreenState extends State<EditorScreen> {
                                                             ),
                                                             Builder(
                                                               builder: (context) {
-                                                                final visibility =
-                                                                    _pageBoundaryVisibilityInDocument(
-                                                                      visibleDocumentRect:
-                                                                          visibleDocumentRect,
-                                                                      pageWorldSize:
-                                                                          pageWorldSize,
-                                                                      pageIndex: i,
-                                                                    );
+                                                                final visibility = _pageBoundaryVisibilityInDocument(
+                                                                  visibleDocumentRect:
+                                                                      visibleDocumentRect,
+                                                                  pageWorldSize:
+                                                                      pageWorldSize,
+                                                                  pageIndex: i,
+                                                                );
                                                                 return CustomPaint(
                                                                   painter: _PageFramePainter(
                                                                     showLeft:
@@ -1357,14 +1361,11 @@ class _EditorScreenState extends State<EditorScreen> {
                                                                             .bottom,
                                                                     highlightColor:
                                                                         Theme.of(
-                                                                              context,
-                                                                            )
-                                                                            .colorScheme
-                                                                            .primary
-                                                                            .withValues(
-                                                                              alpha:
-                                                                                  0.75,
-                                                                            ),
+                                                                          context,
+                                                                        ).colorScheme.primary.withValues(
+                                                                          alpha:
+                                                                              0.75,
+                                                                        ),
                                                                   ),
                                                                 );
                                                               },
@@ -1424,15 +1425,19 @@ class _EditorScreenState extends State<EditorScreen> {
                                                 ],
                                               ),
                                             ),
-                                            for (var pageIndex =
-                                                    visiblePageRange.start;
-                                                pageIndex <
-                                                    visiblePageRange.end;
-                                                pageIndex++)
-                                              for (final image in controller
-                                                  .pages[pageIndex].imageBlocks)
+                                            for (
+                                              var pageIndex =
+                                                  visiblePageRange.start;
+                                              pageIndex < visiblePageRange.end;
+                                              pageIndex++
+                                            )
+                                              for (final image
+                                                  in controller
+                                                      .pages[pageIndex]
+                                                      .imageBlocks)
                                                 if (image.id ==
-                                                    controller.activeImageBlockId)
+                                                    controller
+                                                        .activeImageBlockId)
                                                   ActiveImageTransformHud(
                                                     key: ValueKey(
                                                       'notebook-viewport-image-${image.id}',

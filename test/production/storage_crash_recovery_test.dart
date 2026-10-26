@@ -5,12 +5,17 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:program/core/storage/text_storage.dart';
 
 class _DocumentsPathProvider extends PathProviderPlatform {
-  _DocumentsPathProvider(this.path);
+  _DocumentsPathProvider(this.path, {String? supportPath})
+    : supportPath = supportPath ?? path;
 
   final String path;
+  final String supportPath;
 
   @override
   Future<String?> getApplicationDocumentsPath() async => path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => supportPath;
 }
 
 void main() {
@@ -32,7 +37,7 @@ void main() {
 
   test('interrupted replacement restores last committed text', () async {
     await writeStoredText('app_prefs.json', 'committed');
-    final file = File('${documents.path}/app_prefs.json');
+    final file = File('${documents.path}/data/app_prefs.json');
     await file.rename('${file.path}.previous');
     await File('${file.path}.tmp').writeAsString('truncated');
 
@@ -44,7 +49,7 @@ void main() {
 
   test('uncommitted temporary data never replaces a valid file', () async {
     await writeStoredText('app_prefs.json', 'stable');
-    final file = File('${documents.path}/app_prefs.json');
+    final file = File('${documents.path}/data/app_prefs.json');
     await File('${file.path}.tmp').writeAsString('new but uncommitted');
 
     expect(await readStoredText('app_prefs.json'), 'stable');
@@ -53,7 +58,7 @@ void main() {
 
   test('committed new file wins over a leftover previous copy', () async {
     await writeStoredText('app_prefs.json', 'new');
-    final file = File('${documents.path}/app_prefs.json');
+    final file = File('${documents.path}/data/app_prefs.json');
     await File('${file.path}.previous').writeAsString('old');
     await File('${file.path}.tmp').writeAsString('incomplete');
 
@@ -71,7 +76,7 @@ void main() {
 
     expect(await readStoredText('app_prefs.json'), 'value-29');
     expect(
-      await File('${documents.path}/app_prefs.json.tmp').exists(),
+      await File('${documents.path}/data/app_prefs.json.tmp').exists(),
       isFalse,
     );
   });

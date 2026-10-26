@@ -1520,8 +1520,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     Color? colorOverride,
   }) {
     final points = List<InkPoint>.from(pointsOverride ?? _currentPoints);
-    final width = widthOverride ??
-        _effectiveStrokeWidth(tool, controller.inkStrokeWidth);
+    final width =
+        widthOverride ?? _effectiveStrokeWidth(tool, controller.inkStrokeWidth);
     String? strokeId;
     if (widget.pageIndex != null) {
       strokeId = controller.addInkStrokeOnPage(
@@ -3032,8 +3032,8 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     Color? colorOverride,
   }) {
     final overlayPoints = List<InkPoint>.from(pointsOverride ?? _currentPoints);
-    final width = widthOverride ??
-        _effectiveStrokeWidth(tool, controller.inkStrokeWidth);
+    final width =
+        widthOverride ?? _effectiveStrokeWidth(tool, controller.inkStrokeWidth);
     final strokeId = controller.addInkStrokeOnPage(
       pageIndex,
       _toPageLocalPoints(overlayPoints, pageIndex),
@@ -4117,8 +4117,8 @@ class _InkOverlayPainter extends CustomPainter {
     }
 
     final paint = Paint()
-      ..strokeCap = tool == DrawingTool.highlighter ||
-              (tool.isShape && color.a <= 0.5)
+      ..strokeCap =
+          tool == DrawingTool.highlighter || (tool.isShape && color.a <= 0.5)
           ? StrokeCap.square
           : StrokeCap.round
       ..strokeJoin = StrokeJoin.round

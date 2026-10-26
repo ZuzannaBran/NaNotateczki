@@ -1,7 +1,7 @@
 # PROJECT_MAP.md
 
 Skrócony indeks projektu **Notatek / Stylus Notes** (`pubspec.yaml`:
-`name: program`). Stan sprawdzony względem repozytorium 2026-10-02.
+`name: program`). Stan sprawdzony względem repozytorium 2026-10-26.
 
 Mapa służy do wyboru pliku i zakresu linii przed czytaniem kodu. Zawiera
 publiczne punkty wejścia, ważne prywatne granice i pułapki; nie kataloguje
@@ -43,12 +43,13 @@ lib/
 
 ## 2. Start i aplikacja
 
-### `lib/main.dart` (157 linii)
+### `lib/main.dart` (159 linii)
 
 Start aplikacji, globalne logowanie błędów i linuksowy filtr błędnych zdarzeń
-klawiatury.
+klawiatury. Przed wczytaniem logów przygotowuje i migruje prywatny katalog
+danych aplikacji.
 
-- 33: `main`; 44: `_runApp`; 65–142: handlery błędów i watchdog key data.
+- 33: `main`; 45: `_runApp`; 67–144: handlery błędów i watchdog key data.
 
 ### `lib/app/notes_app.dart` (12 linii)
 
@@ -56,7 +57,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (688 linii)
+### `lib/app/app_scope.dart` (748 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -75,10 +76,12 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 
 - Dostarcza również singleton `StudyPlannerController` (Provider),
   niezależny od migracji bazy notatek.
-- 25: `AppScope`; 32: `_AppScopeState`; 74: `didRequestAppExit`.
-- 233: `AppUiScale`; 284: `_ExitGuardOverlay`;
-  307: `_FinishingExitOverlay`; 415: `_BackupScheduler`;
-  611: `flushForExit`.
+- Dostarcza klient API, sesję konta, zdalny backup i live sync. Tryb lokalny
+  jest domyślny; repozytorium przekazuje zmiany do schedulerów po zapisie.
+- 31: `AppScope`; 38: `_AppScopeState`; 89: `didRequestAppExit`.
+- 300: `AppUiScale`; 348: `_ExitGuardOverlay`;
+  371: `_FinishingExitOverlay`; 479: `_BackupScheduler`;
+  669: `flushForExit`.
 
 ## 3. Core
 
@@ -139,14 +142,29 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 
 ### Storage i diagnostyka
 
+- `lib/core/storage/app_data_directory.dart`: conditional export natywnego
+  układu danych i webowego no-op.
+- `lib/core/storage/app_data_directory_native.dart` (23): rozwiązuje ścieżki
+  `path_provider` i udostępnia `getAppDataPath` oraz
+  `prepareAppDataDirectory`. 6: `getAppDataPath`; 11:
+  `prepareAppDataDirectory`.
+- `lib/core/storage/app_data_directory_io.dart` (259): niezależny od Fluttera
+  silnik bezstratnej migracji starego katalogu Dokumenty do
+  `Application Support/data` przez plik tymczasowy, flush i SHA-256;
+  konfliktów nie nadpisuje. 48: `migrateNativeAppData`; 169: atomowe
+  przeniesienie pojedynczego pliku.
+- `lib/core/storage/app_data_directory_web.dart` (10): webowy odpowiednik bez
+  migracji systemu plików.
+- `lib/core/storage/app_data_migration_report.dart` (13): wynik migracji ze
+  ścieżkami przeniesionymi i konfliktowymi. 1: `AppDataMigrationReport`.
 - `lib/core/storage/app_save_coordinator.dart` (50): rejestr aktywnych
   edytorów i wspólny flush ich oczekujących zapisów przed zamknięciem.
   3: `AppSaveCoordinator`.
 - `lib/core/storage/text_storage.dart`: conditional import IO/web,
   opcjonalne podmiany odczytu/zapisu dla testów oraz możliwość wskazania
-  katalogu natywnego (używana przez backup folderów); produkcja nadal
-  używa platformowego storage.
-- `lib/core/storage/text_storage_io.dart`: odczyty i zapisy małych
+  katalogu natywnego (używana przez backup folderów); produkcja używa
+  prywatnego katalogu aplikacji.
+- `lib/core/storage/text_storage_io.dart` (92): odczyty i zapisy małych
   plików współdzielą kolejkę operacji per ścieżka; zapobiega ona
   usuwaniu aktywnego `.tmp` przez równoległy odczyt backupu. Zapis
   nadal jest atomowy przez `.tmp`/`.previous` z recovery.
@@ -193,26 +211,29 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 
 ### Drift
 
-### `lib/data/drift/notes_database.dart` (337 linii)
+### `lib/data/drift/notes_database.dart` (352 linie)
 
 Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami. Start sprawdza
 `PRAGMA quick_check` i `PRAGMA foreign_key_check`; po potwierdzonej korupcji lub naruszeniu integralności natywna baza jest
 zachowywana jako plik `.corrupt_*`, a aplikacja
 otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
+Po migracji katalogu aktualizuje w SQLite prefiks trwałych ścieżek obrazów.
 
 - 9: `NotebookRows`; 21: `PageRows`; 32: `TextBlockRows`;
   49: `ImageBlockRows`; 72: `InkStrokeRows`.
 - 85: `DatabaseOpenResult`; 99: `DatabaseOpenStage`;
   110: `DatabaseOpenException`; 143: `NotesDatabase`.
-- 150: `NotesDatabase.open`; 294: kontrola integralności;
-  322: `schemaVersion` (`2`); 325: `migration` — usuwa dane starego
+- 150: `NotesDatabase.open`; 295: relokacja ścieżek obrazów; 309: kontrola
+  integralności; 337: `schemaVersion` (`2`); 340: `migration` — usuwa dane starego
   mechanizmu Index tab podczas przejścia z v1.
 
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
   natywnego lub webowego połączenia.
-- `lib/data/drift/notes_database_connection_io.dart` (196): SQLite w katalogu
-  dokumentów przez `NativeDatabase.createInBackground`.
-  7: `NotesDatabaseConnection`; 14: `openNotesDatabaseConnection`.
+- `lib/data/drift/notes_database_connection_io.dart` (210): przed otwarciem
+  migruje dane i otwiera SQLite w prywatnym `Application Support/data` przez
+  `NativeDatabase.createInBackground`.
+  9: `NotesDatabaseConnection`; 27: `openNotesDatabaseConnection`; 70:
+  `quarantineNotesDatabase`.
 - `lib/data/drift/notes_database_connection_web.dart` (41): SQLite WASM z
   trwałym IndexedDB.
   6: `NotesDatabaseConnection`; 13: `openNotesDatabaseConnection`.
@@ -221,7 +242,7 @@ otwiera świeżą bazę, aby lokalny recovery mógł odtworzyć dane.
 
 ### Backup, eksport i synchronizacja
 
-### `lib/data/backup/local_backup_service.dart` (2656 linii)
+### `lib/data/backup/local_backup_service.dart` (2657 linii)
 
 Przyrostowy backup z atomowym `manifest.json` i checksumami SHA-256. Format
 v6 rozdziela notebook na niezmienne, content-addressed pliki stron w
@@ -254,6 +275,25 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
+### `lib/data/backup/remote_backup_service.dart` (140 linii)
+
+Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
+zadania i planer, liczy SHA-256, wykonuje pending → upload → finalize i uznaje
+wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
+
+- 12: `RemoteBackupReceipt`; 24: `RemoteBackupService`;
+  38: `uploadVerifiedSnapshot`.
+
+### `lib/data/backup/remote_backup_scheduler.dart` (154 linie)
+
+Jawnie włączany scheduler zalogowanego konta: po zmianach wysyła verified
+snapshot co 30 minut, po błędzie ponawia po 5 minutach i próbuje przy resume.
+Samo logowanie nie włącza wysyłki.
+
+- 12: `RemoteBackupScheduler`; 37: `enableForSignedInAccount`; 64:
+  `uploadNow`. Licznik generacji nie pozwala zgubić zmiany wykonanej podczas
+  trwającego uploadu.
+
 ### `lib/data/backup/backup_eraser_flattening.dart` (12 linii)
 
 Cienki adapter zgodności dla backupu; deleguje normalizację starych masek
@@ -285,6 +325,22 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - 10: `CloudSyncResult`; 22: `CloudSyncService`; 30: `getCloudPath`;
   48: `setCloudPath`; 56: `sync`; 100: `mergeNotebooks`.
+
+### Nowa synchronizacja serwerowa
+
+- `lib/data/sync/api_client.dart` (188): klient REST z wymuszeniem HTTPS,
+  timeoutem, limitem odpowiedzi, Bearer tokenem i request ID.
+  7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
+- `lib/data/sync/account_session_controller.dart` (137): domyślny tryb
+  lokalny, rejestracja/logowanie, rotacja sesji i tokeny wyłącznie w pamięci.
+  7: `AccountDataMode`; 9: `AccountSessionController`.
+- `lib/data/sync/live_web_sync_service.dart` (560): jawna polityka pierwszej
+  synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
+  kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
+  tylko jako sygnał; własny push nie przesuwa kursora zdarzeń z innych
+  urządzeń.
+  16: `InitialSyncPolicy`; 18: `LiveWebSyncService`; 48: `start`;
+  74: `enqueue`; 90: `syncNow`.
 
 ## 5. Domena notebooka i repozytorium
 
@@ -834,7 +890,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (3199 linii)
+### `lib/features/editor/state/editor_controller.dart` (3258 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
@@ -854,26 +910,28 @@ Trzy szybkie kolory domyślnie używają niebieskiego zestawu; wszystkie
 próbki wybierają ten sam kolor dla pióra i zakreślacza, bez przypisania
 odcienia do narzędzia. Wybór palety wybiera pierwszy kolor. Wcześniejsze
 fabryczne Blue/Pink/Green są migrowane, a ręcznie zmienione kolory pozostają
-nienaruszone. Rozpoznane po przytrzymaniu kształty nie włączają Move.
+nienaruszone. Zapis preferencji tła obejmuje tylko notebook i board, bo
+planner nie ma ustawień tła. Obrazy trafiają do prywatnego katalogu danych
+aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
-- 37: `LassoSelection`; 76: `EditorController`;
-  197: `flushPendingSaves`; 952: `applyInkColorPreset`.
-- 259–332: layout i transformacje viewportu; 274: start blokady transformacji,
-  290: `setViewTransform`.
+- 39: `LassoSelection`; 78: `EditorController`;
+  209: `flushPendingSaves`; 1086: `applyInkColorPreset`.
+- 278–350: layout i transformacje viewportu; 293: start blokady transformacji,
+  318: `setViewTransform`.
 - 362–498: operacje `*OnPage` używane przez canvasy/overlaye.
-- 507–899: narzędzia, aktywne elementy, lasso i preferencje; 559: `setTool`;
+- 537–997: narzędzia, aktywne elementy, lasso i preferencje; 589: `setTool`;
   kształt po narysowaniu lub rozpoznaniu przechodzi na tymczasowe
   `edit` (`startShapeEdit`), a tap poza figurą przywraca poprzednie
   narzędzie (`finishShapeEdit`). Podgląd i commit transformacji ink
   korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
   oraz pojedyncze undo/redo.
-  592: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- 1278: `undo`; 1291: `redo`; 1363: `toggleBookmark`;
-  1369: operacje tekstowe; 1439: `updateActiveTextStyle` — blokowe
+  690: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
+- 1388: łączenie zapisanych domyślnych teł; 1471: `undo`; 1497: `redo`;
+  1585: `toggleBookmark`; 1661: `updateActiveTextStyle` — blokowe
   formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
   zapisywane jako `UpdateTextAction`.
-- 2713: `_applyAction`; 2722: `_applyInkAction`;
-  2824: `_scheduleSave`; 2845: `_saveDirtyPages`; 2867: `_save`.
+- 2751: `_imagesDir`; 2934: `_applyAction`; 2965: `_applyInkAction`;
+  3130: `_scheduleSave`; 3152: `_saveDirtyPages`; 3190: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`
@@ -1215,6 +1273,17 @@ wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
 
 ## 10. Platformy, web i testy
 
+- `data.md`: źródło prawdy dla lokalnego układu plików, trybów konta,
+  backupu serwerowego, synchronizacji i znanych granic szyfrowania.
+- `server/`: lekki stos PostgreSQL 17 + FastAPI + Caddy + opcjonalny
+  Cloudflare Tunnel. API zawiera Argon2id/JWT/rotowane refresh tokeny,
+  owner isolation, CAS/idempotencję, tombstones, change events, WebSocket
+  oraz pending/upload/finalize dla zweryfikowanych snapshotów. Migracja SQL
+  jest w `server/migrations/0001_initial.sql`; klient nie łączy się z 5432.
+  `server/scripts/apply-migrations.sh` pilnuje rejestru i SHA-256 migracji,
+  a `server/scripts/backup-server.sh` tworzy sprawdzony backup PostgreSQL i
+  plików na osobny nośnik, opcjonalnie szyfrowany przez `age`.
+
 - `LICENSE.md`: niezmieniony oficjalny tekst PolyForm Noncommercial 1.0.0
   obejmujący prawa licencjodawcy do oryginalnych elementów projektu.
 - `NOTICE`: wymagana informacja o prawach autorskich właściciela.
@@ -1267,6 +1336,20 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   testowej bazy następuje rzeczywisty zapis.
 - `test/backup_eraser_flattening_test.dart` (109)
 - `test/cloud_sync_service_test.dart` (84)
+- `test/app_data_directory_test.dart`: bezstratna migracja wszystkich kategorii,
+  świeża instalacja bez starego katalogu, zachowanie konfliktującego celu i
+  usuwanie identycznego duplikatu dopiero po porównaniu SHA-256.
+- `test/database_image_path_migration_test.dart`: relokacja zapisanych w
+  SQLite ścieżek obrazów po przeniesieniu katalogu danych.
+- `test/api_client_test.dart`: odrzucenie HTTP/sekretów w URL, Bearer/request
+  ID i zachowanie struktury odpowiedzi 409.
+- `test/remote_backup_service_test.dart`: kompletny snapshot v2 z biblioteką
+  i planerem, wymaganie potwierdzonego `verified` oraz zachowanie flagi dirty,
+  gdy dane zmienią się podczas uploadu.
+- `test/live_web_sync_service_test.dart`: pobranie wszystkich stron feedu po
+  500 zdarzeń i ochrona kursora przed pominięciem równoległej zmiany.
+- `server/api/tests/`: Argon2/JWT, integralność envelope, izolacja urządzeń w
+  schemacie i brak publicznych portów bazy/API w Compose.
 - `test/library_planner_test.dart`: kolory według statusu w obu motywach,
   zgodność Recent i ukończonych z paskiem folderów, `Opacity` całego
   odhaczonego wiersza, automatyczne sortowanie również ze starym

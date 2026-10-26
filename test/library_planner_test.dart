@@ -269,9 +269,7 @@ void main() {
       deadlineHasTime: true,
     );
     await tester.pump();
-    final deadline = find.byKey(
-      ValueKey('planner-task-deadline:${task.id}'),
-    );
+    final deadline = find.byKey(ValueKey('planner-task-deadline:${task.id}'));
     expect(deadline, findsOneWidget);
     expect(
       tester.getTopRight(deleteButton).dx,

@@ -311,9 +311,7 @@ class MoveImageBetweenPagesAction extends EditorAction {
   }) {
     final sourceIndex = pages.indexWhere((page) => page.id == sourceId);
     final targetIndex = pages.indexWhere((page) => page.id == destinationId);
-    if (sourceIndex == -1 ||
-        targetIndex == -1 ||
-        sourceIndex == targetIndex) {
+    if (sourceIndex == -1 || targetIndex == -1 || sourceIndex == targetIndex) {
       throw StateError('Image move pages are no longer available.');
     }
     final source = pages[sourceIndex];
@@ -334,9 +332,7 @@ class MoveImageBetweenPagesAction extends EditorAction {
           .toInt(),
       image,
     );
-    final updatedDestination = destination.copyWith(
-      imageBlocks: updatedImages,
-    );
+    final updatedDestination = destination.copyWith(imageBlocks: updatedImages);
     return [
       for (var i = 0; i < pages.length; i++)
         if (i == sourceIndex)
