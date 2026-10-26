@@ -151,6 +151,8 @@ class EditorController extends ChangeNotifier {
   DrawingTool? _toolBeforeShapeEdit;
   LassoSelection? lassoSelection;
   final ValueNotifier<Offset> lassoDragDelta = ValueNotifier(Offset.zero);
+  final ValueNotifier<ImageBlock?> imageTransformPreview =
+      ValueNotifier<ImageBlock?>(null);
   _ElementClipboardItem? _elementClipboard;
   bool _suppressBackgroundTap = false;
   double viewScale = 1.0;
@@ -266,6 +268,7 @@ class EditorController extends ChangeNotifier {
       unawaited(_save());
     }
     _isDisposed = true;
+    imageTransformPreview.dispose();
     lassoDragDelta.dispose();
     inkRevision.dispose();
     historyRevision.dispose();
@@ -602,6 +605,7 @@ class EditorController extends ChangeNotifier {
       clearActiveTextBlock();
     }
     if (newTool.isInk || newTool == DrawingTool.text) {
+      clearImageTransformPreview();
       activeImageBlockId = null;
     }
     lassoSelection = null;
@@ -699,6 +703,9 @@ class EditorController extends ChangeNotifier {
   }
 
   void setActiveImageBlock(String? blockId) {
+    if (activeImageBlockId != blockId) {
+      clearImageTransformPreview();
+    }
     activeImageBlockId = blockId;
     if (blockId != null) {
       _commitActiveTextEdit();
@@ -890,7 +897,21 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
+  void setImageTransformPreview(ImageBlock block) {
+    if (_isDisposed || block.id != activeImageBlockId) {
+      return;
+    }
+    imageTransformPreview.value = block;
+  }
+
+  void clearImageTransformPreview() {
+    if (!_isDisposed && imageTransformPreview.value != null) {
+      imageTransformPreview.value = null;
+    }
+  }
+
   void clearActiveImageBlock() {
+    clearImageTransformPreview();
     activeImageBlockId = null;
     notifyListeners();
   }

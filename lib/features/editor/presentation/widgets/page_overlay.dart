@@ -128,20 +128,34 @@ class PageOverlay extends StatelessWidget {
             ),
           if (renderInactive)
             for (final block in effectivePage.imageBlocks)
-              _ImageBlockWidget(
-                block: block,
-                pageIndex: effectivePageIndex,
-                worldOrigin: worldOrigin,
-                interactionEnabled:
-                    interactionEnabled && block.id != activeImageId,
-                lassoDragDelta:
-                    lassoSelection?.imageBlockIds.contains(block.id) == true
-                    ? controller.lassoDragDelta
-                    : null,
-                isLassoSelected:
-                    lassoSelection?.imageBlockIds.contains(block.id) == true,
-                selectionEnabled: block.id != activeImageId,
-              ),
+              if (block.id == activeImageId)
+                ValueListenableBuilder<ImageBlock?>(
+                  valueListenable: controller.imageTransformPreview,
+                  builder: (context, preview, _) => _ImageBlockWidget(
+                    block: preview?.id == block.id ? preview! : block,
+                    pageIndex: effectivePageIndex,
+                    worldOrigin: worldOrigin,
+                    interactionEnabled: false,
+                    lassoDragDelta: null,
+                    isLassoSelected: false,
+                    selectionEnabled: false,
+                    isTransformPreview: preview?.id == block.id,
+                  ),
+                )
+              else
+                _ImageBlockWidget(
+                  block: block,
+                  pageIndex: effectivePageIndex,
+                  worldOrigin: worldOrigin,
+                  interactionEnabled: interactionEnabled,
+                  lassoDragDelta:
+                      lassoSelection?.imageBlockIds.contains(block.id) == true
+                      ? controller.lassoDragDelta
+                      : null,
+                  isLassoSelected:
+                      lassoSelection?.imageBlockIds.contains(block.id) == true,
+                  selectionEnabled: true,
+                ),
           if (renderActive && activeTextId != null)
             for (final block in effectivePage.textBlocks)
               if (block.id == activeTextId)
@@ -373,7 +387,10 @@ class ActiveImageTransformHud extends StatelessWidget {
         );
       },
       onTransformStart: controller.beginObjectTransform,
-      onTransformEnd: controller.endObjectTransform,
+      onTransformEnd: () {
+        controller.clearImageTransformPreview();
+        controller.endObjectTransform();
+      },
       onDoubleTap: () {
         _editImageOcrForBlock(context, controller, pageIndex, block);
       },
@@ -387,8 +404,7 @@ class ActiveImageTransformHud extends StatelessWidget {
         );
       },
       onPreview: (before, preview) {
-        controller.updateImageBlockOnPage(
-          pageIndex,
+        controller.setImageTransformPreview(
           _imageBlockFromTransform(before, _toWorld(preview), worldOrigin),
         );
       },
@@ -397,19 +413,35 @@ class ActiveImageTransformHud extends StatelessWidget {
         if (current == null) {
           return;
         }
+        final after = _imageBlockFromTransform(
+          before,
+          _toWorld(preview),
+          worldOrigin,
+        );
+        if (after.position == before.position &&
+            after.width == before.width &&
+            after.height == before.height &&
+            after.cropLeft == before.cropLeft &&
+            after.cropRight == before.cropRight &&
+            after.cropTop == before.cropTop &&
+            after.cropBottom == before.cropBottom &&
+            after.rotation == before.rotation) {
+          return;
+        }
+        controller.updateImageBlockOnPage(pageIndex, after);
         if (preview.kind == ObjectTransformKind.move) {
           controller.finalizeImageMoveOnPage(
             pageIndex,
             before.id,
             before.position,
-            current.position,
+            after.position,
           );
-          return;
+        } else {
+          controller.commitImageResizeOnPage(pageIndex, before, after);
         }
-        controller.commitImageResizeOnPage(pageIndex, before, current);
       },
-      onCancel: (before) {
-        controller.updateImageBlockOnPage(pageIndex, before);
+      onCancel: (_) {
+        controller.clearImageTransformPreview();
       },
     );
   }
@@ -1580,6 +1612,7 @@ class _ImageBlockWidget extends StatefulWidget {
     required this.lassoDragDelta,
     required this.isLassoSelected,
     this.selectionEnabled = true,
+    this.isTransformPreview = false,
   });
 
   final ImageBlock block;
@@ -1589,6 +1622,7 @@ class _ImageBlockWidget extends StatefulWidget {
   final ValueListenable<Offset>? lassoDragDelta;
   final bool isLassoSelected;
   final bool selectionEnabled;
+  final bool isTransformPreview;
 
   @override
   State<_ImageBlockWidget> createState() => _ImageBlockWidgetState();
@@ -1631,7 +1665,7 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
       _loadedImageSizePath = null;
       _loadedImageSize = null;
       _loadImageSize();
-    } else {
+    } else if (!widget.isTransformPreview) {
       _normalizeBlockToImageBounds();
     }
   }
@@ -2327,6 +2361,9 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   }
 
   void _normalizeBlockToImageBounds() {
+    if (widget.isTransformPreview) {
+      return;
+    }
     final imageSize = _loadedImageSize;
     if (imageSize == null ||
         widget.block.cropLeft != 0.0 ||
@@ -2351,7 +2388,11 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
       if (!mounted || widget.block.path != _loadedImageSizePath) {
         return;
       }
-      context.read<EditorController>().updateImageBlockOnPage(
+      final controller = context.read<EditorController>();
+      if (widget.isTransformPreview || controller.isObjectTransformActive) {
+        return;
+      }
+      controller.updateImageBlockOnPage(
         widget.pageIndex,
         widget.block.copyWith(
           position: widget.block.position + inset,
