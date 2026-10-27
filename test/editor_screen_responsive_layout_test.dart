@@ -245,6 +245,7 @@ void main() {
       ),
     );
     await tester.pump();
+    expect(find.textContaining(RegExp(r'^\d+%$')), findsNothing);
 
     final scrollView = tester.widget<SingleChildScrollView>(
       find.byKey(const ValueKey('notebook-document-scroll')),
@@ -281,6 +282,7 @@ void main() {
     await tester.pump();
 
     expect(_documentScale(tester), greaterThan(1.001));
+    expect(find.textContaining(RegExp(r'^\d+%$')), findsNothing);
     final scaledDocumentHeight =
         _documentLayoutSize(tester).height * _documentScale(tester);
     expect(

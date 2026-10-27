@@ -1001,7 +1001,7 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2464 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2424 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px i korzysta z
 aktualnego tytułu przekazanego przez bibliotekę (fallback: kontroler);
@@ -1027,8 +1027,9 @@ centrowana poziomo wewnątrz obszaru między minimapą i prawym marginesem;
 po ręcznym przesunięciu lub zoomie jej pozycja X nie jest resetowana
 przy przebudowie widoku.
 `AppBar` ma wyłączoną zmianę wysokości cienia i tint podczas scrollowania.
-Minimapa i wskaźnik zoomu zachowują odstęp od widocznych pasków,
-a wysokość minimapy jest ograniczona dostępnej przestrzeni.
+Minimapa zachowuje odstęp od widocznych pasków, a jej wysokość jest
+ograniczona dostępną przestrzenią. Procentowy wskaźnik powiększenia nie jest
+wyświetlany, ale gesty zoomu pozostają bez zmian.
 Viewport obejmujący overview i strony notesu ma tło #E6E6E6;
 nagłówek, toolbary i panel folderów używają zwykłego tła motywu. Viewport, wirtualizowane strony, canvasy, minimapa,
 wspólne komendy edytora. Strona zachowuje logiczną
@@ -1071,9 +1072,9 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 - 1057: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1610: `_PageViewportClipper`; 1668: `_PageFramePainter`;
-  1775: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
-  2194: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
+- 1602: `_PageViewportClipper`; 1660: `_PageFramePainter`;
+  1735: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
+  2154: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_commands.dart` (172 linie)
 
@@ -1556,7 +1557,7 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
 - `test/notebook_overview_navigation_test.dart`: kliknięcia widocznej minimapy,
   przełączanie strony, scroll minimapy bez nawigacji, wybór po przewinięciu,
   blokada transformacji, mapowanie współrzędnych i zachowanie skali.
-- `test/editor_screen_responsive_layout_test.dart` (613):
+- `test/editor_screen_responsive_layout_test.dart` (625):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
   poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
@@ -1566,7 +1567,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   aktualizacja wzoru na kartce i ignorowanie powtórnego identycznego wyboru;
   powiększony wielostronicowy notatnik przewija się od środka
   do obu końców bez utknięcia, pokazując przycisk Add page i dolny
-  margines przy maksymalnym przewinięciu; test tap/dwuklik/przytrzymanie szybkiego koloru, otwarcia
+  margines przy maksymalnym przewinięciu; brak procentowej nakładki przed
+  i po powiększeniu; test tap/dwuklik/przytrzymanie szybkiego koloru, otwarcia
   selektora i zapisu nowego koloru.
 - `test/editor_toolbar_color_picker_test.dart`: dark/light picker, odwrócone
   Recent i wartości RGB/HEX, suwak i zapis z zachowaniem koloru wizualnego,

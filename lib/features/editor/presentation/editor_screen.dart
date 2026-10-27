@@ -1129,7 +1129,6 @@ class _EditorScreenState extends State<EditorScreen> {
                 documentClipHeight +
                     (_addPageFooterHeight * effectivePageScale),
               );
-              final zoomPercent = (effectivePageScale * 100).round();
               final visibleDocumentRect = _visibleDocumentRect(
                 docWorldSize: docWorldSize,
                 viewportSize: viewportSize,
@@ -1500,13 +1499,6 @@ class _EditorScreenState extends State<EditorScreen> {
                         ),
                       ),
                     ),
-                    Positioned(
-                      top: 10.0 + toolbarOffset,
-                      right: 12,
-                      child: IgnorePointer(
-                        child: _ZoomPercentBadge(zoomPercent: zoomPercent),
-                      ),
-                    ),
                     if (showProjectOverview)
                       Positioned(
                         top: 10.0 + toolbarOffset,
@@ -1737,38 +1729,6 @@ class _PageFramePainter extends CustomPainter {
         oldDelegate.showRight != showRight ||
         oldDelegate.showBottom != showBottom ||
         oldDelegate.highlightColor != highlightColor;
-  }
-}
-
-class _ZoomPercentBadge extends StatelessWidget {
-  const _ZoomPercentBadge({required this.zoomPercent});
-
-  final int zoomPercent;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerLow.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(
-          '$zoomPercent%',
-          style: Theme.of(context).textTheme.labelLarge,
-        ),
-      ),
-    );
   }
 }
 
