@@ -24,9 +24,9 @@ import 'support/native_test_documents.dart';
 void main() {
   useIsolatedNativeTestDocuments();
 
-  testWidgets('background changes update painters without notifying the editor', (
-    tester,
-  ) async {
+  testWidgets(
+    'background switches repaint without notifying the whole editor',
+    (tester) async {
     await tester.binding.setSurfaceSize(const Size(1100, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -49,6 +49,10 @@ void main() {
           child: const EditorScreen(),
         ),
       ),
+    );
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
     await tester.pump();
 
@@ -94,7 +98,9 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
     await database.close();
-  });
+    },
+  );
+
   testWidgets('page stays clear of overview and inside right boundary', (
     tester,
   ) async {
