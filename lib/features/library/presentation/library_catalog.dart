@@ -349,27 +349,69 @@ class LibraryCatalog extends StatelessWidget {
                   : LayoutBuilder(
                       builder: (context, constraints) {
                         const cellExtent = 246.0;
-                        final rowExtent = activeFolder == null ? 292.0 : 372.0;
-                        final itemCount = folders.length + notes.length;
+                        const folderRowExtent = 292.0;
+                        const documentRowExtent = 372.0;
                         final availableWidth = math.max(
                           1.0,
                           constraints.maxWidth - 40,
                         );
-                        final columns = math.min(
-                          5,
-                          math.min(
-                            itemCount,
-                            math.max(1, (availableWidth / cellExtent).floor()),
-                          ),
+                        final maxColumns = math.max(
+                          1,
+                          (availableWidth / cellExtent).floor(),
                         );
-                        final gridWidth = math.min(
+
+                        int columnsFor(int count) =>
+                            math.min(5, math.min(count, maxColumns));
+
+                        double widthFor(int count) => math.min(
                           availableWidth,
-                          columns * cellExtent,
+                          columnsFor(count) * cellExtent,
                         );
 
                         if (folders.isNotEmpty) {
-                          final cellWidth = gridWidth / columns;
-                          final rowCount = (itemCount + columns - 1) ~/ columns;
+                          Widget tileGrid({
+                            required String key,
+                            required int count,
+                            required double rowExtent,
+                            required Widget Function(int) buildTile,
+                          }) {
+                            final columns = columnsFor(count);
+                            final cellWidth = widthFor(count) / columns;
+                            final rowCount =
+                                (count + columns - 1) ~/ columns;
+                            return SizedBox(
+                              key: ValueKey(key),
+                              width: widthFor(count),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  for (var row = 0; row < rowCount; row++)
+                                    Row(
+                                      children: [
+                                        for (
+                                          var index = row * columns;
+                                          index <
+                                              math.min(
+                                                (row + 1) * columns,
+                                                count,
+                                              );
+                                          index++
+                                        )
+                                          SizedBox(
+                                            width: cellWidth,
+                                            height: rowExtent,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.all(18),
+                                              child: buildTile(index),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                ],
+                              ),
+                            );
+                          }
 
                           return SingleChildScrollView(
                             key: const ValueKey('catalog-folders'),
@@ -390,101 +432,56 @@ class LibraryCatalog extends StatelessWidget {
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 24,
                                   ),
-                                  child: SizedBox(
-                                    key: const ValueKey('catalog-folder-grid'),
-                                    width: gridWidth,
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        for (
-                                          var row = 0;
-                                          row < rowCount;
-                                          row++
-                                        ) ...[
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.start,
-                                            children: [
-                                              for (
-                                                var index = row * columns;
-                                                index <
-                                                    math.min(
-                                                      (row + 1) * columns,
-                                                      itemCount,
-                                                    );
-                                                index++
-                                              )
-                                                SizedBox(
-                                                  width: cellWidth,
-                                                  height: rowExtent,
-                                                  child: Padding(
-                                                    padding:
-                                                        const EdgeInsets.all(
-                                                          18,
-                                                        ),
-                                                    child:
-                                                        index < folders.length
-                                                        ? _FolderTile(
-                                                            name:
-                                                                folders[index],
-                                                            cover: controller
-                                                                .folderCoverFor(
-                                                                  folders[index],
-                                                                ),
-                                                            onTap: () =>
-                                                                onFolderTap(
-                                                                  folders[index],
-                                                                ),
-                                                            onEdit: () =>
-                                                                onEditFolder(
-                                                                  folders[index],
-                                                                ),
-                                                            onRename: () =>
-                                                                onRenameFolder(
-                                                                  folders[index],
-                                                                ),
-                                                            onDelete: () =>
-                                                                onDeleteFolder(
-                                                                  folders[index],
-                                                                ),
-                                                          )
-                                                        : _DocumentTile(
-                                                            item:
-                                                                notes[index -
-                                                                    folders
-                                                                        .length],
-                                                            onTap: () =>
-                                                                onOpenItem(
-                                                                  notes[index -
-                                                                      folders
-                                                                          .length],
-                                                                ),
-                                                            onRename: () =>
-                                                                onRenameItem(
-                                                                  notes[index -
-                                                                      folders
-                                                                          .length],
-                                                                ),
-                                                            onDelete: () =>
-                                                                onDeleteItem(
-                                                                  notes[index -
-                                                                      folders
-                                                                          .length],
-                                                                ),
-                                                          ),
-                                                  ),
-                                                ),
-                                            ],
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      tileGrid(
+                                        key: 'catalog-folder-grid',
+                                        count: folders.length,
+                                        rowExtent: folderRowExtent,
+                                        buildTile: (index) => _FolderTile(
+                                          name: folders[index],
+                                          cover: controller.folderCoverFor(
+                                            folders[index],
                                           ),
-                                        ],
+                                          onTap: () =>
+                                              onFolderTap(folders[index]),
+                                          onEdit: () =>
+                                              onEditFolder(folders[index]),
+                                          onRename: () =>
+                                              onRenameFolder(folders[index]),
+                                          onDelete: () =>
+                                              onDeleteFolder(folders[index]),
+                                        ),
+                                      ),
+                                      if (notes.isNotEmpty) ...[
+                                        const SizedBox(height: 18),
+                                        tileGrid(
+                                          key: 'catalog-document-grid',
+                                          count: notes.length,
+                                          rowExtent: documentRowExtent,
+                                          buildTile: (index) => _DocumentTile(
+                                            item: notes[index],
+                                            onTap: () =>
+                                                onOpenItem(notes[index]),
+                                            onRename: () =>
+                                                onRenameItem(notes[index]),
+                                            onDelete: () =>
+                                                onDeleteItem(notes[index]),
+                                          ),
+                                        ),
                                       ],
-                                    ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ),
                           );
                         }
+
+                        final columns = columnsFor(notes.length);
+                        final gridWidth = widthFor(notes.length);
+                        const rowExtent = documentRowExtent;
                         return Align(
                           alignment: Alignment.topCenter,
                           child: SizedBox(

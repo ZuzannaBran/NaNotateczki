@@ -173,4 +173,99 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'nested folder grid matches Projects independently of documents',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1600, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      late NotesDatabase database;
+      late LibraryController controller;
+      late Notebook note;
+      await tester.runAsync(() async {
+        database = NotesDatabase(NativeDatabase.memory());
+        final repository = NotebookRepository(database);
+        controller = LibraryController(
+          repository,
+          CloudSyncService(repository),
+          LocalBackupService(repository),
+        );
+        await controller.initialize();
+        await controller.createFolder('Root');
+        for (var index = 1; index <= 7; index++) {
+          await controller.createFolder('Child $index', parent: 'Root');
+        }
+        note = await repository.createNotebook(folder: 'Root');
+        await repository.createBoard(folder: 'Root');
+        await controller.loadItems();
+      });
+      addTearDown(database.close);
+      addTearDown(controller.dispose);
+
+      Widget catalog(String? folder) => MaterialApp(
+        home: LibraryCatalog(
+          controller: controller,
+          folder: folder,
+          onBack: () {},
+          onFolderTap: (_) {},
+          onOpenItem: (_) {},
+          onEditFolder: (_) {},
+          onRenameFolder: (_) {},
+          onDeleteFolder: (_) {},
+          onRenameItem: (_) {},
+          onDeleteItem: (_) {},
+          onSettings: () {},
+        ),
+      );
+
+      await tester.pumpWidget(catalog(null));
+      await tester.pumpAndSettle();
+      final rootCover = tester.getSize(
+        find.byKey(const ValueKey('catalog-folder-cover:Root')),
+      );
+
+      await tester.pumpWidget(catalog('Root'));
+      await tester.pumpAndSettle();
+      final folders = find.byKey(const ValueKey('catalog-folder-grid'));
+      final documents = find.byKey(const ValueKey('catalog-document-grid'));
+      final first = find.byKey(const ValueKey('catalog-folder:Root/Child 1'));
+      final sixth = find.byKey(const ValueKey('catalog-folder:Root/Child 6'));
+      final childCover = find.byKey(
+        const ValueKey('catalog-folder-cover:Root/Child 1'),
+      );
+      expect(tester.getSize(childCover), rootCover);
+      expect(tester.getSize(folders).width, 1230);
+      expect(tester.getCenter(folders).dx, closeTo(800, 1));
+      expect(tester.getSize(documents).width, 492);
+      expect(tester.getCenter(documents).dx, closeTo(800, 1));
+      expect(
+        tester.getRect(sixth).top - tester.getRect(first).top,
+        closeTo(292, 1),
+      );
+      expect(
+        tester.getRect(documents).top,
+        greaterThan(tester.getRect(sixth).bottom),
+      );
+      expect(
+        find.byKey(ValueKey('catalog-document:${note.uid}')),
+        findsOneWidget,
+      );
+
+      await tester.binding.setSurfaceSize(const Size(580, 900));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(folders).width, 492);
+      expect(tester.getSize(documents).width, 492);
+      final third = find.byKey(
+        const ValueKey('catalog-folder:Root/Child 3'),
+      );
+      expect(
+        tester.getRect(third).top - tester.getRect(first).top,
+        closeTo(292, 1),
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

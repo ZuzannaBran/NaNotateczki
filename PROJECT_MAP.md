@@ -580,17 +580,18 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1806: `_LibraryWorkspace`;
   1917: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_catalog.dart` (1284 linie)
+### `lib/features/library/presentation/library_catalog.dart` (1280 linii)
 
 Katalog Projects pokazuje wyłącznie foldery główne. Po wejściu do folderu
-siatka łączy jego bezpośrednie podfoldery i własne dokumenty; tytuły
-folderów pokazują tylko lokalną nazwę, a Back wraca do rodzica.
+widok rozdziela bezpośrednie podfoldery i dokumenty na dwie wyśrodkowane
+siatki; tytuły folderów pokazują tylko lokalną nazwę, a Back wraca do rodzica.
 Katalog główny układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
 w poziomie, a ostatni niepełny wiersz zaczyna się od lewej. Brak linii
 oddzielających kafelki i zewnętrznej ramki; blok nie zajmuje całej
-szerokości ekranu. Zawartość folderów używa tej samej wyśrodkowanej siatki 1–5 kolumn
-co Projects (szerokość pola 246 px, stały odstęp 36 px).
+szerokości ekranu. Podfoldery używają tej samej siatki 1–5 kolumn i rzędów 292 px co Projects
+(szerokość pola 246 px, odstęp 36 px), bez wpływu liczby dokumentów.
+Dokumenty są w oddzielnej, wyśrodkowanej siatce o rzędach 372 px.
 Każdy dokument ma podgląd o tej samej szerokości i tej samej
 górnej krawędzi; notebooki są wyższe (0,72), boardy kwadratowe (1,0).
 Rzędy dokumentów mają 372 px wysokości. Menu i nazwa są wyrównane
@@ -602,7 +603,7 @@ pozostaje w menu folderu, bez ikony palety w nagłówku otwartego folderu.
 Okładki folderów mają ponownie delikatne, wektorowe ikony Lucide
 (`FolderCoverIcon`, `FolderCoverStrokePainter`), z konturem 1,25 px
 i wygładzonymi krawędziami. Zachowują kwadratowe proporcje także jako
-podfoldery w wysokim rzędzie współdzielonym z dokumentami. Dekoracje na
+podfoldery, w identycznych rzędach jak foldery główne. Dekoracje na
 okładce (serce, gwiazdka,
 kwiat, błysk) można ponownie wybierać z poziomu edytora folderu.
 Kafelki mają promień 12 px i neutralne tło; zapisany kolor modyfikuje
@@ -639,11 +640,11 @@ Siatka reaguje na wspólną czułość dotyku.
 
 - 27: `dominantFolderColor`; 55: `FolderCoverIcon`;
   109: `FolderCoverStrokePainter`; 235: `LibraryCatalog`;
-  565: `_FolderTile`; 632: `_DocumentTile`;
-  751: `_CatalogTile`; 877: `_DocumentPreview`;
-  960: `_boardPreviewBounds`;
-  1002: `_PagePreviewPainter`;
-  1074: `showFolderCoverEditor`.
+  562: `_FolderTile`; 629: `_DocumentTile`;
+  748: `_CatalogTile`; 872: `_DocumentPreview`;
+  955: `_boardPreviewBounds`;
+  997: `_PagePreviewPainter`;
+  1069: `showFolderCoverEditor`.
 
 - `lib/core/widgets/workspace_document_app_bar.dart`: wspólny pasek
   tytułu notatnika, boarda i planera (56 px), z marginesem chroniącym
@@ -1435,7 +1436,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/library_nested_folders_test.dart`: ścieżki folderów, migracja
   nazw jednopoziomowych, zapis/odczyt, rekurencyjna zmiana nazwy,
   usuwanie poddrzewa z dokumentami oraz podfoldery z dokumentami w katalogu;
-  kwadratowe proporcje okładki podfolderu w mieszanym rzędzie.
+  identyczne rozmiary i odstępy siatki folderów głównych i podfolderów,
+  niezależnie od liczby dokumentów i szerokości ekranu.
 - `test/library_controller_test.dart` (33)
 - `test/library_catalog_test.dart` (971): rozmiary nazw folderów
   i dokumentów, kolor dominujący, serializacja
