@@ -91,10 +91,11 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 - `lib/core/theme/app_colors.dart`: jasna paleta i trzy współdzielone
   zestawy Blue/Pink/Green dla canvasu oraz okładek: trzy wspólne odcienie
   ciemny/średni/jasny, dostępne dla pióra i zakreślacza
-  (Blue #1A2130/#6A8AB9/#8AAAD1, Pink #3A212B/#B66D86/#CE8DA8,
-  Green #1F3027/#73AF8E/#99C2A8); próbki 2 i 3 są ciemniejsze
-  w trybie jasnym i automatycznie jaśniejsze w ciemnym.
-  Kontrast względem canvasu maleje od 1 do 3 w obu motywach.
+  (Blue #263042/#354E6B/#889BB0, Pink #823C44/#D8798A/#EAA6AE,
+  Green #394931/#74866F/#9BAE96); dokładne wartości dla motywu
+  jasnego podane przez użytkownika; w ciemnym transformacja HSL
+  zachowuje barwę i odwraca jasność. Kontrast poszczególnych próbek
+  w ciemnym trybie nie musi maleć kolejno od 1 do 3.
   Tryb ciemny:
   tło #2D2E2B, panele #3A3B39, aktywne #4A4B48, kartka/panele #5A5B57,
   ciemniejszy canvas notatek #50514D, tekst #EEECE6. `displayInkColor` odwraca jasność HSL wszystkich odcieni,
@@ -818,7 +819,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
 - `test/ink_color_presets_test.dart`: odcienie trzech palet, wspólny
   wybór koloru dla pióra i zakreślacza,
   transformacja HSL w dark mode, malejący kontrast odcieni 1–3
-  z jasną kartką, domyślny Blue oraz marker z trzeciej próbki.
+  z jasną kartką, zgodność HEX z paletami oraz zachowanie migracji,
+  domyślny Blue i marker z trzeciej próbki.
 - `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
   zgodność starszych sesji, reset koloru, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
@@ -899,7 +901,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (3155 linii)
+### `lib/features/editor/state/editor_controller.dart` (3173 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
@@ -925,8 +927,8 @@ dwa kontakty wyłączają ten drag i nie transformują obiektu ani canvasa.
 Trzy szybkie kolory domyślnie używają niebieskiego zestawu; wszystkie
 próbki wybierają ten sam kolor dla pióra i zakreślacza, bez przypisania
 odcienia do narzędzia. Wybór palety wybiera pierwszy kolor. Wcześniejsze
-fabryczne Blue/Pink/Green z kolejnych wersji są migrowane według
-indeksu, a ręcznie zmienione kolory pozostają
+fabryczne Blue/Pink/Green (również wersja #1A2130/#6A8AB9)
+są migrowane według indeksu; własne odcienie pozostają
 nienaruszone. Zapis preferencji tła obejmuje tylko notebook i board, bo
 planner nie ma ustawień tła. Obrazy trafiają do prywatnego katalogu danych
 aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
@@ -944,12 +946,12 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
   korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
   oraz pojedyncze undo/redo.
   682: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- 1355: łączenie zapisanych domyślnych teł; 1438: `undo`; 1464: `redo`;
-  1552: `toggleBookmark`; 1628: `updateActiveTextStyle` — blokowe
+- 1373: łączenie zapisanych domyślnych teł; 1456: `undo`; 1482: `redo`;
+  1570: `toggleBookmark`; 1646: `updateActiveTextStyle` — blokowe
   formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
   zapisywane jako `UpdateTextAction`.
-- 2673: `_imagesDir`; 2831: `_applyAction`; 2862: `_applyInkAction`;
-  3027: `_scheduleSave`; 3049: `_saveDirtyPages`; 3087: `_save`.
+- 2691: `_imagesDir`; 2849: `_applyAction`; 2880: `_applyInkAction`;
+  3045: `_scheduleSave`; 3067: `_saveDirtyPages`; 3105: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`

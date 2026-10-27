@@ -229,9 +229,9 @@ void main() {
     final persisted =
         jsonDecode((await readStoredText('editor_prefs.json'))!)
             as Map<String, dynamic>;
-    expect(persisted['quickColors'], ['#1f3027', '#73af8e', '#99c2a8']);
-    expect(persisted['penColor'], '#1f3027');
-    expect(persisted['highlighterColor'], '#1f3027');
+    expect(persisted['quickColors'], ['#394931', '#74866f', '#9bae96']);
+    expect(persisted['penColor'], '#394931');
+    expect(persisted['highlighterColor'], '#394931');
     expect(
       persisted['backgroundDefaults'],
       allOf(
@@ -269,7 +269,7 @@ void main() {
       final persisted =
           jsonDecode((await readStoredText('editor_prefs.json'))!)
               as Map<String, dynamic>;
-      expect(persisted['quickColors'], ['#1a2130', '#6a8ab9', '#8aaad1']);
+      expect(persisted['quickColors'], ['#263042', '#354e6b', '#889bb0']);
     },
   );
 
@@ -302,6 +302,11 @@ void main() {
   test('previous factory swatches migrate by position in every palette',
       () async {
     const previousVersions = <Map<InkColorPreset, List<String>>>[
+      {
+        InkColorPreset.blue: ['#1a2130', '#6a8ab9', '#8aaad1'],
+        InkColorPreset.pink: ['#3a212b', '#b66d86', '#ce8da8'],
+        InkColorPreset.green: ['#1f3027', '#73af8e', '#99c2a8'],
+      },
       {
         InkColorPreset.blue: ['#1a2130', '#acbed8', '#dee7f2'],
         InkColorPreset.pink: ['#3a212b', '#dab5c2', '#f2e1e8'],
