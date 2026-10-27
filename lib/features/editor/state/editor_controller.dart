@@ -1014,7 +1014,8 @@ class EditorController extends ChangeNotifier {
 
   void setCurrentBackgroundSettings(PageBackgroundSettings settings) {
     final previous = currentBackgroundSettings;
-    if (previous.style == settings.style &&
+    if (_localBackgrounds.containsKey(notebook.uid) &&
+        previous.style == settings.style &&
         previous.spacing == settings.spacing) {
       return;
     }
