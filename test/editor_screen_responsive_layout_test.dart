@@ -309,6 +309,16 @@ void main() {
     );
     await tester.pump();
     expect(scroll.offset, closeTo(scroll.position.maxScrollExtent, 1));
+    // The final scroll position must expose the scaled footer and margin.
+    await tester.pump();
+    final addPageButton = find.widgetWithText(FilledButton, 'Add page');
+    final canvasBottom = tester.getBottomRight(
+      find.byKey(const ValueKey('notebook-canvas-area')),
+    ).dy;
+    final buttonRect = tester.getRect(addPageButton);
+    expect(buttonRect.top, lessThan(canvasBottom - 22));
+    expect(buttonRect.bottom, lessThanOrEqualTo(canvasBottom - 22 + 1));
+    expect(buttonRect.bottom, greaterThan(canvasBottom - 80));
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();

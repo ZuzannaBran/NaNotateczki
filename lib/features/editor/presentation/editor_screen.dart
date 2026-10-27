@@ -659,7 +659,7 @@ class _EditorScreenState extends State<EditorScreen> {
     required Size viewportSize,
   }) {
     final contentWidth = docWorldSize.width * scale;
-    final contentHeight = docWorldSize.height * scale;
+    final contentHeight = (docWorldSize.height + _addPageFooterHeight) * scale;
 
     late final double minX;
     late final double maxX;

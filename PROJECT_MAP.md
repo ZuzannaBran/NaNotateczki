@@ -1017,6 +1017,9 @@ bez zmiany logicznych współrzędnych dokumentu.
 Viewport pozostaje 22 px od górnej krawędzi canvasa, więc strona nie jest
 ucinana przez pusty pas, gdy użytkownik wsuwa ją pod toolbar.
 Rozszerzony zakres pionowego pan pozwala również przesuwać stronę niżej.
+Dolny limit przesuwania uwzględnia skalowaną stopkę Add page/Delete page,
+więc po zejściu na koniec notatnika pozostają widoczne przyciski i dolny
+margines 22 px, również przy powiększeniu.
 Granice widoczności i wybór aktywnej strony uwzględniają przesunięcie.
 Wysokość klipu i przewijanej zawartości rośnie wraz z dodatnim `_pagePan.dy`,
 aby dolna część ostatniej strony nie została ucięta. Strona jest domyślnie
@@ -1562,7 +1565,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   narzędzi; przełączanie Grid/Lines bez powiadamiania całego edytora,
   aktualizacja wzoru na kartce i ignorowanie powtórnego identycznego wyboru;
   powiększony wielostronicowy notatnik przewija się od środka
-  do obu końców bez utknięcia; test tap/dwuklik/przytrzymanie szybkiego koloru, otwarcia
+  do obu końców bez utknięcia, pokazując przycisk Add page i dolny
+  margines przy maksymalnym przewinięciu; test tap/dwuklik/przytrzymanie szybkiego koloru, otwarcia
   selektora i zapisu nowego koloru.
 - `test/editor_toolbar_color_picker_test.dart`: dark/light picker, odwrócone
   Recent i wartości RGB/HEX, suwak i zapis z zachowaniem koloru wizualnego,
