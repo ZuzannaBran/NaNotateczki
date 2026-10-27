@@ -767,7 +767,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1756):
+- `lib/features/planner/presentation/planner_screen.dart` (1792):
   `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
   Wydarzenia są wspólnymi wpisami kalendarza bez możliwości uruchomienia
   timera, ze wspólnym opisem, kolorem, czasem, edycją i przenoszeniem.
@@ -816,13 +816,13 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   strzałki do przechodzenia między okresami pozostają.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px; Month na wąskim ekranie listę.
-  16: `CalendarMode`; 18: `CalendarTimeSpan`;
-  25: `calendarTimeSpan`; 161: `monthCalendarFocusOffset`; 44: `CalendarSessionPlacement`;
-  59: `calendarSessionPlacements`; 157: `PlannerScreen`;
-  164: `_PlannerScreenState`;
-  1144: `_HourlyDaySchedule`; 1313: `_CalendarHeaderStrip`;
-  1359: `_CalendarBorderFrame`; 1382: `_WeekTimeGrid`;
-  1679: `_WeekTableClipper`; 1705: `_WeekColumnLinesPainter`.
+  17: `CalendarMode`; 19: `CalendarTimeSpan`;
+  26: `calendarTimeSpan`; 52: `CalendarSessionPlacement`;
+  67: `calendarSessionPlacements`; 164: `monthCalendarFocusOffset`;
+  190: `PlannerScreen`; 197: `_PlannerScreenState`;
+  1202: `_HourlyDaySchedule`; 1367: `_CalendarHeaderStrip`;
+  1408: `_CalendarBorderFrame`; 1431: `_WeekTimeGrid`;
+  1726: `_WeekTableClipper`; 1747: `_WeekColumnLinesPainter`.
   `_WeekTimeGrid`: pełnowysokie separatory i wspólna ramka na
   wierzchu siatki; clip uwzględnia lewą granicę tabeli obok osi godzin.
   `calendarSessionPlacements` przydziela niekolidujące kolumny blokom
