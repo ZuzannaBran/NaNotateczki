@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
-import '../../../core/theme/app_typography.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
 import '../state/study_planner_controller.dart';
@@ -132,10 +133,9 @@ Color plannerDaySurface(ThemeData theme, {required bool highlighted}) {
   if (!highlighted) {
     return base;
   }
-  final shade = theme.brightness == Brightness.dark
-      ? colors.surface
-      : colors.surfaceContainerHighest;
-  return Color.alphaBlend(shade.withValues(alpha: 0.5), base);
+  return theme.brightness == Brightness.dark
+      ? AppColors.darkPaper
+      : AppColors.paper;
 }
 
 Color plannerOutsideMonthSurface(ThemeData theme) {
@@ -160,6 +160,33 @@ List<DateTime> monthCalendarDays(DateTime month) {
   );
 }
 
+/// Scroll offset that puts the focused month day within the initial viewport.
+double monthCalendarFocusOffset({
+  required DateTime month,
+  required DateTime today,
+  required double width,
+  required double viewportHeight,
+  required bool compact,
+}) {
+  final focusedDay = month.year == today.year && month.month == today.month
+      ? today
+      : month;
+  final dayIndex = compact
+      ? focusedDay.day - 1
+      : monthCalendarDays(month).indexWhere(
+          (day) => DateUtils.isSameDay(day, focusedDay),
+        );
+  if (dayIndex < 0) {
+    return 0;
+  }
+  const bottomMargin = 12.0;
+  final row = compact ? dayIndex : dayIndex ~/ 7;
+  final rowHeight = compact ? 168.0 : width / 7 / 1.1;
+  final headerHeight = compact ? 0.0 : 40.0;
+  final focusedBottom = headerHeight + (row + 1) * rowHeight;
+  return math.max(0.0, focusedBottom - viewportHeight + bottomMargin);
+}
+
 class PlannerScreen extends StatefulWidget {
   const PlannerScreen({super.key});
 
@@ -170,6 +197,8 @@ class PlannerScreen extends StatefulWidget {
 class _PlannerScreenState extends State<PlannerScreen> {
   CalendarMode _mode = CalendarMode.week;
   DateTime _anchor = DateUtils.dateOnly(DateTime.now());
+  final ScrollController _monthScrollController = ScrollController();
+  String? _monthScrollKey;
   late final Timer _timeRefresh;
 
   @override
@@ -185,7 +214,42 @@ class _PlannerScreenState extends State<PlannerScreen> {
   @override
   void dispose() {
     _timeRefresh.cancel();
+    _monthScrollController.dispose();
     super.dispose();
+  }
+
+  void _queueMonthFocus({
+    required double width,
+    required double viewportHeight,
+    required bool compact,
+  }) {
+    final now = DateTime.now();
+    final key = '${_anchor.year}-${_anchor.month}-${_anchor.day}-'
+        '${now.year}-${now.month}-${now.day}-$compact-$width-'
+        '$viewportHeight';
+    if (_monthScrollKey == key) {
+      return;
+    }
+    _monthScrollKey = key;
+    final offset = monthCalendarFocusOffset(
+      month: _anchor,
+      today: now,
+      width: width,
+      viewportHeight: viewportHeight,
+      compact: compact,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _mode != CalendarMode.month ||
+          _monthScrollKey != key ||
+          !_monthScrollController.hasClients) {
+        return;
+      }
+      final position = _monthScrollController.position;
+      _monthScrollController.jumpTo(
+        offset.clamp(position.minScrollExtent, position.maxScrollExtent),
+      );
+    });
   }
 
   TouchNavigationScrollPhysics get _navigationPhysics =>
@@ -220,6 +284,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   void _openDay(DateTime day) {
     setState(() {
+      _monthScrollKey = null;
       _mode = CalendarMode.today;
       _anchor = DateUtils.dateOnly(day);
     });
@@ -227,6 +292,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   void _selectMode(CalendarMode mode) {
     setState(() {
+      if (_mode != mode) {
+        _monthScrollKey = null;
+      }
       _mode = mode;
       if (mode == CalendarMode.today) {
         _anchor = DateUtils.dateOnly(DateTime.now());
@@ -775,6 +843,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           if (constraints.maxWidth < 960) {
+            _queueMonthFocus(
+              width: constraints.maxWidth,
+              viewportHeight: constraints.maxHeight,
+              compact: true,
+            );
             final compactDays = days
                 .where((day) => day.month == _anchor.month)
                 .toList();
@@ -793,6 +866,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               ),
               child: ListView.builder(
                 key: const ValueKey('mobile-planner-days'),
+                controller: _monthScrollController,
                 physics: _navigationPhysics,
                 padding: EdgeInsets.zero,
                 itemCount: compactDays.length,
@@ -811,12 +885,19 @@ class _PlannerScreenState extends State<PlannerScreen> {
           final width = constraints.maxWidth < minimumWidth
               ? minimumWidth
               : constraints.maxWidth;
+          _queueMonthFocus(
+            width: width,
+            viewportHeight: constraints.maxHeight,
+            compact: false,
+          );
           return SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: _navigationPhysics,
             child: SizedBox(
               width: width,
               child: SingleChildScrollView(
+                key: const ValueKey('planner-month-scroll'),
+                controller: _monthScrollController,
                 physics: _navigationPhysics,
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
                 child: _CalendarBorderFrame(

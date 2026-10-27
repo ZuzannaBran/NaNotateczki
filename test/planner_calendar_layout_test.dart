@@ -119,6 +119,78 @@ void main() {
     await planner.flush();
   });
 
+  test('month focus keeps 27 October visible on desktop and phone', () {
+    final month = DateTime(2026, 10, 27);
+    final offset = monthCalendarFocusOffset(
+      month: month,
+      today: month,
+      width: 980,
+      viewportHeight: 400,
+      compact: false,
+    );
+    expect(offset, closeTo(40 + 5 * (980 / 7 / 1.1) - 400 + 12, 0.001));
+    expect(
+      monthCalendarFocusOffset(
+        month: month,
+        today: DateTime(2026, 10, 1),
+        width: 980,
+        viewportHeight: 400,
+        compact: false,
+      ),
+      0,
+    );
+    expect(
+      monthCalendarFocusOffset(
+        month: month,
+        today: month,
+        width: 390,
+        viewportHeight: 400,
+        compact: true,
+      ),
+      27 * 168 - 400 + 12,
+    );
+  });
+
+  for (final width in [390.0, 1440.0]) {
+    testWidgets('month opens with the current day on screen at $width', (
+      tester,
+    ) async {
+      final planner = StudyPlannerController(
+        autoTick: false,
+        read: (_) async => null,
+        write: (_, _) async {},
+      );
+      addTearDown(planner.dispose);
+      await planner.load();
+      await tester.binding.setSurfaceSize(Size(width, 610));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: const MaterialApp(home: PlannerScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Month'));
+      await tester.pumpAndSettle();
+
+      final now = DateTime.now();
+      final currentDay = find.byKey(
+        ValueKey('planner-day-cell-${now.year}-${now.month}-${now.day}'),
+      );
+      final scrollViewport = find.byKey(
+        ValueKey(width < 960 ? 'mobile-planner-days' : 'planner-month-scroll'),
+      );
+      expect(currentDay, findsOneWidget);
+      expect(scrollViewport, findsOneWidget);
+      final cell = tester.getRect(currentDay);
+      final viewport = tester.getRect(scrollViewport);
+      expect(cell.top, greaterThanOrEqualTo(viewport.top - 1));
+      expect(cell.bottom, lessThanOrEqualTo(viewport.bottom + 1));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('week and month outline remains above clipped cells', (
     tester,
   ) async {

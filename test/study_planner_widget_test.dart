@@ -828,7 +828,7 @@ void main() {
   });
 
   for (final darkMode in [false, true]) {
-    testWidgets('today normal; week and month lightly shaded, dark=$darkMode', (
+    testWidgets('today normal; week and month clearly lighter, dark=$darkMode', (
       tester,
     ) async {
       final planner = await loadPlanner();
@@ -872,15 +872,12 @@ void main() {
       }
 
       final base = theme.colorScheme.surfaceContainerLowest;
-      final shade = darkMode
-          ? theme.colorScheme.surface
-          : theme.colorScheme.surfaceContainerHighest;
-      final expected = Color.alphaBlend(shade.withValues(alpha: 0.5), base);
+      final expected = darkMode ? AppColors.darkPaper : AppColors.paper;
       expect(cellColor(cell), expected);
       expect(cellColor(otherCell), base);
       expect(
         cellColor(cell).computeLuminance(),
-        lessThan(cellColor(otherCell).computeLuminance()),
+        greaterThan(cellColor(otherCell).computeLuminance()),
       );
 
       final week = find.byKey(const ValueKey('planner-week-time-grid'));

@@ -779,8 +779,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   Sesje zakończone są na ciemniejszych kartach, zaplanowane na jasnych,
   z `ColorScheme`, promieniem 12 px i obramowaniem w kolorze tekstu.
   Wybrany kolor sesji jest nakładką nad tłem karty w Week/Today/Month.
-  W Week i Month bieżący dzień ma umiarkowanie ciemniejsze tło,
-  z 50% warstwą odcienia motywu na tle zwykłej komórki.
+  W Week i Month bieżący dzień ma wyraźnie jaśniejsze tło z palety:
+  AppColors.paper w jasnym i AppColors.darkPaper w ciemnym motywie.
   Day zachowuje normalne tło. Day i Week mają stałą siatkę godzin
   (64 px/h) i bloki pozycjonowane według dokładnej minuty rozpoczęcia
   i całkowitego czasu sesji (w Smart również z przerwami), z podziałem
@@ -800,6 +800,10 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   Today, Week i Month nie pokazują pasków przewijania, ale zachowują
   gesty dotykowe i przewijanie myszy. Czas aktualizuje się co minutę.
   Daty i opisy mają czteropoziomową typografię interfejsu.
+  Month po wejściu, zmianie miesiąca lub rozmiaru widoku ustawia
+  pionowy scroll tak, by bieżący dzień (lub dzień kotwicy dla obcego
+  miesiąca) był w kadrze, także w mobilnej liście. Ręczny scroll
+  pozostaje nienaruszony przy zwykłym odświeżeniu.
   Miesiąc generuje tylko niezbędne 4–6 tygodni; komórki dni granicznych
   innych miesięcy pozostają widoczne z opacity 0.5; pomocniczy napis
   Long-press usunięty. Osobne przyciski
@@ -813,7 +817,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   Stały margines 24 px pod kalendarzem uwzględnia systemowy SafeArea.
   Nagłówek ma 56 px i linię 1 px; Month na wąskim ekranie listę.
   16: `CalendarMode`; 18: `CalendarTimeSpan`;
-  25: `calendarTimeSpan`; 44: `CalendarSessionPlacement`;
+  25: `calendarTimeSpan`; 161: `monthCalendarFocusOffset`; 44: `CalendarSessionPlacement`;
   59: `calendarSessionPlacements`; 157: `PlannerScreen`;
   164: `_PlannerScreenState`;
   1144: `_HourlyDaySchedule`; 1313: `_CalendarHeaderStrip`;
@@ -890,7 +894,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   tła, notebook i board zachowują dotychczasowe klucze.
 - `test/planner_calendar_layout_test.dart`: regresje grupowania i
   pozycjonowania równoległych sesji Day/Week (w tym sesji przechodzących
-  przez północ) oraz obrysu zaokrąglonych ramek Week/Month.
+  przez północ), obrysu ramek Week/Month oraz początkowej widoczności
+  bieżącego dnia miesiąca na desktopie i telefonie.
 - `test/study_planner_calendar_weekday_test.dart`: komplet nazw dni
   tygodnia we wszystkich widokach i po zmianie daty; 4/5/6 tygodni
   miesiąca z zachowaniem dni przejściowych; osobny krok CI.
