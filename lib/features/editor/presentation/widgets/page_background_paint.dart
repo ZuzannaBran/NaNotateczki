@@ -21,16 +21,16 @@ class PageBackgroundPaint extends StatelessWidget {
       child: ClipRRect(
         borderRadius: borderRadius,
         child: CustomPaint(
-        painter: _PageBackgroundPainter(
-          settings: settings,
-          paperColor: Theme.of(context).brightness == Brightness.dark
-              ? AppColors.darkCanvas
-              : AppColors.paper,
-          lineColor: Theme.of(
-            context,
-          ).colorScheme.outlineVariant.withValues(alpha: 0.55),
-          origin: origin,
-        ),
+          painter: _PageBackgroundPainter(
+            settings: settings,
+            paperColor: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.darkCanvas
+                : AppColors.paper,
+            lineColor: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withValues(alpha: 0.55),
+            origin: origin,
+          ),
           child: const SizedBox.expand(),
         ),
       ),
