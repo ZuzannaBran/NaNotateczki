@@ -17,7 +17,8 @@ mapie. Każdy nowy plik w `lib/` musi dostać tu własny wpis.
 - Dane: Drift + SQLite; web używa SQLite WASM/IndexedDB.
 - Tekst: `flutter_quill`; ramki transformacji: `flutter_box_transform`;
   obrazy/PDF: `image_picker`, `file_picker`, `pdfx`.
-- OCR: `google_mlkit_text_recognition`, tylko Android/iOS.
+- OCR nie ma interfejsu ani zależności runtime na żadnej platformie; stare pole
+  `ocrText` pozostaje odczytywane wyłącznie dla zgodności istniejących danych.
 - Główny przepływ:
   `main` → `AppScope` → `LibraryController` → `EditorController` →
   `NotebookRepository` → Drift.
@@ -376,8 +377,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/text_block.dart` (45): blok Quill z pozycją,
   stylem, szerokością i rotacją.
   3: `TextBlock`.
-- `lib/features/notebook/domain/image_block.dart` (71): obraz, OCR, crop,
-  rotacja oraz legacy inline bytes.
+- `lib/features/notebook/domain/image_block.dart` (71): obraz, legacy tekst
+  OCR, crop, rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
 ### `lib/features/notebook/data/notebook_repository.dart` (2494 linie)
@@ -860,7 +861,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
 
 ## 7. Stan edytora
 
-### `lib/features/editor/state/editor_actions.dart` (563 linie)
+### `lib/features/editor/state/editor_actions.dart` (532 linie)
 
 Akcje undo/redo dla pojedynczej strony oraz atomowa akcja przeniesienia
 obrazu między stronami (`MoveImageBetweenPagesAction`, operacje na liście
@@ -872,9 +873,9 @@ usunięte stroke'y i ich pierwotne indeksy zamiast pełnej kopii strony.
 - 13: dodawanie tekstu/obrazu/ink;
   88: destrukcyjne usuwanie ink.
 - 88–242: update/delete/move tekstu i obrazu.
-- 262: `MoveImageBetweenPagesAction`;
-  423: `MoveSelectionAction`; 479: `DeleteSelectionAction`;
-  515: `PasteSelectionAction`; 551: `OffsetPosition`.
+- 264: `MoveImageBetweenPagesAction`;
+  393: `MoveSelectionAction`; 449: `DeleteSelectionAction`;
+  485: `PasteSelectionAction`; 521: `OffsetPosition`.
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
 
@@ -890,7 +891,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (3279 linii)
+### `lib/features/editor/state/editor_controller.dart` (3119 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
@@ -901,15 +902,18 @@ czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
 zgodą na zamknięcie aplikacji. Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
-tuszem i tekstem; wybór narzędzia ink lub tekstu dezaktywuje aktywny obraz.
-`isObjectTransformActive` blokuje zmianę viewportu na czas move/resize ramki.
+tuszem i tekstem; aktywny obraz można wskazać i transformować wyłącznie w
+narzędziu Move (`edit`), a wybór każdego innego narzędzia kończy zaznaczenie.
+`isCanvasNavigationLocked` blokuje zmianę viewportu przez cały czas aktywnego
+zaznaczenia obrazu/PDF w Move oraz podczas move/resize ramki.
 Podczas usuwania aktywnego HUD-u lub overlayu figury flaga zwalniana jest
 synchronicznie, a powiadomienie słuchaczy jest odkładane do post-frame,
 jeśli trwa faza budowania/finalizacji drzewa. Callback sprawdza dispose.
 `imageTransformPreview` jest osobnym `ValueNotifier<ImageBlock?>` dla
-aktywnych gestów obrazów/PDF: aktualizuje wyłącznie ich renderer, bez
-`notifyListeners()` całego edytora i bez mutowania `pages` aż do commita
-cofalnej transformacji.
+gestów uchwytów obrazów/PDF: aktualizuje wyłącznie ich renderer, bez
+`notifyListeners()` całego edytora i bez mutowania `pages` aż do commita.
+Ruch korpusu jednym palcem działa niezależnie od preferencji pisania palcem;
+dwa kontakty wyłączają ten drag i nie transformują obiektu ani canvasa.
 Trzy szybkie kolory domyślnie używają niebieskiego zestawu; wszystkie
 próbki wybierają ten sam kolor dla pióra i zakreślacza, bez przypisania
 odcienia do narzędzia. Wybór palety wybiera pierwszy kolor. Wcześniejsze
@@ -918,25 +922,25 @@ nienaruszone. Zapis preferencji tła obejmuje tylko notebook i board, bo
 planner nie ma ustawień tła. Obrazy trafiają do prywatnego katalogu danych
 aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
-- 39: `LassoSelection`; 78: `EditorController`;
-  211: `flushPendingSaves`; 1107: `applyInkColorPreset`.
-- 281–353: layout i transformacje viewportu; 296: start blokady transformacji,
-  321: `setViewTransform`.
-- 362–498: operacje `*OnPage` używane przez canvasy/overlaye.
-- 503–918: narzędzia, aktywne elementy, lasso i preferencje; 592: `setTool`;
-  900: `setImageTransformPreview`; 907: `clearImageTransformPreview`;
+- 37: `LassoSelection`; 76: `EditorController`;
+  220: `flushPendingSaves`; 1017: `applyInkColorPreset`.
+- 292–364: layout i transformacje viewportu; 305: start blokady transformacji,
+  330: `setViewTransform`.
+- 373–509: operacje `*OnPage` używane przez canvasy/overlaye.
+- 502–919: narzędzia, aktywne elementy, lasso i preferencje; 591: `setTool`;
+  904: `setImageTransformPreview`; 911: `clearImageTransformPreview`;
   kształt po narysowaniu lub rozpoznaniu przechodzi na tymczasowe
   `edit` (`startShapeEdit`), a tap poza figurą przywraca poprzednie
   narzędzie (`finishShapeEdit`). Podgląd i commit transformacji ink
   korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
   oraz pojedyncze undo/redo.
-  694: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- 1409: łączenie zapisanych domyślnych teł; 1492: `undo`; 1518: `redo`;
-  1606: `toggleBookmark`; 1682: `updateActiveTextStyle` — blokowe
+  682: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
+- 1319: łączenie zapisanych domyślnych teł; 1402: `undo`; 1428: `redo`;
+  1516: `toggleBookmark`; 1592: `updateActiveTextStyle` — blokowe
   formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
   zapisywane jako `UpdateTextAction`.
-- 2772: `_imagesDir`; 2955: `_applyAction`; 2986: `_applyInkAction`;
-  3151: `_scheduleSave`; 3173: `_saveDirtyPages`; 3211: `_save`.
+- 2637: `_imagesDir`; 2795: `_applyAction`; 2826: `_applyInkAction`;
+  2991: `_scheduleSave`; 3013: `_saveDirtyPages`; 3051: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`
@@ -949,7 +953,7 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2464 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2456 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px i korzysta z
 aktualnego tytułu przekazanego przez bibliotekę (fallback: kontroler);
@@ -980,8 +984,8 @@ wspólne komendy edytora. Strona zachowuje logiczną
 szerokość 820 px, a węższe okno skaluje cały dokument bez reflow tekstu.
 Overview ma po 10 px wolnej przestrzeni po lewej i prawej stronie; poziomy
 viewport strony zaczyna się przy x=116 i kończy 56 px przed prawą krawędzią.
-Zoom i pan działają wewnątrz tego pasa, ale podczas aktywnego move/resize
-obiektu viewport jest zamrożony: custom pan/zoom jest ignorowany, a pionowy
+Zoom i pan działają wewnątrz tego pasa, ale przez całe aktywne zaznaczenie
+obrazu/PDF viewport jest zamrożony: custom pan/zoom jest ignorowany, a pionowy
 `SingleChildScrollView` przechodzi na `NeverScrollableScrollPhysics`.
 Powiększony dokument zachowuje rzeczywistą wysokość scrolla; ręczny pionowy
 pan uwzględnia bieżący offset przewinięcia, dzięki czemu można wrócić
@@ -989,6 +993,10 @@ do pierwszej i ostatniej strony bez zmiany zoomu. Kółko/trackpad obsługuje
 albo natywny scroll, albo pan canvasa, nigdy obydwa jednocześnie.
 Gesty pan palcem oraz przewijanie stron i minimapy respektują czułość
 nawigacji; zoom i gesty narzędzi pozostają bez zmian.
+W Move jeden palec przesuwa zaznaczony obraz/PDF niezależnie od preferencji
+pisania palcem. Dwa kontakty nie transformują obiektu ani zamrożonego
+viewportu; po tapnięciu poza pełną ramką zaznaczenie znika i zwykła
+nawigacja canvasa wraca.
 Po zakończeniu transformacji normalna nawigacja wraca. Stronę można przesuwać
 poziomo dotykiem także wtedy, gdy jest węższa od viewportu; clamp pozwala jej
 dojść od lewej do prawej granicy pasa, ale nigdy wejść pod margines. Bleed
@@ -999,22 +1007,22 @@ z uwzględnieniem scrolla minimapy, paddingu, pan i granic przesunięć.
 Gest przeciągnięcia nadal przewija samą minimapę, a blokada transformacji
 obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 
-- 37: `EditorScreen`; 51: `_EditorScreenState`.
-- 52: `_logicalPageWidth`; 99: `_effectivePageScale` — skala okna pomnożona
+- 38: `EditorScreen`; 56: `_EditorScreenState`.
+- 57: `_logicalPageWidth`; 104: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
-- 149: synchronizacja strony; 180: nawigacja do klikniętego obszaru.
-- 275–694: gesty pan/zoom, blokada viewportu i transformacje;
+- 162: synchronizacja strony; 193: nawigacja do klikniętego obszaru.
+- 288–658: gesty pan/zoom, blokada viewportu i transformacje;
   dotyk aktywnego obrazu nie uruchamia menu kontekstowego canvasa.
-- 866–896: busy overlay, komendy importu/eksportu i clipboard oraz ustawienia.
-- 1017: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
+- 880–900: busy overlay, komendy importu/eksportu i clipboard oraz ustawienia.
+- 1031: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 1045: główny `build`; pasek tekstu jest renderowany na podstawie
+- 1057: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1609: `_PageViewportClipper`; 1667: `_PageFramePainter`;
-  1774: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
-  2125: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
+- 1602: `_PageViewportClipper`; 1660: `_PageFramePainter`;
+  1767: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
+  2186: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_commands.dart` (172 linie)
 
@@ -1114,19 +1122,19 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   czemu działa niezależnie od zoomu dokumentu i nie dotyka stroke'ów.
   6: `ObjectTransformKind`; 8: `ObjectTransformSnapshot`;
   24: `ObjectTransformEngine`; 263: `_ObjectTransformSession`.
-- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (790):
+- `lib/features/editor/presentation/widgets/object_transform_hud.dart` (860):
   wspólna ramka transformacji dla tekstu i obrazów/PDF; używa gotowych
   `DefaultCornerHandle` i `DefaultSideHandle` z `flutter_box_transform`
   oraz wspólnego grabbera nad górną krawędzią do przesuwania obiektu.
   Grabber działa także wtedy, gdy środek ramki jest wyłączony z dragowania,
-  np. podczas aktywnej edycji tekstu. Opcjonalne `pinchToResize` pozwala
-  obrazom/PDF obsługiwać dwa palce wewnątrz obiektu przez surowe kontakty,
-  bez udziału nawigacji viewportu. Skalowanie zachowuje proporcje,
-  ognisko gestu i jeden krok undo; pierwszy dotyk od razu blokuje
-  przejęcie gestu przez nadrzędny `Listener`. Podgląd jest lokalny i
+  np. podczas aktywnej edycji tekstu. Obrazy/PDF używają surowego drag jednym
+  palcem, aby nadrzędny scroll nie przejmował ruchu; drugi kontakt zawiesza
+  i anuluje ten drag bez skalowania obiektu. Grabber i uchwyty działają
+  zawsze. Przytrzymanie anuluje pusty drag i otwiera menu kopiowania.
+  Podgląd jest lokalny i
   usuwany przy anulowaniu/odmontowaniu; obsługa spóźnionych zdarzeń
   sprawdza `mounted` i czyści kontakty w `dispose()`. Dzięki temu
-  nie ma `setState()` po usunięciu ramki podczas pinch.
+  nie ma `setState()` po usunięciu ramki podczas gestu.
   Dedykowane uchwyty używają surowych pointer events zamiast rozpoznawania
   pan, więc reagują od pierwszego ruchu
   bez systemowego touch slop. Niewidzialny hit-area skaluje się liniowo z
@@ -1140,7 +1148,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   HUD-u również zwalnia blokadę. Kolor, rozmiary i grubość ramki są
   konfigurowalne przez `ObjectTransformHudStyle`.
   14: `ObjectTransformHudStyle`; 55: `ObjectTransformHud`;
-  109: `_ObjectTransformHudState`; 736: `_ObjectTransformFramePainter`.
+  117: `_ObjectTransformHudState`; 806: `_ObjectTransformFramePainter`.
 - `lib/features/editor/presentation/widgets/shape_edit_overlay.dart`:
   `ShapeEditGeometry` udostępnia dwa uchwyty dla linii/strzałki, trzy
   dla trójkąta i strzałki blokowej oraz cztery dla
@@ -1207,7 +1215,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (3111 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (3022 linie)
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -1221,38 +1229,40 @@ kolorami wszystkich fragmentów. Oryginalny
 korzystają z tego samego `ObjectTransformHud`; obrót jest wyłączony, rogi skalują, boki zachowują
 crop, a lasso/ink pozostają poza tym silnikiem.
 W notebooku aktywna ramka korzysta z pełnego viewportu, żeby uchwyty obrazów
-oraz stron PDF po imporcie reagowały również poza kartką. Pinch dwoma palcami
-skaluje wybrany obiekt z ograniczeniem rozmiaru 80–4096 × 60–4096 px.
-Podczas gestu tylko wybrany renderer obrazu/PDF subskrybuje
-`imageTransformPreview`; źródłowy `ImageBlock` i pełny edytor są
-niezmieniane do puszczenia palców. Normalizacja wymiarów pliku nie
-nadpisuje trwającego podglądu. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
+oraz stron PDF po imporcie reagowały również poza kartką. HUD obsługuje ruch
+korpusu jednym palcem oraz rogi, krawędzie i grabber; dwa palce nie wykonują
+transformacji. `imageTransformPreview` dotyczy tych gestów.
+Normalizacja wymiarów pliku nie nadpisuje trwającego podglądu. Piksele obrazów/PDF są zawsze renderowane w warstwie tła przed
 tuszem i tekstem, także gdy obraz jest aktywny; aktywna warstwa zawiera wtedy
 tylko ramkę i uchwyty edycji. W trybie tekstu obrazy ignorują hit-test i nie
 mogą przejąć kliknięcia przeznaczonego do wstawiania lub edycji tekstu.
 W trybach rysunkowych (pióro, marker, gumki, kształty) overlay obiektów
 nie uczestniczy w hit-teście; tekst oraz obrazy/PDF pozostają widoczne.
 Lasso zachowuje swoje interakcje.
+W Move nieaktywny obraz najpierw wymaga tapnięcia i zaznaczenia; nie korzysta
+już z równoległego, starego drag/resize. Przytrzymanie aktywnego lub
+nieaktywnego obrazu pokazuje wyłącznie akcję Copy, bez OCR i bez opóźnienia
+zwykłego tapu. Tap wewnątrz pełnej, także obróconej ramki zachowuje
+zaznaczenie; dopiero tap poza nią je kończy.
 Operuje wyłącznie w logicznych współrzędnych strony/dokumentu; responsywną
 skalę nadaje wspólny rodzic w `EditorScreen`, nie poszczególne bloki
 overlayu. Pojedyncze wskazanie nieaktywnego Quilla jest stosowane po oknie
 double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu na
 `TextHudBlock`.
 
-- 35: `PageOverlay`; 236: `DocumentPageOverlay`;
-  298: `ActiveImageTransformHud`.
+- 34: `PageOverlay`; 251: `DocumentPageOverlay`;
+  313: `ActiveImageTransformHud`.
 - aktywny tekst: `TextHudBlock`; fallback nieaktywnego tekstu:
   `_TextBlockWidget` / `_TextBlockWidgetState`.
   Akcje lassa korzystają z kompaktowego paska w kolorze toolbaru,
   z neutralnymi ikonami konturowymi i zachowaną obsługą akcji.
-- 1606: `_ImageBlockWidget`; 1631: `_ImageBlockWidgetState`.
-- 2702: `_editOcr`; 2776: `_OcrTextDialog`;
-  2875: `_LassoSelectionWidget`; 2996: `LassoSelectionActionBar`;
-  3055: `_LassoActionButton`.
+- 1627: `_ImageBlockWidget`; 1652: `_ImageBlockWidgetState`;
+  2786: `_LassoSelectionWidget`; 2907: `LassoSelectionActionBar`;
+  2966: `_LassoActionButton`.
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (922 linii)
+### `lib/features/board/presentation/board_screen.dart` (892 linie)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -1276,13 +1286,15 @@ więc zawartość można swobodnie przesuwać za toolbar. Obszar roboczy
 ma proste górne rogi i zaokrąglone dolne rogi (12 px) zarówno w dekoracji,
 jak i w klipowaniu zawartości. Nagłówek ma
 wyłączony tint podczas przewijania. Panele dziedziczą aktywną paletę.
+Zaznaczony w Move obraz/PDF zamraża nawigację i granice sceny. Jeden palec
+przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
 
-- 30: `BoardScreen`; 46: `_BoardScreenState`.
-- 70: `_buildBoardRect`; 80–394: obsługa pointerów i viewportu.
-- 514: główny `build`; import/eksport i skróty przez `EditorCommands`.
-- 781: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
-- 794: `_BoardPaintProbe`; 811: `_RenderBoardPaintProbe`;
-  834: `_BoardZoomControls`.
+- 31: `BoardScreen`; 49: `_BoardScreenState`.
+- 75: `_buildBoardRect`; 85–378: obsługa pointerów i viewportu.
+- 510: główny `build`; import/eksport i skróty przez `EditorCommands`.
+- 751: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
+- 787: `_BoardPaintProbe`; 804: `_RenderBoardPaintProbe`;
+  827: `_BoardZoomControls`.
 
 ## 10. Platformy, web i testy
 
@@ -1532,10 +1544,11 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   undo/redo oraz tymczasowego Move z powrotem do narzędzia
   w notebooku i boardzie; usuwanie aktywnej ramki obiektu i kształtu
   w trakcie gestu bez wywoływania powiadomień podczas unmount.
-- `test/image_pdf_transform_regression_test.dart`: uchwyty poza kartką,
-  pinch dwoma palcami w HUD i notebooku, limity i undo/redo dla zdjęcia
-  oraz importowanej strony PDF; 35 kroków pinch bez powiadomienia całego
-  edytora, lokalny podgląd i bezpieczny dispose ramki w trakcie gestu.
+- `test/image_pdf_transform_regression_test.dart`: rogi skali i krawędzie crop
+  poza kartką, zawsze aktywny drag jednym palcem i grabber, brak transformacji
+  obiektu dwoma palcami, zamrożony canvas podczas zaznaczenia, zaznaczenie
+  wyłącznie w Move i deselect dopiero po tapnięciu poza pełną ramką lub zmianie
+  narzędzia, przytrzymanie z Copy bez OCR oraz undo/redo dla zdjęcia i PDF.
 - `test/object_transform_engine_test.dart` (67): wspólna geometria
   move, corner-scale, side-resize i zachowanie historycznych kątów
 - `test/resizable_frame_test.dart` (33)
@@ -1621,10 +1634,7 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `android/app/build.gradle.kts` i `android/app/proguard-rules.pro`:
   Release wymaga prywatnego `android/key.properties` poza CI i jawnym trybem
   debug-signing; konfiguracja odrzuca niepełne klucze i brak keystore.
-  Release uruchamia R8 z wyjątkami wyłącznie dla opcjonalnych modułów
-  ML Kit (Chinese/Devanagari/Japanese/Korean). OCR używa tylko
-  `TextRecognitionScript.latin`; nie dodawaj nieużywanych modeli
-  ani nie wyłączaj shrinkingu dla całej aplikacji.
+  Release uruchamia R8; nie wyłączaj shrinkingu dla całej aplikacji.
 - `.github/scripts/android_emulator_tests.sh`: czeka na `adb` i
   `sys.boot_completed`, następnie uruchamia obydwa testy integracyjne.
   Runner emulatora wywołuje pojedynczą komendę Bash, zamiast interpretować
@@ -1669,8 +1679,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
    Jeśli strona jest węższa od viewportu, poziomy pan ma zakres od lewego do
    prawego wyrównania zamiast jednej sztywnej pozycji. Clipper nie może
    wypuszczać strony poziomo pod marginesy; bleed może być tylko pionowy.
-7. OCR działa tylko na Android/iOS. Import PDF na Linuxie używa `pdftoppm`
-   (`poppler-utils`); pozostałe platformy używają `pdfx`.
+7. OCR jest wyłączony na wszystkich platformach; stare `ocrText` zachowuj dla
+   zgodności danych. Import PDF na Linuxie używa `pdftoppm` (`poppler-utils`),
+   a pozostałe platformy `pdfx`.
 8. Obrazy natywne mają trwałe ścieżki; inline `bytes` są przeznaczone dla web
    lub migracji starych danych i są czyszczone po utrwaleniu pliku.
 9. `DrawingTool.eraser*` pozostają w enumie wyłącznie dla zgodności indeksów

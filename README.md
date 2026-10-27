@@ -36,7 +36,8 @@ open source w rozumieniu OSI.
 - Foldery do porządkowania notatek i tablic.
 - Zmiana nazw folderów oraz elementów biblioteki.
 - Usuwanie pojedynczych notatek/tablic i całych folderów z zawartością.
-- Wyszukiwanie po tytule, nazwach stron, blokach tekstowych i wyniku OCR.
+- Wyszukiwanie po tytule, nazwach stron, blokach tekstowych i zachowanym
+  tekście OCR ze starszych dokumentów.
 - Widok szeroki z panelami: foldery, lista notatek, obszar roboczy.
 - Widok wąski z paskiem folderów i otwieraniem notatek na osobnym ekranie.
 - Zwijanie i ręczna zmiana szerokości paneli w układzie desktopowym.
@@ -84,7 +85,7 @@ open source w rozumieniu OSI.
 - Grupowanie wpisywania w jedną akcję undo, zamiast cofania pojedynczych
   znaków.
 
-### Obrazy, pliki i OCR
+### Obrazy i pliki
 
 - Dodawanie obrazów z galerii lub pliku.
 - Wklejanie obrazów i tekstu ze schowka.
@@ -92,9 +93,15 @@ open source w rozumieniu OSI.
 - Import PDF jako obrazy stron:
   - na Linuksie przez `pdftoppm` z pakietu `poppler-utils`,
   - na pozostałych platformach przez `pdfx`.
-- Przesuwanie, skalowanie, kadrowanie i obracanie obrazów.
-- Kopiowanie obrazów do schowka.
-- OCR obrazów na Androidzie i iOS przez ML Kit.
+- W Move: przesuwanie uchwytem lub jednym palcem niezależnie od ustawienia
+  pisania palcem, skalowanie rogami i kadrowanie krawędziami.
+- Gesty dwoma palcami nie transformują obiektów. Gdy obiekt jest zaznaczony,
+  canvas pozostaje zamrożony.
+- Zaznaczenie pozostaje aktywne po tapnięciu w dowolnym miejscu ramki;
+  kończy je dopiero tapnięcie obok albo zmiana narzędzia.
+- Kopiowanie obrazów do schowka z menu po przytrzymaniu.
+- Brak OCR na wszystkich platformach; zapisane wcześniej wyniki pozostają
+  czytelne i przeszukiwalne.
 - Przechowywanie bajtów obrazów w danych notatki, żeby aplikacja potrafiła
   odtworzyć obraz nawet po utracie pliku cache.
 
@@ -138,7 +145,6 @@ open source w rozumieniu OSI.
 - Drift + SQLite jako lokalna baza danych.
 - `flutter_quill` do edycji tekstu rich text.
 - `pdf`, `pdfx`, `file_picker`, `image_picker`, `super_clipboard`.
-- `google_mlkit_text_recognition` dla OCR na Androidzie i iOS.
 
 ## Struktura projektu
 
@@ -203,8 +209,7 @@ dart run build_runner build
 
 ## Ważne ograniczenia
 
-- OCR działa tylko na Androidzie i iOS. Na desktopie aplikacja zwraca komunikat
-  o braku wsparcia zamiast przerywać pracę błędem.
+- OCR jest wyłączony na wszystkich platformach.
 - Import PDF na Linuksie wymaga `pdftoppm`.
 - Synchronizacja folderowa nie jest usługą chmurową sama w sobie. Aplikacja
   zapisuje plik JSON w katalogu, który może być synchronizowany np. przez

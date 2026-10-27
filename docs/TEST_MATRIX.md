@@ -20,44 +20,47 @@ a platform as tested until its actual Actions job succeeds.
 - Browser smoke test installs a Chrome/ChromeDriver matched pair and uses
   `flutter drive`; browser-compatible
   Dart tests run under Chrome, **not** in the native Dart VM.
-- Real pen hardware, OS shutdown, device permissions, native pickers and
-  camera/OCR workflows still require manual/device-farm tests.
+- Real pen hardware, OS shutdown, device permissions and native pickers still
+  require manual/device-farm tests.
 - CI tests are failure detectors; a green CI run is not proof that unknown bugs
   cannot occur.
 - The desktop matrix also runs merged catalog/planner UI, typography and
   planner lifecycle regressions directly on Linux, Windows and macOS.
 
-## Image and imported PDF pinch gestures (October 2026)
+## Image and imported PDF transform gestures (October 2026)
 
 Synthetic pointer regression: `test/image_pdf_transform_regression_test.dart`
-sends two real Flutter touch contacts through the selected object HUD and
-full notebook viewport, alongside off-page handle, undo/redo, bounds,
-cancellation, zoom isolation and repeated-resize scenarios. It also
-checks 35 consecutive pointer updates without notifying the entire editor,
-the transient picture preview before commit, and safe widget disposal while
-both fingers remain pressed (no repeated setState-after-dispose exceptions).
+sends real Flutter touch contacts through the selected object and notebook
+viewport. It verifies that one finger always moves the object, two fingers
+transform neither the object nor the frozen canvas, and the HUD does not
+start a competing multitouch transform. The suite also covers off-page
+handles, undo/redo, corner scaling, side cropping, the always-active move
+handle, selection only in Move, taps across the full selected frame,
+deselection outside the frame or after changing tools, and the long-press
+Copy menu without OCR actions.
 PDF pages in the editor are rasterized image blocks; this is not a native
 PDF-render throughput benchmark.
 
 Manual checks on touch-capable Linux/Windows laptops, Android and iPadOS:
 
-1. Insert a photo, select it in Edit mode and place two fingers **inside**
-   its selected frame. Spread to enlarge and pinch to reduce. The image
-   should respond while fingers move; the notebook itself must not zoom.
-2. Move the object with one finger, then use two; release one finger
-   before the other. Confirm there is no jump, stuck drag or scrolling lock.
+1. Insert a photo and select it in Move. Move it with one finger with finger
+   writing both enabled and disabled. The result must be identical.
+2. Place two fingers on the selected object or with the second outside its
+   frame. Confirm that neither the object nor the canvas moves or scales.
 3. Import a multipage PDF and repeat on a page represented as an image;
    drag the object partly outside notebook bounds and resize from handles.
 4. Repeat on a board and notebook at 50%, 100%, 125% and 200% zoom,
    in portrait and landscape orientations. Verify consistent dimensions.
 5. Cancel a gesture (e.g. OS interruption), undo and redo the resize,
    save/reopen, and verify that the prior geometry is restored.
-6. Hold both fingers and perform 30–50 consecutive small resizes on
-   a large imported PDF page; the frame and pixels should track the
-   gesture smoothly without a frozen window or error flood. Deselect
-   the object or switch documents mid-touch; no setState-after-dispose.
+6. Hold both fingers and perform 30–50 movements on a large imported PDF
+   page. The frame, pixels and canvas must remain fixed without an error
+   flood. Deselect the object or switch documents mid-touch; no
+   setState-after-dispose.
 7. Without an active image selected, verify two-finger canvas pan/zoom
    still works normally.
+8. Tap the center and near every inner edge of the selected frame. Selection
+   must remain until tapping outside the full frame or switching from Move.
 
 These manual checks require physical touch hardware and are not recorded
 as passed until they are actually executed.
@@ -239,8 +242,8 @@ drawing and page-background settings are unchanged.
 | Windows | Full suite on Ubuntu; merged UI/planner on Windows | Windows integration | Release | Windows Ink manual |
 | macOS | Full suite on Ubuntu; merged UI/planner on macOS | macOS integration | Release | Trackpad manual |
 | Web / Chrome | Browser-compatible suite | ChromeDriver integration | Release | Clipboard and Safari/Firefox/Edge manual |
-| Android | VM suite on Ubuntu | Emulator integration nightly | Debug APK | S Pen, pressure, OCR manual |
-| iOS / iPadOS | VM suite on Ubuntu | iPhone simulator nightly | Simulator | Apple Pencil, OCR and iPad UI manual |
+| Android | VM suite on Ubuntu | Emulator integration nightly | Debug APK | S Pen and pressure manual |
+| iOS / iPadOS | VM suite on Ubuntu | iPhone simulator nightly | Simulator | Apple Pencil and iPad UI manual |
 
 A build only checks compilation. Unit/widget tests use test bindings and do
 not validate native platform plugins. An emulator/simulator has different input,
@@ -376,7 +379,8 @@ timing, filesystem and GPU behavior from physical hardware.
   text layout, no blank export and no remnants of legacy erase masks.
 - Linux `pdftoppm` and alternative platform PDF renderers.
 - Image pickers, native OS file permission dialogs, clipboard MIME formats.
-- OCR enabled Android/iOS only; explicit unsupported behavior on desktop/web.
+- No OCR UI or runtime dependency on any platform; legacy recognized text is
+  retained only for lossless loading and search of existing documents.
 - Cloud path rejection, malformed remote file, conflicts with renamed/deleted
   notebook, inaccessible cloud folder, and partial sync writes.
 
@@ -495,13 +499,10 @@ Linux/Windows/macOS, iOS build and both iPhone/iPad simulators.
 Native line coverage was 42.47% (6567/15463), above the 35% gate.
 Both Android failures require a fresh verification run:
 
-- Android Release failed in `:app:minifyReleaseWithR8` because
-  `google_mlkit_text_recognition` references four optional language
-  recognizer libraries missing from the dependency graph. The application
-  actually constructs only `TextRecognitionScript.latin`. The Release
-  ProGuard file now allows missing symbols only in the unused
-  `com.google.mlkit.vision.text.{chinese,devanagari,japanese,korean}`
-  packages; shrinking stays active and no unused OCR assets are added.
+- Android Release failed in `:app:minifyReleaseWithR8` because the former OCR
+  dependency referenced optional language recognizers missing from the graph.
+  OCR was later removed on every platform, together with that dependency and
+  its R8 exceptions; shrinking remains active.
 - The Android emulator failed before running Flutter tests when the
   emulator action executed an incomplete `for` block in separate
   `/bin/sh` commands. Its `script` input now invokes a single
@@ -595,7 +596,7 @@ items, not the cause of either failure in this run.
   `android.newDsl=false` and `android.builtInKotlin=false`. Native
   third-party plugins still using the legacy Kotlin Gradle Plugin require
   this until they migrate. These flags are transitional, not permanent.
-- Android Debug, Release (including R8/ML Kit), emulator smoke test, and
+- Android Debug, Release (including R8), emulator smoke test, and
   document lifecycle must pass before adopting AGP 9 as the stable baseline.
   If the migration fails, restore the last green toolchain in a revert commit.
 

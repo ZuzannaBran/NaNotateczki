@@ -105,7 +105,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   bool _usesNativePageScroll(EditorController controller) {
     return !controller.tool.isInk &&
-        !controller.isObjectTransformActive &&
+        !controller.isCanvasNavigationLocked &&
         !_isViewportNavigating &&
         !_panZoomSessionActive &&
         _pageScale <= 1.001;
@@ -160,7 +160,7 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _syncCurrentPageToViewport(EditorController controller) {
-    if (controller.isObjectTransformActive) {
+    if (controller.isCanvasNavigationLocked) {
       return;
     }
     // While zoomed-in navigation is active, keep the interaction page stable.
@@ -196,7 +196,7 @@ class _EditorScreenState extends State<EditorScreen> {
     Size documentSize,
     Size viewportSize,
   ) {
-    if (controller.isObjectTransformActive ||
+    if (controller.isCanvasNavigationLocked ||
         controller.pages.isEmpty ||
         !_scrollController.hasClients ||
         _pageExtent <= 0) {
@@ -240,7 +240,7 @@ class _EditorScreenState extends State<EditorScreen> {
     required double fitToWidthScale,
     required Size viewportSize,
   }) {
-    if (context.read<EditorController>().isObjectTransformActive) {
+    if (context.read<EditorController>().isCanvasNavigationLocked) {
       return;
     }
     if (docWorldSize.width <= 0 || docWorldSize.height <= 0) {
@@ -291,7 +291,12 @@ class _EditorScreenState extends State<EditorScreen> {
     Size viewportSize,
   ) {
     final controller = context.read<EditorController>();
-    if (controller.isObjectTransformActive) {
+    if (controller.isActiveImageEdit && event.kind == PointerDeviceKind.touch) {
+      _activePointers[event.pointer] = event.localPosition;
+      controller.setActiveImageMultiTouch(_activePointers.length >= 2);
+      return;
+    }
+    if (controller.isCanvasNavigationLocked) {
       return;
     }
     if (controller.tool.isInk && _isStylusPointerKind(event.kind)) {
@@ -344,12 +349,14 @@ class _EditorScreenState extends State<EditorScreen> {
     Size viewportSize,
   ) {
     final transformController = context.read<EditorController>();
-    if (transformController.isObjectTransformActive) {
+    if (transformController.isCanvasNavigationLocked) {
       if (event.pointer == _pendingNavigationPointer) {
         _pendingNavigationPointer = null;
         _pendingNavigationPosition = null;
       }
-      _activePointers.remove(event.pointer);
+      if (_activePointers.containsKey(event.pointer)) {
+        _activePointers[event.pointer] = event.localPosition;
+      }
       return;
     }
     if (event.pointer == _activeInkPointer) {
@@ -416,16 +423,6 @@ class _EditorScreenState extends State<EditorScreen> {
     _touchLastFocal = focal;
     _touchLastDistance = math.max(0.001, distance);
 
-    final controller = context.read<EditorController>();
-    if (controller.isPinchToScaleImageActive) {
-      final safeScale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
-      controller.updatePinchToScaleActiveImage(
-        scaleDelta,
-        panDelta * _touchPanSensitivity / safeScale,
-      );
-      return;
-    }
-
     _applyPageTransform(
       scaleDelta: scaleDelta,
       panDelta: panDelta * _touchPanSensitivity * _touchNavigationGain,
@@ -446,13 +443,16 @@ class _EditorScreenState extends State<EditorScreen> {
       return;
     }
     final removed = _activePointers.remove(event.pointer) != null;
+    final controller = context.read<EditorController>();
+    if (controller.isActiveImageEdit) {
+      controller.setActiveImageMultiTouch(_activePointers.length >= 2);
+    }
     if (!removed) {
       return;
     }
     if (_activePointers.length >= 2) {
       return;
     }
-    final controller = context.read<EditorController>();
     if (_isViewportNavigating &&
         !_panZoomSessionActive &&
         _activePointers.length == 1 &&
@@ -475,7 +475,6 @@ class _EditorScreenState extends State<EditorScreen> {
       return;
     }
     if (pointers.length >= 2) {
-      context.read<EditorController>().startPinchToScaleActiveImage();
       _touchLastFocal = _midpoint(pointers[0], pointers[1]);
       _touchLastDistance = math.max(
         0.001,
@@ -506,10 +505,9 @@ class _EditorScreenState extends State<EditorScreen> {
     Size viewportSize,
   ) {
     final controller = context.read<EditorController>();
-    if (controller.isObjectTransformActive) {
+    if (controller.isCanvasNavigationLocked) {
       return;
     }
-    controller.startPinchToScaleActiveImage();
     _panZoomSessionActive = true;
     _panZoomLastPan = Offset.zero;
     _panZoomLastScale = 1.0;
@@ -552,16 +550,6 @@ class _EditorScreenState extends State<EditorScreen> {
     _panZoomLastScale = event.scale;
     _panZoomLastLocalPosition = event.localPosition;
 
-    final controller = context.read<EditorController>();
-    if (controller.isPinchToScaleImageActive) {
-      final safeScale = _effectivePageScale <= 0 ? 1.0 : _effectivePageScale;
-      controller.updatePinchToScaleActiveImage(
-        scaleDelta,
-        panDelta * _trackpadPanSensitivity / safeScale,
-      );
-      return;
-    }
-
     _applyPageTransform(
       scaleDelta: scaleDelta,
       panDelta: panDelta * _trackpadPanSensitivity,
@@ -573,7 +561,6 @@ class _EditorScreenState extends State<EditorScreen> {
 
   void _onPointerPanZoomEnd(PointerPanZoomEndEvent event) {
     _panZoomSessionActive = false;
-    context.read<EditorController>().endPinchToScaleActiveImage();
     if (_activePointers.length >= 2) {
       return;
     }
@@ -615,7 +602,7 @@ class _EditorScreenState extends State<EditorScreen> {
     required Size docWorldSize,
     required Size viewportSize,
   }) {
-    if (context.read<EditorController>().isObjectTransformActive) {
+    if (context.read<EditorController>().isCanvasNavigationLocked) {
       return;
     }
     final currentZoom = _pageScale <= 0 ? 1.0 : _pageScale;
@@ -712,7 +699,6 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _stopViewportNavigation() {
-    context.read<EditorController>().endPinchToScaleActiveImage();
     if (!_isViewportNavigating) {
       return;
     }
@@ -1124,7 +1110,7 @@ class _EditorScreenState extends State<EditorScreen> {
               _responsivePageScale = fitToWidthScale;
               final effectivePageScale = _effectivePageScale;
               if (!_hasUserAdjustedHorizontalPan &&
-                  !controller.isObjectTransformActive) {
+                  !controller.isCanvasNavigationLocked) {
                 final scaledPageWidth = docWorldSize.width * effectivePageScale;
                 _pagePan = Offset(
                   (maxPageWidth - scaledPageWidth) / 2,
@@ -1227,7 +1213,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                         behavior: HitTestBehavior.translucent,
                                         onPointerDown: (event) {
                                           final transforming = controller
-                                              .isObjectTransformActive;
+                                              .isCanvasNavigationLocked;
                                           if (!transforming) {
                                             _startTouchContextMenuTimer(
                                               event,
@@ -1436,8 +1422,10 @@ class _EditorScreenState extends State<EditorScreen> {
                                                       .pages[pageIndex]
                                                       .imageBlocks)
                                                 if (image.id ==
-                                                    controller
-                                                        .activeImageBlockId)
+                                                        controller
+                                                            .activeImageBlockId &&
+                                                    controller.tool ==
+                                                        DrawingTool.edit)
                                                   ActiveImageTransformHud(
                                                     key: ValueKey(
                                                       'notebook-viewport-image-${image.id}',
@@ -2103,7 +2091,7 @@ class _ProjectMiniMapOverlayState extends State<_ProjectMiniMapOverlay> {
                 _tapStart = null;
                 if (start == null ||
                     (event.localPosition - start).distance > 10.0 ||
-                    widget.controller.isObjectTransformActive) {
+                    widget.controller.isCanvasNavigationLocked) {
                   return;
                 }
                 final offset = _minimapScrollController.hasClients

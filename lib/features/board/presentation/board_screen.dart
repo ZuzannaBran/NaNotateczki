@@ -78,12 +78,17 @@ class _BoardScreenState extends State<BoardScreen> {
       viewPan: controller.viewPan,
       viewScale: controller.viewScale,
       viewportSize: viewportSize,
-      freeze: controller.isObjectTransformActive,
+      freeze: controller.isCanvasNavigationLocked,
     );
   }
 
   void _onPointerDown(PointerDownEvent event, EditorController controller) {
-    if (controller.isObjectTransformActive) {
+    if (controller.isActiveImageEdit && event.kind == PointerDeviceKind.touch) {
+      _activePointers[event.pointer] = event.localPosition;
+      controller.setActiveImageMultiTouch(_activePointers.length >= 2);
+      return;
+    }
+    if (controller.isCanvasNavigationLocked) {
       return;
     }
     if (controller.tool.isInk && _isStylusPointerKind(event.kind)) {
@@ -134,12 +139,14 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   void _onPointerMove(PointerMoveEvent event, EditorController controller) {
-    if (controller.isObjectTransformActive) {
+    if (controller.isCanvasNavigationLocked) {
       if (event.pointer == _pendingNavigationPointer) {
         _pendingNavigationPointer = null;
         _pendingNavigationPosition = null;
       }
-      _activePointers.remove(event.pointer);
+      if (_activePointers.containsKey(event.pointer)) {
+        _activePointers[event.pointer] = event.localPosition;
+      }
       return;
     }
     if (event.pointer == _activeInkPointer) {
@@ -198,15 +205,6 @@ class _BoardScreenState extends State<BoardScreen> {
     _touchLastFocal = focal;
     _touchLastDistance = math.max(0.001, distance);
 
-    if (controller.isPinchToScaleImageActive) {
-      final safeScale = controller.viewScale <= 0 ? 1.0 : controller.viewScale;
-      controller.updatePinchToScaleActiveImage(
-        scaleDelta,
-        panDelta * _touchPanSensitivity / safeScale,
-      );
-      return;
-    }
-
     if ((scaleDelta - 1.0).abs() > 0.0001) {
       controller.zoomBy(scaleDelta, focalPoint: focal);
     }
@@ -226,6 +224,9 @@ class _BoardScreenState extends State<BoardScreen> {
       return;
     }
     final removed = _activePointers.remove(event.pointer) != null;
+    if (controller.isActiveImageEdit) {
+      controller.setActiveImageMultiTouch(_activePointers.length >= 2);
+    }
     if (!removed) {
       return;
     }
@@ -261,7 +262,6 @@ class _BoardScreenState extends State<BoardScreen> {
       return;
     }
     if (pointers.length >= 2) {
-      controller.startPinchToScaleActiveImage();
       _touchLastFocal = _midpoint(pointers[0], pointers[1]);
       _touchLastDistance = math.max(
         0.001,
@@ -282,10 +282,9 @@ class _BoardScreenState extends State<BoardScreen> {
     PointerPanZoomStartEvent event,
     EditorController controller,
   ) {
-    if (controller.isObjectTransformActive) {
+    if (controller.isCanvasNavigationLocked) {
       return;
     }
-    controller.startPinchToScaleActiveImage();
     _panZoomSessionActive = true;
     _panZoomLastPan = Offset.zero;
     _panZoomLastScale = 1.0;
@@ -323,15 +322,6 @@ class _BoardScreenState extends State<BoardScreen> {
     _panZoomLastScale = event.scale;
     _panZoomLastLocalPosition = event.localPosition;
 
-    if (controller.isPinchToScaleImageActive) {
-      final safeScale = controller.viewScale <= 0 ? 1.0 : controller.viewScale;
-      controller.updatePinchToScaleActiveImage(
-        scaleDelta,
-        panDelta * _trackpadPanSensitivity / safeScale,
-      );
-      return;
-    }
-
     if ((scaleDelta - 1.0).abs() > 0.0001) {
       controller.zoomBy(scaleDelta, focalPoint: event.localPosition);
     }
@@ -345,7 +335,6 @@ class _BoardScreenState extends State<BoardScreen> {
     EditorController controller,
   ) {
     _panZoomSessionActive = false;
-    controller.endPinchToScaleActiveImage();
     if (_activePointers.length >= 2) {
       if (mounted) {
         setState(() {});
@@ -356,7 +345,7 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   void _onPointerSignal(PointerSignalEvent event, EditorController controller) {
-    if (controller.isObjectTransformActive) {
+    if (controller.isCanvasNavigationLocked) {
       return;
     }
     if (event is! PointerScrollEvent) {
@@ -394,7 +383,6 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   void _stopViewportNavigation(EditorController controller) {
-    controller.endPinchToScaleActiveImage();
     if (!_isViewportNavigating) {
       return;
     }

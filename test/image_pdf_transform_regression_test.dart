@@ -10,6 +10,7 @@ import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/editor_screen.dart';
 import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
+import 'package:program/features/editor/state/input_mode.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/image_block.dart';
@@ -63,6 +64,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final database = NotesDatabase(NativeDatabase.memory());
       final controller = _controller(database, source);
+      controller.setTool(DrawingTool.edit);
       controller.setActiveImageBlock('page-image');
 
       await tester.pumpWidget(
@@ -121,7 +123,60 @@ void main() {
       await database.close();
     });
 
-    testWidgets('$source pinches inside the real notebook viewport', (
+    testWidgets('$source side handle crops without scaling', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final database = NotesDatabase(NativeDatabase.memory());
+      final controller = _controller(database, source);
+      controller.setTool(DrawingTool.edit);
+      controller.setActiveImageBlock('page-image');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<EditorController>.value(
+            value: controller,
+            child: Scaffold(
+              body: Stack(
+                children: [
+                  ActiveImageTransformHud(
+                    controller: controller,
+                    block: controller.pages.single.imageBlocks.single,
+                    pageIndex: 0,
+                    worldOrigin: Offset.zero,
+                    interactionEnabled: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final handle = find.byKey(
+        const ValueKey('object-transform-right-hit-zone'),
+      );
+      final gesture = await tester.startGesture(
+        tester.getCenter(handle),
+        kind: PointerDeviceKind.touch,
+      );
+      await gesture.moveBy(const Offset(-30, 0));
+      await gesture.up();
+      await tester.pump();
+
+      final cropped = controller.pages.single.imageBlocks.single;
+      expect(cropped.width, 200);
+      expect(cropped.height, 120);
+      expect(cropped.cropRight, closeTo(0.85, 0.001));
+      controller.undo();
+      expect(controller.pages.single.imageBlocks.single.cropRight, 1);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+      await database.close();
+    });
+
+    testWidgets('$source two fingers keep the selected canvas frozen', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(1300, 900));
@@ -161,8 +216,9 @@ void main() {
           topLeft +
           MatrixUtils.transformPoint(
             transform.transform,
-            const Offset(930, 260),
+            const Offset(850, 340),
           );
+      expect(tester.getRect(viewport).contains(secondPosition), isTrue);
       final originalDocumentScale = transform.transform.entry(0, 0);
 
       final first = await tester.startGesture(
@@ -170,17 +226,18 @@ void main() {
         kind: PointerDeviceKind.touch,
       );
       await tester.pump();
-      expect(controller.isObjectTransformActive, isTrue);
+      expect(controller.isObjectTransformActive, isFalse);
       final second = await tester.startGesture(
         secondPosition,
         kind: PointerDeviceKind.touch,
       );
       await tester.pump();
-      await first.moveBy(const Offset(-12, 0));
-      await second.moveBy(const Offset(12, 0));
+      expect(controller.isObjectTransformActive, isFalse);
+      await first.moveBy(const Offset(0, -12));
+      await second.moveBy(const Offset(0, 12));
       await tester.pump();
 
-      expect(controller.imageTransformPreview.value?.width, greaterThan(200));
+      expect(controller.imageTransformPreview.value, isNull);
       expect(controller.pages.single.imageBlocks.single.width, 200);
       final newDocumentScale = tester
           .widget<Transform>(
@@ -192,13 +249,9 @@ void main() {
       await first.up();
       await second.up();
       await tester.pump();
-      expect(
-        controller.pages.single.imageBlocks.single.width,
-        greaterThan(200),
-      );
-      expect(controller.imageTransformPreview.value, isNull);
-      controller.undo();
       expect(controller.pages.single.imageBlocks.single.width, 200);
+      expect(controller.imageTransformPreview.value, isNull);
+      expect(controller.activeImageBlockId, 'page-image');
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 50));
@@ -207,51 +260,33 @@ void main() {
       await database.close();
     });
 
-    testWidgets('$source repeated pinch is bounded and undoable', (
+    testWidgets('$source viewport zoom preserves selected object geometry', (
       tester,
     ) async {
       final database = NotesDatabase(NativeDatabase.memory());
       final controller = _controller(database, source);
+      controller.setTool(DrawingTool.edit);
       controller.setActiveImageBlock('page-image');
-      controller.startPinchToScaleActiveImage();
-      for (var i = 0; i < 60; i++) {
-        controller.updatePinchToScaleActiveImage(
-          1.05,
-          const Offset(0.5, -0.25),
-        );
-      }
-      controller.endPinchToScaleActiveImage();
-      var image = controller.pages.single.imageBlocks.single;
-      expect(image.width, inInclusiveRange(80, 4096));
-      expect(image.height, inInclusiveRange(60, 4096));
-      expect(image.width / image.height, closeTo(200 / 120, 0.0001));
-
-      controller.undo();
-      image = controller.pages.single.imageBlocks.single;
+      final originalScale = controller.viewScale;
+      controller.zoomBy(1.5, focalPoint: const Offset(400, 300));
+      final image = controller.pages.single.imageBlocks.single;
       expect(image.width, 200);
       expect(image.height, 120);
       expect(image.position, const Offset(790, 200));
-
-      controller.redo();
-      image = controller.pages.single.imageBlocks.single;
-      expect(image.width, greaterThan(200));
-      controller.startPinchToScaleActiveImage();
-      controller.updatePinchToScaleActiveImage(0.00001, Offset.zero);
-      controller.endPinchToScaleActiveImage();
-      image = controller.pages.single.imageBlocks.single;
-      expect(image.width, greaterThanOrEqualTo(80));
-      expect(image.height, greaterThanOrEqualTo(60));
+      expect(controller.activeImageBlockId, 'page-image');
+      expect(controller.viewScale, originalScale);
 
       controller.dispose();
       await database.close();
     });
-    testWidgets('$source two touch contacts resize the selected object', (
+    testWidgets('$source HUD delegates two touch contacts to the viewport', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(1300, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final database = NotesDatabase(NativeDatabase.memory());
       final controller = _controller(database, source);
+      controller.setTool(DrawingTool.edit);
       controller.setActiveImageBlock('page-image');
       var viewportNavigationStarts = 0;
 
@@ -299,38 +334,26 @@ void main() {
         const Offset(1100, 325),
         kind: PointerDeviceKind.touch,
       );
-      expect(controller.isObjectTransformActive, isTrue);
+      expect(controller.isObjectTransformActive, isFalse);
       final second = await tester.startGesture(
         const Offset(1160, 325),
         kind: PointerDeviceKind.touch,
       );
-      expect(viewportNavigationStarts, 0);
+      expect(controller.isObjectTransformActive, isFalse);
+      expect(viewportNavigationStarts, 2);
       await first.moveBy(const Offset(-15, 0));
       await second.moveBy(const Offset(15, 0));
       await tester.pump();
-      final preview = controller.imageTransformPreview.value;
-      expect(preview, isNotNull);
-      expect(preview!.width, greaterThan(200));
-      expect(preview.height, greaterThan(120));
-      expect(preview.width / preview.height, closeTo(5 / 3, 0.0001));
+      expect(controller.imageTransformPreview.value, isNull);
       expect(controller.pages.single.imageBlocks.single.width, 200);
 
       await first.up();
       await second.up();
       await tester.pump();
       final enlarged = controller.pages.single.imageBlocks.single;
-      expect(enlarged.width, greaterThan(200));
+      expect(enlarged.width, 200);
       expect(controller.imageTransformPreview.value, isNull);
       expect(controller.isObjectTransformActive, isFalse);
-      controller.undo();
-      var restored = controller.pages.single.imageBlocks.single;
-      expect(restored.width, 200);
-      expect(restored.height, 120);
-      expect(restored.position, const Offset(790, 200));
-      controller.redo();
-      restored = controller.pages.single.imageBlocks.single;
-      expect(restored.width, closeTo(enlarged.width, 0.001));
-
       final shrinkFirst = await tester.startGesture(
         const Offset(1100, 325),
         kind: PointerDeviceKind.touch,
@@ -345,9 +368,9 @@ void main() {
       await shrinkSecond.up();
       await tester.pump();
       final reduced = controller.pages.single.imageBlocks.single;
-      expect(reduced.width, lessThan(enlarged.width));
-      expect(reduced.height, lessThan(enlarged.height));
-      expect(viewportNavigationStarts, 0);
+      expect(reduced.width, enlarged.width);
+      expect(reduced.height, enlarged.height);
+      expect(viewportNavigationStarts, 4);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 50));
@@ -355,11 +378,13 @@ void main() {
       await database.close();
     });
 
-    testWidgets('$source canceled single-touch drag restores original', (
+    testWidgets('$source one-finger body drag cancels without commit', (
       tester,
     ) async {
       final database = NotesDatabase(NativeDatabase.memory());
       final controller = _controller(database, source);
+      controller.setPointerInputMode(PointerInputMode.on);
+      controller.setTool(DrawingTool.edit);
       controller.setActiveImageBlock('page-image');
       await tester.pumpWidget(
         MaterialApp(
@@ -409,13 +434,14 @@ void main() {
       controller.dispose();
       await database.close();
     });
-    testWidgets('$source keeps frame alive during sustained pinch', (
+    testWidgets('$source HUD stays passive during sustained viewport pinch', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(1300, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final database = NotesDatabase(NativeDatabase.memory());
       final controller = _controller(database, source);
+      controller.setTool(DrawingTool.edit);
       controller.setActiveImageBlock('page-image');
       var rootNotifications = 0;
       controller.addListener(() => rootNotifications++);
@@ -457,15 +483,15 @@ void main() {
         await second.moveBy(const Offset(-1, 0));
         await tester.pump();
         expect(tester.takeException(), isNull);
-        expect(controller.isObjectTransformActive, isTrue);
+        expect(controller.isObjectTransformActive, isFalse);
         expect(rootNotifications, countAfterStart);
         expect(controller.pages.single.imageBlocks.single.width, 200);
       }
-      expect(controller.imageTransformPreview.value?.width, lessThan(200));
+      expect(controller.imageTransformPreview.value, isNull);
       await first.up();
       await second.up();
       await tester.pump();
-      expect(controller.pages.single.imageBlocks.single.width, lessThan(200));
+      expect(controller.pages.single.imageBlocks.single.width, 200);
       expect(controller.imageTransformPreview.value, isNull);
       expect(controller.isObjectTransformActive, isFalse);
       expect(tester.takeException(), isNull);
@@ -475,13 +501,14 @@ void main() {
       await database.close();
     });
 
-    testWidgets('$source disposes safely during active multitouch', (
+    testWidgets('$source disposes safely during delegated multitouch', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(1300, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final database = NotesDatabase(NativeDatabase.memory());
       final controller = _controller(database, source);
+      controller.setTool(DrawingTool.edit);
       controller.setActiveImageBlock('page-image');
       await tester.pumpWidget(
         MaterialApp(
@@ -514,7 +541,7 @@ void main() {
       );
       await first.moveBy(const Offset(10, 0));
       await tester.pump();
-      expect(controller.isObjectTransformActive, isTrue);
+      expect(controller.isObjectTransformActive, isFalse);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
@@ -532,4 +559,201 @@ void main() {
       await database.close();
     });
   }
+
+  testWidgets('image body drag works with either finger drawing preference', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1300, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
+    final controller = _controller(database, 'photo.png');
+    controller.setTool(DrawingTool.edit);
+    controller.setActiveImageBlock('page-image');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
+          ],
+          child: const EditorScreen(showToolbar: false),
+        ),
+      ),
+    );
+    await tester.pump();
+    final viewport = find.byKey(const ValueKey('notebook-page-viewport'));
+    final transform = tester.widget<Transform>(
+      find.byKey(const ValueKey('notebook-document-transform')),
+    );
+    final imagePosition =
+        tester.getTopLeft(viewport) +
+        MatrixUtils.transformPoint(transform.transform, const Offset(890, 260));
+
+    var gesture = await tester.startGesture(
+      imagePosition,
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.moveBy(const Offset(30, 20));
+    await gesture.up();
+    await tester.pump();
+    final draggedWithFingerWriting =
+        controller.pages.single.imageBlocks.single.position;
+    expect(draggedWithFingerWriting.dx, greaterThan(790));
+    expect(draggedWithFingerWriting.dy, greaterThan(200));
+
+    controller.setPointerInputMode(PointerInputMode.on);
+    await tester.pump();
+    gesture = await tester.startGesture(
+      imagePosition,
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.moveBy(const Offset(30, 20));
+    await gesture.up();
+    await tester.pump();
+    final dragged = controller.pages.single.imageBlocks.single.position;
+    expect(dragged.dx, greaterThan(draggedWithFingerWriting.dx));
+    expect(dragged.dy, greaterThan(draggedWithFingerWriting.dy));
+
+    controller.setPointerInputMode(PointerInputMode.off);
+    await tester.pump();
+    gesture = await tester.startGesture(
+      tester.getCenter(
+        find.byKey(const ValueKey('object-transform-move-hit-zone')),
+      ),
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.moveBy(const Offset(20, 10));
+    await gesture.up();
+    await tester.pump();
+    final handleDragged = controller.pages.single.imageBlocks.single.position;
+    expect(handleDragged.dx, greaterThan(dragged.dx));
+    expect(handleDragged.dy, greaterThan(dragged.dy));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 50));
+    controller.dispose();
+    preferences.dispose();
+    await database.close();
+  });
+
+  testWidgets('long press shows copy without OCR actions', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = NotesDatabase(NativeDatabase.memory());
+    final controller = _controller(database, 'photo.png');
+    controller.setTool(DrawingTool.edit);
+    controller.setActiveImageBlock('page-image');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<EditorController>.value(
+          value: controller,
+          child: Scaffold(
+            body: Stack(
+              children: [
+                ActiveImageTransformHud(
+                  controller: controller,
+                  block: controller.pages.single.imageBlocks.single,
+                  pageIndex: 0,
+                  worldOrigin: Offset.zero,
+                  interactionEnabled: true,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.longPressAt(const Offset(890, 260));
+    await tester.pumpAndSettle();
+    expect(find.text('Copy image'), findsOneWidget);
+    expect(find.text('OCR text'), findsNothing);
+    expect(find.text('Run OCR'), findsNothing);
+
+    await tester.tapAt(const Offset(100, 100));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
+
+  testWidgets('inactive image must be selected before it can move', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = NotesDatabase(NativeDatabase.memory());
+    final controller = _controller(database, 'photo.png');
+    controller.setTool(DrawingTool.edit);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<EditorController>.value(
+          value: controller,
+          child: Scaffold(
+            body: Consumer<EditorController>(
+              builder: (context, editor, _) => SizedBox(
+                width: 1200,
+                height: 800,
+                child: PageOverlay(controller: editor),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final gesture = await tester.startGesture(
+      const Offset(890, 260),
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.moveBy(const Offset(30, 20));
+    await gesture.up();
+    await tester.pump();
+    expect(controller.activeImageBlockId, isNull);
+    expect(
+      controller.pages.single.imageBlocks.single.position,
+      const Offset(790, 200),
+    );
+
+    await tester.tapAt(const Offset(890, 260));
+    await tester.pump();
+    expect(controller.activeImageBlockId, 'page-image');
+
+    for (final point in const [
+      Offset(800, 210),
+      Offset(890, 260),
+      Offset(980, 310),
+    ]) {
+      await tester.tapAt(point);
+      await tester.pump();
+      expect(controller.activeImageBlockId, 'page-image');
+    }
+
+    controller.setTool(DrawingTool.lasso);
+    expect(controller.activeImageBlockId, isNull);
+    controller.setActiveImageBlock('page-image');
+    expect(controller.activeImageBlockId, isNull);
+
+    controller.setTool(DrawingTool.edit);
+    await tester.pump();
+    await tester.tapAt(const Offset(890, 260));
+    await tester.pump();
+    expect(controller.activeImageBlockId, 'page-image');
+
+    await tester.tapAt(const Offset(100, 100));
+    await tester.pump();
+    expect(controller.activeImageBlockId, isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await database.close();
+  });
 }

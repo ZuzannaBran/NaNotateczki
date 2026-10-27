@@ -14,7 +14,6 @@ import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:provider/provider.dart';
 
 import '../../../../core/input/soft_keyboard.dart';
-import '../../../../core/widgets/app_dialog_actions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/resizable_frame.dart';
 import '../../../notebook/domain/drawing_tool.dart';
@@ -22,11 +21,11 @@ import '../../../notebook/domain/image_block.dart';
 import '../../../notebook/domain/note_page.dart';
 import '../../../notebook/domain/notebook_kind.dart';
 import '../../../notebook/domain/text_block.dart';
-import 'text_hud_block.dart';
+import '../../state/editor_controller.dart';
 import '../interaction/object_transform_engine.dart';
 import 'object_transform_hud.dart';
 import 'shape_edit_overlay.dart';
-import '../../state/editor_controller.dart';
+import 'text_hud_block.dart';
 
 const Color _lassoAccentColor = AppColors.inkBlack;
 const double _lassoActionOutset = 48.0;
@@ -62,7 +61,9 @@ class PageOverlay extends StatelessWidget {
     final effectivePage = page ?? controller.pageAt(effectivePageIndex);
     final tool = controller.tool;
     final activeTextId = controller.activeTextBlockId;
-    final activeImageId = controller.activeImageBlockId;
+    final activeImageId = tool == DrawingTool.edit
+        ? controller.activeImageBlockId
+        : null;
     final activeShapeId = controller.activeShapePageIndex == effectivePageIndex
         ? controller.activeShapeStrokeId
         : null;
@@ -83,6 +84,20 @@ class PageOverlay extends StatelessWidget {
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onTapDown: (details) async {
+                  final selectedImageId = controller.activeImageBlockId;
+                  if (tool == DrawingTool.edit && selectedImageId != null) {
+                    final selectedImage = controller.findImageBlockById(
+                      selectedImageId,
+                    );
+                    final worldPosition = details.localPosition + worldOrigin;
+                    if (selectedImage != null &&
+                        _imageFrameContainsPoint(
+                          selectedImage,
+                          worldPosition,
+                        )) {
+                      return;
+                    }
+                  }
                   if (controller.activeShapeStrokeId != null) {
                     controller.finishShapeEdit();
                     return;
@@ -346,7 +361,10 @@ class ActiveImageTransformHud extends StatelessWidget {
       rect: visibleRect,
       rotation: block.rotation,
       interactive: interactionEnabled,
-      pinchToResize: true,
+      touchDraggable: true,
+      rawTouchDrag: true,
+      rawTouchDragAllowed: () => !controller.isActiveImageMultiTouch,
+      pinchToResize: false,
       enabledHandles: const {...HandlePosition.values},
       resizeModeResolver: (handle) {
         return handle.isDiagonal ? ResizeMode.scale : ResizeMode.freeform;
@@ -391,9 +409,16 @@ class ActiveImageTransformHud extends StatelessWidget {
         controller.clearImageTransformPreview();
         controller.endObjectTransform();
       },
-      onDoubleTap: () {
-        _editImageOcrForBlock(context, controller, pageIndex, block);
+      onLongPressStart: (details) {
+        _showImageContextMenuForBlock(
+          context,
+          details.globalPosition,
+          controller,
+          pageIndex,
+          block,
+        );
       },
+      onTap: () {},
       onSecondaryTapDown: (details) {
         _showImageContextMenuForBlock(
           context,
@@ -456,6 +481,23 @@ Rect _visibleImageRect(ImageBlock block, Offset worldOrigin) {
     block.width * widthFactor,
     block.height * heightFactor,
   );
+}
+
+bool _imageFrameContainsPoint(ImageBlock block, Offset worldPosition) {
+  final rect = _visibleImageRect(block, Offset.zero).inflate(0.5);
+  if (block.rotation == 0) {
+    return rect.contains(worldPosition);
+  }
+  final delta = worldPosition - rect.center;
+  final cosAngle = math.cos(-block.rotation);
+  final sinAngle = math.sin(-block.rotation);
+  final unrotated =
+      rect.center +
+      Offset(
+        delta.dx * cosAngle - delta.dy * sinAngle,
+        delta.dx * sinAngle + delta.dy * cosAngle,
+      );
+  return rect.contains(unrotated);
 }
 
 ImageBlock _imageBlockFromTransform(
@@ -531,27 +573,6 @@ ImageBlock _imageBlockFromTransform(
     cropBottom: cropBottom,
     rotation: preview.rotation,
   );
-}
-
-Future<void> _editImageOcrForBlock(
-  BuildContext context,
-  EditorController controller,
-  int pageIndex,
-  ImageBlock block,
-) async {
-  final updated = await showDialog<String>(
-    context: context,
-    builder: (_) => _OcrTextDialog(
-      controller: controller,
-      pageIndex: pageIndex,
-      block: block,
-    ),
-  );
-
-  if (updated == null || updated == block.ocrText) {
-    return;
-  }
-  controller.updateImageBlockOcrTextOnPage(pageIndex, block.id, updated);
 }
 
 Future<void> _showImageContextMenuForBlock(
@@ -1673,14 +1694,13 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
-    final canTransform =
-        widget.selectionEnabled &&
-        !controller.tool.isInk &&
-        controller.tool != DrawingTool.text &&
-        widget.interactionEnabled;
     final isSelected =
         widget.selectionEnabled &&
         controller.activeImageBlockId == widget.block.id;
+    final canTransform =
+        isSelected &&
+        controller.tool == DrawingTool.edit &&
+        widget.interactionEnabled;
     final cropLeft = widget.block.cropLeft;
     final cropTop = widget.block.cropTop;
     final cropRight = widget.block.cropRight;
@@ -1694,16 +1714,29 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     final child = GestureDetector(
       key: ValueKey('page-image-hit-target-${widget.block.id}'),
       behavior: HitTestBehavior.translucent,
-      onTap: () {
-        if (controller.currentPageIndex != widget.pageIndex) {
-          controller.setCurrentPage(widget.pageIndex);
-        }
-        controller.clearActiveTextBlock();
-        controller.setActiveImageBlock(widget.block.id);
-      },
-      onSecondaryTapDown: (details) =>
-          _showImageContextMenu(context, details.globalPosition, controller),
-      onDoubleTap: () => _editOcr(context, controller),
+      onTap: controller.tool == DrawingTool.edit
+          ? () {
+              if (controller.currentPageIndex != widget.pageIndex) {
+                controller.setCurrentPage(widget.pageIndex);
+              }
+              controller.clearActiveTextBlock();
+              controller.setActiveImageBlock(widget.block.id);
+            }
+          : null,
+      onSecondaryTapDown: controller.tool == DrawingTool.edit
+          ? (details) => _showImageContextMenu(
+              context,
+              details.globalPosition,
+              controller,
+            )
+          : null,
+      onLongPressStart: controller.tool == DrawingTool.edit
+          ? (details) => _showImageContextMenu(
+              context,
+              details.globalPosition,
+              controller,
+            )
+          : null,
       onPanStart: canTransform
           ? (details) {
               _dragStart = details.globalPosition;
@@ -2699,29 +2732,6 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
     return -cropTop * fullHeight;
   }
 
-  Future<void> _editOcr(
-    BuildContext context,
-    EditorController controller,
-  ) async {
-    final updated = await showDialog<String>(
-      context: context,
-      builder: (_) => _OcrTextDialog(
-        controller: controller,
-        pageIndex: widget.pageIndex,
-        block: widget.block,
-      ),
-    );
-
-    if (updated == null || updated == widget.block.ocrText) {
-      return;
-    }
-    controller.updateImageBlockOcrTextOnPage(
-      widget.pageIndex,
-      widget.block.id,
-      updated,
-    );
-  }
-
   Future<void> _showImageContextMenu(
     BuildContext context,
     Offset globalPosition,
@@ -2770,105 +2780,6 @@ class _ImageBlockWidgetState extends State<_ImageBlockWidget> {
         ).showSnackBar(SnackBar(content: Text(message)));
       }
     }
-  }
-}
-
-class _OcrTextDialog extends StatefulWidget {
-  const _OcrTextDialog({
-    required this.controller,
-    required this.pageIndex,
-    required this.block,
-  });
-
-  final EditorController controller;
-  final int pageIndex;
-  final ImageBlock block;
-
-  @override
-  State<_OcrTextDialog> createState() => _OcrTextDialogState();
-}
-
-class _OcrTextDialogState extends State<_OcrTextDialog> {
-  late final TextEditingController _textController;
-  final FocusNode _focusNode = FocusNode();
-  bool _isRunning = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _textController = TextEditingController(text: widget.block.ocrText);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        requestSoftKeyboardForFocus(context, _focusNode);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    _textController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _runOcr() async {
-    setState(() => _isRunning = true);
-    final message = await widget.controller.runOcrForImageOnPage(
-      widget.pageIndex,
-      widget.block,
-    );
-    if (!mounted) {
-      return;
-    }
-    if (message != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    }
-    final updatedBlock = widget.controller.findImageBlockById(widget.block.id);
-    _textController.text = updatedBlock?.ocrText ?? '';
-    setState(() => _isRunning = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('OCR text'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!widget.controller.supportsOcr) ...[
-            const Text(
-              'Automatic OCR is available only in the Android and iOS apps. '
-              'You can still enter or edit the text here.',
-            ),
-            const SizedBox(height: 12),
-          ],
-          TextField(
-            controller: _textController,
-            focusNode: _focusNode,
-            autofocus: true,
-            maxLines: 5,
-          ),
-        ],
-      ),
-      actions: appDialogActions(context, [
-        if (widget.controller.supportsOcr)
-          TextButton(
-            onPressed: _isRunning ? null : _runOcr,
-            child: const Text('Run OCR'),
-          ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(_textController.text),
-          child: const Text('Save'),
-        ),
-      ]),
-    );
   }
 }
 

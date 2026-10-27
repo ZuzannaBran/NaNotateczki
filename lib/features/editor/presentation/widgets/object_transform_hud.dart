@@ -66,6 +66,9 @@ class ObjectTransformHud<T> extends StatefulWidget {
     this.resizeClampingRectResolver,
     this.enabledHandles = const {...HandlePosition.values},
     this.draggable = true,
+    this.touchDraggable = true,
+    this.rawTouchDrag = false,
+    this.rawTouchDragAllowed,
     this.pinchToResize = false,
     this.interactive = true,
     this.showFrame = true,
@@ -74,6 +77,7 @@ class ObjectTransformHud<T> extends StatefulWidget {
     this.onTransformEnd,
     this.onTap,
     this.onDoubleTap,
+    this.onLongPressStart,
     this.onSecondaryTapDown,
     this.style = const ObjectTransformHudStyle(),
     super.key,
@@ -91,6 +95,9 @@ class ObjectTransformHud<T> extends StatefulWidget {
   final ObjectClampingRectResolver? resizeClampingRectResolver;
   final Set<HandlePosition> enabledHandles;
   final bool draggable;
+  final bool touchDraggable;
+  final bool rawTouchDrag;
+  final ValueGetter<bool>? rawTouchDragAllowed;
   final bool pinchToResize;
   final bool interactive;
   final bool showFrame;
@@ -99,6 +106,7 @@ class ObjectTransformHud<T> extends StatefulWidget {
   final VoidCallback? onTransformEnd;
   final VoidCallback? onTap;
   final VoidCallback? onDoubleTap;
+  final GestureLongPressStartCallback? onLongPressStart;
   final GestureTapDownCallback? onSecondaryTapDown;
   final ObjectTransformHudStyle style;
 
@@ -210,9 +218,20 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       behavior: HitTestBehavior.translucent,
       onTap: widget.onTap,
       onDoubleTap: widget.onDoubleTap,
+      onLongPressStart: widget.onLongPressStart == null
+          ? null
+          : (details) {
+              if (_engine.isActive) {
+                _cancelGesture();
+              }
+              widget.onLongPressStart!(details);
+            },
       onSecondaryTapDown: widget.onSecondaryTapDown,
       onPanStart: (details) {
-        if (_touchPoints.isEmpty && !_engine.isActive) {
+        final canDrag =
+            widget.draggable &&
+            (details.kind != PointerDeviceKind.touch || widget.touchDraggable);
+        if (canDrag && _touchPoints.isEmpty && !_engine.isActive) {
           _beginMove(rect, rotation, details.globalPosition);
         }
       },
@@ -241,7 +260,7 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       child: Transform.rotate(
         angle: rotation,
         alignment: Alignment.center,
-        child: !widget.pinchToResize
+        child: !widget.pinchToResize && !widget.rawTouchDrag
             ? gestures
             : Listener(
                 behavior: HitTestBehavior.translucent,
@@ -249,17 +268,23 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
                   if (!mounted ||
                       event.kind != PointerDeviceKind.touch ||
                       _activeHandlePointer != null ||
-                      (_touchPoints.isEmpty && _engine.isActive)) {
+                      (_touchPoints.isEmpty && _engine.isActive) ||
+                      _touchPoints.length >= 2) {
                     return;
                   }
+                  final localPosition = _globalToLocal(event.position);
                   if (_touchPoints.isEmpty) {
                     _touchResized = false;
-                    _beginMove(rect, rotation, event.position);
-                  }
-                  if (!mounted || !_engine.isActive) {
+                    _touchPoints[event.pointer] = localPosition;
+                    if (widget.pinchToResize) {
+                      _beginMove(rect, rotation, event.position);
+                    }
                     return;
                   }
-                  _touchPoints[event.pointer] = _globalToLocal(event.position);
+                  _touchPoints[event.pointer] = localPosition;
+                  if (!_engine.isActive && widget.pinchToResize) {
+                    _beginMove(rect, rotation, event.position);
+                  }
                 },
                 onPointerMove: (event) {
                   if (event.kind == PointerDeviceKind.touch) {
@@ -292,10 +317,44 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
       return;
     }
     final previous = _touchPoints[pointer];
-    if (previous == null || !_engine.isActive) {
+    if (previous == null) {
       return;
     }
     final current = _globalToLocal(globalPosition);
+    if (!widget.interactive) {
+      _touchPoints[pointer] = current;
+      return;
+    }
+    if (widget.rawTouchDrag && widget.rawTouchDragAllowed?.call() == false) {
+      _touchPoints[pointer] = current;
+      if (_engine.isActive) {
+        _cancelGesture();
+      }
+      return;
+    }
+    if (!_engine.isActive) {
+      if (_touchPoints.length == 1 &&
+          widget.rawTouchDrag &&
+          widget.touchDraggable) {
+        _beginMove(
+          _preview?.rect ?? widget.rect,
+          widget.rotation,
+          _localToGlobal(previous),
+        );
+      }
+      if (!_engine.isActive) {
+        _touchPoints[pointer] = current;
+        return;
+      }
+    }
+    if (_touchPoints.length >= 2 && !widget.pinchToResize) {
+      _touchPoints[pointer] = current;
+      return;
+    }
+    if (_touchPoints.length == 1 && !widget.touchDraggable) {
+      _touchPoints[pointer] = current;
+      return;
+    }
     final previousPositions = _touchPoints.values.toList(growable: false);
     _touchPoints[pointer] = current;
     final currentPositions = _touchPoints.values.toList(growable: false);
@@ -356,6 +415,9 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
 
   void _endTouch(int pointer) {
     if (!mounted || _touchPoints.remove(pointer) == null) {
+      return;
+    }
+    if (!_engine.isActive) {
       return;
     }
     if (_touchPoints.isEmpty) {
@@ -667,6 +729,14 @@ class _ObjectTransformHudState<T> extends State<ObjectTransformHud<T>> {
     final renderObject = _surfaceKey.currentContext?.findRenderObject();
     if (renderObject is RenderBox) {
       return renderObject.globalToLocal(point);
+    }
+    return point;
+  }
+
+  Offset _localToGlobal(Offset point) {
+    final renderObject = _surfaceKey.currentContext?.findRenderObject();
+    if (renderObject is RenderBox) {
+      return renderObject.localToGlobal(point);
     }
     return point;
   }

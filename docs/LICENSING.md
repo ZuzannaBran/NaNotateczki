@@ -39,14 +39,10 @@ Są to odrębne licencje, których wymagane noty należy zachowywać.
 | flutter_box_transform 0.4.7 | Apache 2.0 | https://pub.dev/packages/flutter_box_transform |
 | pdf | Apache 2.0 | https://pub.dev/packages/pdf |
 | sqlite3 / sqlite3_flutter_libs | MIT (pakiety) | https://pub.dev/packages/sqlite3/license |
-| google_mlkit_text_recognition | MIT (wrapper) | https://pub.dev/packages/google_mlkit_text_recognition/license |
 | PDFium (komponent natywny) | Licencja BSD i dodatkowe noty komponentów | https://github.com/chromium/pdfium/blob/main/LICENSE |
 
 **Dodatkowe warunki:**
 
-- Natywne komponenty Google ML Kit podlegają również
-  [warunkom Google ML Kit](https://developers.google.com/ml-kit/terms).
-  Licencja wrappera Flutter nie zastępuje warunków SDK.
 - W systemie Linux import PDF korzysta z osobno zainstalowanego
   `pdftoppm` (`poppler-utils`). Projekt nie dołącza tego programu;
   jego dystrybucję należy ocenić według odrębnych warunków Popplera.

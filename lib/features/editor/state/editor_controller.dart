@@ -4,33 +4,31 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart' as quill_delta;
-import 'package:file_picker/file_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'
-    as mlkit;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfx/pdfx.dart';
-import 'package:uuid/uuid.dart';
 import 'package:super_clipboard/super_clipboard.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../../core/input/ink_activity_tracker.dart';
+import '../../../core/storage/app_data_directory.dart';
+import '../../../core/storage/app_save_coordinator.dart';
+import '../../../core/storage/text_storage.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/ink_spatial_index.dart';
 import '../../notebook/domain/ink_stroke.dart';
+import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
-import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/text_block.dart';
-import '../../../core/input/ink_activity_tracker.dart';
-import '../../../core/storage/app_save_coordinator.dart';
-import '../../../core/storage/app_data_directory.dart';
-import '../../../core/storage/text_storage.dart';
 import 'editor_actions.dart';
 import 'input_mode.dart';
 import 'ink_color_presets.dart';
@@ -168,6 +166,17 @@ class EditorController extends ChangeNotifier {
   bool get canRedo => _redoActions.isNotEmpty;
   bool get allowsFingerDrawing => pointerInputMode.allowsFingerDrawing;
   bool get isObjectTransformActive => _isObjectTransformActive;
+  bool get isActiveImageEdit =>
+      tool == DrawingTool.edit && activeImageBlockId != null;
+  bool get isCanvasNavigationLocked =>
+      _isObjectTransformActive || isActiveImageEdit;
+  bool _isActiveImageMultiTouch = false;
+  bool get isActiveImageMultiTouch => _isActiveImageMultiTouch;
+
+  void setActiveImageMultiTouch(bool value) {
+    _isActiveImageMultiTouch = value;
+  }
+
   PageBackgroundSettings get currentBackgroundSettings {
     return _localBackgrounds[notebook.uid] ??
         defaultBackgroundSettingsForKind(notebook.kind);
@@ -319,7 +328,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void setViewTransform({Offset? pan, double? scale}) {
-    if (_isObjectTransformActive) {
+    if (isCanvasNavigationLocked) {
       return;
     }
     final targetScale = (scale ?? viewScale)
@@ -495,11 +504,6 @@ class EditorController extends ChangeNotifier {
     commitTextUpdate(before, after);
   }
 
-  Future<String?> runOcrForImageOnPage(int pageIndex, ImageBlock block) async {
-    _ensurePageSelected(pageIndex);
-    return runOcrForImage(block);
-  }
-
   void updateImageBlockPositionOnPage(
     int pageIndex,
     String id,
@@ -515,11 +519,6 @@ class EditorController extends ChangeNotifier {
         .map((item) => item.id == block.id ? block : item)
         .toList();
     _updatePage(currentPage.copyWith(imageBlocks: updated));
-  }
-
-  void updateImageBlockOcrTextOnPage(int pageIndex, String id, String text) {
-    _ensurePageSelected(pageIndex);
-    updateImageBlockOcrText(id, text);
   }
 
   void deleteImageBlockOnPage(int pageIndex, String id) {
@@ -604,9 +603,10 @@ class EditorController extends ChangeNotifier {
     if (tool != DrawingTool.text) {
       clearActiveTextBlock();
     }
-    if (newTool.isInk || newTool == DrawingTool.text) {
+    if (newTool != DrawingTool.edit) {
       clearImageTransformPreview();
       activeImageBlockId = null;
+      _isActiveImageMultiTouch = false;
     }
     lassoSelection = null;
     notifyListeners();
@@ -703,10 +703,14 @@ class EditorController extends ChangeNotifier {
   }
 
   void setActiveImageBlock(String? blockId) {
+    if (blockId != null && tool != DrawingTool.edit) {
+      return;
+    }
     if (activeImageBlockId != blockId) {
       clearImageTransformPreview();
     }
     activeImageBlockId = blockId;
+    _isActiveImageMultiTouch = false;
     if (blockId != null) {
       _commitActiveTextEdit();
       activeTextBlockId = null;
@@ -913,102 +917,8 @@ class EditorController extends ChangeNotifier {
   void clearActiveImageBlock() {
     clearImageTransformPreview();
     activeImageBlockId = null;
+    _isActiveImageMultiTouch = false;
     notifyListeners();
-  }
-
-  ImageBlock? _activeImageGestureBefore;
-
-  bool get isPinchToScaleImageActive => _activeImageGestureBefore != null;
-
-  void startPinchToScaleActiveImage() {
-    if (_activeImageGestureBefore != null) {
-      return;
-    }
-    final activeId = activeImageBlockId;
-    if (activeId != null) {
-      _activeImageGestureBefore = findImageBlockById(activeId);
-    } else {
-      _activeImageGestureBefore = null;
-    }
-  }
-
-  void updatePinchToScaleActiveImage(double scaleDelta, Offset panDeltaWorld) {
-    if (_activeImageGestureBefore == null ||
-        !scaleDelta.isFinite ||
-        scaleDelta <= 0 ||
-        !panDeltaWorld.dx.isFinite ||
-        !panDeltaWorld.dy.isFinite) {
-      return;
-    }
-    final activeId = activeImageBlockId;
-    if (activeId == null) {
-      return;
-    }
-
-    final currentBlock = findImageBlockById(activeId);
-    if (currentBlock == null ||
-        currentBlock.width <= 0 ||
-        currentBlock.height <= 0) {
-      return;
-    }
-
-    final pageIndex = _pageIndexContainingImageBlock(activeId);
-    if (pageIndex == null) {
-      return;
-    }
-
-    final minScale = math.max(
-      80 / currentBlock.width,
-      60 / currentBlock.height,
-    );
-    final maxScale = math.min(
-      4096 / currentBlock.width,
-      4096 / currentBlock.height,
-    );
-    if (minScale > maxScale) {
-      return;
-    }
-    final safeScale = scaleDelta.clamp(minScale, maxScale).toDouble();
-    if ((safeScale - 1).abs() < 0.000001 && panDeltaWorld == Offset.zero) {
-      return;
-    }
-    final newWidth = currentBlock.width * safeScale;
-    final newHeight = currentBlock.height * safeScale;
-    final center = Offset(
-      currentBlock.position.dx + currentBlock.width / 2,
-      currentBlock.position.dy + currentBlock.height / 2,
-    );
-    final newCenter = center + panDeltaWorld;
-    final newPosition = newCenter - Offset(newWidth / 2, newHeight / 2);
-
-    final updatedBlock = currentBlock.copyWith(
-      position: newPosition,
-      width: newWidth,
-      height: newHeight,
-    );
-
-    updateImageBlockOnPage(pageIndex, updatedBlock);
-  }
-
-  void endPinchToScaleActiveImage() {
-    final before = _activeImageGestureBefore;
-    _activeImageGestureBefore = null;
-
-    if (before == null) return;
-    final activeId = activeImageBlockId;
-    if (activeId == null) return;
-
-    final after = findImageBlockById(activeId);
-    if (after == null) return;
-
-    if (before.width != after.width ||
-        before.height != after.height ||
-        before.position != after.position) {
-      final pageIndex = _pageIndexContainingImageBlock(activeId);
-      if (pageIndex != null) {
-        commitImageResizeOnPage(pageIndex, before, after);
-      }
-    }
   }
 
   void markTextTap() {
@@ -2280,11 +2190,7 @@ class EditorController extends ChangeNotifier {
     return 'Unsupported file type.';
   }
 
-  Future<String?> _addImageBlockFromFile(
-    File file,
-    Offset position, {
-    bool runOcr = true,
-  }) async {
+  Future<String?> _addImageBlockFromFile(File file, Offset position) async {
     final persisted = await _persistImageFile(file);
     final size = await _imageSize(persisted);
     final initialSize = _initialImageBlockSize(size);
@@ -2310,16 +2216,6 @@ class EditorController extends ChangeNotifier {
     _applyAction(AddImageAction(block));
     _activateInsertedImage(block.id);
     _save();
-    if (!runOcr) {
-      return null;
-    }
-    final ocrText = await _runOcr(persisted);
-    if (ocrText == null) {
-      return 'OCR is not supported on this platform.';
-    }
-    if (ocrText.trim().isNotEmpty) {
-      updateImageBlockOcrText(block.id, ocrText.trim());
-    }
     return null;
   }
 
@@ -2543,22 +2439,6 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> runOcrForImage(ImageBlock block) async {
-    if (!supportsOcr) {
-      return 'OCR is available only in the Android and iOS apps.';
-    }
-    final file = File(block.path);
-    if (!await file.exists()) {
-      return 'Image file not found.';
-    }
-    final ocrText = await _runOcr(file);
-    if (ocrText == null) {
-      return 'OCR is not supported on this platform.';
-    }
-    updateImageBlockOcrText(block.id, ocrText.trim());
-    return null;
-  }
-
   void updateImageBlockPosition(String id, Offset position) {
     final updated = currentPage.imageBlocks
         .map((item) => item.id == id ? item.copyWith(position: position) : item)
@@ -2579,21 +2459,6 @@ class EditorController extends ChangeNotifier {
         )
         .toList();
     _updatePage(currentPage.copyWith(imageBlocks: updated));
-  }
-
-  void updateImageBlockOcrText(String id, String text) {
-    final pageIndex = _pageIndexContainingImageBlock(id);
-    if (pageIndex == null) {
-      return;
-    }
-    _ensurePageSelected(pageIndex);
-    final before = pages[pageIndex].imageBlocks.map((item) => item).toList();
-    final updated = pages[pageIndex].imageBlocks
-        .map((item) => item.id == id ? item.copyWith(ocrText: text) : item)
-        .toList();
-    _applyAction(UpdateImageOcrAction(id: id, ocrText: text, before: before));
-    _updatePage(pages[pageIndex].copyWith(imageBlocks: updated));
-    _save();
   }
 
   Future<void> restoreImageCache(int pageIndex, String blockId) async {
@@ -2875,31 +2740,6 @@ class EditorController extends ChangeNotifier {
     final image = frame.image;
     return Size(image.width.toDouble(), image.height.toDouble());
   }
-
-  Future<String?> _runOcr(File file) async {
-    if (!_isOcrSupported()) {
-      return null;
-    }
-    final input = mlkit.InputImage.fromFilePath(file.path);
-    final recognizer = mlkit.TextRecognizer(
-      script: mlkit.TextRecognitionScript.latin,
-    );
-    try {
-      final result = await recognizer.processImage(input);
-      return result.text;
-    } finally {
-      await recognizer.close();
-    }
-  }
-
-  bool _isOcrSupported() {
-    if (kIsWeb) {
-      return false;
-    }
-    return Platform.isAndroid || Platform.isIOS;
-  }
-
-  bool get supportsOcr => _isOcrSupported();
 
   Rect _computeContentBounds() {
     Rect? bounds;

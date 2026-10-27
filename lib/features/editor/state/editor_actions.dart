@@ -345,32 +345,6 @@ class MoveImageBetweenPagesAction extends EditorAction {
   }
 }
 
-class UpdateImageOcrAction extends EditorAction {
-  UpdateImageOcrAction({
-    required this.id,
-    required this.ocrText,
-    required this.before,
-  });
-
-  final String id;
-  final String ocrText;
-  final List<ImageBlock> before;
-
-  @override
-  NotePage apply(NotePage page) {
-    return page.copyWith(
-      imageBlocks: page.imageBlocks
-          .map((item) => item.id == id ? item.copyWith(ocrText: ocrText) : item)
-          .toList(),
-    );
-  }
-
-  @override
-  NotePage revert(NotePage page) {
-    return page.copyWith(imageBlocks: before);
-  }
-}
-
 class UpdateImageAction extends EditorAction {
   UpdateImageAction({required this.before, required this.after});
 
