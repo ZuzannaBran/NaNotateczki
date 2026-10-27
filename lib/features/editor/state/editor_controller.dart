@@ -122,6 +122,8 @@ class EditorController extends ChangeNotifier {
       <String, ValueNotifier<int>>{};
   final ValueNotifier<int> inkRevision = ValueNotifier<int>(0);
   final ValueNotifier<int> historyRevision = ValueNotifier<int>(0);
+  final ValueNotifier<PageBackgroundSettings> backgroundSettingsListenable =
+      ValueNotifier(const PageBackgroundSettings());
   final Map<String, PageBackgroundSettings> _localBackgrounds =
       <String, PageBackgroundSettings>{};
   final Set<NotebookKind> _dirtyBackgroundDefaultKinds = <NotebookKind>{};
@@ -281,6 +283,7 @@ class EditorController extends ChangeNotifier {
     lassoDragDelta.dispose();
     inkRevision.dispose();
     historyRevision.dispose();
+    backgroundSettingsListenable.dispose();
     for (final revision in _inkPageRevisions.values) {
       revision.dispose();
     }
@@ -1002,15 +1005,23 @@ class EditorController extends ChangeNotifier {
         );
     }
     _dirtyBackgroundDefaultKinds.add(kind);
+    if (kind == notebook.kind && !_localBackgrounds.containsKey(notebook.uid)) {
+      backgroundSettingsListenable.value = settings;
+    }
     _schedulePrefsSave();
     notifyListeners();
   }
 
   void setCurrentBackgroundSettings(PageBackgroundSettings settings) {
+    final previous = currentBackgroundSettings;
+    if (previous.style == settings.style &&
+        previous.spacing == settings.spacing) {
+      return;
+    }
     _localBackgrounds[notebook.uid] = settings;
     _dirtyLocalBackgroundIds.add(notebook.uid);
     _schedulePrefsSave();
-    notifyListeners();
+    backgroundSettingsListenable.value = settings;
   }
 
   /// Replaces the three shared swatches and selects their first color.
@@ -1313,6 +1324,7 @@ class EditorController extends ChangeNotifier {
       if (shouldPersistDrawingColorDefaults || migratedQuickColors) {
         _schedulePrefsSave();
       }
+      backgroundSettingsListenable.value = currentBackgroundSettings;
       notifyListeners();
     } catch (e) {
       debugPrint('EditorController._loadEditorPrefs failed: $e');
