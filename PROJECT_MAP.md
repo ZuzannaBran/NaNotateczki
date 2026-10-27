@@ -964,7 +964,9 @@ odcienia do narzędzia. Wybór palety wybiera pierwszy kolor. Wcześniejsze
 fabryczne Blue/Pink/Green (w tym poprzedni Blue/Green)
 są migrowane według indeksu; własne odcienie pozostają
 nienaruszone. Zapis preferencji tła obejmuje tylko notebook i board, bo
-planner nie ma ustawień tła. Obrazy trafiają do prywatnego katalogu danych
+planner nie ma ustawień tła. `backgroundSettingsListenable` aktualizuje
+tło bez powiadamiania całego edytora; odczyt i domyślne wzory
+synchronizują ten notifier. Obrazy trafiają do prywatnego katalogu danych
 aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 - 37: `LassoSelection`; 76: `EditorController`;
@@ -1109,7 +1111,8 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   spinner długiej operacji. 3: `BusyOverlay`.
 - `lib/features/editor/presentation/widgets/page_background_paint.dart` (131):
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
-  kartce #50514D. 6: `PageBackgroundPaint`;
+  kartce #50514D; strony i board odświeżają go osobnym notifierem.
+  6: `PageBackgroundPaint`;
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
 - `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1093):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
@@ -1554,7 +1557,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
   rozszerzenie dolnej granicy klipu, stabilny kolor `AppBar`,
   minimapa na krótkim ekranie, regulacja scrolla stron i interaktywność
-  narzędzi; powiększony wielostronicowy notatnik przewija się od środka
+  narzędzi; przełączanie Grid/Lines bez powiadamiania całego edytora,
+  aktualizacja wzoru na kartce i ignorowanie powtórnego identycznego wyboru;
+  powiększony wielostronicowy notatnik przewija się od środka
   do obu końców bez utknięcia; test tap/dwuklik/przytrzymanie szybkiego koloru, otwarcia
   selektora i zapisu nowego koloru.
 - `test/editor_toolbar_color_picker_test.dart`: dark/light picker, odwrócone
