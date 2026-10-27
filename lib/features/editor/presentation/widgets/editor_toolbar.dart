@@ -196,18 +196,22 @@ class EditorToolbar extends StatelessWidget {
   }
 
   Widget _backgroundButton(BuildContext context) {
-    final settings = controller.currentBackgroundSettings;
-    final icon = switch (settings.style) {
-      PageBackgroundStyle.blank => Icons.crop_square,
-      PageBackgroundStyle.grid => Icons.grid_4x4,
-      PageBackgroundStyle.lines => Icons.density_medium,
-    };
-    return _actionButton(
-      context: context,
-      icon: icon,
-      label: 'Background',
-      isActive: false,
-      onPressed: () => _showBackgroundDialog(context),
+    return ValueListenableBuilder<PageBackgroundSettings>(
+      valueListenable: controller.backgroundSettingsListenable,
+      builder: (context, settings, _) {
+        final icon = switch (settings.style) {
+          PageBackgroundStyle.blank => Icons.crop_square,
+          PageBackgroundStyle.grid => Icons.grid_4x4,
+          PageBackgroundStyle.lines => Icons.density_medium,
+        };
+        return _actionButton(
+          context: context,
+          icon: icon,
+          label: 'Background',
+          isActive: false,
+          onPressed: () => _showBackgroundDialog(context),
+        );
+      },
     );
   }
 
@@ -215,10 +219,9 @@ class EditorToolbar extends StatelessWidget {
     return showDialog<void>(
       context: context,
       builder: (context) {
-        return AnimatedBuilder(
-          animation: controller,
-          builder: (context, child) {
-            final settings = controller.currentBackgroundSettings;
+        return ValueListenableBuilder<PageBackgroundSettings>(
+          valueListenable: controller.backgroundSettingsListenable,
+          builder: (context, settings, child) {
             return AlertDialog(
               title: const Text('Background'),
               content: SizedBox(
