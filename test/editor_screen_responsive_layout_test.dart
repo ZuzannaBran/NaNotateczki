@@ -10,7 +10,9 @@ import 'package:program/core/theme/app_metrics.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/editor_screen.dart';
 import 'package:program/features/editor/presentation/widgets/editor_toolbar.dart';
+import 'package:program/features/editor/presentation/widgets/page_background_paint.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
+import 'package:program/features/editor/state/page_background.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
@@ -21,6 +23,78 @@ import 'support/native_test_documents.dart';
 
 void main() {
   useIsolatedNativeTestDocuments();
+
+  testWidgets('background changes update painters without notifying the editor', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: _notebook(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
+          ],
+          child: const EditorScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    var editorNotifications = 0;
+    var backgroundNotifications = 0;
+    controller.addListener(() => editorNotifications++);
+    controller.backgroundSettingsListenable.addListener(
+      () => backgroundNotifications++,
+    );
+
+    final painterFinder = find.byType(PageBackgroundPaint);
+    expect(painterFinder, findsWidgets);
+
+    controller.setCurrentBackgroundSettings(
+      const PageBackgroundSettings(style: PageBackgroundStyle.grid),
+    );
+    expect(editorNotifications, 0);
+    expect(backgroundNotifications, 1);
+    await tester.pump();
+    expect(
+      tester.widget<PageBackgroundPaint>(painterFinder.first).settings.style,
+      PageBackgroundStyle.grid,
+    );
+
+    controller.setCurrentBackgroundSettings(
+      const PageBackgroundSettings(style: PageBackgroundStyle.lines),
+    );
+    controller.setCurrentBackgroundSettings(
+      const PageBackgroundSettings(style: PageBackgroundStyle.lines),
+    );
+    expect(editorNotifications, 0);
+    expect(backgroundNotifications, 2);
+    await tester.pump();
+    expect(
+      tester.widget<PageBackgroundPaint>(painterFinder.first).settings.style,
+      PageBackgroundStyle.lines,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    preferences.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await database.close();
+  });
   testWidgets('page stays clear of overview and inside right boundary', (
     tester,
   ) async {
