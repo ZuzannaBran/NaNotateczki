@@ -1318,9 +1318,13 @@ class _EditorScreenState extends State<EditorScreen> {
                                                                 ],
                                                               ),
                                                             ),
-                                                            PageBackgroundPaint(
-                                                              settings: controller
-                                                                  .currentBackgroundSettings,
+                                                            ValueListenableBuilder(
+                                                              valueListenable: controller
+                                                                  .backgroundSettingsListenable,
+                                                              builder: (context, settings, _) =>
+                                                                  PageBackgroundPaint(
+                                                                    settings: settings,
+                                                                  ),
                                                             ),
                                                             Builder(
                                                               builder: (context) {
@@ -1507,7 +1511,10 @@ class _EditorScreenState extends State<EditorScreen> {
                       Positioned(
                         top: 10.0 + toolbarOffset,
                         left: 10,
-                        child: _ProjectMiniMapOverlay(
+                        child: ValueListenableBuilder(
+                          valueListenable:
+                              controller.backgroundSettingsListenable,
+                          builder: (context, _, child) => _ProjectMiniMapOverlay(
                           key: const ValueKey('notebook-project-overview'),
                           controller: controller,
                           pages: controller.pages,
@@ -1521,6 +1528,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             controller,
                             docWorldSize,
                             viewportSize,
+                          ),
                           ),
                         ),
                       ),
