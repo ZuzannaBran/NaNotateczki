@@ -176,7 +176,11 @@ void main() {
 
     const viewportKey = ValueKey('notebook-page-viewport');
     final viewport = find.byKey(viewportKey);
-    final pointer = tester.getTopLeft(viewport) + const Offset(240, 230);
+    final pointer = Offset(
+      tester.getTopLeft(viewport).dx + 240,
+      tester.getTopLeft(find.byKey(const ValueKey('notebook-canvas-area'))).dy +
+          230,
+    );
     final firstFinger = await tester.createGesture(
       kind: PointerDeviceKind.touch,
       pointer: 31,
@@ -211,6 +215,7 @@ void main() {
       ),
     );
     await tester.pump();
+    expect(scroll.offset, closeTo(scroll.position.minScrollExtent, 1));
     expect(
       _documentTopLeft(tester).dy,
       greaterThanOrEqualTo(tester.getTopLeft(viewport).dy - 1),
@@ -223,21 +228,7 @@ void main() {
       ),
     );
     await tester.pump();
-    final documentBottom = _documentPoint(
-      tester,
-      Offset(0, _documentLayoutSize(tester).height),
-    ).dy;
-    expect(
-      documentBottom,
-      greaterThanOrEqualTo(
-        tester
-                .getBottomLeft(
-                  find.byKey(const ValueKey('notebook-canvas-area')),
-                )
-                .dy -
-            40,
-      ),
-    );
+    expect(scroll.offset, closeTo(scroll.position.maxScrollExtent, 1));
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();

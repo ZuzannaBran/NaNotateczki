@@ -1,7 +1,7 @@
 # PROJECT_MAP.md
 
 Skrócony indeks projektu **Notatek / Stylus Notes** (`pubspec.yaml`:
-`name: program`). Stan sprawdzony względem repozytorium 2026-10-26.
+`name: program`). Stan sprawdzony względem repozytorium 2026-10-27.
 
 Mapa służy do wyboru pliku i zakresu linii przed czytaniem kodu. Zawiera
 publiczne punkty wejścia, ważne prywatne granice i pułapki; nie kataloguje
@@ -427,7 +427,7 @@ mobilnej, bez zmiany modelu dokumentu.
 
 ## 6. Biblioteka
 
-### `lib/features/library/presentation/library_controller.dart`
+### `lib/features/library/presentation/library_controller.dart` (1083 linie)
 
 Stan folderów wielopoziomowych, listy dokumentów, wyszukiwania, syncu,
 importu i recovery. Hierarchia folderów korzysta ze ścieżek logicznych
@@ -437,6 +437,9 @@ importu i recovery. Hierarchia folderów korzysta ze ścieżek logicznych
 folderu obejmuje rekurencyjnie podfoldery, dokumenty, okładki i zadania.
 Przenoszenie notebooków i boardów między folderami zapisuje tylko metadane
 w SQLite; aktywny dokument zachowuje zaznaczenie w nowym folderze.
+`moveFolderToFolder` relokuje całe poddrzewo: ścieżki folderów, dokumenty,
+okładki i bieżące zaznaczenie. Odrzuca własny podfolder, dotychczasowego
+rodzica i kolizję z folderem o tej samej nazwie w celu.
 Zapisuje kształt, indywidualny kolor ikony okładki i ostatnie 12
 wybranych kolorów w zgodnym wstecznie `library_folders.json`
 (legacy lista nazw lub obiekt z `folders`, `covers` i `recentCoverColors`);
@@ -459,12 +462,14 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
 - 21: `FolderCoverShape`; 23: `FolderCoverStyle`; 54: `LibraryController`.
 - 146: `initialize`; 161: `loadItems`.
-- 328: `folderNames`; 354: `childFoldersOf`; 364: `updateFolderCover`.
-- 383: `createFolder`; 406: `renameFolder`; 475: `deleteFolder` (poddrzewo).
-- 676: `moveItemToFolder`; 723: `selectFolder`; 851: `_loadFolders`;
-  913: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
+- 328: `folderNames`; 354: `childFoldersOf`; 363: `updateFolderCover`.
+- 382: `createFolder`; 405: `renameFolder`;
+  473: `canMoveFolderToFolder`; 491: `moveFolderToFolder`;
+  551: `deleteFolder` (poddrzewo).
+- 749: `moveItemToFolder`; 796: `selectFolder`; 924: `_loadFolders`;
+  986: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1892 linie)
+### `lib/features/library/presentation/library_screen.dart` (2010 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -527,11 +532,13 @@ szerokości, 44 px wysokości, cień i obrys. Stan toolbaru pozostaje zachowany
 przy przełączaniu dokumentów. Aktualny tytuł notebooka lub boarda jest
 przekazywany do nagłówka bez odtwarzania kontrolera edytora po zmianie nazwy.
 
-W drzewku folderów przytrzymanie notebooka lub boarda uruchamia drag & drop
-na wiersz innego folderu (również zwiniętego). Podczas przeciągania cały
-wiersz zachowuje oryginalną szerokość, ikonę, nazwę i menu, ma mocniejsze
+W drzewku folderów przytrzymanie notebooka, boarda albo folderu uruchamia
+drag & drop na wiersz innego folderu (również zwiniętego). Folder źródłowy
+zwija się przy rozpoczęciu gestu, a po przeniesieniu pozostaje zwinięty pod
+nowym rodzicem razem z całym poddrzewem. Podczas przeciągania cały wiersz
+zachowuje oryginalną szerokość, ikonę, nazwę i menu, ma mocniejsze
 podświetlenie i przesuwa się tylko w pionie; w miejscu źródłowym nie
-wyświetla się jego kopia. Folder przyjmuje element z podświetleniem
+wyświetla się jego kopia. Folder docelowy przyjmuje element z podświetleniem
 i rozwija się po upuszczeniu. Przed ruchem kończone są oczekujące
 zapisy edytora; zmiana folderu aktywnego dokumentu odtwarza
 kontroler edytora z aktualnymi metadanymi, zamiast zostawiać stary folder.
@@ -561,19 +568,19 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   Ustawienia katalogu i planera nie tworzą `EditorController` dla
   `NotebookKind.planner`, aby nie zgłaszać `UnsupportedError`.
 - 25: `LibraryScreen`; 32: `_LibraryScreenState`;
-  506: `_openCatalogSettings`;
-  879: `_CreateMenuButton`;
-  924: `_LibraryTreePane` (`_LibraryTreePaneState` 949);
-  1101: `_buildFolder`; 1246: `_FolderTreeRow`;
-  1295: `_LibraryTreeItemRow` (planner: konturowy kwadrat z tikiem);
-  1400: `_sidebarMenuShape`;
-  1414: `_SidebarMenuShadowPainter`;
-  1450: `_showSidebarMenu`;
-  1563: `_TreeRowActions`;
-  1637: `_LibraryWorkspace`;
-  1748: `_LeftZoneToggleTab` (również przycisk timera).
+  507: `_keepCatalogOnMovedFolder`; 529: `_openCatalogSettings`;
+  893: `_CreateMenuButton`;
+  938: `_LibraryTreePane` (`_LibraryTreePaneState` 963);
+  1174: `_buildFolder`; 1356: `_FolderTreeRow`;
+  1464: `_LibraryTreeItemRow` (planner: konturowy kwadrat z tikiem);
+  1569: `_sidebarMenuShape`;
+  1583: `_SidebarMenuShadowPainter`;
+  1619: `_showSidebarMenu`;
+  1732: `_TreeRowActions`;
+  1806: `_LibraryWorkspace`;
+  1917: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_catalog.dart` (1267 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1284 linie)
 
 Katalog Projects pokazuje wyłącznie foldery główne. Po wejściu do folderu
 siatka łączy jego bezpośrednie podfoldery i własne dokumenty; tytuły
@@ -594,7 +601,9 @@ przycisk nawigacji w trybie kompaktowym oraz
 pozostaje w menu folderu, bez ikony palety w nagłówku otwartego folderu.
 Okładki folderów mają ponownie delikatne, wektorowe ikony Lucide
 (`FolderCoverIcon`, `FolderCoverStrokePainter`), z konturem 1,25 px
-i wygładzonymi krawędziami. Dekoracje na okładce (serce, gwiazdka,
+i wygładzonymi krawędziami. Zachowują kwadratowe proporcje także jako
+podfoldery w wysokim rzędzie współdzielonym z dokumentami. Dekoracje na
+okładce (serce, gwiazdka,
 kwiat, błysk) można ponownie wybierać z poziomu edytora folderu.
 Kafelki mają promień 12 px i neutralne tło; zapisany kolor modyfikuje
 kolor ikon, nie powoduje automatycznego podświetlania całej okładki.
@@ -628,13 +637,13 @@ Katalog i okładki respektują motyw; miniatury odwracają kolory ink/tekstu
 tylko przy renderowaniu, bez zmiany danych. Zmiana motywu wymusza repaint.
 Siatka reaguje na wspólną czułość dotyku.
 
-- 24: `dominantFolderColor`; 53: `FolderCoverIcon`;
-  107: `FolderCoverStrokePainter`; 233: `LibraryCatalog`;
-  547: `_FolderTile`; 614: `_DocumentTile`;
-  625: `_CatalogTile`; 748: `_DocumentPreview`;
-  831: `_boardPreviewBounds`;
-  873: `_PagePreviewPainter`;
-  945: `showFolderCoverEditor`.
+- 27: `dominantFolderColor`; 55: `FolderCoverIcon`;
+  109: `FolderCoverStrokePainter`; 235: `LibraryCatalog`;
+  565: `_FolderTile`; 632: `_DocumentTile`;
+  751: `_CatalogTile`; 877: `_DocumentPreview`;
+  960: `_boardPreviewBounds`;
+  1002: `_PagePreviewPainter`;
+  1074: `showFolderCoverEditor`.
 
 - `lib/core/widgets/workspace_document_app_bar.dart`: wspólny pasek
   tytułu notatnika, boarda i planera (56 px), z marginesem chroniącym
@@ -714,7 +723,9 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   również podczas aktywnej sesji zamiast przycisków Start/Smart.
   Formularz wydarzeń pokazuje datę, czas, długość, kolor, opis,
   zakres dat, checkbox All day i regułę powtarzania; nie pokazuje
-  ustawień timera ani bloków Focus. Karty Upcoming w sidebarze
+  ustawień timera ani bloków Focus. Selektor koloru otwiera się od razu,
+  a wspólne Recent doładowuje w tle `EditorToolbar.pickColor`.
+  Karty Upcoming w sidebarze
   mają obrys jasnobeżowy `AppColors.toolbar` zamiast koloru tekstu
   (bez zmiany obrysów w kalendarzu). Dolny padding timera to 16 px,
   gdy Upcoming jest puste, albo 0 px, gdy istnieją nadchodzące sesje.
@@ -733,12 +744,11 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   Selektor techniki w formularzu `isExpanded` mieści się w wąskim dialogu.
   Motyw obejmuje także kompaktowy timer, a formularz sesji korzysta
   ze wspólnej czułości przewijania.
-  36: `studyRatingStars`;
-  43: `openStudyPlanner`;
-  49: `showStudySessionEditor`;
-  69: `showStudyRating`;
+  36: `studyRatingStars`; 43: `openStudyPlanner`;
+  49: `showStudySessionEditor`; 69: `showStudyRating`;
+  138: `_StudySessionDialog`; 254: `_pickColor`;
   337: `_labeledField` (stałe etykiety formularza);
-  664: `StudyTimerCard`; 950: `CompactStudyTimer`.
+  669: `StudyTimerCard`; 958: `CompactStudyTimer`.
 - `lib/features/planner/presentation/study_action_theme.dart` (166):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
@@ -817,8 +827,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   wypełnienia bieżącego dnia oraz separatorów od górnej do dolnej granicy
   obszaru. Linie godzin nie powinny wychodzić poza tabelę. Przytrzymaj
   i przesuń widok palcem, sprawdź też jasny i ciemny motyw. Testy
-  w study_planner_widget_test.dart są pominięte w tym commicie zgodnie
-  z decyzją użytkownika i nadal wymagają dostosowania.
+  w `study_planner_widget_test.dart` sprawdzają aktualny układ bez
+  łączników wychodzących z tabeli godzin.
   Ręczny scenariusz przy braku Fluttera: 15:45/30 min powinno
   zajmować końcową ćwiartkę godziny 15 i pierwszą ćwiartkę godziny 16
   w Day i Week; Smart 3 × 25 min z przerwami 5 min zajmuje 85 min;
@@ -856,8 +866,9 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   nagłówki styczne z siatką, ostre dolne rogi, zaokrąglone dolne
   narożniki siatki, minutowe pozycjonowanie bloków (z czasem przerw),
   kliknięcie Week/Month do wybranego Day i reset Day do dzisiejszej
-  daty, górne wyrównanie etykiet i pełnowysokie linie Week oraz
-  poziomych linii do etykiet, brak scrollbarów bez blokowania gestów,
+  daty, wyśrodkowanie etykiet i pełnowysokie linie Week oraz
+  brak łączników linii godzin poza tabelą, brak scrollbarów bez blokowania
+  gestów,
   jaśniejsze tła dni spoza miesiąca w obu motywach,
   osobny scroll Upcoming, limit wysokości listy,
   brak górnych przycisków w obu rozmiarach, dodawanie przez plus,
@@ -1093,7 +1104,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
 - `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1093):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
-  całość ma kształt kapsułki i pośrodku obszaru zwęża się do szerokości
+  całość ma promień 12 px i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
   Szerokość dostępna dla toolbaru jest mierzona przez `LayoutBuilder`
   podczas resize, niezależnie od opóźnień w aktualizacji `MediaQuery`.
@@ -1123,7 +1134,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   14: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
   406: selektor kształtu; 534: `_colorDot`; 581: `pickColor`;
   952: `_EraserIcon`.
-- lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (402):
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (401):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Selektor czcionki obejmuje rozmiary 8–192; krótkie menu (do 280 px)
   otwiera się tuż pod dolną krawędzią paska i przewija pionowo, z prostą
@@ -1133,7 +1144,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   underline, strike, font, rozmiar, kolor, wyrównanie, reset stylu i usunięcie.
   Listy oraz formatowanie tylko zaznaczonego fragmentu są celowo pominięte,
   ponieważ obecny `EditableText` nie renderuje ich jako rich-text.
-  Pasek używa takiej samej kapsułki: zwęża się do zawartości,
+  Pasek używa takiego samego promienia 12 px: zwęża się do zawartości,
   pozostaje wycentrowany i przewija poziomo na wąskich ekranach.
   Na ekranach szerokich ma 52 px zewnętrznego i 22 px wewnętrznego
   marginesu bocznego; na telefonach 8 px + 8 px.
@@ -1416,12 +1427,15 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   wspólny zapis, edycja, usuwanie i zgodność starych wpisów.
 - `test/library_sidebar_drag_drop_test.dart`: trwałe przenoszenie notatek i
   boardów między folderami, walidacja celu, zachowanie wyboru, przeciąganie
-  na zwinięty folder i rozwinięcie go po upuszczeniu; zgodność szerokości
-  i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
-  poziomego.
+  na zwinięty folder i rozwinięcie go po upuszczeniu; foldery relokują całe
+  poddrzewo, okładki i dokumenty, nie przyjmują własnego potomka ani kolizji,
+  zwijają się podczas gestu i pozostają zwinięte po przeniesieniu; zgodność
+  szerokości i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada
+  ruchu poziomego.
 - `test/library_nested_folders_test.dart`: ścieżki folderów, migracja
   nazw jednopoziomowych, zapis/odczyt, rekurencyjna zmiana nazwy,
-  usuwanie poddrzewa z dokumentami oraz podfoldery z dokumentami w katalogu.
+  usuwanie poddrzewa z dokumentami oraz podfoldery z dokumentami w katalogu;
+  kwadratowe proporcje okładki podfolderu w mieszanym rzędzie.
 - `test/library_controller_test.dart` (33)
 - `test/library_catalog_test.dart` (971): rozmiary nazw folderów
   i dokumentów, kolor dominujący, serializacja
@@ -1523,7 +1537,7 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
 - `test/notebook_overview_navigation_test.dart`: kliknięcia widocznej minimapy,
   przełączanie strony, scroll minimapy bez nawigacji, wybór po przewinięciu,
   blokada transformacji, mapowanie współrzędnych i zachowanie skali.
-- `test/editor_screen_responsive_layout_test.dart` (427):
+- `test/editor_screen_responsive_layout_test.dart` (533):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
   poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
   pan, wsuwanie strony pod pasek bez maskującego marginesu,

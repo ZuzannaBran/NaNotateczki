@@ -37,6 +37,16 @@ NotePage _page(InkStroke stroke) => NotePage(
   isBookmarked: false,
 );
 
+Future<EditorController> _persistedController(
+  WidgetTester tester,
+  NotesDatabase database,
+  Notebook notebook,
+) async {
+  final repository = NotebookRepository(database);
+  await tester.runAsync(() => repository.saveNotebook(notebook));
+  return EditorController(repository: repository, notebook: notebook);
+}
+
 void main() {
   useIsolatedNativeTestDocuments();
   useInMemoryTestTextStorage();
@@ -200,9 +210,10 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final database = NotesDatabase(NativeDatabase.memory());
       addTearDown(database.close);
-      final controller = EditorController(
-        repository: NotebookRepository(database),
-        notebook: Notebook(
+      final controller = await _persistedController(
+        tester,
+        database,
+        Notebook(
           uid: 'held-line-${kind.name}',
           title: 'Held line',
           kind: kind,
@@ -274,6 +285,7 @@ void main() {
       expect(resized.color, stroke.color);
       expect(resized.width, stroke.width);
       expect(resized.usesHighlighterStrokeCap, isTrue);
+      await tester.runAsync(controller.flushPendingSaves);
     });
 
     for (final inkTool in [DrawingTool.pen, DrawingTool.highlighter]) {
@@ -287,9 +299,10 @@ void main() {
           addTearDown(() => tester.binding.setSurfaceSize(null));
           final database = NotesDatabase(NativeDatabase.memory());
           addTearDown(database.close);
-          final controller = EditorController(
-            repository: NotebookRepository(database),
-            notebook: Notebook(
+          final controller = await _persistedController(
+            tester,
+            database,
+            Notebook(
               uid: 'held-${recognizedTool.name}-${inkTool.name}-${kind.name}',
               title: 'Held shape',
               kind: kind,
@@ -380,6 +393,7 @@ void main() {
             expect(stroke.color.a, closeTo(0.5, 0.01));
             expect(stroke.usesHighlighterStrokeCap, isTrue);
           }
+          await tester.runAsync(controller.flushPendingSaves);
         });
       }
     }
@@ -390,7 +404,6 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final database = NotesDatabase(NativeDatabase.memory());
       addTearDown(database.close);
-      final repository = NotebookRepository(database);
       final page = _page(
         _shape(DrawingTool.rectangle, const [
           Offset(40, 50),
@@ -401,9 +414,10 @@ void main() {
         ]),
       );
       final now = DateTime(2026);
-      final controller = EditorController(
-        repository: repository,
-        notebook: Notebook(
+      final controller = await _persistedController(
+        tester,
+        database,
+        Notebook(
           uid: 'overlay-${kind.name}',
           title: 'Shape canvas',
           kind: kind,
@@ -471,6 +485,7 @@ void main() {
       await tester.pump();
       expect(controller.activeShapeStrokeId, isNull);
       expect(controller.tool, DrawingTool.rectangle);
+      await tester.runAsync(controller.flushPendingSaves);
     });
 
     test('shape selects Move and restores previous tool in $kind', () async {

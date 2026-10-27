@@ -351,9 +351,8 @@ class LibraryController extends ChangeNotifier {
     return separator < 0 ? null : path.substring(0, separator);
   }
 
-  List<String> childFoldersOf(String? parent) => folderNames
-      .where((path) => parentFolderOf(path) == parent)
-      .toList();
+  List<String> childFoldersOf(String? parent) =>
+      folderNames.where((path) => parentFolderOf(path) == parent).toList();
 
   bool isInFolderTree(String folder, String root) =>
       folder == root || folder.startsWith('$root/');
@@ -388,7 +387,7 @@ class LibraryController extends ChangeNotifier {
         (parentPath != null && !folderNames.contains(parentPath))) {
       return null;
     }
-    final path = parentPath == null ? trimmed : '${parentPath}/${trimmed}';
+    final path = parentPath == null ? trimmed : '$parentPath/$trimmed';
     if (folderNames.contains(path)) {
       return null;
     }
@@ -413,18 +412,18 @@ class LibraryController extends ChangeNotifier {
       return null;
     }
     final parent = parentFolderOf(oldPath);
-    final nextPath = parent == null ? trimmed : '${parent}/${trimmed}';
+    final nextPath = parent == null ? trimmed : '$parent/$trimmed';
     if (oldPath == nextPath) {
       return oldPath;
     }
     if (folderNames.any(
-      (path) => !isInFolderTree(path, oldPath) && isInFolderTree(path, nextPath),
+      (path) =>
+          !isInFolderTree(path, oldPath) && isInFolderTree(path, nextPath),
     )) {
       return null;
     }
 
-    String relocate(String path) =>
-        nextPath + path.substring(oldPath.length);
+    String relocate(String path) => nextPath + path.substring(oldPath.length);
 
     final updatedItems = <Notebook>[];
     for (final item in items) {
@@ -447,9 +446,8 @@ class LibraryController extends ChangeNotifier {
       ..addAll(updatedFolders);
     final updatedCovers = <String, FolderCoverStyle>{
       for (final entry in _folderCovers.entries)
-        (isInFolderTree(entry.key, oldPath)
-            ? relocate(entry.key)
-            : entry.key): entry.value,
+        (isInFolderTree(entry.key, oldPath) ? relocate(entry.key) : entry.key):
+            entry.value,
     };
     _folderCovers
       ..clear()
@@ -472,6 +470,84 @@ class LibraryController extends ChangeNotifier {
     return nextPath;
   }
 
+  bool canMoveFolderToFolder(String source, String targetParent) {
+    final sourcePath = source.trim();
+    final targetPath = targetParent.trim();
+    if (!folderNames.contains(sourcePath) ||
+        !folderNames.contains(targetPath) ||
+        sourcePath == targetPath ||
+        parentFolderOf(sourcePath) == targetPath ||
+        isInFolderTree(targetPath, sourcePath)) {
+      return false;
+    }
+    final destination = '$targetPath/${folderLabel(sourcePath)}';
+    return !folderNames.any(
+      (path) =>
+          !isInFolderTree(path, sourcePath) &&
+          isInFolderTree(path, destination),
+    );
+  }
+
+  Future<String?> moveFolderToFolder(String source, String targetParent) async {
+    final sourcePath = source.trim();
+    final targetPath = targetParent.trim();
+    if (!canMoveFolderToFolder(sourcePath, targetPath)) {
+      return null;
+    }
+    final destination = '$targetPath/${folderLabel(sourcePath)}';
+    String relocate(String path) =>
+        destination + path.substring(sourcePath.length);
+
+    final updatedItems = <Notebook>[];
+    for (final item in items) {
+      if (!isInFolderTree(item.folder, sourcePath)) {
+        updatedItems.add(item);
+        continue;
+      }
+      final updated = await repository.updateNotebookMetadata(
+        item.uid,
+        folder: relocate(item.folder),
+      );
+      if (updated == null) {
+        return null;
+      }
+      updatedItems.add(updated);
+    }
+    items = updatedItems;
+    final updatedFolders = _folders
+        .map((path) => isInFolderTree(path, sourcePath) ? relocate(path) : path)
+        .toSet();
+    _folders
+      ..clear()
+      ..addAll(updatedFolders);
+    final updatedCovers = <String, FolderCoverStyle>{
+      for (final entry in _folderCovers.entries)
+        (isInFolderTree(entry.key, sourcePath)
+                ? relocate(entry.key)
+                : entry.key):
+            entry.value,
+    };
+    _folderCovers
+      ..clear()
+      ..addAll(updatedCovers);
+    if (isInFolderTree(selectedFolder, sourcePath)) {
+      selectedFolder = relocate(selectedFolder);
+    }
+    if (_activeNotebook != null &&
+        isInFolderTree(_activeNotebook!.folder, sourcePath)) {
+      _activeNotebook = _itemById(_activeNotebook!.uid);
+    }
+    if (!_selectedItemIsInFolder(selectedFolder)) {
+      selectedItemId = _firstItemInFolder(selectedFolder)?.uid;
+      _activeNotebook = selectedItemId == null
+          ? null
+          : _itemById(selectedItemId!);
+    }
+    await _saveFolders();
+    notifyListeners();
+    return destination;
+  }
+
   Future<void> deleteFolder(String name) async {
     final path = name.trim();
     if (path.isEmpty || !folderNames.contains(path)) {
@@ -489,17 +565,14 @@ class LibraryController extends ChangeNotifier {
     final deletedIds = affected.map((item) => item.uid).toSet();
     items = items.where((item) => !deletedIds.contains(item.uid)).toList();
     _folders.removeWhere((folder) => isInFolderTree(folder, path));
-    _folderCovers.removeWhere(
-      (folder, _) => isInFolderTree(folder, path),
-    );
+    _folderCovers.removeWhere((folder, _) => isInFolderTree(folder, path));
     if (isInFolderTree(selectedFolder, path)) {
       final parent = parentFolderOf(path);
       selectedFolder = parent != null && folderNames.contains(parent)
           ? parent
           : (folderNames.isEmpty ? '' : folderNames.first);
     }
-    if (_activeNotebook != null &&
-        deletedIds.contains(_activeNotebook!.uid)) {
+    if (_activeNotebook != null && deletedIds.contains(_activeNotebook!.uid)) {
       _activeNotebook = null;
     }
     if (!_selectedItemIsInFolder(selectedFolder)) {

@@ -369,8 +369,7 @@ class LibraryCatalog extends StatelessWidget {
 
                         if (folders.isNotEmpty) {
                           final cellWidth = gridWidth / columns;
-                          final rowCount =
-                              (itemCount + columns - 1) ~/ columns;
+                          final rowCount = (itemCount + columns - 1) ~/ columns;
 
                           return SingleChildScrollView(
                             key: const ValueKey('catalog-folders'),
@@ -423,36 +422,55 @@ class LibraryCatalog extends StatelessWidget {
                                                         const EdgeInsets.all(
                                                           18,
                                                         ),
-                                                    child: index < folders.length
+                                                    child:
+                                                        index < folders.length
                                                         ? _FolderTile(
-                                                            name: folders[index],
-                                                            cover: controller.folderCoverFor(
-                                                              folders[index],
-                                                            ),
-                                                            onTap: () => onFolderTap(
-                                                              folders[index],
-                                                            ),
-                                                            onEdit: () => onEditFolder(
-                                                              folders[index],
-                                                            ),
-                                                            onRename: () => onRenameFolder(
-                                                              folders[index],
-                                                            ),
-                                                            onDelete: () => onDeleteFolder(
-                                                              folders[index],
-                                                            ),
+                                                            name:
+                                                                folders[index],
+                                                            cover: controller
+                                                                .folderCoverFor(
+                                                                  folders[index],
+                                                                ),
+                                                            onTap: () =>
+                                                                onFolderTap(
+                                                                  folders[index],
+                                                                ),
+                                                            onEdit: () =>
+                                                                onEditFolder(
+                                                                  folders[index],
+                                                                ),
+                                                            onRename: () =>
+                                                                onRenameFolder(
+                                                                  folders[index],
+                                                                ),
+                                                            onDelete: () =>
+                                                                onDeleteFolder(
+                                                                  folders[index],
+                                                                ),
                                                           )
                                                         : _DocumentTile(
-                                                            item: notes[index - folders.length],
-                                                            onTap: () => onOpenItem(
-                                                              notes[index - folders.length],
-                                                            ),
-                                                            onRename: () => onRenameItem(
-                                                              notes[index - folders.length],
-                                                            ),
-                                                            onDelete: () => onDeleteItem(
-                                                              notes[index - folders.length],
-                                                            ),
+                                                            item:
+                                                                notes[index -
+                                                                    folders
+                                                                        .length],
+                                                            onTap: () =>
+                                                                onOpenItem(
+                                                                  notes[index -
+                                                                      folders
+                                                                          .length],
+                                                                ),
+                                                            onRename: () =>
+                                                                onRenameItem(
+                                                                  notes[index -
+                                                                      folders
+                                                                          .length],
+                                                                ),
+                                                            onDelete: () =>
+                                                                onDeleteItem(
+                                                                  notes[index -
+                                                                      folders
+                                                                          .length],
+                                                                ),
                                                           ),
                                                   ),
                                                 ),
@@ -841,15 +859,13 @@ class _CatalogTile extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Expanded(
-          child: previewAspectRatio == null
-              ? previewSurface
-              : Align(
-                  alignment: Alignment.topCenter,
-                  child: AspectRatio(
-                    aspectRatio: previewAspectRatio!,
-                    child: previewSurface,
-                  ),
-                ),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: AspectRatio(
+              aspectRatio: previewAspectRatio ?? 1,
+              child: previewSurface,
+            ),
+          ),
         ),
       ],
     );

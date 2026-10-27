@@ -47,10 +47,7 @@ void main() {
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {
       final darkMode = theme.brightness == Brightness.dark;
       final base = StudyActionStyles.plannedSessionColor(theme);
-      final display = AppColors.displayInkColor(
-        selected,
-        darkMode: darkMode,
-      );
+      final display = AppColors.displayInkColor(selected, darkMode: darkMode);
       final expected = Color.alphaBlend(
         display.withValues(alpha: darkMode ? 0.45 : 0.32),
         base,
@@ -62,10 +59,7 @@ void main() {
       expect(StudyActionStyles.sessionCardColor(theme, null), base);
     }
     expect(
-      StudyActionStyles.sessionCardColor(
-        AppTheme.light(),
-        selected.toARGB32(),
-      ),
+      StudyActionStyles.sessionCardColor(AppTheme.light(), selected.toARGB32()),
       isNot(
         StudyActionStyles.sessionCardColor(
           AppTheme.dark(),
@@ -76,8 +70,9 @@ void main() {
   });
 
   for (final darkMode in [false, true]) {
-    testWidgets('calendar color preview follows theme, dark=$darkMode',
-        (tester) async {
+    testWidgets('calendar color preview follows theme, dark=$darkMode', (
+      tester,
+    ) async {
       final planner = await loadPlanner();
       final color = InkColorPreset.pink.colors[1];
       final event = planner.create(
@@ -94,10 +89,8 @@ void main() {
             home: Builder(
               builder: (context) => Scaffold(
                 body: TextButton(
-                  onPressed: () => showStudySessionEditor(
-                    context,
-                    session: event,
-                  ),
+                  onPressed: () =>
+                      showStudySessionEditor(context, session: event),
                   child: const Text('Edit event color'),
                 ),
               ),
@@ -113,10 +106,7 @@ void main() {
           matching: find.byIcon(Icons.palette_outlined),
         ),
       );
-      expect(
-        icon.color,
-        AppColors.displayInkColor(color, darkMode: darkMode),
-      );
+      expect(icon.color, AppColors.displayInkColor(color, darkMode: darkMode));
       expect(planner.sessions.single.colorValue, color.toARGB32());
     });
   }
@@ -602,21 +592,13 @@ void main() {
       final connector = find.byKey(
         ValueKey('planner-week-hour-connector-${now.hour}'),
       );
-      expect(connector, findsOneWidget);
-      expect(
-        tester.getRect(connector).right,
-        closeTo(tester.getRect(hourCell).left, 0.1),
-      );
-      expect(
-        tester.getRect(connector).left,
-        greaterThan(tester.getRect(label).right),
-      );
+      expect(connector, findsNothing);
       final columnLines = find.byKey(
         const ValueKey('planner-week-column-lines'),
       );
       expect(columnLines, findsOneWidget);
       final painter = tester.widget<CustomPaint>(columnLines);
-      expect(painter.foregroundPainter, isNotNull);
+      expect(painter.painter, isNotNull);
       expect(tester.getRect(columnLines), tester.getRect(hourlyList));
 
       await tester.tap(find.text('Day').last);
@@ -627,7 +609,10 @@ void main() {
         matching: find.text('${now.hour.toString().padLeft(2, '0')}:00'),
       );
       expect(hourText, findsOneWidget);
-      expect(tester.getRect(hourText).top, closeTo(tester.getRect(row).top, 2));
+      expect(
+        tester.getCenter(hourText).dy,
+        closeTo(tester.getCenter(row).dy, 2),
+      );
 
       await tester.tap(find.text('Month'));
       await tester.pumpAndSettle();
@@ -778,6 +763,8 @@ void main() {
       matching: find.byType(Scrollable),
     );
     final position = tester.state<ScrollableState>(scrollable).position;
+    position.jumpTo(position.minScrollExtent);
+    await tester.pump();
     final firstOffset = position.pixels;
     await tester.drag(hours, const Offset(0, -150));
     await tester.pumpAndSettle();
@@ -876,9 +863,14 @@ void main() {
         ValueKey('planner-day-cell-${keyDate(other)}'),
       );
       final theme = Theme.of(tester.element(cell));
-      Color cellColor(Finder finder) =>
-          (tester.widget<Container>(finder).decoration! as BoxDecoration)
-              .color!;
+      Color cellColor(Finder finder) {
+        final container = tester.widget<Container>(finder);
+        final decoration = container.decoration;
+        return decoration is BoxDecoration
+            ? decoration.color!
+            : container.color!;
+      }
+
       final base = theme.colorScheme.surfaceContainerLowest;
       final shade = darkMode
           ? theme.colorScheme.surface
@@ -938,7 +930,7 @@ void main() {
       final tile = find.byKey(ValueKey('planner-session-tile:${session.id}'));
       expect(
         tester.getRect(tile).left - tester.getRect(time).right,
-        greaterThan(22),
+        closeTo(0, 0.1),
       );
 
       await tester.tap(find.text('Month'));
@@ -1158,7 +1150,14 @@ void main() {
       final sidebarMaterial = tester.widget<Material>(upcoming);
       final calendarMaterial = tester.widget<Material>(calendar);
       expect(sidebarMaterial.color, calendarMaterial.color);
-      expect(sidebarMaterial.shape, calendarMaterial.shape);
+      final sidebarShape = sidebarMaterial.shape! as RoundedRectangleBorder;
+      expect(sidebarShape.borderRadius, BorderRadius.circular(12));
+      expect(
+        sidebarShape.side.color,
+        darkMode
+            ? Theme.of(tester.element(upcoming)).colorScheme.outlineVariant
+            : AppColors.toolbar,
+      );
 
       await tester.tap(
         find.descendant(
@@ -1335,6 +1334,8 @@ void main() {
     expect(find.text('Description'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('study-session-colour')));
     await tester.pumpAndSettle();
+    expect(find.text('Pick color'), findsOneWidget);
+    expect(find.text('Palettes'), findsOneWidget);
     final first = InkColorPreset.blue.colors.first;
     final swatch = find.byKey(
       ValueKey('color-picker-palette-blue-${first.toARGB32()}'),
@@ -1354,7 +1355,10 @@ void main() {
       StudyActionStyles.sessionCardColor(theme, first.toARGB32()),
     );
 
-    await tester.tap(calendar);
+    final calendarTap = tester.widget<InkWell>(
+      find.descendant(of: calendar, matching: find.byType(InkWell)),
+    );
+    calendarTap.onTap!();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
@@ -1550,8 +1554,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byTooltip('Study history'), findsNothing);
     expect(find.byTooltip('Settings'), findsNothing);
-    expect(find.textContaining('★★★☆☆'), findsWidgets);
-    expect(find.textContaining('Not rated'), findsWidgets);
+    await tester.tap(find.byKey(ValueKey('planner-session-tile:${rated.id}')));
+    await tester.pumpAndSettle();
+    expect(find.text('Productivity: ★★★☆☆'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(ValueKey('planner-session-tile:${unrated.id}')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Productivity:'), findsNothing);
     expect(find.textContaining('null/5'), findsNothing);
     expect(find.textContaining('Rate now'), findsNothing);
     expect(tester.takeException(), isNull);

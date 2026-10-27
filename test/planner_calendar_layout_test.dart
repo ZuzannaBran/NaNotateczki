@@ -149,7 +149,15 @@ void main() {
     await tester.tap(find.text('Month'));
     await tester.pumpAndSettle();
     final month = tester.widget<Container>(
-      find.byKey(const ValueKey('planner-month-frame')),
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('planner-month-frame')),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Container && widget.foregroundDecoration != null,
+            ),
+          )
+          .first,
     );
     final monthBorder = month.foregroundDecoration! as BoxDecoration;
     expect(monthBorder.borderRadius, BorderRadius.circular(12));

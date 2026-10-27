@@ -299,56 +299,58 @@ void main() {
     },
   );
 
-  test('previous factory swatches migrate by position in every palette',
-      () async {
-    const previousVersions = <Map<InkColorPreset, List<String>>>[
-      {
-        InkColorPreset.blue: ['#263042', '#354e6b', '#889bb0'],
-        InkColorPreset.green: ['#273526', '#45624e', '#c0cfb2'],
-      },
-      {
-        InkColorPreset.green: ['#394931', '#74866f', '#9bae96'],
-      },
-      {
-        InkColorPreset.blue: ['#1a2130', '#6a8ab9', '#8aaad1'],
-        InkColorPreset.pink: ['#3a212b', '#b66d86', '#ce8da8'],
-        InkColorPreset.green: ['#1f3027', '#73af8e', '#99c2a8'],
-      },
-      {
-        InkColorPreset.blue: ['#1a2130', '#acbed8', '#dee7f2'],
-        InkColorPreset.pink: ['#3a212b', '#dab5c2', '#f2e1e8'],
-        InkColorPreset.green: ['#1f3027', '#b0d2bf', '#e4efe8'],
-      },
-      {
-        InkColorPreset.blue: ['#1a2130', '#7798c0', '#acbed8'],
-        InkColorPreset.pink: ['#3a212b', '#a9788a', '#dab5c2'],
-        InkColorPreset.green: ['#1f3027', '#76a58d', '#b0d2bf'],
-      },
-    ];
-    for (final previous in previousVersions) {
-      for (final entry in previous.entries) {
-        await writeStoredText(
-          'editor_prefs.json',
-          jsonEncode({
-            'penColor': entry.value[1],
-            'highlighterColor': entry.value[1],
-            'quickColors': entry.value,
-          }),
-        );
-        final db = NotesDatabase(NativeDatabase.memory());
-        final controller = EditorController(
-          repository: _repository(db),
-          notebook: _fixture(uid: 'previous-${entry.key.name}'),
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        expect(controller.quickColors, entry.key.colors);
-        expect(controller.inkColor, entry.key.colors[1]);
-        await controller.flushPendingSaves();
-        controller.dispose();
-        await db.close();
+  test(
+    'previous factory swatches migrate by position in every palette',
+    () async {
+      const previousVersions = <Map<InkColorPreset, List<String>>>[
+        {
+          InkColorPreset.blue: ['#263042', '#354e6b', '#889bb0'],
+          InkColorPreset.green: ['#273526', '#45624e', '#c0cfb2'],
+        },
+        {
+          InkColorPreset.green: ['#394931', '#74866f', '#9bae96'],
+        },
+        {
+          InkColorPreset.blue: ['#1a2130', '#6a8ab9', '#8aaad1'],
+          InkColorPreset.pink: ['#3a212b', '#b66d86', '#ce8da8'],
+          InkColorPreset.green: ['#1f3027', '#73af8e', '#99c2a8'],
+        },
+        {
+          InkColorPreset.blue: ['#1a2130', '#acbed8', '#dee7f2'],
+          InkColorPreset.pink: ['#3a212b', '#dab5c2', '#f2e1e8'],
+          InkColorPreset.green: ['#1f3027', '#b0d2bf', '#e4efe8'],
+        },
+        {
+          InkColorPreset.blue: ['#1a2130', '#7798c0', '#acbed8'],
+          InkColorPreset.pink: ['#3a212b', '#a9788a', '#dab5c2'],
+          InkColorPreset.green: ['#1f3027', '#76a58d', '#b0d2bf'],
+        },
+      ];
+      for (final previous in previousVersions) {
+        for (final entry in previous.entries) {
+          await writeStoredText(
+            'editor_prefs.json',
+            jsonEncode({
+              'penColor': entry.value[1],
+              'highlighterColor': entry.value[1],
+              'quickColors': entry.value,
+            }),
+          );
+          final db = NotesDatabase(NativeDatabase.memory());
+          final controller = EditorController(
+            repository: _repository(db),
+            notebook: _fixture(uid: 'previous-${entry.key.name}'),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          expect(controller.quickColors, entry.key.colors);
+          expect(controller.inkColor, entry.key.colors[1]);
+          await controller.flushPendingSaves();
+          controller.dispose();
+          await db.close();
+        }
       }
-    }
-  });
+    },
+  );
 
   test('previous blue and green third swatches keep their index', () async {
     const previous = <InkColorPreset, List<String>>{

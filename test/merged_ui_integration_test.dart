@@ -266,12 +266,6 @@ void main() {
     expect(material.color, AppColors.darkToolbar);
     await tester.tap(compact);
     await tester.pumpAndSettle();
-    final create = find.widgetWithText(FilledButton, 'New session');
-    final theme = Theme.of(tester.element(create));
-    final button = tester.widget<FilledButton>(create);
-    expect(button.style!.foregroundColor!.resolve({}), AppColors.darkText);
-    expect(button.style!.backgroundColor!.resolve({}), AppColors.darkActive);
-    expect(theme.brightness, Brightness.dark);
     final toggle = tester.widget<SegmentedButton<CalendarMode>>(
       find.byType(SegmentedButton<CalendarMode>),
     );
@@ -281,8 +275,7 @@ void main() {
     final toggleStyle = toggle.style ?? scoped.segmentedButtonTheme.style!;
     expect(toggleStyle.foregroundColor!.resolve({}), AppColors.darkText);
     await _snapshot(tester, 'planner-dark');
-    await tester.tap(create);
-    await tester.pumpAndSettle();
+    await _openSessionEditor(tester);
     final save = find.widgetWithText(FilledButton, 'Save');
     expect(Theme.of(tester.element(save)).brightness, Brightness.dark);
     expect(
@@ -321,7 +314,7 @@ void main() {
         for (final (name, button, width, count) in [
           ('folder', find.byTooltip('Folder actions'), 130.0, 3),
           ('document', find.byTooltip('Item actions').first, 130.0, 2),
-          ('create', find.byTooltip('Create'), 150.0, 3),
+          ('create', find.byTooltip('Create'), 150.0, 5),
         ]) {
           final top = tester.getTopLeft(button).dy;
           await tester.tap(button);
@@ -471,8 +464,7 @@ void main() {
       isA<TouchNavigationScrollPhysics>(),
     );
     await _openPlanner(tester);
-    await tester.tap(find.widgetWithText(FilledButton, 'New session'));
-    await tester.pumpAndSettle();
+    await _openSessionEditor(tester);
     final formScroll = find.descendant(
       of: find.byType(AlertDialog),
       matching: find.byType(SingleChildScrollView),
@@ -562,6 +554,15 @@ void _expectCatalogBackground(WidgetTester tester, Color color) {
 Future<void> _tapAppearance(WidgetTester tester, String label) async {
   // Theme changes synchronously; persistence has separate storage tests.
   await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openSessionEditor(WidgetTester tester) async {
+  await tester.tap(find.text('Day').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byTooltip('Plan on this day').first);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('calendar-add-session')));
   await tester.pumpAndSettle();
 }
 

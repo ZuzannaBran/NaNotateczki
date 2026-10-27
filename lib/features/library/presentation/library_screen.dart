@@ -504,6 +504,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
   }
 
+  void _keepCatalogOnMovedFolder(
+    LibraryController controller,
+    String source,
+    String destination,
+  ) {
+    final current = _catalogFolder;
+    if (current == null || !controller.isInFolderTree(current, source)) {
+      return;
+    }
+    setState(() {
+      _catalogFolder = destination + current.substring(source.length);
+    });
+  }
+
   void _openItem(LibraryController controller, Notebook item) {
     setState(() {
       _showCatalog = false;
@@ -965,6 +979,64 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
     }
   }
 
+  Future<String?> _moveFolderToFolder(
+    String source,
+    String targetParent,
+  ) async {
+    try {
+      await AppSaveCoordinator.instance.flushPending();
+      await widget.controller.repository.waitForPendingSaves();
+      return await widget.controller.moveFolderToFolder(source, targetParent);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to move the folder.')),
+        );
+      }
+      return null;
+    }
+  }
+
+  bool _canDropOnFolder(Object? data, String targetFolder) => switch (data) {
+    String uid => widget.controller.items.any(
+      (item) => item.uid == uid && item.folder != targetFolder,
+    ),
+    _FolderTreeDragData(:final folder) =>
+      widget.controller.canMoveFolderToFolder(folder, targetFolder),
+    _ => false,
+  };
+
+  Future<void> _acceptFolderDrop(Object data, String targetFolder) async {
+    switch (data) {
+      case String uid:
+        final moved = await _moveItemToFolder(uid, targetFolder);
+        if (moved && mounted) {
+          setState(() => _collapsedFolders.remove(targetFolder));
+        }
+      case _FolderTreeDragData(:final folder):
+        final destination = await _moveFolderToFolder(folder, targetFolder);
+        if (destination == null || !mounted) {
+          return;
+        }
+        final relocatedCollapsed = _collapsedFolders
+            .where((path) => widget.controller.isInFolderTree(path, folder))
+            .map((path) => destination + path.substring(folder.length))
+            .toSet();
+        setState(() {
+          _collapsedFolders.removeWhere(
+            (path) => widget.controller.isInFolderTree(path, folder),
+          );
+          _collapsedFolders
+            ..addAll(relocatedCollapsed)
+            ..add(destination)
+            ..remove(targetFolder);
+        });
+        context
+            .findAncestorStateOfType<_LibraryScreenState>()
+            ?._keepCatalogOnMovedFolder(widget.controller, folder, destination);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -1039,8 +1111,9 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                               ),
                               padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
                               children: [
-                                for (final folder in
-                                    controller.childFoldersOf(null))
+                                for (final folder in controller.childFoldersOf(
+                                  null,
+                                ))
                                   _buildFolder(folder),
                               ],
                             ),
@@ -1110,41 +1183,72 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          DragTarget<String>(
+          DragTarget<Object>(
             key: ValueKey('library-folder-drop:$folder'),
-            onWillAcceptWithDetails: (details) => controller.items.any(
-              (item) => item.uid == details.data && item.folder != folder,
-            ),
-            onAcceptWithDetails: (details) async {
-              final moved = await _moveItemToFolder(details.data, folder);
-              if (moved && mounted) {
-                setState(() => _collapsedFolders.remove(folder));
-              }
-            },
-            builder: (context, candidates, rejected) => _FolderTreeRow(
-              folder: folder,
-              expanded: expanded,
-              selected:
-                  !widget.showingProjects &&
-                  controller.selectedFolder == folder,
-              dropHighlighted: candidates.isNotEmpty,
-              onToggle: () {
-                setState(() {
-                  if (expanded) {
-                    _collapsedFolders.add(folder);
-                  } else {
-                    _collapsedFolders.remove(folder);
-                  }
-                });
+            onWillAcceptWithDetails: (details) =>
+                _canDropOnFolder(details.data, folder),
+            onAcceptWithDetails: (details) =>
+                _acceptFolderDrop(details.data, folder),
+            builder: (context, candidates, rejected) => LayoutBuilder(
+              builder: (context, constraints) {
+                Widget folderRow({
+                  required bool rowExpanded,
+                  required bool dragging,
+                  Key? key,
+                }) => _FolderTreeRow(
+                  key: key,
+                  folder: folder,
+                  expanded: rowExpanded,
+                  selected:
+                      !widget.showingProjects &&
+                      controller.selectedFolder == folder,
+                  dropHighlighted: candidates.isNotEmpty,
+                  dragging: dragging,
+                  onToggle: () {
+                    setState(() {
+                      if (expanded) {
+                        _collapsedFolders.add(folder);
+                      } else {
+                        _collapsedFolders.remove(folder);
+                      }
+                    });
+                  },
+                  onTap: () => widget.onOpenFolder(folder),
+                  onEdit: () =>
+                      showFolderCoverEditor(context, controller, folder),
+                  onRename: () => context
+                      .findAncestorStateOfType<_LibraryScreenState>()
+                      ?._promptRenameFolder(controller, folder),
+                  onDelete: () => context
+                      .findAncestorStateOfType<_LibraryScreenState>()
+                      ?._confirmDeleteFolder(controller, folder),
+                );
+
+                final row = folderRow(
+                  rowExpanded: expanded,
+                  dragging: false,
+                  key: ValueKey('library-folder-row:$folder'),
+                );
+                return LongPressDraggable<_FolderTreeDragData>(
+                  key: ValueKey('library-folder-drag:$folder'),
+                  data: _FolderTreeDragData(folder),
+                  axis: Axis.vertical,
+                  maxSimultaneousDrags: 1,
+                  onDragStarted: () {
+                    setState(() => _collapsedFolders.add(folder));
+                  },
+                  feedback: SizedBox(
+                    width: constraints.maxWidth,
+                    child: folderRow(
+                      rowExpanded: false,
+                      dragging: true,
+                      key: ValueKey('library-folder-drag-feedback:$folder'),
+                    ),
+                  ),
+                  childWhenDragging: Opacity(opacity: 0, child: row),
+                  child: row,
+                );
               },
-              onTap: () => widget.onOpenFolder(folder),
-              onEdit: () => showFolderCoverEditor(context, controller, folder),
-              onRename: () => context
-                  .findAncestorStateOfType<_LibraryScreenState>()
-                  ?._promptRenameFolder(controller, folder),
-              onDelete: () => context
-                  .findAncestorStateOfType<_LibraryScreenState>()
-                  ?._confirmDeleteFolder(controller, folder),
             ),
           ),
           if (expanded)
@@ -1243,12 +1347,20 @@ class _EmptyLibraryTree extends StatelessWidget {
   }
 }
 
+class _FolderTreeDragData {
+  const _FolderTreeDragData(this.folder);
+
+  final String folder;
+}
+
 class _FolderTreeRow extends StatelessWidget {
   const _FolderTreeRow({
+    super.key,
     required this.folder,
     required this.expanded,
     required this.selected,
     required this.dropHighlighted,
+    required this.dragging,
     required this.onToggle,
     required this.onTap,
     required this.onEdit,
@@ -1260,6 +1372,7 @@ class _FolderTreeRow extends StatelessWidget {
   final bool expanded;
   final bool selected;
   final bool dropHighlighted;
+  final bool dragging;
   final VoidCallback onToggle;
   final VoidCallback onTap;
   final VoidCallback onEdit;
@@ -1269,11 +1382,17 @@ class _FolderTreeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final draggingColor = Color.alphaBlend(
+      colorScheme.onSurface.withValues(alpha: 0.10),
+      colorScheme.surfaceContainerHighest,
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1),
       child: Material(
-        color: dropHighlighted
+        color: dragging
+            ? draggingColor
+            : dropHighlighted
             ? colorScheme.surfaceContainerHigh
             : selected
             ? colorScheme.surfaceContainerHighest

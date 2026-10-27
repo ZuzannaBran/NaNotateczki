@@ -16,6 +16,7 @@ import 'package:program/features/editor/presentation/editor_settings_screen.dart
 import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:program/features/planner/presentation/task_list_screen.dart';
 import 'package:program/features/planner/state/planner_task.dart';
@@ -205,14 +206,19 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(950, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final db = NotesDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
     final repository = NotebookRepository(db);
     final library = LibraryController(
       repository,
       CloudSyncService(repository),
       LocalBackupService(repository),
     );
-    await library.initialize();
-    final planner = await library.createPlanner();
+    addTearDown(library.dispose);
+    late Notebook planner;
+    await tester.runAsync(() async {
+      await library.initialize();
+      planner = await library.createPlanner();
+    });
 
     await tester.pumpWidget(
       ChangeNotifierProvider<LibraryController>.value(
@@ -316,10 +322,11 @@ void main() {
     );
     expect(
       tester.getTopRight(deleteButton).dx,
-      greaterThan(
+      closeTo(
         tester
             .getTopRight(find.byKey(ValueKey('planner-task-date:${task.id}')))
             .dx,
+        1,
       ),
     );
 
@@ -341,10 +348,8 @@ void main() {
     await tester.tap(find.byKey(ValueKey('planner-task-delete:${task.id}')));
     await tester.pump();
     expect(library.plannerTasks(planner.uid), isEmpty);
-    await library.flushPlannerTasks();
+    await tester.runAsync(library.flushPlannerTasks);
     await tester.pumpWidget(const SizedBox.shrink());
-    library.dispose();
-    await db.close();
   });
   testWidgets('planner header stays aligned and settings avoid editor', (
     tester,
@@ -353,18 +358,24 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     final db = NotesDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
     final repository = NotebookRepository(db);
-    final planner = await repository.createPlanner(
-      title: 'New Planner',
-      folder: 'Planner folder',
-    );
+    late Notebook planner;
+    await tester.runAsync(() async {
+      planner = await repository.createPlanner(
+        title: 'New Planner',
+        folder: 'Planner folder',
+      );
+    });
     final library = LibraryController(
       repository,
       CloudSyncService(repository),
       LocalBackupService(repository),
     );
-    await library.loadItems();
+    addTearDown(library.dispose);
+    await tester.runAsync(library.loadItems);
     final preferences = AppPreferencesController();
+    addTearDown(preferences.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -436,8 +447,5 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
-    library.dispose();
-    preferences.dispose();
-    await db.close();
   });
 }

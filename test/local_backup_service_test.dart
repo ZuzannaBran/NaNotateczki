@@ -84,7 +84,10 @@ void main() {
               ).readAsString(),
             )
             as Map<String, dynamic>;
-    expect(manifest['folderMetadata'], latestMetadata);
+    expect(manifest['folderMetadata'], {
+      ...latestMetadata,
+      'folders': ['Final Folder', 'Notes'],
+    });
     expect(AppErrorLog.instance.length, errorsBefore);
     expect(await File('${directory.path}/$key.tmp').exists(), isFalse);
     expect(await File('${directory.path}/$key.previous').exists(), isFalse);

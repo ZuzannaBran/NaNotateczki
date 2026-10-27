@@ -16,98 +16,107 @@ void main() {
   useIsolatedNativeTestDocuments();
   useInMemoryTestTextStorage();
 
-  test('nested folders survive reload, rename and cascading deletion', () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    final repository = NotebookRepository(database);
-    LibraryController newController() => LibraryController(
-      repository,
-      CloudSyncService(repository),
-      LocalBackupService(repository),
-    );
-    final controller = newController();
-    await controller.initialize();
+  test(
+    'nested folders survive reload, rename and cascading deletion',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      final repository = NotebookRepository(database);
+      LibraryController newController() => LibraryController(
+        repository,
+        CloudSyncService(repository),
+        LocalBackupService(repository),
+      );
+      final controller = newController();
+      addTearDown(database.close);
+      addTearDown(controller.dispose);
+      await controller.initialize();
 
-    expect(await controller.createFolder('Courses'), 'Courses');
-    expect(
-      await controller.createFolder('Math', parent: 'Courses'),
-      'Courses/Math',
-    );
-    expect(
-      await controller.createFolder('Lectures', parent: 'Courses/Math'),
-      'Courses/Math/Lectures',
-    );
-    expect(await controller.createFolder('Art'), 'Art');
-    expect(await controller.createFolder('Math', parent: 'Courses'), isNull);
-    expect(await controller.createFolder('Invalid/Name'), isNull);
-    expect(
-      await controller.createFolder('Orphan', parent: 'Missing'),
-      isNull,
-    );
-    expect(controller.childFoldersOf(null), ['Art', 'Courses']);
-    expect(controller.childFoldersOf('Courses'), ['Courses/Math']);
-    expect(controller.folderLabel('Courses/Math'), 'Math');
+      expect(await controller.createFolder('Courses'), 'Courses');
+      expect(
+        await controller.createFolder('Math', parent: 'Courses'),
+        'Courses/Math',
+      );
+      expect(
+        await controller.createFolder('Lectures', parent: 'Courses/Math'),
+        'Courses/Math/Lectures',
+      );
+      expect(await controller.createFolder('Art'), 'Art');
+      expect(await controller.createFolder('Math', parent: 'Courses'), isNull);
+      expect(await controller.createFolder('Invalid/Name'), isNull);
+      expect(
+        await controller.createFolder('Orphan', parent: 'Missing'),
+        isNull,
+      );
+      expect(controller.childFoldersOf(null), ['Art', 'Courses']);
+      expect(controller.childFoldersOf('Courses'), ['Courses/Math']);
+      expect(controller.folderLabel('Courses/Math'), 'Math');
 
-    await controller.updateFolderCover(
-      'Courses/Math',
-      const FolderCoverStyle(iconColor: Colors.blue),
-    );
-    final note = await repository.createNotebook(
-      title: 'Lecture one',
-      folder: 'Courses/Math/Lectures',
-    );
-    await controller.loadItems();
-    await controller.selectItem(note.uid);
-    expect(
-      await controller.renameFolder('Courses/Math', 'Algebra'),
-      'Courses/Algebra',
-    );
-    expect(controller.selectedFolder, 'Courses/Algebra/Lectures');
-    expect(
-      controller.folderCoverFor('Courses/Algebra').iconColor,
-      Colors.blue,
-    );
-    expect(
-      (await repository.getNotebook(note.uid))?.folder,
-      'Courses/Algebra/Lectures',
-    );
+      await controller.updateFolderCover(
+        'Courses/Math',
+        const FolderCoverStyle(iconColor: Colors.blue),
+      );
+      final note = await repository.createNotebook(
+        title: 'Lecture one',
+        folder: 'Courses/Math/Lectures',
+      );
+      await controller.loadItems();
+      await controller.selectItem(note.uid);
+      expect(
+        await controller.renameFolder('Courses/Math', 'Algebra'),
+        'Courses/Algebra',
+      );
+      expect(controller.selectedFolder, 'Courses/Algebra/Lectures');
+      expect(
+        controller.folderCoverFor('Courses/Algebra').iconColor,
+        Colors.blue,
+      );
+      expect(
+        (await repository.getNotebook(note.uid))?.folder,
+        'Courses/Algebra/Lectures',
+      );
 
-    final restored = newController();
-    await restored.initialize();
-    expect(restored.folderNames, contains('Courses/Algebra/Lectures'));
-    expect(restored.folderNames, isNot(contains('Courses/Math')));
-    expect(
-      restored.folderCoverFor('Courses/Algebra').iconColor,
-      Colors.blue,
-    );
-    await restored.deleteFolder('Courses/Algebra');
-    expect(restored.childFoldersOf('Courses'), isEmpty);
-    expect(restored.folderNames, containsAll(['Art', 'Courses']));
-    expect(await repository.getNotebook(note.uid), isNull);
-    restored.dispose();
-    controller.dispose();
-    await database.close();
-  });
+      final restored = newController();
+      addTearDown(restored.dispose);
+      await restored.initialize();
+      expect(restored.folderNames, contains('Courses/Algebra/Lectures'));
+      expect(restored.folderNames, isNot(contains('Courses/Math')));
+      expect(
+        restored.folderCoverFor('Courses/Algebra').iconColor?.toARGB32(),
+        Colors.blue.toARGB32(),
+      );
+      await restored.deleteFolder('Courses/Algebra');
+      expect(restored.childFoldersOf('Courses'), isEmpty);
+      expect(restored.folderNames, containsAll(['Art', 'Courses']));
+      expect(await repository.getNotebook(note.uid), isNull);
+    },
+  );
 
   testWidgets('catalog shows direct children and documents at each level', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1200, 850));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final database = NotesDatabase(NativeDatabase.memory());
-    final repository = NotebookRepository(database);
-    final controller = LibraryController(
-      repository,
-      CloudSyncService(repository),
-      LocalBackupService(repository),
-    );
-    await controller.initialize();
-    await controller.createFolder('Science');
-    await controller.createFolder('Math', parent: 'Science');
-    await repository.createNotebook(
-      title: 'Science notebook',
-      folder: 'Science',
-    );
-    await controller.loadItems();
+    late NotesDatabase database;
+    late LibraryController controller;
+    await tester.runAsync(() async {
+      database = NotesDatabase(NativeDatabase.memory());
+      final repository = NotebookRepository(database);
+      controller = LibraryController(
+        repository,
+        CloudSyncService(repository),
+        LocalBackupService(repository),
+      );
+      await controller.initialize();
+      await controller.createFolder('Science');
+      await controller.createFolder('Math', parent: 'Science');
+      await repository.createNotebook(
+        title: 'Science notebook',
+        folder: 'Science',
+      );
+      await controller.loadItems();
+    });
+    addTearDown(database.close);
+    addTearDown(controller.dispose);
 
     String? current;
     await tester.pumpWidget(
@@ -134,23 +143,34 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('catalog-folder:Science')),
-        findsOneWidget);
-    expect(find.byKey(const ValueKey('catalog-folder:Science/Math')),
-        findsNothing);
+    expect(
+      find.byKey(const ValueKey('catalog-folder:Science')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('catalog-folder:Science/Math')),
+      findsNothing,
+    );
 
     await tester.tap(find.byKey(const ValueKey('catalog-folder:Science')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('catalog-folder:Science/Math')),
-        findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('catalog-folder:Science/Math')),
+      findsOneWidget,
+    );
+    final nestedFolderCover = find.byKey(
+      const ValueKey('catalog-folder-cover:Science/Math'),
+    );
+    final nestedFolderCoverSize = tester.getSize(nestedFolderCover);
+    expect(nestedFolderCoverSize.width, nestedFolderCoverSize.height);
     expect(find.text('Math'), findsWidgets);
     expect(find.text('Science notebook'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('catalog-back')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('catalog-folder:Science')),
-        findsOneWidget);
-    controller.dispose();
-    await database.close();
+    expect(
+      find.byKey(const ValueKey('catalog-folder:Science')),
+      findsOneWidget,
+    );
   });
 }

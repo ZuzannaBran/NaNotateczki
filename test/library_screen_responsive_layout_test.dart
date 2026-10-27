@@ -646,7 +646,8 @@ void main() {
     final createEntries = find.byWidgetPredicate(
       (widget) => widget is PopupMenuItem && widget.height == 36,
     );
-    expect(createEntries, findsNWidgets(4));
+    expect(createEntries, findsNWidgets(5));
+    expect(find.text('New main folder'), findsOneWidget);
     expect(find.text('New folder'), findsOneWidget);
     expect(find.text('New notebook'), findsOneWidget);
     expect(find.text('New board'), findsOneWidget);
@@ -656,6 +657,7 @@ void main() {
       findsNothing,
     );
     for (final label in [
+      'New main folder',
       'New folder',
       'New notebook',
       'New board',
@@ -722,7 +724,7 @@ void main() {
     final bridgeRect = tester.getRect(shadowBridge);
     expect(bridgeRect.left, closeTo(sidebarRight - 2, 1));
     expect(bridgeRect.right, closeTo(sidebarRight + 150, 1));
-    expect(bridgeRect.height, closeTo(150, 1));
+    expect(bridgeRect.height, closeTo(186, 1));
 
     await tester.tap(find.text('New folder'));
     await tester.pumpAndSettle();
@@ -790,7 +792,7 @@ void main() {
     );
     expect(
       (panel.decoration as BoxDecoration).borderRadius,
-      BorderRadius.circular(999),
+      BorderRadius.circular(12),
     );
     final navigationToggle = find.byKey(
       const ValueKey('library-navigation-toggle'),
@@ -933,7 +935,7 @@ void main() {
       expect(
         (tester.widget<Container>(panel).decoration as BoxDecoration)
             .borderRadius,
-        BorderRadius.circular(999),
+        BorderRadius.circular(12),
       );
     }
 
@@ -1104,7 +1106,7 @@ void main() {
     );
     expect(
       tester.widget<Padding>(timer).padding,
-      const EdgeInsets.fromLTRB(14, 20, 14, 0),
+      const EdgeInsets.fromLTRB(14, 20, 14, 16),
     );
     expect(tester.getSize(account).height, AppHeaderDivider.toolbarHeight);
     expect(
@@ -1201,7 +1203,7 @@ void main() {
       matching: find.byType(Scrollable),
     );
     expect(
-      tester.state<ScrollableState>(timerScroll).position.maxScrollExtent,
+      tester.state<ScrollableState>(timerScroll.first).position.maxScrollExtent,
       greaterThan(0),
     );
     expect(tester.takeException(), isNull);

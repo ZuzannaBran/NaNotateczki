@@ -252,14 +252,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
   }
 
   Future<void> _pickColor() async {
-    final recent = await SharedRecentColors.load();
-    if (!mounted) {
-      return;
-    }
     final picked = await EditorToolbar.pickColor(
       context,
       _color ?? AppColors.blueColorSet.first,
-      recent,
+      const [],
       onPaletteColorSelected: (color) {
         if (mounted) {
           setState(() => _color = color);
