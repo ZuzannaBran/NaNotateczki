@@ -27,8 +27,6 @@ const double _eraserStrokeRadiusScale = 1.5;
 const double _eraserTrailMaxLength = 96.0;
 const double _scratchEraseIntersectionMinRadius = 1.0;
 const double _scratchEraseIntersectionRadiusScale = 0.5;
-const double _scratchEraseDeleteMinRadius = 8.0;
-const double _scratchEraseDeleteRadiusScale = 6.0;
 const double _scratchEraseMinPathDensity = 4.0;
 const int _scratchEraseMinDirectionReversals = 3;
 const int _scratchEraseMinInkHits = 3;
@@ -639,13 +637,6 @@ double _scratchEraseIntersectionRadius(double strokeWidth) {
   return max(
     _scratchEraseIntersectionMinRadius,
     strokeWidth * _scratchEraseIntersectionRadiusScale,
-  );
-}
-
-double _scratchEraseDeleteRadius(double strokeWidth) {
-  return max(
-    _scratchEraseDeleteMinRadius,
-    strokeWidth * _scratchEraseDeleteRadiusScale,
   );
 }
 
@@ -1609,7 +1600,10 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     final intersectionRadius = _scratchEraseIntersectionRadius(
       controller.inkStrokeWidth,
     );
-    final deleteRadius = _scratchEraseDeleteRadius(controller.inkStrokeWidth);
+    final deleteRadius = InkEraserEngine.scratchEraseRadius(
+      gesture: _currentPoints,
+      strokeWidth: controller.inkStrokeWidth,
+    );
     final inkHits = InkEraserEngine.scratchInkHitCount(
       strokes: strokes,
       gesture: _currentPoints,
@@ -3112,7 +3106,10 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     final intersectionRadius = _scratchEraseIntersectionRadius(
       controller.inkStrokeWidth,
     );
-    final deleteRadius = _scratchEraseDeleteRadius(controller.inkStrokeWidth);
+    final deleteRadius = InkEraserEngine.scratchEraseRadius(
+      gesture: gesture,
+      strokeWidth: controller.inkStrokeWidth,
+    );
     final inkHits = InkEraserEngine.scratchInkHitCount(
       strokes: strokes,
       gesture: gesture,

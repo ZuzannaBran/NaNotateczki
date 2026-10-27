@@ -104,6 +104,24 @@ class InkEraserEngine {
     return InkBrushEraseResult(strokes: next, changed: changed);
   }
 
+  /// Keeps small scratch gestures local without changing large erase widths.
+  static double scratchEraseRadius({
+    required List<InkPoint> gesture,
+    required double strokeWidth,
+  }) {
+    final fullRadius = max(8.0, strokeWidth * 6.0);
+    if (gesture.isEmpty) {
+      return fullRadius;
+    }
+    final bounds = _pointsBounds(
+      gesture.map((point) => point.toOffset()).toList(),
+    );
+    final diagonal = sqrt(
+      bounds.width * bounds.width + bounds.height * bounds.height,
+    );
+    return min(fullRadius, max(1.5, diagonal * 0.3));
+  }
+
   static int scratchInkHitCount({
     required List<InkStroke> strokes,
     required List<InkPoint> gesture,
@@ -428,13 +446,15 @@ class InkEraserEngine {
     InkStroke stroke,
     List<Offset> path,
     double radius,
-    String Function() createId,
-  ) {
+    String Function() createId, {
+    bool includeStrokeWidth = true,
+  }) {
     if (!_canErase(stroke) || stroke.points.isEmpty) {
       return [stroke];
     }
 
-    final eraseRadius = radius + stroke.width * 0.5;
+    final eraseRadius =
+        radius + (includeStrokeWidth ? stroke.width * 0.5 : 0);
     final eraseRadiusSquared = eraseRadius * eraseRadius;
     if (stroke.points.length == 1) {
       return _distanceSquaredToPolyline(stroke.points.first.toOffset(), path) <=
@@ -599,47 +619,16 @@ class InkEraserEngine {
     double radius,
     String Function() createId,
   ) {
-    final points = stroke.points;
-    final removed = List<bool>.filled(points.length, false);
-    final radiusSquared = radius * radius;
-    for (var index = 0; index < points.length; index++) {
-      if (_distanceSquaredToPolyline(points[index].toOffset(), gesture) <=
-          radiusSquared) {
-        removed[index] = true;
-      }
-    }
-    for (var index = 0; index < points.length - 1; index++) {
-      if (_segmentDistanceSquaredToPolyline(
-            points[index].toOffset(),
-            points[index + 1].toOffset(),
-            gesture,
-          ) <=
-          radiusSquared) {
-        removed[index] = true;
-        removed[index + 1] = true;
-      }
-    }
-    if (!removed.contains(true)) {
+    final parts = _splitStrokeForBrush(
+      stroke,
+      gesture,
+      radius,
+      createId,
+      includeStrokeWidth: false,
+    );
+    if (parts.length == 1 && identical(parts.single, stroke)) {
       return null;
     }
-
-    final parts = <InkStroke>[];
-    var run = <InkPoint>[];
-    void flushRun() {
-      if (run.length >= 2) {
-        parts.add(stroke.copyWith(id: createId(), points: List.of(run)));
-      }
-      run = <InkPoint>[];
-    }
-
-    for (var index = 0; index < points.length; index++) {
-      if (removed[index]) {
-        flushRun();
-      } else {
-        run.add(points[index]);
-      }
-    }
-    flushRun();
     return parts;
   }
 

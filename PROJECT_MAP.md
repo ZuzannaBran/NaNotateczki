@@ -368,16 +368,19 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/ink_spatial_index.dart` (125): cache'owany
   indeks siatkowy kandydatów do hit-testu.
   14: `inkSpatialIndexFor`; 24: `InkSpatialIndex`.
-- `lib/features/notebook/domain/ink_eraser_engine.dart` (837):
+- `lib/features/notebook/domain/ink_eraser_engine.dart` (826):
   jedyny silnik modyfikacji gumki dla boarda i notebooka. Obsługuje zwykłą
   gumkę, erase-stroke, gumkę zakresową (przycinanie fragmentów)
-  oraz scratch erase. Legacy maski są tu wyłącznie jednorazowo
+  oraz scratch erase. Promień bazgrołu skaluje się do jego rozmiaru;
+  rzadkie punkty tuszu są przycinane, bez kasowania całego odcinka.
+  Legacy maski są tu wyłącznie jednorazowo
   normalizowane do zwykłego ink; generator fragmentów unika
   kolizji ID i obsługuje też pojedyncze punkty.
   34: `InkEraserEngine`; 37: `normalizePage`; 42: `normalizeNotebook`;
-  107: `scratchInkHitCount`; 129: `eraseScratchParts`;
-  169: `eraseAreaParts` — przycinanie na krawędziach wielokąta;
-  215: `flattenLegacyErasers`.
+  108: `scratchEraseRadius`;
+  125: `scratchInkHitCount`; 147: `eraseScratchParts`;
+  187: `eraseAreaParts` — przycinanie na krawędziach wielokąta;
+  232: `flattenLegacyErasers`.
 - `lib/features/notebook/domain/text_block.dart` (45): blok Quill z pozycją,
   stylem, szerokością i rotacją.
   3: `TextBlock`.
@@ -1211,7 +1214,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   Nieaktywne teksty używają
   starego Quilla jako fallback.
 
-### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4201 linii)
+### `lib/features/editor/presentation/widgets/drawing_canvas.dart` (4273 linii)
 
 Dwa świadomie osobne canvasy ink, wspólna geometria rozpoznawania gestów,
 lasso, handoff aktywnej kreski i pomiary wydajności.
@@ -1227,7 +1230,7 @@ pierwszeństwo, gdy pojedynczy kontakt dłoni pojawił się przed nim; canvasy
 przyjmują zdarzenia rysika podczas nawigacji wielodotykowej, aby móc
 bezpiecznie przejąć kontakt. Dwa palce bez rysika pozostają wyłącznie
 nawigacją (pan/zoom), bez tworzenia ink. Wszystkie modyfikacje
-gumki, włącznie ze scratch erase, delegują dane do jednego
+gumki, włącznie ze scratch erase ze zmiennym promieniem, delegują dane do jednego
 `InkEraserEngine`. Canvas nie ma już drugiego silnika cięcia, zapisanego
 `BlendMode.clear` ani martwego stanu kursora gumki. Tymczasowy podgląd
 brush/area istnieje tylko podczas aktywnego gestu. Lasso oraz gumka
@@ -1240,10 +1243,10 @@ szarości w trybie ciemnym bez zmian modelu. Podczas rysowania
 pen/highlighter overlay stosuje ten sam LOD co zapisany
 tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
 
-- 46: `_InkPerfLog`; geometria rozpoznawania scratch pozostaje przed
+- 44: `_InkPerfLog`; geometria rozpoznawania scratch pozostaje przed
   deklaracjami canvasów, ale hit-test i cięcie są w `InkEraserEngine`.
-- 665: `DrawingCanvas`; 687: `DocumentDrawingCanvas`.
-- 904: `_DrawingCanvasState`; 2250: `_DocumentDrawingCanvasState`.
+- 656: `DrawingCanvas`; 678: `DocumentDrawingCanvas`.
+- 895: `_DrawingCanvasState`; 2290: `_DocumentDrawingCanvasState`.
 - 3783: `_InkPainter`; 3843: `_InkOverlayPainter`;
   4087: `_InkPageLayer`; 4134: `_PageInkPainter`.
 
@@ -1529,7 +1532,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
-- `test/ink_eraser_engine_test.dart` (348): zwykła gumka, scratch erase,
+- `test/ink_eraser_engine_test.dart` (401): zwykła gumka, scratch erase,
+  krótki bazgroł, ochronę sąsiednich kresek i limit dużego gestu,
   erase-stroke/area hit-test, precyzyjne fragmenty zakresu, undo/redo,
   migracja legacy gumek, pojedyncze punkty,
   kolizje ID i undo

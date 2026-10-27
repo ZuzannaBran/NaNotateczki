@@ -81,6 +81,60 @@ void main() {
     expect(result.strokes.any((stroke) => stroke.tool.isEraser), isFalse);
   });
 
+  test('small scratch preserves adjacent ink and splits sparse strokes', () {
+    final target = _stroke('target', const [
+      Offset(0, 0),
+      Offset(100, 0),
+    ]);
+    final neighbor = _stroke('neighbor', const [
+      Offset(0, 8),
+      Offset(100, 8),
+    ]);
+    const gesture = [
+      InkPoint(dx: 48, dy: -2, pressure: 1),
+      InkPoint(dx: 52, dy: 2, pressure: 1),
+      InkPoint(dx: 48, dy: 2, pressure: 1),
+      InkPoint(dx: 52, dy: -2, pressure: 1),
+      InkPoint(dx: 48, dy: -2, pressure: 1),
+    ];
+    final radius = InkEraserEngine.scratchEraseRadius(
+      gesture: gesture,
+      strokeWidth: 2,
+    );
+    expect(radius, lessThan(3));
+    var index = 0;
+    final result = InkEraserEngine.eraseScratchParts(
+      strokes: [target, neighbor],
+      gesture: gesture,
+      radius: radius,
+      createId: () => 'part-${index++}',
+    );
+    expect(result.changed, isTrue);
+    expect(result.strokes.where((item) => identical(item, neighbor)),
+        hasLength(1));
+    final parts = result.strokes
+        .where((item) => !identical(item, neighbor))
+        .toList();
+    expect(parts, hasLength(2));
+    expect(parts.first.points.first.dx, 0);
+    expect(parts.first.points.last.dx, inInclusiveRange(44, 50));
+    expect(parts.last.points.first.dx, inInclusiveRange(50, 56));
+    expect(parts.last.points.last.dx, 100);
+  });
+
+  test('large scribble keeps previous scratch radius limit', () {
+    double radius(double span) => InkEraserEngine.scratchEraseRadius(
+      gesture: [
+        const InkPoint(dx: 0, dy: 0, pressure: 1),
+        InkPoint(dx: span, dy: span, pressure: 1),
+      ],
+      strokeWidth: 2,
+    );
+    expect(radius(5), lessThan(radius(20)));
+    expect(radius(20), lessThan(radius(60)));
+    expect(radius(60), 12);
+  });
+
   test('legacy brush flattening removes a covered single-point stroke', () {
     final dot = InkStroke(
       id: 'dot',
