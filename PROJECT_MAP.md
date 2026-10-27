@@ -1352,6 +1352,16 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
 
 ## 10. Platformy, web i testy
 
+- `tool/website_widget_demo.dart`: osobny entry point Flutter Web dla
+  publicznej strony wizytówkowej. Używa istniejących `EditorScreen`,
+  `EditorToolbar`, `EditorController` i wydzielonej bazy IndexedDB demo;
+  nie inicjuje AppScope, konta, synchronizacji ani backupu sieciowego.
+  Kompiluj wyłącznie lokalnie, kopiując do publicznego repo wynik builda,
+  a nie źródła Dart.
+- `test/website_widget_demo_test.dart`: pusty notatnik demonstracyjny i
+  osobna nazwa bazy danych.
+
+
 - `data.md`: źródło prawdy dla lokalnego układu plików, trybów konta,
   backupu serwerowego, synchronizacji i znanych granic szyfrowania.
 - `server/`: lekki stos PostgreSQL 17 + FastAPI + Caddy + opcjonalny
