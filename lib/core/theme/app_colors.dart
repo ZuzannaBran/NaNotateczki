@@ -77,9 +77,9 @@ class AppColors {
 
   // Shared factory tones for the light theme; dark mode uses HSL inversion.
   static const blueColorSet = <Color>[
-    Color(0xFF263042),
-    Color(0xFF354E6B),
-    Color(0xFF889BB0),
+    Color(0xFF03223A),
+    Color(0xFF083F69),
+    Color(0xFF7DADC8),
   ];
   static const pinkColorSet = <Color>[
     Color(0xFF823C44),
@@ -89,7 +89,7 @@ class AppColors {
   static const greenColorSet = <Color>[
     Color(0xFF273526),
     Color(0xFF45624E),
-    Color(0xFFC0CFB2),
+    Color(0xFFCADFB8),
   ];
 
   static const inkPalette = <Color>[

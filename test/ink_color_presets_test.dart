@@ -15,9 +15,9 @@ import 'package:program/features/notebook/domain/notebook_kind.dart';
 void main() {
   test('presets retain their hues with three progressively lighter tones', () {
     expect(InkColorPreset.blue.colors, [
-      const Color(0xFF263042),
-      const Color(0xFF354E6B),
-      const Color(0xFF889BB0),
+      const Color(0xFF03223A),
+      const Color(0xFF083F69),
+      const Color(0xFF7DADC8),
     ]);
     expect(InkColorPreset.pink.colors, [
       const Color(0xFF823C44),
@@ -27,7 +27,7 @@ void main() {
     expect(InkColorPreset.green.colors, [
       const Color(0xFF273526),
       const Color(0xFF45624E),
-      const Color(0xFFC0CFB2),
+      const Color(0xFFCADFB8),
     ]);
   });
 

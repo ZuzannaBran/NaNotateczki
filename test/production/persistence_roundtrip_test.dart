@@ -229,7 +229,7 @@ void main() {
     final persisted =
         jsonDecode((await readStoredText('editor_prefs.json'))!)
             as Map<String, dynamic>;
-    expect(persisted['quickColors'], ['#273526', '#45624e', '#c0cfb2']);
+    expect(persisted['quickColors'], ['#273526', '#45624e', '#cadfb8']);
     expect(persisted['penColor'], '#273526');
     expect(persisted['highlighterColor'], '#273526');
     expect(
@@ -269,7 +269,7 @@ void main() {
       final persisted =
           jsonDecode((await readStoredText('editor_prefs.json'))!)
               as Map<String, dynamic>;
-      expect(persisted['quickColors'], ['#263042', '#354e6b', '#889bb0']);
+      expect(persisted['quickColors'], ['#03223a', '#083f69', '#7dadc8']);
     },
   );
 
@@ -302,6 +302,10 @@ void main() {
   test('previous factory swatches migrate by position in every palette',
       () async {
     const previousVersions = <Map<InkColorPreset, List<String>>>[
+      {
+        InkColorPreset.blue: ['#263042', '#354e6b', '#889bb0'],
+        InkColorPreset.green: ['#273526', '#45624e', '#c0cfb2'],
+      },
       {
         InkColorPreset.green: ['#394931', '#74866f', '#9bae96'],
       },
@@ -343,6 +347,35 @@ void main() {
         controller.dispose();
         await db.close();
       }
+    }
+  });
+
+  test('previous blue and green third swatches keep their index', () async {
+    const previous = <InkColorPreset, List<String>>{
+      InkColorPreset.blue: ['#263042', '#354e6b', '#889bb0'],
+      InkColorPreset.green: ['#273526', '#45624e', '#c0cfb2'],
+    };
+    for (final entry in previous.entries) {
+      await writeStoredText(
+        'editor_prefs.json',
+        jsonEncode({
+          'penColor': entry.value[2],
+          'highlighterColor': entry.value[2],
+          'quickColors': entry.value,
+        }),
+      );
+      final db = NotesDatabase(NativeDatabase.memory());
+      final controller = EditorController(
+        repository: _repository(db),
+        notebook: _fixture(uid: 'third-${entry.key.name}-migration'),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(controller.quickColors, entry.key.colors);
+      expect(controller.inkColor, entry.key.colors[2]);
+      await controller.flushPendingSaves();
+      controller.dispose();
+      await db.close();
     }
   });
 
