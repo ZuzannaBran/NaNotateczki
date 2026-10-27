@@ -935,7 +935,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (3206 linii)
+### `lib/features/editor/state/editor_controller.dart` (3207 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
@@ -971,7 +971,7 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 - 37: `LassoSelection`; 76: `EditorController`;
   220: `flushPendingSaves`; 1015: `setCurrentBackgroundSettings`;
-  1028: `applyInkColorPreset`.
+  1029: `applyInkColorPreset`.
 - 292–364: layout i transformacje viewportu; 305: start blokady transformacji,
   330: `setViewTransform`.
 - 373–509: operacje `*OnPage` używane przez canvasy/overlaye.
@@ -983,12 +983,12 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
   korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
   oraz pojedyncze undo/redo.
   682: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- 1406: łączenie zapisanych domyślnych teł; 1489: `undo`; 1515: `redo`;
+- 1407: łączenie zapisanych domyślnych teł; 1490: `undo`; 1516: `redo`;
   1591: `toggleBookmark`; 1667: `updateActiveTextStyle` — blokowe
   formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
   zapisywane jako `UpdateTextAction`.
-- 2724: `_imagesDir`; 2882: `_applyAction`; 2913: `_applyInkAction`;
-  3078: `_scheduleSave`; 3100: `_saveDirtyPages`; 3138: `_save`.
+- 2725: `_imagesDir`; 2883: `_applyAction`; 2914: `_applyInkAction`;
+  3079: `_scheduleSave`; 3101: `_saveDirtyPages`; 3139: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`
