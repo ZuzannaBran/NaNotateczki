@@ -25,9 +25,9 @@ void main() {
       const Color(0xFFEAA6AE),
     ]);
     expect(InkColorPreset.green.colors, [
-      const Color(0xFF394931),
-      const Color(0xFF74866F),
-      const Color(0xFF9BAE96),
+      const Color(0xFF273526),
+      const Color(0xFF45624E),
+      const Color(0xFFC0CFB2),
     ]);
   });
 

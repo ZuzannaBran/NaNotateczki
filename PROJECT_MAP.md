@@ -92,7 +92,7 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   zestawy Blue/Pink/Green dla canvasu oraz okładek: trzy wspólne odcienie
   ciemny/średni/jasny, dostępne dla pióra i zakreślacza
   (Blue #263042/#354E6B/#889BB0, Pink #823C44/#D8798A/#EAA6AE,
-  Green #394931/#74866F/#9BAE96); dokładne wartości dla motywu
+  Green #273526/#45624E/#C0CFB2); dokładne wartości dla motywu
   jasnego podane przez użytkownika; w ciemnym transformacja HSL
   zachowuje barwę i odwraca jasność. Kontrast poszczególnych próbek
   w ciemnym trybie nie musi maleć kolejno od 1 do 3.
@@ -901,7 +901,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (3173 linii)
+### `lib/features/editor/state/editor_controller.dart` (3181 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
@@ -946,12 +946,12 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
   korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
   oraz pojedyncze undo/redo.
   682: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- 1373: łączenie zapisanych domyślnych teł; 1456: `undo`; 1482: `redo`;
-  1570: `toggleBookmark`; 1646: `updateActiveTextStyle` — blokowe
+- 1381: łączenie zapisanych domyślnych teł; 1464: `undo`; 1490: `redo`;
+  1578: `toggleBookmark`; 1654: `updateActiveTextStyle` — blokowe
   formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
   zapisywane jako `UpdateTextAction`.
-- 2691: `_imagesDir`; 2849: `_applyAction`; 2880: `_applyInkAction`;
-  3045: `_scheduleSave`; 3067: `_saveDirtyPages`; 3105: `_save`.
+- 2699: `_imagesDir`; 2857: `_applyAction`; 2888: `_applyInkAction`;
+  3053: `_scheduleSave`; 3075: `_saveDirtyPages`; 3113: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`

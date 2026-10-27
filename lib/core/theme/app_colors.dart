@@ -87,9 +87,9 @@ class AppColors {
     Color(0xFFEAA6AE),
   ];
   static const greenColorSet = <Color>[
-    Color(0xFF394931),
-    Color(0xFF74866F),
-    Color(0xFF9BAE96),
+    Color(0xFF273526),
+    Color(0xFF45624E),
+    Color(0xFFC0CFB2),
   ];
 
   static const inkPalette = <Color>[

@@ -1135,6 +1135,13 @@ class EditorController extends ChangeNotifier {
             .map((item) => _colorFromHex(item?.toString()))
             .whereType<Color>()
             .toList();
+        const previousGreenPreset = <InkColorPreset, List<Color>>{
+          InkColorPreset.green: [
+            Color(0xFF394931),
+            Color(0xFF74866F),
+            Color(0xFF9BAE96),
+          ],
+        };
         const newestPresets = <InkColorPreset, List<Color>>{
           InkColorPreset.blue: [
             Color(0xFF1A2130),
@@ -1223,6 +1230,7 @@ class EditorController extends ChangeNotifier {
         InkColorPreset? previousPreset;
         List<Color>? previousColors;
         for (final entry in [
+          ...previousGreenPreset.entries,
           ...newestPresets.entries,
           ...recentPresets.entries,
           ...lastPresets.entries,
