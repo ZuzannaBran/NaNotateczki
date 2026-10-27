@@ -935,7 +935,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (3194 linii)
+### `lib/features/editor/state/editor_controller.dart` (3206 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
@@ -970,7 +970,8 @@ synchronizują ten notifier. Obrazy trafiają do prywatnego katalogu danych
 aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 - 37: `LassoSelection`; 76: `EditorController`;
-  220: `flushPendingSaves`; 1017: `applyInkColorPreset`.
+  220: `flushPendingSaves`; 1015: `setCurrentBackgroundSettings`;
+  1028: `applyInkColorPreset`.
 - 292–364: layout i transformacje viewportu; 305: start blokady transformacji,
   330: `setViewTransform`.
 - 373–509: operacje `*OnPage` używane przez canvasy/overlaye.
@@ -982,12 +983,12 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
   korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
   oraz pojedyncze undo/redo.
   682: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- 1394: łączenie zapisanych domyślnych teł; 1477: `undo`; 1503: `redo`;
+- 1406: łączenie zapisanych domyślnych teł; 1489: `undo`; 1515: `redo`;
   1591: `toggleBookmark`; 1667: `updateActiveTextStyle` — blokowe
   formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
   zapisywane jako `UpdateTextAction`.
-- 2712: `_imagesDir`; 2870: `_applyAction`; 2901: `_applyInkAction`;
-  3066: `_scheduleSave`; 3088: `_saveDirtyPages`; 3126: `_save`.
+- 2724: `_imagesDir`; 2882: `_applyAction`; 2913: `_applyInkAction`;
+  3078: `_scheduleSave`; 3100: `_saveDirtyPages`; 3138: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`
@@ -1000,7 +1001,7 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2456 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2464 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px i korzysta z
 aktualnego tytułu przekazanego przez bibliotekę (fallback: kontroler);
@@ -1067,9 +1068,9 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 - 1057: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1602: `_PageViewportClipper`; 1660: `_PageFramePainter`;
-  1767: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
-  2186: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
+- 1610: `_PageViewportClipper`; 1668: `_PageFramePainter`;
+  1775: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
+  2194: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_commands.dart` (172 linie)
 
@@ -1109,12 +1110,13 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
 
 - `lib/features/editor/presentation/widgets/busy_overlay.dart` (18): blokujący
   spinner długiej operacji. 3: `BusyOverlay`.
-- `lib/features/editor/presentation/widgets/page_background_paint.dart` (131):
+- `lib/features/editor/presentation/widgets/page_background_paint.dart` (133):
   render tła i kratki w bieżącym trybie wizualnym, także na ciemniejszej
-  kartce #50514D; strony i board odświeżają go osobnym notifierem.
+  kartce #50514D; `RepaintBoundary` izoluje malowanie od tuszu;
+  strony i board odświeżają go osobnym notifierem.
   6: `PageBackgroundPaint`;
-  36: `PageBackgroundPreview`; 64: `_PageBackgroundPainter`.
-- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1093):
+  41: `PageBackgroundPreview`; 71: `_PageBackgroundPainter`.
+- `lib/features/editor/presentation/widgets/editor_toolbar.dart` (1096):
   główny toolbar narzędzi, kolorów, gumek, kształtów, tła i eksportu;
   całość ma promień 12 px i pośrodku obszaru zwęża się do szerokości
   ikon, gdy mieszczą się w całości; przy braku miejsca przewija się poziomo.
@@ -1143,8 +1145,8 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   Po odczycie Recent selektor sprawdza osobno `context.mounted` i
   `navigator.mounted` przed odwołaniem do `NavigatorState.context`;
   chroni to dostęp do kontekstu na granicy asynchronicznej.
-  14: `EditorToolbar`; 199: dialog tła; 338: selektor gumki;
-  406: selektor kształtu; 534: `_colorDot`; 581: `pickColor`;
+  14: `EditorToolbar`; 218: dialog tła; 342: selektor gumki;
+  410: selektor kształtu; 550: `_colorDot`; 585: `pickColor`;
   952: `_EraserIcon`.
 - `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (401):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
@@ -1310,7 +1312,7 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
-### `lib/features/board/presentation/board_screen.dart` (892 linie)
+### `lib/features/board/presentation/board_screen.dart` (896 linie)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i
 warstwami tła/canvasu/overlayu; podczas aktywnej transformacji obiektu
@@ -1340,9 +1342,9 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
 - 31: `BoardScreen`; 49: `_BoardScreenState`.
 - 75: `_buildBoardRect`; 85–378: obsługa pointerów i viewportu.
 - 510: główny `build`; import/eksport i skróty przez `EditorCommands`.
-- 751: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
-- 787: `_BoardPaintProbe`; 804: `_RenderBoardPaintProbe`;
-  827: `_BoardZoomControls`.
+- 755: `BoardSceneBoundsResolver` — stabilne granice sceny podczas gestu.
+- 791: `_BoardPaintProbe`; 808: `_RenderBoardPaintProbe`;
+  831: `_BoardZoomControls`.
 
 ## 10. Platformy, web i testy
 
@@ -1551,7 +1553,7 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
 - `test/notebook_overview_navigation_test.dart`: kliknięcia widocznej minimapy,
   przełączanie strony, scroll minimapy bez nawigacji, wybór po przewinięciu,
   blokada transformacji, mapowanie współrzędnych i zachowanie skali.
-- `test/editor_screen_responsive_layout_test.dart` (533):
+- `test/editor_screen_responsive_layout_test.dart` (613):
   pełna wysokość canvasa pod pływającym toolbarem, położenie strony
   poniżej narzędzi i domyślne centrowanie poziome z zachowaniem ręcznego
   pan, wsuwanie strony pod pasek bez maskującego marginesu,
