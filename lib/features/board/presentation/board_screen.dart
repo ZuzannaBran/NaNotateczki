@@ -619,10 +619,14 @@ class _BoardScreenState extends State<BoardScreen> {
                                         Positioned.fill(
                                           child: _BoardPaintProbe(
                                             layerName: 'backgroundPaint',
-                                            child: PageBackgroundPaint(
-                                              settings: controller
-                                                  .currentBackgroundSettings,
-                                              origin: boardRect.topLeft,
+                                            child: ValueListenableBuilder(
+                                              valueListenable: controller
+                                                  .backgroundSettingsListenable,
+                                              builder: (context, settings, _) =>
+                                                  PageBackgroundPaint(
+                                                    settings: settings,
+                                                    origin: boardRect.topLeft,
+                                                  ),
                                             ),
                                           ),
                                         ),
