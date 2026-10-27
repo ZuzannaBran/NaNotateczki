@@ -17,9 +17,10 @@ class PageBackgroundPaint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: borderRadius,
-      child: CustomPaint(
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: CustomPaint(
         painter: _PageBackgroundPainter(
           settings: settings,
           paperColor: Theme.of(context).brightness == Brightness.dark
@@ -30,7 +31,8 @@ class PageBackgroundPaint extends StatelessWidget {
           ).colorScheme.outlineVariant.withValues(alpha: 0.55),
           origin: origin,
         ),
-        child: const SizedBox.expand(),
+          child: const SizedBox.expand(),
+        ),
       ),
     );
   }
