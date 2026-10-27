@@ -40,6 +40,12 @@ w podkatalogu `data`. Na obecnym Linuksie jest to:
 └── legacy/                              nieużywane dane dawnego Isar
 ```
 
+Foldery logiczne zapisują się w `library_folders.json` jako ścieżki
+`Folder główny/Podfolder`. Jednopoziomowe dotychczasowe nazwy pozostają
+niezmienione. Kolumna `Notebook.folder` w SQLite przechowuje tę samą
+ścieżkę, więc zagnieżdżanie nie wymaga migracji schematu Drift.
+Zmiana nazwy lub usunięcie rodzica obejmuje całe poddrzewo.
+
 Ręczne eksporty JSON/PDF/PNG pozostają w `Dokumenty`, ponieważ są plikami
 użytkownika, a nie wewnętrznym stanem programu. Katalog danych na
 Linuksie/macOS ma prawa `700`; na pozostałych systemach ochronę katalogu

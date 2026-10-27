@@ -429,7 +429,12 @@ mobilnej, bez zmiany modelu dokumentu.
 
 ### `lib/features/library/presentation/library_controller.dart`
 
-Stan folderów, listy dokumentów, wyszukiwania, syncu, importu i recovery.
+Stan folderów wielopoziomowych, listy dokumentów, wyszukiwania, syncu,
+importu i recovery. Hierarchia folderów korzysta ze ścieżek logicznych
+`Rodzic/Dziecko` w dotychczasowym polu `Notebook.folder` i liście
+`folders` w JSON; starsze pojedyncze nazwy są folderami głównymi.
+`childFoldersOf` filtruje bezpośrednie dzieci. Zmiana nazwy lub usunięcie
+folderu obejmuje rekurencyjnie podfoldery, dokumenty, okładki i zadania.
 Przenoszenie notebooków i boardów między folderami zapisuje tylko metadane
 w SQLite; aktywny dokument zachowuje zaznaczenie w nowym folderze.
 Zapisuje kształt, indywidualny kolor ikony okładki i ostatnie 12
@@ -452,14 +457,14 @@ zgłasza pusty zestaw zmian repozytorium, więc aktualizuje manifest bez
 oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
 tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
-- 15: `FolderCoverShape`; 17: `FolderCoverStyle`; 48: `LibraryController`.
-- 124: `initialize`; 139: `loadItems`.
-- 321: `updateFolderCover` — aktualizuje również listę Recent; 339–483:
-  foldery i dokumenty.
-- 500: `moveItemToFolder`; 547: `selectFolder`; 658: `_loadFolders`;
-  706: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
+- 21: `FolderCoverShape`; 23: `FolderCoverStyle`; 54: `LibraryController`.
+- 146: `initialize`; 161: `loadItems`.
+- 328: `folderNames`; 354: `childFoldersOf`; 364: `updateFolderCover`.
+- 383: `createFolder`; 406: `renameFolder`; 475: `deleteFolder` (poddrzewo).
+- 676: `moveItemToFolder`; 723: `selectFolder`; 851: `_loadFolders`;
+  913: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (1843 linii)
+### `lib/features/library/presentation/library_screen.dart` (1892 linie)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -548,15 +553,18 @@ i przywracane natychmiast po zamknięciu;
 2 px łącznik koloru panelu maskuje linię graniczną. Menu folderu zawiera także
 edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon.
 
-- Menu dodawania oferuje Folder, Notebook, Board i Planner.
+- Menu dodawania oferuje New main folder, New folder (w aktywnym folderze),
+  Notebook, Board i Planner. Sidebar wyświetla podfoldery rekurencyjnie
+  z wcięciem; rozwijanie i upuszczanie dokumentów działa na każdym poziomie.
+  Katalog cofa do rodzica, nie od razu do Projects.
   Planner otwiera `TaskListScreen` zamiast kontrolera edytora.
   Ustawienia katalogu i planera nie tworzą `EditorController` dla
   `NotebookKind.planner`, aby nie zgłaszać `UnsupportedError`.
 - 25: `LibraryScreen`; 32: `_LibraryScreenState`;
   506: `_openCatalogSettings`;
-  841: `_CreateMenuButton`;
-  882: `_LibraryTreePane` (`_LibraryTreePaneState` 907);
-  1196: `_FolderTreeRow`;
+  879: `_CreateMenuButton`;
+  924: `_LibraryTreePane` (`_LibraryTreePaneState` 949);
+  1101: `_buildFolder`; 1246: `_FolderTreeRow`;
   1295: `_LibraryTreeItemRow` (planner: konturowy kwadrat z tikiem);
   1400: `_sidebarMenuShape`;
   1414: `_SidebarMenuShadowPainter`;
@@ -565,9 +573,12 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1637: `_LibraryWorkspace`;
   1748: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_catalog.dart` (1158 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1267 linii)
 
-Katalog główny Projects układa foldery w responsywną siatkę od 1 do 5
+Katalog Projects pokazuje wyłącznie foldery główne. Po wejściu do folderu
+siatka łączy jego bezpośrednie podfoldery i własne dokumenty; tytuły
+folderów pokazują tylko lokalną nazwę, a Back wraca do rodzica.
+Katalog główny układa foldery w responsywną siatkę od 1 do 5
 kolumn, z górnym marginesem 24 px. Cały blok folderów jest wyśrodkowany
 w poziomie, a ostatni niepełny wiersz zaczyna się od lewej. Brak linii
 oddzielających kafelki i zewnętrznej ramki; blok nie zajmuje całej
@@ -619,7 +630,7 @@ Siatka reaguje na wspólną czułość dotyku.
 
 - 24: `dominantFolderColor`; 53: `FolderCoverIcon`;
   107: `FolderCoverStrokePainter`; 233: `LibraryCatalog`;
-  530: `_FolderTile`; 597: `_DocumentTile`;
+  547: `_FolderTile`; 614: `_DocumentTile`;
   625: `_CatalogTile`; 748: `_DocumentPreview`;
   831: `_boardPreviewBounds`;
   873: `_PagePreviewPainter`;
@@ -1408,6 +1419,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   na zwinięty folder i rozwinięcie go po upuszczeniu; zgodność szerokości
   i zawartości przeciąganego wiersza, mocniejsze tło oraz blokada ruchu
   poziomego.
+- `test/library_nested_folders_test.dart`: ścieżki folderów, migracja
+  nazw jednopoziomowych, zapis/odczyt, rekurencyjna zmiana nazwy,
+  usuwanie poddrzewa z dokumentami oraz podfoldery z dokumentami w katalogu.
 - `test/library_controller_test.dart` (33)
 - `test/library_catalog_test.dart` (971): rozmiary nazw folderów
   i dokumentów, kolor dominujący, serializacja

@@ -250,8 +250,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                             onOpen: (item) =>
                                                 _openItem(controller, item),
                                             onCreate: _createAndSelectItem,
-                                            onCreateFolder: () {
-                                              _promptNewFolder(controller);
+                                            onCreateFolder: (asMainFolder) {
+                                              _promptNewFolder(
+                                                controller,
+                                                asMainFolder: asMainFolder,
+                                              );
                                             },
                                           ),
                                         ),
@@ -359,9 +362,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           _closeCompactNavigation();
                           return _createAndSelectItem(kind);
                         },
-                        onCreateFolder: () {
+                        onCreateFolder: (asMainFolder) {
                           _closeCompactNavigation();
-                          _promptNewFolder(controller);
+                          _promptNewFolder(
+                            controller,
+                            asMainFolder: asMainFolder,
+                          );
                         },
                       ),
                     ),
@@ -404,7 +410,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         folder: controller.folderNames.contains(_catalogFolder)
             ? _catalogFolder
             : null,
-        onBack: _openCatalogRoot,
+        onBack: () => _openCatalogParent(controller),
         onFolderTap: (folder) => _openCatalogFolder(controller, folder),
         onOpenItem: (item) => _openItem(controller, item),
         onEditFolder: (folder) =>
@@ -455,6 +461,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
     });
     if (wasEditing) {
       await context.read<LibraryController>().loadItems();
+    }
+  }
+
+  Future<void> _openCatalogParent(LibraryController controller) async {
+    final parent = controller.parentFolderOf(_catalogFolder ?? '');
+    if (parent == null) {
+      await _openCatalogRoot();
+    } else {
+      await _openCatalogFolder(controller, parent);
     }
   }
 
@@ -550,26 +565,40 @@ class _LibraryScreenState extends State<LibraryScreen> {
     await _promptRenameItem(controller, item);
   }
 
-  Future<void> _promptNewFolder(LibraryController controller) async {
+  Future<void> _promptNewFolder(
+    LibraryController controller, {
+    bool asMainFolder = false,
+  }) async {
+    final parent = asMainFolder
+        ? null
+        : _catalogFolder ??
+              (controller.folderNames.contains(controller.selectedFolder)
+                  ? controller.selectedFolder
+                  : null);
     final result = await showDialog<String>(
       context: context,
-      builder: (_) => const _NameInputDialog(
-        title: 'New folder',
+      builder: (_) => _NameInputDialog(
+        title: asMainFolder ? 'New main folder' : 'New folder',
         hintText: 'Folder name',
         actionLabel: 'Create',
       ),
     );
-
-    if (result == null) {
+    if (result == null || !mounted) {
       return;
     }
-    await controller.createFolder(result);
+    final created = await controller.createFolder(result, parent: parent);
     if (!mounted) {
+      return;
+    }
+    if (created == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid or duplicate folder name.')),
+      );
       return;
     }
     setState(() {
       _showCatalog = true;
-      _catalogFolder = result.trim();
+      _catalogFolder = created;
     });
   }
 
@@ -583,17 +612,26 @@ class _LibraryScreenState extends State<LibraryScreen> {
         title: 'Rename folder',
         hintText: 'Folder name',
         actionLabel: 'Rename',
-        initialText: folder,
+        initialText: controller.folderLabel(folder),
       ),
     );
-
-    if (result == null) {
+    if (result == null || !mounted) {
       return;
     }
-    await controller.renameFolder(folder, result);
-    if (mounted && _catalogFolder == folder) {
+    final renamed = await controller.renameFolder(folder, result);
+    if (!mounted) {
+      return;
+    }
+    if (renamed == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid or duplicate folder name.')),
+      );
+      return;
+    }
+    if (_catalogFolder != null &&
+        controller.isInFolderTree(_catalogFolder!, folder)) {
       setState(() {
-        _catalogFolder = result.trim();
+        _catalogFolder = renamed + _catalogFolder!.substring(folder.length);
       });
     }
   }
@@ -629,7 +667,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         return AlertDialog(
           title: const Text('Delete folder?'),
           content: const Text(
-            'This will delete the folder and all items inside it.',
+            'This will delete the folder, its subfolders and all their items.',
           ),
           actions: appDialogActions(context, [
             TextButton(
@@ -649,9 +687,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     await controller.deleteFolder(folder);
-    if (mounted && _catalogFolder == folder) {
+    if (mounted &&
+        _catalogFolder != null &&
+        controller.isInFolderTree(_catalogFolder!, folder)) {
       setState(() {
-        _catalogFolder = null;
+        _catalogFolder = controller.parentFolderOf(folder);
       });
     }
   }
@@ -849,6 +889,7 @@ class _CreateMenuButton extends StatelessWidget {
       width: 150,
       items: [
         for (final (value, label) in [
+          (_CreateAction.mainFolder, 'New main folder'),
           (_CreateAction.folder, 'New folder'),
           (_CreateAction.notebook, 'New notebook'),
           (_CreateAction.board, 'New board'),
@@ -896,7 +937,7 @@ class _LibraryTreePane extends StatefulWidget {
   final bool extendDividersIntoResizeHandle;
   final ValueChanged<Notebook> onOpen;
   final Future<void> Function(NotebookKind kind) onCreate;
-  final VoidCallback onCreateFolder;
+  final ValueChanged<bool> onCreateFolder;
   final VoidCallback onShowProjects;
   final ValueChanged<String> onOpenFolder;
   final bool showingProjects;
@@ -998,7 +1039,8 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                               ),
                               padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
                               children: [
-                                for (final folder in folders)
+                                for (final folder in
+                                    controller.childFoldersOf(null))
                                   _buildFolder(folder),
                               ],
                             ),
@@ -1106,6 +1148,12 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
             ),
           ),
           if (expanded)
+            for (final child in controller.childFoldersOf(folder))
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: _buildFolder(child),
+              ),
+          if (expanded)
             for (final item in items)
               _LibraryTreeItemRow(
                 item: item,
@@ -1125,8 +1173,11 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
 
   void _handleCreateAction(_CreateAction action) {
     switch (action) {
+      case _CreateAction.mainFolder:
+        widget.onCreateFolder(true);
+        return;
       case _CreateAction.folder:
-        widget.onCreateFolder();
+        widget.onCreateFolder(false);
         return;
       case _CreateAction.notebook:
         widget.onCreate(NotebookKind.notebook);
@@ -1181,9 +1232,9 @@ class _EmptyLibraryTree extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             TextButton.icon(
-              onPressed: () => onCreate(_CreateAction.folder),
+              onPressed: () => onCreate(_CreateAction.mainFolder),
               icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('New folder'),
+              label: const Text('New main folder'),
             ),
           ],
         ),
@@ -1264,7 +1315,7 @@ class _FolderTreeRow extends StatelessWidget {
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
-                    folder,
+                    folder.split('/').last,
                     style: _sidebarTextStyle.copyWith(
                       color: colorScheme.onSurface,
                       fontSize: AppTypography.folder,
@@ -1694,7 +1745,7 @@ class _LibraryWorkspace extends StatelessWidget {
   }
 }
 
-enum _CreateAction { folder, notebook, board, planner }
+enum _CreateAction { mainFolder, folder, notebook, board, planner }
 
 class _SidebarSpanDivider extends StatelessWidget {
   const _SidebarSpanDivider({this.dividerKey, this.extendBy = 0});

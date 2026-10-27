@@ -333,9 +333,30 @@ class LibraryController extends ChangeNotifier {
           .map((name) => name.trim())
           .where((name) => name.trim().isNotEmpty),
     };
+    for (final path in names.toList()) {
+      var parent = parentFolderOf(path);
+      while (parent != null) {
+        names.add(parent);
+        parent = parentFolderOf(parent);
+      }
+    }
     final list = names.toList()..sort(_compareFolderNames);
     return list;
   }
+
+  String folderLabel(String path) => path.split('/').last;
+
+  String? parentFolderOf(String path) {
+    final separator = path.lastIndexOf('/');
+    return separator < 0 ? null : path.substring(0, separator);
+  }
+
+  List<String> childFoldersOf(String? parent) => folderNames
+      .where((path) => parentFolderOf(path) == parent)
+      .toList();
+
+  bool isInFolderTree(String folder, String root) =>
+      folder == root || folder.startsWith('$root/');
 
   FolderCoverStyle folderCoverFor(String name) =>
       _folderCovers[name] ?? const FolderCoverStyle();
@@ -359,56 +380,85 @@ class LibraryController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createFolder(String name) async {
+  Future<String?> createFolder(String name, {String? parent}) async {
     final trimmed = name.trim();
-    if (trimmed.isEmpty) {
-      return;
+    final parentPath = parent?.trim();
+    if (trimmed.isEmpty ||
+        trimmed.contains('/') ||
+        (parentPath != null && !folderNames.contains(parentPath))) {
+      return null;
     }
-    _folders.add(trimmed);
-    selectedFolder = trimmed;
-    selectedItemId = _firstItemInFolder(trimmed)?.uid;
+    final path = parentPath == null ? trimmed : '${parentPath}/${trimmed}';
+    if (folderNames.contains(path)) {
+      return null;
+    }
+    _folders.add(path);
+    selectedFolder = path;
+    selectedItemId = _firstItemInFolder(path)?.uid;
     _activeNotebook = selectedItemId == null
         ? null
         : _itemById(selectedItemId!);
     await _saveFolders();
     notifyListeners();
+    return path;
   }
 
-  Future<void> renameFolder(String oldName, String newName) async {
-    final trimmedOldName = oldName.trim();
-    final trimmedNewName = newName.trim();
-    if (trimmedOldName.isEmpty ||
-        trimmedNewName.isEmpty ||
-        trimmedOldName == trimmedNewName) {
-      return;
+  Future<String?> renameFolder(String oldName, String newName) async {
+    final oldPath = oldName.trim();
+    final trimmed = newName.trim();
+    if (oldPath.isEmpty ||
+        trimmed.isEmpty ||
+        trimmed.contains('/') ||
+        !folderNames.contains(oldPath)) {
+      return null;
+    }
+    final parent = parentFolderOf(oldPath);
+    final nextPath = parent == null ? trimmed : '${parent}/${trimmed}';
+    if (oldPath == nextPath) {
+      return oldPath;
+    }
+    if (folderNames.any(
+      (path) => !isInFolderTree(path, oldPath) && isInFolderTree(path, nextPath),
+    )) {
+      return null;
     }
 
-    _folders
-      ..remove(trimmedOldName)
-      ..add(trimmedNewName);
-    final cover = _folderCovers.remove(trimmedOldName);
-    if (cover != null) {
-      _folderCovers[trimmedNewName] = cover;
-    }
+    String relocate(String path) =>
+        nextPath + path.substring(oldPath.length);
+
     final updatedItems = <Notebook>[];
     for (final item in items) {
-      if (item.folder != trimmedOldName) {
+      if (!isInFolderTree(item.folder, oldPath)) {
         updatedItems.add(item);
         continue;
       }
-
       final updated = await repository.updateNotebookMetadata(
         item.uid,
-        folder: trimmedNewName,
+        folder: relocate(item.folder),
       );
       updatedItems.add(updated ?? item);
     }
-
     items = updatedItems;
-    if (selectedFolder == trimmedOldName) {
-      selectedFolder = trimmedNewName;
+    final updatedFolders = _folders
+        .map((path) => isInFolderTree(path, oldPath) ? relocate(path) : path)
+        .toSet();
+    _folders
+      ..clear()
+      ..addAll(updatedFolders);
+    final updatedCovers = <String, FolderCoverStyle>{
+      for (final entry in _folderCovers.entries)
+        (isInFolderTree(entry.key, oldPath)
+            ? relocate(entry.key)
+            : entry.key): entry.value,
+    };
+    _folderCovers
+      ..clear()
+      ..addAll(updatedCovers);
+    if (isInFolderTree(selectedFolder, oldPath)) {
+      selectedFolder = relocate(selectedFolder);
     }
-    if (_activeNotebook?.folder == trimmedOldName) {
+    if (_activeNotebook != null &&
+        isInFolderTree(_activeNotebook!.folder, oldPath)) {
       _activeNotebook = _itemById(_activeNotebook!.uid);
     }
     if (!_selectedItemIsInFolder(selectedFolder)) {
@@ -419,34 +469,37 @@ class LibraryController extends ChangeNotifier {
     }
     await _saveFolders();
     notifyListeners();
+    return nextPath;
   }
 
   Future<void> deleteFolder(String name) async {
-    final trimmed = name.trim();
-    if (trimmed.isEmpty) {
+    final path = name.trim();
+    if (path.isEmpty || !folderNames.contains(path)) {
       return;
     }
-
-    _folders.remove(trimmed);
-    _folderCovers.remove(trimmed);
-    for (final item in items) {
-      if (item.folder != trimmed) {
-        continue;
-      }
-
+    final affected = items
+        .where((item) => isInFolderTree(item.folder, path))
+        .toList();
+    for (final item in affected) {
       await repository.deleteNotebook(item.uid);
     }
-
-    for (final item in items) {
-      if (item.folder == trimmed) {
-        _plannerTasks.remove(item.uid);
-      }
+    for (final item in affected) {
+      _plannerTasks.remove(item.uid);
     }
-    items = items.where((item) => item.folder != trimmed).toList();
-    if (selectedFolder == trimmed) {
-      selectedFolder = folderNames.isEmpty ? '' : folderNames.first;
+    final deletedIds = affected.map((item) => item.uid).toSet();
+    items = items.where((item) => !deletedIds.contains(item.uid)).toList();
+    _folders.removeWhere((folder) => isInFolderTree(folder, path));
+    _folderCovers.removeWhere(
+      (folder, _) => isInFolderTree(folder, path),
+    );
+    if (isInFolderTree(selectedFolder, path)) {
+      final parent = parentFolderOf(path);
+      selectedFolder = parent != null && folderNames.contains(parent)
+          ? parent
+          : (folderNames.isEmpty ? '' : folderNames.first);
     }
-    if (_activeNotebook?.folder == trimmed) {
+    if (_activeNotebook != null &&
+        deletedIds.contains(_activeNotebook!.uid)) {
       _activeNotebook = null;
     }
     if (!_selectedItemIsInFolder(selectedFolder)) {
