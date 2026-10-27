@@ -91,8 +91,9 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 - `lib/core/theme/app_colors.dart`: jasna paleta i trzy współdzielone
   zestawy Blue/Pink/Green dla canvasu oraz okładek: trzy wspólne odcienie
   ciemny/średni/jasny, dostępne dla pióra i zakreślacza
-  (Blue #1A2130/#7798C0/#ACBED8, Pink #3A212B/#A9788A/#DAB5C2,
-  Green #1F3027/#76A58D/#B0D2BF); tryb ciemny:
+  (Blue #1A2130/#ACBED8/#DEE7F2, Pink #3A212B/#DAB5C2/#F2E1E8,
+  Green #1F3027/#B0D2BF/#E4EFE8); próbka 2 to dawny odcień 3,
+  próbka 3 ma mniejszy kontrast z jasną kartką. Tryb ciemny:
   tło #2D2E2B, panele #3A3B39, aktywne #4A4B48, kartka/panele #5A5B57,
   ciemniejszy canvas notatek #50514D, tekst #EEECE6. `displayInkColor` odwraca jasność HSL wszystkich odcieni,
   zachowując hue, saturację i alpha (czerń↔biel, jasny błękit↔ciemny).
@@ -681,7 +682,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   10: `StudyTechnique`; 45: `StudyRepeat`; 51: `StudySession`;
   219: `StudyPlannerController`; 282: `calendarEntries`;
   432: `load`; 498: `create`; 537: `edit`; 779: `flush`.
-- `lib/features/planner/presentation/study_timer_widgets.dart` (999):
+- `lib/features/planner/presentation/study_timer_widgets.dart` (1006):
   `StudyTimerCard`, `CompactStudyTimer`, dialog edycji i gwiazdkowej oceny
   sesji, funkcja `studyRatingStars`; zamknięcie dialogu traktowane jako
   pominięcie oceny, bez przycisku „Rate” w bocznym timerze.
@@ -705,6 +706,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   gdy Upcoming jest puste, albo 0 px, gdy istnieją nadchodzące sesje.
   Nowe i edytowane sesje (także z kalendarza) mogą mieć indywidualny
   kolor z tych samych palet, Recent i edytora HEX co foldery.
+  Ikona wybranego koloru w formularzu konwertuje HSL w dark mode
+  bez modyfikacji zapisanego koloru.
   Formularz Smart umożliwia wybór liczby bloków 1–12.
   Ocena ma wyśrodkowany nagłówek „Great job! Time's up.”.
   Pola Name, Description, Study technique, Duration, Focus blocks i Repeat
@@ -722,12 +725,13 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   69: `showStudyRating`;
   337: `_labeledField` (stałe etykiety formularza);
   664: `StudyTimerCard`; 950: `CompactStudyTimer`.
-- `lib/features/planner/presentation/study_action_theme.dart` (163):
+- `lib/features/planner/presentation/study_action_theme.dart` (166):
   `StudyActionTheme`, `StudyActionStyles`; wspólne style przycisków
   timera i kalendarza (promień 12 px, padding 8/10); wspólna wyśrodkowana
   zawartość ikon i tekstu oraz promień 12 px selektora Today/Week/Month;
   wspólne tło i obrys kart planowanych sesji w kalendarzu i timerze,
-  z opcjonalnym odcieniem wybranego koloru;
+  z opcjonalnym odcieniem wybranego koloru po automatycznej konwersji
+  HSL w dark mode; zapisany kolor pozostaje bez zmian;
   zaznaczenie przycisków Start/Smart i Day/Week/Month oraz ich
   obrys korzystają z globalnego koloru AppColors.divider, nie
   z ręcznie przypisanego brązu; pozostałe przyciski zachowują tło
@@ -811,12 +815,14 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   i standardowe promienie 12 px prostokątnych kontrolek.
 - `test/ink_color_presets_test.dart`: odcienie trzech palet, wspólny
   wybór koloru dla pióra i zakreślacza,
-  transformacja HSL w dark mode, domyślny Blue oraz marker z trzeciej próbki.
+  transformacja HSL w dark mode, malejący kontrast odcieni 1–3
+  z jasną kartką, domyślny Blue oraz marker z trzeciej próbki.
 - `test/study_planner_controller_test.dart`: zapis bloków i kolorów,
   zgodność starszych sesji, reset koloru, resume, pauza, konflikt
   timerów, Pomodoro, ocena, pominięcie oceny, recovery dawnych review
   i ochrona uszkodzonych danych; sukces/błąd wczytywania po dispose.
-- `test/study_planner_widget_test.dart`: szerokości 50/50, odstępy
+- `test/study_planner_widget_test.dart`: konwersja kolorów kart kalendarza
+  i próbek formularza w obu motywach, szerokości 50/50, odstępy
   i zaokrąglenia przycisków timera przy panelach 240/320 px;
   środkowanie ikon i etykiet, wspólną wysokość 32 px planera i timera
   i większy padding timera,
@@ -891,7 +897,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (3119 linii)
+### `lib/features/editor/state/editor_controller.dart` (3137 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
@@ -917,7 +923,8 @@ dwa kontakty wyłączają ten drag i nie transformują obiektu ani canvasa.
 Trzy szybkie kolory domyślnie używają niebieskiego zestawu; wszystkie
 próbki wybierają ten sam kolor dla pióra i zakreślacza, bez przypisania
 odcienia do narzędzia. Wybór palety wybiera pierwszy kolor. Wcześniejsze
-fabryczne Blue/Pink/Green są migrowane, a ręcznie zmienione kolory pozostają
+fabryczne Blue/Pink/Green (także bezpośrednio poprzednie odcienie)
+są migrowane według indeksu, a ręcznie zmienione kolory pozostają
 nienaruszone. Zapis preferencji tła obejmuje tylko notebook i board, bo
 planner nie ma ustawień tła. Obrazy trafiają do prywatnego katalogu danych
 aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
@@ -935,12 +942,12 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
   korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
   oraz pojedyncze undo/redo.
   682: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- 1319: łączenie zapisanych domyślnych teł; 1402: `undo`; 1428: `redo`;
-  1516: `toggleBookmark`; 1592: `updateActiveTextStyle` — blokowe
+- 1337: łączenie zapisanych domyślnych teł; 1420: `undo`; 1446: `redo`;
+  1534: `toggleBookmark`; 1610: `updateActiveTextStyle` — blokowe
   formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
   zapisywane jako `UpdateTextAction`.
-- 2637: `_imagesDir`; 2795: `_applyAction`; 2826: `_applyInkAction`;
-  2991: `_scheduleSave`; 3013: `_saveDirtyPages`; 3051: `_save`.
+- 2655: `_imagesDir`; 2813: `_applyAction`; 2844: `_applyInkAction`;
+  3009: `_scheduleSave`; 3031: `_saveDirtyPages`; 3069: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`
@@ -1620,7 +1627,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   restore zamyka źródłowy `NotesDatabase` przed otwarciem docelowego,
   aby nie utrzymywać dwóch instancji Drift w tym samym isolate.
   Weryfikuje również trwałość ustawienia czułości nawigacji i skali UI,
-  domyślne palety, ich utrwalanie, migrację fabrycznych kolorów i
+  domyślne palety, ich utrwalanie, migrację fabrycznych kolorów
+  (także zestawów z poprzedniej wersji) i
   zachowanie ustawionych ręcznie próbek.
 - `test/production/export_render_test.dart` (305): produkcyjne PNG/PDF
   w pamięci, liczba stron i rozmiar obrazu, treść oraz legacy gumka.

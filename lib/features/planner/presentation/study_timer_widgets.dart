@@ -510,7 +510,14 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                     onPressed: _pickColor,
                     icon: Icon(
                       Icons.palette_outlined,
-                      color: _color == null ? scheme.onSurface : _color!,
+                      color: _color == null
+                          ? scheme.onSurface
+                          : AppColors.displayInkColor(
+                              _color!,
+                              darkMode:
+                                  Theme.of(context).brightness ==
+                                  Brightness.dark,
+                            ),
                       size: 18,
                     ),
                     label: const Text('Colour'),

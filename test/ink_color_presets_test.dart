@@ -16,18 +16,18 @@ void main() {
   test('presets retain their hues with three progressively lighter tones', () {
     expect(InkColorPreset.blue.colors, [
       const Color(0xFF1A2130),
-      const Color(0xFF7798C0),
       const Color(0xFFACBED8),
+      const Color(0xFFDEE7F2),
     ]);
     expect(InkColorPreset.pink.colors, [
       const Color(0xFF3A212B),
-      const Color(0xFFA9788A),
       const Color(0xFFDAB5C2),
+      const Color(0xFFF2E1E8),
     ]);
     expect(InkColorPreset.green.colors, [
       const Color(0xFF1F3027),
-      const Color(0xFF76A58D),
       const Color(0xFFB0D2BF),
+      const Color(0xFFE4EFE8),
     ]);
   });
 
@@ -55,7 +55,17 @@ void main() {
       expect(light[1], lessThan(light[2]));
       expect(dark[0], greaterThan(dark[1]));
       expect(dark[1], greaterThan(dark[2]));
-      expect(light[2], lessThan(0.85));
+      expect(light[2], greaterThan(0.85));
+      expect(light[2], lessThan(0.96));
+      final canvasLuminance = AppColors.paper.computeLuminance();
+      final contrast = preset.colors
+          .map(
+            (color) => (canvasLuminance + 0.05) /
+                (color.computeLuminance() + 0.05),
+          )
+          .toList();
+      expect(contrast[0], greaterThan(contrast[1]));
+      expect(contrast[1], greaterThan(contrast[2]));
       expect(
         HSLColor.fromColor(
           AppColors.displayInkColor(preset.colors[0], darkMode: true),

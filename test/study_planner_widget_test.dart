@@ -42,6 +42,85 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  test('calendar and upcoming cards invert user colors in dark mode', () {
+    const selected = Color(0xFFACBED8);
+    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+      final darkMode = theme.brightness == Brightness.dark;
+      final base = StudyActionStyles.plannedSessionColor(theme);
+      final display = AppColors.displayInkColor(
+        selected,
+        darkMode: darkMode,
+      );
+      final expected = Color.alphaBlend(
+        display.withValues(alpha: darkMode ? 0.45 : 0.32),
+        base,
+      );
+      expect(
+        StudyActionStyles.sessionCardColor(theme, selected.toARGB32()),
+        expected,
+      );
+      expect(StudyActionStyles.sessionCardColor(theme, null), base);
+    }
+    expect(
+      StudyActionStyles.sessionCardColor(
+        AppTheme.light(),
+        selected.toARGB32(),
+      ),
+      isNot(
+        StudyActionStyles.sessionCardColor(
+          AppTheme.dark(),
+          selected.toARGB32(),
+        ),
+      ),
+    );
+  });
+
+  for (final darkMode in [false, true]) {
+    testWidgets('calendar color preview follows theme, dark=$darkMode',
+        (tester) async {
+      final planner = await loadPlanner();
+      final color = InkColorPreset.pink.colors[1];
+      final event = planner.create(
+        kind: StudyEntryKind.event,
+        title: 'Colored event',
+        scheduledAt: DateTime.now(),
+        colorValue: color.toARGB32(),
+      );
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StudyPlannerController>.value(
+          value: planner,
+          child: MaterialApp(
+            theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: TextButton(
+                  onPressed: () => showStudySessionEditor(
+                    context,
+                    session: event,
+                  ),
+                  child: const Text('Edit event color'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Edit event color'));
+      await tester.pumpAndSettle();
+      final icon = tester.widget<Icon>(
+        find.descendant(
+          of: find.byKey(const ValueKey('study-session-colour')),
+          matching: find.byIcon(Icons.palette_outlined),
+        ),
+      );
+      expect(
+        icon.color,
+        AppColors.displayInkColor(color, darkMode: darkMode),
+      );
+      expect(planner.sessions.single.colorValue, color.toARGB32());
+    });
+  }
+
   testWidgets('upcoming shows only sessions with a light beige outline', (
     tester,
   ) async {

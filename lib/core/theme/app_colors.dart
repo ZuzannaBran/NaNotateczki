@@ -75,21 +75,21 @@ class AppColors {
   static const shadow = Color(0x22000000);
   static const divider = Color(0xFFCFCCC5);
 
-  // Shared palettes: dark, medium and light tones for either ink tool.
+  // Shared tones: darkest first, then the former third, then a softer third.
   static const blueColorSet = <Color>[
     Color(0xFF1A2130),
-    Color(0xFF7798C0),
     Color(0xFFACBED8),
+    Color(0xFFDEE7F2),
   ];
   static const pinkColorSet = <Color>[
     Color(0xFF3A212B),
-    Color(0xFFA9788A),
     Color(0xFFDAB5C2),
+    Color(0xFFF2E1E8),
   ];
   static const greenColorSet = <Color>[
     Color(0xFF1F3027),
-    Color(0xFF76A58D),
     Color(0xFFB0D2BF),
+    Color(0xFFE4EFE8),
   ];
 
   static const inkPalette = <Color>[

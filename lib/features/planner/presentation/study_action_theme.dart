@@ -48,10 +48,13 @@ class StudyActionStyles {
     if (colorValue == null) {
       return base;
     }
+    final darkMode = theme.brightness == Brightness.dark;
+    final displayColor = AppColors.displayInkColor(
+      Color(colorValue),
+      darkMode: darkMode,
+    );
     return Color.alphaBlend(
-      Color(
-        colorValue,
-      ).withValues(alpha: theme.brightness == Brightness.dark ? 0.45 : 0.32),
+      displayColor.withValues(alpha: darkMode ? 0.45 : 0.32),
       base,
     );
   }
