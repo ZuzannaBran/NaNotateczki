@@ -27,77 +27,77 @@ void main() {
   testWidgets(
     'background switches repaint without notifying the whole editor',
     (tester) async {
-    await tester.binding.setSurfaceSize(const Size(1100, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(1100, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    final database = NotesDatabase(NativeDatabase.memory());
-    final preferences = AppPreferencesController();
-    final controller = EditorController(
-      repository: NotebookRepository(database),
-      notebook: _notebook(),
-    );
+      final database = NotesDatabase(NativeDatabase.memory());
+      final preferences = AppPreferencesController();
+      final controller = EditorController(
+        repository: NotebookRepository(database),
+        notebook: _notebook(),
+      );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: MultiProvider(
-          providers: [
-            ChangeNotifierProvider<AppPreferencesController>.value(
-              value: preferences,
-            ),
-            ChangeNotifierProvider<EditorController>.value(value: controller),
-          ],
-          child: const EditorScreen(),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MultiProvider(
+            providers: [
+              ChangeNotifierProvider<AppPreferencesController>.value(
+                value: preferences,
+              ),
+              ChangeNotifierProvider<EditorController>.value(value: controller),
+            ],
+            child: const EditorScreen(),
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 20)),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
 
-    var editorNotifications = 0;
-    var backgroundNotifications = 0;
-    controller.addListener(() => editorNotifications++);
-    controller.backgroundSettingsListenable.addListener(
-      () => backgroundNotifications++,
-    );
+      var editorNotifications = 0;
+      var backgroundNotifications = 0;
+      controller.addListener(() => editorNotifications++);
+      controller.backgroundSettingsListenable.addListener(
+        () => backgroundNotifications++,
+      );
 
-    final painterFinder = find.byType(PageBackgroundPaint);
-    expect(painterFinder, findsWidgets);
+      final painterFinder = find.byType(PageBackgroundPaint);
+      expect(painterFinder, findsWidgets);
 
-    controller.setCurrentBackgroundSettings(
-      const PageBackgroundSettings(style: PageBackgroundStyle.grid),
-    );
-    expect(editorNotifications, 0);
-    expect(backgroundNotifications, 1);
-    await tester.pump();
-    expect(
-      tester.widget<PageBackgroundPaint>(painterFinder.first).settings.style,
-      PageBackgroundStyle.grid,
-    );
+      controller.setCurrentBackgroundSettings(
+        const PageBackgroundSettings(style: PageBackgroundStyle.grid),
+      );
+      expect(editorNotifications, 0);
+      expect(backgroundNotifications, 1);
+      await tester.pump();
+      expect(
+        tester.widget<PageBackgroundPaint>(painterFinder.first).settings.style,
+        PageBackgroundStyle.grid,
+      );
 
-    controller.setCurrentBackgroundSettings(
-      const PageBackgroundSettings(style: PageBackgroundStyle.lines),
-    );
-    controller.setCurrentBackgroundSettings(
-      const PageBackgroundSettings(style: PageBackgroundStyle.lines),
-    );
-    expect(editorNotifications, 0);
-    expect(backgroundNotifications, 2);
-    await tester.pump();
-    expect(
-      tester.widget<PageBackgroundPaint>(painterFinder.first).settings.style,
-      PageBackgroundStyle.lines,
-    );
+      controller.setCurrentBackgroundSettings(
+        const PageBackgroundSettings(style: PageBackgroundStyle.lines),
+      );
+      controller.setCurrentBackgroundSettings(
+        const PageBackgroundSettings(style: PageBackgroundStyle.lines),
+      );
+      expect(editorNotifications, 0);
+      expect(backgroundNotifications, 2);
+      await tester.pump();
+      expect(
+        tester.widget<PageBackgroundPaint>(painterFinder.first).settings.style,
+        PageBackgroundStyle.lines,
+      );
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    controller.dispose();
-    preferences.dispose();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 20)),
-    );
-    await database.close();
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+      preferences.dispose();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await database.close();
     },
   );
 
