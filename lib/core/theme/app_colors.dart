@@ -75,21 +75,21 @@ class AppColors {
   static const shadow = Color(0x22000000);
   static const divider = Color(0xFFCFCCC5);
 
-  // Shared tones: darkest first, then the former third, then a softer third.
+  // Shared tones: decreasing canvas contrast in light and dark themes.
   static const blueColorSet = <Color>[
     Color(0xFF1A2130),
-    Color(0xFFACBED8),
-    Color(0xFFDEE7F2),
+    Color(0xFF6A8AB9),
+    Color(0xFF8AAAD1),
   ];
   static const pinkColorSet = <Color>[
     Color(0xFF3A212B),
-    Color(0xFFDAB5C2),
-    Color(0xFFF2E1E8),
+    Color(0xFFB66D86),
+    Color(0xFFCE8DA8),
   ];
   static const greenColorSet = <Color>[
     Color(0xFF1F3027),
-    Color(0xFFB0D2BF),
-    Color(0xFFE4EFE8),
+    Color(0xFF73AF8E),
+    Color(0xFF99C2A8),
   ];
 
   static const inkPalette = <Color>[

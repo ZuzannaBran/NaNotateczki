@@ -16,18 +16,18 @@ void main() {
   test('presets retain their hues with three progressively lighter tones', () {
     expect(InkColorPreset.blue.colors, [
       const Color(0xFF1A2130),
-      const Color(0xFFACBED8),
-      const Color(0xFFDEE7F2),
+      const Color(0xFF6A8AB9),
+      const Color(0xFF8AAAD1),
     ]);
     expect(InkColorPreset.pink.colors, [
       const Color(0xFF3A212B),
-      const Color(0xFFDAB5C2),
-      const Color(0xFFF2E1E8),
+      const Color(0xFFB66D86),
+      const Color(0xFFCE8DA8),
     ]);
     expect(InkColorPreset.green.colors, [
       const Color(0xFF1F3027),
-      const Color(0xFFB0D2BF),
-      const Color(0xFFE4EFE8),
+      const Color(0xFF73AF8E),
+      const Color(0xFF99C2A8),
     ]);
   });
 
@@ -55,23 +55,79 @@ void main() {
       expect(light[1], lessThan(light[2]));
       expect(dark[0], greaterThan(dark[1]));
       expect(dark[1], greaterThan(dark[2]));
-      expect(light[2], greaterThan(0.85));
-      expect(light[2], lessThan(0.96));
-      final canvasLuminance = AppColors.paper.computeLuminance();
-      final contrast = preset.colors
+      expect(light[2], greaterThan(0.65));
+      expect(light[2], lessThan(0.75));
+      double contrast(Color first, Color second) {
+        final a = first.computeLuminance();
+        final b = second.computeLuminance();
+        final greater = a > b ? a : b;
+        final smaller = a > b ? b : a;
+        return (greater + 0.05) / (smaller + 0.05);
+      }
+
+      final lightContrast = preset.colors
+          .map((color) => contrast(color, AppColors.paper))
+          .toList();
+      final darkContrast = preset.colors
           .map(
-            (color) => (canvasLuminance + 0.05) /
-                (color.computeLuminance() + 0.05),
+            (color) => contrast(
+              AppColors.displayInkColor(color, darkMode: true),
+              AppColors.darkCanvas,
+            ),
           )
           .toList();
-      expect(contrast[0], greaterThan(contrast[1]));
-      expect(contrast[1], greaterThan(contrast[2]));
+      expect(lightContrast[0], greaterThan(lightContrast[1]));
+      expect(lightContrast[1], greaterThan(lightContrast[2]));
+      expect(darkContrast[0], greaterThan(darkContrast[1]));
+      expect(darkContrast[1], greaterThan(darkContrast[2]));
       expect(
         HSLColor.fromColor(
           AppColors.displayInkColor(preset.colors[0], darkMode: true),
         ).lightness,
         greaterThan(0.8),
       );
+    }
+  });
+
+  test('swatches 2 and 3 darken in light and brighten in dark', () {
+    const previous = <InkColorPreset, List<Color>>{
+      InkColorPreset.blue: [
+        Color(0xFF1A2130),
+        Color(0xFFACBED8),
+        Color(0xFFDEE7F2),
+      ],
+      InkColorPreset.pink: [
+        Color(0xFF3A212B),
+        Color(0xFFDAB5C2),
+        Color(0xFFF2E1E8),
+      ],
+      InkColorPreset.green: [
+        Color(0xFF1F3027),
+        Color(0xFFB0D2BF),
+        Color(0xFFE4EFE8),
+      ],
+    };
+    for (final entry in previous.entries) {
+      final updated = entry.key.colors;
+      expect(updated[0], entry.value[0]);
+      for (final index in [1, 2]) {
+        expect(
+          updated[index].computeLuminance(),
+          lessThan(entry.value[index].computeLuminance()),
+        );
+        expect(
+          AppColors.displayInkColor(
+            updated[index],
+            darkMode: true,
+          ).computeLuminance(),
+          greaterThan(
+            AppColors.displayInkColor(
+              entry.value[index],
+              darkMode: true,
+            ).computeLuminance(),
+          ),
+        );
+      }
     }
   });
 
