@@ -201,7 +201,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         final apiClient = _apiClient ?? ApiClient();
         _apiClient = apiClient;
         final accountSession =
-            _accountSession ?? AccountSessionController(apiClient);
+            _accountSession ??
+            (AccountSessionController(apiClient)..loadProfile());
         _accountSession = accountSession;
         final remoteBackup =
             _remoteBackupService ??

@@ -44,6 +44,9 @@ void main() {
   test('migrates every known data category and records the layout', () async {
     await File('${legacy.path}/notes.sqlite').writeAsBytes([1, 2, 3]);
     await File('${legacy.path}/app_prefs.json').writeAsString('{}');
+    await File(
+      '${legacy.path}/account_profile.json',
+    ).writeAsString('{"version":1}');
     await File('${legacy.path}/default.isar').writeAsBytes([9, 8, 7]);
     await File('${legacy.path}/schema_version.txt').writeAsString('legacy');
     await Directory('${legacy.path}/images/nested').create(recursive: true);
@@ -61,6 +64,10 @@ void main() {
     final data = Directory(report.dataPath);
     expect(await File('${data.path}/notes.sqlite').readAsBytes(), [1, 2, 3]);
     expect(await File('${data.path}/app_prefs.json').readAsString(), '{}');
+    expect(
+      await File('${data.path}/account_profile.json').readAsString(),
+      '{"version":1}',
+    );
     expect(await File('${data.path}/legacy/default.isar').readAsBytes(), [
       9,
       8,

@@ -6,8 +6,9 @@ offline również po zalogowaniu.
 
 ## Tryby danych
 
-- `localOnly` jest trybem domyślnym. Nie wymaga konta i nie wykonuje żadnego
-  połączenia z API.
+- Przy pierwszym uruchomieniu użytkownik jawnie wybiera rejestrację, logowanie
+  albo tryb lokalny. `localOnly` wymaga wyłącznie lokalnej nazwy użytkownika
+  i nie wykonuje żadnego połączenia z API.
 - `account` powstaje dopiero po jawnym logowaniu. Samo logowanie nie wysyła
   lokalnych notatek.
 - Backup zdalny wymaga osobnego wywołania
@@ -15,6 +16,14 @@ offline również po zalogowaniu.
 - Synchronizacja Web wymaga jawnego `LiveWebSyncService.start(...)` z wyborem:
   `uploadLocal`, `downloadRemote` albo `mergeSafely`. Pierwsze dwie opcje
   odmawiają działania, jeśli mogłyby nadpisać niepustą bibliotekę.
+- Panel konta uruchamia backup dopiero po poprawnym logowaniu, a na Web
+  wymaga od użytkownika wyboru jednej z trzech polityk przed startem live
+  sync. Przy wylogowaniu najpierw zatrzymuje live sync i backup, a dopiero
+  potem czyści sesję przechowywaną w pamięci.
+- `account_profile.json` przechowuje wyłącznie ukończenie onboardingu,
+  preferowany tryb, lokalną nazwę i ostatni e-mail. Nie zawiera hasła,
+  access tokenu ani refresh tokenu. Preferowany tryb konta po restarcie
+  wymaga ponownego logowania, ponieważ tokeny celowo nie są utrwalane.
 
 ## Dane lokalne na platformach natywnych
 
@@ -26,11 +35,12 @@ w podkatalogu `data`. Na obecnym Linuksie jest to:
 ├── notes.sqlite                         główna baza Drift
 ├── notes.sqlite-{wal,shm,journal}       pliki robocze SQLite, jeśli istnieją
 ├── app_prefs.json                       ustawienia aplikacji
+├── account_profile.json                 tryb i lokalna nazwa, bez tokenów
 ├── editor_prefs.json                    ustawienia edytora
 ├── shared_recent_colors.json            historia kolorów
 ├── library_folders.json                 foldery, okładki i zadania planerów
 ├── study_planner.json                   sesje i wydarzenia
-├── server_device.json                   losowy identyfikator urządzenia
+├── server_device_<hash>.json            identyfikator urządzenia per konto
 ├── server_sync_state_<hash>.json        kursor, rewizje i mały outbox konta
 ├── storage_layout.json                  raport migracji układu
 ├── images/                              trwałe obrazy/PDF-y notatek
@@ -78,6 +88,10 @@ katalogu głównego ani całego katalogu domowego jako celu.
 - Małe ustawienia, outbox identyfikatorów i kursor są w `localStorage`.
 - Token dostępu i refresh token są wyłącznie w pamięci procesu; po pełnym
   zamknięciu przeglądarki trzeba zalogować się ponownie.
+- Kursor, rewizje, outbox, stan UI backupu oraz identyfikator urządzenia są
+  izolowane według `userId`; przełączenie konta nie może odziedziczyć stanu
+  poprzedniego właściciela. Stary nieprzypisany `server_device.json` nie jest
+  używany do nowych backupów.
 - WebSocket przenosi wyłącznie mały sygnał zmiany. Pełny, trwały stan jest
   zawsze pobierany przez REST z kursorem `change_events`.
 
@@ -112,6 +126,21 @@ w prywatnej sieci Compose. Caddy wiąże port `8080` wyłącznie do
    payloadu; dopiero potem wykonuje atomowy rename i ustawia `verified`.
 5. Błąd nie usuwa wcześniejszego poprawnego snapshotu. Scheduler ponawia próbę
    po 5 minutach i normalnie wysyła co 30 minut tylko po zmianach.
+   Przycisk `Back up now` jawnie oznacza snapshot jako wymagany i uruchamia go
+   od razu.
+
+### Konto i zmiana hasła
+
+- Rejestracja i logowanie używają e-maila oraz hasła 12–256 znaków;
+  powtórzenie hasła przy rejestracji jest walidowane wyłącznie lokalnie.
+- Zmiana hasła wywołuje uwierzytelnione
+  `POST /v1/auth/change-password` z `currentPassword` i `newPassword`.
+  Powtórzenie nowego hasła nie jest wysyłane do API.
+- Po sukcesie `204` serwer unieważnia wszystkie sesje. Klient zatrzymuje live
+  sync i backup, czyści tokeny z pamięci oraz wymaga ponownego logowania.
+- Użytkownik może przełączać się między profilem lokalnym i kontem z poziomu
+  ustawień konta. Przejście do trybu lokalnego zatrzymuje usługi sieciowe
+  przed wyczyszczeniem sesji.
 
 ### Synchronizacja dwóch przeglądarek
 

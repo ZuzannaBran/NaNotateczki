@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -11,6 +12,7 @@ import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../data/sync/account_session_controller.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
 import '../../editor/state/editor_controller.dart';
@@ -21,11 +23,14 @@ import '../../notebook/presentation/notebook_screen.dart';
 import '../../planner/presentation/study_timer_widgets.dart';
 import '../../planner/presentation/task_list_screen.dart';
 import '../../planner/state/study_planner_controller.dart';
+import 'library_account_slot.dart';
 import 'library_catalog.dart';
 import 'library_controller.dart';
 
 class LibraryScreen extends StatefulWidget {
-  const LibraryScreen({super.key});
+  const LibraryScreen({super.key, this.liveSyncAvailable = kIsWeb});
+
+  final bool liveSyncAvailable;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -47,6 +52,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   bool _showEditorToolbar = true;
   double _navigationPaneWidth = 320;
   bool _isShowingCorruptRecoveryDialog = false;
+  bool _isShowingAccountOnboarding = false;
   final ValueNotifier<bool> _sidebarMenuOpen = ValueNotifier<bool>(false);
   final GlobalKey<ScaffoldState> _compactScaffoldKey =
       GlobalKey<ScaffoldState>();
@@ -103,9 +109,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<LibraryController>();
+    final accountSession = context.watch<AccountSessionController?>();
     final selectedItem = controller.selectedItem();
     final headerDividerColor = AppHeaderDivider.colorOf(context);
     _maybeShowCorruptRecoveryDialog(controller);
+    _maybeShowAccountOnboarding(accountSession);
 
     return Scaffold(
       body: SafeArea(
@@ -236,6 +244,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                           width: navigationWidth,
                                           child: _LibraryTreePane(
                                             controller: controller,
+                                            liveSyncAvailable:
+                                                widget.liveSyncAvailable,
                                             extendDividersIntoResizeHandle:
                                                 true,
                                             showingProjects:
@@ -345,6 +355,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           .toDouble(),
                       child: _LibraryTreePane(
                         controller: controller,
+                        liveSyncAvailable: widget.liveSyncAvailable,
                         showingProjects: _showCatalog && _catalogFolder == null,
                         onShowProjects: () {
                           _closeCompactNavigation();
@@ -385,6 +396,27 @@ class _LibraryScreenState extends State<LibraryScreen> {
         ),
       ),
     );
+  }
+
+  void _maybeShowAccountOnboarding(AccountSessionController? session) {
+    if (session?.shouldShowStartupDialog != true ||
+        _isShowingAccountOnboarding) {
+      return;
+    }
+    _isShowingAccountOnboarding = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        return;
+      }
+      await showLibraryAccountDialog(
+        context,
+        liveSyncAvailable: widget.liveSyncAvailable,
+        startupRequired: true,
+      );
+      if (mounted) {
+        setState(() => _isShowingAccountOnboarding = false);
+      }
+    });
   }
 
   void _openCompactNavigation() {
@@ -945,10 +977,12 @@ class _LibraryTreePane extends StatefulWidget {
     required this.onOpenFolder,
     required this.showingProjects,
     this.extendDividersIntoResizeHandle = false,
+    this.liveSyncAvailable = kIsWeb,
   });
 
   final LibraryController controller;
   final bool extendDividersIntoResizeHandle;
+  final bool liveSyncAvailable;
   final ValueChanged<Notebook> onOpen;
   final Future<void> Function(NotebookKind kind) onCreate;
   final ValueChanged<bool> onCreateFolder;
@@ -1160,7 +1194,11 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                         dividerKey: const ValueKey('sidebar-account-divider'),
                         extendBy: dividerExtension,
                       ),
-                    const Spacer(),
+                    Expanded(
+                      child: LibraryAccountSlot(
+                        liveSyncAvailable: widget.liveSyncAvailable,
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/storage/text_storage.dart';
 import 'api_client.dart';
 
 enum AccountDataMode { localOnly, account }
@@ -9,16 +10,84 @@ enum AccountDataMode { localOnly, account }
 class AccountSessionController extends ChangeNotifier {
   AccountSessionController(this.apiClient);
 
+  static const profileStorageKey = 'account_profile.json';
+
   final ApiClient apiClient;
   AccountDataMode mode = AccountDataMode.localOnly;
+  AccountDataMode preferredMode = AccountDataMode.localOnly;
   String? userId;
   String? email;
+  String? localDisplayName;
+  String? lastAccountEmail;
   String? _refreshToken;
   DateTime? accessExpiresAt;
+  bool profileLoaded = false;
+  bool onboardingComplete = false;
+  bool accountDialogOpen = false;
   bool isBusy = false;
   String? error;
+  Future<void>? _profileLoad;
 
   bool get isSignedIn => mode == AccountDataMode.account && userId != null;
+  bool get shouldShowStartupDialog =>
+      profileLoaded &&
+      !accountDialogOpen &&
+      (!onboardingComplete ||
+          (preferredMode == AccountDataMode.account && !isSignedIn));
+  bool get isLocalProfile => !isSignedIn && localDisplayName != null;
+  String get displayName =>
+      isSignedIn ? (email ?? 'Account') : (localDisplayName ?? 'Local user');
+  String get avatarLetter {
+    final trimmed = displayName.trim();
+    return trimmed.isEmpty
+        ? '?'
+        : String.fromCharCode(trimmed.runes.first).toUpperCase();
+  }
+
+  void beginAccountInteraction() {
+    accountDialogOpen = true;
+    notifyListeners();
+  }
+
+  void endAccountInteraction() {
+    accountDialogOpen = false;
+    notifyListeners();
+  }
+
+  void clearError() {
+    if (error == null) {
+      return;
+    }
+    error = null;
+    notifyListeners();
+  }
+
+  Future<void> loadProfile() {
+    return _profileLoad ??= _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final content = await readStoredText(profileStorageKey);
+      if (content != null) {
+        final raw = jsonDecode(content);
+        if (raw is! Map<String, dynamic> || raw['version'] != 1) {
+          throw const FormatException('Unsupported account profile.');
+        }
+        onboardingComplete = raw['onboardingComplete'] == true;
+        preferredMode = raw['preferredMode'] == AccountDataMode.account.name
+            ? AccountDataMode.account
+            : AccountDataMode.localOnly;
+        localDisplayName = _optionalNonEmptyString(raw['localDisplayName']);
+        lastAccountEmail = _optionalNonEmptyString(raw['lastAccountEmail']);
+      }
+    } catch (failure) {
+      error = _failureMessage(failure);
+    } finally {
+      profileLoaded = true;
+      notifyListeners();
+    }
+  }
 
   Future<void> register(String email, String password) async {
     await _authenticate('/v1/auth/register', email, password);
@@ -51,8 +120,18 @@ class AccountSessionController extends ChangeNotifier {
         'password': password,
       }, authenticated: false);
       _applySession(response.decodeJson());
+      preferredMode = AccountDataMode.account;
+      onboardingComplete = true;
+      lastAccountEmail = email;
+      if (profileLoaded) {
+        try {
+          await _saveProfile();
+        } catch (failure) {
+          error = _failureMessage(failure);
+        }
+      }
     } catch (failure) {
-      error = failure.toString();
+      error = _failureMessage(failure);
       rethrow;
     } finally {
       isBusy = false;
@@ -72,6 +151,38 @@ class AccountSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    if (!isSignedIn) {
+      throw StateError('Sign in before changing the password.');
+    }
+    if (currentPassword.isEmpty || currentPassword.length > 256) {
+      throw const FormatException('Enter the current password.');
+    }
+    if (newPassword.length < 12 || newPassword.length > 256) {
+      throw const FormatException(
+        'The new password must contain 12 to 256 characters.',
+      );
+    }
+    isBusy = true;
+    error = null;
+    notifyListeners();
+    try {
+      await apiClient.postJson('/v1/auth/change-password', {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      });
+    } catch (failure) {
+      error = _failureMessage(failure);
+      rethrow;
+    } finally {
+      isBusy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     final refreshToken = _refreshToken;
     try {
@@ -86,14 +197,49 @@ class AccountSessionController extends ChangeNotifier {
   }
 
   void useLocalOnly() {
+    _clearSession();
+    error = null;
+    notifyListeners();
+  }
+
+  Future<void> useLocalProfile(String rawDisplayName) async {
+    final displayName = rawDisplayName.trim();
+    if (displayName.isEmpty || displayName.length > 80) {
+      throw const FormatException(
+        'The local name must contain 1 to 80 characters.',
+      );
+    }
+    _clearSession();
+    localDisplayName = displayName;
+    preferredMode = AccountDataMode.localOnly;
+    onboardingComplete = true;
+    profileLoaded = true;
+    error = null;
+    try {
+      await _saveProfile();
+    } catch (failure) {
+      error = _failureMessage(failure);
+      notifyListeners();
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  void requireAccountReauthentication() {
+    _clearSession();
+    preferredMode = AccountDataMode.account;
+    onboardingComplete = true;
+    error = null;
+    notifyListeners();
+  }
+
+  void _clearSession() {
     mode = AccountDataMode.localOnly;
     userId = null;
     email = null;
     _refreshToken = null;
     accessExpiresAt = null;
     apiClient.setAccessToken(null);
-    error = null;
-    notifyListeners();
   }
 
   void _applySession(Object? raw) {
@@ -124,6 +270,36 @@ class AccountSessionController extends ChangeNotifier {
     mode = AccountDataMode.account;
   }
 
+  Future<void> _saveProfile() {
+    return writeStoredText(
+      profileStorageKey,
+      jsonEncode({
+        'version': 1,
+        'onboardingComplete': onboardingComplete,
+        'preferredMode': preferredMode.name,
+        'localDisplayName': localDisplayName,
+        'lastAccountEmail': lastAccountEmail,
+      }),
+    );
+  }
+
+  static String? _optionalNonEmptyString(Object? raw) {
+    if (raw is! String || raw.trim().isEmpty) {
+      return null;
+    }
+    return raw.trim();
+  }
+
+  static String _failureMessage(Object failure) {
+    if (failure is ApiException) {
+      return failure.message;
+    }
+    if (failure is FormatException) {
+      return failure.message;
+    }
+    return failure.toString();
+  }
+
   @visibleForTesting
   String? get debugRefreshToken => _refreshToken;
 
@@ -132,6 +308,8 @@ class AccountSessionController extends ChangeNotifier {
     'mode': mode.name,
     'userId': userId,
     'email': email,
+    'preferredMode': preferredMode.name,
+    'localDisplayName': localDisplayName,
     'accessExpiresAt': accessExpiresAt?.toIso8601String(),
   });
 }

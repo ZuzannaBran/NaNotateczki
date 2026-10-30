@@ -38,6 +38,7 @@ class LiveWebSyncService extends ChangeNotifier {
   bool _disposed = false;
   int _cursor = 0;
   int _reconnectAttempt = 0;
+  String? _activeUserId;
   String? lastError;
   DateTime? lastSuccessfulSync;
   Future<void> Function()? onRemoteApplied;
@@ -46,13 +47,19 @@ class LiveWebSyncService extends ChangeNotifier {
   bool get hasPendingChanges => _pending.isNotEmpty;
 
   Future<void> start(InitialSyncPolicy policy) async {
-    if (!session.isSignedIn) {
+    final userId = session.userId;
+    if (!session.isSignedIn || userId == null) {
       throw StateError('Live synchronization requires a signed-in account.');
     }
-    if (_started) {
+    if (_started && _activeUserId == userId) {
       return;
     }
-    await _loadState();
+    if (_activeUserId != null || _activeSync != null) {
+      await stop();
+    }
+    _resetAccountState();
+    _activeUserId = userId;
+    await _loadState(userId);
     final bootstrap = await _getJsonObject('/v1/sync/bootstrap');
     final rawRecords = bootstrap['notebooks'];
     final cursor = bootstrap['cursor'];
@@ -462,17 +469,13 @@ class LiveWebSyncService extends ChangeNotifier {
     );
   }
 
-  String get _stateKey {
-    final id = session.userId;
-    if (id == null) {
-      throw StateError('Cannot address sync state without a user.');
-    }
+  String _stateKey(String id) {
     final suffix = sha256.convert(utf8.encode(id)).toString().substring(0, 16);
     return 'server_sync_state_$suffix.json';
   }
 
-  Future<void> _loadState() async {
-    final content = await readStoredText(_stateKey);
+  Future<void> _loadState(String userId) async {
+    final content = await readStoredText(_stateKey(userId));
     if (content == null) {
       return;
     }
@@ -504,8 +507,12 @@ class LiveWebSyncService extends ChangeNotifier {
   }
 
   Future<void> _saveState() {
+    final userId = _activeUserId;
+    if (userId == null) {
+      return Future<void>.value();
+    }
     return writeStoredText(
-      _stateKey,
+      _stateKey(userId),
       jsonEncode({
         'version': 1,
         'cursor': _cursor,
@@ -531,7 +538,20 @@ class LiveWebSyncService extends ChangeNotifier {
     await _channel?.sink.close();
     _socketSubscription = null;
     _channel = null;
+    await _activeSync;
+    _resetAccountState();
     notifyListeners();
+  }
+
+  void _resetAccountState() {
+    _activeUserId = null;
+    _cursor = 0;
+    _reconnectAttempt = 0;
+    _revisions.clear();
+    _pending.clear();
+    _idempotencyKeys.clear();
+    lastError = null;
+    lastSuccessfulSync = null;
   }
 
   @override

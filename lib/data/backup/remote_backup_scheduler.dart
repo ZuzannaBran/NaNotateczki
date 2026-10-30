@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 
@@ -27,6 +28,8 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   bool _enabled = false;
   bool _uploading = false;
   bool _disposed = false;
+  Future<void>? _activeUpload;
+  String? _accountUserId;
   RemoteBackupReceipt? lastVerifiedBackup;
   String? lastError;
 
@@ -35,8 +38,13 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   bool get isEnabled => _enabled;
 
   void enableForSignedInAccount() {
-    if (!session.isSignedIn) {
+    final userId = session.userId;
+    if (!session.isSignedIn || userId == null) {
       throw StateError('Sign in before enabling remote backups.');
+    }
+    if (_accountUserId != userId) {
+      _clearAccountState();
+      _accountUserId = userId;
     }
     _enabled = true;
     _dirty = true;
@@ -49,7 +57,13 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     _enabled = false;
     _timer?.cancel();
     _timer = null;
+    _clearAccountState();
     notifyListeners();
+  }
+
+  Future<void> stop() async {
+    disable();
+    await _activeUpload;
   }
 
   void markDirty() {
@@ -61,8 +75,32 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> uploadNow() async {
+  Future<void> uploadNow() {
+    final running = _activeUpload;
+    if (running != null) {
+      return running;
+    }
+    final future = _uploadNow();
+    _activeUpload = future;
+    return future.whenComplete(() {
+      if (identical(_activeUpload, future)) {
+        _activeUpload = null;
+      }
+    });
+  }
+
+  Future<void> backupNow() {
+    markDirty();
+    return uploadNow();
+  }
+
+  Future<void> _uploadNow() async {
     if (!_enabled || !session.isSignedIn || !_dirty || _uploading) {
+      return;
+    }
+    final accountUserId = _accountUserId;
+    if (accountUserId == null || accountUserId != session.userId) {
+      disable();
       return;
     }
     _timer?.cancel();
@@ -72,14 +110,18 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
     try {
       final receipt = await service.uploadVerifiedSnapshot(
-        deviceId: await _deviceId(),
+        deviceId: await _deviceId(accountUserId),
       );
-      lastVerifiedBackup = receipt;
-      lastError = null;
-      _dirty = _changeGeneration != uploadGeneration;
+      if (_accountUserId == accountUserId && session.userId == accountUserId) {
+        lastVerifiedBackup = receipt;
+        lastError = null;
+        _dirty = _changeGeneration != uploadGeneration;
+      }
     } catch (error, stackTrace) {
-      lastError = error.toString();
-      _dirty = true;
+      if (_accountUserId == accountUserId) {
+        lastError = error.toString();
+        _dirty = true;
+      }
       AppErrorLog.instance.record(
         error,
         stackTrace,
@@ -97,7 +139,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _sessionChanged() {
-    if (!session.isSignedIn) {
+    if (!session.isSignedIn || session.userId != _accountUserId) {
       disable();
       return;
     }
@@ -116,8 +158,12 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
-  Future<String> _deviceId() async {
-    const key = 'server_device.json';
+  Future<String> _deviceId(String userId) async {
+    final suffix = sha256
+        .convert(utf8.encode(userId))
+        .toString()
+        .substring(0, 16);
+    final key = 'server_device_$suffix.json';
     final stored = await readStoredText(key);
     if (stored != null) {
       final decoded = jsonDecode(stored);
@@ -131,6 +177,14 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     final value = const Uuid().v4();
     await writeStoredText(key, jsonEncode({'version': 1, 'deviceId': value}));
     return value;
+  }
+
+  void _clearAccountState() {
+    _accountUserId = null;
+    lastVerifiedBackup = null;
+    lastError = null;
+    _dirty = true;
+    _changeGeneration++;
   }
 
   @override

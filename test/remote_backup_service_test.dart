@@ -173,4 +173,81 @@ void main() {
     expect(scheduler.lastVerifiedBackup, isNotNull);
     expect(scheduler.hasPendingBackup, isTrue);
   });
+
+  test('isolates status and device identity between accounts', () async {
+    final values = <String, String>{};
+    textStorageReadOverride = (key) async => values[key];
+    textStorageWriteOverride = (key, value) async => values[key] = value;
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final apiClient = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final isAccountA = body['email'] == 'a@example.com';
+        return http.Response(
+          jsonEncode({
+            'accessToken': isAccountA ? 'access-a' : 'access-b',
+            'refreshToken': 'refresh-token-with-at-least-forty-characters',
+            'expiresIn': 600,
+            'userId': isAccountA ? 'user-a' : 'user-b',
+            'email': body['email'],
+          }),
+          200,
+        );
+      }),
+    );
+    final session = AccountSessionController(apiClient);
+    await session.login('a@example.com', 'a-secure-password');
+    final service = _RecordingRemoteBackupService(
+      repository: repository,
+      apiClient: apiClient,
+      session: session,
+    );
+    final scheduler = RemoteBackupScheduler(service: service, session: session);
+    addTearDown(scheduler.dispose);
+
+    scheduler.enableForSignedInAccount();
+    await scheduler.uploadNow();
+    expect(scheduler.lastVerifiedBackup, isNotNull);
+    await scheduler.stop();
+    session.useLocalOnly();
+
+    await session.login('b@example.com', 'b-secure-password');
+    expect(scheduler.lastVerifiedBackup, isNull);
+    expect(scheduler.lastError, isNull);
+    scheduler.enableForSignedInAccount();
+    await scheduler.uploadNow();
+
+    expect(service.deviceIds, hasLength(2));
+    expect(service.deviceIds[0], isNot(service.deviceIds[1]));
+    expect(
+      values.keys.where((key) => key.startsWith('server_device_')),
+      hasLength(2),
+    );
+    expect(values, isNot(contains('server_device.json')));
+  });
+}
+
+class _RecordingRemoteBackupService extends RemoteBackupService {
+  _RecordingRemoteBackupService({
+    required super.repository,
+    required super.apiClient,
+    required super.session,
+  });
+
+  final deviceIds = <String>[];
+
+  @override
+  Future<RemoteBackupReceipt> uploadVerifiedSnapshot({
+    required String deviceId,
+  }) async {
+    deviceIds.add(deviceId);
+    return RemoteBackupReceipt(
+      backupId: 'backup-${deviceIds.length}',
+      checksum: 'checksum-${deviceIds.length}',
+      verifiedAt: DateTime.utc(2026, 10, 30, 12, deviceIds.length),
+    );
+  }
 }

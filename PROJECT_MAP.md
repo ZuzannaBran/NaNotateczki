@@ -58,7 +58,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (748 linii)
+### `lib/app/app_scope.dart` (749 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -77,12 +77,12 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 
 - Dostarcza również singleton `StudyPlannerController` (Provider),
   niezależny od migracji bazy notatek.
-- Dostarcza klient API, sesję konta, zdalny backup i live sync. Tryb lokalny
-  jest domyślny; repozytorium przekazuje zmiany do schedulerów po zapisie.
-- 31: `AppScope`; 38: `_AppScopeState`; 89: `didRequestAppExit`.
-- 300: `AppUiScale`; 348: `_ExitGuardOverlay`;
-  371: `_FinishingExitOverlay`; 479: `_BackupScheduler`;
-  669: `flushForExit`.
+- Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
+  backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
+- 31: `AppScope`; 38: `_AppScopeState`; 91: `didRequestAppExit`.
+- 301: `AppUiScale`; 349: `_ExitGuardOverlay`;
+  372: `_FinishingExitOverlay`; 480: `_BackupScheduler`;
+  676: `flushForExit`.
 
 ## 3. Core
 
@@ -153,10 +153,11 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   `path_provider` i udostępnia `getAppDataPath` oraz
   `prepareAppDataDirectory`. 6: `getAppDataPath`; 11:
   `prepareAppDataDirectory`.
-- `lib/core/storage/app_data_directory_io.dart` (259): niezależny od Fluttera
+- `lib/core/storage/app_data_directory_io.dart` (262): niezależny od Fluttera
   silnik bezstratnej migracji starego katalogu Dokumenty do
   `Application Support/data` przez plik tymczasowy, flush i SHA-256;
-  konfliktów nie nadpisuje. 48: `migrateNativeAppData`; 169: atomowe
+  konfliktów nie nadpisuje; obejmuje też lokalny profil konta bez sekretów.
+  51: `migrateNativeAppData`; 172: atomowe
   przeniesienie pojedynczego pliku.
 - `lib/core/storage/app_data_directory_web.dart` (10): webowy odpowiednik bez
   migracji systemu plików.
@@ -290,15 +291,16 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
 - 12: `RemoteBackupReceipt`; 24: `RemoteBackupService`;
   38: `uploadVerifiedSnapshot`.
 
-### `lib/data/backup/remote_backup_scheduler.dart` (154 linie)
+### `lib/data/backup/remote_backup_scheduler.dart` (208 linii)
 
 Jawnie włączany scheduler zalogowanego konta: po zmianach wysyła verified
 snapshot co 30 minut, po błędzie ponawia po 5 minutach i próbuje przy resume.
-Samo logowanie nie włącza wysyłki.
+Samo logowanie nie włącza wysyłki. Stan wyniku i błędu jest czyszczony przy
+zmianie konta, a losowy `deviceId` ma osobny plik per `userId`.
 
-- 12: `RemoteBackupScheduler`; 37: `enableForSignedInAccount`; 64:
-  `uploadNow`. Licznik generacji nie pozwala zgubić zmiany wykonanej podczas
-  trwającego uploadu.
+- 13: `RemoteBackupScheduler`; 40: `enableForSignedInAccount`; 64: `stop`;
+  75: `uploadNow`; 92: `backupNow`. Licznik generacji nie pozwala zgubić zmiany wykonanej
+  podczas trwającego uploadu.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (12 linii)
 
@@ -337,16 +339,21 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/api_client.dart` (188): klient REST z wymuszeniem HTTPS,
   timeoutem, limitem odpowiedzi, Bearer tokenem i request ID.
   7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
-- `lib/data/sync/account_session_controller.dart` (137): domyślny tryb
-  lokalny, rejestracja/logowanie, rotacja sesji i tokeny wyłącznie w pamięci.
-  7: `AccountDataMode`; 9: `AccountSessionController`.
-- `lib/data/sync/live_web_sync_service.dart` (560): jawna polityka pierwszej
+- `lib/data/sync/account_session_controller.dart` (315): trwały profil
+  pierwszego uruchomienia i trybu lokalnego, rejestracja/logowanie, zmiana
+  hasła, rotacja sesji oraz tokeny wyłącznie w pamięci. Plik profilu zawiera
+  tylko tryb, lokalną nazwę i ostatni e-mail.
+  8: `AccountDataMode`; 10: `AccountSessionController`; 65: `loadProfile`;
+  154: `changePassword`; 205: `useLocalProfile`.
+- `lib/data/sync/live_web_sync_service.dart` (580): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
   tylko jako sygnał; własny push nie przesuwa kursora zdarzeń z innych
-  urządzeń.
-  16: `InitialSyncPolicy`; 18: `LiveWebSyncService`; 48: `start`;
-  74: `enqueue`; 90: `syncNow`.
+  urządzeń. `start`/`stop` zerują pamięciowy stan konta, a zapis stanu używa
+  utrwalonego `userId`, więc kursor, rewizje i outbox nie przechodzą między
+  kontami.
+  16: `InitialSyncPolicy`; 18: `LiveWebSyncService`; 49: `start`;
+  81: `enqueue`; 97: `syncNow`; 533: `stop`.
 
 ## 5. Domena notebooka i repozytorium
 
@@ -473,7 +480,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 749: `moveItemToFolder`; 796: `selectFolder`; 924: `_loadFolders`;
   986: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (2010 linii)
+### `lib/features/library/presentation/library_screen.dart` (2048 linii)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -497,8 +504,13 @@ Lokalny panel rezerwuje pod separatorem 1 px bez rysowania drugiej linii.
 Nagłówek Projects jest klikalny, ale nie ma podświetlenia przy hover,
 naciśnięciu ani podczas wyświetlania katalogu głównego.
 
+Dolny slot konta korzysta z tego samego panelu w szerokim sidebarze i w
+mobilnym drawerze; na Web przekazuje jawny dostęp do wyboru pierwszej
+synchronizacji. Po załadowaniu pustego profilu ekran pokazuje niedający się
+trwale pominąć onboarding konta/lokalnej nazwy.
+
 Panel dzieli wysokość na rozwijane drzewko folderów,
-bezramkową sekcję `StudyTimerCard` i pusty dolny pasek konta o wysokości
+bezramkową sekcję `StudyTimerCard` i aktywny dolny pasek konta o wysokości
 56 px (identycznej jak Projects). Timer zajmuje tylko wysokość treści,
 maksymalnie 45% obszaru między nagłówkiem a paskiem konta;
 separatory folderów/timera i paska konta używają `AppHeaderDivider`,
@@ -571,18 +583,32 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   Planner otwiera `TaskListScreen` zamiast kontrolera edytora.
   Ustawienia katalogu i planera nie tworzą `EditorController` dla
   `NotebookKind.planner`, aby nie zgłaszać `UnsupportedError`.
-- 25: `LibraryScreen`; 32: `_LibraryScreenState`;
-  507: `_keepCatalogOnMovedFolder`; 529: `_openCatalogSettings`;
-  893: `_CreateMenuButton`;
-  938: `_LibraryTreePane` (`_LibraryTreePaneState` 963);
-  1174: `_buildFolder`; 1356: `_FolderTreeRow`;
-  1464: `_LibraryTreeItemRow` (planner: konturowy kwadrat z tikiem);
-  1569: `_sidebarMenuShape`;
-  1583: `_SidebarMenuShadowPainter`;
-  1619: `_showSidebarMenu`;
-  1732: `_TreeRowActions`;
-  1806: `_LibraryWorkspace`;
-  1917: `_LeftZoneToggleTab` (również przycisk timera).
+- 30: `LibraryScreen`; 39: `_LibraryScreenState`;
+  401: `_maybeShowAccountOnboarding`;
+  539: `_keepCatalogOnMovedFolder`; 561: `_openCatalogSettings`;
+  925: `_CreateMenuButton`;
+  970: `_LibraryTreePane` (`_LibraryTreePaneState` 997);
+  1212: `_buildFolder`; 1394: `_FolderTreeRow`;
+  1502: `_LibraryTreeItemRow` (planner: konturowy kwadrat z tikiem);
+  1607: `_sidebarMenuShape`;
+  1621: `_SidebarMenuShadowPainter`;
+  1657: `_showSidebarMenu`;
+  1770: `_TreeRowActions`;
+  1844: `_LibraryWorkspace`;
+  1955: `_LeftZoneToggleTab` (również przycisk timera).
+
+### `lib/features/library/presentation/library_account_slot.dart` (896 linii)
+
+Spójny z aplikacją onboarding `Create account`/`Sign in`/`Try local`, dolny
+pasek z inicjałem, nazwą i ustawieniami oraz panel stanu zdalnego backupu
+i live sync. Rejestracja i zmiana hasła wymagają zgodnego powtórzenia;
+ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
+loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
+a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
+
+- 12: `showLibraryAccountDialog`; 41: `LibraryAccountSlot`;
+  158: `_AccountDialog`; 171: `_AccountDialogState`;
+  706: `_backupNow`; 743: `_changePassword`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
@@ -1435,9 +1461,17 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   ID i zachowanie struktury odpowiedzi 409.
 - `test/remote_backup_service_test.dart`: kompletny snapshot v2 z biblioteką
   i planerem, wymaganie potwierdzonego `verified` oraz zachowanie flagi dirty,
-  gdy dane zmienią się podczas uploadu.
+  gdy dane zmienią się podczas uploadu, a także izolacja stanu i `deviceId`
+  między kontami.
 - `test/live_web_sync_service_test.dart`: pobranie wszystkich stron feedu po
-  500 zdarzeń i ochrona kursora przed pominięciem równoległej zmiany.
+  500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany oraz brak
+  przenoszenia outboxu i rewizji między kontami.
+- `test/library_account_slot_test.dart`: dostęp do konta w szerokim sidebarze
+  i mobilnym drawerze, onboarding/rejestracja z powtórzeniem hasła, lokalna
+  nazwa i inicjał, logowanie, ręczny backup, pierwsza polityka Web, zmiana
+  hasła oraz kolejność zatrzymania usług przed wyczyszczeniem sesji.
+- `test/account_session_controller_test.dart`: trwały profil lokalny bez
+  sekretów, preferowany tryb konta, dokładny kontrakt zmiany hasła i błędy API.
 - `server/api/tests/`: Argon2/JWT, integralność envelope, izolacja urządzeń w
   schemacie i brak publicznych portów bazy/API w Compose.
 - `test/library_planner_test.dart`: kolory według statusu w obu motywach,
