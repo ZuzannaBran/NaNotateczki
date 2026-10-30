@@ -216,7 +216,7 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 
 ### Drift
 
-### `lib/data/drift/notes_database.dart` (352 linie)
+### `lib/data/drift/notes_database.dart` (361 linii)
 
 Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami. Start sprawdza
 `PRAGMA quick_check` i `PRAGMA foreign_key_check`; po potwierdzonej korupcji lub naruszeniu integralności natywna baza jest
@@ -228,8 +228,9 @@ Po migracji katalogu aktualizuje w SQLite prefiks trwałych ścieżek obrazów.
   49: `ImageBlockRows`; 72: `InkStrokeRows`.
 - 85: `DatabaseOpenResult`; 99: `DatabaseOpenStage`;
   110: `DatabaseOpenException`; 143: `NotesDatabase`.
-- 150: `NotesDatabase.open`; 295: relokacja ścieżek obrazów; 309: kontrola
-  integralności; 337: `schemaVersion` (`2`); 340: `migration` — usuwa dane starego
+- 152: `NotesDatabase.open` (opcjonalna publiczna nazwa osobnej bazy);
+  304: relokacja ścieżek obrazów; 318: kontrola integralności;
+  346: `schemaVersion` (`2`); 349: `migration` — usuwa dane starego
   mechanizmu Index tab podczas przejścia z v1.
 
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
@@ -368,7 +369,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/features/notebook/domain/ink_spatial_index.dart` (125): cache'owany
   indeks siatkowy kandydatów do hit-testu.
   14: `inkSpatialIndexFor`; 24: `InkSpatialIndex`.
-- `lib/features/notebook/domain/ink_eraser_engine.dart` (826):
+- `lib/features/notebook/domain/ink_eraser_engine.dart` (824):
   jedyny silnik modyfikacji gumki dla boarda i notebooka. Obsługuje zwykłą
   gumkę, erase-stroke, gumkę zakresową (przycinanie fragmentów)
   oraz scratch erase. Promień bazgrołu skaluje się do jego rozmiaru;
@@ -583,7 +584,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1806: `_LibraryWorkspace`;
   1917: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_catalog.dart` (1280 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
 Katalog Projects pokazuje wyłącznie foldery główne. Po wejściu do folderu
 widok rozdziela bezpośrednie podfoldery i dokumenty na dwie wyśrodkowane
@@ -643,11 +644,11 @@ Siatka reaguje na wspólną czułość dotyku.
 
 - 27: `dominantFolderColor`; 55: `FolderCoverIcon`;
   109: `FolderCoverStrokePainter`; 235: `LibraryCatalog`;
-  562: `_FolderTile`; 629: `_DocumentTile`;
-  748: `_CatalogTile`; 872: `_DocumentPreview`;
-  955: `_boardPreviewBounds`;
-  997: `_PagePreviewPainter`;
-  1069: `showFolderCoverEditor`.
+  560: `_FolderTile`; 627: `_DocumentTile`;
+  746: `_CatalogTile`; 870: `_DocumentPreview`;
+  953: `_boardPreviewBounds`;
+  995: `_PagePreviewPainter`;
+  1067: `showFolderCoverEditor`.
 
 - `lib/core/widgets/workspace_document_app_bar.dart`: wspólny pasek
   tytułu notatnika, boarda i planera (56 px), z marginesem chroniącym
@@ -767,7 +768,7 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   kontrolki zachowują typografię aplikacji. `primary(ThemeData)` zależy
   od bieżącego motywu. 6: `StudyActionStyles`;
   101: `StudyActionTheme`.
-- `lib/features/planner/presentation/planner_screen.dart` (1792):
+- `lib/features/planner/presentation/planner_screen.dart` (1793):
   `PlannerScreen` – kalendarz Day/Week/Month, przeciąganie i edycja.
   Wydarzenia są wspólnymi wpisami kalendarza bez możliwości uruchomienia
   timera, ze wspólnym opisem, kolorem, czasem, edycją i przenoszeniem.
@@ -820,9 +821,9 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   26: `calendarTimeSpan`; 52: `CalendarSessionPlacement`;
   67: `calendarSessionPlacements`; 164: `monthCalendarFocusOffset`;
   190: `PlannerScreen`; 197: `_PlannerScreenState`;
-  1202: `_HourlyDaySchedule`; 1367: `_CalendarHeaderStrip`;
-  1408: `_CalendarBorderFrame`; 1431: `_WeekTimeGrid`;
-  1726: `_WeekTableClipper`; 1747: `_WeekColumnLinesPainter`.
+  1203: `_HourlyDaySchedule`; 1368: `_CalendarHeaderStrip`;
+  1409: `_CalendarBorderFrame`; 1432: `_WeekTimeGrid`;
+  1727: `_WeekTableClipper`; 1748: `_WeekColumnLinesPainter`.
   `_WeekTimeGrid`: pełnowysokie separatory i wspólna ramka na
   wierzchu siatki; clip uwzględnia lewą granicę tabeli obok osi godzin.
   `calendarSessionPlacements` przydziela niekolidujące kolumny blokom
@@ -1001,7 +1002,7 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2424 linii)
+### `lib/features/editor/presentation/editor_screen.dart` (2433 linie)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px i korzysta z
 aktualnego tytułu przekazanego przez bibliotekę (fallback: kontroler);
@@ -1072,9 +1073,9 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 - 1057: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1602: `_PageViewportClipper`; 1660: `_PageFramePainter`;
-  1735: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
-  2154: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
+- 1611: `_PageViewportClipper`; 1669: `_PageFramePainter`;
+  1744: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
+  2163: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_commands.dart` (172 linie)
 
@@ -1358,8 +1359,8 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
   nie inicjuje AppScope, konta, synchronizacji ani backupu sieciowego.
   Kompiluj wyłącznie lokalnie, kopiując do publicznego repo wynik builda,
   a nie źródła Dart.
-- `test/website_widget_demo_test.dart`: pusty notatnik demonstracyjny i
-  osobna nazwa bazy danych.
+- `test/website_widget_demo_test.dart`: pusty notatnik demonstracyjny oraz
+  przekazanie osobnej nazwy bazy danych do publicznego API otwierania.
 
 
 - `data.md`: źródło prawdy dla lokalnego układu plików, trybów konta,
@@ -1556,7 +1557,7 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
 - `test/ink_activity_tracker_test.dart` (25): exit guard czeka na koniec
   aktywnego kontaktu rysika.
 - `test/ink_spatial_index_test.dart` (49)
-- `test/ink_eraser_engine_test.dart` (401): zwykła gumka, scratch erase,
+- `test/ink_eraser_engine_test.dart` (396): zwykła gumka, scratch erase,
   krótki bazgroł, ochronę sąsiednich kresek i limit dużego gestu,
   erase-stroke/area hit-test, precyzyjne fragmenty zakresu, undo/redo,
   migracja legacy gumek, pojedyncze punkty,

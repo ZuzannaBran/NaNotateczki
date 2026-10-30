@@ -1,4 +1,7 @@
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/drift/notes_database_connection.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 import '../tool/website_widget_demo.dart';
@@ -17,8 +20,26 @@ void main() {
     expect(notebook.createdAt, now);
   });
 
-  test('website demo uses a different database from the regular app', () {
-    expect(websiteDemoDatabaseName, isNot('notes.sqlite'));
-    expect(websiteDemoDatabaseName, contains('demo'));
-  });
+  test(
+    'website demo opens a different database from the regular app',
+    () async {
+      expect(websiteDemoDatabaseName, isNot('notes.sqlite'));
+      expect(websiteDemoDatabaseName, contains('demo'));
+
+      String? openedName;
+      final result = await NotesDatabase.open(
+        databaseName: websiteDemoDatabaseName,
+        connectionOpener: (name) async {
+          openedName = name;
+          return NotesDatabaseConnection(
+            executor: NativeDatabase.memory(),
+            freshFile: true,
+          );
+        },
+      );
+      addTearDown(result.database.close);
+
+      expect(openedName, websiteDemoDatabaseName);
+    },
+  );
 }

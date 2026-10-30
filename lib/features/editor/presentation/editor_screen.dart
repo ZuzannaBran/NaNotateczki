@@ -1318,11 +1318,17 @@ class _EditorScreenState extends State<EditorScreen> {
                                                               ),
                                                             ),
                                                             ValueListenableBuilder(
-                                                              valueListenable: controller
-                                                                  .backgroundSettingsListenable,
-                                                              builder: (context, settings, _) =>
-                                                                  PageBackgroundPaint(
-                                                                    settings: settings,
+                                                              valueListenable:
+                                                                  controller
+                                                                      .backgroundSettingsListenable,
+                                                              builder:
+                                                                  (
+                                                                    context,
+                                                                    settings,
+                                                                    _,
+                                                                  ) => PageBackgroundPaint(
+                                                                    settings:
+                                                                        settings,
                                                                   ),
                                                             ),
                                                             Builder(
@@ -1506,22 +1512,25 @@ class _EditorScreenState extends State<EditorScreen> {
                         child: ValueListenableBuilder(
                           valueListenable:
                               controller.backgroundSettingsListenable,
-                          builder: (context, _, child) => _ProjectMiniMapOverlay(
-                            key: const ValueKey('notebook-project-overview'),
-                            controller: controller,
-                            pages: controller.pages,
-                            currentPageIndex: controller.currentPageIndex,
-                            pageWorldSize: pageWorldSize,
-                            pageGap: _pageGap,
-                            panelHeight: minimapPanelHeight,
-                            visibleDocumentRect: visibleDocumentRect,
-                            onNavigate: (point) => _navigateToOverviewPoint(
-                              point,
-                              controller,
-                              docWorldSize,
-                              viewportSize,
-                            ),
-                          ),
+                          builder: (context, _, child) =>
+                              _ProjectMiniMapOverlay(
+                                key: const ValueKey(
+                                  'notebook-project-overview',
+                                ),
+                                controller: controller,
+                                pages: controller.pages,
+                                currentPageIndex: controller.currentPageIndex,
+                                pageWorldSize: pageWorldSize,
+                                pageGap: _pageGap,
+                                panelHeight: minimapPanelHeight,
+                                visibleDocumentRect: visibleDocumentRect,
+                                onNavigate: (point) => _navigateToOverviewPoint(
+                                  point,
+                                  controller,
+                                  docWorldSize,
+                                  viewportSize,
+                                ),
+                              ),
                         ),
                       ),
                   ],

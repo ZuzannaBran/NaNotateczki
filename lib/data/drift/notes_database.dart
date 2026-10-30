@@ -141,13 +141,16 @@ class DatabaseOpenException implements Exception {
   ],
 )
 class NotesDatabase extends _$NotesDatabase {
-  NotesDatabase(super.executor);
+  NotesDatabase(super.executor, {String databaseName = _databaseFileName})
+    : _databaseName = databaseName;
 
   static const _databaseFileName = 'notes.sqlite';
   static const _openAttemptCount = 3;
   static const _openRetryDelay = Duration(milliseconds: 250);
+  final String _databaseName;
 
   static Future<DatabaseOpenResult> open({
+    String databaseName = _databaseFileName,
     @visibleForTesting
     Future<NotesDatabaseConnection> Function(String name)? connectionOpener,
     @visibleForTesting Future<void> Function(Duration duration)? retryDelay,
@@ -180,9 +183,12 @@ class NotesDatabase extends _$NotesDatabase {
       NotesDatabase? database;
       var stage = DatabaseOpenStage.connection;
       try {
-        final connection = await openConnection(_databaseFileName);
+        final connection = await openConnection(databaseName);
         stage = DatabaseOpenStage.validation;
-        database = NotesDatabase(connection.executor);
+        database = NotesDatabase(
+          connection.executor,
+          databaseName: databaseName,
+        );
         await database.customSelect('select 1').getSingle();
         await database._relocateImagePaths(connection);
         await validateIntegrity(database);
@@ -227,10 +233,13 @@ class NotesDatabase extends _$NotesDatabase {
         _isDatabaseCorruption(lastError!)) {
       NotesDatabase? recoveredDatabase;
       try {
-        final quarantinePath = await quarantineDatabase(_databaseFileName);
+        final quarantinePath = await quarantineDatabase(databaseName);
         if (quarantinePath != null) {
-          final connection = await openConnection(_databaseFileName);
-          recoveredDatabase = NotesDatabase(connection.executor);
+          final connection = await openConnection(databaseName);
+          recoveredDatabase = NotesDatabase(
+            connection.executor,
+            databaseName: databaseName,
+          );
           await recoveredDatabase.customSelect('select 1').getSingle();
           await validateIntegrity(recoveredDatabase);
           return DatabaseOpenResult(
@@ -289,7 +298,7 @@ class NotesDatabase extends _$NotesDatabase {
   }
 
   Future<void> clearRecoveryMarker() {
-    return clearNotesDatabaseRecoveryMarker(_databaseFileName);
+    return clearNotesDatabaseRecoveryMarker(_databaseName);
   }
 
   Future<void> _relocateImagePaths(NotesDatabaseConnection connection) async {

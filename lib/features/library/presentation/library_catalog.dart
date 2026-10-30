@@ -377,8 +377,7 @@ class LibraryCatalog extends StatelessWidget {
                           }) {
                             final columns = columnsFor(count);
                             final cellWidth = widthFor(count) / columns;
-                            final rowCount =
-                                (count + columns - 1) ~/ columns;
+                            final rowCount = (count + columns - 1) ~/ columns;
                             return SizedBox(
                               key: ValueKey(key),
                               width: widthFor(count),
@@ -401,8 +400,7 @@ class LibraryCatalog extends StatelessWidget {
                                             width: cellWidth,
                                             height: rowExtent,
                                             child: Padding(
-                                              padding:
-                                                  const EdgeInsets.all(18),
+                                              padding: const EdgeInsets.all(18),
                                               child: buildTile(index),
                                             ),
                                           ),

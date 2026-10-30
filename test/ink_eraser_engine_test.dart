@@ -82,14 +82,8 @@ void main() {
   });
 
   test('small scratch preserves adjacent ink and splits sparse strokes', () {
-    final target = _stroke('target', const [
-      Offset(0, 0),
-      Offset(100, 0),
-    ]);
-    final neighbor = _stroke('neighbor', const [
-      Offset(0, 8),
-      Offset(100, 8),
-    ]);
+    final target = _stroke('target', const [Offset(0, 0), Offset(100, 0)]);
+    final neighbor = _stroke('neighbor', const [Offset(0, 8), Offset(100, 8)]);
     const gesture = [
       InkPoint(dx: 48, dy: -2, pressure: 1),
       InkPoint(dx: 52, dy: 2, pressure: 1),
@@ -110,8 +104,10 @@ void main() {
       createId: () => 'part-${index++}',
     );
     expect(result.changed, isTrue);
-    expect(result.strokes.where((item) => identical(item, neighbor)),
-        hasLength(1));
+    expect(
+      result.strokes.where((item) => identical(item, neighbor)),
+      hasLength(1),
+    );
     final parts = result.strokes
         .where((item) => !identical(item, neighbor))
         .toList();

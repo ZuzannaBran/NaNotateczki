@@ -453,8 +453,7 @@ class InkEraserEngine {
       return [stroke];
     }
 
-    final eraseRadius =
-        radius + (includeStrokeWidth ? stroke.width * 0.5 : 0);
+    final eraseRadius = radius + (includeStrokeWidth ? stroke.width * 0.5 : 0);
     final eraseRadiusSquared = eraseRadius * eraseRadius;
     if (stroke.points.length == 1) {
       return _distanceSquaredToPolyline(stroke.points.first.toOffset(), path) <=

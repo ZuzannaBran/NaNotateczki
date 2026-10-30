@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:program/core/input/app_scroll_behavior.dart';
 import 'package:program/core/theme/app_theme.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/drift/notes_database_connection.dart';
 import 'package:program/features/editor/presentation/editor_screen.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -73,8 +72,7 @@ Future<_DemoSession> _openSession() async {
   // Uses the real application's SQLite/Drift engine, but a distinct IndexedDB
   // database name. Website visitors never connect to the account backend.
   final opened = await NotesDatabase.open(
-    connectionOpener: (_) =>
-        openNotesDatabaseConnection(websiteDemoDatabaseName),
+    databaseName: websiteDemoDatabaseName,
   );
   final database = opened.database;
   try {

@@ -828,115 +828,128 @@ void main() {
   });
 
   for (final darkMode in [false, true]) {
-    testWidgets('today normal; week and month clearly lighter, dark=$darkMode', (
-      tester,
-    ) async {
-      final planner = await loadPlanner();
-      await tester.binding.setSurfaceSize(const Size(1440, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final now = DateTime.now();
-      final other = DateTime(
-        now.year,
-        now.month,
-        now.day + (now.weekday == DateTime.sunday ? -1 : 1),
-      );
-      final session = planner.create(
-        title: 'Timed lesson',
-        scheduledAt: DateTime(now.year, now.month, now.day, now.hour),
-      );
+    testWidgets(
+      'today normal; week and month clearly lighter, dark=$darkMode',
+      (tester) async {
+        final planner = await loadPlanner();
+        await tester.binding.setSurfaceSize(const Size(1440, 900));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final now = DateTime.now();
+        final other = DateTime(
+          now.year,
+          now.month,
+          now.day + (now.weekday == DateTime.sunday ? -1 : 1),
+        );
+        final session = planner.create(
+          title: 'Timed lesson',
+          scheduledAt: DateTime(now.year, now.month, now.day, now.hour),
+        );
 
-      await tester.pumpWidget(
-        ChangeNotifierProvider<StudyPlannerController>.value(
-          value: planner,
-          child: MaterialApp(
-            theme: darkMode ? AppTheme.dark() : AppTheme.light(),
-            home: const PlannerScreen(),
+        await tester.pumpWidget(
+          ChangeNotifierProvider<StudyPlannerController>.value(
+            value: planner,
+            child: MaterialApp(
+              theme: darkMode ? AppTheme.dark() : AppTheme.light(),
+              home: const PlannerScreen(),
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      String keyDate(DateTime date) => '${date.year}-${date.month}-${date.day}';
-      final todayKey = keyDate(now);
-      final cell = find.byKey(ValueKey('planner-day-cell-$todayKey'));
-      final otherCell = find.byKey(
-        ValueKey('planner-day-cell-${keyDate(other)}'),
-      );
-      final theme = Theme.of(tester.element(cell));
-      Color cellColor(Finder finder) {
-        final container = tester.widget<Container>(finder);
-        final decoration = container.decoration;
-        return decoration is BoxDecoration
-            ? decoration.color!
-            : container.color!;
-      }
+        String keyDate(DateTime date) =>
+            '${date.year}-${date.month}-${date.day}';
+        final todayKey = keyDate(now);
+        final cell = find.byKey(ValueKey('planner-day-cell-$todayKey'));
+        final otherCell = find.byKey(
+          ValueKey('planner-day-cell-${keyDate(other)}'),
+        );
+        final theme = Theme.of(tester.element(cell));
+        Color cellColor(Finder finder) {
+          final container = tester.widget<Container>(finder);
+          final decoration = container.decoration;
+          return decoration is BoxDecoration
+              ? decoration.color!
+              : container.color!;
+        }
 
-      final base = theme.colorScheme.surfaceContainerLowest;
-      final expected = darkMode ? AppColors.darkPaper : AppColors.paper;
-      expect(cellColor(cell), expected);
-      expect(cellColor(otherCell), base);
-      expect(
-        cellColor(cell).computeLuminance(),
-        greaterThan(cellColor(otherCell).computeLuminance()),
-      );
+        final base = theme.colorScheme.surfaceContainerLowest;
+        final expected = darkMode ? AppColors.darkPaper : AppColors.paper;
+        expect(cellColor(cell), expected);
+        expect(cellColor(otherCell), base);
+        expect(
+          cellColor(cell).computeLuminance(),
+          greaterThan(cellColor(otherCell).computeLuminance()),
+        );
 
-      final week = find.byKey(const ValueKey('planner-week-time-grid'));
-      expect(week, findsOneWidget);
-      expect(find.byKey(const ValueKey('planner-week-hours')), findsOneWidget);
-      expect(
-        tester
-            .widget<ListView>(find.byKey(const ValueKey('planner-week-hours')))
-            .childrenDelegate
-            .estimatedChildCount,
-        1,
-      );
-      expect(
-        find.byKey(ValueKey('planner-week-hour-label-${now.hour}')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(ValueKey('planner-week-now-line-$todayKey')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(ValueKey('planner-week-cell-$todayKey-${now.hour}')),
-        findsOneWidget,
-      );
-      expect(find.byKey(ValueKey('planner-hour-list-$todayKey')), findsNothing);
-      expect(
-        find.byKey(ValueKey('planner-session-tile:${session.id}')),
-        findsOneWidget,
-      );
+        final week = find.byKey(const ValueKey('planner-week-time-grid'));
+        expect(week, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('planner-week-hours')),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .widget<ListView>(
+                find.byKey(const ValueKey('planner-week-hours')),
+              )
+              .childrenDelegate
+              .estimatedChildCount,
+          1,
+        );
+        expect(
+          find.byKey(ValueKey('planner-week-hour-label-${now.hour}')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(ValueKey('planner-week-now-line-$todayKey')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(ValueKey('planner-week-cell-$todayKey-${now.hour}')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(ValueKey('planner-hour-list-$todayKey')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(ValueKey('planner-session-tile:${session.id}')),
+          findsOneWidget,
+        );
 
-      await tester.tap(find.text('Day').last);
-      await tester.pumpAndSettle();
-      expect(cellColor(cell), base);
-      final grid = find.byKey(ValueKey('planner-hour-list-$todayKey'));
-      expect(grid, findsOneWidget);
-      expect(
-        find.byKey(ValueKey('planner-now-line-$todayKey')),
-        findsOneWidget,
-      );
-      final hour = find.byKey(
-        ValueKey('planner-hour-row-$todayKey-${now.hour}'),
-      );
-      final time = find.descendant(
-        of: hour,
-        matching: find.text('${now.hour.toString().padLeft(2, '0')}:00'),
-      );
-      final tile = find.byKey(ValueKey('planner-session-tile:${session.id}'));
-      expect(
-        tester.getRect(tile).left - tester.getRect(time).right,
-        closeTo(0, 0.1),
-      );
+        await tester.tap(find.text('Day').last);
+        await tester.pumpAndSettle();
+        expect(cellColor(cell), base);
+        final grid = find.byKey(ValueKey('planner-hour-list-$todayKey'));
+        expect(grid, findsOneWidget);
+        expect(
+          find.byKey(ValueKey('planner-now-line-$todayKey')),
+          findsOneWidget,
+        );
+        final hour = find.byKey(
+          ValueKey('planner-hour-row-$todayKey-${now.hour}'),
+        );
+        final time = find.descendant(
+          of: hour,
+          matching: find.text('${now.hour.toString().padLeft(2, '0')}:00'),
+        );
+        final tile = find.byKey(ValueKey('planner-session-tile:${session.id}'));
+        expect(
+          tester.getRect(tile).left - tester.getRect(time).right,
+          closeTo(0, 0.1),
+        );
 
-      await tester.tap(find.text('Month'));
-      await tester.pumpAndSettle();
-      expect(cellColor(cell), expected);
-      expect(find.byKey(ValueKey('planner-now-line-$todayKey')), findsNothing);
-      expect(find.byKey(const ValueKey('planner-week-hours')), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
+        await tester.tap(find.text('Month'));
+        await tester.pumpAndSettle();
+        expect(cellColor(cell), expected);
+        expect(
+          find.byKey(ValueKey('planner-now-line-$todayKey')),
+          findsNothing,
+        );
+        expect(find.byKey(const ValueKey('planner-week-hours')), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('phone planner uses shared week axis and compact actions', (

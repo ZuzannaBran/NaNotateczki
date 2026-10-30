@@ -256,9 +256,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.getSize(folders).width, 492);
       expect(tester.getSize(documents).width, 492);
-      final third = find.byKey(
-        const ValueKey('catalog-folder:Root/Child 3'),
-      );
+      final third = find.byKey(const ValueKey('catalog-folder:Root/Child 3'));
       expect(
         tester.getRect(third).top - tester.getRect(first).top,
         closeTo(292, 1),

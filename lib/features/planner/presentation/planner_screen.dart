@@ -173,9 +173,9 @@ double monthCalendarFocusOffset({
       : month;
   final dayIndex = compact
       ? focusedDay.day - 1
-      : monthCalendarDays(month).indexWhere(
-          (day) => DateUtils.isSameDay(day, focusedDay),
-        );
+      : monthCalendarDays(
+          month,
+        ).indexWhere((day) => DateUtils.isSameDay(day, focusedDay));
   if (dayIndex < 0) {
     return 0;
   }
@@ -224,7 +224,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
     required bool compact,
   }) {
     final now = DateTime.now();
-    final key = '${_anchor.year}-${_anchor.month}-${_anchor.day}-'
+    final key =
+        '${_anchor.year}-${_anchor.month}-${_anchor.day}-'
         '${now.year}-${now.month}-${now.day}-$compact-$width-'
         '$viewportHeight';
     if (_monthScrollKey == key) {
