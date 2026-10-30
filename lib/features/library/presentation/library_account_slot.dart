@@ -180,6 +180,7 @@ class _AccountDialogState extends State<_AccountDialog> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _newPasswordConfirmationController = TextEditingController();
+  final Set<TextEditingController> _visiblePasswords = {};
   late _AccountView _view;
   bool _isWorking = false;
   String? _actionError;
@@ -219,8 +220,19 @@ class _AccountDialogState extends State<_AccountDialog> {
         _actionError ?? session.error ?? backup.lastError ?? sync.lastError;
     final canClose = !widget.startupRequired;
 
+    final colors = Theme.of(context).colorScheme;
     return AlertDialog(
-      title: Text(_title),
+      backgroundColor: colors.surface,
+      elevation: 10,
+      shadowColor: colors.shadow.withValues(alpha: 0.12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      titlePadding: const EdgeInsets.fromLTRB(32, 28, 32, 0),
+      title: Text(_title, textAlign: TextAlign.center),
+      contentPadding: const EdgeInsets.fromLTRB(32, 20, 32, 12),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
@@ -272,24 +284,44 @@ class _AccountDialogState extends State<_AccountDialog> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Choose how you want to use Notatek. You can switch modes later '
-          'from account settings.',
+          'NaNotateczki',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: AppTypography.heading,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
+        const Text(
+          'Choose how you want to use NaNotateczki. '
+          'You can switch modes later in account settings.',
+          key: ValueKey('account-welcome-description'),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 28),
         FilledButton(
           key: const ValueKey('account-create-choice'),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+          ),
           onPressed: _isWorking ? null : () => _show(_AccountView.register),
           child: const Text('Create account'),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         OutlinedButton(
           key: const ValueKey('account-sign-in-choice'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+          ),
           onPressed: _isWorking ? null : () => _show(_AccountView.signIn),
           child: const Text('Sign in'),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 12),
         TextButton(
           key: const ValueKey('account-local-choice'),
+          style: TextButton.styleFrom(
+            minimumSize: const Size.fromHeight(44),
+          ),
           onPressed: _isWorking ? null : () => _show(_AccountView.local),
           child: const Text('Try local'),
         ),
@@ -305,12 +337,15 @@ class _AccountDialogState extends State<_AccountDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _emailField(),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
           _passwordField(_passwordController),
           if (_actionMessage != null) _MessageText(_actionMessage!),
           _ProgressAndError(isWorking: _isWorking, error: error),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
             key: const ValueKey('account-login-submit'),
             onPressed: _isWorking ? null : _login,
             child: const Text('Sign in'),
@@ -332,9 +367,9 @@ class _AccountDialogState extends State<_AccountDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _emailField(),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
           _passwordField(_passwordController, newPassword: true),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
           _passwordField(
             _passwordConfirmationController,
             key: const ValueKey('account-password-confirmation'),
@@ -342,8 +377,11 @@ class _AccountDialogState extends State<_AccountDialog> {
             confirmationOf: _passwordController,
           ),
           _ProgressAndError(isWorking: _isWorking, error: error),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
             key: const ValueKey('account-register-submit'),
             onPressed: _isWorking ? null : _register,
             child: const Text('Create account'),
@@ -368,13 +406,13 @@ class _AccountDialogState extends State<_AccountDialog> {
             'Local mode keeps your library on this device and does not '
             'connect to the account server.',
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           TextFormField(
             key: const ValueKey('account-local-name'),
             controller: _localNameController,
             enabled: !_isWorking,
             textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(labelText: 'Your name'),
+            decoration: _accountInputDecoration('Your name'),
             validator: (value) {
               final length = value?.trim().length ?? 0;
               return length < 1 || length > 80
@@ -388,8 +426,11 @@ class _AccountDialogState extends State<_AccountDialog> {
             },
           ),
           _ProgressAndError(isWorking: _isWorking, error: error),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
             key: const ValueKey('account-local-submit'),
             onPressed: _isWorking ? null : _useLocal,
             child: const Text('Continue locally'),
@@ -413,28 +454,38 @@ class _AccountDialogState extends State<_AccountDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            CircleAvatar(child: Text(session.avatarLetter)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    session.displayName,
-                    style: Theme.of(context).textTheme.titleMedium,
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                CircleAvatar(child: Text(session.avatarLetter)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        session.displayName,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        session.isSignedIn ? 'Online account' : 'Local mode',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                  Text(
-                    session.isSignedIn ? 'Online account' : 'Local mode',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         if (session.isSignedIn) ...[
           Text(
             _backupStatus(backup),
@@ -537,14 +588,14 @@ class _AccountDialogState extends State<_AccountDialog> {
             label: 'Current password',
             allowAnyNonEmpty: true,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
           _passwordField(
             _newPasswordController,
             key: const ValueKey('account-new-password'),
             label: 'New password',
             newPassword: true,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
           _passwordField(
             _newPasswordConfirmationController,
             key: const ValueKey('account-new-password-confirmation'),
@@ -552,8 +603,11 @@ class _AccountDialogState extends State<_AccountDialog> {
             confirmationOf: _newPasswordController,
           ),
           _ProgressAndError(isWorking: _isWorking, error: error),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
             key: const ValueKey('account-change-password-submit'),
             onPressed: _isWorking ? null : _changePassword,
             child: const Text('Change password'),
@@ -575,10 +629,25 @@ class _AccountDialogState extends State<_AccountDialog> {
       keyboardType: TextInputType.emailAddress,
       autofillHints: const [AutofillHints.email],
       textInputAction: TextInputAction.next,
-      decoration: const InputDecoration(labelText: 'E-mail'),
+      decoration: _accountInputDecoration('E-mail'),
       validator: (value) => value == null || !value.contains('@')
           ? 'Enter a valid e-mail address.'
           : null,
+    );
+  }
+
+  InputDecoration _accountInputDecoration(
+    String label, {
+    String? helperText,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      helperText: helperText,
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
     );
   }
 
@@ -590,15 +659,38 @@ class _AccountDialogState extends State<_AccountDialog> {
     bool allowAnyNonEmpty = false,
     TextEditingController? confirmationOf,
   }) {
+    final visible = _visiblePasswords.contains(controller);
+    final isNewPassword = newPassword || confirmationOf != null;
     return TextFormField(
       key: key ?? const ValueKey('account-password'),
       controller: controller,
       enabled: !_isWorking,
-      obscureText: true,
+      obscureText: !visible,
+      enableSuggestions: false,
+      autocorrect: false,
       autofillHints: [
-        newPassword ? AutofillHints.newPassword : AutofillHints.password,
+        isNewPassword ? AutofillHints.newPassword : AutofillHints.password,
       ],
-      decoration: InputDecoration(labelText: label),
+      decoration: _accountInputDecoration(
+        label,
+        helperText: newPassword ? '8 to 128 characters' : null,
+        suffixIcon: IconButton(
+          key: ValueKey('account-password-visibility-$label'),
+          tooltip: visible ? 'Hide $label' : 'Show $label',
+          onPressed: () {
+            setState(() {
+              if (visible) {
+                _visiblePasswords.remove(controller);
+              } else {
+                _visiblePasswords.add(controller);
+              }
+            });
+          },
+          icon: Icon(
+            visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+          ),
+        ),
+      ),
       validator: (value) {
         final password = value ?? '';
         if (allowAnyNonEmpty) {
@@ -607,8 +699,13 @@ class _AccountDialogState extends State<_AccountDialog> {
         if (confirmationOf != null && password != confirmationOf.text) {
           return 'Passwords do not match.';
         }
-        return password.length < 12 || password.length > 256
-            ? 'Use 12 to 256 characters.'
+        if (isNewPassword) {
+          return password.length < 8 || password.length > 128
+              ? 'Use 8 to 128 characters.'
+              : null;
+        }
+        return password.isEmpty || password.length > 256
+            ? 'Enter your password.'
             : null;
       },
     );
@@ -825,7 +922,7 @@ class _SyncPolicyButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onPressed,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
             children: [
               Expanded(

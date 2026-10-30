@@ -105,6 +105,37 @@ void main() {
     },
   );
 
+  test('registers with eight characters and accepts legacy logins', () async {
+    final requests = <String, Object?>{};
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        requests[request.url.path] =
+            (jsonDecode(request.body) as Map<String, dynamic>)['password'];
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'access-token',
+            'refreshToken': 'refresh-token',
+            'expiresIn': 600,
+            'userId': 'user-1',
+            'email': 'user@example.com',
+          }),
+          request.url.path.endsWith('/register') ? 201 : 200,
+        );
+      }),
+    );
+    final session = AccountSessionController(client);
+    await session.register('user@example.com', '12345678');
+    await session.login('user@example.com', 'short');
+    expect(requests['/v1/auth/register'], '12345678');
+    expect(requests['/v1/auth/login'], 'short');
+    await expectLater(
+      session.register('user@example.com', '1234567'),
+      throwsA(isA<FormatException>()),
+    );
+    client.close();
+  });
+
   test(
     'surfaces the server detail for an incorrect current password',
     () async {

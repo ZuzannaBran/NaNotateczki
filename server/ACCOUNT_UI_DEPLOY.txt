@@ -1,0 +1,40 @@
+NaNotateczki - aktualizacja backendu konta (nie wdrozono na serwerze)
+
+ZMIANY:
+- rejestracja: haslo 8-128 znakow; logowanie: 1-256 znakow,
+  aby zachowac dostep do istniejacych kont;
+- nowe haslo przy zmianie: 8-128 znakow;
+- POST /v1/auth/change-password zapisuje hash Argon2 i uniewaznia
+  refresh tokeny;
+- nie wymaga migracji ani zmian schematu PostgreSQL.
+
+KROKI:
+1. Zrob i zweryfikuj backup PostgreSQL oraz data/, zgodnie z
+   server/README.md. Nie uzywaj docker compose down -v.
+2. NAJPIERW zaktualizuj API. Stara wersja odrzuca hasla 8-11 znakow.
+3. Na komputerze, w katalogu repo:
+       git switch dev
+       git pull --ff-only origin dev
+       rsync -av server/api/ UZYTKOWNIK@SERWER:/srv/nanotateczki/api/
+   Dostosuj konto SSH. Nie nadpisuj .env, data/ i web-dist/.
+4. Na serwerze:
+       cd /srv/nanotateczki
+       docker compose build api
+       docker compose up -d --no-deps api
+       docker compose ps api
+       docker compose logs --tail=100 api
+5. Zweryfikuj logowanie istniejacego konta, zmiane hasla oraz, przy
+   ALLOW_REGISTRATION=true, rejestracje z haslem 8 znakow.
+   Gdy nie rejestrujesz kont, ponownie ustaw ALLOW_REGISTRATION=false.
+6. Potem opublikuj build Flutter Web z prawidlowym URL API HTTPS:
+       flutter build web --release --dart-define=BACKEND_URL=https://api.TWOJA_DOMENA
+   Przenies zawartosc build/web/ do /srv/nanotateczki/web-dist/.
+7. Przy bledzie sprawdz logi kontenera; nie kasuj wolumenow ani bazy.
+
+UWAGI:
+- Po zmianie hasla stare refresh tokeny sa uniewazniane, wydane
+  JWT moga dzialac jeszcze do 10 minut.
+- Georgia nie jest dolaczona jako font do repo. Web i systemy bez
+  lokalnie zainstalowanej Georgii pokaza czcionke zastepcza.
+  Do absolutnie identycznego wygladu wymagane sa legalne pliki
+  fontu Georgia i ich umieszczenie w assets Fluttera.

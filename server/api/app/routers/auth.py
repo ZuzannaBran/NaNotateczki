@@ -2,14 +2,19 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import database_session
 from ..models import RefreshSession, User
 from ..rate_limit import auth_limiter
-from ..schemas import Credentials, RefreshRequest
+from ..schemas import (
+    ChangePasswordRequest,
+    Credentials,
+    RefreshRequest,
+    RegistrationCredentials,
+)
 from ..security import (
     create_access_token,
     create_refresh_session,
@@ -45,7 +50,7 @@ async def limit_auth(request: Request, email: str) -> None:
 
 @router.post("/register", status_code=201)
 async def register(
-    credentials: Credentials,
+    credentials: RegistrationCredentials,
     request: Request,
     session: AsyncSession = Depends(database_session),
 ) -> dict:
@@ -114,6 +119,23 @@ async def logout(
     if record is not None and record.revoked_at is None:
         record.revoked_at = datetime.now(UTC)
         await session.commit()
+
+
+@router.post("/change-password", status_code=204)
+async def change_password(
+    request: ChangePasswordRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(database_session),
+) -> None:
+    if not verify_password(request.currentPassword, user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    user.password_hash = hash_password(request.newPassword)
+    await session.execute(
+        update(RefreshSession)
+        .where(RefreshSession.owner_id == user.id)
+        .values(revoked_at=datetime.now(UTC))
+    )
+    await session.commit()
 
 
 @router.get("/me")

@@ -1,6 +1,6 @@
 # PROJECT_MAP.md
 
-Skrócony indeks projektu **Notatek / Stylus Notes** (`pubspec.yaml`:
+Skrócony indeks projektu **NaNotateczki** (`pubspec.yaml`:
 `name: program`). Stan sprawdzony względem repozytorium 2026-10-27.
 
 Mapa służy do wyboru pliku i zakresu linii przed czytaniem kodu. Zawiera
@@ -344,7 +344,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   hasła, rotacja sesji oraz tokeny wyłącznie w pamięci. Plik profilu zawiera
   tylko tryb, lokalną nazwę i ostatni e-mail.
   8: `AccountDataMode`; 10: `AccountSessionController`; 65: `loadProfile`;
-  154: `changePassword`; 205: `useLocalProfile`.
+  154: `changePassword`; 205: `useLocalProfile`. Nowe hasła: 8–128.
 - `lib/data/sync/live_web_sync_service.dart` (580): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
@@ -599,16 +599,16 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
 
 ### `lib/features/library/presentation/library_account_slot.dart` (896 linii)
 
-Spójny z aplikacją onboarding `Create account`/`Sign in`/`Try local`, dolny
-pasek z inicjałem, nazwą i ustawieniami oraz panel stanu zdalnego backupu
-i live sync. Rejestracja i zmiana hasła wymagają zgodnego powtórzenia;
+Przestrzenny onboarding `Create account`/`Sign in`/`Try local` z
+wyśrodkowaną nazwą NaNotateczki, podglądem haseł i większymi odstępami.
+Dolny pasek pokazuje konto i stan backupu oraz synchronizacji. Rejestracja i zmiana hasła wymagają zgodnego powtórzenia;
 ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
 loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
 
 - 12: `showLibraryAccountDialog`; 41: `LibraryAccountSlot`;
   158: `_AccountDialog`; 171: `_AccountDialogState`;
-  706: `_backupNow`; 743: `_changePassword`.
+  803: `_backupNow`; 840: `_changePassword`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
@@ -1466,13 +1466,16 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/live_web_sync_service_test.dart`: pobranie wszystkich stron feedu po
   500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany oraz brak
   przenoszenia outboxu i rewizji między kontami.
-- `test/library_account_slot_test.dart`: dostęp do konta w szerokim sidebarze
+- `test/library_account_slot_test.dart`: centrowanie nazwy, podgląd i limit
+  hasła; dostęp do konta w szerokim sidebarze
   i mobilnym drawerze, onboarding/rejestracja z powtórzeniem hasła, lokalna
   nazwa i inicjał, logowanie, ręczny backup, pierwsza polityka Web, zmiana
   hasła oraz kolejność zatrzymania usług przed wyczyszczeniem sesji.
-- `test/account_session_controller_test.dart`: trwały profil lokalny bez
+- `test/account_session_controller_test.dart`: krótsze nowe hasła i logowanie
+  istniejących kont, trwały profil lokalny bez
   sekretów, preferowany tryb konta, dokładny kontrakt zmiany hasła i błędy API.
-- `server/api/tests/`: Argon2/JWT, integralność envelope, izolacja urządzeń w
+- `server/api/tests/`: nowe limity haseł, Argon2/JWT,
+  integralność envelope, izolacja urządzeń w
   schemacie i brak publicznych portów bazy/API w Compose.
 - `test/library_planner_test.dart`: kolory według statusu w obu motywach,
   zgodność Recent i ukończonych z paskiem folderów, `Opacity` całego

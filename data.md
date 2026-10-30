@@ -131,12 +131,14 @@ w prywatnej sieci Compose. Caddy wiąże port `8080` wyłącznie do
 
 ### Konto i zmiana hasła
 
-- Rejestracja i logowanie używają e-maila oraz hasła 12–256 znaków;
-  powtórzenie hasła przy rejestracji jest walidowane wyłącznie lokalnie.
+- Rejestracja używa e-maila i hasła 8–128 znaków; logowanie akceptuje
+  istniejące hasła 1–256 znaków. Nowe hasło też ma 8–128 znaków.
+  Powtórzenie hasła jest walidowane lokalnie.
 - Zmiana hasła wywołuje uwierzytelnione
   `POST /v1/auth/change-password` z `currentPassword` i `newPassword`.
   Powtórzenie nowego hasła nie jest wysyłane do API.
-- Po sukcesie `204` serwer unieważnia wszystkie sesje. Klient zatrzymuje live
+- Po sukcesie `204` serwer unieważnia refresh tokeny; wydane JWT
+  wygasają po maksymalnie 10 minutach. Klient zatrzymuje live
   sync i backup, czyści tokeny z pamięci oraz wymaga ponownego logowania.
 - Użytkownik może przełączać się między profilem lokalnym i kontem z poziomu
   ustawień konta. Przejście do trybu lokalnego zatrzymuje usługi sieciowe

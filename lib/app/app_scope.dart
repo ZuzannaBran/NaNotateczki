@@ -169,7 +169,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             scrollBehavior: const AppScrollBehavior(),
-            title: 'Notatek',
+            title: 'NaNotateczki',
             theme: AppTheme.light(),
             home: _StartupErrorScreen(error: snapshot.error!),
           );
@@ -269,7 +269,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
             scrollBehavior: const AppScrollBehavior(),
-            title: 'Notatek',
+            title: 'NaNotateczki',
             theme: AppTheme.light(),
             home: const LibraryScreen(),
             builder: (context, child) {

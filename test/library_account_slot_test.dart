@@ -105,6 +105,26 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('account-sign-in-choice')));
       await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextFormField>(
+          find.byKey(const ValueKey('account-password')),
+        ).obscureText,
+        isTrue,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('account-password-visibility-Password')),
+      );
+      await tester.pump();
+      expect(
+        tester.widget<TextFormField>(
+          find.byKey(const ValueKey('account-password')),
+        ).obscureText,
+        isFalse,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('account-password-visibility-Password')),
+      );
+      await tester.pump();
       await tester.enterText(
         find.byKey(const ValueKey('account-email')),
         'user@example.com',
@@ -338,6 +358,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome'), findsOneWidget);
+    expect(find.text('NaNotateczki'), findsOneWidget);
+    final welcomeCopy = tester.widget<Text>(
+      find.byKey(const ValueKey('account-welcome-description')),
+    );
+    expect(welcomeCopy.textAlign, TextAlign.center);
+    expect(welcomeCopy.data, contains('NaNotateczki'));
     expect(find.byKey(const ValueKey('account-create-choice')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('account-sign-in-choice')),
@@ -351,6 +377,22 @@ void main() {
       find.byKey(const ValueKey('account-email')),
       'user@example.com',
     );
+    expect(find.text('Username'), findsNothing);
+    await tester.enterText(
+      find.byKey(const ValueKey('account-password')),
+      '1234567',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('account-password-confirmation')),
+      '1234567',
+    );
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('account-register-submit')),
+        )
+        .onPressed!();
+    await tester.pump();
+    expect(find.text('Use 8 to 128 characters.'), findsWidgets);
     await tester.enterText(
       find.byKey(const ValueKey('account-password')),
       'first-secure-password',

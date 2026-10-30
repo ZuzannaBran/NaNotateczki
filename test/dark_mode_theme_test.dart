@@ -39,6 +39,14 @@ void main() {
     }
   });
 
+  test('both themes use Georgia for interface text', () {
+    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+      expect(theme.textTheme.bodyMedium?.fontFamily, 'Georgia');
+      expect(theme.textTheme.titleMedium?.fontFamily, 'Georgia');
+      expect(theme.fontFamily, 'Georgia');
+    }
+  });
+
   test('both themes use the four interface text sizes', () {
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {
       final t = theme.textTheme;

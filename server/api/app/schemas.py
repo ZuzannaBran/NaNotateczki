@@ -6,7 +6,16 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 class Credentials(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=12, max_length=256)
+    password: str = Field(min_length=1, max_length=256)
+
+
+class RegistrationCredentials(Credentials):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str = Field(min_length=1, max_length=256)
+    newPassword: str = Field(min_length=8, max_length=128)
 
 
 class RefreshRequest(BaseModel):

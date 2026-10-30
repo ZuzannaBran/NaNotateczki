@@ -8,7 +8,7 @@ class AppTypography {
   static const double small = 12;
 
   static ThemeData apply(ThemeData theme) {
-    final text = theme.textTheme;
+    final text = theme.textTheme.apply(fontFamily: 'Georgia');
     return theme.copyWith(
       textTheme: text.copyWith(
         displayLarge: text.displayLarge?.copyWith(fontSize: heading),

@@ -106,9 +106,15 @@ class AccountSessionController extends ChangeNotifier {
       throw StateError('BACKEND_URL is not configured.');
     }
     final normalizedEmail = rawEmail.trim().toLowerCase();
-    if (normalizedEmail.isEmpty || password.length < 12) {
+    if (!normalizedEmail.contains('@') ||
+        password.isEmpty ||
+        password.length > 256) {
+      throw const FormatException('Enter a valid e-mail and password.');
+    }
+    if (path == '/v1/auth/register' &&
+        (password.length < 8 || password.length > 128)) {
       throw const FormatException(
-        'A valid e-mail and a password of at least 12 characters are required.',
+        'The password must contain 8 to 128 characters.',
       );
     }
     isBusy = true;
@@ -122,7 +128,7 @@ class AccountSessionController extends ChangeNotifier {
       _applySession(response.decodeJson());
       preferredMode = AccountDataMode.account;
       onboardingComplete = true;
-      lastAccountEmail = email;
+      lastAccountEmail = normalizedEmail;
       if (profileLoaded) {
         try {
           await _saveProfile();
@@ -161,9 +167,9 @@ class AccountSessionController extends ChangeNotifier {
     if (currentPassword.isEmpty || currentPassword.length > 256) {
       throw const FormatException('Enter the current password.');
     }
-    if (newPassword.length < 12 || newPassword.length > 256) {
+    if (newPassword.length < 8 || newPassword.length > 128) {
       throw const FormatException(
-        'The new password must contain 12 to 256 characters.',
+        'The new password must contain 8 to 128 characters.',
       );
     }
     isBusy = true;
