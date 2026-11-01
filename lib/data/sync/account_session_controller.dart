@@ -1,18 +1,27 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
 import '../../core/storage/text_storage.dart';
+import 'account_credential_store.dart';
 import 'api_client.dart';
 
 enum AccountDataMode { localOnly, account }
 
 class AccountSessionController extends ChangeNotifier {
-  AccountSessionController(this.apiClient);
+  AccountSessionController(
+    this.apiClient, {
+    AccountCredentialStore? credentialStore,
+  }) : _credentialStore =
+           credentialStore ?? const SecureAccountCredentialStore();
 
   static const profileStorageKey = 'account_profile.json';
 
   final ApiClient apiClient;
+  final AccountCredentialStore _credentialStore;
+  Future<void> _credentialQueue = Future<void>.value();
+  int _sessionGeneration = 0;
   AccountDataMode mode = AccountDataMode.localOnly;
   AccountDataMode preferredMode = AccountDataMode.localOnly;
   String? userId;
@@ -36,13 +45,13 @@ class AccountSessionController extends ChangeNotifier {
   );
   bool get isSignedIn => mode == AccountDataMode.account && userId != null;
   bool get shouldShowStartupDialog =>
-      profileLoaded &&
-      !accountDialogOpen &&
-      (!onboardingComplete ||
-          (preferredMode == AccountDataMode.account && !isSignedIn));
+      profileLoaded && !accountDialogOpen && !onboardingComplete;
   bool get isLocalProfile => !isSignedIn && localDisplayName != null;
-  String get displayName =>
-      isSignedIn ? (username ?? 'Account') : (localDisplayName ?? 'Local user');
+  String get displayName => isSignedIn
+      ? (username ?? 'Account')
+      : preferredMode == AccountDataMode.account
+      ? (lastAccountUsername ?? 'Account')
+      : (localDisplayName ?? 'Local user');
   String get avatarLetter {
     final trimmed = displayName.trim();
     return trimmed.isEmpty
@@ -94,6 +103,11 @@ class AccountSessionController extends ChangeNotifier {
           raw['lastAccountEmail'],
         )?.split('@').first.toLowerCase();
         _boundUserId = _optionalNonEmptyString(raw['boundUserId']);
+      }
+      if (preferredMode == AccountDataMode.account &&
+          onboardingComplete &&
+          _boundUserId != null) {
+        await _restorePersistedSession();
       }
     } catch (failure) {
       if (!_disposed) {
@@ -180,6 +194,7 @@ class AccountSessionController extends ChangeNotifier {
           );
         }
       }
+      await _persistRefreshCredential();
     } catch (failure) {
       _clearSession();
       error = _failureMessage(failure);
@@ -206,7 +221,11 @@ class AccountSessionController extends ChangeNotifier {
 
   Future<void> _refreshSession() async {
     final refreshToken = _refreshToken;
-    if (refreshToken == null) {
+    final expectedUserId = userId;
+    final expectedUsername = username;
+    if (refreshToken == null ||
+        expectedUserId == null ||
+        expectedUsername == null) {
       throw StateError('No refresh session is available.');
     }
     final response = await apiClient.postJson('/v1/auth/refresh', {
@@ -215,8 +234,101 @@ class AccountSessionController extends ChangeNotifier {
     if (_disposed || refreshToken != _refreshToken || !isSignedIn) {
       return;
     }
-    _applySession(response.decodeJson());
+    final incoming = response.decodeJson();
+    if (!_matchesIdentity(incoming, expectedUserId, expectedUsername)) {
+      throw const FormatException('Refresh returned another account.');
+    }
+    _applySession(incoming);
+    await _persistRefreshCredential();
     _notifyIfActive();
+  }
+
+  Future<void> _restorePersistedSession() async {
+    final generation = _sessionGeneration;
+    try {
+      final saved = await _credentialStore.read();
+      if (saved == null || _disposed || generation != _sessionGeneration) {
+        return;
+      }
+      final data = jsonDecode(saved);
+      if (data is! Map<String, dynamic> ||
+          data['version'] != 1 ||
+          data['backend'] != apiClient.baseUri.toString() ||
+          data['userId'] != _boundUserId ||
+          data['username'] != lastAccountUsername ||
+          data['refreshToken'] is! String ||
+          (data['refreshToken'] as String).isEmpty) {
+        await _queueCredential(null);
+        return;
+      }
+      final response = await apiClient.postJson('/v1/auth/refresh', {
+        'refreshToken': data['refreshToken'],
+      }, authenticated: false);
+      if (_disposed || generation != _sessionGeneration) {
+        return;
+      }
+      final incoming = response.decodeJson();
+      if (!_matchesIdentity(
+        incoming,
+        data['userId'] as String,
+        data['username'] as String,
+      )) {
+        await _queueCredential(null);
+        return;
+      }
+      _applySession(incoming);
+      await _persistRefreshCredential();
+    } on ApiException catch (failure) {
+      if (failure.statusCode == 400 ||
+          failure.statusCode == 401 ||
+          failure.statusCode == 403) {
+        await _queueCredential(null);
+      }
+    } on FormatException {
+      await _queueCredential(null);
+    } catch (_) {
+      // Offline and unavailable keyrings do not block local notebooks.
+    }
+  }
+
+  bool _matchesIdentity(
+    Object? response,
+    String expectedUserId,
+    String expectedUsername,
+  ) {
+    return response is Map<String, dynamic> &&
+        response['userId'] == expectedUserId &&
+        response['username'] == expectedUsername;
+  }
+
+  Future<void> _persistRefreshCredential() async {
+    final token = _refreshToken;
+    if (token == null || userId == null || username == null) {
+      return;
+    }
+    try {
+      await _queueCredential(
+        jsonEncode({
+          'version': 1,
+          'backend': apiClient.baseUri.toString(),
+          'userId': userId,
+          'username': username,
+          'refreshToken': token,
+        }),
+      );
+    } catch (_) {
+      error = 'Automatic sign-in is unavailable on this device.';
+    }
+  }
+
+  Future<void> _queueCredential(String? value) {
+    final pending = _credentialQueue.then((_) {
+      return value == null
+          ? _credentialStore.delete()
+          : _credentialStore.write(value);
+    });
+    _credentialQueue = pending.catchError((Object _) {});
+    return pending;
   }
 
   Future<void> changePassword(
@@ -261,11 +373,13 @@ class AccountSessionController extends ChangeNotifier {
       }
     } finally {
       useLocalOnly();
+      await _credentialQueue;
     }
   }
 
   void useLocalOnly() {
     _clearSession();
+    unawaited(_queueCredential(null).catchError((Object _) {}));
     error = null;
     _notifyIfActive();
   }
@@ -278,6 +392,11 @@ class AccountSessionController extends ChangeNotifier {
       );
     }
     _clearSession();
+    try {
+      await _queueCredential(null);
+    } catch (_) {
+      // Local mode remains available when the keyring is inaccessible.
+    }
     localDisplayName = displayName;
     preferredMode = AccountDataMode.localOnly;
     onboardingComplete = true;
@@ -293,8 +412,13 @@ class AccountSessionController extends ChangeNotifier {
     _notifyIfActive();
   }
 
-  void requireAccountReauthentication() {
+  Future<void> requireAccountReauthentication() async {
     _clearSession();
+    try {
+      await _queueCredential(null);
+    } catch (_) {
+      // Revoked server tokens cannot be used again.
+    }
     preferredMode = AccountDataMode.account;
     onboardingComplete = true;
     error = null;
@@ -302,6 +426,7 @@ class AccountSessionController extends ChangeNotifier {
   }
 
   void _clearSession() {
+    _sessionGeneration++;
     mode = AccountDataMode.localOnly;
     userId = null;
     username = null;
