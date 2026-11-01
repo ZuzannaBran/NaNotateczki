@@ -23,7 +23,8 @@ mapie. Każdy nowy plik w `lib/` musi dostać tu własny wpis.
   `main` → `AppScope` → `LibraryController` → `EditorController` →
   `NotebookRepository` → Drift.
 - Po zapisie repozytorium przekazuje schedulerowi UID-y zmienionych
-  notebooków. Backup czeka na bezczynność rysika, przetwarza tylko dirty
+  notebooków. Backup na serwer czeka na bezczynność użytkownika,
+  a kodowanie JSON i SHA-256 na natywnych platformach trafia do isolate. Backup czeka na bezczynność rysika, przetwarza tylko dirty
   dokumenty i może przerwać worker po wznowieniu pisania.
 - `features/editor` obsługuje wspólny model notebooka i boarda; różnią się
   ekranem oraz układem współrzędnych canvasu.
@@ -283,7 +284,7 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/remote_backup_service.dart` (140 linii)
+### `lib/data/backup/remote_backup_service.dart` (164 linie)
 
 Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
 zadania i planer, liczy SHA-256, wykonuje pending → upload → finalize i uznaje
@@ -292,14 +293,14 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
 - 12: `RemoteBackupReceipt`; 24: `RemoteBackupService`;
   38: `uploadVerifiedSnapshot`.
 
-### `lib/data/backup/remote_backup_scheduler.dart` (208 linii)
+### `lib/data/backup/remote_backup_scheduler.dart` (341 linii)
 
 Jawnie włączany scheduler zalogowanego konta: po zmianach wysyła verified
 snapshot co 30 minut, po błędzie ponawia po 5 minutach i próbuje przy resume.
 Samo logowanie nie włącza wysyłki. Stan wyniku i błędu jest czyszczony przy
 zmianie konta, a losowy `deviceId` ma osobny plik per `userId`.
 
-- 13: `RemoteBackupScheduler`; 40: `enableForSignedInAccount`; 64: `stop`;
+- 13: `RemoteBackupScheduler`; logika bezczynności i zapis per konto; `enableForSignedInAccount`, `setIdleSeconds`, `backupNow`;
   75: `uploadNow`; 92: `backupNow`. Licznik generacji nie pozwala zgubić zmiany wykonanej
   podczas trwającego uploadu.
 
@@ -337,23 +338,23 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 ### Nowa synchronizacja serwerowa
 
-- `lib/data/sync/api_client.dart` (188): klient REST z wymuszeniem HTTPS,
+- `lib/data/sync/api_client.dart` (190): klient REST z wymuszeniem HTTPS,
   timeoutem, limitem odpowiedzi, Bearer tokenem i request ID.
   7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
-- `lib/data/sync/account_session_controller.dart` (315): trwały profil
+- `lib/data/sync/account_session_controller.dart` (350): trwały profil
   pierwszego uruchomienia i trybu lokalnego, rejestracja/logowanie, zmiana
   hasła, rotacja sesji oraz tokeny wyłącznie w pamięci. Plik profilu zawiera
   tylko tryb, lokalną nazwę i ostatni e-mail.
-  8: `AccountDataMode`; 10: `AccountSessionController`; 65: `loadProfile`;
+  8: `AccountDataMode`; 10: `AccountSessionController`; `loadProfile` i loginy 3–32 znaków; asynchroniczny odczyt nie zgłasza po dispose;
   154: `changePassword`; 205: `useLocalProfile`. Nowe hasła: 8–128.
-- `lib/data/sync/live_web_sync_service.dart` (580): jawna polityka pierwszej
+- `lib/data/sync/live_web_sync_service.dart` (603): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
   tylko jako sygnał; własny push nie przesuwa kursora zdarzeń z innych
   urządzeń. `start`/`stop` zerują pamięciowy stan konta, a zapis stanu używa
   utrwalonego `userId`, więc kursor, rewizje i outbox nie przechodzą między
   kontami.
-  16: `InitialSyncPolicy`; 18: `LiveWebSyncService`; 49: `start`;
+  16: `InitialSyncPolicy`; 18: `LiveWebSyncService`; `start`, `enqueue`, `syncNow`; po reconnect i wznowieniu aplikacji REST uzupełnia utracone sygnały WebSocket;
   81: `enqueue`; 97: `syncNow`; 533: `stop`.
 
 ## 5. Domena notebooka i repozytorium
@@ -598,7 +599,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1844: `_LibraryWorkspace`;
   1955: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (1017 linii)
+### `lib/features/library/presentation/library_account_slot.dart` (1044 linii)
 
 Przestrzenny onboarding `Create account`/`Sign in`/`Try local` z
 wyśrodkowaną nazwą NaNotateczki, podglądem haseł i spójnymi odstępami
@@ -1470,6 +1471,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   SQLite ścieżek obrazów po przeniesieniu katalogu danych.
 - `test/api_client_test.dart`: odrzucenie HTTP/sekretów w URL, Bearer/request
   ID i zachowanie struktury odpowiedzi 409.
+- `test/remote_backup_scheduler_test.dart`: odstęp bezczynności, nieblokujący upload podczas oczekiwania na serwer.
 - `test/remote_backup_service_test.dart`: kompletny snapshot v2 z biblioteką
   i planerem, wymaganie potwierdzonego `verified` oraz zachowanie flagi dirty,
   gdy dane zmienią się podczas uploadu, a także izolacja stanu i `deviceId`

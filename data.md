@@ -21,7 +21,7 @@ offline również po zalogowaniu.
   sync. Przy wylogowaniu najpierw zatrzymuje live sync i backup, a dopiero
   potem czyści sesję przechowywaną w pamięci.
 - `account_profile.json` przechowuje wyłącznie ukończenie onboardingu,
-  preferowany tryb, lokalną nazwę i ostatni e-mail. Nie zawiera hasła,
+  preferowany tryb, lokalną nazwę i ostatnią nazwę użytkownika. Nie zawiera hasła,
   access tokenu ani refresh tokenu. Preferowany tryb konta po restarcie
   wymaga ponownego logowania, ponieważ tokeny celowo nie są utrwalane.
 
@@ -134,13 +134,17 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 4. Serwer ponownie sprawdza rozmiar, SHA-256, format, urządzenie i checksumę
    payloadu; dopiero potem wykonuje atomowy rename i ustawia `verified`.
 5. Błąd nie usuwa wcześniejszego poprawnego snapshotu. Scheduler ponawia próbę
-   po 5 minutach i normalnie wysyła co 30 minut tylko po zmianach.
-   Przycisk `Back up now` jawnie oznacza snapshot jako wymagany i uruchamia go
+   nie wcześniej niż po 5 minutach. Zmieniony snapshot wysyła po ustalonym
+   okresie bezczynności (domyślnie 2 minuty, zakres 30 s–30 min); aktywny
+   rysik, mysz i klawiatura przesuwają termin. Preferencja jest lokalna i
+   odrębna dla każdego konta. Serializacja i SHA-256 na platformach natywnych
+   działają poza głównym isolate. Przycisk `Back up now` jawnie oznacza snapshot jako wymagany i uruchamia go
    od razu.
 
 ### Konto i zmiana hasła
 
-- Rejestracja używa e-maila i hasła 8–128 znaków; logowanie akceptuje
+- Rejestracja używa loginu (3–32 znaki: litery ASCII, cyfry i _) oraz hasła
+  8–128 znaków; logowanie akceptuje
   istniejące hasła 1–256 znaków. Nowe hasło też ma 8–128 znaków.
   Powtórzenie hasła jest walidowane lokalnie.
 - Zmiana hasła wywołuje uwierzytelnione
@@ -148,7 +152,7 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
   Powtórzenie nowego hasła nie jest wysyłane do API.
 - Po sukcesie `204` serwer zwiększa `auth_version` i unieważnia refresh
   tokeny, wydane JWT oraz połączenia WebSocket. Wymaga to migracji
-  `0002_auth_version.sql`. Klient zatrzymuje live
+  `0002_auth_version.sql` i `0003_username.sql`. Klient zatrzymuje live
   sync i backup, czyści tokeny z pamięci oraz wymaga ponownego logowania.
 - Użytkownik może przełączać się między profilem lokalnym i kontem z poziomu
   ustawień konta. Przejście do trybu lokalnego zatrzymuje usługi sieciowe
@@ -162,6 +166,8 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
   dokument z dopiskiem `Conflict`, a następnie stosuje stan serwera.
 - Usunięcia są tombstonami. Outbox znika dopiero po potwierdzonym commicie.
 - Po reconnect klient zawsze wywołuje `/v1/sync/changes?after=<cursor>`.
+- Na Web po wznowieniu aplikacji i zapasowo co 45 sekund (10 sekund po błędzie)
+  weryfikuje zmiany przez REST, niezależnie od częstotliwości backupów.
 - Feed jest stronicowany po 500 zdarzeń; klient pobiera wszystkie pełne
   strony, zanim zacznie wysyłać lokalny outbox.
 
@@ -194,5 +200,6 @@ narzędziem `age`. Skrypt nie wdraża retencji i nie zastępuje testu odtworzeni
 - SQLite: `NotesDatabase.schemaVersion`.
 - Backup lokalny: manifest v6.
 - Backup serwerowy: envelope v2.
-- PostgreSQL: niezmienne migracje w `server/migrations/`; zastosowanej
+- PostgreSQL: niezmienne migracje w `server/migrations/` (w tym
+  `0003_username.sql`); zastosowanej
   migracji nie edytuje się, tylko dodaje następną.

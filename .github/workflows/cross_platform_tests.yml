@@ -75,6 +75,25 @@ jobs:
           path: coverage/lcov.info
           if-no-files-found: ignore
 
+  backend-unit:
+    name: Python API and deployment contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install -r server/api/requirements.txt
+      - name: Verify backend contract, migrations and security
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+          APP_ORIGIN: https://app.example.invalid
+          JWT_SECRET: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdef
+        run: |
+          cd server
+          python -m pytest -q api/tests
+
   stylus-input:
     name: Stylus and palm input regression (isolated)
     runs-on: ubuntu-24.04
@@ -289,6 +308,10 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+      - name: Free space for Gradle
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/share/powershell /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.6'
@@ -333,6 +356,10 @@ jobs:
     timeout-minutes: 65
     steps:
       - uses: actions/checkout@v5
+      - name: Free space for Android emulator userdata
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/share/powershell /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.6'

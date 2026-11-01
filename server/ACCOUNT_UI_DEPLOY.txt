@@ -1,6 +1,8 @@
 NaNotateczki — wdrożenie backendu zgodnego z klientem
 
 Kontrakt:
+- logowanie przez username (3–32 znaki ASCII, cyfry, podkreślenie), bez e-maila;
+- migracja 0003_username.sql zachowuje UUID kont oraz nadaje stare loginy;
 - rejestracja i nowe hasło: 8–128 znaków; logowanie: 1–256 znaków;
 - zmiana hasła unieważnia również JWT i WebSocket przez auth_version;
 - wymagana migracja 0002_auth_version.sql, poza 0001_initial.sql.
