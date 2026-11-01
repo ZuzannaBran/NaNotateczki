@@ -59,7 +59,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (758 linii)
+### `lib/app/app_scope.dart` (922 linie)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -80,12 +80,13 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   niezależny od migracji bazy notatek.
 - Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
   backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
-- 31: `AppScope`; 38: `_AppScopeState`; 105: `didRequestAppExit`;
+- 33: `AppScope`; 40: `_AppScopeState`; 115: `didRequestAppExit`;
   `_startAccountSync` automatycznie odtwarza stan po logowaniu i restarcie
   na wszystkich platformach, zanim uruchomi backup.
-- 411: `AppUiScale`; 459: `_ExitGuardOverlay`;
-  482: `_FinishingExitOverlay`; 590: `_BackupScheduler`;
-  786: `flushForExit`.
+- 205: `_syncAccountSettings`; 217: `_startAccountSync`;
+  474: `AppUiScale`; 522: `_ExitGuardOverlay`;
+  545: `_FinishingExitOverlay`; 653: `_BackupScheduler`;
+  849: `flushForExit`.
 
 ## 3. Core
 
@@ -288,7 +289,7 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/remote_backup_service.dart` (403 linie)
+### `lib/data/backup/remote_backup_service.dart` (504 linie)
 
 Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
 zadania, planer, ustawienia, Recent i preferencję backupu; liczy SHA-256,
@@ -296,14 +297,22 @@ wykonuje pending → upload → finalize i uznaje
 wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
 
 - 12: `RemoteBackupReceipt`; 24: `RemoteBackupService`;
-  38: `uploadVerifiedSnapshot`; `hydrateFromLatestAccountBackup` pobiera
-  najnowszy zweryfikowany backup, weryfikuje SHA i importuje go tylko
-  do pustej biblioteki, o ile serwer nie ma już historii zmian.
-  Nie nadpisuje istniejących preferencji ani danych planera; po udanym
+  42: `uploadVerifiedSnapshot`; 145: `hydrateFromLatestAccountBackup` pobiera
+  najnowszy zweryfikowany backup, weryfikuje SHA oryginalnych bajtów i dołącza
+  brakujące dokumenty; inną wersję zachowuje z nazwą `(1)`, `(2)` w tym samym
+  folderze. Historia synchronizacji i tombstones mają pierwszeństwo.
+  Odmienny szkic z backupu zachowuje jako kopię obok rewizji konta;
+  nie wskrzesza dokumentów oznaczonych jako usunięte.
+  Łączy foldery i zachowuje zadania przy właściwej kopii planera.
+  Nie nadpisuje istniejących preferencji ani historii planera; po udanym
   sprawdzeniu zapisuje znacznik, aby nie pobierać wielkiego backupu
   podczas każdego restartu.
 
-### `lib/data/backup/remote_backup_scheduler.dart` (343 linie)
+- `lib/data/backup/backup_payload_bytes.dart`: 6: `backupPayloadBytes`
+  wycina oryginalne UTF-8 payloadu z już poprawnego JSON, bez zmiany
+  zapisu liczb, Unicode i escape'ów podczas sprawdzania SHA-256.
+
+### `lib/data/backup/remote_backup_scheduler.dart` (354 linie)
 
 Jawnie włączany scheduler zalogowanego konta: po zmianach wysyła verified
 snapshot po ustawionym okresie bezczynności (domyślnie 120 sekund), po błędzie
@@ -311,8 +320,9 @@ ponawia po 5 minutach; resume rozpoczyna nowe oczekiwanie na bezczynność.
 Samo logowanie nie włącza wysyłki. Stan wyniku i błędu jest czyszczony przy
 zmianie konta, a losowy `deviceId` ma osobny plik per `userId`.
 
-- 13: `RemoteBackupScheduler`; logika bezczynności i zapis per konto; `enableForSignedInAccount`, `setIdleSeconds`, `backupNow`;
-  119: `uploadNow`; 133: `backupNow`. Licznik generacji nie pozwala zgubić zmiany wykonanej
+- 17: `RemoteBackupScheduler`; logika bezczynności i zapis per konto; `enableForSignedInAccount`, `setIdleSeconds`, `backupNow`;
+  102: `refreshAccountPreference`; 130: `uploadNow`; 144: `backupNow`.
+  Licznik generacji nie pozwala zgubić zmiany wykonanej
   podczas trwającego uploadu.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (12 linii)
@@ -372,7 +382,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   247: `_restorePersistedSession`; 313: `_persistRefreshCredential`;
   343: `changePassword`; 396: `useLocalProfile`.
   Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
-- `lib/data/sync/account_settings_sync_service.dart`:
+- `lib/data/sync/account_settings_sync_service.dart` (224 linie):
+  11: `AccountSettingsSyncService`; 34: `syncNow`; 164: `stop`.
   `AccountSettingsSyncService.syncNow` uzgadnia rewizje ustawień konta
   (`appPreferences`, `editorPreferences`, `recentColors`,
   `backupPreferences`). Zapisuje potwierdzone wartości per konto,
@@ -382,20 +393,27 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   oraz wysyłkę po zmianie preferencji, recent i czasu backupu.
 - `test/account_settings_sync_service_test.dart`: dwa urządzenia,
   wysyłka, odtworzenie, odrzucenie równoczesnego nadpisania.
-- `lib/data/sync/live_web_sync_service.dart` (około 730): jawna polityka pierwszej
+- `lib/data/sync/live_web_sync_service.dart` (780 linii): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
   tylko jako sygnał na wszystkich platformach; własny push nie przesuwa
   kursora zdarzeń z innych
   urządzeń. `start`/`stop` zerują pamięciowy stan konta, a zapis stanu używa
   utrwalonego `userId`, więc kursor, rewizje i outbox nie przechodzą między
-  kontami. Normalizuje ścieżki obrazów, zapobiegając fałszywym konfliktom
-  między Linuxem, Web, iOS i Androidem.
-  16: `InitialSyncPolicy`; 18: `LiveWebSyncService`; `start`, `enqueue`, `syncNow`; po reconnect i wznowieniu aplikacji REST uzupełnia utracone sygnały WebSocket;
+  kontami. Normalizuje ścieżki obrazów oraz daty dokumentu do UTC,
+  zapobiegając fałszywym konfliktom między Linuxem, Web, iOS i Androidem.
+  Bazowy snapshot zachowuje dokładną odpowiedź serwera, bez normalizacji,
+  ponieważ API weryfikuje go względem niezmiennej historii rewizji.
+  Niezmieniona data utworzenia zachowuje oryginalny zapis bazy także w PUT.
+  18: `InitialSyncPolicy`; 20: `LiveWebSyncService`; 67: `start`;
+  po reconnect i wznowieniu aplikacji REST uzupełnia utracone sygnały WebSocket;
   Przy odbiorze zmian gości najpierw opróżnia edytor właściciela i wysyła
   jego oczekujące operacje ścieżką serwerowego scalenia, zanim zastosuje
   feed, aby niezależne zmiany nie tworzyły kopii konfliktowej.
-  81: `enqueue`; 97: `syncNow`; 533: `stop`.
+  117: `enqueue`; 133: `syncNow`; 727: `stop`.
+- `lib/data/sync/notebook_conflicts.dart`: 6: `numberedNotebookCopy`
+  zachowuje treść w tym samym folderze pod pierwszą wolną nazwą `(1)` itd.,
+  nadając nowe UID dokumentu, stron, tekstów, obrazów i kresek.
 
 ## 5. Domena notebooka i repozytorium
 
@@ -522,7 +540,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 749: `moveItemToFolder`; 796: `selectFolder`; 924: `_loadFolders`;
   986: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (2134 linie)
+### `lib/features/library/presentation/library_screen.dart` (2204 linie)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -547,8 +565,8 @@ Nagłówek Projects jest klikalny, ale nie ma podświetlenia przy hover,
 naciśnięciu ani podczas wyświetlania katalogu głównego.
 
 Dolny slot konta korzysta z tego samego panelu w szerokim sidebarze i w
-mobilnym drawerze; na Web przekazuje jawny dostęp do wyboru pierwszej
-synchronizacji. Po załadowaniu pustego profilu ekran pokazuje niedający się
+mobilnym drawerze; udostępnia ręczny wybór polityki synchronizacji na
+wszystkich platformach. Po załadowaniu pustego profilu ekran pokazuje niedający się
 trwale pominąć onboarding konta/lokalnej nazwy.
 
 Panel dzieli wysokość na rozwijane drzewko folderów,
@@ -631,19 +649,19 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   Planner otwiera `TaskListScreen` zamiast kontrolera edytora.
   Ustawienia katalogu i planera nie tworzą `EditorController` dla
   `NotebookKind.planner`, aby nie zgłaszać `UnsupportedError`.
-- 34: `LibraryScreen`; 43: `_LibraryScreenState`;
-  407: `_maybeShowAccountOnboarding`;
-  555: `_keepCatalogOnMovedFolder`; 626: `_openCatalogSettings`;
-  990: `_CreateMenuButton`;
-  1035: `_LibraryTreePane` (`_LibraryTreePaneState` 1062);
-  1277: `_buildFolder`; 1464: `_FolderTreeRow`;
-  1567: `_LibraryTreeItemRow` (bez ikon typów);
-  1668: `_sidebarMenuShape`;
-  1682: `_SidebarMenuShadowPainter`;
-  1718: `_showSidebarMenu`;
-  1831: `_TreeRowActions`;
-  1911: `_LibraryWorkspace`;
-  2041: `_LeftZoneToggleTab` (również przycisk timera).
+- 35: `LibraryScreen`; 44: `_LibraryScreenState`;
+  437: `_maybeShowAccountOnboarding`;
+  586: `_keepCatalogOnMovedFolder`; 688: `_openCatalogSettings`;
+  1052: `_CreateMenuButton`;
+  1097: `_LibraryTreePane` (`_LibraryTreePaneState` 1124);
+  1339: `_buildFolder`; 1526: `_FolderTreeRow`;
+  1629: `_LibraryTreeItemRow` (bez ikon typów);
+  1730: `_sidebarMenuShape`;
+  1744: `_SidebarMenuShadowPainter`;
+  1780: `_showSidebarMenu`;
+  1893: `_TreeRowActions`;
+  1973: `_LibraryWorkspace`;
+  2111: `_LeftZoneToggleTab` (również przycisk timera).
 
 ### `lib/features/library/presentation/library_account_slot.dart` (1104 linie)
 
@@ -673,9 +691,9 @@ a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
   Automatyczne inicjowanie synchronizacji należy do `AppScope`, także na
   platformach natywnych; ręczne polityki pozostają awaryjnym wyborem.
 
-- 20: `showLibraryAccountDialog`; 49: `LibraryAccountSlot`;
-  154: `_AccountAvatar`; 186: `_AccountDialog`;
-  199: `_AccountDialogState`; 695: `_usernameField`;
+- 19: `showLibraryAccountDialog`; 48: `LibraryAccountSlot`;
+  153: `_AccountAvatar`; 185: `_AccountDialog`;
+  198: `_AccountDialogState`; 695: `_usernameField`;
   716: `_accountLabeledField`; 908: `_backupNow`;
   945: `_changePassword`.
 
@@ -1783,9 +1801,21 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `test/cloud_sync_service_test.dart`: dodatkowe konflikty czasów i ID.
 - `test/account_cross_device_backup_test.dart`: transfer zweryfikowanych
   notatników, preferencji konta, Recent i opóźnienia backupu na nowe
-  urządzenie; odrzucenie uszkodzonego payloadu przed zapisem.
+  urządzenie; odrzucenie uszkodzonego payloadu i błędnego ID przed zapisem,
+  brak ponownego pobierania, ochrona lokalnej pracy i historii usunięć.
+- `test/live_web_sync_service_test.dart`: lokalne daty z SQLite i ich
+  odpowiedniki UTC nie tworzą kopii konfliktowych ani zbędnych zapisów;
+  późniejsza edycja wysyła niezmieniony bazowy snapshot serwera.
 - `test/account_tombstone_bootstrap_test.dart`: tombstone przy logowaniu
   usuwa stary UID, ale zachowuje lokalne edycje w osobnej kopii.
+- `test/account_backup_recovery_regression_test.dart`: oryginalne bajty SHA,
+  odrzucenie uszkodzeń, łączenie niepustej biblioteki i zadania kopii planera.
+- `test/backup_payload_bytes_test.dart`: liczby, Unicode, escape'y i zakres
+  top-level payloadu; działa także w Chrome.
+- `test/notebook_conflicts_test.dart`: numeracja w obrębie folderu,
+  nowe ID wszystkich obiektów i zachowanie treści/obrazów.
+- `test/web_share_routing_test.dart`: reguła 200 dla `/share/*` w
+  `web/_redirects`, kopiowana do paczki hostingu Cloudflare.
 - `test/cross_platform/eraser_stress_test.dart`: deterministyczne sekwencje
   gumki z kontrolą unikalności i niepowracania raz usuniętych ID.
 - `test/library_controller_lifecycle_test.dart`: dispose podczas
@@ -1924,6 +1954,8 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `lib/data/sync/study_share_service.dart`: utworzenie, odzyskiwanie,
   przedłużanie i zakończenie sesji oraz uwierzytelniony bilet gościa
   do odczytu/zapisu całego dokumentu; brak dostępu do konta autora.
+  Zapis gościa zachowuje niezmienioną datę utworzenia z bazy serwera,
+  nawet gdy edytor odczytał tę samą chwilę w lokalnej strefie czasowej.
 - `lib/features/share/presentation/study_share_dialog.dart`: link,
   hasło, zakończenie i przedłużenie.
 - `lib/features/share/presentation/study_share_capture.dart`: nakładka
@@ -1976,5 +2008,6 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `server/api/tests/test_study_shares_flow.py`: REST/WebSocket,
   edycja, izolacja, walidacja bazowych snapshotów, zapisy właściciela
   w feedzie, usunięcie oryginału, pojedyncza sesja i konflikty.
-- Uwaga: outbox gościa nie przetrwa zamknięcia karty; testy środowiskowe
-  i wdrożenie nadal wymagają wykonania. Nie usuwać oznaczenia WIP.
+- Uwaga: outbox zapisuje ostatni niepotwierdzony snapshot per link;
+  testy środowiskowe i wdrożenie nadal wymagają wykonania.
+  Nie usuwać oznaczenia WIP.

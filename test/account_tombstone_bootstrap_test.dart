@@ -11,8 +11,11 @@ import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/live_web_sync_service.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 
+import 'support/native_test_documents.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  useIsolatedNativeTestDocuments();
 
   setUp(() {
     textStorageReadOverride = (_) async => null;
@@ -34,17 +37,20 @@ void main() {
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
         if (request.url.path == '/v1/sync/bootstrap') {
-          return http.Response(jsonEncode({
-            'cursor': 1,
-            'notebooks': [
-              {
-                'uid': original.uid,
-                'revision': 2,
-                'deleted': true,
-                'notebook': null,
-              },
-            ],
-          }), 200);
+          return http.Response(
+            jsonEncode({
+              'cursor': 1,
+              'notebooks': [
+                {
+                  'uid': original.uid,
+                  'revision': 2,
+                  'deleted': true,
+                  'notebook': null,
+                },
+              ],
+            }),
+            200,
+          );
         }
         if (request.url.path == '/v1/sync/changes') {
           return http.Response('{"cursor":1,"changes":[]}', 200);
@@ -79,7 +85,7 @@ void main() {
     final saved = await repository.fetchNotebooks();
     expect(saved, hasLength(1));
     expect(saved.single.uid, isNot(original.uid));
-    expect(saved.single.title, contains('Conflict from this device'));
+    expect(saved.single.title, '${original.title} (1)');
     expect(copiedToServer, isTrue);
   });
 }

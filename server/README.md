@@ -132,7 +132,7 @@ w `server/SECURITY_DEPLOY.md`.
 
 ## Wspólna edycja na Web
 
-Przed wdrożeniem API zastosuj **obie** migracje:
+Przed wdrożeniem API zastosuj migracje:
 `0004_study_shares.sql`, `0005_study_share_edit_clock.sql` i
 `0006_change_events_document_revision.sql`.
 Nie modyfikuj migracji już zastosowanych. Użyj:

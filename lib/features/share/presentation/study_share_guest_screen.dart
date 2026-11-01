@@ -278,9 +278,8 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
                       ticket: _ticket!,
                       client: _client,
                       updateRevision: _documentUpdates,
-                      onEnded: () => _endView(
-                        'This session is no longer available.',
-                      ),
+                      onEnded: () =>
+                          _endView('This session is no longer available.'),
                     ),
                   ),
                   const Padding(

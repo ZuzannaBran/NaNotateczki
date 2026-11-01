@@ -6,13 +6,17 @@ Map<String, dynamic> _doc({
   required List<Map<String, dynamic>> strokes,
 }) => {
   'uid': 'original',
-  'pages': [{
-    'id': 'page-1',
-    'title': 'Page',
-    'textBlocks': [{'id': 'text-1', 'text': text}],
-    'imageBlocks': <Map<String, dynamic>>[],
-    'inkStrokes': strokes,
-  }],
+  'pages': [
+    {
+      'id': 'page-1',
+      'title': 'Page',
+      'textBlocks': [
+        {'id': 'text-1', 'text': text},
+      ],
+      'imageBlocks': <Map<String, dynamic>>[],
+      'inkStrokes': strokes,
+    },
+  ],
 };
 
 void main() {
@@ -20,7 +24,13 @@ void main() {
     final base = _doc(text: 'old', strokes: []);
     final submitted = _doc(text: 'new', strokes: []);
     final accepted = _doc(
-      text: 'new', strokes: [{'id': 'ink-1', 'points': [1]}],
+      text: 'new',
+      strokes: [
+        {
+          'id': 'ink-1',
+          'points': [1],
+        },
+      ],
     );
     expect(hasRejectedSharedEdits(base, submitted, accepted), isFalse);
   });
@@ -34,14 +44,26 @@ void main() {
 
   test('lost deletion and lost new ink both count as rejected changes', () {
     final base = _doc(
-      text: 'old', strokes: [{'id': 'ink-old', 'points': [1]}],
+      text: 'old',
+      strokes: [
+        {
+          'id': 'ink-old',
+          'points': [1],
+        },
+      ],
     );
     final deleteStroke = _doc(text: 'old', strokes: []);
     final addStroke = _doc(
       text: 'old',
       strokes: [
-        {'id': 'ink-old', 'points': [1]},
-        {'id': 'ink-new', 'points': [2]},
+        {
+          'id': 'ink-old',
+          'points': [1],
+        },
+        {
+          'id': 'ink-new',
+          'points': [2],
+        },
       ],
     );
     expect(hasRejectedSharedEdits(base, deleteStroke, base), isTrue);
@@ -52,13 +74,17 @@ void main() {
     final base = _doc(text: 'old', strokes: []);
     final submitted = _doc(text: 'new', strokes: []);
     final accepted = {
-      'pages': [{
-        'textBlocks': [{'text': 'new', 'id': 'text-1'}],
-        'inkStrokes': [],
-        'imageBlocks': [],
-        'title': 'Page',
-        'id': 'page-1',
-      }],
+      'pages': [
+        {
+          'textBlocks': [
+            {'text': 'new', 'id': 'text-1'},
+          ],
+          'inkStrokes': [],
+          'imageBlocks': [],
+          'title': 'Page',
+          'id': 'page-1',
+        },
+      ],
       'uid': 'original',
     };
     expect(hasRejectedSharedEdits(base, submitted, accepted), isFalse);

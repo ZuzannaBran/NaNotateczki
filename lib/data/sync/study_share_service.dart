@@ -105,9 +105,7 @@ class StudyShareService {
 
   Future<List<ActiveStudyShare>> activeShares() async {
     await _refreshIfNeeded();
-    final response = await session.apiClient.get(
-      '/v1/study-shares/active',
-    );
+    final response = await session.apiClient.get('/v1/study-shares/active');
     final json = response.decodeJson();
     if (json is! Map<String, dynamic> || json['sessions'] is! List) {
       throw const FormatException('Invalid active shares response.');
@@ -168,14 +166,10 @@ class StudyShareService {
       // Owner data remains in the local repository for subsequent sync.
     }
   }
-
 }
 
 class SharedStudyDocument {
-  const SharedStudyDocument({
-    required this.notebook,
-    required this.revision,
-  });
+  const SharedStudyDocument({required this.notebook, required this.revision});
 
   final Map<String, dynamic> notebook;
   final int revision;
@@ -194,7 +188,8 @@ class SharedStudyDocument {
 }
 
 class StudyShareGuestClient {
-  StudyShareGuestClient({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
+  StudyShareGuestClient({ApiClient? apiClient})
+    : _api = apiClient ?? ApiClient();
 
   final ApiClient _api;
 
@@ -222,10 +217,7 @@ class StudyShareGuestClient {
     return response.bodyBytes;
   }
 
-  Future<SharedStudyDocument> readDocument(
-    String id,
-    String ticket,
-  ) async {
+  Future<SharedStudyDocument> readDocument(String id, String ticket) async {
     final response = await _api.request(
       'GET',
       '/v1/study-shares/$id/document',
@@ -242,16 +234,32 @@ class StudyShareGuestClient {
     required Map<String, dynamic> baseNotebook,
     required Map<String, dynamic> notebook,
   }) async {
+    final createdAt = notebook['createdAt'];
+    final baseCreatedAt = baseNotebook['createdAt'];
+    final localTime = createdAt is String ? DateTime.tryParse(createdAt) : null;
+    final baseTime = baseCreatedAt is String
+        ? DateTime.tryParse(baseCreatedAt)
+        : null;
+    // Re-encoding a timezone must not change immutable session metadata.
+    final submitted = {
+      ...notebook,
+      if (localTime != null &&
+          baseTime != null &&
+          localTime.isAtSameMomentAs(baseTime))
+        'createdAt': baseCreatedAt,
+    };
     final response = await _api.request(
       'PUT',
       '/v1/study-shares/$id/document',
       authenticated: false,
       headers: {'Authorization': 'Bearer $ticket'},
-      body: utf8.encode(jsonEncode({
-        'baseRevision': baseRevision,
-        'baseNotebook': baseNotebook,
-        'notebook': notebook,
-      })),
+      body: utf8.encode(
+        jsonEncode({
+          'baseRevision': baseRevision,
+          'baseNotebook': baseNotebook,
+          'notebook': submitted,
+        }),
+      ),
     );
     return SharedStudyDocument.fromResponse(response.decodeJson());
   }

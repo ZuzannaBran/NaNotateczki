@@ -89,10 +89,8 @@ class AccountSettingsSyncService {
             ? known!['revision'] as int
             : 0;
         final knownValue = known?['value'];
-        if (known != null && local != null &&
-            !_equivalent(local, knownValue)) {
-          if (serverEntry != null &&
-              _equivalent(local, remoteValue)) {
+        if (known != null && local != null && !_equivalent(local, knownValue)) {
+          if (serverEntry != null && _equivalent(local, remoteValue)) {
             entries[category] = {
               'revision': remoteRevision,
               'value': remoteValue,
@@ -106,20 +104,17 @@ class AccountSettingsSyncService {
           if (remoteRevision != knownRevision &&
               !_equivalent(remoteValue, knownValue)) {
             throw StateError(
-              'Account settings conflict in ' + category +
+              'Account settings conflict in $category'
               '. Local changes have been preserved.',
             );
           }
           final update = _object(
-            (await apiClient.putJson(
-              '/v1/account-settings/' + category,
-              {'expectedRevision': remoteRevision, 'value': local},
-            )).decodeJson(),
+            (await apiClient.putJson('/v1/account-settings/$category', {
+              'expectedRevision': remoteRevision,
+              'value': local,
+            })).decodeJson(),
           );
-          entries[category] = {
-            'revision': update['revision'],
-            'value': local,
-          };
+          entries[category] = {'revision': update['revision'], 'value': local};
         } else if (serverEntry != null) {
           if (!_equivalent(local, remoteValue)) {
             _applying = true;
@@ -139,15 +134,12 @@ class AccountSettingsSyncService {
           };
         } else if (local != null) {
           final update = _object(
-            (await apiClient.putJson(
-              '/v1/account-settings/' + category,
-              {'expectedRevision': 0, 'value': local},
-            )).decodeJson(),
+            (await apiClient.putJson('/v1/account-settings/$category', {
+              'expectedRevision': 0,
+              'value': local,
+            })).decodeJson(),
           );
-          entries[category] = {
-            'revision': update['revision'],
-            'value': local,
-          };
+          entries[category] = {'revision': update['revision'], 'value': local};
         }
         await writeStoredText(
           key,
@@ -179,9 +171,7 @@ class AccountSettingsSyncService {
   static Object? _canonical(Object? value) {
     if (value is Map) {
       final keys = value.keys.whereType<String>().toList()..sort();
-      return {
-        for (final key in keys) key: _canonical(value[key]),
-      };
+      return {for (final key in keys) key: _canonical(value[key])};
     }
     if (value is List) {
       return value.map(_canonical).toList();
@@ -203,15 +193,14 @@ class AccountSettingsSyncService {
       sha256.convert(utf8.encode(userId)).toString().substring(0, 16);
 
   static String _checkpointKey(String userId) =>
-      'account_settings_cursor_' + _hash(userId) + '.json';
+      'account_settings_cursor_${_hash(userId)}.json';
 
   static String _fileKey(String category, String userId) {
     return switch (category) {
       'appPreferences' => 'app_prefs.json',
       'editorPreferences' => 'editor_prefs.json',
       'recentColors' => 'shared_recent_colors.json',
-      'backupPreferences' =>
-        'server_backup_preferences_' + _hash(userId) + '.json',
+      'backupPreferences' => 'server_backup_preferences_${_hash(userId)}.json',
       _ => throw ArgumentError.value(category),
     };
   }
@@ -221,7 +210,7 @@ class AccountSettingsSyncService {
     String category,
     Object value,
   ) async {
-    final key = 'account_preimport_' + _hash(userId) + '.json';
+    final key = 'account_preimport_${_hash(userId)}.json';
     final old = await readStoredText(key);
     final previous = old == null
         ? <String, dynamic>{}

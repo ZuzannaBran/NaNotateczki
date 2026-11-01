@@ -14,6 +14,7 @@ import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/notebook.dart';
 import '../sync/account_session_controller.dart';
 import '../sync/api_client.dart';
+import 'notebook_conflicts.dart';
 
 enum InitialSyncPolicy { uploadLocal, downloadRemote, mergeSafely }
 
@@ -243,14 +244,15 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     for (final record in remote) {
       _revisions[record.uid] = record.revision;
       if (record.notebook != null) {
-        _bases[record.uid] = _encodeSyncNotebook(
-          record.notebook!,
-        );
+        _bases[record.uid] = record.baseNotebook!;
       }
       if (record.deleted || record.notebook == null) {
         final localNotebook = localByUid[record.uid];
         if (localNotebook != null) {
-          final preserved = _conflictCopy(localNotebook, 'this device');
+          final preserved = await _conflictCopy(
+            localNotebook,
+            reserved: imports,
+          );
           imports.add(preserved);
           _pending.add(preserved.uid);
           _idempotencyKeys[preserved.uid] = const Uuid().v4();
@@ -266,7 +268,13 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (_sameNotebook(localNotebook, record.notebook!)) {
         continue;
       }
-      imports.add(_conflictCopy(record.notebook!, 'server'));
+      final preserved = await _conflictCopy(
+        record.notebook!,
+        reserved: imports,
+      );
+      imports.add(preserved);
+      _pending.add(preserved.uid);
+      _idempotencyKeys[preserved.uid] = const Uuid().v4();
       _pending.add(localNotebook.uid);
       _idempotencyKeys[localNotebook.uid] = const Uuid().v4();
     }
@@ -297,9 +305,19 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _push(String uid) async {
     final notebook = await repository.getNotebook(uid);
-    final sentNotebook = notebook == null
+    final encodedNotebook = notebook == null
         ? null
-        : jsonEncode(_encodeSyncNotebook(notebook));
+        : _encodeSyncNotebook(notebook);
+    final sentNotebook = encodedNotebook == null
+        ? null
+        : jsonEncode(encodedNotebook);
+    final baseCreatedAt = _bases[uid]?['createdAt'];
+    if (encodedNotebook != null &&
+        baseCreatedAt is String &&
+        DateTime.parse(baseCreatedAt).isAtSameMomentAs(notebook!.createdAt)) {
+      // Shared editing treats createdAt as immutable, including its spelling.
+      encodedNotebook['createdAt'] = baseCreatedAt;
+    }
     final expectedRevision = _revisions[uid] ?? 0;
     if (notebook == null && expectedRevision == 0) {
       _pending.remove(uid);
@@ -324,7 +342,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
               '/v1/sync/notebooks/${Uri.encodeComponent(uid)}',
               {
                 'expectedRevision': expectedRevision,
-                'notebook': _encodeSyncNotebook(notebook),
+                'notebook': encodedNotebook,
                 if (_bases[uid] case final Map<String, dynamic> base)
                   'baseNotebook': base,
               },
@@ -335,7 +353,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (result['notebook'] case final Map<String, dynamic> merged) {
         _bases[uid] = merged;
       } else if (notebook != null) {
-        _bases[uid] = _encodeSyncNotebook(notebook);
+        _bases[uid] = encodedNotebook!;
       } else {
         _bases.remove(uid);
       }
@@ -345,11 +363,10 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           : jsonEncode(_encodeSyncNotebook(current));
       if (currentNotebook == sentNotebook) {
         if (result['notebook'] case final Map<String, dynamic> merged) {
-          if (jsonEncode(_normalizePortableImagePaths(merged)) !=
-              sentNotebook) {
-            final authoritative = repository
-                .decodeBackupStrict([merged])
-                .single;
+          if (jsonEncode(_normalizeSyncNotebook(merged)) != sentNotebook) {
+            final authoritative = repository.decodeBackupStrict([
+              merged,
+            ]).single;
             await _applyRemoteImports([authoritative]);
           }
         }
@@ -367,13 +384,10 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       final record = _decodeRemoteRecord(conflict);
       _revisions[uid] = record.revision;
       if (record.notebook != null) {
-        _bases[uid] = _encodeSyncNotebook(record.notebook!);
+        _bases[uid] = record.baseNotebook!;
       }
       if (!record.deleted && record.notebook != null) {
-        await _applyRemoteImports(
-          [record.notebook!],
-          preserveLocalUids: {uid},
-        );
+        await _applyRemoteImports([record.notebook!], preserveLocalUids: {uid});
       }
       _pending.remove(uid);
       _idempotencyKeys.remove(uid);
@@ -435,9 +449,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         if (record.deleted || record.notebook == null) {
           _bases.remove(record.uid);
         } else {
-          _bases[record.uid] = _encodeSyncNotebook(
-            record.notebook!,
-          );
+          _bases[record.uid] = record.baseNotebook!;
         }
       }
       if (imports.isNotEmpty) {
@@ -465,11 +477,10 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         if (existing != null && _sameNotebook(existing, notebook)) {
           continue;
         }
-        if (existing != null &&
-            preserveLocalUids.contains(notebook.uid)) {
+        if (existing != null && preserveLocalUids.contains(notebook.uid)) {
           // Preserve concurrent local edits without replacing the
           // authoritative document's UID or folder.
-          final preserved = _conflictCopy(existing, 'this device');
+          final preserved = await _conflictCopy(existing);
           await repository.importNotebooksAtomically([preserved]);
           _pending.add(preserved.uid);
           _idempotencyKeys[preserved.uid] = const Uuid().v4();
@@ -559,18 +570,21 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       throw const FormatException('Malformed remote notebook record.');
     }
     Notebook? notebook;
+    Map<String, dynamic>? baseNotebook;
     if (!deleted) {
       final encoded = json['notebook'];
       if (encoded is! Map<String, dynamic>) {
         throw const FormatException('Remote notebook content is missing.');
       }
       notebook = repository.decodeBackupStrict([encoded]).single;
+      baseNotebook = encoded;
     }
     return _RemoteNotebookRecord(
       uid: uid,
       revision: revision.toInt(),
       deleted: deleted,
       notebook: notebook,
+      baseNotebook: baseNotebook,
     );
   }
 
@@ -587,18 +601,28 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// Prevents absolute image paths from leaking between devices and from
   /// producing false conflicts when native imports relocate image files.
   Map<String, dynamic> _encodeSyncNotebook(Notebook notebook) =>
-      _normalizePortableImagePaths(
-        NotebookRepository.encodeNotebook(notebook),
-      );
+      _normalizeSyncNotebook(NotebookRepository.encodeNotebook(notebook));
 
-  static Map<String, dynamic> _normalizePortableImagePaths(
+  static Map<String, dynamic> _normalizeSyncNotebook(
     Map<String, dynamic> encoded,
   ) {
+    // Keep the authenticated base snapshot intact for server verification.
+    encoded = Map<String, dynamic>.of(encoded);
+    // SQLite returns local DateTimes; wire comparisons must use one zone.
+    for (final key in ['createdAt', 'updatedAt']) {
+      final value = encoded[key];
+      if (value is String) {
+        encoded[key] = DateTime.parse(value).toUtc().toIso8601String();
+      }
+    }
     final pages = encoded['pages'];
     if (pages is! List<dynamic>) {
       return encoded;
     }
+    final normalizedPages = <dynamic>[];
+    encoded['pages'] = normalizedPages;
     for (final page in pages) {
+      normalizedPages.add(page);
       if (page is! Map<String, dynamic>) {
         continue;
       }
@@ -606,11 +630,18 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (images is! List<dynamic>) {
         continue;
       }
+      final normalizedImages = <dynamic>[];
+      normalizedPages[normalizedPages.length - 1] = {
+        ...page,
+        'imageBlocks': normalizedImages,
+      };
       for (final image in images) {
         if (image is Map<String, dynamic> &&
             image['bytes'] is String &&
             (image['bytes'] as String).isNotEmpty) {
-          image['path'] = '';
+          normalizedImages.add({...image, 'path': ''});
+        } else {
+          normalizedImages.add(image);
         }
       }
     }
@@ -622,32 +653,14 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         jsonEncode(_encodeSyncNotebook(second));
   }
 
-  Notebook _conflictCopy(Notebook source, String origin) {
-    final now = DateTime.now().toUtc();
-    return source.copyWith(
-      uid: const Uuid().v4(),
-      title: '${source.title} (Conflict from $origin)',
-      createdAt: now,
-      updatedAt: now,
-      pages: [
-        for (final page in source.pages)
-          page.copyWith(
-            id: const Uuid().v4(),
-            textBlocks: [
-              for (final block in page.textBlocks)
-                block.copyWith(id: const Uuid().v4()),
-            ],
-            imageBlocks: [
-              for (final block in page.imageBlocks)
-                block.copyWith(id: const Uuid().v4()),
-            ],
-            inkStrokes: [
-              for (final stroke in page.inkStrokes)
-                stroke.copyWith(id: const Uuid().v4()),
-            ],
-          ),
-      ],
-    );
+  Future<Notebook> _conflictCopy(
+    Notebook source, {
+    Iterable<Notebook> reserved = const [],
+  }) async {
+    return numberedNotebookCopy(source, [
+      ...await repository.fetchNotebooks(),
+      ...reserved,
+    ]);
   }
 
   String _stateKey(String id) {
@@ -756,10 +769,12 @@ class _RemoteNotebookRecord {
     required this.revision,
     required this.deleted,
     required this.notebook,
+    required this.baseNotebook,
   });
 
   final String uid;
   final int revision;
   final bool deleted;
   final Notebook? notebook;
+  final Map<String, dynamic>? baseNotebook;
 }

@@ -12,8 +12,12 @@ offline również po zalogowaniu.
 - Konto powstaje dopiero po jawnym logowaniu. Na Linuxie, Web, Androidzie
   i iOS aplikacja automatycznie uruchamia bezpieczne scalanie `mergeSafely`,
   odtwarzając najpierw brakujące dane ze zweryfikowanego backupu.
-- Odtwarzanie backupu nigdy nie zastępuje istniejącego notatnika;
-  pierwszeństwo nad nim mają zdarzenia synchronizacji i tombstones.
+- Odtwarzanie backupu dołącza brakujące notatniki, pomija identyczne,
+  a odmienną wersję zachowuje w tym samym folderze z pierwszym wolnym
+  numerem `(1)`, `(2)` itd. Kopia ma nowe UID i ID wszystkich obiektów.
+  Nie zastępuje istniejącego notatnika; pierwszeństwo nad backupem mają
+  zdarzenia synchronizacji i tombstones. Foldery są łączone, a zadania
+  konfliktowego planera trafiają pod UID jego kopii.
 - Scheduler backupu włącza się dopiero po inicjalizacji konta i sync.
   Po wylogowaniu aplikacja zatrzymuje sync i backup przed wyczyszczeniem sesji.
 - `account_profile.json` przechowuje ukończenie onboardingu,
@@ -148,6 +152,9 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
    wywołuje `finalize`.
 4. Serwer ponownie sprawdza rozmiar, SHA-256, format, urządzenie i checksumę
    payloadu; dopiero potem wykonuje atomowy rename i ustawia `verified`.
+   Klient przy odzyskiwaniu sprawdza oryginalne bajty payloadu, ponieważ
+   ponowne kodowanie JSON w innym środowisku może zmienić zapis liczb.
+   Starszy wariant checksumy kompaktowego JSON pozostaje obsługiwany.
 5. Błąd nie usuwa wcześniejszego poprawnego snapshotu. Scheduler ponawia próbę
    nie wcześniej niż po 5 minutach. Zmieniony snapshot wysyła po ustalonym
    okresie bezczynności (domyślnie 2 minuty, zakres 30 s–30 min); aktywny
@@ -185,6 +192,11 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 - Na wszystkich platformach po wznowieniu aplikacji i zapasowo co 45 sekund
   (10 sekund po błędzie) weryfikuje zmiany przez REST. Ścieżki obrazów
   przesyłanych przez konto są neutralne względem systemu plików urządzenia.
+- Daty `createdAt` i `updatedAt` w protokole sync są normalizowane do UTC;
+  lokalna strefa zwrócona przez SQLite nie oznacza zmiany dokumentu.
+  Bazowy snapshot pozostaje identyczny z odpowiedzią serwera. Jeśli data
+  utworzenia się nie zmienia, PUT zachowuje jej oryginalny zapis, aby
+  nie naruszyć ochrony niezmiennych metadanych współdzielonego dokumentu.
 - Feed jest stronicowany po 500 zdarzeń; klient pobiera wszystkie pełne
   strony, zanim zacznie wysyłać lokalny outbox.
 

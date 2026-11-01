@@ -16,103 +16,97 @@ void main() {
     textStorageWriteOverride = null;
   });
 
-  test('account settings transfer across devices with safe revisions',
-      () async {
-    final remote = <String, Map<String, dynamic>>{};
-    var writes = 0;
+  test(
+    'account settings transfer across devices with safe revisions',
+    () async {
+      final remote = <String, Map<String, dynamic>>{};
+      var writes = 0;
 
-    ApiClient buildClient() => ApiClient(
-          baseUri: Uri.parse('https://api.example.com'),
-          httpClient: MockClient((request) async {
-            if (request.method == 'GET' &&
-                request.url.path == '/v1/account-settings') {
-              return http.Response(jsonEncode({'settings': remote}), 200);
-            }
-            if (request.method == 'PUT' &&
-                request.url.path.startsWith('/v1/account-settings/')) {
-              final category = request.url.pathSegments.last;
-              final payload = jsonDecode(request.body) as Map<String, dynamic>;
-              final current = remote[category];
-              final revision = current?['revision'] as int? ?? 0;
-              if (payload['expectedRevision'] != revision) {
-                return http.Response(
-                  jsonEncode({'detail': {
-                    'revision': revision,
-                    'value': current?['value'],
-                  }}),
-                  409,
-                );
-              }
-              writes++;
-              final value = payload['value'];
-              remote[category] = {
-                'revision': revision + 1,
-                'value': value,
-              };
+      ApiClient buildClient() => ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/v1/account-settings') {
+            return http.Response(jsonEncode({'settings': remote}), 200);
+          }
+          if (request.method == 'PUT' &&
+              request.url.path.startsWith('/v1/account-settings/')) {
+            final category = request.url.pathSegments.last;
+            final payload = jsonDecode(request.body) as Map<String, dynamic>;
+            final current = remote[category];
+            final revision = current?['revision'] as int? ?? 0;
+            if (payload['expectedRevision'] != revision) {
               return http.Response(
-                jsonEncode(remote[category]),
-                200,
+                jsonEncode({
+                  'detail': {'revision': revision, 'value': current?['value']},
+                }),
+                409,
               );
             }
-            fail('Unexpected request: ' + request.url.toString());
-          }),
-        )..setAccessToken('valid');
+            writes++;
+            final value = payload['value'];
+            remote[category] = {'revision': revision + 1, 'value': value};
+            return http.Response(jsonEncode(remote[category]), 200);
+          }
+          fail('Unexpected request: ${request.url}');
+        }),
+      )..setAccessToken('valid');
 
-    final firstFiles = <String, String>{
-      'app_prefs.json': '{"darkMode":true,"uiScale":1.25}',
-      'shared_recent_colors.json': '[4278190080]',
-      'editor_prefs.json': '{"penSize":3}',
-    };
-    textStorageReadOverride = (key) async => firstFiles[key];
-    textStorageWriteOverride = (key, value) async => firstFiles[key] = value;
-    final firstClient = buildClient();
-    addTearDown(firstClient.close);
-    final firstSession = AccountSessionController(firstClient)
-      ..mode = AccountDataMode.account
-      ..userId = 'account-a';
-    addTearDown(firstSession.dispose);
-    final first = AccountSettingsSyncService(
-      apiClient: firstClient,
-      session: firstSession,
-    );
-    await first.syncNow();
-    expect(writes, 3);
-    expect(remote['appPreferences']!['value']['darkMode'], true);
+      final firstFiles = <String, String>{
+        'app_prefs.json': '{"darkMode":true,"uiScale":1.25}',
+        'shared_recent_colors.json': '[4278190080]',
+        'editor_prefs.json': '{"penSize":3}',
+      };
+      textStorageReadOverride = (key) async => firstFiles[key];
+      textStorageWriteOverride = (key, value) async => firstFiles[key] = value;
+      final firstClient = buildClient();
+      addTearDown(firstClient.close);
+      final firstSession = AccountSessionController(firstClient)
+        ..mode = AccountDataMode.account
+        ..userId = 'account-a';
+      addTearDown(firstSession.dispose);
+      final first = AccountSettingsSyncService(
+        apiClient: firstClient,
+        session: firstSession,
+      );
+      await first.syncNow();
+      expect(writes, 3);
+      expect(remote['appPreferences']!['value']['darkMode'], true);
 
-    final secondFiles = <String, String>{};
-    textStorageReadOverride = (key) async => secondFiles[key];
-    textStorageWriteOverride = (key, value) async => secondFiles[key] = value;
-    final secondClient = buildClient();
-    addTearDown(secondClient.close);
-    final secondSession = AccountSessionController(secondClient)
-      ..mode = AccountDataMode.account
-      ..userId = 'account-a';
-    addTearDown(secondSession.dispose);
-    var remoteApplied = 0;
-    final second = AccountSettingsSyncService(
-      apiClient: secondClient,
-      session: secondSession,
-      onRemoteApplied: () async {
-        remoteApplied++;
-      },
-    );
-    await second.syncNow();
-    expect(remoteApplied, 1);
-    expect(jsonDecode(secondFiles['app_prefs.json']!)['darkMode'], true);
-    expect(jsonDecode(secondFiles['shared_recent_colors.json']!), [4278190080]);
-    expect(writes, 3);
+      final secondFiles = <String, String>{};
+      textStorageReadOverride = (key) async => secondFiles[key];
+      textStorageWriteOverride = (key, value) async => secondFiles[key] = value;
+      final secondClient = buildClient();
+      addTearDown(secondClient.close);
+      final secondSession = AccountSessionController(secondClient)
+        ..mode = AccountDataMode.account
+        ..userId = 'account-a';
+      addTearDown(secondSession.dispose);
+      var remoteApplied = 0;
+      final second = AccountSettingsSyncService(
+        apiClient: secondClient,
+        session: secondSession,
+        onRemoteApplied: () async {
+          remoteApplied++;
+        },
+      );
+      await second.syncNow();
+      expect(remoteApplied, 1);
+      expect(jsonDecode(secondFiles['app_prefs.json']!)['darkMode'], true);
+      expect(jsonDecode(secondFiles['shared_recent_colors.json']!), [
+        4278190080,
+      ]);
+      expect(writes, 3);
 
-    secondFiles['app_prefs.json'] =
-        '{"darkMode":false,"uiScale":1.25}';
-    await second.syncNow();
-    expect(remote['appPreferences']!['revision'], 2);
-    expect(remote['appPreferences']!['value']['darkMode'], false);
-  });
+      secondFiles['app_prefs.json'] = '{"darkMode":false,"uiScale":1.25}';
+      await second.syncNow();
+      expect(remote['appPreferences']!['revision'], 2);
+      expect(remote['appPreferences']!['value']['darkMode'], false);
+    },
+  );
 
   test('accepted update survives a lost client response', () async {
-    final stored = <String, String>{
-      'app_prefs.json': '{"darkMode":true}',
-    };
+    final stored = <String, String>{'app_prefs.json': '{"darkMode":true}'};
     textStorageReadOverride = (key) async => stored[key];
     textStorageWriteOverride = (key, value) async => stored[key] = value;
     var serverRevision = 0;
@@ -122,24 +116,27 @@ void main() {
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
         if (request.method == 'GET') {
-          return http.Response(jsonEncode({
-            'settings': {
-              if (serverRevision > 0)
-                'appPreferences': {
-                  'revision': serverRevision,
-                  'value': serverValue,
-                },
-            },
-          }), 200);
+          return http.Response(
+            jsonEncode({
+              'settings': {
+                if (serverRevision > 0)
+                  'appPreferences': {
+                    'revision': serverRevision,
+                    'value': serverValue,
+                  },
+              },
+            }),
+            200,
+          );
         }
         writes++;
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         serverValue = body['value'];
         serverRevision++;
-        return http.Response(jsonEncode({
-          'revision': serverRevision,
-          'value': serverValue,
-        }), 200);
+        return http.Response(
+          jsonEncode({'revision': serverRevision, 'value': serverValue}),
+          200,
+        );
       }),
     )..setAccessToken('valid');
     addTearDown(client.close);
@@ -162,11 +159,8 @@ void main() {
     expect(writes, 1);
   });
 
-  test('simultaneous edits never silently overwrite another device',
-      () async {
-    final files = <String, String>{
-      'app_prefs.json': '{"darkMode":true}',
-    };
+  test('simultaneous edits never silently overwrite another device', () async {
+    final files = <String, String>{'app_prefs.json': '{"darkMode":true}'};
     textStorageReadOverride = (key) async => files[key];
     textStorageWriteOverride = (key, value) async => files[key] = value;
     var remoteRevision = 1;
@@ -176,17 +170,20 @@ void main() {
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
         if (request.method == 'GET') {
-          return http.Response(jsonEncode({
-            'settings': {
-              'appPreferences': {
-                'revision': remoteRevision,
-                'value': {
-                  'darkMode': remoteDarkMode,
-                  if (remoteRevision > 1) 'uiScale': 1.25,
+          return http.Response(
+            jsonEncode({
+              'settings': {
+                'appPreferences': {
+                  'revision': remoteRevision,
+                  'value': {
+                    'darkMode': remoteDarkMode,
+                    if (remoteRevision > 1) 'uiScale': 1.25,
+                  },
                 },
               },
-            },
-          }), 200);
+            }),
+            200,
+          );
         }
         writes++;
         return http.Response('', 409);

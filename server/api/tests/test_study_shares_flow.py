@@ -155,9 +155,9 @@ def environment(monkeypatch, tmp_path):
         shares.publish_limiter._entries.clear()
 
 
-def create(client):
+def create(client, document_uid=NOTE_UID):
     return client.post("/v1/study-shares", json={
-        "documentUid": NOTE_UID, "title": "Spoofed title",
+        "documentUid": document_uid, "title": "Spoofed title",
         "password": PASSWORD,
     })
 
@@ -258,9 +258,17 @@ def test_password_ticket_and_private_frame(environment):
 
 
 def test_ticket_cannot_open_another_share(environment):
-    client, _, _, _ = environment
+    client, db, _, _ = environment
     first = create(client).json()["id"]
-    second = create(client).json()["id"]
+    other_uid = "another-notebook"
+    db.notebooks.append(SyncedNotebook(
+        id=uuid.uuid4(), owner_id=OWNER_ID, uid=other_uid,
+        content={"uid": other_uid, "kind": 0, "title": "Another notebook"},
+        revision=1, deleted_at=None,
+    ))
+    response = create(client, other_uid)
+    assert response.status_code == 201, response.text
+    second = response.json()["id"]
     ticket = join(client, first).json()["ticket"]
     response = client.get(f"/v1/study-shares/{second}/frame", headers={
         "Authorization": f"Bearer {ticket}",
@@ -296,7 +304,9 @@ def test_other_account_cannot_manage_share(environment):
         "Content-Type": "image/png",
     }).status_code == 404
     assert client.post(root + "/extend", json={}).status_code == 404
-    assert client.request("DELETE", root, content=b"").status_code == 404
+    assert client.request(
+        "DELETE", root, content=b"", headers={"Content-Length": "0"},
+    ).status_code == 404
     assert db.shares[uuid.UUID(share_id)].revoked_at is None
 
 
@@ -345,7 +355,9 @@ def test_end_revokes_guest_but_preserves_original_document(environment):
         "Content-Type": "image/png",
     }).status_code == 204
     assert (folder / f"{share_id}.png").exists()
-    assert client.request("DELETE", root, content=b"").status_code == 204
+    assert client.request(
+        "DELETE", root, content=b"", headers={"Content-Length": "0"},
+    ).status_code == 204
     assert not (folder / f"{share_id}.png").exists()
     assert db.notebooks[0].uid == NOTE_UID
     assert db.shares[uuid.UUID(share_id)].revoked_at is not None
@@ -415,7 +427,8 @@ def test_websocket_receives_end_event_before_revocation(environment):
         websocket.send_json({"type": "authenticate", "ticket": ticket})
         assert websocket.receive_json()["type"] == "authenticated"
         assert client.request(
-            "DELETE", f"/v1/study-shares/{share_id}", content=b""
+            "DELETE", f"/v1/study-shares/{share_id}", content=b"",
+            headers={"Content-Length": "0"},
         ).status_code == 204
         assert websocket.receive_json() == {"type": "ended"}
 
@@ -565,7 +578,8 @@ def test_guest_can_edit_original_and_is_revoked_on_end(environment):
     assert len(db.events) == 1
 
     assert client.request(
-        "DELETE", f"/v1/study-shares/{share_id}", content=b""
+        "DELETE", f"/v1/study-shares/{share_id}", content=b"",
+        headers={"Content-Length": "0"},
     ).status_code == 204
     assert client.get(url, headers=bearer).status_code == 410
     assert client.put(url, headers=bearer, json={

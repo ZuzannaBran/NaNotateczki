@@ -360,7 +360,8 @@ class NotebookRepository {
                   (existingAt == null || trackedAt.isAfter(existingAt))
               ? trackedAt
               : existingAt;
-          if (!verifiedRemoteSync && latestAt != null &&
+          if (!verifiedRemoteSync &&
+              latestAt != null &&
               latestAt.isAfter(notebook.updatedAt)) {
             throw StateError(
               'Import target changed while import was running: '

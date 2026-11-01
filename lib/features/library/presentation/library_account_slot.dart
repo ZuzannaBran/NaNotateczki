@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -133,9 +132,7 @@ class LibraryAccountSlot extends StatelessWidget {
     if (liveSyncAvailable && sync.isStarted) {
       return sync.hasPendingChanges ? 'Syncing changes' : 'Live sync active';
     }
-    return backup.isEnabled
-        ? 'Remote backup enabled'
-        : 'Connecting to account';
+    return backup.isEnabled ? 'Remote backup enabled' : 'Connecting to account';
   }
 
   String _relativeTime(DateTime value, DateTime now) {

@@ -177,7 +177,7 @@ void main() {
               ),
               ChangeNotifierProvider<LiveWebSyncService>.value(value: sync),
             ],
-            child: const LibraryScreen(liveSyncAvailable: true),
+            child: const LibraryScreen(),
           ),
         ),
       );
@@ -359,7 +359,9 @@ void main() {
       await tester.pump();
 
       expect(session.isSignedIn, isTrue);
-      expect(backup.isEnabled, isTrue);
+      expect(backup.isEnabled, isFalse);
+      backup.enableForSignedInAccount();
+      await tester.pump();
       tester
           .widget<OutlinedButton>(
             find.descendant(

@@ -82,9 +82,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       SharedRecentColors.revision.removeListener(scheduler.markDirty);
       scheduler.removeListener(_onBackupDelayChanged);
     }
-    SharedRecentColors.revision.removeListener(
-      _scheduleAccountSettingsSync,
-    );
+    SharedRecentColors.revision.removeListener(_scheduleAccountSettingsSync);
     _preferences?.removeListener(_scheduleAccountSettingsSync);
     _libraryController?.dispose();
     _preferences?.dispose();
@@ -394,13 +392,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (newAccountSession) {
           preferences.addListener(remoteBackupScheduler.markDirty);
           preferences.addListener(_scheduleAccountSettingsSync);
-          SharedRecentColors.revision.addListener(
-            _scheduleAccountSettingsSync,
-          );
+          SharedRecentColors.revision.addListener(_scheduleAccountSettingsSync);
           remoteBackupScheduler.addListener(_onBackupDelayChanged);
-          planner.savedRevision.addListener(
-            remoteBackupScheduler.markDirty,
-          );
+          planner.savedRevision.addListener(remoteBackupScheduler.markDirty);
           SharedRecentColors.revision.addListener(
             remoteBackupScheduler.markDirty,
           );
@@ -414,11 +408,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               _accountSettingsSync?.stop();
             }
           });
-          unawaited(accountSession.loadProfile().then((_) {
-            if (mounted) {
-              return _startAccountSync();
-            }
-          }));
+          unawaited(
+            accountSession.loadProfile().then((_) {
+              if (mounted) {
+                return _startAccountSync();
+              }
+            }),
+          );
         }
 
         return MultiProvider(

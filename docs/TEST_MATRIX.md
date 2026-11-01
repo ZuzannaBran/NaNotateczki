@@ -789,6 +789,33 @@ Manual scenario (Linux first; repeat on Windows/macOS, Chrome, Android/iOS):
 
 ## Server backup and two-browser synchronization
 
+Local verification after merging `origin/dev` on 2026-11-01:
+
+- `dart format lib test`: clean; `dart analyze`: no issues.
+- `flutter test`: 486 passed on the local Dart VM after the final merge,
+  checksum, numbered-copy and share-routing fixes.
+- Chrome: 14 passed across `api_client_test`, `shared_edit_conflicts_test`,
+  `study_share_guest_outbox_test` and `study_share_web_assets_test`.
+  Additional scoped Chrome runs: 3 account-settings tests and 4 original
+  payload / numbered-copy tests passed.
+- `python -m pytest -q api/tests` from `server/`: 83 passed.
+  SQL queries are isolated by test fixtures; this is not a PostgreSQL run.
+- Regression coverage includes UTC/local timestamp equality, unchanged
+  historical base snapshots, invalid backup IDs, one-time recovery,
+  preservation of local preferences/work and sync-history precedence.
+  Owner and guest writes preserve the spelling of an unchanged creation
+  timestamp required by the shared-document metadata guard.
+  Backup tests also verify numeric JSON spelling, numbered copies uploaded
+  to the account and preservation of the copied planner's task list.
+- `web_share_routing_test.dart` checks the packaged rewrite rule; it does
+  not prove the production deployment has applied it. The public share
+  URL returned HTTP 404 while the root returned 200 during diagnosis.
+  Deployment and acceptance instructions: `DEPLOY_CURRENT_RELEASE_PL.md`.
+
+Real cross-device login/restart, PostgreSQL transactions and production
+HTTPS/WSS remain manual acceptance checks below. Docker is unavailable in
+the local verification environment; no production data was changed.
+
 Automated local tests cover the app-data migration, HTTPS-only API
 configuration, authentication headers, complete backup v2, checksum handling,
 Argon2/JWT primitives, paginated reconciliation, concurrent backup dirtiness,
@@ -798,9 +825,13 @@ manually:
 
 1. Create accounts A and B. Confirm that B receives 404/403 for every
    notebook, device, snapshot and download identifier belonging to A.
-2. Open the same account in two separate Chrome profiles. Select an explicit
-   initial policy, edit A and confirm B updates without reload. Repeat after
+2. Open the same account in two separate Chrome profiles. Confirm automatic
+   safe recovery and synchronization, edit A and confirm B updates without reload. Repeat after
    disabling Wi-Fi, sleeping the tab, restarting API and letting JWT expire.
+   Repeat between native Linux and a fresh browser profile. Existing local
+   work and preferences must remain intact; a tombstone must not resurrect
+   an old UID from a backup. If automatic startup fails, verify the visible
+   error and use the explicit policies only as recovery controls.
 3. Edit the same document on both devices while offline. Confirm a `409`
    creates a visible conflict copy and neither version disappears.
 4. Delete an uploaded document and a never-uploaded document. Confirm only the

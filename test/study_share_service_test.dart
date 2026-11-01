@@ -62,6 +62,15 @@ void main() {
 
     await tester.tap(find.text('Open sharing'));
     await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Everyone with the link and password can edit'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Only you can edit'), findsNothing);
+    expect(
+      find.textContaining("saved in the host's original document."),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Create link'));
     await tester.pump();
@@ -71,11 +80,6 @@ void main() {
     await tester.enterText(find.byType(TextField), 'x');
     await tester.tap(find.text('Create link'));
     await tester.pumpAndSettle();
-    expect(
-      find.textContaining('Everyone with the link and password can edit'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('Only you can edit'), findsNothing);
 
     expect(service.createdPassword, 'x');
     expect(find.text('Invitation link'), findsOneWidget);
@@ -117,6 +121,5 @@ class _RecordingStudyShareService implements StudyShareService {
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

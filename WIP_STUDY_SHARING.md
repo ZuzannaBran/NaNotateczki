@@ -148,3 +148,22 @@ nadpisania; bez trwałego outboxu wciąż nie ma odzyskiwania po zamknięciu.
 
 - URI SQLite WASM w edytorze gościa rozwiązywane jest od korzenia originu,
   niezależnie od ścieżki /share/UUID i parametrów zaproszenia.
+
+## Lokalna weryfikacja po scaleniu origin/dev (2026-11-01)
+
+Uruchomiono formatowanie i analizę (bez zgłoszeń), pełny zestaw Flutter
+(486 testów), kontrakty backendu (83 testy) i wybrane testy klienta w Chrome
+(wcześniej 14, dodatkowo 3 ustawień i 4 checksum/kopii). Naprawiono błędy
+składni odtwarzania backupu i dialogu oraz
+ujednolicono daty porównań synchronizacji do UTC, zachowując dokładną bazę
+historyczną i niezmieniony zapis daty utworzenia przy edycji.
+
+Kolejne poprawki sprawdzają oryginalne bajty payloadu zamiast ponownego
+kodowania JSON, zachowują konflikty pod nazwami `(1)`, `(2)` w tym samym
+folderze i wysyłają obie wersje na konto. Dodano `_redirects` do paczki
+web; produkcyjne HTTP 404 dla `/share/UID` wymaga wdrożenia hostingu według
+`docs/DEPLOY_CURRENT_RELEASE_PL.md`.
+
+Nie wykonano wdrożenia ani testu rzeczywistego PostgreSQL i dwóch urządzeń.
+Wyniki lokalne nie zamykają otwartych zadań E2E i nie są podstawą do
+usunięcia oznaczenia WIP. Aktualne scenariusze są w `docs/TEST_MATRIX.md`.

@@ -20,7 +20,7 @@ class PendingStudyShareEdit {
 /// Do not clear it until the server accepts the submitted changes.
 class StudyShareGuestOutbox {
   StudyShareGuestOutbox(String shareId)
-      : _key = 'study_share_guest_outbox_v1_$shareId';
+    : _key = 'study_share_guest_outbox_v1_$shareId';
 
   final String _key;
 
@@ -54,12 +54,15 @@ class StudyShareGuestOutbox {
   }
 
   Future<void> write(PendingStudyShareEdit pending) {
-    return writeStoredText(_key, jsonEncode({
-      'version': 1,
-      'baseRevision': pending.baseRevision,
-      'baseNotebook': pending.baseNotebook,
-      'notebook': pending.notebook,
-    }));
+    return writeStoredText(
+      _key,
+      jsonEncode({
+        'version': 1,
+        'baseRevision': pending.baseRevision,
+        'baseNotebook': pending.baseNotebook,
+        'notebook': pending.notebook,
+      }),
+    );
   }
 
   Future<void> clear() => writeStoredText(_key, '');

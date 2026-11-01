@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -133,9 +134,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
         }
       });
     }
-    if (kIsWeb && accountSession != null && liveSync != null &&
+    if (kIsWeb &&
+        accountSession != null &&
+        liveSync != null &&
         accountSession.isSignedIn &&
-        !_restoringShare && _activeShare == null &&
+        !_restoringShare &&
+        _activeShare == null &&
         _shareRestoredForAccount != accountSession.userId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -606,8 +610,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
     LiveWebSyncService sync,
   ) async {
     final userId = session.userId;
-    if (_restoringShare || userId == null ||
-        _shareRestoredForAccount == userId || !session.isSignedIn) {
+    if (_restoringShare ||
+        userId == null ||
+        _shareRestoredForAccount == userId ||
+        !session.isSignedIn) {
       return;
     }
     _restoringShare = true;

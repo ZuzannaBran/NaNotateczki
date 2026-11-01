@@ -6,8 +6,12 @@ import 'package:flutter/foundation.dart';
 import '../../core/storage/app_save_coordinator.dart';
 import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
+import '../../features/notebook/domain/notebook.dart';
+import '../../features/notebook/domain/notebook_kind.dart';
 import '../sync/account_session_controller.dart';
 import '../sync/api_client.dart';
+import '../sync/notebook_conflicts.dart';
+import 'backup_payload_bytes.dart';
 
 class RemoteBackupReceipt {
   const RemoteBackupReceipt({
@@ -64,8 +68,9 @@ class RemoteBackupService {
     final editorPreferences = await readStoredText('editor_prefs.json');
     final recentColors = await readStoredText('shared_recent_colors.json');
     final userId = session.userId!;
-    final backupPreferences =
-        await readStoredText(_backupPreferenceKey(userId));
+    final backupPreferences = await readStoredText(
+      _backupPreferenceKey(userId),
+    );
     final payload = <String, dynamic>{
       'notebooks': repository.encodeSelfContainedBackup(notebooks),
       'libraryState': _decodeOptionalObject(libraryState),
@@ -135,17 +140,18 @@ class RemoteBackupService {
     );
   }
 
-
-  /// Imports verified account data only where this installation is empty.
-  /// A populated library is never replaced by a device snapshot.
+  /// Adds missing documents and keeps conflicting versions as numbered copies.
+  /// Account sync history takes precedence over an older device snapshot.
   Future<bool> hydrateFromLatestAccountBackup() async {
     final userId = session.userId;
     if (!session.isSignedIn || userId == null) {
       throw StateError('Account backup recovery requires sign-in.');
     }
-    final hydrationKey = 'account_backup_hydrated_' +
-        sha256.convert(utf8.encode(userId)).toString().substring(0, 16) +
-        '.json';
+    final suffix = sha256
+        .convert(utf8.encode(userId))
+        .toString()
+        .substring(0, 16);
+    final hydrationKey = 'account_backup_hydrated_$suffix.json';
     if (await readStoredText(hydrationKey) != null) {
       return false;
     }
@@ -164,44 +170,7 @@ class RemoteBackupService {
     final expectedHash = latest['sha256'];
     final expectedSize = latest['sizeBytes'];
     if (backupId is! String ||
-        !RegExp(r'^[0-9a-fA-F-]{36}
-    if (value == null || value.trim().isEmpty) {
-      return const <String, dynamic>{};
-    }
-    final decoded = jsonDecode(value);
-    if (decoded is! Map<String, dynamic>) {
-      throw const FormatException('Application state is not a JSON object.');
-    }
-    return decoded;
-  }
-
-  static Map<String, dynamic> _jsonObject(Object? raw) {
-    if (raw is! Map<String, dynamic>) {
-      throw const FormatException('Server returned malformed JSON.');
-    }
-    return raw;
-  }
-}
-
-({String checksum, Uint8List bytes}) _encodeSnapshot(
-  Map<String, dynamic> data,
-) {
-  final payload = data['payload'] as Map<String, dynamic>;
-  final deviceId = data['deviceId'] as String;
-  final checksum = sha256.convert(utf8.encode(jsonEncode(payload))).toString();
-  final envelope = <String, dynamic>{
-    'format': 'nanotateczki-server-backup',
-    'version': RemoteBackupService.formatVersion,
-    'createdAt': DateTime.now().toUtc().toIso8601String(),
-    'deviceId': deviceId,
-    'checksumAlgorithm': 'sha256',
-    'checksum': checksum,
-    'payload': payload,
-  };
-  final bytes = Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
-  return (checksum: checksum, bytes: bytes);
-}
-).hasMatch(backupId) ||
+        !RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(backupId) ||
         expectedHash is! String ||
         expectedSize is! int ||
         expectedSize > maximumSnapshotBytes ||
@@ -228,8 +197,10 @@ class RemoteBackupService {
       throw const FormatException('Unsupported account backup envelope.');
     }
     final payload = _jsonObject(envelope['payload']);
-    final canonical = utf8.encode(jsonEncode(payload));
-    if (sha256.convert(canonical).toString() != envelope['checksum']) {
+    final wireChecksum = sha256.convert(backupPayloadBytes(bytes)).toString();
+    if (wireChecksum != envelope['checksum'] &&
+        sha256.convert(utf8.encode(jsonEncode(payload))).toString() !=
+            envelope['checksum']) {
       throw const FormatException('Account backup payload was modified.');
     }
     final rawNotebooks = payload['notebooks'];
@@ -245,47 +216,110 @@ class RemoteBackupService {
 
     var changed = false;
     final local = await repository.fetchNotebooks();
+    final recoveredUids = <String, String>{};
+    final recoveredLibrary = _jsonObject(payload['libraryState']);
+    final localLibrary = _jsonObject(
+      _decodeOptionalObject(await readStoredText('library_folders.json')),
+    );
     // The sync journal, including tombstones, takes precedence over backup.
     // Replaying a snapshot after a deletion would resurrect old documents.
-    if (local.isEmpty && recoveredNotebooks.isNotEmpty) {
+    if (recoveredNotebooks.isNotEmpty) {
       final bootstrap = _jsonObject(
         (await apiClient.get('/v1/sync/bootstrap')).decodeJson(),
       );
-      if (bootstrap['cursor'] == 0 &&
-          bootstrap['notebooks'] is List<dynamic> &&
-          (bootstrap['notebooks'] as List<dynamic>).isEmpty) {
-        await repository.importNotebooksAtomically(recoveredNotebooks);
-        changed = true;
+      final records = bootstrap['notebooks'];
+      final cursor = bootstrap['cursor'];
+      if (records is! List<dynamic> || cursor is! num) {
+        throw const FormatException('Malformed sync bootstrap response.');
+      }
+      // An empty historic feed may have compacted tombstones; never replay it.
+      if (records.isNotEmpty || cursor == 0) {
+        final authoritative = {
+          for (final raw in records) _jsonObject(raw)['uid']: _jsonObject(raw),
+        };
+        final remoteNotes = repository.decodeBackupStrict([
+          for (final record in authoritative.values)
+            if (record['deleted'] != true) record['notebook'],
+        ]);
+        final remoteByUid = {for (final note in remoteNotes) note.uid: note};
+        final imports = <Notebook>[];
+        for (final recovered in recoveredNotebooks) {
+          if (authoritative[recovered.uid]?['deleted'] == true) {
+            continue;
+          }
+          final existing = local.where((note) => note.uid == recovered.uid);
+          final sameTasks =
+              recovered.kind != NotebookKind.planner ||
+              jsonEncode(_plannerTasks(localLibrary, recovered.uid)) ==
+                  jsonEncode(_plannerTasks(recoveredLibrary, recovered.uid));
+          if (existing.isNotEmpty &&
+              sameTasks &&
+              _sameContent(existing.first, recovered)) {
+            continue;
+          }
+          final remote = remoteByUid[recovered.uid];
+          if (remote != null &&
+              _sameContent(remote, recovered) &&
+              (sameTasks || existing.isEmpty)) {
+            // Sync will supply this document; only missing task state needs recovery.
+            if (existing.isEmpty) {
+              recoveredUids[recovered.uid] = recovered.uid;
+            }
+            continue;
+          }
+          final occupied = [...local, ...remoteNotes, ...imports];
+          final conflicts =
+              existing.isNotEmpty ||
+              remote != null ||
+              occupied.any(
+                (note) =>
+                    note.folder == recovered.folder &&
+                    note.title == recovered.title,
+              );
+          final incoming = conflicts
+              ? numberedNotebookCopy(recovered, occupied)
+              : recovered;
+          imports.add(incoming);
+          recoveredUids[recovered.uid] = incoming.uid;
+        }
+        if (session.userId != userId || !session.isSignedIn) {
+          return false;
+        }
+        if (imports.isNotEmpty) {
+          await repository.importNotebooksAtomically(imports);
+          changed = true;
+        }
       }
     }
-    changed = await _restoreAccountFile(
-          'library_folders.json',
-          payload['libraryState'],
-          allowDefaultFolders: true,
-        ) ||
-        changed;
-    changed = await _restoreAccountFile(
+    changed =
+        await _mergeLibraryState(recoveredLibrary, recoveredUids) || changed;
+    changed =
+        await _restoreAccountFile(
           'study_planner.json',
           payload['studyPlannerState'],
           allowEmptyPlanner: true,
         ) ||
         changed;
-    changed = await _restoreAccountFile(
+    changed =
+        await _restoreAccountFile(
           'app_prefs.json',
           payload['appPreferences'],
         ) ||
         changed;
-    changed = await _restoreAccountFile(
+    changed =
+        await _restoreAccountFile(
           'editor_prefs.json',
           payload['editorPreferences'],
         ) ||
         changed;
-    changed = await _restoreAccountFile(
+    changed =
+        await _restoreAccountFile(
           'shared_recent_colors.json',
           payload['recentColors'],
         ) ||
         changed;
-    changed = await _restoreAccountFile(
+    changed =
+        await _restoreAccountFile(
           _backupPreferenceKey(userId),
           payload['backupPreferences'],
         ) ||
@@ -307,10 +341,77 @@ class RemoteBackupService {
     return 'server_backup_preferences_$suffix.json';
   }
 
+  static Object _plannerTasks(Map<String, dynamic> library, String uid) {
+    final tasks = library['plannerTasks'];
+    return tasks is Map ? tasks[uid] ?? const [] : const [];
+  }
+
+  static Future<bool> _mergeLibraryState(
+    Map<String, dynamic> recovered,
+    Map<String, String> recoveredUids,
+  ) async {
+    if (recovered.isEmpty) {
+      return false;
+    }
+    final current = _jsonObject(
+      _decodeOptionalObject(await readStoredText('library_folders.json')),
+    );
+    final merged = <String, dynamic>{...recovered, ...current};
+    for (final field in ['folders', 'recentCoverColors']) {
+      if (recovered[field] is List) {
+        merged[field] = {
+          if (current[field] is List) ...current[field] as List,
+          ...recovered[field] as List,
+        }.toList();
+      }
+    }
+    if (recovered['covers'] is Map) {
+      merged['covers'] = {
+        ...recovered['covers'] as Map,
+        if (current['covers'] is Map) ...current['covers'] as Map,
+      };
+    }
+    final tasks = <String, dynamic>{
+      if (current['plannerTasks'] is Map)
+        ...Map<String, dynamic>.from(current['plannerTasks'] as Map),
+    };
+    for (final entry in recoveredUids.entries) {
+      if (!tasks.containsKey(entry.value)) {
+        tasks[entry.value] = _plannerTasks(recovered, entry.key);
+      }
+    }
+    if (current['plannerTasks'] is Map || recovered['plannerTasks'] is Map) {
+      merged['plannerTasks'] = tasks;
+    }
+    if (jsonEncode(merged) == jsonEncode(current)) {
+      return false;
+    }
+    await writeStoredText('library_folders.json', jsonEncode(merged));
+    return true;
+  }
+
+  static bool _sameContent(Notebook left, Notebook right) {
+    Map<String, dynamic> comparable(Notebook note) {
+      final encoded = NotebookRepository.encodeNotebook(note)
+        ..remove('createdAt')
+        ..remove('updatedAt');
+      for (final page in encoded['pages'] as List) {
+        for (final image in page['imageBlocks'] as List) {
+          if (image['bytes'] is String &&
+              (image['bytes'] as String).isNotEmpty) {
+            image['path'] = '';
+          }
+        }
+      }
+      return encoded;
+    }
+
+    return jsonEncode(comparable(left)) == jsonEncode(comparable(right));
+  }
+
   static List<int> _decodeRecentColors(String raw) {
     final decoded = jsonDecode(raw);
-    if (decoded is! List<dynamic> ||
-        decoded.any((item) => item is! int)) {
+    if (decoded is! List<dynamic> || decoded.any((item) => item is! int)) {
       throw const FormatException('Invalid recent color history.');
     }
     return decoded.cast<int>().take(12).toList();
