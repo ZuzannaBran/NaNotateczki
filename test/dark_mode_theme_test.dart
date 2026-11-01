@@ -43,7 +43,7 @@ void main() {
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {
       expect(theme.textTheme.bodyMedium?.fontFamily, 'Georgia');
       expect(theme.textTheme.titleMedium?.fontFamily, 'Georgia');
-      expect(theme.fontFamily, 'Georgia');
+      expect(theme.primaryTextTheme.bodyMedium?.fontFamily, 'Georgia');
     }
   });
 

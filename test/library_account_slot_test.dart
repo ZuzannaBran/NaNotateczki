@@ -122,9 +122,14 @@ void main() {
         find.widgetWithText(TextButton, 'Back'),
       );
       expect(
-        tester.widget<TextFormField>(
-          find.byKey(const ValueKey('account-password')),
-        ).obscureText,
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: find.byKey(const ValueKey('account-password')),
+                matching: find.byType(EditableText),
+              ),
+            )
+            .obscureText,
         isTrue,
       );
       await tester.tap(
@@ -132,9 +137,14 @@ void main() {
       );
       await tester.pump();
       expect(
-        tester.widget<TextFormField>(
-          find.byKey(const ValueKey('account-password')),
-        ).obscureText,
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: find.byKey(const ValueKey('account-password')),
+                matching: find.byType(EditableText),
+              ),
+            )
+            .obscureText,
         isFalse,
       );
       await tester.tap(
@@ -477,8 +487,13 @@ void main() {
     expect(find.text('Zuzanna'), findsOneWidget);
     expect(find.text('Z'), findsOneWidget);
     final sidebarAvatar = find.byKey(const ValueKey('account-avatar'));
+    final sidebarAvatarContainer = find.descendant(
+      of: sidebarAvatar,
+      matching: find.byType(Container),
+    );
     final sidebarDecoration =
-        tester.widget<Container>(sidebarAvatar).decoration! as BoxDecoration;
+        tester.widget<Container>(sidebarAvatarContainer).decoration!
+            as BoxDecoration;
     expect(sidebarDecoration.shape, BoxShape.circle);
     expect(sidebarDecoration.border, isNotNull);
     expect(tester.getSize(sidebarAvatar), const Size(32, 32));
@@ -492,8 +507,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('account-settings-button')));
     await tester.pumpAndSettle();
     final dialogAvatar = find.byKey(const ValueKey('account-dialog-avatar'));
+    final dialogAvatarContainer = find.descendant(
+      of: dialogAvatar,
+      matching: find.byType(Container),
+    );
     final dialogDecoration =
-        tester.widget<Container>(dialogAvatar).decoration! as BoxDecoration;
+        tester.widget<Container>(dialogAvatarContainer).decoration!
+            as BoxDecoration;
     expect(dialogDecoration.shape, BoxShape.circle);
     expect(dialogDecoration.border, isNotNull);
     expect(tester.getSize(dialogAvatar), const Size(40, 40));

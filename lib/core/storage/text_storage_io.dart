@@ -5,40 +5,56 @@ import 'app_data_directory.dart';
 
 final Map<String, Future<void>> _operationTails = <String, Future<void>>{};
 
-Future<T> _withFileLock<T>(File file, Future<T> Function() action) async {
-  final path = file.absolute.path;
-  final previous = _operationTails[path] ?? Future<void>.value();
+Future<T> _withStorageLock<T>(
+  String key, {
+  required String? directoryPath,
+  required Future<T> Function() action,
+}) async {
+  final operationKey = directoryPath == null
+      ? 'default:$key'
+      : '${Directory(directoryPath).absolute.path}/$key';
+  final previous = _operationTails[operationKey] ?? Future<void>.value();
   final completion = Completer<void>();
-  _operationTails[path] = completion.future;
+  _operationTails[operationKey] = completion.future;
   try {
     await previous;
     return await action();
   } finally {
     completion.complete();
-    if (identical(_operationTails[path], completion.future)) {
-      _operationTails.remove(path);
+    if (identical(_operationTails[operationKey], completion.future)) {
+      _operationTails.remove(operationKey);
     }
   }
 }
 
-Future<String?> readStoredText(String key, {String? directoryPath}) async {
-  final file = await _fileForKey(key, directoryPath: directoryPath);
-  return _withFileLock(file, () async {
-    await _recoverAtomicWrite(file);
-    if (!await file.exists()) {
-      return null;
-    }
-    return file.readAsString();
-  });
+Future<String?> readStoredText(String key, {String? directoryPath}) {
+  return _withStorageLock(
+    key,
+    directoryPath: directoryPath,
+    action: () async {
+      final file = await _fileForKey(key, directoryPath: directoryPath);
+      await _recoverAtomicWrite(file);
+      if (!await file.exists()) {
+        return null;
+      }
+      return file.readAsString();
+    },
+  );
 }
 
 Future<void> writeStoredText(
   String key,
   String value, {
   String? directoryPath,
-}) async {
-  final file = await _fileForKey(key, directoryPath: directoryPath);
-  await _withFileLock(file, () => _atomicWriteString(file, value));
+}) {
+  return _withStorageLock(
+    key,
+    directoryPath: directoryPath,
+    action: () async {
+      final file = await _fileForKey(key, directoryPath: directoryPath);
+      await _atomicWriteString(file, value);
+    },
+  );
 }
 
 Future<void> _atomicWriteString(File file, String content) async {

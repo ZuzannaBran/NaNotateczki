@@ -448,7 +448,7 @@ void main() {
     );
     await tester.tap(find.text('Month'));
     await tester.pumpAndSettle();
-    final target = DateTime(today.year, today.month, 12);
+    final target = DateTime(tue.year, tue.month, 12);
     final targetLabel = find.byKey(
       ValueKey('planner-day-label-${key(target)}'),
     );

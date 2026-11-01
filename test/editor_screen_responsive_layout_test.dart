@@ -313,6 +313,7 @@ void main() {
     expect(scroll.offset, closeTo(scroll.position.maxScrollExtent, 1));
     // The final scroll position must expose the scaled footer and margin.
     await tester.pump();
+    expect(scroll.offset, closeTo(scroll.position.maxScrollExtent, 1));
     final addPageButton = find.widgetWithText(FilledButton, 'Add page');
     final canvasBottom = tester
         .getBottomRight(find.byKey(const ValueKey('notebook-canvas-area')))

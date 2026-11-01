@@ -170,10 +170,11 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   opcjonalne podmiany odczytu/zapisu dla testów oraz możliwość wskazania
   katalogu natywnego (używana przez backup folderów); produkcja używa
   prywatnego katalogu aplikacji.
-- `lib/core/storage/text_storage_io.dart` (92): odczyty i zapisy małych
-  plików współdzielą kolejkę operacji per ścieżka; zapobiega ona
-  usuwaniu aktywnego `.tmp` przez równoległy odczyt backupu. Zapis
-  nadal jest atomowy przez `.tmp`/`.previous` z recovery.
+- `lib/core/storage/text_storage_io.dart` (108): odczyty i zapisy małych
+  plików współdzielą kolejkę operacji per klucz i katalog; operacja trafia
+  do niej przed asynchronicznym rozwiązaniem ścieżki, więc zachowuje kolejność
+  wywołań i zapobiega usuwaniu aktywnego `.tmp` przez równoległy odczyt
+  backupu. Zapis nadal jest atomowy przez `.tmp`/`.previous` z recovery.
 - `lib/core/storage/text_storage_web.dart` (9): odpowiednik w `localStorage`.
   3: `readStoredText`; 7: `writeStoredText`.
 - `lib/core/error/app_error_log.dart` (180): trwały bufor błędów z ostatnich
@@ -597,7 +598,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1844: `_LibraryWorkspace`;
   1955: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (1030 linii)
+### `lib/features/library/presentation/library_account_slot.dart` (1017 linii)
 
 Przestrzenny onboarding `Create account`/`Sign in`/`Try local` z
 wyśrodkowaną nazwą NaNotateczki, podglądem haseł i spójnymi odstępami
@@ -612,10 +613,10 @@ a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
 
 - 12: `showLibraryAccountDialog`; 41: `LibraryAccountSlot`;
   146: `_AccountAvatar`;
-  184: `_AccountDialog`;
-  197: `_AccountDialogState`;
-  839: `_backupNow`;
-  876: `_changePassword`.
+  178: `_AccountDialog`;
+  191: `_AccountDialogState`;
+  827: `_backupNow`;
+  864: `_changePassword`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
@@ -1035,7 +1036,7 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 ## 8. UI edytora
 
-### `lib/features/editor/presentation/editor_screen.dart` (2433 linie)
+### `lib/features/editor/presentation/editor_screen.dart` (2445 linii)
 
 Wielostronicowy edytor notebooka: nagłówek notesu ma 18 px i korzysta z
 aktualnego tytułu przekazanego przez bibliotekę (fallback: kontroler);
@@ -1097,18 +1098,18 @@ obiektu ignoruje wybór. Programowy scroll nie nadpisuje aktywnej strony.
 - 57: `_logicalPageWidth`; 104: `_effectivePageScale` — skala okna pomnożona
   przez zoom użytkownika.
 - 162: synchronizacja strony; 193: nawigacja do klikniętego obszaru.
-- 288–658: gesty pan/zoom, blokada viewportu i transformacje;
+- 300–670: gesty pan/zoom, blokada viewportu i transformacje;
   dotyk aktywnego obrazu nie uruchamia menu kontekstowego canvasa.
-- 880–900: busy overlay, komendy importu/eksportu i clipboard oraz ustawienia.
-- 1031: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
+- 892–912: busy overlay, komendy importu/eksportu i clipboard oraz ustawienia.
+- 1043: `_buildTransformedDocumentLayer` rozkłada warstwy w logicznym
   rozmiarze 820 px przed skalowaniem, żeby viewport nie obcinał prawej
   krawędzi.
-- 1057: główny `build`; pasek tekstu jest renderowany na podstawie
+- 1069: główny `build`; pasek tekstu jest renderowany na podstawie
   aktywnego `TextBlock`, niezależnie od starego `QuillController`; wspólna
   macierz `pageTransform` skaluje dokument.
-- 1611: `_PageViewportClipper`; 1669: `_PageFramePainter`;
-  1744: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
-  2163: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
+- 1623: `_PageViewportClipper`; 1681: `_PageFramePainter`;
+  1756: `_ProjectMiniMapOverlay`; Listener kliknięć minimapy;
+  2175: `_ProjectMiniMapPainter` renderuje wyłącznie zwykły ink.
 
 ### `lib/features/editor/presentation/editor_commands.dart` (172 linie)
 
@@ -1728,7 +1729,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   zamiast wycofanego `kotlinOptions.jvmTarget`.
 - `test/production/storage_crash_recovery_test.dart`: atomiczne pliki
   ustawień: częściowe zapisy `.tmp`, odzyskiwanie `.previous`, błąd I/O
-  i ponowny zapis oraz równoległe write'y jednego klucza.
+  i ponowny zapis oraz równoległe write'y jednego klucza; kontrolowane
+  opóźnienie rozwiązania pierwszej ścieżki pilnuje kolejności wywołań.
 - `test/production/backup_crash_recovery_test.dart`: symulacje awarii
   między rename manifestu, błędu dostępu do katalogu stron i przerwania
   backupu z zachowaniem starego kompletnego snapshotu.

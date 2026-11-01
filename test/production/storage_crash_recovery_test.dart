@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +17,24 @@ class _DocumentsPathProvider extends PathProviderPlatform {
 
   @override
   Future<String?> getApplicationSupportPath() async => supportPath;
+}
+
+class _DelayedFirstSupportPathProvider extends _DocumentsPathProvider {
+  _DelayedFirstSupportPathProvider(super.path);
+
+  final firstRequestStarted = Completer<void>();
+  final releaseFirstRequest = Completer<void>();
+  var supportRequestCount = 0;
+
+  @override
+  Future<String?> getApplicationSupportPath() async {
+    supportRequestCount += 1;
+    if (supportRequestCount == 1) {
+      firstRequestStarted.complete();
+      await releaseFirstRequest.future;
+    }
+    return supportPath;
+  }
 }
 
 void main() {
@@ -68,6 +87,18 @@ void main() {
   });
 
   test('concurrent writes to one key commit in invocation order', () async {
+    final delayedProvider = _DelayedFirstSupportPathProvider(documents.path);
+    PathProviderPlatform.instance = delayedProvider;
+    final firstWrite = writeStoredText('app_prefs.json', 'first');
+    await delayedProvider.firstRequestStarted.future;
+    final secondWrite = writeStoredText('app_prefs.json', 'second');
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(delayedProvider.supportRequestCount, 1);
+    delayedProvider.releaseFirstRequest.complete();
+    await Future.wait([firstWrite, secondWrite]);
+    expect(await readStoredText('app_prefs.json'), 'second');
+
     final writes = List<Future<void>>.generate(
       30,
       (index) => writeStoredText('app_prefs.json', 'value-$index'),

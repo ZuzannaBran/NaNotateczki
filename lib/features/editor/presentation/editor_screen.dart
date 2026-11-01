@@ -61,7 +61,7 @@ class _EditorScreenState extends State<EditorScreen> {
   static const double _topBottomPadding = 22;
   static const double _mainToolbarClearance = 72;
   static const double _addPageButtonGap = 10;
-  static const double _addPageFooterHeight = 56;
+  static const double _addPageFooterHeight = _addPageButtonGap + 48;
   static const double _pageViewportBleed = 20;
   static const double _minPageScaleFactor = 0.25;
   static const double _maxPageScaleFloor = 1.8;
@@ -268,9 +268,21 @@ class _EditorScreenState extends State<EditorScreen> {
       if (!mounted) {
         return;
       }
+      final latestScale = _pageScale
+          .clamp(_pageMinScale, _pageMaxScale)
+          .toDouble();
+      final latestPan = _clampPagePan(
+        scale: latestScale * _responsivePageScale,
+        pan: _pagePan,
+        docWorldSize: docWorldSize,
+        viewportSize: viewportSize,
+      );
+      if (latestScale == _pageScale && latestPan == _pagePan) {
+        return;
+      }
       setState(() {
-        _pageScale = clampedScale;
-        _pagePan = clampedPan;
+        _pageScale = latestScale;
+        _pagePan = latestPan;
       });
     });
   }

@@ -144,11 +144,7 @@ class LibraryAccountSlot extends StatelessWidget {
 }
 
 class _AccountAvatar extends StatelessWidget {
-  const _AccountAvatar({
-    super.key,
-    required this.letter,
-    this.radius = 16,
-  });
+  const _AccountAvatar({super.key, required this.letter, this.radius = 16});
 
   final String letter;
   final double radius;
@@ -163,9 +159,7 @@ class _AccountAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surfaceContainerHigh,
         shape: BoxShape.circle,
-        border: Border.all(
-          color: colors.onSurface.withValues(alpha: 0.18),
-        ),
+        border: Border.all(color: colors.onSurface.withValues(alpha: 0.18)),
       ),
       child: Text(
         letter,
@@ -251,9 +245,7 @@ class _AccountDialogState extends State<_AccountDialog> {
       backgroundColor: colors.surface,
       elevation: 10,
       shadowColor: colors.shadow.withValues(alpha: 0.12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       titlePadding: const EdgeInsets.fromLTRB(32, 28, 32, 0),
       title: Text(_title, textAlign: TextAlign.center),
@@ -327,9 +319,7 @@ class _AccountDialogState extends State<_AccountDialog> {
         const SizedBox(height: 28),
         FilledButton(
           key: const ValueKey('account-create-choice'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           onPressed: _isWorking ? null : () => _show(_AccountView.register),
           child: const Text('Create account'),
         ),
@@ -345,9 +335,7 @@ class _AccountDialogState extends State<_AccountDialog> {
         const SizedBox(height: 12),
         TextButton(
           key: const ValueKey('account-local-choice'),
-          style: TextButton.styleFrom(
-            minimumSize: const Size.fromHeight(44),
-          ),
+          style: TextButton.styleFrom(minimumSize: const Size.fromHeight(44)),
           onPressed: _isWorking ? null : () => _show(_AccountView.local),
           child: const Text('Try local'),
         ),

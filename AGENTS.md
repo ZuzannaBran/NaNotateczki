@@ -58,7 +58,7 @@ mapy o oczywiste helpery ani opis każdej metody.
   ograniczenie i dodaj powtarzalny scenariusz testu ręcznego do dokumentacji
   testów. Nie przedstawiaj go jako zaliczonego testu automatycznego.
 
-Szczegóły stylu są w [AI_INSTRUCTIONS.md](AI_INSTRUCTIONS.md). Minimum:
+Obowiązują następujące zasady stylu:
 
 - `dart format`, linie do 80 znaków, standardowe nazewnictwo Darta,
 - klamry przy sterowaniu; UpperCamelCase dla typów, lowerCamelCase dla reszty,
