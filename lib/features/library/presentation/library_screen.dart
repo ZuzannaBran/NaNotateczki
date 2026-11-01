@@ -470,6 +470,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
       share: _activeShare?.documentUid == selectedItem?.uid
           ? _activeShare : null,
       shareService: _studyShareService,
+      onShareExtended: (updated) {
+        if (mounted) {
+          setState(() => _activeShare = updated);
+        }
+      },
     );
   }
 
@@ -1911,6 +1916,7 @@ class _LibraryWorkspace extends StatelessWidget {
     required this.onSettings,
     this.share,
     this.shareService,
+    required this.onShareExtended,
     this.onOpenNavigation,
     super.key,
   });
@@ -1921,6 +1927,7 @@ class _LibraryWorkspace extends StatelessWidget {
   final VoidCallback onSettings;
   final ActiveStudyShare? share;
   final StudyShareService? shareService;
+  final ValueChanged<ActiveStudyShare> onShareExtended;
   final VoidCallback? onOpenNavigation;
 
   @override
@@ -1967,7 +1974,10 @@ class _LibraryWorkspace extends StatelessWidget {
               );
         if (share != null && shareService != null && kIsWeb) {
           return StudyShareCapture(
-            share: share!, service: shareService!, child: canvas,
+            share: share!,
+            service: shareService!,
+            child: canvas,
+            onExtended: onShareExtended,
           );
         }
         return canvas;
