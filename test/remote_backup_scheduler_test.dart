@@ -56,6 +56,18 @@ void main() {
     await tester.pump();
     await scheduler.setIdleSeconds(30);
 
+    final schedulingWatch = Stopwatch()..start();
+    for (var index = 0; index < 1000; index++) {
+      scheduler.markDirty();
+    }
+    schedulingWatch.stop();
+    debugPrint(
+      'Backup scheduler 1000 changes: ' +
+          schedulingWatch.elapsedMicroseconds.toString() +
+          ' microseconds',
+    );
+    expect(schedulingWatch.elapsed, lessThan(const Duration(seconds: 1)));
+
     now = now.add(const Duration(seconds: 20));
     await tester.pump(const Duration(seconds: 20));
     scheduler.markDirty();

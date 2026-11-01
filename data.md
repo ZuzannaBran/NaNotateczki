@@ -40,6 +40,7 @@ w podkatalogu `data`. Na obecnym Linuksie jest to:
 ├── shared_recent_colors.json            historia kolorów
 ├── library_folders.json                 foldery, okładki i zadania planerów
 ├── study_planner.json                   sesje i wydarzenia
+├── server_backup_preferences_<hash>.json  czas bezczynności przed backupem
 ├── server_device_<hash>.json            identyfikator urządzenia per konto
 ├── server_sync_state_<hash>.json        kursor, rewizje i mały outbox konta
 ├── storage_layout.json                  raport migracji układu

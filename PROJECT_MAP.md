@@ -293,7 +293,7 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
 - 12: `RemoteBackupReceipt`; 24: `RemoteBackupService`;
   38: `uploadVerifiedSnapshot`.
 
-### `lib/data/backup/remote_backup_scheduler.dart` (341 linii)
+### `lib/data/backup/remote_backup_scheduler.dart` (347 linii)
 
 Jawnie włączany scheduler zalogowanego konta: po zmianach wysyła verified
 snapshot co 30 minut, po błędzie ponawia po 5 minutach i próbuje przy resume.
@@ -341,13 +341,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/api_client.dart` (190): klient REST z wymuszeniem HTTPS,
   timeoutem, limitem odpowiedzi, Bearer tokenem i request ID.
   7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
-- `lib/data/sync/account_session_controller.dart` (350): trwały profil
+- `lib/data/sync/account_session_controller.dart` (369): trwały profil
   pierwszego uruchomienia i trybu lokalnego, rejestracja/logowanie, zmiana
   hasła, rotacja sesji oraz tokeny wyłącznie w pamięci. Plik profilu zawiera
   tylko tryb, lokalną nazwę i ostatni e-mail.
-  8: `AccountDataMode`; 10: `AccountSessionController`; `loadProfile` i loginy 3–32 znaków; asynchroniczny odczyt nie zgłasza po dispose;
+  8: `AccountDataMode`; 10: `AccountSessionController`; `loadProfile`, loginy 3–32 znaków,
+  współdzielone odświeżanie tokenu i brak powiadomień po dispose;
   154: `changePassword`; 205: `useLocalProfile`. Nowe hasła: 8–128.
-- `lib/data/sync/live_web_sync_service.dart` (603): jawna polityka pierwszej
+- `lib/data/sync/live_web_sync_service.dart` (613): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
   tylko jako sygnał; własny push nie przesuwa kursora zdarzeń z innych
