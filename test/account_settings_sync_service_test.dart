@@ -92,7 +92,9 @@ void main() {
     final second = AccountSettingsSyncService(
       apiClient: secondClient,
       session: secondSession,
-      onRemoteApplied: () async => remoteApplied++,
+      onRemoteApplied: () async {
+        remoteApplied++;
+      },
     );
     await second.syncNow();
     expect(remoteApplied, 1);
@@ -125,7 +127,10 @@ void main() {
             'settings': {
               'appPreferences': {
                 'revision': remoteRevision,
-                'value': {'darkMode': remoteDarkMode},
+                'value': {
+                  'darkMode': remoteDarkMode,
+                  if (remoteRevision > 1) 'uiScale': 1.25,
+                },
               },
             },
           }), 200);
