@@ -21,6 +21,17 @@ import 'package:program/features/notebook/data/notebook_repository.dart';
 
 import 'support/native_test_documents.dart';
 
+void _expectAccountActionSpacing(
+  WidgetTester tester,
+  Finder first,
+  Finder second,
+) {
+  expect(first, findsOneWidget);
+  expect(second, findsOneWidget);
+  final gap = tester.getRect(second).top - tester.getRect(first).bottom;
+  expect(gap, greaterThanOrEqualTo(12));
+}
+
 void main() {
   useIsolatedNativeTestDocuments();
 
@@ -105,6 +116,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('account-sign-in-choice')));
       await tester.pumpAndSettle();
+      _expectAccountActionSpacing(
+        tester,
+        find.byKey(const ValueKey('account-login-submit')),
+        find.widgetWithText(TextButton, 'Back'),
+      );
       expect(
         tester.widget<TextFormField>(
           find.byKey(const ValueKey('account-password')),
@@ -145,6 +161,11 @@ void main() {
 
       expect(session.isSignedIn, isTrue);
       expect(backup.isEnabled, isTrue);
+      _expectAccountActionSpacing(
+        tester,
+        find.byKey(const ValueKey('account-change-password')),
+        find.byKey(const ValueKey('account-switch-local')),
+      );
       expect(find.byKey(const ValueKey('sync-policy-upload')), findsOneWidget);
       expect(
         find.byKey(const ValueKey('sync-policy-download')),
@@ -182,6 +203,11 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('account-switch-local')));
       await tester.pumpAndSettle();
+      _expectAccountActionSpacing(
+        tester,
+        find.byKey(const ValueKey('account-local-submit')),
+        find.widgetWithText(TextButton, 'Back'),
+      );
       await tester.enterText(
         find.byKey(const ValueKey('account-local-name')),
         'Local Zuzanna',
@@ -242,6 +268,11 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('account-change-password')));
       await tester.pumpAndSettle();
+      _expectAccountActionSpacing(
+        tester,
+        find.byKey(const ValueKey('account-change-password-submit')),
+        find.widgetWithText(TextButton, 'Back'),
+      );
       await tester.enterText(
         find.byKey(const ValueKey('account-current-password')),
         'current-secure-password',
@@ -365,6 +396,11 @@ void main() {
     expect(welcomeCopy.textAlign, TextAlign.center);
     expect(welcomeCopy.data, contains('NaNotateczki'));
     expect(find.byKey(const ValueKey('account-create-choice')), findsOneWidget);
+    _expectAccountActionSpacing(
+      tester,
+      find.byKey(const ValueKey('account-create-choice')),
+      find.byKey(const ValueKey('account-sign-in-choice')),
+    );
     expect(
       find.byKey(const ValueKey('account-sign-in-choice')),
       findsOneWidget,
@@ -373,6 +409,11 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('account-create-choice')));
     await tester.pumpAndSettle();
+    _expectAccountActionSpacing(
+      tester,
+      find.byKey(const ValueKey('account-register-submit')),
+      find.widgetWithText(TextButton, 'Back'),
+    );
     await tester.enterText(
       find.byKey(const ValueKey('account-email')),
       'user@example.com',
@@ -413,6 +454,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('account-local-choice')));
     await tester.pumpAndSettle();
+    _expectAccountActionSpacing(
+      tester,
+      find.byKey(const ValueKey('account-local-submit')),
+      find.widgetWithText(TextButton, 'Back'),
+    );
     await tester.enterText(
       find.byKey(const ValueKey('account-local-name')),
       'Zuzanna',
@@ -451,6 +497,11 @@ void main() {
     expect(dialogDecoration.shape, BoxShape.circle);
     expect(dialogDecoration.border, isNotNull);
     expect(tester.getSize(dialogAvatar), const Size(40, 40));
+    _expectAccountActionSpacing(
+      tester,
+      find.byKey(const ValueKey('account-edit-local-name')),
+      find.byKey(const ValueKey('account-switch-online')),
+    );
     expect(find.byKey(const ValueKey('account-remote-status')), findsNothing);
     expect(
       find.byKey(const ValueKey('account-settings-button')),

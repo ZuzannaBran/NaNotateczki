@@ -376,6 +376,7 @@ class _AccountDialogState extends State<_AccountDialog> {
             onPressed: _isWorking ? null : _login,
             child: const Text('Sign in'),
           ),
+          const SizedBox(height: 12),
           TextButton(
             onPressed: _isWorking ? null : () => _show(_AccountView.landing),
             child: const Text('Back'),
@@ -412,6 +413,7 @@ class _AccountDialogState extends State<_AccountDialog> {
             onPressed: _isWorking ? null : _register,
             child: const Text('Create account'),
           ),
+          const SizedBox(height: 12),
           TextButton(
             onPressed: _isWorking ? null : () => _show(_AccountView.landing),
             child: const Text('Back'),
@@ -461,6 +463,7 @@ class _AccountDialogState extends State<_AccountDialog> {
             onPressed: _isWorking ? null : _useLocal,
             child: const Text('Continue locally'),
           ),
+          const SizedBox(height: 12),
           TextButton(
             onPressed: _isWorking ? null : () => _show(_AccountView.landing),
             child: const Text('Back'),
@@ -578,6 +581,7 @@ class _AccountDialogState extends State<_AccountDialog> {
             onPressed: _isWorking ? null : () => _show(_AccountView.password),
             child: const Text('Change password'),
           ),
+          const SizedBox(height: 12),
           TextButton(
             key: const ValueKey('account-switch-local'),
             onPressed: _isWorking ? null : () => _show(_AccountView.local),
@@ -593,6 +597,7 @@ class _AccountDialogState extends State<_AccountDialog> {
             onPressed: _isWorking ? null : () => _show(_AccountView.local),
             child: const Text('Change local name'),
           ),
+          const SizedBox(height: 12),
           FilledButton(
             key: const ValueKey('account-switch-online'),
             onPressed: _isWorking ? null : () => _show(_AccountView.landing),
@@ -642,6 +647,7 @@ class _AccountDialogState extends State<_AccountDialog> {
             onPressed: _isWorking ? null : _changePassword,
             child: const Text('Change password'),
           ),
+          const SizedBox(height: 12),
           TextButton(
             onPressed: _isWorking ? null : () => _show(_AccountView.settings),
             child: const Text('Back'),
@@ -948,7 +954,7 @@ class _SyncPolicyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: OutlinedButton(
         onPressed: onPressed,
         child: Padding(
