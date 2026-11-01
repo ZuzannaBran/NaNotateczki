@@ -200,9 +200,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _cloudSync = cloudSync;
         final apiClient = _apiClient ?? ApiClient();
         _apiClient = apiClient;
+        final newAccountSession = _accountSession == null;
         final accountSession =
-            _accountSession ??
-            (AccountSessionController(apiClient)..loadProfile());
+            _accountSession ?? AccountSessionController(apiClient);
         _accountSession = accountSession;
         final remoteBackup =
             _remoteBackupService ??
@@ -219,6 +219,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               session: accountSession,
             );
         _remoteBackupScheduler = remoteBackupScheduler;
+        if (newAccountSession) {
+          unawaited(accountSession.loadProfile().then((_) {
+            if (mounted && accountSession.isSignedIn) {
+              remoteBackupScheduler.enableForSignedInAccount();
+            }
+          }));
+        }
         final liveSync =
             _liveSync ??
             LiveWebSyncService(
