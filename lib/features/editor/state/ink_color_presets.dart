@@ -29,6 +29,7 @@ enum InkColorPreset {
 class SharedRecentColors {
   static const _storageKey = 'shared_recent_colors.json';
   static Future<void> _pending = Future<void>.value();
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
   @visibleForTesting
   static void resetPendingForTests() {
@@ -101,6 +102,7 @@ class SharedRecentColors {
         _storageKey,
         jsonEncode(colors.map((item) => item.toARGB32()).toList()),
       );
+      revision.value++;
     });
     _pending = next.catchError((Object error) {
       debugPrint('SharedRecentColors.record failed: $error');
