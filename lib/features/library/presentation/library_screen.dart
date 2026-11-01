@@ -1464,12 +1464,7 @@ class _FolderTreeRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                Icon(
-                  expanded ? Icons.folder_open_outlined : Icons.folder_outlined,
-                  size: 18,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 7),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     folder.split('/').last,
@@ -1516,11 +1511,6 @@ class _LibraryTreeItemRow extends StatelessWidget {
 
   Widget _buildRow(BuildContext context, {required bool dragging, Key? key}) {
     final colorScheme = Theme.of(context).colorScheme;
-    final icon = switch (item.kind) {
-      NotebookKind.board => Icons.dashboard_outlined,
-      NotebookKind.notebook => Icons.description_outlined,
-      NotebookKind.planner => Icons.check_box_outlined,
-    };
     final draggingColor = Color.alphaBlend(
       colorScheme.onSurface.withValues(alpha: 0.10),
       colorScheme.surfaceContainerHighest,
@@ -1545,9 +1535,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
             height: 36,
             child: Row(
               children: [
-                const SizedBox(width: 38),
-                Icon(icon, size: 15, color: colorScheme.onSurfaceVariant),
-                const SizedBox(width: 7),
+                const SizedBox(width: 48),
                 Expanded(
                   child: Text(
                     item.title,
