@@ -1280,7 +1280,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   gesty wyłącznie w obszarze figury/uchwytów, blokuje viewport podczas
   przesuwania i zmiany rozmiaru, zapisuje transformację jako undo/redo.
 
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (588):
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (583):
   podgląd używa tych samych zamienników Georgii co UI, ale nie narzuca
   ich blokom z indywidualnie wybranym fontem;
   aktywny `TextBlock` renderowany przez Flutter `EditableText`;
