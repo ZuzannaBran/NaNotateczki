@@ -2,7 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+
+import '../../core/input/ink_activity_tracker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/error/app_error_log.dart';
@@ -15,14 +19,20 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     session.addListener(_sessionChanged);
     _dirty = true;
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
+    HardwareKeyboard.instance.addHandler(_onKey);
   }
 
-  static const interval = Duration(minutes: 30);
+  static const defaultIdleSeconds = 120;
+  static const supportedIdleSeconds = <int>[30, 120, 300, 900, 1800];
   static const failureRetry = Duration(minutes: 5);
 
   final RemoteBackupService service;
   final AccountSessionController session;
   Timer? _timer;
+  DateTime _lastActivityAt = DateTime.now();
+  DateTime? _retryNotBefore;
+  int _idleSeconds = defaultIdleSeconds;
   bool _dirty = false;
   int _changeGeneration = 0;
   bool _enabled = false;
@@ -36,6 +46,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   bool get isUploading => _uploading;
   bool get hasPendingBackup => _dirty;
   bool get isEnabled => _enabled;
+  int get idleSeconds => _idleSeconds;
 
   void enableForSignedInAccount() {
     final userId = session.userId;
@@ -49,7 +60,10 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     _enabled = true;
     _dirty = true;
     _changeGeneration++;
-    _schedule(const Duration(seconds: 3));
+    _lastActivityAt = DateTime.now();
+    _retryNotBefore = null;
+    _scheduleIdle();
+    unawaited(_loadPreference(userId));
     notifyListeners();
   }
 
@@ -58,7 +72,9 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     _timer?.cancel();
     _timer = null;
     _clearAccountState();
-    notifyListeners();
+    if (!_disposed) {
+      notifyListeners();
+    }
   }
 
   Future<void> stop() async {
@@ -69,18 +85,36 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   void markDirty() {
     _dirty = true;
     _changeGeneration++;
-    if (_enabled && session.isSignedIn) {
-      _schedule(interval);
+    _recordActivity();
+    _scheduleIdle();
+    if (!_disposed) {
+      notifyListeners();
     }
-    notifyListeners();
   }
 
-  Future<void> uploadNow() {
+  Future<void> setIdleSeconds(int seconds) async {
+    if (!supportedIdleSeconds.contains(seconds)) {
+      throw ArgumentError.value(seconds, 'seconds', 'Unsupported idle delay');
+    }
+    final userId = _accountUserId;
+    if (userId == null || !_enabled) {
+      throw StateError('Sign in before setting a backup delay.');
+    }
+    _idleSeconds = seconds;
+    _scheduleIdle();
+    notifyListeners();
+    await writeStoredText(
+      _preferenceKey(userId),
+      jsonEncode({'version': 1, 'idleSeconds': seconds}),
+    );
+  }
+
+  Future<void> uploadNow({bool manual = false}) {
     final running = _activeUpload;
     if (running != null) {
       return running;
     }
-    final future = _uploadNow();
+    final future = _uploadNow(manual: manual);
     _activeUpload = future;
     return future.whenComplete(() {
       if (identical(_activeUpload, future)) {
@@ -91,16 +125,20 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> backupNow() {
     markDirty();
-    return uploadNow();
+    return uploadNow(manual: true);
   }
 
-  Future<void> _uploadNow() async {
+  Future<void> _uploadNow({required bool manual}) async {
     if (!_enabled || !session.isSignedIn || !_dirty || _uploading) {
       return;
     }
     final accountUserId = _accountUserId;
     if (accountUserId == null || accountUserId != session.userId) {
       disable();
+      return;
+    }
+    if (!manual && !_canUploadAutomatically) {
+      _scheduleIdle();
       return;
     }
     _timer?.cancel();
@@ -121,6 +159,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
       if (_accountUserId == accountUserId) {
         lastError = error.toString();
         _dirty = true;
+        _retryNotBefore = DateTime.now().add(failureRetry);
       }
       AppErrorLog.instance.record(
         error,
@@ -130,7 +169,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     } finally {
       _uploading = false;
       if (_dirty && _enabled && session.isSignedIn) {
-        _schedule(lastError == null ? interval : failureRetry);
+        _scheduleIdle();
       }
       if (!_disposed) {
         notifyListeners();
@@ -144,18 +183,101 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     if (_enabled && _dirty) {
-      _schedule(const Duration(seconds: 3));
+      _scheduleIdle();
     }
   }
 
-  void _schedule(Duration delay) {
-    if (_timer != null || _uploading || _disposed) {
+  bool get _canUploadAutomatically {
+    if (InkActivityTracker.instance.isBusy) {
+      return false;
+    }
+    if (_retryNotBefore != null &&
+        DateTime.now().isBefore(_retryNotBefore!)) {
+      return false;
+    }
+    return DateTime.now().difference(_lastActivityAt) >=
+        Duration(seconds: _idleSeconds);
+  }
+
+  void _recordActivity() {
+    if (_enabled && !_disposed) {
+      _lastActivityAt = DateTime.now();
+    }
+  }
+
+  void _onPointer(PointerEvent event) {
+    if (event is PointerDownEvent ||
+        event is PointerSignalEvent ||
+        (event is PointerMoveEvent && event.buttons != 0)) {
+      _recordActivity();
+    }
+  }
+
+  bool _onKey(KeyEvent event) {
+    if (event is KeyDownEvent || event is KeyRepeatEvent) {
+      _recordActivity();
+    }
+    return false;
+  }
+
+  void _scheduleIdle() {
+    _timer?.cancel();
+    _timer = null;
+    if (!_enabled || !_dirty || _uploading || _disposed) {
       return;
+    }
+    final now = DateTime.now();
+    final idleRemaining =
+        Duration(seconds: _idleSeconds) - now.difference(_lastActivityAt);
+    final retryRemaining = _retryNotBefore == null
+        ? Duration.zero
+        : _retryNotBefore!.difference(now);
+    var delay = idleRemaining > retryRemaining
+        ? idleRemaining
+        : retryRemaining;
+    if (delay < Duration.zero) {
+      delay = Duration.zero;
+    }
+    if (InkActivityTracker.instance.isBusy && delay == Duration.zero) {
+      delay = const Duration(seconds: 2);
     }
     _timer = Timer(delay, () {
       _timer = null;
       unawaited(uploadNow());
     });
+  }
+
+  String _preferenceKey(String userId) {
+    final suffix = sha256
+        .convert(utf8.encode(userId))
+        .toString()
+        .substring(0, 16);
+    return 'server_backup_preferences_$suffix.json';
+  }
+
+  Future<void> _loadPreference(String userId) async {
+    try {
+      final stored = await readStoredText(_preferenceKey(userId));
+      if (stored == null) {
+        return;
+      }
+      final decoded = jsonDecode(stored);
+      if (decoded is Map<String, dynamic> &&
+          decoded['version'] == 1 &&
+          supportedIdleSeconds.contains(decoded['idleSeconds']) &&
+          !_disposed &&
+          _accountUserId == userId) {
+        _idleSeconds = decoded['idleSeconds'] as int;
+        _scheduleIdle();
+        notifyListeners();
+      }
+    } catch (error, stackTrace) {
+      AppErrorLog.instance.record(
+        error,
+        stackTrace,
+        source: 'RemoteBackupScheduler.loadPreference',
+      );
+    }
   }
 
   Future<String> _deviceId(String userId) async {
@@ -185,6 +307,8 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     lastError = null;
     _dirty = true;
     _changeGeneration++;
+    _idleSeconds = defaultIdleSeconds;
+    _retryNotBefore = null;
   }
 
   @override
@@ -193,7 +317,8 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
         _enabled &&
         _dirty &&
         session.isSignedIn) {
-      unawaited(uploadNow());
+      _recordActivity();
+      _scheduleIdle();
     }
   }
 
@@ -202,6 +327,8 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     _disposed = true;
     _timer?.cancel();
     session.removeListener(_sessionChanged);
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(_onPointer);
+    HardwareKeyboard.instance.removeHandler(_onKey);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
