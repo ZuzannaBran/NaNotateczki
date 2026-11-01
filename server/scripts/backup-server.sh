@@ -42,13 +42,13 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 docker compose --project-directory "$project_root" exec -T db \
-  pg_dump -U nano_admin -d nanotateczki --format=custom \
+  pg_dump -U nano_data -d nanotateczki --format=custom \
   > "$staging/postgres.dump"
 
 tar --exclude='*.upload' -C "$project_root" -czf \
   "$staging/device-backups.tar.gz" data/backups
 tar -C "$project_root" -czf "$staging/deployment-metadata.tar.gz" \
-  compose.yaml Caddyfile migrations
+  compose.yaml compose.public.yaml Caddyfile migrations
 
 (
   cd "$staging"

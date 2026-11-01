@@ -64,3 +64,21 @@ def test_rejects_tampering_and_cross_device_finalize() -> None:
     envelope["checksum"] = compact_sha256(envelope["payload"])
     with pytest.raises(ValueError):
         validate_envelope(envelope, backup_record(uuid.uuid4()))
+
+
+def test_rejects_non_object_and_incomplete_backup_payload() -> None:
+    record = backup_record(uuid.uuid4())
+    with pytest.raises(ValueError):
+        validate_envelope([], record)
+
+    payload = {"notebooks": [], "libraryState": {}}
+    envelope = {
+        "format": "nanotateczki-server-backup",
+        "version": 2,
+        "deviceId": str(record.device_id),
+        "checksumAlgorithm": "sha256",
+        "checksum": compact_sha256(payload),
+        "payload": payload,
+    }
+    with pytest.raises(ValueError):
+        validate_envelope(envelope, record)

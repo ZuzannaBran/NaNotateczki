@@ -1,40 +1,28 @@
-NaNotateczki - aktualizacja backendu konta (nie wdrozono na serwerze)
+NaNotateczki — wdrożenie backendu zgodnego z klientem
 
-ZMIANY:
-- rejestracja: haslo 8-128 znakow; logowanie: 1-256 znakow,
-  aby zachowac dostep do istniejacych kont;
-- nowe haslo przy zmianie: 8-128 znakow;
-- POST /v1/auth/change-password zapisuje hash Argon2 i uniewaznia
-  refresh tokeny;
-- nie wymaga migracji ani zmian schematu PostgreSQL.
+Kontrakt:
+- rejestracja i nowe hasło: 8–128 znaków; logowanie: 1–256 znaków;
+- zmiana hasła unieważnia również JWT i WebSocket przez auth_version;
+- wymagana migracja 0002_auth_version.sql, poza 0001_initial.sql.
 
-KROKI:
-1. Zrob i zweryfikuj backup PostgreSQL oraz data/, zgodnie z
-   server/README.md. Nie uzywaj docker compose down -v.
-2. NAJPIERW zaktualizuj API. Stara wersja odrzuca hasla 8-11 znakow.
-3. Na komputerze, w katalogu repo:
-       git switch dev
-       git pull --ff-only origin dev
-       rsync -av server/api/ UZYTKOWNIK@SERWER:/srv/nanotateczki/api/
-   Dostosuj konto SSH. Nie nadpisuj .env, data/ i web-dist/.
-4. Na serwerze:
-       cd /srv/nanotateczki
-       docker compose build api
-       docker compose up -d --no-deps api
-       docker compose ps api
-       docker compose logs --tail=100 api
-5. Zweryfikuj logowanie istniejacego konta, zmiane hasla oraz, przy
-   ALLOW_REGISTRATION=true, rejestracje z haslem 8 znakow.
-   Gdy nie rejestrujesz kont, ponownie ustaw ALLOW_REGISTRATION=false.
-6. Potem opublikuj build Flutter Web z prawidlowym URL API HTTPS:
-       flutter build web --release --dart-define=BACKEND_URL=https://api.TWOJA_DOMENA
-   Przenies zawartosc build/web/ do /srv/nanotateczki/web-dist/.
-7. Przy bledzie sprawdz logi kontenera; nie kasuj wolumenow ani bazy.
+Aktualizacja:
+1. Wykonaj i zweryfikuj backup PostgreSQL i data/ zgodnie z README.md.
+2. Przenieś pakiet server/ do /srv/nanotateczki/ bez nadpisywania .env,
+   data/ i web-dist/. Aktualizacja samego api/ nie dostarcza migracji.
+3. Uruchom scripts/apply-migrations.sh, potem docker compose build api.
+4. Dla testu HTTP uruchom:
+   docker compose -f compose.yaml -f compose.local.yaml up -d api
+   python3 scripts/smoke-local-api.py
+5. Klienta lokalnego uruchom z katalogu aplikacji:
+   bash tool/run_local_backend_web.sh
+   Na innym komputerze otwórz najpierw tunel SSH opisany w README.md.
 
-UWAGI:
-- Po zmianie hasla stare refresh tokeny sa uniewazniane, wydane
-  JWT moga dzialac jeszcze do 10 minut.
-- Georgia nie jest dolaczona jako font do repo. Web i systemy bez
-  lokalnie zainstalowanej Georgii pokaza czcionke zastepcza.
-  Do absolutnie identycznego wygladu wymagane sa legalne pliki
-  fontu Georgia i ich umieszczenie w assets Fluttera.
+Wdrożenie publiczne:
+- ustaw domenę i Cloudflare Tunnel zgodnie z README.md;
+- uruchom compose.yaml z compose.public.yaml;
+- zbuduj Web z --dart-define=BACKEND_URL=https://api.TWOJA_DOMENA;
+- opublikuj build/web/ jako /srv/nanotateczki/web-dist/;
+- sprawdź rejestrację zgodnie z ALLOW_REGISTRATION w .env.
+
+Nie używaj docker compose down -v. Lokalny wariant Compose włącza
+rejestrację i port HTTP tylko na loopback; pomiń go przy wdrożeniu domeny.

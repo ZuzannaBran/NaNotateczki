@@ -1,7 +1,7 @@
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class Credentials(BaseModel):
@@ -13,13 +13,15 @@ class RegistrationCredentials(Credentials):
     password: str = Field(min_length=8, max_length=128)
 
 
-class ChangePasswordRequest(BaseModel):
-    currentPassword: str = Field(min_length=1, max_length=256)
-    newPassword: str = Field(min_length=8, max_length=128)
-
-
 class RefreshRequest(BaseModel):
     refreshToken: str = Field(min_length=40, max_length=256)
+
+
+class PasswordChangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    currentPassword: str = Field(min_length=1, max_length=256)
+    newPassword: str = Field(min_length=8, max_length=128)
 
 
 class SyncWrite(BaseModel):
@@ -43,4 +45,4 @@ class BackupCreate(BaseModel):
     deviceId: UUID
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     sizeBytes: int = Field(gt=0)
-    formatVersion: int = Field(ge=1, le=100)
+    formatVersion: Literal[2]

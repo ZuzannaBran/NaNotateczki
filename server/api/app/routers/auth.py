@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import database_session
 from ..models import RefreshSession, User
 from ..rate_limit import auth_limiter
+from ..realtime_hub import hub
 from ..schemas import (
-    ChangePasswordRequest,
     Credentials,
+    PasswordChangeRequest,
     RefreshRequest,
     RegistrationCredentials,
 )
@@ -32,7 +33,7 @@ router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
 
 def session_response(user: User, refresh_token: str) -> dict:
-    access_token, expires_in = create_access_token(user.id)
+    access_token, expires_in = create_access_token(user.id, user.auth_version)
     return {
         "accessToken": access_token,
         "refreshToken": refresh_token,
@@ -63,10 +64,12 @@ async def register(
         id=uuid.uuid4(),
         email=email,
         password_hash=hash_password(credentials.password),
+        auth_version=1,
     )
     session.add(user)
-    refresh_token, _ = await create_refresh_session(session, user.id)
     try:
+        await session.flush()
+        refresh_token, _ = await create_refresh_session(session, user)
         await session.commit()
     except IntegrityError as error:
         await session.rollback()
@@ -82,13 +85,15 @@ async def login(
 ) -> dict:
     email = credentials.email.lower()
     await limit_auth(request, email)
-    result = await session.execute(select(User).where(User.email == email))
+    result = await session.execute(
+        select(User).where(User.email == email).with_for_update()
+    )
     user = result.scalar_one_or_none()
     encoded_hash = user.password_hash if user is not None else dummy_password_hash
     password_valid = verify_password(credentials.password, encoded_hash)
     if user is None or not password_valid:
         raise HTTPException(status_code=401, detail="Invalid e-mail or password.")
-    refresh_token, _ = await create_refresh_session(session, user.id)
+    refresh_token, _ = await create_refresh_session(session, user)
     await session.commit()
     return session_response(user, refresh_token)
 
@@ -123,19 +128,38 @@ async def logout(
 
 @router.post("/change-password", status_code=204)
 async def change_password(
-    request: ChangePasswordRequest,
+    body: PasswordChangeRequest,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(database_session),
 ) -> None:
-    if not verify_password(request.currentPassword, user.password_hash):
+    await auth_limiter.check(f"password-change:{user.id}")
+    locked_user = await session.scalar(
+        select(User)
+        .where(User.id == user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if locked_user is None:
+        raise HTTPException(status_code=401, detail="The account no longer exists.")
+    if not verify_password(body.currentPassword, locked_user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
-    user.password_hash = hash_password(request.newPassword)
+    if verify_password(body.newPassword, locked_user.password_hash):
+        raise HTTPException(
+            status_code=400,
+            detail="New password must differ from current password.",
+        )
+    locked_user.password_hash = hash_password(body.newPassword)
+    locked_user.auth_version += 1
     await session.execute(
         update(RefreshSession)
-        .where(RefreshSession.owner_id == user.id)
+        .where(
+            RefreshSession.owner_id == locked_user.id,
+            RefreshSession.revoked_at.is_(None),
+        )
         .values(revoked_at=datetime.now(UTC))
     )
     await session.commit()
+    await hub.publish(locked_user.id, {"type": "session_revoked"})
 
 
 @router.get("/me")

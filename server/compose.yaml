@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: nanotateczki
-      POSTGRES_USER: nano_admin
+      POSTGRES_USER: nano_data
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD}
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
@@ -14,7 +14,7 @@ services:
       - pg_data:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U nano_admin -d nanotateczki]
+      test: [CMD-SHELL, pg_isready -U nano_data -d nanotateczki]
       interval: 10s
       timeout: 3s
       retries: 10
@@ -27,6 +27,7 @@ services:
     build: ./api
     restart: unless-stopped
     read_only: true
+    user: "1000:1000"
     tmpfs:
       - /tmp:size=64m,mode=1777
     environment:
@@ -63,18 +64,6 @@ services:
       - 127.0.0.1:8080:8080
     depends_on: [api]
     mem_limit: 200m
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
-    networks: [private]
-
-  cloudflared:
-    image: ${CLOUDFLARED_IMAGE:?set a tested cloudflared digest}
-    profiles: [public]
-    restart: unless-stopped
-    read_only: true
-    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
-    depends_on: [caddy]
-    mem_limit: 160m
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     networks: [private]

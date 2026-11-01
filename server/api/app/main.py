@@ -39,18 +39,22 @@ async def security_boundary(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
     if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", request_id):
         return JSONResponse(status_code=400, content={"detail": "Invalid request ID."})
-    length = request.headers.get("content-length")
-    if length and length.isdigit() and int(length) > settings.maximum_backup_bytes:
-        return JSONResponse(status_code=413, content={"detail": "Request is too large."})
-    if request.url.path.startswith("/v1/sync/notebooks/"):
+    if request.method in {"POST", "PUT", "DELETE"}:
+        length = request.headers.get("content-length")
         if length is None or not length.isdigit():
             return JSONResponse(
                 status_code=411, content={"detail": "Content-Length is required."}
             )
-        if int(length) > settings.maximum_sync_bytes:
-            return JSONResponse(
-                status_code=413, content={"detail": "Sync payload is too large."}
-            )
+        if request.url.path.startswith("/v1/sync/notebooks/"):
+            maximum = settings.maximum_sync_bytes
+        elif request.url.path.startswith("/v1/backups/") and request.url.path.endswith(
+            "/content"
+        ):
+            maximum = settings.maximum_backup_bytes
+        else:
+            maximum = 1024 * 1024
+        if int(length) > maximum:
+            return JSONResponse(status_code=413, content={"detail": "Request is too large."})
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     response.headers["Cache-Control"] = "no-store"

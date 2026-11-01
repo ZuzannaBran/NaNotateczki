@@ -28,14 +28,15 @@ def backup_root() -> Path:
 
 
 async def owned_backup(
-    backup_id: uuid.UUID, owner_id: uuid.UUID, session: AsyncSession
+    backup_id: uuid.UUID, owner_id: uuid.UUID, session: AsyncSession, *, lock: bool = False
 ) -> DeviceBackup:
-    result = await session.execute(
-        select(DeviceBackup).where(
-            DeviceBackup.id == backup_id,
-            DeviceBackup.owner_id == owner_id,
-        )
+    statement = select(DeviceBackup).where(
+        DeviceBackup.id == backup_id,
+        DeviceBackup.owner_id == owner_id,
     )
+    if lock:
+        statement = statement.with_for_update()
+    result = await session.execute(statement)
     backup = result.scalar_one_or_none()
     if backup is None:
         raise HTTPException(status_code=404, detail="Backup not found.")
@@ -91,7 +92,7 @@ async def upload_content(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(database_session),
 ) -> None:
-    backup = await owned_backup(backup_id, user.id, session)
+    backup = await owned_backup(backup_id, user.id, session, lock=True)
     if backup.status != "pending":
         raise HTTPException(status_code=409, detail="Backup is not pending.")
     if content_sha256 != backup.sha256:
@@ -134,7 +135,7 @@ async def finalize_backup(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(database_session),
 ) -> dict:
-    backup = await owned_backup(backup_id, user.id, session)
+    backup = await owned_backup(backup_id, user.id, session, lock=True)
     if backup.status != "pending":
         raise HTTPException(status_code=409, detail="Backup is not pending.")
     target = backup_root() / backup.storage_key
@@ -162,18 +163,25 @@ async def finalize_backup(
     }
 
 
-def validate_envelope(envelope: dict, backup: DeviceBackup) -> None:
+def validate_envelope(envelope: object, backup: DeviceBackup) -> None:
+    if not isinstance(envelope, dict):
+        raise ValueError("backup envelope must be an object")
     if (
         envelope.get("format") != "nanotateczki-server-backup"
-        or envelope.get("version") != backup.format_version
+        or envelope.get("version") != 2
+        or backup.format_version != 2
         or envelope.get("deviceId") != str(backup.device_id)
         or envelope.get("checksumAlgorithm") != "sha256"
         or not isinstance(envelope.get("payload"), dict)
     ):
         raise ValueError("unsupported envelope")
     payload = envelope["payload"]
-    if not isinstance(payload.get("notebooks"), list):
-        raise ValueError("missing notebooks")
+    if (
+        not isinstance(payload.get("notebooks"), list)
+        or not isinstance(payload.get("libraryState"), dict)
+        or not isinstance(payload.get("studyPlannerState"), dict)
+    ):
+        raise ValueError("incomplete backup payload")
     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
     if hashlib.sha256(encoded).hexdigest() != envelope.get("checksum"):
         raise ValueError("payload checksum mismatch")

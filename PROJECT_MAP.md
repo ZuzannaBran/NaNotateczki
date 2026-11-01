@@ -1387,6 +1387,9 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
 
 ## 10. Platformy, web i testy
 
+- `tool/run_local_backend_web.sh`: uruchamia Flutter Web na
+  `http://localhost:3000` z API `http://localhost:18080`; zdalny serwer
+  wymaga tunelu SSH opisanego w `server/README.md`.
 - `tool/website_widget_demo.dart`: osobny entry point Flutter Web dla
   publicznej strony wizytówkowej. Używa istniejących `EditorScreen`,
   `EditorToolbar`, `EditorController` i wydzielonej bazy IndexedDB demo;

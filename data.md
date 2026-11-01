@@ -114,6 +114,15 @@ w prywatnej sieci Compose. Caddy wiąże port `8080` wyłącznie do
 └── backups/                     kopie całego serwera na czas wysyłki offsite
 ```
 
+### Lokalny test HTTP
+
+Wariant `server/compose.local.yaml` wystawia API na `127.0.0.1:18080`,
+włącza lokalną rejestrację i dopuszcza origin `http://localhost:3000`.
+Klienta Web uruchamia `bash tool/run_local_backend_web.sh`. Przy pracy
+z innego komputera najpierw otwórz tunel
+`ssh -L 18080:127.0.0.1:18080 UZYTKOWNIK@SERWER`.
+Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
+
 ### Backup urządzenia
 
 1. Klient opróżnia aktywne zapisy, odrzuca backup przy uszkodzonych rekordach
@@ -137,8 +146,9 @@ w prywatnej sieci Compose. Caddy wiąże port `8080` wyłącznie do
 - Zmiana hasła wywołuje uwierzytelnione
   `POST /v1/auth/change-password` z `currentPassword` i `newPassword`.
   Powtórzenie nowego hasła nie jest wysyłane do API.
-- Po sukcesie `204` serwer unieważnia refresh tokeny; wydane JWT
-  wygasają po maksymalnie 10 minutach. Klient zatrzymuje live
+- Po sukcesie `204` serwer zwiększa `auth_version` i unieważnia refresh
+  tokeny, wydane JWT oraz połączenia WebSocket. Wymaga to migracji
+  `0002_auth_version.sql`. Klient zatrzymuje live
   sync i backup, czyści tokeny z pamięci oraz wymaga ponownego logowania.
 - Użytkownik może przełączać się między profilem lokalnym i kontem z poziomu
   ustawień konta. Przejście do trybu lokalnego zatrzymuje usługi sieciowe

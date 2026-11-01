@@ -17,6 +17,9 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    auth_version: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=1, server_default="1"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -30,6 +33,9 @@ class RefreshSession(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    auth_version: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=1, server_default="1"
+    )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import database_session
@@ -16,6 +16,14 @@ from ..settings import get_settings
 
 
 router = APIRouter(prefix="/v1/sync", tags=["sync"])
+
+
+async def lock_owner_events(session: AsyncSession, owner_id: uuid.UUID) -> None:
+    # PostgreSQL sequences are assigned before commit. Serializing writes for
+    # one account prevents a later event from making an uncommitted one invisible
+    # to a client that advances its change cursor.
+    key = int.from_bytes(hashlib.sha256(owner_id.bytes).digest()[:8], "big", signed=True)
+    await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
 
 
 def record_json(record: SyncedNotebook) -> dict:
@@ -118,6 +126,7 @@ async def put_notebook(
         raise HTTPException(status_code=422, detail="Notebook UID mismatch.")
     encoded = json.dumps(body.model_dump(), sort_keys=True, separators=(",", ":")).encode()
     request_hash = hashlib.sha256(encoded).hexdigest()
+    await lock_owner_events(session, user.id)
     previous = await idempotent_response(session, user.id, idempotency_key, request_hash)
     if previous is not None:
         return previous
@@ -181,6 +190,7 @@ async def delete_notebook(
     await request_size_guard(request)
     encoded = json.dumps(body.model_dump(), sort_keys=True, separators=(",", ":")).encode()
     request_hash = hashlib.sha256(encoded).hexdigest()
+    await lock_owner_events(session, user.id)
     previous = await idempotent_response(session, user.id, idempotency_key, request_hash)
     if previous is not None:
         return previous

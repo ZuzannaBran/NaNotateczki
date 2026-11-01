@@ -24,36 +24,41 @@ async def realtime(websocket: WebSocket) -> None:
     try:
         raw = await asyncio.wait_for(websocket.receive_text(), timeout=5)
         message = json.loads(raw)
-        if message.get("type") != "authenticate" or not isinstance(
-            message.get("token"), str
+        if (
+            not isinstance(message, dict)
+            or message.get("type") != "authenticate"
+            or not isinstance(message.get("token"), str)
         ):
             await websocket.close(code=4401)
             return
-        user_id, expires_at = decode_access_token_claims(message["token"])
+        user_id, expires_at, auth_version = decode_access_token_claims(
+            message["token"]
+        )
         async with session_factory() as session:
-            if await session.get(User, user_id) is None:
+            user = await session.get(User, user_id)
+            if user is None or user.auth_version != auth_version:
                 await websocket.close(code=4401)
                 return
         queue = await hub.subscribe(user_id)
         await websocket.send_json({"type": "authenticated"})
         try:
             while True:
-                if datetime.now(UTC) >= expires_at:
-                    await websocket.close(code=4401)
-                    return
-                event = await asyncio.wait_for(queue.get(), timeout=25)
-                await websocket.send_json(event)
-        except TimeoutError:
-            await websocket.send_json({"type": "ping"})
-            while True:
-                if datetime.now(UTC) >= expires_at:
+                seconds_left = (expires_at - datetime.now(UTC)).total_seconds()
+                if seconds_left <= 0:
                     await websocket.close(code=4401)
                     return
                 try:
-                    event = await asyncio.wait_for(queue.get(), timeout=25)
-                    await websocket.send_json(event)
+                    event = await asyncio.wait_for(
+                        queue.get(), timeout=min(25, seconds_left)
+                    )
                 except TimeoutError:
-                    await websocket.send_json({"type": "ping"})
+                    event = {"type": "ping"}
+                async with session_factory() as session:
+                    user = await session.get(User, user_id)
+                if user is None or user.auth_version != auth_version:
+                    await websocket.close(code=4401)
+                    return
+                await websocket.send_json(event)
         finally:
             await hub.unsubscribe(user_id, queue)
     except (

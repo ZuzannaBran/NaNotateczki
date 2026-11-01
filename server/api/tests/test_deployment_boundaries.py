@@ -48,3 +48,4 @@ def test_migrations_are_recorded_and_modified_history_is_rejected() -> None:
     assert "sha256sum" in script
     assert "Applied migration was modified" in script
     assert "BEGIN;" in script and "COMMIT;" in script
+    assert "REVOKE ALL ON TABLE schema_migrations FROM nano_app" in script
