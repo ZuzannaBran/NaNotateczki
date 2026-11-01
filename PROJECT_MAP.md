@@ -347,7 +347,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   pozwala w testach używać pamięci; implementacja
   `SecureAccountCredentialStore` korzysta z `flutter_secure_storage`
   dla natywnych systemów oraz Web.
-- `lib/data/sync/account_session_controller.dart` (530): trwały profil
+- `lib/data/sync/account_session_controller.dart` (531): trwały profil
   pierwszego uruchomienia i trybu lokalnego, rejestracja/logowanie,
   rotacja refresh tokenów i ich bezpieczne utrwalanie poza
   `account_profile.json`. Przy starcie odświeża zapisaną sesję,
@@ -619,7 +619,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1832: `_LibraryWorkspace`;
   1943: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (1101 linii)
+### `lib/features/library/presentation/library_account_slot.dart` (1109 linii)
 
 Onboarding `Create account`/`Sign in`/`Try local` z jednym
 nagłówkiem NaNotateczki i tekstem Welcome poniżej, bez podwójnego tytułu,
@@ -647,9 +647,9 @@ a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
 
 - 20: `showLibraryAccountDialog`; 49: `LibraryAccountSlot`;
   154: `_AccountAvatar`; 186: `_AccountDialog`;
-  199: `_AccountDialogState`; 689: `_usernameField`;
-  710: `_accountLabeledField`; 905: `_backupNow`;
-  942: `_changePassword`.
+  199: `_AccountDialogState`; 693: `_usernameField`;
+  714: `_accountLabeledField`; 912: `_backupNow`;
+  949: `_changePassword`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
