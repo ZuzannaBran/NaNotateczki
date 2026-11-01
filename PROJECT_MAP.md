@@ -372,6 +372,16 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   247: `_restorePersistedSession`; 313: `_persistRefreshCredential`;
   343: `changePassword`; 396: `useLocalProfile`.
   Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
+- `lib/data/sync/account_settings_sync_service.dart`:
+  `AccountSettingsSyncService.syncNow` uzgadnia rewizje ustawień konta
+  (`appPreferences`, `editorPreferences`, `recentColors`,
+  `backupPreferences`). Zapisuje potwierdzone wartości per konto,
+  nie nadpisuje konfliktujących zmian, przechowuje lokalną kopię
+  sprzed pierwszego importu i normalizuje kolejność pól JSON.
+  `AppScope` uruchamia odczyt po logowaniu, przy wznowieniu i co 45 s
+  oraz wysyłkę po zmianie preferencji, recent i czasu backupu.
+- `test/account_settings_sync_service_test.dart`: dwa urządzenia,
+  wysyłka, odtworzenie, odrzucenie równoczesnego nadpisania.
 - `lib/data/sync/live_web_sync_service.dart` (około 730): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
@@ -1897,6 +1907,17 @@ dart compile js -O4 -o web/drift_worker.dart.js web/drift_worker.dart
 
 Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
+
+## Synchronizacja ustawień i natywne WebSocket
+
+- `server/api/app/routers/account_settings.py` oraz
+  `server/migrations/0007_account_settings.sql`: izolowany per konto
+  magazyn preferencji, kontrola CAS i powiadomienie WebSocket;
+  stan portowany również do repozytorium `NaNotateczki-serwer`.
+- `server/api/app/routers/realtime.py`: weryfikuje `Origin` w
+  przeglądarce, dopuszcza brak `Origin` w kliencie natywnym;
+  JWT pozostaje obowiązkowy. Regresja:
+  `server/api/tests/test_native_realtime.py`.
 
 ## 13. Wspólna edycja sesji Web
 

@@ -98,6 +98,16 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Reloads an account setting received from another signed-in device.
+  Future<void> refreshAccountPreference() async {
+    final id = _accountUserId;
+    if (!_enabled || id == null) {
+      return;
+    }
+    _preferenceGeneration++;
+    await _loadPreference(id);
+  }
+
   Future<void> setIdleSeconds(int seconds) async {
     if (!supportedIdleSeconds.contains(seconds)) {
       throw ArgumentError.value(seconds, 'seconds', 'Unsupported idle delay');
