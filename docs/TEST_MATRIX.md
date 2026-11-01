@@ -845,3 +845,7 @@ the unit suite and require a configured test server.
   sprawdzić status Saved, oryginalny UID i brak pętli.
 - Wyjście ze wspólnego edytora bez jakichkolwiek zmian nie może wytworzyć
   sztucznej oczekującej edycji w localStorage.
+
+- Bezpośrednie wejście na /share/UUID z nowej karty i po odświeżeniu:
+  SQLite WASM musi być pobrany z /sqlite3.wasm (Content-Type application/wasm),
+  bez prób pobierania z /share/sqlite3.wasm.

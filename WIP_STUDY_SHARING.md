@@ -145,3 +145,6 @@ nadpisania; bez trwałego outboxu wciąż nie ma odzyskiwania po zamknięciu.
 - Usunięto wyścig pomiędzy HTTP odświeżeniem a timerem wysyłania gościa:
   po zakończeniu odświeżenia oczekująca zmiana ponawia PUT.
 - Zamknięcie niezmienionego edytora nie tworzy fałszywego rekordu outboxu.
+
+- URI SQLite WASM w edytorze gościa rozwiązywane jest od korzenia originu,
+  niezależnie od ścieżki /share/UUID i parametrów zaproszenia.

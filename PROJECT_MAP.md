@@ -1899,6 +1899,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `test/study_share_guest_outbox_test.dart`: reload, izolacja i walidacja.
 - `study_share_memory_db_stub.dart` i `study_share_memory_db_web.dart`:
   osobna baza SQLite w pamięci, bez podpinania biblioteki konta.
+- `lib/data/sync/study_share_web_assets.dart`: poprawna absolutna ścieżka
+  modułu SQLite WASM przy bezpośrednim otwarciu zagnieżdżonego /share/UID;
+  test `study_share_web_assets_test.dart`.
 - `lib/features/library/presentation/library_screen.dart`: aktywna sesja
   i jej odzyskanie po ponownym uruchomieniu. Zmiana epoki remote sync
   odtwarza widok kanwy ze zaktualizowanego oryginału.
