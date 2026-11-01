@@ -371,6 +371,16 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   247: `_restorePersistedSession`; 313: `_persistRefreshCredential`;
   343: `changePassword`; 396: `useLocalProfile`.
   Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
+- `lib/data/sync/account_settings_sync_service.dart`:
+  `AccountSettingsSyncService.syncNow` uzgadnia rewizje ustawień konta
+  (`appPreferences`, `editorPreferences`, `recentColors`,
+  `backupPreferences`). Zapisuje potwierdzone wartości per konto,
+  nie nadpisuje konfliktujących zmian, przechowuje lokalną kopię
+  sprzed pierwszego importu i normalizuje kolejność pól JSON.
+  `AppScope` uruchamia odczyt po logowaniu, przy wznowieniu i co 45 s
+  oraz wysyłkę po zmianie preferencji, recent i czasu backupu.
+- `test/account_settings_sync_service_test.dart`: dwa urządzenia,
+  wysyłka, odtworzenie, odrzucenie równoczesnego nadpisania.
 - `lib/data/sync/live_web_sync_service.dart` (około 730): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
