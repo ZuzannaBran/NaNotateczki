@@ -138,7 +138,7 @@ class StudyShareService {
 }
 
 class StudyShareGuestClient {
-  StudyShareGuestClient() : _api = ApiClient();
+  StudyShareGuestClient({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
   final ApiClient _api;
 
