@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../data/drift/notes_database.dart';
 import '../../../data/sync/api_client.dart';
+import '../../../data/sync/shared_edit_conflicts.dart';
 import '../../../data/sync/study_share_service.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/state/editor_controller.dart';
@@ -168,11 +169,27 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         baseNotebook: original,
         notebook: submitted,
       );
-      _base = _dirty ? submitted : answer.notebook;
+      final rejected = hasRejectedSharedEdits(
+        original, submitted, answer.notebook,
+      );
+      // Even if more input arrived during the request, the next diff must
+      // use the authoritative server snapshot, not the submitted one.
+      _base = answer.notebook;
       _revision = answer.revision;
+      if (rejected) {
+        _dirty = true;
+        if (mounted) {
+          setState(() {
+            _error = 'A concurrent edit took precedence. Your changes '
+                'remain in this tab but were not fully saved.';
+            _status = 'Changes not saved';
+          });
+        }
+        return;
+      }
       if (mounted) {
         setState(() {
-          _status = 'All changes saved';
+          _status = _dirty ? 'Unsaved changes' : 'All changes saved';
           _error = null;
         });
       }
