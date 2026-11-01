@@ -213,6 +213,7 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 - `lib/core/widgets/app_dialog_actions.dart`: kolory dolnych akcji
   dialogowych dopasowane do `onSurface` w trybie jasnym i ciemnym;
   pozostałe przyciski nie zmieniają wyglądu.
+- `lib/core/widgets/app_labeled_field.dart`: stałe etykiety i wspólne obrysy formularzy konta i zgłoszeń.
 - `lib/core/widgets/empty_state.dart` (30): wspólny pusty stan.
   3: `EmptyState`.
 - `lib/core/widgets/resizable_frame.dart` (200): ramka z ośmioma uchwytami
@@ -364,6 +365,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
   Domyślny adres dla wszystkich platform to `https://api.nanotateczki.pl`;
   `BACKEND_URL` może go nadpisać w buildach lokalnych/testowych.
+- `lib/data/sync/diagnostics_upload_service.dart`: podczas zalogowanej sesji nasłuchuje trzech lokalnych logów i przesyła aktualny snapshot po 12 s bezczynności; błędy ponawia po 5 min, nie blokuje aplikacji; jeden trwały UUID urządzenia.
 - `lib/data/sync/account_credential_store.dart`: `AccountCredentialStore`
   pozwala w testach używać pamięci; implementacja
   `SecureAccountCredentialStore` korzysta z `flutter_secure_storage`
@@ -682,7 +684,7 @@ Inicjał z okrągłą obramówką pozostaje w dialogu ustawień konta;
 ikona ustawień ma 18 px
 przy zachowanym rozmiarze obszaru kliknięcia. Rejestracja i zmiana hasła
 wymagają zgodnego powtórzenia. Formularze logowania, rejestracji, lokalnej
-nazwy i zmiany hasła używają etykiet nad polami (14 px, bold, odstęp 6 px),
+nazwy i zmiany hasła współdzielą `AppLabeledField` i używają etykiet nad polami (14 px, bold, odstęp 6 px),
 obrysu 12 px i nieruchomych podpisów jak edytor wydarzeń w kalendarzu;
 brak pływających etykiet oraz wypełnionego tła pola;
 ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
@@ -1207,6 +1209,9 @@ ma suwak czułości nawigacji 0.5×–2.0×, a Visual globalną skalę
 interfejsu 75%–150% z natychmiastowym podglądem. Oba suwaki nie
 wyświetlają liczb ani etykiet wartości. Pozostałe sekcje
 obsługują ustawienia tła i podgląd logów diagnostycznych.
+Trzecia zakładka `Contact the creator` pokazuje formularz z systemem
+oraz opisem błędu. Zgłoszenie nie wymaga konta; trafia do prywatnego
+pliku serwera. Zalogowane konta wysyłają logi jako nadpisywane snapshoty.
   Na telefonach selektory System/Visual są pod etykietami; `SafeArea`
   chroni dolny obszar systemowych gestów.
 `EditorController` jest opcjonalny: ustawienia globalne działają z pustego
@@ -1217,6 +1222,10 @@ paskiem; linia jest w body, nie w AppBar.bottom.
 - 17: `EditorSettingsScreen`; 369: `_showErrorsDialog`;
   451: `_showDataIntegrityDialog`; 538: `_showOptimizationDialog`;
   624: `_BackgroundSection`.
+
+- `lib/features/editor/presentation/contact_creator_tab.dart`:
+  formularz zgłoszenia, identyczny wygląd pól jak w logowaniu.
+  Test: `test/contact_creator_tab_test.dart`.
 
 ### `lib/features/editor/presentation/interaction/notebook_overview_navigation.dart` (55 linii)
 

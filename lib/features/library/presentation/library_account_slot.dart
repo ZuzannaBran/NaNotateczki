@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
+import '../../../core/widgets/app_labeled_field.dart';
 import '../../../data/backup/remote_backup_scheduler.dart';
 import '../../../data/sync/account_session_controller.dart';
 import '../../../data/sync/api_client.dart';
@@ -714,32 +715,15 @@ class _AccountDialogState extends State<_AccountDialog> {
   }
 
   Widget _accountLabeledField({required String label, required Widget child}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          key: ValueKey('account-field-label-$label'),
-          style: const TextStyle(
-            fontSize: AppTypography.document,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        child,
-      ],
+    return AppLabeledField(
+      label: label,
+      labelKey: ValueKey('account-field-label-$label'),
+      child: child,
     );
   }
 
   InputDecoration _accountInputDecoration({Widget? suffixIcon}) {
-    return InputDecoration(
-      suffixIcon: suffixIcon,
-      border: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(12)),
-      ),
-      floatingLabelBehavior: FloatingLabelBehavior.never,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
-    );
+    return appFormFieldDecoration(suffixIcon: suffixIcon);
   }
 
   Widget _passwordField(

@@ -13,6 +13,7 @@ import '../../notebook/domain/notebook_kind.dart';
 import '../state/editor_controller.dart';
 import '../state/input_mode.dart';
 import '../state/page_background.dart';
+import 'contact_creator_tab.dart';
 import 'widgets/page_background_paint.dart';
 
 class EditorSettingsScreen extends StatelessWidget {
@@ -43,7 +44,7 @@ class EditorSettingsScreen extends StatelessWidget {
                   tabs: [
                     Tab(text: 'System'),
                     Tab(text: 'Visual'),
-                    Tab(text: 'Widgets'),
+                    Tab(text: 'Contact the creator'),
                   ],
                 ),
               ),
@@ -319,7 +320,7 @@ class EditorSettingsScreen extends StatelessWidget {
                         ],
                       ],
                     ),
-                    const SizedBox.shrink(),
+                    const ContactCreatorTab(),
                   ],
                 ),
               ),

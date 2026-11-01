@@ -22,6 +22,7 @@ import '../data/sync/account_session_controller.dart';
 import '../data/sync/account_settings_sync_service.dart';
 import '../data/sync/api_client.dart';
 import '../data/sync/cloud_sync_service.dart';
+import '../data/sync/diagnostics_upload_service.dart';
 import '../data/sync/live_web_sync_service.dart';
 import '../features/editor/state/ink_color_presets.dart';
 import '../features/library/presentation/library_controller.dart';
@@ -48,6 +49,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   RemoteBackupScheduler? _remoteBackupScheduler;
   LiveWebSyncService? _liveSync;
   AccountSettingsSyncService? _accountSettingsSync;
+  DiagnosticsUploadService? _diagnosticsUpload;
   Timer? _settingsPoll;
   Timer? _settingsDebounce;
   int? _observedIdleSeconds;
@@ -90,6 +92,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       _studyPlanner?.savedRevision.removeListener(scheduler.markDirty);
     }
     _studyPlanner?.dispose();
+    _diagnosticsUpload?.dispose();
     _accountSession?.dispose();
     _apiClient?.close();
     final backupService = _backupService;
@@ -336,6 +339,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         final accountSession =
             _accountSession ?? AccountSessionController(apiClient);
         _accountSession = accountSession;
+        _diagnosticsUpload ??= DiagnosticsUploadService(
+          apiClient: apiClient,
+          session: accountSession,
+        );
         final remoteBackup =
             _remoteBackupService ??
             RemoteBackupService(
@@ -425,6 +432,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             ChangeNotifierProvider<StudyPlannerController>.value(
               value: planner,
             ),
+            Provider<ApiClient>.value(value: apiClient),
             Provider<NotebookRepository>.value(value: repository),
             Provider<LocalBackupService>.value(value: backupService),
             ChangeNotifierProvider<AccountSessionController>.value(
