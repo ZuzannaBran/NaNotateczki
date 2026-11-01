@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/core/theme/app_typography.dart';
+import 'package:program/core/theme/app_theme.dart';
+import 'package:program/core/widgets/app_header_divider.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/backup/remote_backup_scheduler.dart';
 import 'package:program/data/backup/remote_backup_service.dart';
@@ -59,6 +61,30 @@ void _expectAccountFieldLayout(
   );
 }
 
+void _expectAccountHeaderTypography(WidgetTester tester) {
+  final title = tester.widget<Text>(
+    find.byKey(const ValueKey('account-display-name')),
+  );
+  expect(title.style, AppHeaderDivider.titleStyle);
+
+  final statusFinder = find.byKey(const ValueKey('account-remote-status'));
+  if (statusFinder.evaluate().isNotEmpty) {
+    final status = tester.widget<Text>(statusFinder);
+    expect(status.style?.fontSize, AppTypography.small);
+    expect(
+      status.style?.color,
+      Theme.of(tester.element(statusFinder)).colorScheme.onSurfaceVariant,
+    );
+  }
+}
+
+void _expectAccountDialogTypography(WidgetTester tester) {
+  final heading = tester.widget<Text>(
+    find.byKey(const ValueKey('account-dialog-title')),
+  );
+  expect(heading.style, AppHeaderDivider.titleStyle);
+}
+
 void main() {
   useIsolatedNativeTestDocuments();
 
@@ -71,6 +97,16 @@ void main() {
   tearDown(() {
     textStorageReadOverride = null;
     textStorageWriteOverride = null;
+  });
+
+  test('account and timer typography share Georgia in both modes', () {
+    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+      expect(theme.textTheme.titleLarge?.fontFamily, 'Georgia');
+      expect(theme.textTheme.bodyMedium?.fontFamily, 'Georgia');
+      expect(theme.textTheme.bodySmall?.fontFamily, 'Georgia');
+      expect(AppHeaderDivider.titleStyle.fontSize, AppTypography.heading);
+      expect(AppHeaderDivider.titleStyle.fontWeight, FontWeight.w600);
+    }
   });
 
   testWidgets(
@@ -141,6 +177,7 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('account-settings-button')));
       await tester.pumpAndSettle();
+      _expectAccountDialogTypography(tester);
       await tester.tap(find.byKey(const ValueKey('account-sign-in-choice')));
       await tester.pumpAndSettle();
       _expectAccountActionSpacing(
@@ -208,6 +245,16 @@ void main() {
 
       expect(session.isSignedIn, isTrue);
       expect(backup.isEnabled, isTrue);
+      _expectAccountHeaderTypography(tester);
+      _expectAccountDialogTypography(tester);
+      final profileName = tester.widget<Text>(
+        find.byKey(const ValueKey('account-dialog-display-name')),
+      );
+      expect(profileName.style, AppHeaderDivider.titleStyle);
+      final profileMode = tester.widget<Text>(
+        find.byKey(const ValueKey('account-dialog-mode')),
+      );
+      expect(profileMode.style?.fontSize, AppTypography.small);
       _expectAccountActionSpacing(
         tester,
         find.byKey(const ValueKey('account-change-password')),
@@ -276,6 +323,8 @@ void main() {
 
       expect(session.isLocalProfile, isTrue);
       expect(session.displayName, 'Local Zuzanna');
+      _expectAccountHeaderTypography(tester);
+      _expectAccountDialogTypography(tester);
       expect(sync.isStarted, isFalse);
       expect(backup.isEnabled, isFalse);
       expect(stoppedBeforeSessionClear, isTrue);
@@ -456,6 +505,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome'), findsOneWidget);
+    _expectAccountDialogTypography(tester);
     expect(find.text('NaNotateczki'), findsOneWidget);
     final welcomeCopy = tester.widget<Text>(
       find.byKey(const ValueKey('account-welcome-description')),
@@ -563,6 +613,7 @@ void main() {
 
     expect(find.text('Welcome'), findsNothing);
     expect(find.text('Zuzanna'), findsOneWidget);
+    _expectAccountHeaderTypography(tester);
     expect(find.text('Z'), findsOneWidget);
     final sidebarAvatar = find.byKey(const ValueKey('account-avatar'));
     final sidebarAvatarContainer = find.descendant(
@@ -584,6 +635,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('account-settings-button')));
     await tester.pumpAndSettle();
+    _expectAccountDialogTypography(tester);
     final dialogAvatar = find.byKey(const ValueKey('account-dialog-avatar'));
     final dialogAvatarContainer = find.descendant(
       of: dialogAvatar,
