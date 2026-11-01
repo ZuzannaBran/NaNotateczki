@@ -115,3 +115,15 @@ Dalsza poprawka: `hasRejectedSharedEdits` i testy `shared_edit_conflicts_test.da
 wykrywają, gdy serwer nie przyjął edycji konkretnego obiektu. Klient zachowuje
 ją lokalnie w otwartej karcie i pokazuje ostrzeżenie zamiast cichego
 nadpisania; bez trwałego outboxu wciąż nie ma odzyskiwania po zamknięciu.
+
+## Doprecyzowanie i poprawka współpracy (2026-11-01)
+
+- Blokada dotyczy **liczby aktywnych linków/sesji jednego dokumentu**, a
+  nie liczby gości. Jedna sesja wpuszcza wielu edytujących uczestników.
+- Poprawiono mylący opis przy tworzeniu linku (goście mogą edytować).
+- Przed zastosowaniem zdarzeń z serwera klient właściciela opróżnia edytor
+  i wysyła oczekujące zmiany przez serwerowy merge, ograniczając zbędne
+  kopie konfliktowe podczas równoczesnej edycji.
+- Dodano regresję synchronizacji właściciel–gość i tekstu dialogu.
+- Nadal brak trwałego outboxu gości, przeglądarkowego E2E i pomiarów.
+  Zmiany nie są wdrożeniem produkcyjnym, testy Flutter nieuruchomione.

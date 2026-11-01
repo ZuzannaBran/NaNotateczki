@@ -371,6 +371,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   utrwalonego `userId`, więc kursor, rewizje i outbox nie przechodzą między
   kontami.
   16: `InitialSyncPolicy`; 18: `LiveWebSyncService`; `start`, `enqueue`, `syncNow`; po reconnect i wznowieniu aplikacji REST uzupełnia utracone sygnały WebSocket;
+  Przy odbiorze zmian gości najpierw opróżnia edytor właściciela i wysyła
+  jego oczekujące operacje ścieżką serwerowego scalenia, zanim zastosuje
+  feed, aby niezależne zmiany nie tworzyły kopii konfliktowej.
   81: `enqueue`; 97: `syncNow`; 533: `stop`.
 
 ## 5. Domena notebooka i repozytorium

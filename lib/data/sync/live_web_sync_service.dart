@@ -340,9 +340,15 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         throw const FormatException('Malformed sync changes response.');
       }
       if (rawChanges.isNotEmpty) {
-        // Persist in-progress text before applying another user's edits.
+        // Capture in-progress host edits before applying guest changes.
         await AppSaveCoordinator.instance.flushPending();
         await repository.waitForPendingSaves();
+        // A shared document must reach the server through its merge path
+        // before an incoming revision can replace the local editor's data.
+        // CAS still protects ordinary, non-shared documents.
+        for (final uid in _pending.toList()) {
+          await _push(uid);
+        }
       }
       final imports = <String, Notebook>{};
       final preserveLocal = <String>{};

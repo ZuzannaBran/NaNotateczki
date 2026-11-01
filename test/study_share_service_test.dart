@@ -71,6 +71,11 @@ void main() {
     await tester.enterText(find.byType(TextField), 'x');
     await tester.tap(find.text('Create link'));
     await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Everyone with the link and password can edit'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Only you can edit'), findsNothing);
 
     expect(service.createdPassword, 'x');
     expect(find.text('Invitation link'), findsOneWidget);

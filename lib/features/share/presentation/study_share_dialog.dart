@@ -181,7 +181,7 @@ class _StudyShareDialogState extends State<_StudyShareDialog> {
             const SizedBox(height: 16),
             if (active == null) ...[
               const Text(
-                'Guests can watch the canvas live. Only you can edit.',
+                'Everyone with the link and password can edit this document live. All accepted changes are saved in the host's original document.',
               ),
               const SizedBox(height: 12),
               TextField(

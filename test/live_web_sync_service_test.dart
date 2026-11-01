@@ -165,6 +165,127 @@ void main() {
     expect(sync.remoteApplyEpoch, greaterThan(epoch));
   });
 
+  test('host and guest edits merge into the original without extra copies',
+      () async {
+    final now = DateTime.utc(2026, 11, 1, 12);
+    final initial = Notebook(
+      uid: 'shared-host-document',
+      title: 'Shared document',
+      kind: NotebookKind.board,
+      folder: 'Meeting',
+      createdAt: now,
+      updatedAt: now,
+      pages: [
+        NotePage(
+          id: 'page-1',
+          title: 'Page',
+          textBlocks: [],
+          imageBlocks: [],
+          inkStrokes: [],
+          isBookmarked: false,
+        ),
+      ],
+    );
+    final guest = initial.copyWith(
+      updatedAt: now.add(const Duration(seconds: 1)),
+      pages: [initial.pages.single.copyWith(isBookmarked: true)],
+    );
+    final owner = initial.copyWith(
+      updatedAt: now.add(const Duration(seconds: 2)),
+      pages: [initial.pages.single.copyWith(title: 'Host change')],
+    );
+    final merged = owner.copyWith(
+      pages: [owner.pages.single.copyWith(isBookmarked: true)],
+    );
+    var changeRequests = 0;
+    var ownerWriteSent = false;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return _sessionResponse();
+        }
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response(jsonEncode({
+            'cursor': 0,
+            'notebooks': [{
+              'uid': initial.uid,
+              'revision': 1,
+              'deleted': false,
+              'notebook': NotebookRepository.encodeNotebook(initial),
+            }],
+          }), 200);
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          changeRequests++;
+          if (changeRequests == 1) {
+            return http.Response(
+              jsonEncode({'cursor': 0, 'changes': []}), 200,
+            );
+          }
+          expect(ownerWriteSent, isTrue,
+              reason: 'Host edits must merge before guest feed is applied.');
+          return http.Response(jsonEncode({
+            'cursor': 2,
+            'changes': [{
+              'uid': initial.uid,
+              'revision': 2,
+              'deleted': false,
+              'notebook': NotebookRepository.encodeNotebook(guest),
+            }],
+          }), 200);
+        }
+        if (request.method == 'PUT' &&
+            request.url.path == '/v1/sync/notebooks/${initial.uid}') {
+          ownerWriteSent = true;
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['expectedRevision'], 1);
+          expect(
+            body['baseNotebook'],
+            NotebookRepository.encodeNotebook(initial),
+          );
+          expect(
+            body['notebook'],
+            NotebookRepository.encodeNotebook(owner),
+          );
+          return http.Response(jsonEncode({
+            'revision': 3,
+            'cursor': 2,
+            'notebook': NotebookRepository.encodeNotebook(merged),
+          }), 200);
+        }
+        fail('Unexpected request: ${request.method} ${request.url}');
+      }),
+    );
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final session = AccountSessionController(client);
+    await session.login('owner', 'password123');
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+    );
+    addTearDown(() async {
+      sync.dispose();
+      session.dispose();
+      await database.close();
+      client.close();
+    });
+    await sync.start(InitialSyncPolicy.downloadRemote);
+    await repository.saveNotebook(owner);
+    sync.enqueue([NotebookRepositoryChange.full(initial.uid)]);
+    await sync.syncNow();
+
+    expect(ownerWriteSent, isTrue);
+    final notebooks = await repository.fetchNotebooks();
+    expect(notebooks, hasLength(1));
+    expect(notebooks.single.uid, initial.uid);
+    expect(notebooks.single.folder, 'Meeting');
+    expect(notebooks.single.pages.single.title, 'Host change');
+    expect(notebooks.single.pages.single.isBookmarked, isTrue);
+  });
+
   test('resuming Web sync reconciles missed realtime notifications', () async {
     var changeRequests = 0;
     final client = ApiClient(
