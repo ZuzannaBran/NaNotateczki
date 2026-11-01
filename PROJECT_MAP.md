@@ -558,12 +558,18 @@ W drzewku folderów przytrzymanie notebooka, boarda albo folderu uruchamia
 drag & drop na wiersz innego folderu (również zwiniętego). Folder źródłowy
 zwija się przy rozpoczęciu gestu, a po przeniesieniu pozostaje zwinięty pod
 nowym rodzicem razem z całym poddrzewem. Podczas przeciągania cały wiersz
-zachowuje oryginalną szerokość, ikonę, nazwę i menu, ma mocniejsze
+zachowuje oryginalną szerokość, nazwę i menu, ma mocniejsze
 podświetlenie i przesuwa się tylko w pionie; w miejscu źródłowym nie
 wyświetla się jego kopia. Folder docelowy przyjmuje element z podświetleniem
 i rozwija się po upuszczeniu. Przed ruchem kończone są oczekujące
 zapisy edytora; zmiana folderu aktywnego dokumentu odtwarza
 kontroler edytora z aktualnymi metadanymi, zamiast zostawiać stary folder.
+
+Wiersze drzewa folderów, notatników, tablic i planerów nie mają
+piktogramów typów. Pozostają strzałki rozwijania folderów i menu
+trzech kropek. Foldery zaczynają nazwę 8 px za 30-pikselową
+strzałką, dokumenty mają wcięcie 48 px; podfoldery zachowują
+rekurencyjne wcięcie 16 px.
 
 Menu trzech kropek folderów, notebooków i boardów (130 px) oraz menu
 dodawania przez `+` (150 px) używają wspólnej pozycji przy prawej krawędzi
@@ -595,15 +601,15 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   925: `_CreateMenuButton`;
   970: `_LibraryTreePane` (`_LibraryTreePaneState` 997);
   1212: `_buildFolder`; 1394: `_FolderTreeRow`;
-  1502: `_LibraryTreeItemRow` (planner: konturowy kwadrat z tikiem);
-  1607: `_sidebarMenuShape`;
-  1621: `_SidebarMenuShadowPainter`;
-  1657: `_showSidebarMenu`;
-  1770: `_TreeRowActions`;
-  1844: `_LibraryWorkspace`;
-  1955: `_LeftZoneToggleTab` (również przycisk timera).
+  1497: `_LibraryTreeItemRow` (bez ikon typów);
+  1595: `_sidebarMenuShape`;
+  1609: `_SidebarMenuShadowPainter`;
+  1645: `_showSidebarMenu`;
+  1758: `_TreeRowActions`;
+  1832: `_LibraryWorkspace`;
+  1943: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (1100 linii)
+### `lib/features/library/presentation/library_account_slot.dart` (1096 linii)
 
 Przestrzenny onboarding `Create account`/`Sign in`/`Try local` z
 wyśrodkowaną nazwą NaNotateczki, podglądem haseł i spójnymi odstępami
@@ -613,8 +619,11 @@ Pasek konta oraz nagłówki dialogów i profilu używają tej samej typografii
 opisy statusu, trybu konta i polityk synchronizacji to 12 px w kolorze
 `onSurfaceVariant`. Nagłówek sekcji synchronizacji to 16 px, waga 600.
 Globalny motyw dostarcza Georgia (lub systemowy zamiennik).
-Dolny pasek pokazuje konto i stan backupu oraz synchronizacji. Inicjał konta
-ma subtelne okrągłe obramowanie w panelu i dialogu; ikona ustawień ma 18 px
+Dolny pasek pokazuje nazwę konta i status w dwóch wyrównanych do timera
+wierszach, bez awatara, bez dodatkowej karty i z marginesem 14 px.
+Status jest pokazywany również w trybie lokalnym i przed logowaniem.
+Inicjał z okrągłą obramówką pozostaje w dialogu ustawień konta;
+ikona ustawień ma 18 px
 przy zachowanym rozmiarze obszaru kliknięcia. Rejestracja i zmiana hasła
 wymagają zgodnego powtórzenia. Formularze logowania, rejestracji, lokalnej
 nazwy i zmiany hasła używają etykiet nad polami (14 px, bold, odstęp 6 px),
@@ -625,10 +634,10 @@ loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
 
 - 20: `showLibraryAccountDialog`; 49: `LibraryAccountSlot`;
-  153: `_AccountAvatar`; 185: `_AccountDialog`;
-  198: `_AccountDialogState`; 688: `_usernameField`;
-  709: `_accountLabeledField`; 904: `_backupNow`;
-  941: `_changePassword`.
+  149: `_AccountAvatar`; 181: `_AccountDialog`;
+  194: `_AccountDialogState`; 684: `_usernameField`;
+  705: `_accountLabeledField`; 900: `_backupNow`;
+  937: `_changePassword`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
@@ -1491,7 +1500,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany oraz brak
   przenoszenia outboxu i rewizji między kontami.
 - `test/library_account_slot_test.dart`: centrowanie nazwy, podgląd i limit
-  hasła, obramowanie awatara, rozmiar ikony ustawień i odstępy przycisków;
+  hasła, brak awatara w pasku konta (pozostaje w dialogu), wyrównanie
+  statusu z nazwą, rozmiar ikony ustawień i odstępy przycisków;
   dostęp do konta w szerokim sidebarze
   i mobilnym drawerze, onboarding/rejestracja z powtórzeniem hasła, lokalna
   nazwa i inicjał, logowanie, ręczny backup, pierwsza polityka Web, zmiana
