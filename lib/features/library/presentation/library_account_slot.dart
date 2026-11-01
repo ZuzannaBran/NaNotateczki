@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/app_header_divider.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
+import '../../../core/widgets/app_header_divider.dart';
 import '../../../data/backup/remote_backup_scheduler.dart';
 import '../../../data/sync/account_session_controller.dart';
 import '../../../data/sync/api_client.dart';
@@ -316,10 +316,7 @@ class _AccountDialogState extends State<_AccountDialog> {
         const Text(
           'NaNotateczki',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: AppTypography.heading,
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppHeaderDivider.titleStyle,
         ),
         const SizedBox(height: 12),
         const Text(
