@@ -1904,15 +1904,24 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   import potwierdzonej aktualizacji serwera i brak cichego nadpisania
   niesynchronizowanej pracy.
 - `server/api/app/routers/study_shares.py`: dostęp i zapisy gości
-  tylko do jednego UID; pierwszeństwo serwerowego czasu mikrosekundowego,
-  większa zmiana przy remisie, blokada po zakończeniu.
+  tylko do jednego UID, sprawdzanie bazowych rewizji w historii serwera
+  oraz ochrona przed wieloma sesjami tego samego dokumentu;
+  mikrosekundowe pierwszeństwo i blokada po zakończeniu.
 - `server/api/app/routers/sync.py`: właściciel edytuje przez te same
-  zasady scalania i rozsyła sygnały WebSocket gościom.
+  zasady scalania; dziennik zdarzeń otrzymuje scalony dokument. Usunięcie
+  oryginału atomowo odbiera dostęp do aktywnej sesji.
 - `server/migrations/0005_study_share_edit_clock.sql`: trwały zegar
   rozstrzygania konfliktów.
+- `server/migrations/0006_change_events_document_revision.sql`:
+  indeks historycznych rewizji służący walidacji wspólnej bazy zmian.
 - `test/study_share_http_test.dart`: kontrakt HTTP gościa i odcięcie,
-  przedłużanie i zakończenie mimo awarii synchronizacji.
+  przedłużanie i natychmiastowe żądanie zakończenia przed synchronizacją.
+- `test/study_share_guest_socket_test.dart`: kody WebSocket oznaczające
+  trwałe odebranie dostępu (bez nieskończonego reconnect).
 - `test/live_web_sync_service_test.dart`: powrót zmian gości do
   oryginału właściciela, bez konfliktowych kopii bez potrzeby.
 - `server/api/tests/test_study_shares_flow.py`: REST/WebSocket,
-  edycja, izolacja, pierwszeństwo i remis zmian.
+  edycja, izolacja, walidacja bazowych snapshotów, zapisy właściciela
+  w feedzie, usunięcie oryginału, pojedyncza sesja i konflikty.
+- Uwaga: outbox gościa nie przetrwa zamknięcia karty; testy środowiskowe
+  i wdrożenie nadal wymagają wykonania. Nie usuwać oznaczenia WIP.
