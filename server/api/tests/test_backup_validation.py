@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from app.models import DeviceBackup
-from app.routers.backups import validate_envelope
+from app.routers.backups import original_payload_json, validate_envelope
 
 
 def compact_sha256(value: object) -> str:
@@ -114,4 +114,83 @@ def test_rejects_malformed_or_duplicate_notebooks_in_verified_backup() -> None:
     payload["notebooks"] = [notebook, dict(notebook)]
     envelope["checksum"] = compact_sha256(payload)
     with pytest.raises(ValueError, match="duplicate notebook UID"):
+        validate_envelope(envelope, record)
+
+def test_accepts_dart_json_number_and_string_representation() -> None:
+    record = backup_record(uuid.uuid4())
+    payload_json = (
+        b'{"notebooks":[],"libraryState":{"label":"\\u0141odz"},'
+        b'"studyPlannerState":{"value":1e-7,"nested":{"payload":"a}b"}}}'
+    )
+    digest = hashlib.sha256(payload_json).hexdigest()
+    envelope = {
+        "format": "nanotateczki-server-backup",
+        "version": 2,
+        "deviceId": str(record.device_id),
+        "checksumAlgorithm": "sha256",
+        "checksum": digest,
+    }
+    prefix = json.dumps(envelope, separators=(",", ":"))[:-1].encode()
+    raw = prefix + b',"payload":' + payload_json + b"}"
+
+    assert bytes(original_payload_json(raw)) == payload_json
+    with pytest.raises(ValueError, match="payload checksum mismatch"):
+        validate_envelope(json.loads(raw), record)
+    validate_envelope(json.loads(raw), record, original_json=raw)
+
+
+def test_rejects_tampering_and_malformed_notebooks_with_wire_checksum() -> None:
+    record = backup_record(uuid.uuid4())
+    payload_json = (
+        b'{"notebooks":[],"libraryState":{},"studyPlannerState":{"value":1e-7}}'
+    )
+    envelope = {
+        "format": "nanotateczki-server-backup",
+        "version": 2,
+        "deviceId": str(record.device_id),
+        "checksumAlgorithm": "sha256",
+        "checksum": hashlib.sha256(payload_json).hexdigest(),
+    }
+    prefix = json.dumps(envelope, separators=(",", ":"))[:-1].encode()
+    tampered = prefix + b',"payload":' + payload_json.replace(b"1e-7", b"2e-7") + b"}"
+    with pytest.raises(ValueError, match="payload checksum mismatch"):
+        validate_envelope(json.loads(tampered), record, original_json=tampered)
+
+    malformed = b'{"notebooks":[{"uid":"bad"}],"libraryState":{},"studyPlannerState":{}}'
+    bad_raw = prefix + b',"payload":' + malformed + b"}"
+    with pytest.raises(ValueError, match="notebook payload is incomplete"):
+        validate_envelope(json.loads(bad_raw), record, original_json=bad_raw)
+
+
+
+def test_account_preferences_are_optional_but_validated() -> None:
+    record = backup_record(uuid.uuid4())
+    payload = {
+        "notebooks": [],
+        "libraryState": {},
+        "studyPlannerState": {},
+        "appPreferences": {"darkMode": True},
+        "editorPreferences": {},
+        "recentColors": [4278190080],
+        "backupPreferences": {"version": 1, "idleSeconds": 900},
+    }
+    envelope = {
+        "format": "nanotateczki-server-backup",
+        "version": 2,
+        "deviceId": str(record.device_id),
+        "checksumAlgorithm": "sha256",
+        "payload": payload,
+    }
+    envelope["checksum"] = compact_sha256(payload)
+    validate_envelope(envelope, record)
+
+    payload["recentColors"] = [True]
+    envelope["checksum"] = compact_sha256(payload)
+    with pytest.raises(ValueError):
+        validate_envelope(envelope, record)
+
+    payload["recentColors"] = []
+    payload["backupPreferences"]["idleSeconds"] = 1
+    envelope["checksum"] = compact_sha256(payload)
+    with pytest.raises(ValueError):
         validate_envelope(envelope, record)
