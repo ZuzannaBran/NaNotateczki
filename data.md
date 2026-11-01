@@ -9,17 +9,13 @@ offline również po zalogowaniu.
 - Przy pierwszym uruchomieniu użytkownik jawnie wybiera rejestrację, logowanie
   albo tryb lokalny. `localOnly` wymaga wyłącznie lokalnej nazwy użytkownika
   i nie wykonuje żadnego połączenia z API.
-- `account` powstaje dopiero po jawnym logowaniu. Samo logowanie nie wysyła
-  lokalnych notatek.
-- Backup zdalny wymaga osobnego wywołania
-  `RemoteBackupScheduler.enableForSignedInAccount()`.
-- Synchronizacja Web wymaga jawnego `LiveWebSyncService.start(...)` z wyborem:
-  `uploadLocal`, `downloadRemote` albo `mergeSafely`. Pierwsze dwie opcje
-  odmawiają działania, jeśli mogłyby nadpisać niepustą bibliotekę.
-- Panel konta uruchamia backup dopiero po poprawnym logowaniu, a na Web
-  wymaga od użytkownika wyboru jednej z trzech polityk przed startem live
-  sync. Przy wylogowaniu najpierw zatrzymuje live sync i backup, a dopiero
-  potem czyści sesję przechowywaną w pamięci.
+- Konto powstaje dopiero po jawnym logowaniu. Na Linuxie, Web, Androidzie
+  i iOS aplikacja automatycznie uruchamia bezpieczne scalanie `mergeSafely`,
+  odtwarzając najpierw brakujące dane ze zweryfikowanego backupu.
+- Odtwarzanie backupu nigdy nie zastępuje istniejącego notatnika;
+  pierwszeństwo nad nim mają zdarzenia synchronizacji i tombstones.
+- Scheduler backupu włącza się dopiero po inicjalizacji konta i sync.
+  Po wylogowaniu aplikacja zatrzymuje sync i backup przed wyczyszczeniem sesji.
 - `account_profile.json` przechowuje ukończenie onboardingu,
   preferowany tryb, lokalną nazwę, ostatnią nazwę użytkownika oraz `boundUserId`.
   Raz przypisane dane lokalne nie mogą zostać użyte z innym kontem bez
@@ -110,10 +106,9 @@ katalogu głównego ani całego katalogu domowego jako celu.
   używany do nowych backupów.
 - WebSocket przenosi wyłącznie mały sygnał zmiany. Pełny, trwały stan jest
   zawsze pobierany przez REST z kursorem `change_events`.
-- Przy przywróceniu konta na starcie natywny scheduler backupu wraca
-  do działania. Pierwszy sync Web nadal wymaga jawnego wyboru polityki;
-  samo odnowienie tokenu nie rozpoczyna synchronizacji.
-
+- Przy przywróceniu zapamiętanego konta na wszystkich platformach aplikacja
+  ponownie uruchamia synchronizację i backup. WebSocket służy także na
+  platformach natywnych; trwałe dane są pobierane przez REST.
 ## Serwer
 
 Kod wdrożeniowy znajduje się w `server/`. PostgreSQL i API są dostępne tylko
@@ -146,8 +141,9 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 
 1. Klient opróżnia aktywne zapisy, odrzuca backup przy uszkodzonych rekordach
    i buduje format `nanotateczki-server-backup` v2.
-2. Snapshot zawiera notatniki z bajtami obrazów, foldery/zadania oraz pełny
-   `study_planner.json`.
+2. Snapshot zawiera notatniki z bajtami obrazów, foldery/zadania,
+   `study_planner.json`, `app_prefs.json`, `editor_prefs.json`,
+   `shared_recent_colors.json` i preferencję bezczynności backupu konta.
 3. Klient liczy SHA-256, tworzy rekord `pending`, wysyła maksymalnie 64 MiB i
    wywołuje `finalize`.
 4. Serwer ponownie sprawdza rozmiar, SHA-256, format, urządzenie i checksumę
@@ -186,8 +182,9 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
   dokument z dopiskiem `Conflict`, a następnie stosuje stan serwera.
 - Usunięcia są tombstonami. Outbox znika dopiero po potwierdzonym commicie.
 - Po reconnect klient zawsze wywołuje `/v1/sync/changes?after=<cursor>`.
-- Na Web po wznowieniu aplikacji i zapasowo co 45 sekund (10 sekund po błędzie)
-  weryfikuje zmiany przez REST, niezależnie od częstotliwości backupów.
+- Na wszystkich platformach po wznowieniu aplikacji i zapasowo co 45 sekund
+  (10 sekund po błędzie) weryfikuje zmiany przez REST. Ścieżki obrazów
+  przesyłanych przez konto są neutralne względem systemu plików urządzenia.
 - Feed jest stronicowany po 500 zdarzeń; klient pobiera wszystkie pełne
   strony, zanim zacznie wysyłać lokalny outbox.
 
@@ -225,27 +222,58 @@ narzędziem `age`. Skrypt nie wdraża retencji i nie zastępuje testu odtworzeni
   migracji nie edytuje się, tylko dodaje następną.
 
 
-## Współdzielona sesja nauki Web
+## Wspólna edycja sesji Web
 
-Sesja jest tylko sposobem na wyświetlenie kanwy na żywo zaproszonym
-osobom; nie jest alternatywnym magazynem dokumentów ani nowym właścicielem
-notatnika. Projekt, jego UID, folder, wszystkie strony i lokalny backup
-pozostają w bibliotece autora. Udostępnianie nie usuwa ani nie przenosi
-oryginalnego projektu.
+Właściciel udostępnia istniejący notebook lub board na 4 godziny.
+Link `/share/<UUID>` i hasło 1–128 znaków pozwalają gościowi edytować
+**wyłącznie ten dokument** bez konta. Token gościa nie daje dostępu
+do folderów, innych notatek, backupów ani API właściciela. Dane gościa
+są trzymane w osobnej bazie SQLite WASM w pamięci, a nie w IndexedDB konta.
+Ostatni niepotwierdzony snapshot i zweryfikowana wersja bazowa są zapisywane
+dodatkowo pod kluczem specyficznym dla linku w magazynie tekstowym
+(przeglądarkowy localStorage). Po ponownym podaniu hasła przywracana jest
+wersja oczekująca i ponawiana próba scalenia. Bilet i hasło nie są
+utrwalane. Limit pojemności localStorage i zamknięcie karty przed lokalnym
+zapisem pozostają ryzykiem i są sygnalizowane w interfejsie.
 
-Właściciel musi być zalogowany i mieć włączoną synchronizację Web.
-Przed utworzeniem linku i przed ręcznym zakończeniem sesji aplikacja
-wykonuje flush edytora i repozytorium, czeka na synchronizację z kontem,
-a w przypadku błędu/pending odmawia potwierdzenia zapisu. Backend dodatkowo
-weryfikuje, że udostępniany dokument jest aktywnym rekordem konta
-`synced_notebooks`. Zakończenie sesji tylko blokuje bilety gości i kasuje
-chwilowy obraz PNG; nie dotyka rekordu notatnika.
+Każda potwierdzona zmiana trafia w transakcji PostgreSQL do istniejącego
+`synced_notebooks` pod **oryginalnym UID i folderem**; zmiana nie tworzy
+osobnego pliku lub dokumentu. Zapis powiadamia klientów przez WebSocket,
+a odpytywanie zapasowe służy wyłącznie na wypadek utraty połączenia.
+Gdy sesja jest aktywna, edytor ma krótszy debounce 100 ms, synchronizacja
+90 ms, a gość wysyła zapisane zmiany po dodatkowych 35 ms.
+Nie jest to gwarancja latencji Internetu, Cloudflare czy renderowania.
 
-Zaproszenie jest linkiem `/share/<session UUID>` oraz osobno
-przekazanym hasłem, bez obowiązku zakładania konta. Hasło sesji ma hash
-Argon2id; bilet uczestnika jest wyłącznie w pamięci przeglądarki i pozwala
-pobierać jedynie prywatny obraz udostępnionej kanwy. Nie udostępnia
-biblioteki, SQLite ani tokenów konta autora. Uczestnicy mają wyłącznie
-podgląd. Obraz aktualizuje się przez WebSocket i chroniony REST.
-Sesja wygasa po 4 godzinach; w ostatnich 5 minutach właściciel dostaje
-ostrzeżenie i może przedłużyć o kolejne 4 godziny bez zmiany linku.
+Serwer weryfikuje `baseRevision` i `baseNotebook` względem
+niezmiennej historii `change_events`; indeks na rewizję pochodzi z migracji
+`0006_change_events_document_revision.sql`. Tylko jedna aktywna sesja
+może dotyczyć konkretnego UID. Właściciel usuwa oryginał i jednocześnie
+unieważnia sesję w tej samej transakcji. Feed właściciela zapisuje
+scalony stan dokumentu, nie stan pojedynczego żądania.
+
+Serwer scala zmiany niezależnych obiektów (kreski, pola tekstowe, obrazy)
+bez nadpisywania ich. Gdy ten sam obiekt zmieniono jednocześnie, wygrywa
+wcześniejszy czas przyjęcia przez serwer z dokładnością do mikrosekund.
+W identycznej mikrosekundzie rozstrzyga większy rozmiar zmiany względem
+wspólnej wersji początkowej. Rozstrzygnięcia są utrwalane w
+`study_shares.edit_clock` (migracja `0005_study_share_edit_clock.sql`).
+Zegary urządzeń nie są używane. Zmiany lokalne w konflikcie z
+potwierdzonymi z serwera wymagają bezpiecznego rozdzielenia, nigdy
+cichego usuwania treści.
+
+Po restarcie strony właściciel może odzyskać aktywną sesję z API;
+po stronie gościa ponowne wejście wymaga podania hasła. Przedłużenie
+w ostatnich 15 minutach dodaje 4 godziny i zachowuje link oraz bilety.
+Ręczne zakończenie unieważnia bilety niezwłocznie, nawet gdy zapis
+lokalny jest zablokowany. Po wygaśnięciu serwer zwraca HTTP 410
+i żadne nowe operacje nie są przyjmowane.
+
+### Granica bezpieczeństwa niedokończonego wdrożenia
+
+Wspólna edycja Web nadal jest WIP: gość przechowuje bazę roboczą
+w pamięci, ale niepotwierdzony snapshot jest utrwalany w localStorage.
+Nie gwarantuje to odzyskania edycji jeszcze niezapisanej lokalnie,
+przekraczającej limit magazynu lub wykonanej podczas nagłego zakończenia
+procesu przed zakończeniem zapisu. Przed włączeniem produkcyjnym wymagane są testy Flutter,
+FastAPI, PostgreSQL, równoczesna edycja w dwóch przeglądarkach oraz testy
+odzyskiwania i latencji. Na serwerze wymagane są migracje 0004, 0005 i 0006.

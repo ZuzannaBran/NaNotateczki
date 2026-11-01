@@ -114,6 +114,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
       _preferenceKey(userId),
       jsonEncode({'version': 1, 'idleSeconds': seconds}),
     );
+    markDirty();
   }
 
   Future<void> uploadNow({bool manual = false}) {

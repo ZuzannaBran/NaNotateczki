@@ -80,10 +80,12 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   niezależny od migracji bazy notatek.
 - Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
   backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
-- 31: `AppScope`; 38: `_AppScopeState`; 91: `didRequestAppExit`.
-- 310: `AppUiScale`; 358: `_ExitGuardOverlay`;
-  381: `_FinishingExitOverlay`; 489: `_BackupScheduler`;
-  685: `flushForExit`.
+- 31: `AppScope`; 38: `_AppScopeState`; 105: `didRequestAppExit`;
+  `_startAccountSync` automatycznie odtwarza stan po logowaniu i restarcie
+  na wszystkich platformach, zanim uruchomi backup.
+- 411: `AppUiScale`; 459: `_ExitGuardOverlay`;
+  482: `_FinishingExitOverlay`; 590: `_BackupScheduler`;
+  786: `flushForExit`.
 
 ## 3. Core
 
@@ -286,14 +288,20 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/remote_backup_service.dart` (162 linie)
+### `lib/data/backup/remote_backup_service.dart` (403 linie)
 
 Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
-zadania i planer, liczy SHA-256, wykonuje pending → upload → finalize i uznaje
+zadania, planer, ustawienia, Recent i preferencję backupu; liczy SHA-256,
+wykonuje pending → upload → finalize i uznaje
 wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
 
 - 12: `RemoteBackupReceipt`; 24: `RemoteBackupService`;
-  38: `uploadVerifiedSnapshot`.
+  38: `uploadVerifiedSnapshot`; `hydrateFromLatestAccountBackup` pobiera
+  najnowszy zweryfikowany backup, weryfikuje SHA i importuje go tylko
+  do pustej biblioteki, o ile serwer nie ma już historii zmian.
+  Nie nadpisuje istniejących preferencji ani danych planera; po udanym
+  sprawdzeniu zapisuje znacznik, aby nie pobierać wielkiego backupu
+  podczas każdego restartu.
 
 ### `lib/data/backup/remote_backup_scheduler.dart` (343 linie)
 
@@ -364,14 +372,19 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   247: `_restorePersistedSession`; 313: `_persistRefreshCredential`;
   343: `changePassword`; 396: `useLocalProfile`.
   Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
-- `lib/data/sync/live_web_sync_service.dart` (613): jawna polityka pierwszej
+- `lib/data/sync/live_web_sync_service.dart` (około 730): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
-  tylko jako sygnał; własny push nie przesuwa kursora zdarzeń z innych
+  tylko jako sygnał na wszystkich platformach; własny push nie przesuwa
+  kursora zdarzeń z innych
   urządzeń. `start`/`stop` zerują pamięciowy stan konta, a zapis stanu używa
   utrwalonego `userId`, więc kursor, rewizje i outbox nie przechodzą między
-  kontami.
+  kontami. Normalizuje ścieżki obrazów, zapobiegając fałszywym konfliktom
+  między Linuxem, Web, iOS i Androidem.
   16: `InitialSyncPolicy`; 18: `LiveWebSyncService`; `start`, `enqueue`, `syncNow`; po reconnect i wznowieniu aplikacji REST uzupełnia utracone sygnały WebSocket;
+  Przy odbiorze zmian gości najpierw opróżnia edytor właściciela i wysyła
+  jego oczekujące operacje ścieżką serwerowego scalenia, zanim zastosuje
+  feed, aby niezależne zmiany nie tworzyły kopii konfliktowej.
   81: `enqueue`; 97: `syncNow`; 533: `stop`.
 
 ## 5. Domena notebooka i repozytorium
@@ -645,8 +658,10 @@ nazwy i zmiany hasła używają etykiet nad polami (14 px, bold, odstęp 6 px),
 obrysu 12 px i nieruchomych podpisów jak edytor wydarzeń w kalendarzu;
 brak pływających etykiet oraz wypełnionego tła pola;
 ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
-loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
+loginie `AppScope` automatycznie inicjuje odzyskiwanie i bezpieczny sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
+  Automatyczne inicjowanie synchronizacji należy do `AppScope`, także na
+  platformach natywnych; ręczne polityki pozostają awaryjnym wyborem.
 
 - 20: `showLibraryAccountDialog`; 49: `LibraryAccountSlot`;
   154: `_AccountAvatar`; 186: `_AccountDialog`;
@@ -1756,6 +1771,11 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   Testy używają izolowanego natywnego katalogu dla preferencji i logów błędów,
   aby regresje nie generowały `MissingPluginException`.
 - `test/cloud_sync_service_test.dart`: dodatkowe konflikty czasów i ID.
+- `test/account_cross_device_backup_test.dart`: transfer zweryfikowanych
+  notatników, preferencji konta, Recent i opóźnienia backupu na nowe
+  urządzenie; odrzucenie uszkodzonego payloadu przed zapisem.
+- `test/account_tombstone_bootstrap_test.dart`: tombstone przy logowaniu
+  usuwa stary UID, ale zachowuje lokalne edycje w osobnej kopii.
 - `test/cross_platform/eraser_stress_test.dart`: deterministyczne sekwencje
   gumki z kontrolą unikalności i niepowracania raz usuniętych ID.
 - `test/library_controller_lifecycle_test.dart`: dispose podczas
@@ -1878,26 +1898,62 @@ dart compile js -O4 -o web/drift_worker.dart.js web/drift_worker.dart
 Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
 
-## 13. Wspólne sesje Web
+## 13. Wspólna edycja sesji Web
 
-- `lib/data/sync/study_share_service.dart`: tworzenie/publikacja/przedłużanie
-  i zakończenie sesji po potwierdzeniu trwałego zapisu właściciela
-  przez LiveWebSync; osobny, anonimowy klient gościa.
-- `lib/features/share/presentation/study_share_dialog.dart`: formularz
-  linku i hasła, kopiowanie, wygaśnięcie i przedłużenie, spójny AlertDialog.
-- `lib/features/share/presentation/study_share_capture.dart`: ograniczone
-  rozmiarowo PNG istniejącego edytora, poza głównym wątkiem sieciowym,
-  bez udostępniania biblioteki.
-- `lib/features/share/presentation/study_share_guest_screen.dart`: wejście
-  przez link bez konta, WebSocket i okresowa kontrola najnowszego obrazu.
-- `lib/main.dart`: trasa `/share/{id}` rozpoznawana przed inicjalizacją
-  prywatnej biblioteki. Zwykły start aplikacji bez zmian.
-- `lib/features/library/presentation/library_catalog.dart` oraz
-  `library_screen.dart`: Share w menu dokumentu dla Web; inne platformy
-  i istniejące akcje zachowane; aktywne udostępnienie korzysta z
-  działającego EditorController.
-- `server/api/app/routers/study_shares.py`: oddzielne API sesji i
-  podglądu, ograniczenia, autoryzacja i wygaśnięcie; migracja
-  `server/migrations/0004_study_shares.sql`.
-- `test/study_share_service_test.dart`: trwałość identyfikatora dokumentu
-  przy przedłużaniu oraz izolowany ekran wejścia gościa.
+- `lib/data/sync/study_share_service.dart`: utworzenie, odzyskiwanie,
+  przedłużanie i zakończenie sesji oraz uwierzytelniony bilet gościa
+  do odczytu/zapisu całego dokumentu; brak dostępu do konta autora.
+- `lib/features/share/presentation/study_share_dialog.dart`: link,
+  hasło, zakończenie i przedłużenie.
+- `lib/features/share/presentation/study_share_capture.dart`: nakładka
+  ostrzeżenia końca sesji bez kosztownych screenshotów PNG.
+- `lib/features/share/presentation/study_share_guest_screen.dart`: logowanie
+  hasłem, WebSocket, odnowienie połączenia, odcięcie dostępu.
+- `lib/features/share/presentation/study_share_guest_editor.dart`:
+  prawdziwy BoardScreen/NotebookScreen, zapis zmian do serwera,
+  odtwarzanie scalonej wersji, retry i wznowienie zachowanego outboxu.
+- `lib/data/sync/study_share_guest_outbox.dart`: izolowany per link trwały
+  zapis ostatniej niepotwierdzonej wersji, bez biletu lub hasła gościa.
+  `test/study_share_guest_outbox_test.dart`: reload, izolacja i walidacja.
+- `study_share_memory_db_stub.dart` i `study_share_memory_db_web.dart`:
+  osobna baza SQLite w pamięci, bez podpinania biblioteki konta.
+- `lib/data/sync/study_share_web_assets.dart`: poprawna absolutna ścieżka
+  modułu SQLite WASM przy bezpośrednim otwarciu zagnieżdżonego /share/UID;
+  test `study_share_web_assets_test.dart`.
+- `lib/features/library/presentation/library_screen.dart`: aktywna sesja
+  i jej odzyskanie po ponownym uruchomieniu. Zmiana epoki remote sync
+  odtwarza widok kanwy ze zaktualizowanego oryginału.
+- `lib/data/sync/shared_edit_conflicts.dart`:
+  `hasRejectedSharedEdits` sprawdza, czy serwer potwierdził wszystkie
+  zmodyfikowane przez gościa obiekty (z ignorowaniem zmian niezależnych).
+- `test/shared_edit_conflicts_test.dart`: odrzucone edycje tekstu,
+  kreski i usunięcia oraz scalanie niezależnych obiektów.
+- `lib/data/sync/live_web_sync_service.dart`: 90 ms debounce sync,
+  bazowe snapshoty do trójstronnego scalania zmian właściciela.
+- `lib/features/editor/state/editor_controller.dart`: parametr
+  `saveDebounce` – 100 ms w sesji, domyślnie 2 s poza sesją.
+- `lib/features/notebook/data/notebook_repository.dart`: kontrolowany
+  import potwierdzonej aktualizacji serwera i brak cichego nadpisania
+  niesynchronizowanej pracy.
+- `server/api/app/routers/study_shares.py`: dostęp i zapisy gości
+  tylko do jednego UID, sprawdzanie bazowych rewizji w historii serwera
+  oraz ochrona przed wieloma sesjami tego samego dokumentu;
+  mikrosekundowe pierwszeństwo i blokada po zakończeniu.
+- `server/api/app/routers/sync.py`: właściciel edytuje przez te same
+  zasady scalania; dziennik zdarzeń otrzymuje scalony dokument. Usunięcie
+  oryginału atomowo odbiera dostęp do aktywnej sesji.
+- `server/migrations/0005_study_share_edit_clock.sql`: trwały zegar
+  rozstrzygania konfliktów.
+- `server/migrations/0006_change_events_document_revision.sql`:
+  indeks historycznych rewizji służący walidacji wspólnej bazy zmian.
+- `test/study_share_http_test.dart`: kontrakt HTTP gościa i odcięcie,
+  przedłużanie i natychmiastowe żądanie zakończenia przed synchronizacją.
+- `test/study_share_guest_socket_test.dart`: kody WebSocket oznaczające
+  trwałe odebranie dostępu (bez nieskończonego reconnect).
+- `test/live_web_sync_service_test.dart`: powrót zmian gości do
+  oryginału właściciela, bez konfliktowych kopii bez potrzeby.
+- `server/api/tests/test_study_shares_flow.py`: REST/WebSocket,
+  edycja, izolacja, walidacja bazowych snapshotów, zapisy właściciela
+  w feedzie, usunięcie oryginału, pojedyncza sesja i konflikty.
+- Uwaga: outbox gościa nie przetrwa zamknięcia karty; testy środowiskowe
+  i wdrożenie nadal wymagają wykonania. Nie usuwać oznaczenia WIP.

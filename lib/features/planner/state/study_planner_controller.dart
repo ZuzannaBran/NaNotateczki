@@ -239,6 +239,7 @@ class StudyPlannerController extends ChangeNotifier {
   final List<StudySession> _sessions = [];
   Timer? _ticker;
   Future<void> _saveTail = Future<void>.value();
+  final ValueNotifier<int> savedRevision = ValueNotifier<int>(0);
   int _pendingWrites = 0;
   bool _disposed = false;
   bool isLoaded = false;
@@ -766,7 +767,12 @@ class StudyPlannerController extends ChangeNotifier {
     });
     _pendingWrites++;
     _saveTail = _saveTail
-        .then((_) => _write(storageKey, snapshot))
+        .then((_) async {
+          await _write(storageKey, snapshot);
+          if (!_disposed) {
+            savedRevision.value++;
+          }
+        })
         .catchError((Object e) {
           error = 'Could not save study history: $e';
           if (!_disposed) {
@@ -783,6 +789,7 @@ class StudyPlannerController extends ChangeNotifier {
     _disposed = true;
     _ticker?.cancel();
     AppSaveCoordinator.instance.unregister(this);
+    savedRevision.dispose();
     super.dispose();
   }
 }

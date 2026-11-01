@@ -286,7 +286,10 @@ class NotebookRepository {
     return persisted.length;
   }
 
-  Future<int> importNotebooksAtomically(List<Notebook> notebooks) async {
+  Future<int> importNotebooksAtomically(
+    List<Notebook> notebooks, {
+    bool verifiedRemoteSync = false,
+  }) async {
     if (notebooks.isEmpty) {
       return 0;
     }
@@ -308,7 +311,7 @@ class NotebookRepository {
             trackedAt != null && trackedAt.isAfter(existingRow.updatedAt)
             ? trackedAt
             : existingRow.updatedAt;
-        if (latestAt.isAfter(notebook.updatedAt)) {
+        if (!verifiedRemoteSync && latestAt.isAfter(notebook.updatedAt)) {
           continue;
         }
         final existingResult = await _readNotebook(existingRow);
@@ -318,14 +321,16 @@ class NotebookRepository {
             'Cannot import over an unreadable notebook: ${notebook.uid}',
           );
         }
-        await _protectSuspiciousOverwrite(
-          before: existingResult.notebook,
-          attempted: notebook,
-          operation: 'importBackup',
-          affectedPageIds: notebook.pages.map((page) => page.id).toSet(),
-          requestStackTrace: requestStackTrace,
-          expectedRemovedIdsByPage: const {},
-        );
+        if (!verifiedRemoteSync) {
+          await _protectSuspiciousOverwrite(
+            before: existingResult.notebook,
+            attempted: notebook,
+            operation: 'importBackup',
+            affectedPageIds: notebook.pages.map((page) => page.id).toSet(),
+            requestStackTrace: requestStackTrace,
+            expectedRemovedIdsByPage: const {},
+          );
+        }
       }
       candidates.add(notebook);
     }
@@ -355,7 +360,8 @@ class NotebookRepository {
                   (existingAt == null || trackedAt.isAfter(existingAt))
               ? trackedAt
               : existingAt;
-          if (latestAt != null && latestAt.isAfter(notebook.updatedAt)) {
+          if (!verifiedRemoteSync && latestAt != null &&
+              latestAt.isAfter(notebook.updatedAt)) {
             throw StateError(
               'Import target changed while import was running: '
               '${notebook.uid}',

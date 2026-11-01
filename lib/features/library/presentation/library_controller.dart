@@ -158,6 +158,12 @@ class LibraryController extends ChangeNotifier {
     await _loadCloudPath();
   }
 
+  /// Refreshes folders, covers and tasks after verified account recovery.
+  Future<void> reloadFromAccount() async {
+    await _loadFolders();
+    await loadItems();
+  }
+
   Future<void> loadItems() async {
     if (_isDisposed) {
       return;
@@ -213,7 +219,7 @@ class LibraryController extends ChangeNotifier {
           _activeNotebook = selectedItemId == null
               ? null
               : _itemById(selectedItemId!);
-        } else if (_activeNotebook == null && selectedItemId != null) {
+        } else if (selectedItemId != null) {
           _activeNotebook = _itemById(selectedItemId!);
         }
       } else {
