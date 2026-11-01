@@ -218,12 +218,15 @@ class _AccountDialogState extends State<_AccountDialog> {
   void initState() {
     super.initState();
     final session = context.read<AccountSessionController>();
-    _usernameController.text = session.lastAccountUsername ?? session.username ?? '';
+    _usernameController.text =
+        session.lastAccountUsername ?? session.username ?? '';
     _localNameController.text = session.localDisplayName ?? '';
+    final hasLocalProfile =
+        session.preferredMode == AccountDataMode.localOnly &&
+        session.isLocalProfile;
     _view = widget.startupRequired
         ? _AccountView.landing
-        : session.isSignedIn || session.preferredMode == AccountDataMode.localOnly
-            && session.isLocalProfile
+        : session.isSignedIn || hasLocalProfile
         ? _AccountView.settings
         : session.onboardingComplete
         ? _AccountView.signIn
@@ -618,7 +621,8 @@ class _AccountDialogState extends State<_AccountDialog> {
           ),
         ] else ...[
           const Text(
-            'Remote backup and live synchronization are disabled in local mode.',
+            'Remote backup and live synchronization are disabled '
+            'in local mode.',
           ),
           const SizedBox(height: 12),
           OutlinedButton(
@@ -840,7 +844,10 @@ class _AccountDialogState extends State<_AccountDialog> {
     try {
       final session = context.read<AccountSessionController>();
       if (register) {
-        await session.register(_usernameController.text, _passwordController.text);
+        await session.register(
+          _usernameController.text,
+          _passwordController.text,
+        );
       } else {
         await session.login(_usernameController.text, _passwordController.text);
       }
