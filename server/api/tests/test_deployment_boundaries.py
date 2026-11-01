@@ -14,6 +14,15 @@ def test_compose_does_not_publish_database_or_api_ports() -> None:
     assert "cap_drop: [ALL]" in compose
 
 
+def test_caddy_can_start_with_restricted_capabilities() -> None:
+    compose = (ROOT / "compose.yaml").read_text()
+    caddy = compose.split("\n  caddy:\n", 1)[1].split("\nvolumes:\n", 1)[0]
+
+    assert "cap_drop: [ALL]" in caddy
+    assert "cap_add: [NET_BIND_SERVICE]" in caddy
+    assert "security_opt: [no-new-privileges:true]" in caddy
+
+
 def test_schema_enforces_cross_owner_device_integrity() -> None:
     migration = (ROOT / "migrations" / "0001_initial.sql").read_text()
 
@@ -57,3 +66,17 @@ def test_username_migration_preserves_legacy_accounts() -> None:
     assert "split_part(email, '@', 1)" in migration
     assert "CREATE UNIQUE INDEX users_username_unique" in migration
     assert "DROP COLUMN email" in migration
+
+
+def test_proxy_uses_strict_client_ip_handling_and_limits_script_origins() -> None:
+    caddy = (ROOT / "Caddyfile").read_text()
+    assert "trusted_proxies_strict" in caddy
+    assert "client_ip_headers CF-Connecting-IP" in caddy
+    assert "header_up X-Forwarded-For {client_ip}" in caddy
+    assert "script-src 'self' https://cdn.jsdelivr.net" in caddy
+
+
+def test_backend_limiter_does_not_grow_without_a_bound() -> None:
+    limiter = (ROOT / "api/app/rate_limit.py").read_text()
+    assert "max_keys: int = 4096" in limiter
+    assert "if len(self._entries) >= self.max_keys" in limiter

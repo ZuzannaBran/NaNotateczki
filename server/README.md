@@ -85,3 +85,15 @@ migracją wykonaj pełną kopię i test odtworzenia na osobnej instancji.
 granice HTTP i konfigurację wdrożenia. Testy integracyjne z PostgreSQL,
 równoległym zapisem dwóch sesji i odtworzeniem backupu są potrzebne przed
 udostępnieniem usługi użytkownikom. Sam zestaw jednostkowy ich nie zastępuje.
+
+## Utwardzenie zabezpieczeń
+
+Proxy Caddy pobiera adres klienta z nagłówka `CF-Connecting-IP` od
+zaufanego kontenera tunelu, stosuje `trusted_proxies_strict` i
+ustawia zweryfikowany `X-Forwarded-For` dla backendu.
+Dodatkowe reguły CSP ograniczają źródła JavaScript i połączeń Web.
+Walidacja API kontroluje strukturę stron, identyfikatory i kodowanie
+obrazów. Limiter logowań ma limit pamięci.
+Po zmianach wykonaj test Web, import PDF oraz test HTTPS przez Cloudflare.
+HTTPS nie szyfruje bazy i backupów na dysku HP — nadal potrzebna jest
+oddzielna decyzja dotycząca szyfrowania danych w spoczynku i E2EE.
