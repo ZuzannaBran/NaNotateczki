@@ -188,6 +188,31 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 - Feed jest stronicowany po 500 zdarzeń; klient pobiera wszystkie pełne
   strony, zanim zacznie wysyłać lokalny outbox.
 
+## Synchronizacja preferencji konta
+
+Na Linuxie, Web, iOS i Androidzie ustawienia `app_prefs.json`,
+`editor_prefs.json`, `shared_recent_colors.json` oraz preferencja
+`server_backup_preferences_<hash>.json` są synchronizowane niezależnie
+od snapshotów urządzeń przez `/v1/account-settings`.
+Każda kategoria ma oddzielną rewizję i atomowy zapis CAS.
+Po logowaniu konto jest źródłem ustawień, lecz przed pierwszym importem
+dotychczasowy stan lokalny jest zachowywany w
+`account_preimport_<hash>.json`. Klient pamięta ostatnią
+potwierdzoną rewizję i zawartość w
+`account_settings_cursor_<hash>.json`, dzięki czemu nie wysyła
+starych wartości przy ponownym uruchomieniu. Równoległe modyfikacje
+tej samej kategorii nie nadpisują się po cichu: klient zachowuje
+lokalny stan i rejestruje konflikt.
+Odpytywanie odbywa się przy starcie, po zmianie, wznowieniu aplikacji
+i co 45 sekund. Brak nowego endpointu na starej wersji serwera
+nie może blokować synchronizacji notatników ani tworzenia backupu.
+Serwer wymaga migracji `0007_account_settings.sql`.
+
+Foldery, zadania i historia planera są nadal częścią zweryfikowanych
+snapshotów urządzeń, a nie tego oddzielnego feedu preferencji.
+Ich odzyskanie na nowym urządzeniu nie oznacza jeszcze
+synchronizacji zmian na żywo między wszystkimi aktywnymi urządzeniami.
+
 ## Zabezpieczenia
 
 - wyłącznie HTTPS/WSS poza localhostem; brak bezpośredniego połączenia
