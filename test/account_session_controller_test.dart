@@ -103,6 +103,10 @@ void main() {
       expect(encoded, isNot(contains('access-secret')));
       expect(encoded, isNot(contains('refresh-token')));
       expect(encoded, isNot(contains('secure-password')));
+      expect(credentials.value, contains('refresh-token'));
+      await session.requireAccountReauthentication();
+      expect(credentials.value, isNull);
+      expect(session.isSignedIn, isFalse);
 
       final restored = AccountSessionController(
         client,
