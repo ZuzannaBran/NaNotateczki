@@ -82,9 +82,12 @@ migracją wykonaj pełną kopię i test odtworzenia na osobnej instancji.
 ## Weryfikacja lokalna
 
 `python -m pytest -q api/tests` sprawdza uwierzytelnianie, walidację backupu,
-granice HTTP i konfigurację wdrożenia. Testy integracyjne z PostgreSQL,
-równoległym zapisem dwóch sesji i odtworzeniem backupu są potrzebne przed
-udostępnieniem usługi użytkownikom. Sam zestaw jednostkowy ich nie zastępuje.
+granice HTTP, konfigurację wdrożenia oraz kontrakty wspólnych sesji HTTP
+i WebSocket. `python3 scripts/smoke-local-api.py` na uruchomionym API z PostgreSQL
+sprawdza rzeczywisty cykl udostępniania, PNG, dostęp gościa i unieważnienie.
+Testy równoległości, odzyskiwania backupu oraz publicznego HTTPS/WSS przez
+Cloudflare nadal wymagają odrębnej weryfikacji. Matryca i instrukcje:
+`TESTING.md`.
 
 ## Utwardzenie zabezpieczeń
 
