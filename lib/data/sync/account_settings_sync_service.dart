@@ -26,7 +26,6 @@ class AccountSettingsSyncService {
     'backupPreferences',
   ];
   Future<void>? _running;
-  String? _activeUserId;
   bool _applying = false;
   String? lastError;
 
@@ -51,7 +50,6 @@ class AccountSettingsSyncService {
     if (!session.isSignedIn || userId == null) {
       return;
     }
-    _activeUserId = userId;
     final key = _checkpointKey(userId);
     final saved = await readStoredText(key);
     final checkpoint = saved == null
@@ -91,7 +89,8 @@ class AccountSettingsSyncService {
             ? known!['revision'] as int
             : 0;
         final knownValue = known?['value'];
-        if (known != null && !_equivalent(local, knownValue)) {
+        if (known != null && local != null &&
+            !_equivalent(local, knownValue)) {
           if (remoteRevision != knownRevision &&
               !_equivalent(remoteValue, knownValue)) {
             throw StateError(
@@ -159,7 +158,6 @@ class AccountSettingsSyncService {
   }
 
   void stop() {
-    _activeUserId = null;
     lastError = null;
   }
 
