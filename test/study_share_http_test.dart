@@ -516,6 +516,11 @@ void main() {
     expect(upload, greaterThanOrEqualTo(0));
     expect(created, greaterThan(upload));
     expect(ended, greaterThan(created));
+    final syncAfterShare = requests.indexWhere(
+      (value) => value == 'GET /v1/sync/changes',
+      created + 1,
+    );
+    expect(syncAfterShare, greaterThan(ended));
     expect(await harness.repository.getNotebook(original.uid), isNotNull);
   });
 
