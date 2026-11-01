@@ -9,6 +9,10 @@ import '../../../data/sync/api_client.dart';
 import '../../../data/sync/study_share_service.dart';
 import 'study_share_guest_editor.dart';
 
+/// An invalidated ticket cannot be recovered by transport reconnects.
+bool isTerminalShareSocketClose(int? code) =>
+    code == 4401 || code == 4403 || code == 4410;
+
 class StudyShareGuestApp extends StatelessWidget {
   const StudyShareGuestApp({required this.sessionId, super.key});
 
@@ -135,14 +139,25 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
             // Ignore malformed, non-authoritative real-time notifications.
           }
         },
-        onDone: _scheduleReconnect,
-        onError: (_) => _scheduleReconnect(),
+        onDone: () => _socketClosed(channel),
+        onError: (_) => _socketClosed(channel),
         cancelOnError: true,
       );
       channel.sink.add(jsonEncode({'type': 'authenticate', 'ticket': ticket}));
     } catch (_) {
       _scheduleReconnect();
     }
+  }
+
+  void _socketClosed(WebSocketChannel channel) {
+    if (!mounted || !identical(_channel, channel)) {
+      return;
+    }
+    if (isTerminalShareSocketClose(channel.closeCode)) {
+      _endView('This session is no longer available.');
+      return;
+    }
+    _scheduleReconnect();
   }
 
   void _scheduleReconnect() {
