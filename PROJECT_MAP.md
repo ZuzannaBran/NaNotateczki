@@ -611,7 +611,10 @@ wyśrodkowaną nazwą NaNotateczki, podglądem haseł i spójnymi odstępami
 Dolny pasek pokazuje konto i stan backupu oraz synchronizacji. Inicjał konta
 ma subtelne okrągłe obramowanie w panelu i dialogu; ikona ustawień ma 18 px
 przy zachowanym rozmiarze obszaru kliknięcia. Rejestracja i zmiana hasła
-wymagają zgodnego powtórzenia;
+wymagają zgodnego powtórzenia. Formularze logowania, rejestracji, lokalnej
+nazwy i zmiany hasła używają etykiet nad polami (14 px, bold, odstęp 6 px),
+obrysu 12 px i nieruchomych podpisów jak edytor wydarzeń w kalendarzu;
+brak pływających etykiet oraz wypełnionego tła pola;
 ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
 loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
@@ -1489,6 +1492,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i mobilnym drawerze, onboarding/rejestracja z powtórzeniem hasła, lokalna
   nazwa i inicjał, logowanie, ręczny backup, pierwsza polityka Web, zmiana
   hasła oraz kolejność zatrzymania usług przed wyczyszczeniem sesji.
+  Sprawdza też osobne, nieruchome podpisy i obramowanie pól we wszystkich
+  formularzach konta, również po wpisaniu tekstu.
 - `test/account_session_controller_test.dart`: krótsze nowe hasła i logowanie
   istniejących kont, trwały profil lokalny bez
   sekretów, preferowany tryb konta, dokładny kontrakt zmiany hasła i błędy API.
