@@ -127,3 +127,17 @@ nadpisania; bez trwałego outboxu wciąż nie ma odzyskiwania po zamknięciu.
 - Dodano regresję synchronizacji właściciel–gość i tekstu dialogu.
 - Nadal brak trwałego outboxu gości, przeglądarkowego E2E i pomiarów.
   Zmiany nie są wdrożeniem produkcyjnym, testy Flutter nieuruchomione.
+
+## Audyt kolejnych skrajnych przypadków
+
+- Dodano snapshot niepotwierdzonych edycji gościa, izolowany per link.
+  Ponowne wejście przez hasło odtwarza zapis i ponawia żądanie serwerowe.
+  Rekord nie zawiera biletu sesji ani hasła.
+- Przed wysłaniem gościa opróżniane są zapisy edytora, w tym bieżącego tekstu.
+- Snapshot jest usuwany dopiero po odpowiedzi serwera potwierdzającej brak
+  odrzuconych edycji; przy HTTP 409, 410 lub problemie sieciowym pozostaje.
+- Przy braku miejsca w localStorage edytor zgłasza niepowodzenie odzyskiwania,
+  ale nadal podejmuje próbę wysłania zmian do serwera.
+- Weryfikacja kodu nie zastępuje testów przeglądarkowych. Zapis w toku w chwili
+  zabicia procesu, bardzo duże dokumenty i brak dostępnej przestrzeni
+  magazynu przeglądarki nadal są otwartymi ryzykami.

@@ -232,6 +232,12 @@ Link `/share/<UUID>` i hasło 1–128 znaków pozwalają gościowi edytować
 **wyłącznie ten dokument** bez konta. Token gościa nie daje dostępu
 do folderów, innych notatek, backupów ani API właściciela. Dane gościa
 są trzymane w osobnej bazie SQLite WASM w pamięci, a nie w IndexedDB konta.
+Ostatni niepotwierdzony snapshot i zweryfikowana wersja bazowa są zapisywane
+dodatkowo pod kluczem specyficznym dla linku w magazynie tekstowym
+(przeglądarkowy localStorage). Po ponownym podaniu hasła przywracana jest
+wersja oczekująca i ponawiana próba scalenia. Bilet i hasło nie są
+utrwalane. Limit pojemności localStorage i zamknięcie karty przed lokalnym
+zapisem pozostają ryzykiem i są sygnalizowane w interfejsie.
 
 Każda potwierdzona zmiana trafia w transakcji PostgreSQL do istniejącego
 `synced_notebooks` pod **oryginalnym UID i folderem**; zmiana nie tworzy
@@ -267,9 +273,10 @@ i żadne nowe operacje nie są przyjmowane.
 
 ### Granica bezpieczeństwa niedokończonego wdrożenia
 
-Wspólna edycja Web nadal jest WIP: gość przechowuje dane robocze
-w bazie SQLite w pamięci. Nie ma trwałego outboxu między zamknięciem
-i ponownym otwarciem karty, więc zapis w toku lub konflikt może nie zostać
-odzyskany. Przed włączeniem produkcyjnym wymagane są testy Flutter,
+Wspólna edycja Web nadal jest WIP: gość przechowuje bazę roboczą
+w pamięci, ale niepotwierdzony snapshot jest utrwalany w localStorage.
+Nie gwarantuje to odzyskania edycji jeszcze niezapisanej lokalnie,
+przekraczającej limit magazynu lub wykonanej podczas nagłego zakończenia
+procesu przed zakończeniem zapisu. Przed włączeniem produkcyjnym wymagane są testy Flutter,
 FastAPI, PostgreSQL, równoczesna edycja w dwóch przeglądarkach oraz testy
 odzyskiwania i latencji. Na serwerze wymagane są migracje 0004, 0005 i 0006.

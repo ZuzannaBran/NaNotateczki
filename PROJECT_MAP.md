@@ -1893,7 +1893,10 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   hasłem, WebSocket, odnowienie połączenia, odcięcie dostępu.
 - `lib/features/share/presentation/study_share_guest_editor.dart`:
   prawdziwy BoardScreen/NotebookScreen, zapis zmian do serwera,
-  odtwarzanie scalonej wersji i status niesynchronizowanych zmian.
+  odtwarzanie scalonej wersji, retry i wznowienie zachowanego outboxu.
+- `lib/data/sync/study_share_guest_outbox.dart`: izolowany per link trwały
+  zapis ostatniej niepotwierdzonej wersji, bez biletu lub hasła gościa.
+  `test/study_share_guest_outbox_test.dart`: reload, izolacja i walidacja.
 - `study_share_memory_db_stub.dart` i `study_share_memory_db_web.dart`:
   osobna baza SQLite w pamięci, bez podpinania biblioteki konta.
 - `lib/features/library/presentation/library_screen.dart`: aktywna sesja

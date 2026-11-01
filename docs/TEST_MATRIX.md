@@ -817,3 +817,24 @@ manually:
 
 These PostgreSQL/Cloudflare/two-browser scenarios are not marked as passed by
 the unit suite and require a configured test server.
+
+### Wspólna edycja – scenariusze ręczne do wykonania na wdrożeniu
+
+- Host otwiera board i udostępnia link; dwóch gości równocześnie rysuje na
+  różnych częściach, host edytuje tekst. Zweryfikować ten sam UID i folder
+  oraz brak dokumentów „Conflict”.
+- Jeden gość zmienia tekst, drugi zmienia ten sam blok w tej samej sekundzie:
+  wcześniejszy czas przyjęcia na serwerze wygrywa; przegrana wersja pozostaje
+  widoczna i odzyskiwalna, nie znika po reloadzie.
+- Odłączyć sieć podczas pisania i odświeżyć stronę gościa: po ponownym
+  podaniu hasła jego zapisane lokalnie zmiany powinny zostać ponowione.
+- Zamknąć kartę bezpośrednio w trakcie nowej kreski i otworzyć ponownie;
+  odnotować, że operacja niewysłana jeszcze do lokalnego magazynu może
+  wymagać ponownego wykonania.
+- Uruchomić równoczesne PUT/DELETE i wygaszenie sesji; żadna edycja
+  zatwierdzona po unieważnieniu nie może wejść do dokumentu.
+- Wypełnić limit localStorage, ponowić edycję i zweryfikować ostrzeżenie.
+- Sprawdzić tekst Quill, gumki, obrazy z bajtami, wiele stron, cofanie,
+  przedłużanie sesji, dwa równoczesne zalogowane okna hosta, restart API.
+- Zmierzyć czas od wykonania kreski do jej wyświetlenia na drugim kliencie,
+  także na wolnym łączu i po utracie WebSocket.

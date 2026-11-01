@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../../data/drift/notes_database.dart';
 import '../../../data/sync/api_client.dart';
 import '../../../data/sync/shared_edit_conflicts.dart';
+import '../../../data/sync/study_share_guest_outbox.dart';
 import '../../../data/sync/study_share_service.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/state/editor_controller.dart';
@@ -40,6 +41,10 @@ class StudyShareGuestEditor extends StatefulWidget {
 }
 
 class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
+  late final StudyShareGuestOutbox _outbox =
+      StudyShareGuestOutbox(widget.shareId);
+  Future<void> _persistTail = Future<void>.value();
+  bool _outboxFailed = false;
   NotesDatabase? _database;
   NotebookRepository? _repository;
   EditorController? _editor;
@@ -83,16 +88,40 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         onChanged: (_) => _changed(),
       );
       _suppressChanges = true;
+      var recovered = false;
       try {
-        final notebook = _decode(document.notebook);
+        var notebook = _decode(document.notebook);
         await _repository!.restoreNotebooksAtomically([notebook]);
+        _base = document.notebook;
+        _revision = document.revision;
+        PendingStudyShareEdit? pending;
+        try {
+          pending = await _outbox.read();
+        } catch (error) {
+          _outboxFailed = true;
+          _error = 'Stored guest edits need manual recovery: $error';
+        }
+        if (pending != null) {
+          if (pending.notebook['uid'] != document.notebook['uid']) {
+            throw const FormatException(
+              'Recovered edit belongs to another document.',
+            );
+          }
+          notebook = _decode(pending.notebook);
+          await _repository!.importNotebooksAtomically(
+            [notebook],
+            verifiedRemoteSync: true,
+          );
+          _base = pending.baseNotebook;
+          _revision = pending.baseRevision;
+          _dirty = true;
+          recovered = true;
+        }
         _editor = EditorController(
           repository: _repository!,
           notebook: notebook,
           saveDebounce: const Duration(milliseconds: 100),
         );
-        _base = document.notebook;
-        _revision = document.revision;
       } finally {
         _suppressChanges = false;
       }
@@ -103,9 +132,20 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         const Duration(seconds: 15),
         (_) => unawaited(_refresh()),
       );
-      setState(() => _status = 'Editing · All changes saved');
-      // Close the gap between the initial HTTP read and WebSocket auth.
-      unawaited(_refresh());
+      setState(() {
+        _status = recovered
+            ? 'Restored unsent changes · Saving'
+            : 'Editing · All changes saved';
+      });
+      if (recovered) {
+        _pushTimer = Timer(
+          const Duration(milliseconds: 35),
+          () => unawaited(_push()),
+        );
+      } else {
+        // Close the gap between the first read and WebSocket auth.
+        unawaited(_refresh());
+      }
     } on ApiException catch (error) {
       if (error.statusCode == 401 || error.statusCode == 410) {
         widget.onEnded();
@@ -128,6 +168,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       return;
     }
     _dirty = true;
+    unawaited(_persistPending());
     _pushTimer?.cancel();
     _pushTimer = Timer(
       const Duration(milliseconds: 35),
@@ -136,17 +177,68 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     setState(() => _status = 'Unsaved changes');
   }
 
+  Future<void> _persistPending() {
+    // Serialized storage writes cannot revert a newer snapshot.
+    final task = _persistTail.catchError((Object _) {}).then((_) async {
+      if (_repository == null || _base == null) {
+        return;
+      }
+      final notebook = await _repository!.getNotebook(
+        _base!['uid'] as String,
+      );
+      if (notebook == null) {
+        throw StateError('Local guest document is unavailable.');
+      }
+      await _outbox.write(PendingStudyShareEdit(
+        baseRevision: _revision,
+        baseNotebook: _base!,
+        notebook: NotebookRepository.encodeNotebook(notebook),
+      ));
+      _outboxFailed = false;
+    });
+    _persistTail = task;
+    unawaited(task.catchError((Object error) {
+      _outboxFailed = true;
+      if (mounted) {
+        setState(() {
+          _error = 'Browser recovery failed: $error. '
+              'Keep this tab open until changes are saved on the server.';
+        });
+      }
+    }));
+    return task;
+  }
+
+  Future<void> _clearPending() async {
+    try {
+      await _persistTail;
+      if (!_dirty && !_closed) {
+        await _outbox.clear();
+        _outboxFailed = false;
+      }
+    } catch (_) {
+      // The pending snapshot remains available for manual recovery.
+    }
+  }
+
   Future<void> _push() async {
     if (_sending || _refreshing || _closed || !_dirty ||
         _base == null || _repository == null) {
       return;
     }
     _sending = true;
-    _dirty = false;
     if (mounted) {
       setState(() => _status = 'Saving changes');
     }
     try {
+      await _editor?.flushPendingSaves();
+      await _repository!.waitForPendingSaves();
+      try {
+        await _persistPending();
+      } catch (_) {
+        // Network transmission is still useful when storage quota is full.
+      }
+      _dirty = false;
       final original = _base!;
       final notebook = await _repository!.getNotebook(
         original['uid'] as String,
@@ -157,6 +249,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       final submitted = NotebookRepository.encodeNotebook(notebook);
       if (jsonEncode(submitted['pages']) ==
           jsonEncode(original['pages'])) {
+        await _clearPending();
         if (mounted) {
           setState(() => _status = 'All changes saved');
         }
@@ -199,6 +292,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
               jsonEncode(submitted['pages'])) {
         await _installRemote(answer);
       }
+      await _clearPending();
     } on ApiException catch (error) {
       _dirty = true;
       if (error.statusCode == 401 || error.statusCode == 410) {
@@ -335,12 +429,18 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       try {
         await editor?.flushPendingSaves();
         if (repository != null && _base != null) {
+          try {
+            await _persistPending();
+          } catch (_) {
+            // Keep any older durable snapshot if this final save fails.
+          }
           final notebook = await repository.getNotebook(
             _base!['uid'] as String,
           );
           if (notebook != null) {
             final encoded = NotebookRepository.encodeNotebook(notebook);
-            if (jsonEncode(encoded) != jsonEncode(_base!)) {
+            if (jsonEncode(encoded['pages']) !=
+                jsonEncode(_base!['pages'])) {
               await widget.client.writeDocument(
                 widget.shareId,
                 widget.ticket,
@@ -383,6 +483,8 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
           child: Column(
             children: [
               Text('Shared editing · $_status'),
+              if (_outboxFailed)
+                const Text('Browser recovery is currently unavailable.'),
               if (_error != null) Text(
                 _error!,
                 style: TextStyle(
