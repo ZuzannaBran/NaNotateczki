@@ -31,7 +31,10 @@ void main() {
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((_) async => http.Response('', 500)),
     );
-    final session = AccountSessionController(client, credentialStore: credentials);
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
 
     await session.loadProfile();
     expect(session.shouldShowStartupDialog, isTrue);
@@ -45,7 +48,10 @@ void main() {
     expect(encoded, isNot(contains('password')));
     expect(encoded, isNot(contains('token')));
 
-    final restored = AccountSessionController(client, credentialStore: credentials);
+    final restored = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
     await restored.loadProfile();
     expect(restored.displayName, 'Zuzanna');
     expect(restored.isLocalProfile, isTrue);
@@ -83,7 +89,10 @@ void main() {
           fail('Unexpected request: ${request.method} ${request.url}');
         }),
       );
-      final session = AccountSessionController(client, credentialStore: credentials);
+      final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
       await session.loadProfile();
 
       await session.register('TEST_USER', 'first-secure-password');
@@ -286,7 +295,10 @@ void main() {
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((_) async => http.Response('', 500)),
     );
-    final session = AccountSessionController(client, credentialStore: credentials);
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
     final load = session.loadProfile();
     session.dispose();
     pending.complete(null);
@@ -294,7 +306,7 @@ void main() {
     client.close();
   });
 
-  test('concurrent backup and Web refresh rotate the token only once', () async {
+  test('concurrent refresh requests rotate the token only once', () async {
     final responsePending = Completer<http.Response>();
     var refreshCalls = 0;
     final client = ApiClient(
@@ -319,7 +331,10 @@ void main() {
         fail('Unexpected authentication endpoint.');
       }),
     );
-    final session = AccountSessionController(client, credentialStore: credentials);
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
     await session.login('test_user', 'password');
     final first = session.refresh();
     final second = session.refresh();
@@ -364,7 +379,10 @@ void main() {
         );
       }),
     );
-    final session = AccountSessionController(client, credentialStore: credentials);
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
     await session.register('test_user', '12345678');
     await session.login('test_user', 'short');
     expect(requests['/v1/auth/register'], '12345678');
@@ -400,7 +418,10 @@ void main() {
           );
         }),
       );
-      final session = AccountSessionController(client, credentialStore: credentials);
+      final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
       await session.login('test_user', 'first-secure-password');
 
       await expectLater(
@@ -434,7 +455,10 @@ void main() {
         );
       }),
     );
-    final first = AccountSessionController(client, credentialStore: credentials);
+    final first = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
     await first.loadProfile();
     await first.login('account_a', 'password');
     expect(
@@ -444,7 +468,10 @@ void main() {
     );
     first.useLocalOnly();
 
-    final restarted = AccountSessionController(client, credentialStore: credentials);
+    final restarted = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
     await restarted.loadProfile();
     await expectLater(
       restarted.login('account_b', 'password'),
@@ -476,7 +503,10 @@ void main() {
         fail('No request should be made for a different user.');
       }),
     );
-    final session = AccountSessionController(client, credentialStore: credentials);
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
     await session.loadProfile();
     await expectLater(
       session.login('other_user', 'password'),
@@ -506,7 +536,10 @@ void main() {
         );
       }),
     );
-    final session = AccountSessionController(client, credentialStore: credentials);
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
     await session.loadProfile();
     await expectLater(
       session.login('account_a', 'password'),
