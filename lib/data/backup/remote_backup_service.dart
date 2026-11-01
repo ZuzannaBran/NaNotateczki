@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/storage/app_save_coordinator.dart';
 import '../../core/storage/text_storage.dart';
@@ -44,6 +45,13 @@ class RemoteBackupService {
     if (!RegExp(r'^[0-9a-f-]{36}$').hasMatch(deviceId)) {
       throw const FormatException('deviceId must be a UUID.');
     }
+    final expiresAt = session.accessExpiresAt;
+    if (expiresAt != null &&
+        DateTime.now().toUtc().isAfter(
+          expiresAt.subtract(const Duration(minutes: 1)),
+        )) {
+      await session.refresh();
+    }
     await AppSaveCoordinator.instance.flushPending();
     await repository.waitForPendingSaves();
     final notebooks = await repository.fetchNotebooks();
@@ -58,19 +66,14 @@ class RemoteBackupService {
       'libraryState': _decodeOptionalObject(libraryState),
       'studyPlannerState': _decodeOptionalObject(studyPlannerState),
     };
-    final checksum = sha256
-        .convert(utf8.encode(jsonEncode(payload)))
-        .toString();
-    final envelope = <String, dynamic>{
-      'format': 'nanotateczki-server-backup',
-      'version': formatVersion,
-      'createdAt': DateTime.now().toUtc().toIso8601String(),
-      'deviceId': deviceId,
-      'checksumAlgorithm': 'sha256',
-      'checksum': checksum,
-      'payload': payload,
-    };
-    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
+    // Native platforms serialize and hash off the UI isolate. On Web the
+    // caller schedules this operation only after user inactivity.
+    final encoded = await compute(
+      _encodeSnapshot,
+      <String, dynamic>{'payload': payload, 'deviceId': deviceId},
+    );
+    final checksum = encoded.checksum;
+    final bytes = encoded.bytes;
     if (bytes.length > maximumSnapshotBytes) {
       throw StateError('Remote backup exceeds the client safety limit.');
     }
@@ -95,6 +98,7 @@ class RemoteBackupService {
         'Content-Type': 'application/octet-stream',
         'X-Content-SHA256': sha256.convert(bytes).toString(),
       },
+      requestTimeout: const Duration(minutes: 2),
     );
     final finalizeResponse = await apiClient.postJson(
       '/v1/backups/$backupId/finalize',
@@ -137,4 +141,23 @@ class RemoteBackupService {
     }
     return raw;
   }
+}
+
+({String checksum, Uint8List bytes}) _encodeSnapshot(
+  Map<String, dynamic> data,
+) {
+  final payload = data['payload'] as Map<String, dynamic>;
+  final deviceId = data['deviceId'] as String;
+  final checksum = sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+  final envelope = <String, dynamic>{
+    'format': 'nanotateczki-server-backup',
+    'version': RemoteBackupService.formatVersion,
+    'createdAt': DateTime.now().toUtc().toIso8601String(),
+    'deviceId': deviceId,
+    'checksumAlgorithm': 'sha256',
+    'checksum': checksum,
+    'payload': payload,
+  };
+  final bytes = Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
+  return (checksum: checksum, bytes: bytes);
 }
