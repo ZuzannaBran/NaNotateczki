@@ -67,15 +67,25 @@ void _expectAccountHeaderTypography(WidgetTester tester) {
   );
   expect(title.style, AppHeaderDivider.titleStyle);
 
-  final statusFinder = find.byKey(const ValueKey('account-remote-status'));
-  if (statusFinder.evaluate().isNotEmpty) {
-    final status = tester.widget<Text>(statusFinder);
-    expect(status.style?.fontSize, AppTypography.small);
-    expect(
-      status.style?.color,
-      Theme.of(tester.element(statusFinder)).colorScheme.onSurfaceVariant,
-    );
-  }
+  final statusFinder = find.byKey(const ValueKey('account-status'));
+  expect(statusFinder, findsOneWidget);
+  final status = tester.widget<Text>(statusFinder);
+  expect(status.style?.fontSize, AppTypography.small);
+  expect(
+    status.style?.color,
+    Theme.of(tester.element(statusFinder)).colorScheme.onSurfaceVariant,
+  );
+
+  final footer = find.byKey(const ValueKey('account-menu-button'));
+  expect(find.byKey(const ValueKey('account-avatar')), findsNothing);
+  expect(
+    tester.getTopLeft(find.byKey(const ValueKey('account-display-name'))).dx,
+    closeTo(tester.getTopLeft(footer).dx + 14, 0.1),
+  );
+  expect(
+    tester.getTopLeft(statusFinder).dx,
+    tester.getTopLeft(find.byKey(const ValueKey('account-display-name'))).dx,
+  );
 }
 
 void _expectAccountDialogTypography(WidgetTester tester) {
@@ -618,18 +628,13 @@ void main() {
     expect(find.text('Welcome'), findsNothing);
     expect(find.text('Zuzanna'), findsOneWidget);
     _expectAccountHeaderTypography(tester);
-    expect(find.text('Z'), findsOneWidget);
-    final sidebarAvatar = find.byKey(const ValueKey('account-avatar'));
-    final sidebarAvatarContainer = find.descendant(
-      of: sidebarAvatar,
-      matching: find.byType(Container),
+    expect(find.text('Z'), findsNothing);
+    expect(
+      tester.widget<Text>(
+        find.byKey(const ValueKey('account-status')),
+      ).data,
+      'Local mode',
     );
-    final sidebarDecoration =
-        tester.widget<Container>(sidebarAvatarContainer).decoration!
-            as BoxDecoration;
-    expect(sidebarDecoration.shape, BoxShape.circle);
-    expect(sidebarDecoration.border, isNotNull);
-    expect(tester.getSize(sidebarAvatar), const Size(32, 32));
 
     final settingsIcon = find.descendant(
       of: find.byKey(const ValueKey('account-settings-button')),
@@ -656,7 +661,7 @@ void main() {
       find.byKey(const ValueKey('account-edit-local-name')),
       find.byKey(const ValueKey('account-switch-online')),
     );
-    expect(find.byKey(const ValueKey('account-remote-status')), findsNothing);
+    expect(find.byKey(const ValueKey('account-status')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('account-settings-button')),
       findsOneWidget,
