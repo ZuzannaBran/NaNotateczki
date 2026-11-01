@@ -425,23 +425,26 @@ class _AccountDialogState extends State<_AccountDialog> {
             'connect to the account server.',
           ),
           const SizedBox(height: 24),
-          TextFormField(
-            key: const ValueKey('account-local-name'),
-            controller: _localNameController,
-            enabled: !_isWorking,
-            textInputAction: TextInputAction.done,
-            decoration: _accountInputDecoration('Your name'),
-            validator: (value) {
-              final length = value?.trim().length ?? 0;
-              return length < 1 || length > 80
-                  ? 'Enter a name containing 1 to 80 characters.'
-                  : null;
-            },
-            onFieldSubmitted: (_) {
-              if (!_isWorking) {
-                _useLocal();
-              }
-            },
+          _accountLabeledField(
+            label: 'Your name',
+            child: TextFormField(
+              key: const ValueKey('account-local-name'),
+              controller: _localNameController,
+              enabled: !_isWorking,
+              textInputAction: TextInputAction.done,
+              decoration: _accountInputDecoration(),
+              validator: (value) {
+                final length = value?.trim().length ?? 0;
+                return length < 1 || length > 80
+                    ? 'Enter a name containing 1 to 80 characters.'
+                    : null;
+              },
+              onFieldSubmitted: (_) {
+                if (!_isWorking) {
+                  _useLocal();
+                }
+              },
+            ),
           ),
           _ProgressAndError(isWorking: _isWorking, error: error),
           const SizedBox(height: 24),
@@ -671,34 +674,58 @@ class _AccountDialogState extends State<_AccountDialog> {
   }
 
   Widget _usernameField() {
-    return TextFormField(
-      key: const ValueKey('account-username'),
-      controller: _usernameController,
-      enabled: !_isWorking,
-      keyboardType: TextInputType.text,
-      autofillHints: const [AutofillHints.username],
-      textInputAction: TextInputAction.next,
-      decoration: _accountInputDecoration('Username'),
-      validator: (value) => AccountSessionController.usernamePattern.hasMatch(
-        value?.trim() ?? '',
-      )
-          ? null
-          : 'Use 3–32 letters, numbers or underscores.',
+    return _accountLabeledField(
+      label: 'Username',
+      child: TextFormField(
+        key: const ValueKey('account-username'),
+        controller: _usernameController,
+        enabled: !_isWorking,
+        keyboardType: TextInputType.text,
+        autofillHints: const [AutofillHints.username],
+        textInputAction: TextInputAction.next,
+        decoration: _accountInputDecoration(),
+        validator: (value) =>
+            AccountSessionController.usernamePattern.hasMatch(
+              value?.trim() ?? '',
+            )
+            ? null
+            : 'Use 3–32 letters, numbers or underscores.',
+      ),
     );
   }
 
-  InputDecoration _accountInputDecoration(
-    String label, {
-    String? helperText,
-    Widget? suffixIcon,
+  Widget _accountLabeledField({
+    required String label,
+    required Widget child,
   }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          key: ValueKey('account-field-label-$label'),
+          style: const TextStyle(
+            fontSize: AppTypography.document,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+
+  InputDecoration _accountInputDecoration({Widget? suffixIcon}) {
     return InputDecoration(
-      labelText: label,
-      helperText: helperText,
       suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+      border: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+      ),
+      floatingLabelBehavior: FloatingLabelBehavior.never,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 17,
+      ),
     );
   }
 
@@ -712,53 +739,56 @@ class _AccountDialogState extends State<_AccountDialog> {
   }) {
     final visible = _visiblePasswords.contains(controller);
     final isNewPassword = newPassword || confirmationOf != null;
-    return TextFormField(
-      key: key ?? const ValueKey('account-password'),
-      controller: controller,
-      enabled: !_isWorking,
-      obscureText: !visible,
-      enableSuggestions: false,
-      autocorrect: false,
-      autofillHints: [
-        isNewPassword ? AutofillHints.newPassword : AutofillHints.password,
-      ],
-      decoration: _accountInputDecoration(
-        label,
-        helperText: newPassword ? '8 to 128 characters' : null,
-        suffixIcon: IconButton(
-          key: ValueKey('account-password-visibility-$label'),
-          tooltip: visible ? 'Hide $label' : 'Show $label',
-          onPressed: () {
-            setState(() {
-              if (visible) {
-                _visiblePasswords.remove(controller);
-              } else {
-                _visiblePasswords.add(controller);
-              }
-            });
-          },
-          icon: Icon(
-            visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+    return _accountLabeledField(
+      label: label,
+      child: TextFormField(
+        key: key ?? const ValueKey('account-password'),
+        controller: controller,
+        enabled: !_isWorking,
+        obscureText: !visible,
+        enableSuggestions: false,
+        autocorrect: false,
+        autofillHints: [
+          isNewPassword ? AutofillHints.newPassword : AutofillHints.password,
+        ],
+        decoration: _accountInputDecoration(
+          suffixIcon: IconButton(
+            key: ValueKey('account-password-visibility-$label'),
+            tooltip: visible ? 'Hide $label' : 'Show $label',
+            onPressed: () {
+              setState(() {
+                if (visible) {
+                  _visiblePasswords.remove(controller);
+                } else {
+                  _visiblePasswords.add(controller);
+                }
+              });
+            },
+            icon: Icon(
+              visible
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
           ),
         ),
-      ),
-      validator: (value) {
-        final password = value ?? '';
-        if (allowAnyNonEmpty) {
-          return password.isEmpty ? 'Enter the current password.' : null;
-        }
-        if (confirmationOf != null && password != confirmationOf.text) {
-          return 'Passwords do not match.';
-        }
-        if (isNewPassword) {
-          return password.length < 8 || password.length > 128
-              ? 'Use 8 to 128 characters.'
+        validator: (value) {
+          final password = value ?? '';
+          if (allowAnyNonEmpty) {
+            return password.isEmpty ? 'Enter the current password.' : null;
+          }
+          if (confirmationOf != null && password != confirmationOf.text) {
+            return 'Passwords do not match.';
+          }
+          if (isNewPassword) {
+            return password.length < 8 || password.length > 128
+                ? 'Use 8 to 128 characters.'
+                : null;
+          }
+          return password.isEmpty || password.length > 256
+              ? 'Enter your password.'
               : null;
-        }
-        return password.isEmpty || password.length > 256
-            ? 'Enter your password.'
-            : null;
-      },
+        },
+      ),
     );
   }
 
