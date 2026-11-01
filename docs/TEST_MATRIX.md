@@ -30,20 +30,23 @@ a platform as tested until its actual Actions job succeeds.
 ## Account and study timer typography (November 2026)
 
 Automated regression: `test/library_account_slot_test.dart` checks that
-the account sidebar title, account dialog titles and profile title use
+account dialog titles and profile title use
 `AppHeaderDivider.titleStyle` (18 px, weight 600), the same style as
-`Study timer`. Account status and mode details use the small 12 px
+`Study timer`. The account footer name instead matches document labels
+(14 px, weight 400). Account status and mode details use the small 12 px
 secondary style; `AppTheme.light` and `AppTheme.dark` both specify
 Georgia. No test here certifies the availability of Georgia on every OS.
 
 Repeatable manual acceptance on Linux, Windows, macOS and browser:
 
-1. Open the sidebar with a signed-in account. Compare the account name
-   against `Study timer`: both must have the same visual font, size and
-   weight. The backup status must match the timer subtitle (12 px).
+1. Open the sidebar with a signed-in account. The name must match a
+   document label (14 px, normal weight), not the bold Study timer title.
+   The backup status must match the timer subtitle (12 px).
 2. Open account settings and the Sign in, Create account, Local mode and
    Change password dialogs. Titles must match the timer heading; labels
-   stay above inputs at 14 px, including after typing.
+   stay above inputs at 14 px, including after typing. In the initial
+   dialog there must be a single NaNotateczki title, with Welcome in
+   the paragraph below, rather than two competing title blocks.
 3. In light and dark themes, check the account profile title (18 px),
    mode and sync descriptions (12 px), and secondary section headings.
 4. Repeat at a narrow sidebar, mobile drawer and 75–150% UI scale.
@@ -65,6 +68,33 @@ Manual checks: expand and collapse nested folders, open each document
 kind, long-press and move a folder or document, and open its action menu.
 Check readable indentation in both themes, on desktop and in the
 mobile drawer. Do not count these checks as passed without execution.
+
+## Persistent account session (November 2026)
+
+Automated regression: `test/account_session_controller_test.dart` uses a
+fake credential store. It covers token rotation and a second application
+session without a login dialog, offline restarts without loss of refresh
+credentials, and deletion of rejected credentials or on logout. It does not
+validate real platform secret storage.
+
+Manual acceptance on Linux, Windows, macOS, Android, iOS and HTTPS Web:
+
+1. Complete the first-run onboarding, sign in and fully restart the app.
+   The library must open without a login dialog and account status must
+   show the same signed-in username.
+2. Restart without Internet: local notebooks must remain accessible
+   without a modal; after network restoration reauthenticate from
+   account settings if needed.
+3. Change password, quit and reopen: the old refresh credential must
+   not restore access. Repeat after logging out or switching to local.
+4. On Web, verify a browser restart with the same origin and profile.
+   First sync still requires explicit safe policy selection; auto-login
+   must not automatically select upload/download/merge.
+5. Linux requires `libsecret-1-dev` to build, `libsecret-1-0` and
+   an available GNOME Keyring/KWallet/Secret Service at runtime.
+   Windows builds with this plugin require Visual Studio C++ ATL.
+   Run `flutter pub get` after adding the dependency. A missing
+   secure store must not prevent local notebook use.
 
 These checks are not marked as passed without execution.
 
