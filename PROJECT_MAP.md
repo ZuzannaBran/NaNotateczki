@@ -45,13 +45,13 @@ lib/
 
 ## 2. Start i aplikacja
 
-### `lib/main.dart` (159 linii)
+### `lib/main.dart` (169 linii)
 
 Start aplikacji, globalne logowanie błędów i linuksowy filtr błędnych zdarzeń
 klawiatury. Przed wczytaniem logów przygotowuje i migruje prywatny katalog
 danych aplikacji.
 
-- 33: `main`; 45: `_runApp`; 67–144: handlery błędów i watchdog key data.
+- 37: `main`; 48: `_runApp`; 77–169: handlery błędów i watchdog key data.
 
 ### `lib/app/notes_app.dart` (12 linii)
 
@@ -59,7 +59,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (757 linii)
+### `lib/app/app_scope.dart` (758 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -81,9 +81,9 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 - Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
   backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
 - 31: `AppScope`; 38: `_AppScopeState`; 91: `didRequestAppExit`.
-- 301: `AppUiScale`; 349: `_ExitGuardOverlay`;
-  372: `_FinishingExitOverlay`; 480: `_BackupScheduler`;
-  676: `flushForExit`.
+- 310: `AppUiScale`; 358: `_ExitGuardOverlay`;
+  381: `_FinishingExitOverlay`; 489: `_BackupScheduler`;
+  685: `flushForExit`.
 
 ## 3. Core
 
@@ -286,7 +286,7 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/remote_backup_service.dart` (164 linie)
+### `lib/data/backup/remote_backup_service.dart` (162 linie)
 
 Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
 zadania i planer, liczy SHA-256, wykonuje pending → upload → finalize i uznaje
@@ -295,15 +295,16 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
 - 12: `RemoteBackupReceipt`; 24: `RemoteBackupService`;
   38: `uploadVerifiedSnapshot`.
 
-### `lib/data/backup/remote_backup_scheduler.dart` (347 linii)
+### `lib/data/backup/remote_backup_scheduler.dart` (343 linie)
 
 Jawnie włączany scheduler zalogowanego konta: po zmianach wysyła verified
-snapshot co 30 minut, po błędzie ponawia po 5 minutach i próbuje przy resume.
+snapshot po ustawionym okresie bezczynności (domyślnie 120 sekund), po błędzie
+ponawia po 5 minutach; resume rozpoczyna nowe oczekiwanie na bezczynność.
 Samo logowanie nie włącza wysyłki. Stan wyniku i błędu jest czyszczony przy
 zmianie konta, a losowy `deviceId` ma osobny plik per `userId`.
 
 - 13: `RemoteBackupScheduler`; logika bezczynności i zapis per konto; `enableForSignedInAccount`, `setIdleSeconds`, `backupNow`;
-  75: `uploadNow`; 92: `backupNow`. Licznik generacji nie pozwala zgubić zmiany wykonanej
+  119: `uploadNow`; 133: `backupNow`. Licznik generacji nie pozwala zgubić zmiany wykonanej
   podczas trwającego uploadu.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (12 linii)
@@ -498,7 +499,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 749: `moveItemToFolder`; 796: `selectFolder`; 924: `_loadFolders`;
   986: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (2048 linii)
+### `lib/features/library/presentation/library_screen.dart` (2134 linie)
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -607,21 +608,21 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   Planner otwiera `TaskListScreen` zamiast kontrolera edytora.
   Ustawienia katalogu i planera nie tworzą `EditorController` dla
   `NotebookKind.planner`, aby nie zgłaszać `UnsupportedError`.
-- 30: `LibraryScreen`; 39: `_LibraryScreenState`;
-  401: `_maybeShowAccountOnboarding`;
-  539: `_keepCatalogOnMovedFolder`; 561: `_openCatalogSettings`;
-  925: `_CreateMenuButton`;
-  970: `_LibraryTreePane` (`_LibraryTreePaneState` 997);
-  1212: `_buildFolder`; 1394: `_FolderTreeRow`;
-  1497: `_LibraryTreeItemRow` (bez ikon typów);
-  1595: `_sidebarMenuShape`;
-  1609: `_SidebarMenuShadowPainter`;
-  1645: `_showSidebarMenu`;
-  1758: `_TreeRowActions`;
-  1832: `_LibraryWorkspace`;
-  1943: `_LeftZoneToggleTab` (również przycisk timera).
+- 34: `LibraryScreen`; 43: `_LibraryScreenState`;
+  407: `_maybeShowAccountOnboarding`;
+  555: `_keepCatalogOnMovedFolder`; 626: `_openCatalogSettings`;
+  990: `_CreateMenuButton`;
+  1035: `_LibraryTreePane` (`_LibraryTreePaneState` 1062);
+  1277: `_buildFolder`; 1464: `_FolderTreeRow`;
+  1567: `_LibraryTreeItemRow` (bez ikon typów);
+  1668: `_sidebarMenuShape`;
+  1682: `_SidebarMenuShadowPainter`;
+  1718: `_showSidebarMenu`;
+  1831: `_TreeRowActions`;
+  1911: `_LibraryWorkspace`;
+  2041: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (1109 linii)
+### `lib/features/library/presentation/library_account_slot.dart` (1104 linie)
 
 Onboarding `Create account`/`Sign in`/`Try local` z jednym
 nagłówkiem NaNotateczki i tekstem Welcome poniżej, bez podwójnego tytułu,
@@ -649,11 +650,11 @@ a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
 
 - 20: `showLibraryAccountDialog`; 49: `LibraryAccountSlot`;
   154: `_AccountAvatar`; 186: `_AccountDialog`;
-  199: `_AccountDialogState`; 693: `_usernameField`;
-  714: `_accountLabeledField`; 912: `_backupNow`;
-  949: `_changePassword`.
+  199: `_AccountDialogState`; 695: `_usernameField`;
+  716: `_accountLabeledField`; 908: `_backupNow`;
+  945: `_changePassword`.
 
-### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
+### `lib/features/library/presentation/library_catalog.dart` (1288 linii)
 
 Katalog Projects pokazuje wyłącznie foldery główne. Po wejściu do folderu
 widok rozdziela bezpośrednie podfoldery i dokumenty na dwie wyśrodkowane
@@ -713,11 +714,11 @@ Siatka reaguje na wspólną czułość dotyku.
 
 - 27: `dominantFolderColor`; 55: `FolderCoverIcon`;
   109: `FolderCoverStrokePainter`; 235: `LibraryCatalog`;
-  560: `_FolderTile`; 627: `_DocumentTile`;
-  746: `_CatalogTile`; 870: `_DocumentPreview`;
-  953: `_boardPreviewBounds`;
-  995: `_PagePreviewPainter`;
-  1067: `showFolderCoverEditor`.
+  565: `_FolderTile`; 632: `_DocumentTile`;
+  757: `_CatalogTile`; 881: `_DocumentPreview`;
+  964: `_boardPreviewBounds`;
+  1006: `_PagePreviewPainter`;
+  1078: `showFolderCoverEditor`.
 
 - `lib/core/widgets/workspace_document_app_bar.dart`: wspólny pasek
   tytułu notatnika, boarda i planera (56 px), z marginesem chroniącym
@@ -1510,8 +1511,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/remote_backup_scheduler_test.dart`: odstęp bezczynności, nieblokujący upload podczas oczekiwania na serwer.
 - `test/remote_backup_service_test.dart`: kompletny snapshot v2 z biblioteką
   i planerem, wymaganie potwierdzonego `verified` oraz zachowanie flagi dirty,
-  gdy dane zmienią się podczas uploadu, a także izolacja stanu i `deviceId`
-  między kontami.
+  gdy dane zmienią się podczas ręcznego `backupNow`, a także izolacja stanu
+  i `deviceId` między osobnymi sesjami kont.
 - `test/live_web_sync_service_test.dart`: pobranie wszystkich stron feedu po
   500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany oraz brak
   przenoszenia outboxu i rewizji między kontami.
