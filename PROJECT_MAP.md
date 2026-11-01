@@ -299,6 +299,9 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
   38: `uploadVerifiedSnapshot`; `hydrateFromLatestAccountBackup` pobiera
   najnowszy zweryfikowany backup, weryfikuje SHA i importuje go tylko
   do pustej biblioteki, o ile serwer nie ma już historii zmian.
+  Nie nadpisuje istniejących preferencji ani danych planera; po udanym
+  sprawdzeniu zapisuje znacznik, aby nie pobierać wielkiego backupu
+  podczas każdego restartu.
 
 ### `lib/data/backup/remote_backup_scheduler.dart` (347 linii)
 
@@ -654,7 +657,7 @@ nazwy i zmiany hasła używają etykiet nad polami (14 px, bold, odstęp 6 px),
 obrysu 12 px i nieruchomych podpisów jak edytor wydarzeń w kalendarzu;
 brak pływających etykiet oraz wypełnionego tła pola;
 ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
-loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
+loginie `AppScope` automatycznie inicjuje odzyskiwanie i bezpieczny sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
   Automatyczne inicjowanie synchronizacji należy do `AppScope`, także na
   platformach natywnych; ręczne polityki pozostają awaryjnym wyborem.
