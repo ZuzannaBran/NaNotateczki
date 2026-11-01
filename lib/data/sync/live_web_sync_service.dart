@@ -318,7 +318,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         if (result['notebook'] case final Map<String, dynamic> merged) {
           if (jsonEncode(_normalizePortableImagePaths(merged)) !=
               sentNotebook) {
-            final authoritative = repository.decodeBackupStrict([merged]).single;
+            final authoritative = repository
+                .decodeBackupStrict([merged])
+                .single;
             await _applyRemoteImports([authoritative]);
           }
         }
