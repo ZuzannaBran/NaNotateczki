@@ -9,17 +9,13 @@ offline również po zalogowaniu.
 - Przy pierwszym uruchomieniu użytkownik jawnie wybiera rejestrację, logowanie
   albo tryb lokalny. `localOnly` wymaga wyłącznie lokalnej nazwy użytkownika
   i nie wykonuje żadnego połączenia z API.
-- `account` powstaje dopiero po jawnym logowaniu. Samo logowanie nie wysyła
-  lokalnych notatek.
-- Backup zdalny wymaga osobnego wywołania
-  `RemoteBackupScheduler.enableForSignedInAccount()`.
-- Synchronizacja Web wymaga jawnego `LiveWebSyncService.start(...)` z wyborem:
-  `uploadLocal`, `downloadRemote` albo `mergeSafely`. Pierwsze dwie opcje
-  odmawiają działania, jeśli mogłyby nadpisać niepustą bibliotekę.
-- Panel konta uruchamia backup dopiero po poprawnym logowaniu, a na Web
-  wymaga od użytkownika wyboru jednej z trzech polityk przed startem live
-  sync. Przy wylogowaniu najpierw zatrzymuje live sync i backup, a dopiero
-  potem czyści sesję przechowywaną w pamięci.
+- Konto powstaje dopiero po jawnym logowaniu. Na Linuxie, Web, Androidzie
+  i iOS aplikacja automatycznie uruchamia bezpieczne scalanie `mergeSafely`,
+  odtwarzając najpierw brakujące dane ze zweryfikowanego backupu.
+- Odtwarzanie backupu nigdy nie zastępuje istniejącego notatnika;
+  pierwszeństwo nad nim mają zdarzenia synchronizacji i tombstones.
+- Scheduler backupu włącza się dopiero po inicjalizacji konta i sync.
+  Po wylogowaniu aplikacja zatrzymuje sync i backup przed wyczyszczeniem sesji.
 - `account_profile.json` przechowuje ukończenie onboardingu,
   preferowany tryb, lokalną nazwę, ostatnią nazwę użytkownika oraz `boundUserId`.
   Raz przypisane dane lokalne nie mogą zostać użyte z innym kontem bez
@@ -110,10 +106,9 @@ katalogu głównego ani całego katalogu domowego jako celu.
   używany do nowych backupów.
 - WebSocket przenosi wyłącznie mały sygnał zmiany. Pełny, trwały stan jest
   zawsze pobierany przez REST z kursorem `change_events`.
-- Przy przywróceniu konta na starcie natywny scheduler backupu wraca
-  do działania. Pierwszy sync Web nadal wymaga jawnego wyboru polityki;
-  samo odnowienie tokenu nie rozpoczyna synchronizacji.
-
+- Przy przywróceniu zapamiętanego konta na wszystkich platformach aplikacja
+  ponownie uruchamia synchronizację i backup. WebSocket służy także na
+  platformach natywnych; trwałe dane są pobierane przez REST.
 ## Serwer
 
 Kod wdrożeniowy znajduje się w `server/`. PostgreSQL i API są dostępne tylko
@@ -146,8 +141,9 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 
 1. Klient opróżnia aktywne zapisy, odrzuca backup przy uszkodzonych rekordach
    i buduje format `nanotateczki-server-backup` v2.
-2. Snapshot zawiera notatniki z bajtami obrazów, foldery/zadania oraz pełny
-   `study_planner.json`.
+2. Snapshot zawiera notatniki z bajtami obrazów, foldery/zadania,
+   `study_planner.json`, `app_prefs.json`, `editor_prefs.json`,
+   `shared_recent_colors.json` i preferencję bezczynności backupu konta.
 3. Klient liczy SHA-256, tworzy rekord `pending`, wysyła maksymalnie 64 MiB i
    wywołuje `finalize`.
 4. Serwer ponownie sprawdza rozmiar, SHA-256, format, urządzenie i checksumę
@@ -186,8 +182,9 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
   dokument z dopiskiem `Conflict`, a następnie stosuje stan serwera.
 - Usunięcia są tombstonami. Outbox znika dopiero po potwierdzonym commicie.
 - Po reconnect klient zawsze wywołuje `/v1/sync/changes?after=<cursor>`.
-- Na Web po wznowieniu aplikacji i zapasowo co 45 sekund (10 sekund po błędzie)
-  weryfikuje zmiany przez REST, niezależnie od częstotliwości backupów.
+- Na wszystkich platformach po wznowieniu aplikacji i zapasowo co 45 sekund
+  (10 sekund po błędzie) weryfikuje zmiany przez REST. Ścieżki obrazów
+  przesyłanych przez konto są neutralne względem systemu plików urządzenia.
 - Feed jest stronicowany po 500 zdarzeń; klient pobiera wszystkie pełne
   strony, zanim zacznie wysyłać lokalny outbox.
 
