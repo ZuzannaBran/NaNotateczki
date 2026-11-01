@@ -110,3 +110,8 @@ Przeprowadzone poprawki:
 
 Plik WIP należy **usunąć dopiero po wykonaniu i potwierdzeniu** powyższych
 punktów. GitHub Actions nie uruchamiano.
+
+Dalsza poprawka: `hasRejectedSharedEdits` i testy `shared_edit_conflicts_test.dart`
+wykrywają, gdy serwer nie przyjął edycji konkretnego obiektu. Klient zachowuje
+ją lokalnie w otwartej karcie i pokazuje ostrzeżenie zamiast cichego
+nadpisania; bez trwałego outboxu wciąż nie ma odzyskiwania po zamknięciu.
