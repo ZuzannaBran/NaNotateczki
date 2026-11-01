@@ -33,6 +33,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   DateTime _lastActivityAt = DateTime.now();
   DateTime? _retryNotBefore;
   int _idleSeconds = defaultIdleSeconds;
+  int _preferenceGeneration = 0;
   bool _dirty = false;
   int _changeGeneration = 0;
   bool _enabled = false;
@@ -101,6 +102,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
       throw StateError('Sign in before setting a backup delay.');
     }
     _idleSeconds = seconds;
+    _preferenceGeneration++;
     _scheduleIdle();
     notifyListeners();
     await writeStoredText(
@@ -153,6 +155,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
       if (_accountUserId == accountUserId && session.userId == accountUserId) {
         lastVerifiedBackup = receipt;
         lastError = null;
+        _retryNotBefore = null;
         _dirty = _changeGeneration != uploadGeneration;
       }
     } catch (error, stackTrace) {
@@ -256,6 +259,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _loadPreference(String userId) async {
+    final generation = _preferenceGeneration;
     try {
       final stored = await readStoredText(_preferenceKey(userId));
       if (stored == null) {
@@ -266,6 +270,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
           decoded['version'] == 1 &&
           supportedIdleSeconds.contains(decoded['idleSeconds']) &&
           !_disposed &&
+          generation == _preferenceGeneration &&
           _accountUserId == userId) {
         _idleSeconds = decoded['idleSeconds'] as int;
         _scheduleIdle();
@@ -309,6 +314,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     _changeGeneration++;
     _idleSeconds = defaultIdleSeconds;
     _retryNotBefore = null;
+    _preferenceGeneration++;
   }
 
   @override
