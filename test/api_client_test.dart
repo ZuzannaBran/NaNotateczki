@@ -6,6 +6,27 @@ import 'package:http/testing.dart';
 import 'package:program/data/sync/api_client.dart';
 
 void main() {
+  test('uses the production API by default for REST and WebSocket', () {
+    const override = String.fromEnvironment('BACKEND_URL');
+    final client = ApiClient();
+
+    if (override.trim().isEmpty) {
+      expect(client.baseUri.toString(), 'https://api.nanotateczki.pl');
+      expect(
+        client.resolve('/v1/auth/login').toString(),
+        'https://api.nanotateczki.pl/v1/auth/login',
+      );
+      expect(
+        client.realtimeUri().toString(),
+        'wss://api.nanotateczki.pl/v1/realtime',
+      );
+    } else {
+      expect(client.baseUri.toString(), override.trim());
+    }
+    expect(client.isConfigured, isTrue);
+    client.close();
+  });
+
   test('rejects plaintext or credential-bearing production URLs', () {
     expect(
       () => ApiClient(baseUri: Uri.parse('http://api.example.com')),

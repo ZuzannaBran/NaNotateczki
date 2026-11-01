@@ -341,6 +341,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/api_client.dart` (190): klient REST z wymuszeniem HTTPS,
   timeoutem, limitem odpowiedzi, Bearer tokenem i request ID.
   7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
+  Domyślny adres dla wszystkich platform to `https://api.nanotateczki.pl`;
+  `BACKEND_URL` może go nadpisać w buildach lokalnych/testowych.
 - `lib/data/sync/account_session_controller.dart` (369): trwały profil
   pierwszego uruchomienia i trybu lokalnego, rejestracja/logowanie, zmiana
   hasła, rotacja sesji oraz tokeny wyłącznie w pamięci. Plik profilu zawiera

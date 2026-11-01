@@ -48,7 +48,8 @@ class ApiClient {
 
   static Uri backendUriFromEnvironment() {
     const value = String.fromEnvironment('BACKEND_URL');
-    return value.trim().isEmpty ? Uri() : Uri.parse(value.trim());
+    const defaultUrl = 'https://api.nanotateczki.pl';
+    return Uri.parse(value.trim().isEmpty ? defaultUrl : value.trim());
   }
 
   static void validateBackendUri(Uri uri) {
