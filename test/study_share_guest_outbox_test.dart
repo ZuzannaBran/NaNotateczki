@@ -54,6 +54,24 @@ void main() {
     await expectLater(outbox.read(), throwsFormatException);
   });
 
+  test('storage write failures propagate without deleting earlier data',
+      () async {
+    final outbox = StudyShareGuestOutbox('session-a');
+    storage['study_share_guest_outbox_v1_session-a'] = 'previous';
+    textStorageWriteOverride = (_, _) async {
+      throw StateError('storage quota exceeded');
+    };
+    await expectLater(
+      outbox.write(const PendingStudyShareEdit(
+        baseRevision: 1,
+        baseNotebook: {'uid': 'original', 'pages': []},
+        notebook: {'uid': 'original', 'pages': []},
+      )),
+      throwsStateError,
+    );
+    expect(storage['study_share_guest_outbox_v1_session-a'], 'previous');
+  });
+
   test('malformed snapshots are never silently accepted', () async {
     final outbox = StudyShareGuestOutbox('session-a');
     storage['study_share_guest_outbox_v1_session-a'] = '{"version":1}';

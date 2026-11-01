@@ -370,6 +370,11 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       // The next poll will reconcile after reconnect.
     } finally {
       _refreshing = false;
+      // A push timer may have fired while the remote read was in flight.
+      // Re-arm it so the locally saved edit cannot remain dirty forever.
+      if (_dirty && !_sending && !_closed && mounted) {
+        _retry();
+      }
     }
   }
 
@@ -429,11 +434,6 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       try {
         await editor?.flushPendingSaves();
         if (repository != null && _base != null) {
-          try {
-            await _persistPending();
-          } catch (_) {
-            // Keep any older durable snapshot if this final save fails.
-          }
           final notebook = await repository.getNotebook(
             _base!['uid'] as String,
           );
@@ -441,6 +441,11 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
             final encoded = NotebookRepository.encodeNotebook(notebook);
             if (jsonEncode(encoded['pages']) !=
                 jsonEncode(_base!['pages'])) {
+              try {
+                await _persistPending();
+              } catch (_) {
+                // Keep any older snapshot if final persistence fails.
+              }
               await widget.client.writeDocument(
                 widget.shareId,
                 widget.ticket,

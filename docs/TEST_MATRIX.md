@@ -838,3 +838,10 @@ the unit suite and require a configured test server.
   przedłużanie sesji, dwa równoczesne zalogowane okna hosta, restart API.
 - Zmierzyć czas od wykonania kreski do jej wyświetlenia na drugim kliencie,
   także na wolnym łączu i po utracie WebSocket.
+
+- Gość rysuje w chwili trwającego GET odświeżającego po WebSocket,
+  tak aby 35-ms timer zapisu wywołał się przed odpowiedzią GET.
+  Po zakończeniu GET musi zostać zaplanowane ponowienie PUT;
+  sprawdzić status Saved, oryginalny UID i brak pętli.
+- Wyjście ze wspólnego edytora bez jakichkolwiek zmian nie może wytworzyć
+  sztucznej oczekującej edycji w localStorage.

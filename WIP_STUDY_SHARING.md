@@ -141,3 +141,7 @@ nadpisania; bez trwałego outboxu wciąż nie ma odzyskiwania po zamknięciu.
 - Weryfikacja kodu nie zastępuje testów przeglądarkowych. Zapis w toku w chwili
   zabicia procesu, bardzo duże dokumenty i brak dostępnej przestrzeni
   magazynu przeglądarki nadal są otwartymi ryzykami.
+
+- Usunięto wyścig pomiędzy HTTP odświeżeniem a timerem wysyłania gościa:
+  po zakończeniu odświeżenia oczekująca zmiana ponawia PUT.
+- Zamknięcie niezmienionego edytora nie tworzy fałszywego rekordu outboxu.
