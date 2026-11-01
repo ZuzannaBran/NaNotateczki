@@ -332,7 +332,11 @@ class RemoteBackupService {
                 (folder) => folder != 'Notes',
               ) ||
               (previous['plannerTasks'] is Map &&
-                  (previous['plannerTasks'] as Map).isNotEmpty)) {
+                  (previous['plannerTasks'] as Map).isNotEmpty) ||
+              (previous['covers'] is Map &&
+                  (previous['covers'] as Map).isNotEmpty) ||
+              (previous['recentCoverColors'] is List &&
+                  (previous['recentCoverColors'] as List).isNotEmpty)) {
             return false;
           }
         }
