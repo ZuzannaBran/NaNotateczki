@@ -72,3 +72,41 @@ backend może nadal zwracać 404, dopóki nie zostanie zaktualizowany.
 
 Następny czat powinien zacząć od `CZAT.md`, `PROJECT_MAP.md` i
 `data.md`, a następnie użyć tej listy.
+
+## Stan po kontynuacji 2026-11-01
+
+**Kod zabezpieczeń zapisano commitami** na `NaNotateczki/dev` oraz
+`NaNotateczki-serwer/main`; kopie backendu w obu repozytoriach są zgodne.
+Nie oznacza to pomyślnego zakończenia ani wdrożenia mechanizmu.
+
+Przeprowadzone poprawki:
+
+- W feedzie zmian właściciela utrwalany jest zatwierdzony, scalony snapshot,
+  a nie nieaktualny payload przeglądarki.
+- Gość i właściciel muszą podawać `baseNotebook` zgodny z odpowiednią
+  historyczną rewizją serwera; dodano indeks historii (migracja 0006).
+- Serwer blokuje tworzenie dwóch aktywnych sesji tego samego UID,
+  serializuje tworzenie z operacjami konta i unieważnia sesję przy skasowaniu
+  udostępnionego oryginału.
+- Przy ręcznym kończeniu sesji Flutter najpierw odcina gości, dopiero potem
+  próbuje opróżnić zaległe zapisy właściciela.
+- Klient gościa rozpoznaje terminalne kody zamknięcia WebSocket oraz
+  ponownie odczytuje dokument po inicjalizacji edytora.
+- Dodano regresje do `test/study_share_http_test.dart`,
+  `test/study_share_guest_socket_test.dart` i
+  `server/api/tests/test_study_shares_flow.py`. **Nie uruchomiono ich**.
+
+**Wciąż obowiązkowe przed uznaniem pracy za ukończoną:**
+
+1. Trwała kolejka gościa dla odłączenia, odświeżenia i zamknięcia karty;
+   brak dowodu ochrony każdej niezapisanej operacji przy kolizjach.
+2. Weryfikacja działania całego edytora (tekst, rysowanie, gumka, obrazy,
+   obiekty) i widoku właściciela bez nadmiarowych kopii konfliktowych.
+3. Kontrola czyszczenia plików PNG po wygaśnięciu i wielokrotnych remisów.
+4. Lokalne `flutter test`, `dart analyze`, `pytest`, prawdziwy
+   PostgreSQL i dwie przeglądarki, wraz z pomiarem latencji.
+5. Po wykonaniu kopii bezpieczeństwa: migracje 0004–0006 na serwerze HP,
+   wdrożenie nowego API i Flutter Web, ponowny test E2E.
+
+Plik WIP należy **usunąć dopiero po wykonaniu i potwierdzeniu** powyższych
+punktów. GitHub Actions nie uruchamiano.
