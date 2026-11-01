@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
+import 'package:program/core/theme/app_typography.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/features/editor/presentation/editor_commands.dart';
 import 'package:program/features/editor/presentation/interaction/object_transform_engine.dart';
@@ -122,6 +123,52 @@ void main() {
     }
 
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('text preview uses serif fallback unless font is custom', (
+    tester,
+  ) async {
+    final block = TextBlock(
+      id: 'font-preview',
+      text: 'Zażółć gęślą jaźń',
+      position: Offset.zero,
+      fontSize: 18,
+      color: Colors.black,
+      width: 320,
+    );
+    final customBlock = block.copyWith(
+      deltaJson: jsonEncode([
+        {
+          'insert': block.text,
+          'attributes': {'font': 'Arial'},
+        },
+        {'insert': '\n'},
+      ]),
+    );
+
+    for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+      late TextBlockAppearance appearance;
+      late TextBlockAppearance customAppearance;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Builder(
+            builder: (context) {
+              appearance = textBlockAppearance(context, block);
+              customAppearance = textBlockAppearance(context, customBlock);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      expect(appearance.textStyle.fontFamily, AppTypography.fontFamily);
+      expect(
+        appearance.textStyle.fontFamilyFallback,
+        AppTypography.fontFamilyFallback,
+      );
+      expect(customAppearance.textStyle.fontFamily, 'Arial');
+      expect(customAppearance.textStyle.fontFamilyFallback, isNull);
+    }
   });
 
   testWidgets('block text toolbar applies only supported formatting', (

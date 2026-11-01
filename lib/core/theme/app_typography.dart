@@ -2,14 +2,31 @@ import 'package:flutter/material.dart';
 
 /// Shared typography for application UI; document content is independent.
 class AppTypography {
+  static const String fontFamily = 'Georgia';
+  static const List<String> fontFamilyFallback = [
+    'Gelasio',
+    'Noto Serif',
+    'DejaVu Serif',
+    'Liberation Serif',
+    'Times New Roman',
+    'serif',
+  ];
+
   static const double heading = 18;
   static const double folder = 16;
   static const double document = 14;
   static const double small = 12;
 
   static ThemeData apply(ThemeData theme) {
-    final text = theme.textTheme.apply(fontFamily: 'Georgia');
+    final text = theme.textTheme.apply(
+      fontFamily: fontFamily,
+      fontFamilyFallback: fontFamilyFallback,
+    );
     return theme.copyWith(
+      primaryTextTheme: theme.primaryTextTheme.apply(
+        fontFamily: fontFamily,
+        fontFamilyFallback: fontFamilyFallback,
+      ),
       textTheme: text.copyWith(
         displayLarge: text.displayLarge?.copyWith(fontSize: heading),
         displayMedium: text.displayMedium?.copyWith(fontSize: heading),

@@ -37,8 +37,8 @@ class AppTheme {
         );
     final theme = ThemeData(
       brightness: Brightness.dark,
-      fontFamily: 'Georgia',
-      fontFamilyFallback: const ['Times New Roman', 'Noto Serif', 'serif'],
+      fontFamily: AppTypography.fontFamily,
+      fontFamilyFallback: AppTypography.fontFamilyFallback,
       colorScheme: scheme,
       scaffoldBackgroundColor: background,
       cardColor: AppColors.darkPaper,
@@ -113,8 +113,8 @@ class AppTheme {
         );
 
     final theme = ThemeData(
-      fontFamily: 'Georgia',
-      fontFamilyFallback: const ['Times New Roman', 'Noto Serif', 'serif'],
+      fontFamily: AppTypography.fontFamily,
+      fontFamilyFallback: AppTypography.fontFamilyFallback,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
       useMaterial3: true,

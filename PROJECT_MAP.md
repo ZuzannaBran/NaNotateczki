@@ -106,7 +106,9 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
 - `lib/core/theme/app_typography.dart`: cztery rozmiary tekstu interfejsu
-  (18/16/14/12 px); tekst w edytowanych dokumentach pozostaje niezależny.
+  (18/16/14/12 px), Georgia z fallbackiem Gelasio / Noto Serif /
+  DejaVu Serif / Liberation Serif / Times New Roman / serif na wszystkich
+  platformach; edytowane dokumenty zachowują własne rozmiary tekstu.
 - `lib/core/theme/app_theme.dart`: `AppTheme.light` i `AppTheme.dark`
   z kontrastowymi kontrolkami i nagłówkami. Tekstowe i konturowe
   przyciski jasnego motywu używają `onSurface` zamiast bladego akcentu.
@@ -911,8 +913,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   kliknięcie w tydzień/miesiąc wybiera dzień, a zakładka Day
   przywraca dzisiaj. Sprawdź zaokrąglone dolne rogi, kolor przycisków
   i wyśrodkowany komunikat zakończenia sesji.
-- `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów
-  i standardowe promienie 12 px prostokątnych kontrolek.
+- `test/dark_mode_theme_test.dart`: czteropoziomowa typografia obu motywów,
+  wspólna lista zamienników Georgii i standardowe promienie 12 px kontrolek.
 - `test/ink_color_presets_test.dart`: odcienie trzech palet, wspólny
   wybór koloru dla pióra i zakreślacza,
   transformacja HSL w dark mode, malejący kontrast odcieni 1–3
@@ -1279,6 +1281,8 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   przesuwania i zmiany rozmiaru, zapisuje transformację jako undo/redo.
 
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (588):
+  podgląd używa tych samych zamienników Georgii co UI, ale nie narzuca
+  ich blokom z indywidualnie wybranym fontem;
   aktywny `TextBlock` renderowany przez Flutter `EditableText`;
   Delete usuwa obiekt tylko przy pustym tekście, w przeciwnym razie
   pozostaje natywną edycją tekstu (znak po prawej stronie kursora). ramka,

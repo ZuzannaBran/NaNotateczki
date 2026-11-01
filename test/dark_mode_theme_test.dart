@@ -39,11 +39,25 @@ void main() {
     }
   });
 
-  test('both themes use Georgia for interface text', () {
+  test('both themes keep Georgia and a consistent serif fallback', () {
+    expect(AppTypography.fontFamilyFallback.first, 'Gelasio');
+    expect(AppTypography.fontFamilyFallback, contains('Noto Serif'));
+    expect(AppTypography.fontFamilyFallback, contains('DejaVu Serif'));
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {
-      expect(theme.textTheme.bodyMedium?.fontFamily, 'Georgia');
-      expect(theme.textTheme.titleMedium?.fontFamily, 'Georgia');
-      expect(theme.primaryTextTheme.bodyMedium?.fontFamily, 'Georgia');
+      for (final text in [theme.textTheme, theme.primaryTextTheme]) {
+        for (final style in [
+          text.bodyMedium,
+          text.titleMedium,
+          text.headlineLarge,
+          text.labelLarge,
+        ]) {
+          expect(style?.fontFamily, AppTypography.fontFamily);
+          expect(
+            style?.fontFamilyFallback,
+            AppTypography.fontFamilyFallback,
+          );
+        }
+      }
     }
   });
 

@@ -7,6 +7,7 @@ import 'package:flutter_box_transform/flutter_box_transform.dart';
 
 import '../../../../core/input/soft_keyboard.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/text_block.dart';
 import '../../state/editor_controller.dart';
@@ -542,6 +543,7 @@ TextBlockAppearance textBlockAppearance(
       }
     }
   }
+  final customFontFamily = inline['font']?.toString();
   final decorations = <TextDecoration>[
     if (inline['underline'] == true) TextDecoration.underline,
     if (inline['strike'] == true) TextDecoration.lineThrough,
@@ -553,7 +555,10 @@ TextBlockAppearance textBlockAppearance(
         darkMode: Theme.of(context).brightness == Brightness.dark,
       ),
       fontSize: fontSize ?? block.fontSize,
-      fontFamily: inline['font']?.toString() ?? 'Georgia',
+      fontFamily: customFontFamily ?? AppTypography.fontFamily,
+      fontFamilyFallback: customFontFamily == null
+          ? AppTypography.fontFamilyFallback
+          : null,
       fontWeight: inline['bold'] == true ? FontWeight.bold : FontWeight.normal,
       fontStyle: inline['italic'] == true ? FontStyle.italic : FontStyle.normal,
       decoration: decorations.isEmpty

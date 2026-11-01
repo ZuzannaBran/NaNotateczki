@@ -34,8 +34,11 @@ account dialog titles and profile title use
 `AppHeaderDivider.titleStyle` (18 px, weight 600), the same style as
 `Study timer`. The account footer name instead matches document labels
 (14 px, weight 400). Account status and mode details use the small 12 px
-secondary style; `AppTheme.light` and `AppTheme.dark` both specify
-Georgia. No test here certifies the availability of Georgia on every OS.
+secondary style; `AppTheme.light` and `AppTheme.dark` both prefer
+Georgia, followed by Gelasio, Noto Serif, DejaVu Serif, Liberation Serif,
+Times New Roman and the generic serif. The shared order applies to normal
+and primary text themes and default text-block previews. Structural tests
+do not prove a particular font is installed or rendered on a given OS.
 
 Repeatable manual acceptance on Linux, Windows, macOS and browser:
 
@@ -57,6 +60,12 @@ Repeatable manual acceptance on Linux, Windows, macOS and browser:
    their own status text.
 5. Compare the same screen on Linux and web. If Georgia is unavailable,
    both timer and account must fall back to the same serif family.
+6. On Linux and Android without Georgia, compare text in the library,
+   calendar, account dialogs and a default editor text block. Check the
+   sentence "Zażółć gęślą jaźń" in light/dark modes, online and offline.
+   Verify a consistent serif appearance without missing Polish glyphs.
+   Repeat on Windows/macOS/iOS with Georgia installed and verify it remains
+   preferred. Do not mark device rendering as tested without running it.
 
 The folder tree also has a regression in
 `test/library_screen_responsive_layout_test.dart` and
