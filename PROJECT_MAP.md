@@ -1896,6 +1896,11 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `lib/features/library/presentation/library_screen.dart`: aktywna sesja
   i jej odzyskanie po ponownym uruchomieniu. Zmiana epoki remote sync
   odtwarza widok kanwy ze zaktualizowanego oryginału.
+- `lib/data/sync/shared_edit_conflicts.dart`:
+  `hasRejectedSharedEdits` sprawdza, czy serwer potwierdził wszystkie
+  zmodyfikowane przez gościa obiekty (z ignorowaniem zmian niezależnych).
+- `test/shared_edit_conflicts_test.dart`: odrzucone edycje tekstu,
+  kreski i usunięcia oraz scalanie niezależnych obiektów.
 - `lib/data/sync/live_web_sync_service.dart`: 90 ms debounce sync,
   bazowe snapshoty do trójstronnego scalania zmian właściciela.
 - `lib/features/editor/state/editor_controller.dart`: parametr
