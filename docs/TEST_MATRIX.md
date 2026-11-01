@@ -47,10 +47,24 @@ Repeatable manual acceptance on Linux, Windows, macOS and browser:
 3. In light and dark themes, check the account profile title (18 px),
    mode and sync descriptions (12 px), and secondary section headings.
 4. Repeat at a narrow sidebar, mobile drawer and 75–150% UI scale.
-   Confirm that long account names elide instead of overlapping the
-   18 px settings icon, and account status stays legible.
+   Confirm the footer has no avatar, the account name starts 14 px from
+   the left edge (like the timer header), and status text is aligned
+   with the name. Long account names must elide instead of overlapping
+   the 18 px settings icon. Local mode and signed-out states have
+   their own status text.
 5. Compare the same screen on Linux and web. If Georgia is unavailable,
    both timer and account must fall back to the same serif family.
+
+The folder tree also has a regression in
+`test/library_screen_responsive_layout_test.dart` and
+`test/library_sidebar_drag_drop_test.dart`. Folder, notebook, board
+and planner type icons must not appear in tree rows or drag feedback.
+Expand/collapse chevrons and three-dot action menus must stay visible.
+
+Manual checks: expand and collapse nested folders, open each document
+kind, long-press and move a folder or document, and open its action menu.
+Check readable indentation in both themes, on desktop and in the
+mobile drawer. Do not count these checks as passed without execution.
 
 These checks are not marked as passed without execution.
 
