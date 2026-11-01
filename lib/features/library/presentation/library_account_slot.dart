@@ -133,7 +133,9 @@ class LibraryAccountSlot extends StatelessWidget {
     if (liveSyncAvailable && sync.isStarted) {
       return sync.hasPendingChanges ? 'Syncing changes' : 'Live sync active';
     }
-    return 'Remote backup enabled';
+    return backup.isEnabled
+        ? 'Remote backup enabled'
+        : 'Connecting to account';
   }
 
   String _relativeTime(DateTime value, DateTime now) {
@@ -574,7 +576,8 @@ class _AccountDialogState extends State<_AccountDialog> {
             const SizedBox(height: 8),
             if (!sync.isStarted) ...[
               const Text(
-                'Choose how this browser should perform its first safe sync.',
+                'Sync starts automatically. These recovery options are '
+                'available if a retry is needed.',
               ),
               const SizedBox(height: 12),
               _SyncPolicyButton(
