@@ -62,9 +62,8 @@ void main() {
     }
     schedulingWatch.stop();
     debugPrint(
-      'Backup scheduler 1000 changes: ' +
-          schedulingWatch.elapsedMicroseconds.toString() +
-          ' microseconds',
+      'Backup scheduler 1000 changes: '
+      '${schedulingWatch.elapsedMicroseconds} microseconds',
     );
     expect(schedulingWatch.elapsed, lessThan(const Duration(seconds: 1)));
 
@@ -106,10 +105,7 @@ void main() {
       session: session,
     );
     service.pending = Completer<RemoteBackupReceipt>();
-    final scheduler = RemoteBackupScheduler(
-      service: service,
-      session: session,
-    );
+    final scheduler = RemoteBackupScheduler(service: service, session: session);
     scheduler.enableForSignedInAccount();
     unawaited(scheduler.backupNow());
     await tester.pump();

@@ -26,11 +26,9 @@ class ActiveStudyShare {
     expiresAt: expiresAt ?? this.expiresAt,
   );
 
-  String get link => Uri.base.replace(
-    path: '/share/' + id,
-    query: null,
-    fragment: null,
-  ).toString();
+  String get link => Uri.base
+      .replace(path: '/share/$id', query: null, fragment: null)
+      .toString();
 }
 
 /// Sharing does not transfer ownership of the original notebook.
@@ -51,7 +49,9 @@ class StudyShareService {
     }
     final expires = session.accessExpiresAt;
     if (expires == null ||
-        expires.isBefore(DateTime.now().toUtc().add(const Duration(minutes: 1)))) {
+        expires.isBefore(
+          DateTime.now().toUtc().add(const Duration(minutes: 1)),
+        )) {
       await session.refresh();
     }
   }
@@ -106,7 +106,7 @@ class StudyShareService {
     await _refreshIfNeeded();
     await session.apiClient.request(
       'PUT',
-      '/v1/study-shares/' + share.id + '/frame',
+      '/v1/study-shares/${share.id}/frame',
       body: png,
       headers: {'Content-Type': 'image/png'},
     );
@@ -115,21 +115,23 @@ class StudyShareService {
   Future<ActiveStudyShare> extend(ActiveStudyShare share) async {
     await _refreshIfNeeded();
     final response = await session.apiClient.postJson(
-      '/v1/study-shares/' + share.id + '/extend',
+      '/v1/study-shares/${share.id}/extend',
       <String, dynamic>{},
     );
     final body = response.decodeJson();
     if (body is! Map<String, dynamic> || body['expiresAt'] is! String) {
       throw const FormatException('Invalid extension response.');
     }
-    return share.copyWith(expiresAt: DateTime.parse(body['expiresAt'] as String));
+    return share.copyWith(
+      expiresAt: DateTime.parse(body['expiresAt'] as String),
+    );
   }
 
   Future<void> end(ActiveStudyShare share) async {
     await ensureSavedOnAccount(share.documentUid);
     await session.apiClient.request(
       'DELETE',
-      '/v1/study-shares/' + share.id,
+      '/v1/study-shares/${share.id}',
       body: const <int>[],
     );
   }
@@ -141,11 +143,9 @@ class StudyShareGuestClient {
   final ApiClient _api;
 
   Future<Map<String, dynamic>> join(String id, String password) async {
-    final response = await _api.postJson(
-      '/v1/study-shares/' + id + '/join',
-      {'password': password},
-      authenticated: false,
-    );
+    final response = await _api.postJson('/v1/study-shares/$id/join', {
+      'password': password,
+    }, authenticated: false);
     final body = response.decodeJson();
     if (body is! Map<String, dynamic> ||
         body['ticket'] is! String ||
@@ -159,15 +159,15 @@ class StudyShareGuestClient {
   Future<Uint8List> frame(String id, String ticket) async {
     final response = await _api.request(
       'GET',
-      '/v1/study-shares/' + id + '/frame',
+      '/v1/study-shares/$id/frame',
       authenticated: false,
-      headers: {'Authorization': 'Bearer ' + ticket},
+      headers: {'Authorization': 'Bearer $ticket'},
     );
     return response.bodyBytes;
   }
 
   Uri eventsUri(String id) {
-    final uri = _api.resolve('/v1/study-shares/' + id + '/events');
+    final uri = _api.resolve('/v1/study-shares/$id/events');
     return uri.replace(scheme: uri.scheme == 'https' ? 'wss' : 'ws');
   }
 

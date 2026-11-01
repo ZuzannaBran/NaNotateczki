@@ -325,9 +325,9 @@ class _AccountDialogState extends State<_AccountDialog> {
           'You can switch modes later in account settings.',
           key: const ValueKey('account-welcome-description'),
           textAlign: TextAlign.center,
-          style: _accountSecondaryTextStyle(context).copyWith(
-            fontSize: AppTypography.document,
-          ),
+          style: _accountSecondaryTextStyle(
+            context,
+          ).copyWith(fontSize: AppTypography.document),
         ),
         const SizedBox(height: 28),
         FilledButton(
@@ -538,11 +538,13 @@ class _AccountDialogState extends State<_AccountDialog> {
               DropdownButton<int>(
                 key: const ValueKey('account-backup-idle'),
                 value: backup.idleSeconds,
-                onChanged: _isWorking ? null : (seconds) {
-                  if (seconds != null) {
-                    unawaited(_setBackupIdle(seconds));
-                  }
-                },
+                onChanged: _isWorking
+                    ? null
+                    : (seconds) {
+                        if (seconds != null) {
+                          unawaited(_setBackupIdle(seconds));
+                        }
+                      },
                 items: const [
                   DropdownMenuItem(value: 30, child: Text('30 sec')),
                   DropdownMenuItem(value: 120, child: Text('2 min')),
@@ -711,10 +713,7 @@ class _AccountDialogState extends State<_AccountDialog> {
     );
   }
 
-  Widget _accountLabeledField({
-    required String label,
-    required Widget child,
-  }) {
+  Widget _accountLabeledField({required String label, required Widget child}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -739,10 +738,7 @@ class _AccountDialogState extends State<_AccountDialog> {
         borderRadius: BorderRadius.all(Radius.circular(12)),
       ),
       floatingLabelBehavior: FloatingLabelBehavior.never,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 17,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
     );
   }
 

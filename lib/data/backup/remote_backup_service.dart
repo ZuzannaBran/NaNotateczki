@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -68,10 +67,10 @@ class RemoteBackupService {
     };
     // Native platforms serialize and hash off the UI isolate. On Web the
     // caller schedules this operation only after user inactivity.
-    final encoded = await compute(
-      _encodeSnapshot,
-      <String, dynamic>{'payload': payload, 'deviceId': deviceId},
-    );
+    final encoded = await compute(_encodeSnapshot, <String, dynamic>{
+      'payload': payload,
+      'deviceId': deviceId,
+    });
     final checksum = encoded.checksum;
     final bytes = encoded.bytes;
     if (bytes.length > maximumSnapshotBytes) {

@@ -18,8 +18,7 @@ class SecureAccountCredentialStore implements AccountCredentialStore {
   Future<String?> read() => _storage.read(key: _key);
 
   @override
-  Future<void> write(String value) =>
-      _storage.write(key: _key, value: value);
+  Future<void> write(String value) => _storage.write(key: _key, value: value);
 
   @override
   Future<void> delete() => _storage.delete(key: _key);

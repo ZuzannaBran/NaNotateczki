@@ -49,8 +49,7 @@ Future<void> _runApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kIsWeb) {
     final path = Uri.base.pathSegments;
-    if (path.length == 2 && path.first == 'share' &&
-        path.last.isNotEmpty) {
+    if (path.length == 2 && path.first == 'share' && path.last.isNotEmpty) {
       runApp(StudyShareGuestApp(sessionId: path.last));
       return;
     }

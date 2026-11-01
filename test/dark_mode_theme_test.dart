@@ -52,10 +52,7 @@ void main() {
           text.labelLarge,
         ]) {
           expect(style?.fontFamily, AppTypography.fontFamily);
-          expect(
-            style?.fontFamilyFallback,
-            AppTypography.fontFamilyFallback,
-          );
+          expect(style?.fontFamilyFallback, AppTypography.fontFamilyFallback);
         }
       }
     }

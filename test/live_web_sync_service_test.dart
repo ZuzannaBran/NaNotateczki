@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/account_credential_store.dart';
 import 'package:program/data/sync/account_session_controller.dart';
 import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/live_web_sync_service.dart';
@@ -209,23 +210,36 @@ void main() {
     addTearDown(database.close);
     final repository = NotebookRepository(database);
     final notebook = await repository.createNotebook();
-    final session = AccountSessionController(client);
-    final sync = LiveWebSyncService(
+    final sessionA = AccountSessionController(
+      client,
+      credentialStore: _MemoryAccountCredentialStore(),
+    );
+    final syncA = LiveWebSyncService(
       repository: repository,
       apiClient: client,
-      session: session,
+      session: sessionA,
     );
-    addTearDown(sync.dispose);
+    addTearDown(syncA.dispose);
 
-    await session.login('account_a', 'a-secure-password');
-    await sync.start(InitialSyncPolicy.uploadLocal);
+    await sessionA.login('account_a', 'a-secure-password');
+    await syncA.start(InitialSyncPolicy.uploadLocal);
     await repository.deleteNotebook(notebook.uid);
-    sync.enqueue([NotebookRepositoryChange.full(notebook.uid)]);
-    await sync.stop();
+    syncA.enqueue([NotebookRepositoryChange.full(notebook.uid)]);
+    await syncA.stop();
 
-    session.useLocalOnly();
-    await session.login('account_b', 'b-secure-password');
-    await sync.start(InitialSyncPolicy.downloadRemote);
+    sessionA.useLocalOnly();
+    final sessionB = AccountSessionController(
+      client,
+      credentialStore: _MemoryAccountCredentialStore(),
+    );
+    final syncB = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: sessionB,
+    );
+    addTearDown(syncB.dispose);
+    await sessionB.login('account_b', 'b-secure-password');
+    await syncB.start(InitialSyncPolicy.downloadRemote);
 
     expect(accountBDeletes, 0);
     expect(
@@ -233,6 +247,19 @@ void main() {
       hasLength(2),
     );
   });
+}
+
+class _MemoryAccountCredentialStore implements AccountCredentialStore {
+  String? value;
+
+  @override
+  Future<void> delete() async => value = null;
+
+  @override
+  Future<String?> read() async => value;
+
+  @override
+  Future<void> write(String value) async => this.value = value;
 }
 
 http.Response _sessionResponse({

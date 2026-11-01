@@ -11,7 +11,9 @@ void main() {
       title: 'Biology',
       expiresAt: DateTime.utc(2026, 11, 1, 18),
     );
-    final extended = original.copyWith(expiresAt: DateTime.utc(2026, 11, 1, 22));
+    final extended = original.copyWith(
+      expiresAt: DateTime.utc(2026, 11, 1, 22),
+    );
 
     expect(extended.documentUid, original.documentUid);
     expect(extended.id, original.id);
@@ -20,11 +22,18 @@ void main() {
     expect(extended.link, original.link);
   });
 
-  testWidgets('guest link requests a password without account login', (tester) async {
+  testWidgets('guest link requests a password without account login', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      const StudyShareGuestApp(sessionId: 'e5b63a5e-82f3-4a2a-9c57-16255f4e4431'),
+      const StudyShareGuestApp(
+        sessionId: 'e5b63a5e-82f3-4a2a-9c57-16255f4e4431',
+      ),
     );
-    expect(find.text('Enter the password to join the session.'), findsOneWidget);
+    expect(
+      find.text('Enter the password to join the session.'),
+      findsOneWidget,
+    );
     expect(find.text('Session password'), findsOneWidget);
     expect(find.text('Join'), findsOneWidget);
   });

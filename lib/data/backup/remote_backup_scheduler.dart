@@ -199,8 +199,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     if (InkActivityTracker.instance.isBusy) {
       return false;
     }
-    if (_retryNotBefore != null &&
-        _now().isBefore(_retryNotBefore!)) {
+    if (_retryNotBefore != null && _now().isBefore(_retryNotBefore!)) {
       return false;
     }
     return _now().difference(_lastActivityAt) >=
@@ -240,9 +239,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     final retryRemaining = _retryNotBefore == null
         ? Duration.zero
         : _retryNotBefore!.difference(now);
-    var delay = idleRemaining > retryRemaining
-        ? idleRemaining
-        : retryRemaining;
+    var delay = idleRemaining > retryRemaining ? idleRemaining : retryRemaining;
     if (delay < Duration.zero) {
       delay = Duration.zero;
     }

@@ -93,11 +93,14 @@ class _StudyShareCaptureState extends State<StudyShareCapture> {
         _dirty = true;
         return;
       }
-      final scale =
-          (1440 / boundary.size.longestSide).clamp(0.25, 1.0).toDouble();
+      final scale = (1440 / boundary.size.longestSide)
+          .clamp(0.25, 1.0)
+          .toDouble();
       final picture = await boundary.toImage(pixelRatio: scale);
       try {
-        final encoded = await picture.toByteData(format: ui.ImageByteFormat.png);
+        final encoded = await picture.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
         if (!mounted || encoded == null) {
           return;
         }
@@ -159,8 +162,8 @@ class _StudyShareCaptureState extends State<StudyShareCapture> {
   @override
   Widget build(BuildContext context) {
     final remaining = widget.share.expiresAt.difference(DateTime.now().toUtc());
-    final warning = remaining <= const Duration(minutes: 5) &&
-        remaining > Duration.zero;
+    final warning =
+        remaining <= const Duration(minutes: 5) && remaining > Duration.zero;
     return Stack(
       fit: StackFit.expand,
       children: [

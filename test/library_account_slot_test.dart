@@ -13,6 +13,7 @@ import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/backup/remote_backup_scheduler.dart';
 import 'package:program/data/backup/remote_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/account_credential_store.dart';
 import 'package:program/data/sync/account_session_controller.dart';
 import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/cloud_sync_service.dart';
@@ -51,7 +52,11 @@ void _expectAccountFieldLayout(
   expect(text.style?.fontSize, AppTypography.document);
   expect(text.style?.fontWeight, FontWeight.w600);
 
-  final decoration = tester.widget<TextFormField>(input).decoration!;
+  final textField = find.descendant(
+    of: input,
+    matching: find.byType(TextField),
+  );
+  final decoration = tester.widget<TextField>(textField).decoration!;
   expect(decoration.labelText, isNull);
   expect(decoration.floatingLabelBehavior, FloatingLabelBehavior.never);
   expect(decoration.filled, isNot(true));
@@ -196,16 +201,8 @@ void main() {
         find.byKey(const ValueKey('account-login-submit')),
         find.widgetWithText(TextButton, 'Back'),
       );
-      _expectAccountFieldLayout(
-        tester,
-        'account-username',
-        'Username',
-      );
-      _expectAccountFieldLayout(
-        tester,
-        'account-password',
-        'Password',
-      );
+      _expectAccountFieldLayout(tester, 'account-username', 'Username');
+      _expectAccountFieldLayout(tester, 'account-password', 'Password');
       expect(
         tester
             .widget<EditableText>(
@@ -313,11 +310,7 @@ void main() {
         find.byKey(const ValueKey('account-local-submit')),
         find.widgetWithText(TextButton, 'Back'),
       );
-      _expectAccountFieldLayout(
-        tester,
-        'account-local-name',
-        'Your name',
-      );
+      _expectAccountFieldLayout(tester, 'account-local-name', 'Your name');
       await tester.enterText(
         find.byKey(const ValueKey('account-local-name')),
         'Local Zuzanna',
@@ -327,7 +320,7 @@ void main() {
             find.byKey(const ValueKey('account-local-submit')),
           )
           .onPressed!();
-      for (var i = 0; i < 100 && session.isSignedIn; i++) {
+      for (var i = 0; i < 100 && !session.isLocalProfile; i++) {
         await tester.pump(const Duration(milliseconds: 10));
       }
       await tester.pump();
@@ -390,11 +383,7 @@ void main() {
         'account-current-password',
         'Current password',
       );
-      _expectAccountFieldLayout(
-        tester,
-        'account-new-password',
-        'New password',
-      );
+      _expectAccountFieldLayout(tester, 'account-new-password', 'New password');
       _expectAccountFieldLayout(
         tester,
         'account-new-password-confirmation',
@@ -481,7 +470,10 @@ void main() {
       CloudSyncService(repository),
       LocalBackupService(repository),
     );
-    final session = AccountSessionController(apiClient);
+    final session = AccountSessionController(
+      apiClient,
+      credentialStore: _MemoryAccountCredentialStore(),
+    );
     session.profileLoaded = true;
     final backup = RemoteBackupScheduler(
       service: _FakeRemoteBackupService(
@@ -513,15 +505,15 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('Welcome'), findsNothing);
     _expectAccountDialogTypography(tester);
     expect(find.text('NaNotateczki'), findsOneWidget);
     expect(
-      tester.widget<Text>(
-        find.byKey(const ValueKey('account-dialog-title')),
-      ).style,
+      tester
+          .widget<Text>(find.byKey(const ValueKey('account-dialog-title')))
+          .style,
       AppHeaderDivider.titleStyle,
     );
     final welcomeCopy = tester.widget<Text>(
@@ -550,16 +542,8 @@ void main() {
       find.byKey(const ValueKey('account-register-submit')),
       find.widgetWithText(TextButton, 'Back'),
     );
-    _expectAccountFieldLayout(
-      tester,
-      'account-username',
-      'Username',
-    );
-    _expectAccountFieldLayout(
-      tester,
-      'account-password',
-      'Password',
-    );
+    _expectAccountFieldLayout(tester, 'account-username', 'Username');
+    _expectAccountFieldLayout(tester, 'account-password', 'Password');
     _expectAccountFieldLayout(
       tester,
       'account-password-confirmation',
@@ -611,11 +595,7 @@ void main() {
       find.byKey(const ValueKey('account-local-submit')),
       find.widgetWithText(TextButton, 'Back'),
     );
-    _expectAccountFieldLayout(
-      tester,
-      'account-local-name',
-      'Your name',
-    );
+    _expectAccountFieldLayout(tester, 'account-local-name', 'Your name');
     await tester.enterText(
       find.byKey(const ValueKey('account-local-name')),
       'Zuzanna',
@@ -635,9 +615,7 @@ void main() {
     _expectAccountHeaderTypography(tester);
     expect(find.text('Z'), findsNothing);
     expect(
-      tester.widget<Text>(
-        find.byKey(const ValueKey('account-status')),
-      ).data,
+      tester.widget<Text>(find.byKey(const ValueKey('account-status'))).data,
       'Local mode',
     );
 
@@ -683,7 +661,8 @@ void main() {
 }
 
 class _FakeAccountSessionController extends AccountSessionController {
-  _FakeAccountSessionController(super.apiClient);
+  _FakeAccountSessionController(super.apiClient)
+    : super(credentialStore: _MemoryAccountCredentialStore());
 
   bool changedPassword = false;
   String? currentPassword;
@@ -714,6 +693,19 @@ class _FakeAccountSessionController extends AccountSessionController {
   Future<void> logout() async {
     useLocalOnly();
   }
+}
+
+class _MemoryAccountCredentialStore implements AccountCredentialStore {
+  String? value;
+
+  @override
+  Future<void> delete() async => value = null;
+
+  @override
+  Future<String?> read() async => value;
+
+  @override
+  Future<void> write(String value) async => this.value = value;
 }
 
 class _FakeRemoteBackupService extends RemoteBackupService {

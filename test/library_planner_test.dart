@@ -396,7 +396,7 @@ void main() {
         of: plannerRow,
         matching: find.byIcon(Icons.check_box_outlined),
       ),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.descendant(

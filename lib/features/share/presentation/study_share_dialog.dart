@@ -74,7 +74,9 @@ class _StudyShareDialogState extends State<_StudyShareDialog> {
 
   Future<void> _create() async {
     if (_password.text.length < 8) {
-      setState(() => _error = 'Use a session password of at least 8 characters.');
+      setState(
+        () => _error = 'Use a session password of at least 8 characters.',
+      );
       return;
     }
     setState(() {
@@ -180,7 +182,9 @@ class _StudyShareDialogState extends State<_StudyShareDialog> {
             Text(widget.document.title),
             const SizedBox(height: 16),
             if (active == null) ...[
-              const Text('Guests can watch the canvas live. Only you can edit.'),
+              const Text(
+                'Guests can watch the canvas live. Only you can edit.',
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _password,
@@ -191,8 +195,9 @@ class _StudyShareDialogState extends State<_StudyShareDialog> {
                   suffixIcon: IconButton(
                     tooltip: _showPassword ? 'Hide password' : 'Show password',
                     icon: Icon(
-                      _showPassword ? Icons.visibility_off_outlined :
-                          Icons.visibility_outlined,
+                      _showPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                     ),
                     onPressed: () {
                       setState(() => _showPassword = !_showPassword);
@@ -208,9 +213,7 @@ class _StudyShareDialogState extends State<_StudyShareDialog> {
               Text(
                 aboutToExpire
                     ? 'This session is about to expire.'
-                    : 'Expires at ' + TimeOfDay.fromDateTime(
-                        active.expiresAt.toLocal(),
-                      ).format(context),
+                    : 'Expires at ${TimeOfDay.fromDateTime(active.expiresAt.toLocal()).format(context)}',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -225,9 +228,10 @@ class _StudyShareDialogState extends State<_StudyShareDialog> {
             ],
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-              )),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
           ],
         ),

@@ -468,7 +468,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
       onOpenNavigation: onOpenNavigation,
       onSettings: _openCatalogSettings,
       share: _activeShare?.documentUid == selectedItem?.uid
-          ? _activeShare : null,
+          ? _activeShare
+          : null,
       shareService: _studyShareService,
       onShareExtended: (updated) {
         if (mounted) {
@@ -572,7 +573,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
     });
     controller.selectItem(item.uid);
   }
-
 
   Future<void> _shareItem(Notebook item) async {
     if (!kIsWeb || item.kind == NotebookKind.planner) {
@@ -1374,8 +1374,8 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                     ?._confirmDeleteItem(controller, item),
                 onShare: kIsWeb && item.kind != NotebookKind.planner
                     ? () => context
-                        .findAncestorStateOfType<_LibraryScreenState>()
-                        ?._shareItem(item)
+                          .findAncestorStateOfType<_LibraryScreenState>()
+                          ?._shareItem(item)
                     : null,
               ),
         ],
@@ -1958,30 +1958,32 @@ class _LibraryWorkspace extends StatelessWidget {
     return ChangeNotifierProvider(
       key: ValueKey('${item!.uid}:${item!.folder}'),
       create: (_) => EditorController(repository: repository, notebook: item!),
-      child: Builder(builder: (context) {
-        final canvas = isBoard
-            ? BoardScreen(
-                title: item!.title,
-                showToolbar: showToolbar,
-                showCompactTimer: showCompactTimer,
-                onOpenNavigation: onOpenNavigation,
-              )
-            : NotebookScreen(
-                title: item!.title,
-                showToolbar: showToolbar,
-                showCompactTimer: showCompactTimer,
-                onOpenNavigation: onOpenNavigation,
-              );
-        if (share != null && shareService != null && kIsWeb) {
-          return StudyShareCapture(
-            share: share!,
-            service: shareService!,
-            child: canvas,
-            onExtended: onShareExtended,
-          );
-        }
-        return canvas;
-      }),
+      child: Builder(
+        builder: (context) {
+          final canvas = isBoard
+              ? BoardScreen(
+                  title: item!.title,
+                  showToolbar: showToolbar,
+                  showCompactTimer: showCompactTimer,
+                  onOpenNavigation: onOpenNavigation,
+                )
+              : NotebookScreen(
+                  title: item!.title,
+                  showToolbar: showToolbar,
+                  showCompactTimer: showCompactTimer,
+                  onOpenNavigation: onOpenNavigation,
+                );
+          if (share != null && shareService != null && kIsWeb) {
+            return StudyShareCapture(
+              share: share!,
+              service: shareService!,
+              onExtended: onShareExtended,
+              child: canvas,
+            );
+          }
+          return canvas;
+        },
+      ),
     );
   }
 }

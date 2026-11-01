@@ -468,7 +468,8 @@ class LibraryCatalog extends StatelessWidget {
                                                 onRenameItem(notes[index]),
                                             onDelete: () =>
                                                 onDeleteItem(notes[index]),
-                                            onShare: () => onShareItem?.call(notes[index]),
+                                            onShare: () =>
+                                                onShareItem?.call(notes[index]),
                                           ),
                                         ),
                                       ],

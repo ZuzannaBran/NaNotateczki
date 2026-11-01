@@ -9,6 +9,7 @@ import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/backup/remote_backup_scheduler.dart';
 import 'package:program/data/backup/remote_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/account_credential_store.dart';
 import 'package:program/data/sync/account_session_controller.dart';
 import 'package:program/data/sync/api_client.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -81,7 +82,10 @@ void main() {
           );
         }),
       );
-      final session = AccountSessionController(apiClient);
+      final session = AccountSessionController(
+        apiClient,
+        credentialStore: _MemoryAccountCredentialStore(),
+      );
       await session.login('test_user', 'a-secure-password');
       final service = RemoteBackupService(
         repository: repository,
@@ -155,7 +159,10 @@ void main() {
         );
       }),
     );
-    final session = AccountSessionController(apiClient);
+    final session = AccountSessionController(
+      apiClient,
+      credentialStore: _MemoryAccountCredentialStore(),
+    );
     await session.login('test_user', 'a-secure-password');
     scheduler = RemoteBackupScheduler(
       service: RemoteBackupService(
@@ -168,7 +175,7 @@ void main() {
     addTearDown(scheduler.dispose);
     scheduler.enableForSignedInAccount();
 
-    await scheduler.uploadNow();
+    await scheduler.backupNow();
 
     expect(scheduler.lastVerifiedBackup, isNotNull);
     expect(scheduler.hasPendingBackup, isTrue);
@@ -198,30 +205,53 @@ void main() {
         );
       }),
     );
-    final session = AccountSessionController(apiClient);
-    await session.login('account_a', 'a-secure-password');
-    final service = _RecordingRemoteBackupService(
+    final deviceIds = <String>[];
+    final sessionA = AccountSessionController(
+      apiClient,
+      credentialStore: _MemoryAccountCredentialStore(),
+    );
+    await sessionA.login('account_a', 'a-secure-password');
+    final serviceA = _RecordingRemoteBackupService(
       repository: repository,
       apiClient: apiClient,
-      session: session,
+      session: sessionA,
+      deviceIds: deviceIds,
     );
-    final scheduler = RemoteBackupScheduler(service: service, session: session);
-    addTearDown(scheduler.dispose);
+    final schedulerA = RemoteBackupScheduler(
+      service: serviceA,
+      session: sessionA,
+    );
+    addTearDown(schedulerA.dispose);
 
-    scheduler.enableForSignedInAccount();
-    await scheduler.uploadNow();
-    expect(scheduler.lastVerifiedBackup, isNotNull);
-    await scheduler.stop();
-    session.useLocalOnly();
+    schedulerA.enableForSignedInAccount();
+    await schedulerA.backupNow();
+    expect(schedulerA.lastVerifiedBackup, isNotNull);
+    await schedulerA.stop();
+    sessionA.useLocalOnly();
 
-    await session.login('account_b', 'b-secure-password');
-    expect(scheduler.lastVerifiedBackup, isNull);
-    expect(scheduler.lastError, isNull);
-    scheduler.enableForSignedInAccount();
-    await scheduler.uploadNow();
+    final sessionB = AccountSessionController(
+      apiClient,
+      credentialStore: _MemoryAccountCredentialStore(),
+    );
+    await sessionB.login('account_b', 'b-secure-password');
+    final serviceB = _RecordingRemoteBackupService(
+      repository: repository,
+      apiClient: apiClient,
+      session: sessionB,
+      deviceIds: deviceIds,
+    );
+    final schedulerB = RemoteBackupScheduler(
+      service: serviceB,
+      session: sessionB,
+    );
+    addTearDown(schedulerB.dispose);
+    expect(schedulerB.lastVerifiedBackup, isNull);
+    expect(schedulerB.lastError, isNull);
+    schedulerB.enableForSignedInAccount();
+    await schedulerB.backupNow();
 
-    expect(service.deviceIds, hasLength(2));
-    expect(service.deviceIds[0], isNot(service.deviceIds[1]));
+    expect(deviceIds, hasLength(2));
+    expect(deviceIds[0], isNot(deviceIds[1]));
     expect(
       values.keys.where((key) => key.startsWith('server_device_')),
       hasLength(2),
@@ -235,9 +265,10 @@ class _RecordingRemoteBackupService extends RemoteBackupService {
     required super.repository,
     required super.apiClient,
     required super.session,
+    required this.deviceIds,
   });
 
-  final deviceIds = <String>[];
+  final List<String> deviceIds;
 
   @override
   Future<RemoteBackupReceipt> uploadVerifiedSnapshot({
@@ -250,4 +281,17 @@ class _RecordingRemoteBackupService extends RemoteBackupService {
       verifiedAt: DateTime.utc(2026, 10, 30, 12, deviceIds.length),
     );
   }
+}
+
+class _MemoryAccountCredentialStore implements AccountCredentialStore {
+  String? value;
+
+  @override
+  Future<void> delete() async => value = null;
+
+  @override
+  Future<String?> read() async => value;
+
+  @override
+  Future<void> write(String value) async => this.value = value;
 }

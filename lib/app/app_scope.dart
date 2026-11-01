@@ -220,11 +220,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             );
         _remoteBackupScheduler = remoteBackupScheduler;
         if (newAccountSession) {
-          unawaited(accountSession.loadProfile().then((_) {
-            if (mounted && accountSession.isSignedIn) {
-              remoteBackupScheduler.enableForSignedInAccount();
-            }
-          }));
+          unawaited(
+            accountSession.loadProfile().then((_) {
+              if (mounted && accountSession.isSignedIn) {
+                remoteBackupScheduler.enableForSignedInAccount();
+              }
+            }),
+          );
         }
         final liveSync =
             _liveSync ??

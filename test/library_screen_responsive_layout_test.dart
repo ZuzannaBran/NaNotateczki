@@ -404,10 +404,7 @@ void main() {
       const ValueKey('library-folder-row:Project A'),
     );
     expect(folderRow, findsOneWidget);
-    for (final icon in [
-      Icons.folder_outlined,
-      Icons.folder_open_outlined,
-    ]) {
+    for (final icon in [Icons.folder_outlined, Icons.folder_open_outlined]) {
       expect(
         find.descendant(of: folderRow, matching: find.byIcon(icon)),
         findsNothing,
@@ -421,7 +418,10 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: folderRow, matching: find.byTooltip('Folder actions')),
+      find.descendant(
+        of: folderRow,
+        matching: find.byTooltip('Folder actions'),
+      ),
       findsOneWidget,
     );
     for (final icon in [

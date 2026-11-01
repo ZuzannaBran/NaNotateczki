@@ -84,7 +84,8 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
       });
       _connect();
       _pollTimer = Timer.periodic(
-        const Duration(seconds: 20), (_) => unawaited(_fetchFrame()),
+        const Duration(seconds: 20),
+        (_) => unawaited(_fetchFrame()),
       );
       await _fetchFrame();
     } catch (error) {
@@ -142,17 +143,16 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
         onError: (_) => _scheduleReconnect(),
         cancelOnError: true,
       );
-      channel.sink.add(jsonEncode({
-        'type': 'authenticate',
-        'ticket': ticket,
-      }));
+      channel.sink.add(jsonEncode({'type': 'authenticate', 'ticket': ticket}));
     } catch (_) {
       _scheduleReconnect();
     }
   }
 
   void _scheduleReconnect() {
-    if (!mounted || _ticket == null || _ended ||
+    if (!mounted ||
+        _ticket == null ||
+        _ended ||
         _reconnectTimer?.isActive == true) {
       return;
     }
@@ -258,9 +258,12 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 10),
-                        Text(_error!, style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        )),
+                        Text(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 18),
                       FilledButton(
@@ -293,7 +296,9 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
                       padding: const EdgeInsets.all(16),
                       child: _frame == null
                           ? const Center(
-                              child: Text('Waiting for the host to share the canvas.'),
+                              child: Text(
+                                'Waiting for the host to share the canvas.',
+                              ),
                             )
                           : Image.memory(
                               _frame!,
