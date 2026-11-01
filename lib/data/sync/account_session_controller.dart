@@ -27,6 +27,7 @@ class AccountSessionController extends ChangeNotifier {
   bool isBusy = false;
   String? error;
   Future<void>? _profileLoad;
+  Future<void>? _refreshInProgress;
   bool _disposed = false;
 
   static final usernamePattern = RegExp(
@@ -162,7 +163,21 @@ class AccountSessionController extends ChangeNotifier {
     }
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh() {
+    final running = _refreshInProgress;
+    if (running != null) {
+      return running;
+    }
+    final future = _refreshSession();
+    _refreshInProgress = future;
+    return future.whenComplete(() {
+      if (identical(_refreshInProgress, future)) {
+        _refreshInProgress = null;
+      }
+    });
+  }
+
+  Future<void> _refreshSession() async {
     final refreshToken = _refreshToken;
     if (refreshToken == null) {
       throw StateError('No refresh session is available.');
@@ -170,6 +185,9 @@ class AccountSessionController extends ChangeNotifier {
     final response = await apiClient.postJson('/v1/auth/refresh', {
       'refreshToken': refreshToken,
     }, authenticated: false);
+    if (_disposed || refreshToken != _refreshToken || !isSignedIn) {
+      return;
+    }
     _applySession(response.decodeJson());
     _notifyIfActive();
   }
