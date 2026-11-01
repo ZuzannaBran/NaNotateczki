@@ -162,7 +162,23 @@ class AccountSettingsSyncService {
   }
 
   static bool _equivalent(Object? left, Object? right) =>
-      jsonEncode(left) == jsonEncode(right);
+      jsonEncode(_canonical(left)) == jsonEncode(_canonical(right));
+
+  static Object? _canonical(Object? value) {
+    if (value is Map) {
+      final keys = value.keys.whereType<String>().toList()..sort();
+      return {
+        for (final key in keys) key: _canonical(value[key]),
+      };
+    }
+    if (value is List) {
+      return value.map(_canonical).toList();
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
+    return value;
+  }
 
   static Map<String, dynamic> _object(Object? raw) {
     if (raw is! Map<String, dynamic>) {
