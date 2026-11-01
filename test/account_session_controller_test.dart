@@ -115,6 +115,166 @@ void main() {
     },
   );
 
+  test('restores a rotating session after a restart and clears it at logout',
+      () async {
+    final profile = <String, String>{};
+    textStorageReadOverride = (key) async => profile[key];
+    textStorageWriteOverride = (key, value) async {
+      profile[key] = value;
+    };
+    var refreshCalls = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return http.Response(jsonEncode({
+            'accessToken': 'access-1',
+            'refreshToken': 'refresh-1',
+            'expiresIn': 600,
+            'userId': 'user-1',
+            'username': 'test_user',
+          }), 200);
+        }
+        if (request.url.path == '/v1/auth/refresh') {
+          refreshCalls++;
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['refreshToken'], 'refresh-$refreshCalls');
+          return http.Response(jsonEncode({
+            'accessToken': 'access-${refreshCalls + 1}',
+            'refreshToken': 'refresh-${refreshCalls + 1}',
+            'expiresIn': 600,
+            'userId': 'user-1',
+            'username': 'test_user',
+          }), 200);
+        }
+        if (request.url.path == '/v1/auth/logout') {
+          return http.Response('', 204);
+        }
+        fail('Unexpected request: ${request.url}');
+      }),
+    );
+    final initial = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await initial.loadProfile();
+    await initial.login('test_user', 'password');
+    expect(credentials.value, contains('refresh-1'));
+    expect(profile[AccountSessionController.profileStorageKey],
+        isNot(contains('refresh-1')));
+
+    final restarted = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await restarted.loadProfile();
+    expect(restarted.isSignedIn, isTrue);
+    expect(restarted.shouldShowStartupDialog, isFalse);
+    expect(restarted.userId, 'user-1');
+    expect(credentials.value, contains('refresh-2'));
+    await restarted.refresh();
+    expect(refreshCalls, 2);
+    expect(credentials.value, contains('refresh-3'));
+
+    await restarted.logout();
+    expect(credentials.value, isNull);
+    expect(restarted.isSignedIn, isFalse);
+    initial.dispose();
+    restarted.dispose();
+    client.close();
+  });
+
+  test('offline restart keeps credentials but never forces onboarding',
+      () async {
+    final profile = <String, String>{};
+    textStorageReadOverride = (key) async => profile[key];
+    textStorageWriteOverride = (key, value) async {
+      profile[key] = value;
+    };
+    var offline = false;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (offline) {
+          throw StateError('Server unreachable');
+        }
+        return http.Response(jsonEncode({
+          'accessToken': 'access',
+          'refreshToken': 'refresh',
+          'expiresIn': 600,
+          'userId': 'user-1',
+          'username': 'test_user',
+        }), 200);
+      }),
+    );
+    final initial = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await initial.loadProfile();
+    await initial.login('test_user', 'password');
+    offline = true;
+    final restarted = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await restarted.loadProfile();
+    expect(restarted.profileLoaded, isTrue);
+    expect(restarted.isSignedIn, isFalse);
+    expect(restarted.shouldShowStartupDialog, isFalse);
+    expect(restarted.displayName, 'test_user');
+    expect(credentials.value, contains('refresh'));
+    initial.dispose();
+    restarted.dispose();
+    client.close();
+  });
+
+  test('revoked refresh token is deleted without a startup login dialog',
+      () async {
+    final profile = <String, String>{};
+    textStorageReadOverride = (key) async => profile[key];
+    textStorageWriteOverride = (key, value) async {
+      profile[key] = value;
+    };
+    var revoke = false;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (revoke) {
+          return http.Response(
+            jsonEncode({'detail': 'Session expired'}),
+            401,
+          );
+        }
+        return http.Response(jsonEncode({
+          'accessToken': 'access',
+          'refreshToken': 'refresh',
+          'expiresIn': 600,
+          'userId': 'user-1',
+          'username': 'test_user',
+        }), 200);
+      }),
+    );
+    final initial = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await initial.loadProfile();
+    await initial.login('test_user', 'password');
+    revoke = true;
+    final restarted = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await restarted.loadProfile();
+    expect(restarted.shouldShowStartupDialog, isFalse);
+    expect(restarted.isSignedIn, isFalse);
+    expect(credentials.value, isNull);
+    initial.dispose();
+    restarted.dispose();
+    client.close();
+  });
+
   test('late profile read does not notify a disposed controller', () async {
     final pending = Completer<String?>();
     textStorageReadOverride = (_) => pending.future;
