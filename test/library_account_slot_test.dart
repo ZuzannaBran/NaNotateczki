@@ -65,7 +65,8 @@ void _expectAccountHeaderTypography(WidgetTester tester) {
   final title = tester.widget<Text>(
     find.byKey(const ValueKey('account-display-name')),
   );
-  expect(title.style, AppHeaderDivider.titleStyle);
+  expect(title.style?.fontSize, AppTypography.document);
+  expect(title.style?.fontWeight, FontWeight.w400);
 
   final statusFinder = find.byKey(const ValueKey('account-status'));
   expect(statusFinder, findsOneWidget);
@@ -514,11 +515,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome'), findsOneWidget);
+    expect(find.text('Welcome'), findsNothing);
     _expectAccountDialogTypography(tester);
     expect(find.text('NaNotateczki'), findsOneWidget);
     expect(
-      tester.widget<Text>(find.text('NaNotateczki')).style,
+      tester.widget<Text>(
+        find.byKey(const ValueKey('account-dialog-title')),
+      ).style,
       AppHeaderDivider.titleStyle,
     );
     final welcomeCopy = tester.widget<Text>(
@@ -526,6 +529,8 @@ void main() {
     );
     expect(welcomeCopy.textAlign, TextAlign.center);
     expect(welcomeCopy.data, contains('NaNotateczki'));
+    expect(welcomeCopy.data, startsWith('Welcome.'));
+    expect(welcomeCopy.style?.fontSize, AppTypography.document);
     expect(find.byKey(const ValueKey('account-create-choice')), findsOneWidget);
     _expectAccountActionSpacing(
       tester,
