@@ -61,6 +61,8 @@ class LibraryAccountSlot extends StatelessWidget {
     }
     final subtitle = session.isSignedIn
         ? _remoteSubtitle(backup, sync, DateTime.now())
+        : session.preferredMode == AccountDataMode.account
+        ? 'Sign in to sync'
         : session.isLocalProfile
         ? 'Local mode'
         : 'Not signed in';
@@ -81,7 +83,10 @@ class LibraryAccountSlot extends StatelessWidget {
                     key: const ValueKey('account-display-name'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppHeaderDivider.titleStyle,
+                    style: const TextStyle(
+                      fontSize: AppTypography.document,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -217,8 +222,11 @@ class _AccountDialogState extends State<_AccountDialog> {
     _localNameController.text = session.localDisplayName ?? '';
     _view = widget.startupRequired
         ? _AccountView.landing
-        : (session.isSignedIn || session.isLocalProfile)
+        : session.isSignedIn || session.preferredMode == AccountDataMode.localOnly
+            && session.isLocalProfile
         ? _AccountView.settings
+        : session.onboardingComplete
+        ? _AccountView.signIn
         : _AccountView.landing;
   }
 
@@ -248,38 +256,38 @@ class _AccountDialogState extends State<_AccountDialog> {
       backgroundColor: colors.surface,
       elevation: 10,
       shadowColor: colors.shadow.withValues(alpha: 0.12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      titlePadding: const EdgeInsets.fromLTRB(32, 28, 32, 0),
+      titlePadding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
       title: Text(
         _title,
         key: const ValueKey('account-dialog-title'),
         textAlign: TextAlign.center,
         style: AppHeaderDivider.titleStyle,
       ),
-      contentPadding: const EdgeInsets.fromLTRB(32, 20, 32, 12),
-      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+      contentPadding: const EdgeInsets.fromLTRB(28, 16, 28, 24),
+      actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       content: SizedBox(
-        width: 440,
+        width: 420,
         child: SingleChildScrollView(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: _buildView(session, backup, sync, error),
-          ),
+          child: _buildView(session, backup, sync, error),
         ),
       ),
-      actions: appDialogActions(context, [
-        if (canClose)
-          TextButton(
-            onPressed: _isWorking ? null : () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-      ]),
+      actions: canClose
+          ? appDialogActions(context, [
+              TextButton(
+                onPressed: _isWorking
+                    ? null
+                    : () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ])
+          : null,
     );
   }
 
   String get _title => switch (_view) {
-    _AccountView.landing => widget.startupRequired ? 'Welcome' : 'Account',
+    _AccountView.landing => 'NaNotateczki',
     _AccountView.signIn => 'Sign in',
     _AccountView.register => 'Create account',
     _AccountView.local => 'Use local mode',
@@ -309,17 +317,14 @@ class _AccountDialogState extends State<_AccountDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'NaNotateczki',
-          textAlign: TextAlign.center,
-          style: AppHeaderDivider.titleStyle,
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Choose how you want to use NaNotateczki. '
+        Text(
+          'Welcome. Choose how you want to use NaNotateczki. '
           'You can switch modes later in account settings.',
-          key: ValueKey('account-welcome-description'),
+          key: const ValueKey('account-welcome-description'),
           textAlign: TextAlign.center,
+          style: _accountSecondaryTextStyle(context).copyWith(
+            fontSize: AppTypography.document,
+          ),
         ),
         const SizedBox(height: 28),
         FilledButton(
@@ -949,7 +954,7 @@ class _AccountDialogState extends State<_AccountDialog> {
       );
       await sync.stop();
       await backup.stop();
-      session.requireAccountReauthentication();
+      await session.requireAccountReauthentication();
       _currentPasswordController.clear();
       _newPasswordController.clear();
       _newPasswordConfirmationController.clear();
