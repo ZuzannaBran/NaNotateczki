@@ -185,7 +185,7 @@ void main() {
     }
   });
 
-  test('guest frame uses its private ticket and keeps binary PNG bytes', () async {
+  test('guest frame retains ticket and binary PNG bytes', () async {
     late http.Request captured;
     final frame = Uint8List.fromList([137, 80, 78, 71, 0, 255, 42]);
     final guest = StudyShareGuestClient(
