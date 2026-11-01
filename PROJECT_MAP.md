@@ -348,6 +348,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   hasła, rotacja sesji oraz tokeny wyłącznie w pamięci. Plik profilu zawiera
   tylko tryb, lokalną nazwę i ostatni e-mail.
   8: `AccountDataMode`; 10: `AccountSessionController`; `loadProfile`, loginy 3–32 znaków,
+  trwałe przypisanie lokalnej biblioteki do jednego `userId` (blokada przełączenia konta),
   współdzielone odświeżanie tokenu i brak powiadomień po dispose;
   154: `changePassword`; 205: `useLocalProfile`. Nowe hasła: 8–128.
 - `lib/data/sync/live_web_sync_service.dart` (613): jawna polityka pierwszej

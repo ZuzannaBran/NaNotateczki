@@ -238,4 +238,76 @@ void main() {
       expect(session.error, 'Current password is incorrect.');
     },
   );
+
+  test('refuses a second account on the same local notebook storage', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    var loginCalls = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        loginCalls++;
+        final username = (jsonDecode(request.body) as Map<String, dynamic>)['username'];
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'access-$username',
+            'refreshToken': 'refresh-$username',
+            'expiresIn': 600,
+            'userId': username == 'account_a' ? 'user-a' : 'user-b',
+            'username': username,
+          }),
+          200,
+        );
+      }),
+    );
+    final first = AccountSessionController(client);
+    await first.loadProfile();
+    await first.login('account_a', 'password');
+    expect(
+      jsonDecode(stored[AccountSessionController.profileStorageKey]!)
+          ['boundUserId'],
+      'user-a',
+    );
+    first.useLocalOnly();
+
+    final restarted = AccountSessionController(client);
+    await restarted.loadProfile();
+    await expectLater(
+      restarted.login('account_b', 'password'),
+      throwsA(isA<StateError>()),
+    );
+    expect(loginCalls, 1);
+    expect(restarted.isSignedIn, isFalse);
+    await restarted.login('account_a', 'password');
+    expect(restarted.isSignedIn, isTrue);
+    expect(loginCalls, 2);
+    first.dispose();
+    restarted.dispose();
+    client.close();
+  });
+
+  test('legacy account profile blocks a different username', () async {
+    textStorageReadOverride = (key) async {
+      if (key != AccountSessionController.profileStorageKey) return null;
+      return jsonEncode({
+        'version': 1,
+        'lastAccountUsername': 'original_user',
+      });
+    };
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) async {
+        fail('No request should be made for a different user.');
+      }),
+    );
+    final session = AccountSessionController(client);
+    await session.loadProfile();
+    await expectLater(
+      session.login('other_user', 'password'),
+      throwsA(isA<StateError>()),
+    );
+    session.dispose();
+    client.close();
+  });
 }

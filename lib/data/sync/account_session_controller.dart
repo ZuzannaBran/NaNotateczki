@@ -19,6 +19,7 @@ class AccountSessionController extends ChangeNotifier {
   String? username;
   String? localDisplayName;
   String? lastAccountUsername;
+  String? _boundUserId;
   String? _refreshToken;
   DateTime? accessExpiresAt;
   bool profileLoaded = false;
@@ -92,6 +93,7 @@ class AccountSessionController extends ChangeNotifier {
         lastAccountUsername ??= _optionalNonEmptyString(
           raw['lastAccountEmail'],
         )?.split('@').first.toLowerCase();
+        _boundUserId = _optionalNonEmptyString(raw['boundUserId']);
       }
     } catch (failure) {
       if (!_disposed) {
@@ -135,6 +137,13 @@ class AccountSessionController extends ChangeNotifier {
         'The password must contain 8 to 128 characters.',
       );
     }
+    if (lastAccountUsername != null &&
+        lastAccountUsername != normalizedUsername) {
+      throw StateError(
+        'This device already contains another account library. '
+        'Use a separate browser profile or app installation.',
+      );
+    }
     isBusy = true;
     error = null;
     _notifyIfActive();
@@ -143,7 +152,21 @@ class AccountSessionController extends ChangeNotifier {
         'username': normalizedUsername,
         'password': password,
       }, authenticated: false);
-      _applySession(response.decodeJson());
+      final incoming = response.decodeJson();
+      if (incoming is! Map<String, dynamic> ||
+          incoming['userId'] is! String ||
+          incoming['username'] != normalizedUsername) {
+        throw const FormatException('Malformed account identity response.');
+      }
+      final incomingUserId = incoming['userId'] as String;
+      if (_boundUserId != null && _boundUserId != incomingUserId) {
+        throw StateError(
+          'This device already contains another account library. '
+          'Use a separate browser profile or app installation.',
+        );
+      }
+      _applySession(incoming);
+      _boundUserId ??= incomingUserId;
       preferredMode = AccountDataMode.account;
       onboardingComplete = true;
       lastAccountUsername = normalizedUsername;
@@ -320,6 +343,7 @@ class AccountSessionController extends ChangeNotifier {
         'preferredMode': preferredMode.name,
         'localDisplayName': localDisplayName,
         'lastAccountUsername': lastAccountUsername,
+        'boundUserId': _boundUserId,
       }),
     );
   }

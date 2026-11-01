@@ -20,8 +20,10 @@ offline również po zalogowaniu.
   wymaga od użytkownika wyboru jednej z trzech polityk przed startem live
   sync. Przy wylogowaniu najpierw zatrzymuje live sync i backup, a dopiero
   potem czyści sesję przechowywaną w pamięci.
-- `account_profile.json` przechowuje wyłącznie ukończenie onboardingu,
-  preferowany tryb, lokalną nazwę i ostatnią nazwę użytkownika. Nie zawiera hasła,
+- `account_profile.json` przechowuje ukończenie onboardingu,
+  preferowany tryb, lokalną nazwę, ostatnią nazwę użytkownika oraz `boundUserId`.
+  Raz przypisane dane lokalne nie mogą zostać użyte z innym kontem bez
+  osobnego profilu przeglądarki lub instalacji. Nie zawiera hasła,
   access tokenu ani refresh tokenu. Preferowany tryb konta po restarcie
   wymaga ponownego logowania, ponieważ tokeny celowo nie są utrwalane.
 
@@ -90,8 +92,9 @@ katalogu głównego ani całego katalogu domowego jako celu.
 - Token dostępu i refresh token są wyłącznie w pamięci procesu; po pełnym
   zamknięciu przeglądarki trzeba zalogować się ponownie.
 - Kursor, rewizje, outbox, stan UI backupu oraz identyfikator urządzenia są
-  izolowane według `userId`; przełączenie konta nie może odziedziczyć stanu
-  poprzedniego właściciela. Stary nieprzypisany `server_device.json` nie jest
+  izolowane według `userId`. Cała lokalna biblioteka jest przypisywana do
+  pierwszego konta (`boundUserId`); zmiana konta na tej samej instalacji jest
+  blokowana, ponieważ wspólne SQLite/IndexedDB nie izoluje notatek. Stary nieprzypisany `server_device.json` nie jest
   używany do nowych backupów.
 - WebSocket przenosi wyłącznie mały sygnał zmiany. Pełny, trwały stan jest
   zawsze pobierany przez REST z kursorem `change_events`.
