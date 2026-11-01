@@ -131,7 +131,9 @@ class ApiClient {
     List<int>? body,
     bool authenticated = true,
     Map<String, String>? headers,
+    Duration? requestTimeout,
   }) async {
+    final effectiveTimeout = requestTimeout ?? timeout;
     final request = http.Request(method, resolve(path, query));
     request.headers.addAll({
       'Accept': 'application/json',
@@ -150,13 +152,13 @@ class ApiClient {
       request.bodyBytes = body;
     }
 
-    final streamed = await _httpClient.send(request).timeout(timeout);
+    final streamed = await _httpClient.send(request).timeout(effectiveTimeout);
     final contentLength = streamed.contentLength;
     if (contentLength != null && contentLength > maximumResponseBytes) {
       throw const ApiException(413, 'API response is too large.');
     }
     final builder = BytesBuilder(copy: false);
-    await for (final chunk in streamed.stream.timeout(timeout)) {
+    await for (final chunk in streamed.stream.timeout(effectiveTimeout)) {
       builder.add(chunk);
       if (builder.length > maximumResponseBytes) {
         throw const ApiException(413, 'API response is too large.');
