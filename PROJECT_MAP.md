@@ -603,11 +603,16 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1844: `_LibraryWorkspace`;
   1955: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (1082 linie)
+### `lib/features/library/presentation/library_account_slot.dart` (1100 linii)
 
 Przestrzenny onboarding `Create account`/`Sign in`/`Try local` z
 wyśrodkowaną nazwą NaNotateczki, podglądem haseł i spójnymi odstępami
 12 px między przyciskami konta, formularzy i akcji synchronizacji.
+Pasek konta oraz nagłówki dialogów i profilu używają tej samej typografii
+`AppHeaderDivider.titleStyle` co nagłówek Study timer (18 px, waga 600);
+opisy statusu, trybu konta i polityk synchronizacji to 12 px w kolorze
+`onSurfaceVariant`. Nagłówek sekcji synchronizacji to 16 px, waga 600.
+Globalny motyw dostarcza Georgia (lub systemowy zamiennik).
 Dolny pasek pokazuje konto i stan backupu oraz synchronizacji. Inicjał konta
 ma subtelne okrągłe obramowanie w panelu i dialogu; ikona ustawień ma 18 px
 przy zachowanym rozmiarze obszaru kliknięcia. Rejestracja i zmiana hasła
@@ -619,11 +624,11 @@ ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
 loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
 
-- 14: `showLibraryAccountDialog`; 43: `LibraryAccountSlot`;
-  148: `_AccountAvatar`; 180: `_AccountDialog`;
-  193: `_AccountDialogState`; 676: `_usernameField`;
-  697: `_accountLabeledField`; 892: `_backupNow`;
-  929: `_changePassword`.
+- 20: `showLibraryAccountDialog`; 49: `LibraryAccountSlot`;
+  153: `_AccountAvatar`; 185: `_AccountDialog`;
+  198: `_AccountDialogState`; 688: `_usernameField`;
+  709: `_accountLabeledField`; 904: `_backupNow`;
+  941: `_changePassword`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
@@ -1492,7 +1497,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   nazwa i inicjał, logowanie, ręczny backup, pierwsza polityka Web, zmiana
   hasła oraz kolejność zatrzymania usług przed wyczyszczeniem sesji.
   Sprawdza też osobne, nieruchome podpisy i obramowanie pól we wszystkich
-  formularzach konta, również po wpisaniu tekstu.
+  formularzach konta, również po wpisaniu tekstu. Dodatkowa regresja
+  porównuje nagłówki paska i dialogów z timerem, opis statusu 12 px
+  oraz Georgia w obu motywach. Ręczna kontrola na Linux/web i w wąskim
+  sidebarze jest opisana w `docs/TEST_MATRIX.md`.
 - `test/account_session_controller_test.dart`: krótsze nowe hasła i logowanie
   istniejących kont, trwały profil lokalny bez
   sekretów, preferowany tryb konta, dokładny kontrakt zmiany hasła i błędy API.
