@@ -38,10 +38,14 @@ class EditorSettingsScreen extends StatelessWidget {
           child: Column(
             children: [
               const AppHeaderDivider(),
-              const Material(
+              Material(
                 color: Colors.transparent,
                 child: TabBar(
-                  tabs: [
+                  isScrollable: MediaQuery.sizeOf(context).width < 520,
+                  tabAlignment: MediaQuery.sizeOf(context).width < 520
+                      ? TabAlignment.start
+                      : TabAlignment.fill,
+                  tabs: const [
                     Tab(text: 'System'),
                     Tab(text: 'Visual'),
                     Tab(text: 'Contact the creator'),

@@ -35,6 +35,7 @@ class DiagnosticsUploadService {
   bool _changedWhileUploading = false;
   String? _lastUploaded;
   String? _lastAccount;
+  DateTime? _retryNotBefore;
 
   void _schedule() {
     if (_disposed) {
@@ -44,9 +45,15 @@ class DiagnosticsUploadService {
     if (!_session.isSignedIn || _session.isBusy) {
       _lastUploaded = null;
       _lastAccount = null;
+      _retryNotBefore = null;
       return;
     }
-    _timer = Timer(const Duration(seconds: 12), () {
+    final remaining = _retryNotBefore?.difference(DateTime.now());
+    final delay = remaining != null &&
+            remaining > const Duration(seconds: 12)
+        ? remaining
+        : const Duration(seconds: 12);
+    _timer = Timer(delay, () {
       unawaited(uploadNow());
     });
     if (_uploading) {
@@ -113,10 +120,12 @@ class DiagnosticsUploadService {
       if (_session.userId == account && !_disposed) {
         _lastAccount = account;
         _lastUploaded = encoded;
+        _retryNotBefore = null;
       }
     } catch (_) {
       // A failed report must never block the editor, backup or synchronization.
       if (!_disposed && _session.isSignedIn) {
+        _retryNotBefore = DateTime.now().add(const Duration(minutes: 5));
         _timer?.cancel();
         _timer = Timer(const Duration(minutes: 5), () {
           unawaited(uploadNow());

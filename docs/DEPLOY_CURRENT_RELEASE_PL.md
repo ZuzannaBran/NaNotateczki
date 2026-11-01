@@ -213,6 +213,26 @@ prawdziwą sesją. Cloudflare Tunnel dla obu domen ma prowadzić do
 `http://caddy:8080` przy uruchomieniu w sieci Compose, bez zmiany nagłówka
 Host. Sam rekord DNS nie przełącza istniejącego Worker Route na ten tunel.
 
+## Raporty i diagnostyka
+
+Nowe API zawiera:
+- `POST /v1/reports/feedback` – anonimowe zgłoszenie użytkownika
+  (z limitem żądań);
+- `PUT /v1/reports/diagnostics` – zastąpienie snapshotu Errors,
+  Data integrity i Optimization, wyłącznie po zalogowaniu.
+
+Pliki dostępne na HP:
+- `/srv/nanotateczki/data/feedback/reports.json` – zgłoszenia
+  z licznikiem identycznych problemów;
+- `/srv/nanotateczki/data/diagnostics/<account-id>/<device-id>.json` –
+  ostatnie logi urządzenia. Ten sam plik jest nadpisywany po zmianie.
+
+Nie udostępniaj tego katalogu przez Caddy ani Cloudflare. Może zawierać
+ścieżki plików i stack trace. `scripts/backup-server.sh` archiwizuje
+teraz całe `data/`, a nie tylko `data/backups/`. Nie jest potrzebna
+nowa migracja PostgreSQL. Backend powinien zostać zaktualizowany przed
+opublikowaniem frontendu z zakładką Contact the creator.
+
 ## 4. Potwierdź wynik po wdrożeniu
 
 ```bash
