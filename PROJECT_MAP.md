@@ -1907,6 +1907,17 @@ dart compile js -O4 -o web/drift_worker.dart.js web/drift_worker.dart
 Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
 
+## Synchronizacja ustawień i natywne WebSocket
+
+- `server/api/app/routers/account_settings.py` oraz
+  `server/migrations/0007_account_settings.sql`: izolowany per konto
+  magazyn preferencji, kontrola CAS i powiadomienie WebSocket;
+  stan portowany również do repozytorium `NaNotateczki-serwer`.
+- `server/api/app/routers/realtime.py`: weryfikuje `Origin` w
+  przeglądarce, dopuszcza brak `Origin` w kliencie natywnym;
+  JWT pozostaje obowiązkowy. Regresja:
+  `server/api/tests/test_native_realtime.py`.
+
 ## 13. Wspólna edycja sesji Web
 
 - `lib/data/sync/study_share_service.dart`: utworzenie, odzyskiwanie,
