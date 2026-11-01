@@ -289,7 +289,9 @@ void main() {
 
   test('legacy account profile blocks a different username', () async {
     textStorageReadOverride = (key) async {
-      if (key != AccountSessionController.profileStorageKey) return null;
+      if (key != AccountSessionController.profileStorageKey) {
+        return null;
+      }
       return jsonEncode({
         'version': 1,
         'lastAccountUsername': 'original_user',
@@ -307,6 +309,38 @@ void main() {
       session.login('other_user', 'password'),
       throwsA(isA<StateError>()),
     );
+    session.dispose();
+    client.close();
+  });
+
+  test('failed account binding persistence disables remote sessions', () async {
+    textStorageReadOverride = (_) async => null;
+    textStorageWriteOverride = (_, __) async {
+      throw StateError('Disk is full.');
+    };
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'access',
+            'refreshToken': 'refresh',
+            'expiresIn': 600,
+            'userId': 'user-a',
+            'username': 'account_a',
+          }),
+          200,
+        );
+      }),
+    );
+    final session = AccountSessionController(client);
+    await session.loadProfile();
+    await expectLater(
+      session.login('account_a', 'password'),
+      throwsA(isA<StateError>()),
+    );
+    expect(session.isSignedIn, isFalse);
+    expect(client.accessToken, isNull);
     session.dispose();
     client.close();
   });

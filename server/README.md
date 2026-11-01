@@ -97,3 +97,6 @@ obrazów. Limiter logowań ma limit pamięci.
 Po zmianach wykonaj test Web, import PDF oraz test HTTPS przez Cloudflare.
 HTTPS nie szyfruje bazy i backupów na dysku HP — nadal potrzebna jest
 oddzielna decyzja dotycząca szyfrowania danych w spoczynku i E2EE.
+
+Szczegółowa lista kroków wdrożenia poprawek bezpieczeństwa znajduje się
+w `server/SECURITY_DEPLOY.md`.

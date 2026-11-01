@@ -174,10 +174,14 @@ class AccountSessionController extends ChangeNotifier {
         try {
           await _saveProfile();
         } catch (failure) {
-          error = _failureMessage(failure);
+          throw StateError(
+            'Account identity could not be saved. Backup is disabled: '
+            '${_failureMessage(failure)}',
+          );
         }
       }
     } catch (failure) {
+      _clearSession();
       error = _failureMessage(failure);
       rethrow;
     } finally {
