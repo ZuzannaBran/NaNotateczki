@@ -219,6 +219,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _bootstrappedAccount = userId;
         scheduler.enableForSignedInAccount();
       } catch (error, stackTrace) {
+        sync.reportStartupFailure(error);
         AppErrorLog.instance.record(
           error,
           stackTrace,
