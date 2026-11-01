@@ -44,7 +44,12 @@ ActiveStudyShare _activeShare() => ActiveStudyShare(
   expiresAt: DateTime.utc(2027, 1, 1),
 );
 
-Future<({StudyShareService service, AccountSessionController session})>
+Future<({
+  StudyShareService service,
+  AccountSessionController session,
+  LiveWebSyncService liveSync,
+  NotebookRepository repository,
+})>
 _makeOwner(Future<http.Response> Function(http.Request) handler) async {
   final api = _api((request) async {
     if (request.url.path == '/v1/auth/login') {
@@ -74,6 +79,8 @@ _makeOwner(Future<http.Response> Function(http.Request) handler) async {
       repository: repository,
     ),
     session: session,
+    liveSync: liveSync,
+    repository: repository,
   );
 }
 
@@ -347,5 +354,91 @@ void main() {
       harness.service.end(_activeShare()),
       throwsA(isA<StateError>()),
     );
+  });
+
+  test('share link is created only after uploading owner document', () async {
+    final requests = <String>[];
+    final harness = await _makeOwner((request) async {
+      requests.add('${request.method} ${request.url.path}');
+      if (request.url.path == '/v1/sync/bootstrap') {
+        return http.Response(jsonEncode({'cursor': 0, 'notebooks': []}), 200);
+      }
+      if (request.url.path == '/v1/sync/changes') {
+        return http.Response(jsonEncode({'cursor': 0, 'changes': []}), 200);
+      }
+      if (request.method == 'PUT' &&
+          request.url.path.startsWith('/v1/sync/notebooks/')) {
+        return http.Response(jsonEncode({'revision': 1}), 200);
+      }
+      if (request.url.path == '/v1/study-shares' &&
+          request.method == 'POST') {
+        return http.Response(
+          jsonEncode({
+            'id': _sessionId,
+            'expiresAt': '2027-01-01T00:00:00Z',
+          }),
+          201,
+        );
+      }
+      if (request.url.path == '/v1/study-shares/$_sessionId' &&
+          request.method == 'DELETE') {
+        return http.Response('', 204);
+      }
+      fail('Unexpected HTTP call: ${request.method} ${request.url}');
+    });
+    final original = await harness.repository.createNotebook();
+    await harness.liveSync.start(InitialSyncPolicy.uploadLocal);
+
+    final share = await harness.service.create(
+      documentUid: original.uid,
+      title: original.title,
+      password: 'study-password',
+    );
+    await harness.service.end(share);
+
+    final upload = requests.indexWhere(
+      (value) => value.startsWith('PUT /v1/sync/notebooks/'),
+    );
+    final created = requests.indexOf('POST /v1/study-shares');
+    final ended = requests.indexOf('DELETE /v1/study-shares/$_sessionId');
+    expect(upload, greaterThanOrEqualTo(0));
+    expect(created, greaterThan(upload));
+    expect(ended, greaterThan(created));
+    expect(await harness.repository.getNotebook(original.uid), isNotNull);
+  });
+
+  test('failed owner upload prevents creating a guest link', () async {
+    var linkRequests = 0;
+    final harness = await _makeOwner((request) async {
+      if (request.url.path == '/v1/sync/bootstrap') {
+        return http.Response(jsonEncode({'cursor': 0, 'notebooks': []}), 200);
+      }
+      if (request.url.path == '/v1/sync/changes') {
+        return http.Response(jsonEncode({'cursor': 0, 'changes': []}), 200);
+      }
+      if (request.method == 'PUT' &&
+          request.url.path.startsWith('/v1/sync/notebooks/')) {
+        return http.Response('{"detail":"Storage unavailable"}', 503);
+      }
+      if (request.url.path == '/v1/study-shares') {
+        linkRequests++;
+        return http.Response('{}', 201);
+      }
+      fail('Unexpected HTTP call: ${request.method} ${request.url}');
+    });
+    final original = await harness.repository.createNotebook();
+    await harness.liveSync.start(InitialSyncPolicy.uploadLocal);
+
+    await expectLater(
+      harness.service.create(
+        documentUid: original.uid,
+        title: original.title,
+        password: 'study-password',
+      ),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(linkRequests, 0);
+    expect(await harness.repository.getNotebook(original.uid), isNotNull);
   });
 }
