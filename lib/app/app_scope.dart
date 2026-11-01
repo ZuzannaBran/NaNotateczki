@@ -76,6 +76,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
     _libraryController?.dispose();
     _preferences?.dispose();
+    if (scheduler != null) {
+      _studyPlanner?.savedRevision.removeListener(scheduler.markDirty);
+    }
     _studyPlanner?.dispose();
     _accountSession?.dispose();
     _apiClient?.close();
@@ -329,7 +332,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _studyPlanner = planner;
         if (newAccountSession) {
           preferences.addListener(remoteBackupScheduler.markDirty);
-          planner.addListener(remoteBackupScheduler.markDirty);
+          planner.savedRevision.addListener(
+            remoteBackupScheduler.markDirty,
+          );
           SharedRecentColors.revision.addListener(
             remoteBackupScheduler.markDirty,
           );
