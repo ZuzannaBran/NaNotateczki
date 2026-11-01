@@ -158,6 +158,12 @@ class LibraryController extends ChangeNotifier {
     await _loadCloudPath();
   }
 
+  /// Refreshes folders, covers and tasks after verified account recovery.
+  Future<void> reloadFromAccount() async {
+    await _loadFolders();
+    await loadItems();
+  }
+
   Future<void> loadItems() async {
     if (_isDisposed) {
       return;
