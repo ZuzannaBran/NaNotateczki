@@ -5,11 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_header_divider.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../data/backup/remote_backup_scheduler.dart';
 import '../../../data/sync/account_session_controller.dart';
 import '../../../data/sync/api_client.dart';
 import '../../../data/sync/live_web_sync_service.dart';
+
+TextStyle _accountSecondaryTextStyle(BuildContext context) => TextStyle(
+  fontSize: AppTypography.small,
+  color: Theme.of(context).colorScheme.onSurfaceVariant,
+);
 
 Future<void> showLibraryAccountDialog(
   BuildContext context, {
@@ -78,19 +84,18 @@ class LibraryAccountSlot extends StatelessWidget {
                     key: const ValueKey('account-display-name'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: AppTypography.document,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: AppHeaderDivider.titleStyle,
                   ),
-                  if (subtitle != null)
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
                       key: const ValueKey('account-remote-status'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: _accountSecondaryTextStyle(context),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -250,7 +255,12 @@ class _AccountDialogState extends State<_AccountDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       titlePadding: const EdgeInsets.fromLTRB(32, 28, 32, 0),
-      title: Text(_title, textAlign: TextAlign.center),
+      title: Text(
+        _title,
+        key: const ValueKey('account-dialog-title'),
+        textAlign: TextAlign.center,
+        style: AppHeaderDivider.titleStyle,
+      ),
       contentPadding: const EdgeInsets.fromLTRB(32, 20, 32, 12),
       actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
       content: SizedBox(
@@ -497,12 +507,14 @@ class _AccountDialogState extends State<_AccountDialog> {
                     children: [
                       Text(
                         session.displayName,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        key: const ValueKey('account-dialog-display-name'),
+                        style: AppHeaderDivider.titleStyle,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         session.isSignedIn ? 'Online account' : 'Local mode',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        key: const ValueKey('account-dialog-mode'),
+                        style: _accountSecondaryTextStyle(context),
                       ),
                     ],
                   ),
@@ -551,7 +563,10 @@ class _AccountDialogState extends State<_AccountDialog> {
             const SizedBox(height: 20),
             Text(
               'Live synchronization',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: const TextStyle(
+                fontSize: AppTypography.folder,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 8),
             if (!sync.isStarted) ...[
@@ -1018,10 +1033,16 @@ class _SyncPolicyButton extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: AppTypography.document,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     Text(
                       description,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: _accountSecondaryTextStyle(context),
                     ),
                   ],
                 ),
