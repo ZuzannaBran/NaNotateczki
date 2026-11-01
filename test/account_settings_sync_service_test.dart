@@ -109,6 +109,59 @@ void main() {
     expect(remote['appPreferences']!['value']['darkMode'], false);
   });
 
+  test('accepted update survives a lost client response', () async {
+    final stored = <String, String>{
+      'app_prefs.json': '{"darkMode":true}',
+    };
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    var serverRevision = 0;
+    Object? serverValue;
+    var writes = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.method == 'GET') {
+          return http.Response(jsonEncode({
+            'settings': {
+              if (serverRevision > 0)
+                'appPreferences': {
+                  'revision': serverRevision,
+                  'value': serverValue,
+                },
+            },
+          }), 200);
+        }
+        writes++;
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        serverValue = body['value'];
+        serverRevision++;
+        return http.Response(jsonEncode({
+          'revision': serverRevision,
+          'value': serverValue,
+        }), 200);
+      }),
+    )..setAccessToken('valid');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-a';
+    addTearDown(session.dispose);
+    final sync = AccountSettingsSyncService(
+      apiClient: client,
+      session: session,
+    );
+    await sync.syncNow();
+    expect(writes, 1);
+    stored['app_prefs.json'] = '{"darkMode":false}';
+    serverRevision = 2;
+    serverValue = {'darkMode': false};
+    await sync.syncNow();
+    expect(writes, 1);
+    await sync.syncNow();
+    expect(writes, 1);
+  });
+
   test('simultaneous edits never silently overwrite another device',
       () async {
     final files = <String, String>{
