@@ -22,7 +22,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     required this.repository,
     required this.apiClient,
     required this.session,
-    this.enableRealtime = true,
+    this.enableRealtime = kIsWeb,
   }) {
     WidgetsBinding.instance.addObserver(this);
   }
