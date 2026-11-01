@@ -239,6 +239,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
     final localByUid = {for (final item in local) item.uid: item};
     final imports = <Notebook>[];
+    final remoteDeletes = <String>[];
     for (final record in remote) {
       _revisions[record.uid] = record.revision;
       if (record.notebook != null) {
@@ -247,6 +248,14 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         );
       }
       if (record.deleted || record.notebook == null) {
+        final localNotebook = localByUid[record.uid];
+        if (localNotebook != null) {
+          final preserved = _conflictCopy(localNotebook, 'this device');
+          imports.add(preserved);
+          _pending.add(preserved.uid);
+          _idempotencyKeys[preserved.uid] = const Uuid().v4();
+          remoteDeletes.add(record.uid);
+        }
         continue;
       }
       final localNotebook = localByUid[record.uid];
@@ -263,6 +272,18 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     }
     if (imports.isNotEmpty) {
       await _applyRemoteImports(imports);
+    }
+    if (remoteDeletes.isNotEmpty) {
+      _applyingRemote = true;
+      try {
+        for (final uid in remoteDeletes) {
+          await repository.deleteNotebook(uid);
+        }
+      } finally {
+        _applyingRemote = false;
+      }
+      remoteApplyEpoch++;
+      await onRemoteApplied?.call();
     }
     if (policy != InitialSyncPolicy.downloadRemote) {
       for (final notebook in local) {
