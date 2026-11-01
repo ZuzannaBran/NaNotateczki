@@ -9,6 +9,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/input/touch_navigation_scroll_physics.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
+import '../../../core/widgets/app_labeled_field.dart';
 import '../../editor/presentation/widgets/editor_toolbar.dart';
 import '../../editor/state/ink_color_presets.dart';
 import '../state/study_planner_controller.dart';
@@ -337,20 +338,10 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            key: labelKey,
-            style: const TextStyle(
-              fontSize: AppTypography.document,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          child,
-        ],
+      child: AppLabeledField(
+        label: label,
+        labelKey: labelKey,
+        child: child,
       ),
     );
   }
@@ -388,13 +379,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   controller: _title,
                   autofocus: true,
                   maxLength: 100,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                    ),
-                    floatingLabelBehavior: FloatingLabelBehavior.never,
-                    counterText: '',
-                  ),
+                  decoration: appFormFieldDecoration().copyWith(counterText: ''),
                 ),
               ),
               _labeledField(
@@ -406,13 +391,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   minLines: 3,
                   maxLines: 3,
                   maxLength: 500,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                    ),
-                    floatingLabelBehavior: FloatingLabelBehavior.never,
-                    counterText: '',
-                  ),
+                  decoration: appFormFieldDecoration().copyWith(counterText: ''),
                 ),
               ),
               const SizedBox(height: 8),
@@ -422,11 +401,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   child: DropdownButtonFormField<StudyTechnique>(
                     initialValue: _technique,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
+                    decoration: appFormFieldDecoration(),
                     items: [
                       for (final method in StudyTechnique.values)
                         DropdownMenuItem(
@@ -454,11 +429,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   child: TextField(
                     controller: _minutes,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
+                    decoration: appFormFieldDecoration(),
                   ),
                 )
               else if (_kind == StudyEntryKind.session) ...[
@@ -470,11 +441,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                       key: const ValueKey('study-focus-blocks'),
                       initialValue: _focusBlocks,
                       isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                        ),
-                      ),
+                      decoration: appFormFieldDecoration(),
                       items: [
                         for (var blocks = 1; blocks <= 12; blocks++)
                           DropdownMenuItem(
@@ -586,11 +553,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                     key: const ValueKey('event-repeat'),
                     initialValue: _repeat,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
+                    decoration: appFormFieldDecoration(),
                     items: const [
                       DropdownMenuItem(
                         value: StudyRepeat.none,
@@ -627,11 +590,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                       key: const ValueKey('event-repeat-every'),
                       initialValue: _repeatEvery.clamp(1, 12).toInt(),
                       isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                        ),
-                      ),
+                      decoration: appFormFieldDecoration(),
                       items: [
                         for (var interval = 1; interval <= 12; interval++)
                           DropdownMenuItem(

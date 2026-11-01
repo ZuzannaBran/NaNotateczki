@@ -856,7 +856,8 @@ Karta notebooka/boarda/planera z menu zmiany nazwy i usuwania.
   Formularz Smart umożliwia wybór liczby bloków 1–12.
   Ocena ma wyśrodkowany nagłówek „Great job! Time's up.”.
   Pola Name, Description, Study technique, Duration, Focus blocks i Repeat
-  używają stałych etykiet nad obramowanymi polami. Name i Description
+  używają wspólnych `AppLabeledField` i `appFormFieldDecoration`, tak jak
+  logowanie oraz Contact the creator. Name i Description
   mają jawnie wyłączone pływające etykiety; test sprawdza pozycję
   i wielkość nagłówków po wpisaniu treści sesji oraz wydarzenia.
   W trakcie sesji Resume/Pause oraz Stop mają tę samą wysokość 32 px,
