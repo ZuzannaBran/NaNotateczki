@@ -73,10 +73,8 @@ class _StudyShareDialogState extends State<_StudyShareDialog> {
   }
 
   Future<void> _create() async {
-    if (_password.text.length < 8) {
-      setState(
-        () => _error = 'Use a session password of at least 8 characters.',
-      );
+    if (_password.text.isEmpty) {
+      setState(() => _error = 'Enter a session password.');
       return;
     }
     setState(() {

@@ -114,7 +114,7 @@ void main() {
     final guest = StudyShareGuestClient(apiClient: api);
     addTearDown(guest.close);
 
-    final result = await guest.join(_sessionId, 'session-password');
+    final result = await guest.join(_sessionId, 'x');
 
     expect(result['ticket'], 'guest-ticket');
     expect(result['revision'], 3);
@@ -122,7 +122,7 @@ void main() {
     expect(captured.url.path, '/v1/study-shares/$_sessionId/join');
     expect(captured.url.query, isEmpty);
     expect(captured.headers.containsKey('authorization'), isFalse);
-    expect(jsonDecode(captured.body), {'password': 'session-password'});
+    expect(jsonDecode(captured.body), {'password': 'x'});
   });
 
   test('wrong guest password remains an HTTP 401', () async {

@@ -109,6 +109,7 @@ w `server/SECURITY_DEPLOY.md`.
 
 Wdróż migrację `0004_study_shares.sql` poleceniem
 `scripts/apply-migrations.sh` **przed restartem nowego API**.
+Hasło sesji może mieć jeden znak (maksymalnie 128); nie może być puste.
 Wymagane jest konto z włączoną synchronizacją Web. API odrzuca
 próbę współdzielenia dokumentu, którego nie ma jeszcze w bibliotece
 kontowej (HTTP 409). Po zamknięciu nie usuwa oryginalnego notatnika ani

@@ -1900,8 +1900,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `server/migrations/0004_study_shares.sql`. Przy kończeniu sesji
   powiadomienie WebSocket `ended` jest wysyłane już uwierzytelnionym
   gościom przed ponownym sprawdzeniem unieważnionego biletu.
-- `test/study_share_service_test.dart`: trwałość identyfikatora dokumentu
-  przy przedłużaniu oraz izolowany ekran wejścia gościa.
+- `test/study_share_service_test.dart`: trwałość identyfikatora dokumentu,
+  walidacja jednoznakowego i pustego hasła sesji w dialogu oraz
+  izolowany ekran wejścia gościa.
 - `test/study_share_http_test.dart`: klient gościa, bilety, HTTP/WSS,
   autoryzacja właściciela, odmowa utworzenia linku przy błędzie sync
   i zachowanie oryginalnego notebooka po zamknięciu udostępniania.

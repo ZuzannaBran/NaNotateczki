@@ -242,7 +242,7 @@ weryfikuje, że udostępniany dokument jest aktywnym rekordem konta
 chwilowy obraz PNG; nie dotyka rekordu notatnika.
 
 Zaproszenie jest linkiem `/share/<session UUID>` oraz osobno
-przekazanym hasłem, bez obowiązku zakładania konta. Hasło sesji ma hash
+przekazanym hasłem, bez obowiązku zakładania konta. Hasło sesji może mieć od 1 do 128 znaków i ma hash
 Argon2id; bilet uczestnika jest wyłącznie w pamięci przeglądarki i pozwala
 pobierać jedynie prywatny obraz udostępnionej kanwy. Nie udostępnia
 biblioteki, SQLite ani tokenów konta autora. Uczestnicy mają wyłącznie
