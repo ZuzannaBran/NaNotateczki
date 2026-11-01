@@ -19,6 +19,7 @@ import '../data/backup/remote_backup_service.dart';
 import '../data/backup/remote_backup_scheduler.dart';
 import '../data/drift/notes_database.dart';
 import '../data/sync/account_session_controller.dart';
+import '../data/sync/account_settings_sync_service.dart';
 import '../data/sync/api_client.dart';
 import '../data/sync/cloud_sync_service.dart';
 import '../data/sync/live_web_sync_service.dart';
@@ -46,6 +47,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   RemoteBackupService? _remoteBackupService;
   RemoteBackupScheduler? _remoteBackupScheduler;
   LiveWebSyncService? _liveSync;
+  AccountSettingsSyncService? _accountSettingsSync;
+  Timer? _settingsPoll;
+  Timer? _settingsDebounce;
+  int? _observedIdleSeconds;
   LibraryController? _libraryController;
   AppPreferencesController? _preferences;
   StudyPlannerController? _studyPlanner;
@@ -67,13 +72,20 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _settingsPoll?.cancel();
+    _settingsDebounce?.cancel();
     _backupScheduler?.dispose();
     _remoteBackupScheduler?.dispose();
     _liveSync?.dispose();
     final scheduler = _remoteBackupScheduler;
     if (scheduler != null) {
       SharedRecentColors.revision.removeListener(scheduler.markDirty);
+      scheduler.removeListener(_onBackupDelayChanged);
     }
+    SharedRecentColors.revision.removeListener(
+      _scheduleAccountSettingsSync,
+    );
+    _preferences?.removeListener(_scheduleAccountSettingsSync);
     _libraryController?.dispose();
     _preferences?.dispose();
     if (scheduler != null) {
@@ -170,6 +182,37 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_startAccountSync());
+      unawaited(_syncAccountSettings());
+    }
+  }
+
+  void _scheduleAccountSettingsSync() {
+    if (_accountSettingsSync?.isApplying ?? false) {
+      return;
+    }
+    _settingsDebounce?.cancel();
+    _settingsDebounce = Timer(const Duration(milliseconds: 400), () {
+      unawaited(_syncAccountSettings());
+    });
+  }
+
+  void _onBackupDelayChanged() {
+    final delay = _remoteBackupScheduler?.idleSeconds;
+    if (delay != null && delay != _observedIdleSeconds) {
+      _observedIdleSeconds = delay;
+      _scheduleAccountSettingsSync();
+    }
+  }
+
+  Future<void> _syncAccountSettings() async {
+    try {
+      await _accountSettingsSync?.syncNow();
+    } catch (error, stackTrace) {
+      AppErrorLog.instance.record(
+        error,
+        stackTrace,
+        source: 'AppScope.syncAccountSettings',
+      );
     }
   }
 
@@ -212,12 +255,20 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           await preferences.load();
           await planner.load();
         }
+        // Settings use their own versioned account record rather than
+        // replacing a newer device preference with a stale backup.
+        await _syncAccountSettings();
         await sync.start(InitialSyncPolicy.mergeSafely);
         if (!mounted || session.userId != userId) {
           return;
         }
         _bootstrappedAccount = userId;
         scheduler.enableForSignedInAccount();
+        _observedIdleSeconds = scheduler.idleSeconds;
+        _settingsPoll?.cancel();
+        _settingsPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+          unawaited(_syncAccountSettings());
+        });
       } catch (error, stackTrace) {
         sync.reportStartupFailure(error);
         AppErrorLog.instance.record(
@@ -332,8 +383,21 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _preferences = preferences;
         final planner = _studyPlanner ?? (StudyPlannerController()..load());
         _studyPlanner = planner;
+        _accountSettingsSync ??= AccountSettingsSyncService(
+          apiClient: apiClient,
+          session: accountSession,
+          onRemoteApplied: () async {
+            await preferences.load();
+            await remoteBackupScheduler.refreshAccountPreference();
+          },
+        );
         if (newAccountSession) {
           preferences.addListener(remoteBackupScheduler.markDirty);
+          preferences.addListener(_scheduleAccountSettingsSync);
+          SharedRecentColors.revision.addListener(
+            _scheduleAccountSettingsSync,
+          );
+          remoteBackupScheduler.addListener(_onBackupDelayChanged);
           planner.savedRevision.addListener(
             remoteBackupScheduler.markDirty,
           );
@@ -345,6 +409,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               unawaited(_startAccountSync());
             } else if (!accountSession.isSignedIn) {
               _bootstrappedAccount = null;
+              _settingsPoll?.cancel();
+              _settingsDebounce?.cancel();
+              _accountSettingsSync?.stop();
             }
           });
           unawaited(accountSession.loadProfile().then((_) {
