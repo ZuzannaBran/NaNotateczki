@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -15,12 +16,14 @@ import '../sync/api_client.dart';
 
 enum InitialSyncPolicy { uploadLocal, downloadRemote, mergeSafely }
 
-class LiveWebSyncService extends ChangeNotifier {
+class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   LiveWebSyncService({
     required this.repository,
     required this.apiClient,
     required this.session,
-  });
+  }) {
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   final NotebookRepository repository;
   final ApiClient apiClient;
@@ -30,6 +33,7 @@ class LiveWebSyncService extends ChangeNotifier {
   final Map<String, String> _idempotencyKeys = <String, String>{};
   Timer? _drainTimer;
   Timer? _reconnectTimer;
+  Timer? _fallbackTimer;
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _socketSubscription;
   Future<void>? _activeSync;
@@ -121,6 +125,9 @@ class LiveWebSyncService extends ChangeNotifier {
       if (error.statusCode == 401) {
         try {
           await session.refresh();
+          if (kIsWeb) {
+            unawaited(_connectRealtime());
+          }
           await _runSyncPass();
           lastError = null;
           lastSuccessfulSync = DateTime.now().toUtc();
@@ -149,8 +156,30 @@ class LiveWebSyncService extends ChangeNotifier {
         source: 'LiveWebSyncService.syncNow',
       );
     }
+    _scheduleFallback();
     if (!_disposed) {
       notifyListeners();
+    }
+  }
+
+  void _scheduleFallback() {
+    _fallbackTimer?.cancel();
+    if (!_started || _disposed || !session.isSignedIn) {
+      return;
+    }
+    final delay = lastError == null
+        ? const Duration(seconds: 45)
+        : const Duration(seconds: 10);
+    _fallbackTimer = Timer(delay, () {
+      _fallbackTimer = null;
+      unawaited(syncNow());
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _started && !_disposed) {
+      unawaited(syncNow());
     }
   }
 
@@ -534,6 +563,7 @@ class LiveWebSyncService extends ChangeNotifier {
     _started = false;
     _drainTimer?.cancel();
     _reconnectTimer?.cancel();
+    _fallbackTimer?.cancel();
     await _socketSubscription?.cancel();
     await _channel?.sink.close();
     _socketSubscription = null;
@@ -559,6 +589,8 @@ class LiveWebSyncService extends ChangeNotifier {
     _disposed = true;
     _drainTimer?.cancel();
     _reconnectTimer?.cancel();
+    _fallbackTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_socketSubscription?.cancel());
     unawaited(_channel?.sink.close());
     super.dispose();
