@@ -1098,7 +1098,7 @@ class _LibraryTreePane extends StatefulWidget {
     required this.onOpenFolder,
     required this.showingProjects,
     this.extendDividersIntoResizeHandle = false,
-    this.liveSyncAvailable = kIsWeb,
+    this.liveSyncAvailable = true,
   });
 
   final LibraryController controller;
