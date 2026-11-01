@@ -152,8 +152,12 @@ class StudyShareService {
 
   Future<void> end(ActiveStudyShare share) async {
     await _refreshIfNeeded();
-    // Try to drain the owner's edits, but never block guest revocation
-    // because a document was deleted or background sync failed.
+    // Revoke access first; slow local saves must never extend guest privileges.
+    await session.apiClient.request(
+      'DELETE',
+      '/v1/study-shares/${share.id}',
+      body: const <int>[],
+    );
     try {
       await AppSaveCoordinator.instance.flushPending();
       await repository.waitForPendingSaves();
@@ -161,14 +165,10 @@ class StudyShareService {
         await liveSync.syncNow();
       }
     } catch (_) {
-      // Revoking a guest's permissions takes precedence over sync.
+      // Owner data remains in the local repository for subsequent sync.
     }
-    await session.apiClient.request(
-      'DELETE',
-      '/v1/study-shares/${share.id}',
-      body: const <int>[],
-    );
   }
+
 }
 
 class SharedStudyDocument {
