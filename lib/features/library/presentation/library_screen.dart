@@ -32,7 +32,7 @@ import 'library_catalog.dart';
 import 'library_controller.dart';
 
 class LibraryScreen extends StatefulWidget {
-  const LibraryScreen({super.key, this.liveSyncAvailable = kIsWeb});
+  const LibraryScreen({super.key, this.liveSyncAvailable = true});
 
   final bool liveSyncAvailable;
 
