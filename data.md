@@ -24,8 +24,16 @@ offline również po zalogowaniu.
   preferowany tryb, lokalną nazwę, ostatnią nazwę użytkownika oraz `boundUserId`.
   Raz przypisane dane lokalne nie mogą zostać użyte z innym kontem bez
   osobnego profilu przeglądarki lub instalacji. Nie zawiera hasła,
-  access tokenu ani refresh tokenu. Preferowany tryb konta po restarcie
-  wymaga ponownego logowania, ponieważ tokeny celowo nie są utrwalane.
+  access tokenu ani refresh tokenu. Odnawialny token jest przechowywany
+  oddzielnie przez `flutter_secure_storage` (systemowy magazyn
+  sekretów/kluczy; na Web zaszyfrowany magazyn przeglądarki).
+  Przy restarcie klient sprawdza tożsamość z `boundUserId`, loginem i
+  adresem API, następnie wywołuje `POST /v1/auth/refresh`, utrwala
+  rotowany token i dopiero wtedy przywraca sesję. Nie utrwala hasła
+  ani access tokenu. Brak sieci nie czyści tokenu i nie blokuje lokalnej
+  biblioteki; odrzucenie odnowienia unieważnia zapisany token.
+  Onboarding uruchamia się tylko przy pierwszej konfiguracji profilu,
+  nie przy każdym ponownym uruchomieniu aplikacji.
 
 ## Dane lokalne na platformach natywnych
 
@@ -89,8 +97,12 @@ katalogu głównego ani całego katalogu domowego jako celu.
 
 - Drift używa SQLite WASM w IndexedDB.
 - Małe ustawienia, outbox identyfikatorów i kursor są w `localStorage`.
-- Token dostępu i refresh token są wyłącznie w pamięci procesu; po pełnym
-  zamknięciu przeglądarki trzeba zalogować się ponownie.
+- Access token pozostaje wyłącznie w pamięci; rotowany refresh token
+  jest przechowywany przez `flutter_secure_storage` na tym samym originie.
+  Web wymaga bezpiecznego kontekstu HTTPS (localhost do testów).
+  Współdzielenie profilu przeglądarki i skrypty działające na tym
+  originie pozostają ryzykiem; XSS wymaga odrębnej ochrony.
+  Zmiana hasła i wylogowanie czyszczą utrwalony token.
 - Kursor, rewizje, outbox, stan UI backupu oraz identyfikator urządzenia są
   izolowane według `userId`. Cała lokalna biblioteka jest przypisywana do
   pierwszego konta (`boundUserId`); zmiana konta na tej samej instalacji jest
@@ -98,6 +110,9 @@ katalogu głównego ani całego katalogu domowego jako celu.
   używany do nowych backupów.
 - WebSocket przenosi wyłącznie mały sygnał zmiany. Pełny, trwały stan jest
   zawsze pobierany przez REST z kursorem `change_events`.
+- Przy przywróceniu konta na starcie natywny scheduler backupu wraca
+  do działania. Pierwszy sync Web nadal wymaga jawnego wyboru polityki;
+  samo odnowienie tokenu nie rozpoczyna synchronizacji.
 
 ## Serwer
 
@@ -157,7 +172,8 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 - Po sukcesie `204` serwer zwiększa `auth_version` i unieważnia refresh
   tokeny, wydane JWT oraz połączenia WebSocket. Wymaga to migracji
   `0002_auth_version.sql` i `0003_username.sql`. Klient zatrzymuje live
-  sync i backup, czyści tokeny z pamięci oraz wymaga ponownego logowania.
+  sync i backup, czyści sesję z pamięci i magazynu sekretów oraz wymaga
+  ponownego logowania.
 - Użytkownik może przełączać się między profilem lokalnym i kontem z poziomu
   ustawień konta. Przejście do trybu lokalnego zatrzymuje usługi sieciowe
   przed wyczyszczeniem sesji.
