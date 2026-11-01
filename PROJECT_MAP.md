@@ -1773,6 +1773,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `test/account_cross_device_backup_test.dart`: transfer zweryfikowanych
   notatników, preferencji konta, Recent i opóźnienia backupu na nowe
   urządzenie; odrzucenie uszkodzonego payloadu przed zapisem.
+- `test/account_tombstone_bootstrap_test.dart`: tombstone przy logowaniu
+  usuwa stary UID, ale zachowuje lokalne edycje w osobnej kopii.
 - `test/cross_platform/eraser_stress_test.dart`: deterministyczne sekwencje
   gumki z kontrolą unikalności i niepowracania raz usuniętych ID.
 - `test/library_controller_lifecycle_test.dart`: dispose podczas
