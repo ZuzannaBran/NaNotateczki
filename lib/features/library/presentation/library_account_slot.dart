@@ -61,19 +61,16 @@ class LibraryAccountSlot extends StatelessWidget {
     }
     final subtitle = session.isSignedIn
         ? _remoteSubtitle(backup, sync, DateTime.now())
-        : null;
+        : session.isLocalProfile
+        ? 'Local mode'
+        : 'Not signed in';
 
     return SizedBox(
       key: const ValueKey('account-menu-button'),
       child: Padding(
-        padding: const EdgeInsets.only(left: 14, right: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(
           children: [
-            _AccountAvatar(
-              key: const ValueKey('account-avatar'),
-              letter: session.avatarLetter,
-            ),
-            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -86,19 +83,18 @@ class LibraryAccountSlot extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: AppHeaderDivider.titleStyle,
                   ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      key: const ValueKey('account-remote-status'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: _accountSecondaryTextStyle(context),
-                    ),
-                  ],
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    key: const ValueKey('account-remote-status'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _accountSecondaryTextStyle(context),
+                  ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             IconButton(
               key: const ValueKey('account-settings-button'),
               tooltip: 'Account settings',
