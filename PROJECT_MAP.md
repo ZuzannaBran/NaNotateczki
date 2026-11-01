@@ -1858,3 +1858,28 @@ dart compile js -O4 -o web/drift_worker.dart.js web/drift_worker.dart
 ```
 
 Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
+
+
+## 13. Wspólne sesje Web
+
+- `lib/data/sync/study_share_service.dart`: tworzenie/publikacja/przedłużanie
+  i zakończenie sesji po potwierdzeniu trwałego zapisu właściciela
+  przez LiveWebSync; osobny, anonimowy klient gościa.
+- `lib/features/share/presentation/study_share_dialog.dart`: formularz
+  linku i hasła, kopiowanie, wygaśnięcie i przedłużenie, spójny AlertDialog.
+- `lib/features/share/presentation/study_share_capture.dart`: ograniczone
+  rozmiarowo PNG istniejącego edytora, poza głównym wątkiem sieciowym,
+  bez udostępniania biblioteki.
+- `lib/features/share/presentation/study_share_guest_screen.dart`: wejście
+  przez link bez konta, WebSocket i okresowa kontrola najnowszego obrazu.
+- `lib/main.dart`: trasa `/share/{id}` rozpoznawana przed inicjalizacją
+  prywatnej biblioteki. Zwykły start aplikacji bez zmian.
+- `lib/features/library/presentation/library_catalog.dart` oraz
+  `library_screen.dart`: Share w menu dokumentu dla Web; inne platformy
+  i istniejące akcje zachowane; aktywne udostępnienie korzysta z
+  działającego EditorController.
+- `server/api/app/routers/study_shares.py`: oddzielne API sesji i
+  podglądu, ograniczenia, autoryzacja i wygaśnięcie; migracja
+  `server/migrations/0004_study_shares.sql`.
+- `test/study_share_service_test.dart`: trwałość identyfikatora dokumentu
+  przy przedłużaniu oraz izolowany ekran wejścia gościa.

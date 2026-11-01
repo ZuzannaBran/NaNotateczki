@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,6 +12,7 @@ import 'core/diagnostics/optimization_log.dart';
 import 'core/error/app_error_log.dart';
 import 'core/input/stylus_button_state.dart';
 import 'core/storage/app_data_directory.dart';
+import 'features/share/presentation/study_share_guest_screen.dart';
 
 ui.KeyDataCallback? _wrappedKeyDataHandler;
 ui.ErrorCallback? _wrappedPlatformErrorHandler;
@@ -44,6 +47,14 @@ void main() {
 
 Future<void> _runApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    final path = Uri.base.pathSegments;
+    if (path.length == 2 && path.first == 'share' &&
+        path.last.isNotEmpty) {
+      runApp(StudyShareGuestApp(sessionId: path.last));
+      return;
+    }
+  }
   await prepareAppDataDirectory();
   await AppErrorLog.instance.load();
   await DataIntegrityLog.instance.load();

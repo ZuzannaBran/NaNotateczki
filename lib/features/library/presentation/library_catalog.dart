@@ -244,6 +244,7 @@ class LibraryCatalog extends StatelessWidget {
     required this.onDeleteFolder,
     required this.onRenameItem,
     required this.onDeleteItem,
+    this.onShareItem,
     required this.onSettings,
     this.showCompactTimer = false,
     this.onOpenNavigation,
@@ -260,6 +261,7 @@ class LibraryCatalog extends StatelessWidget {
   final ValueChanged<String> onDeleteFolder;
   final ValueChanged<Notebook> onRenameItem;
   final ValueChanged<Notebook> onDeleteItem;
+  final ValueChanged<Notebook>? onShareItem;
   final VoidCallback onSettings;
   final bool showCompactTimer;
   final VoidCallback? onOpenNavigation;
@@ -466,6 +468,7 @@ class LibraryCatalog extends StatelessWidget {
                                                 onRenameItem(notes[index]),
                                             onDelete: () =>
                                                 onDeleteItem(notes[index]),
+                                            onShare: () => onShareItem?.call(notes[index]),
                                           ),
                                         ),
                                       ],
@@ -513,6 +516,7 @@ class LibraryCatalog extends StatelessWidget {
                                     onTap: () => onOpenItem(item),
                                     onRename: () => onRenameItem(item),
                                     onDelete: () => onDeleteItem(item),
+                                    onShare: () => onShareItem?.call(item),
                                   ),
                                 );
                               },
@@ -630,12 +634,14 @@ class _DocumentTile extends StatelessWidget {
     required this.onTap,
     required this.onRename,
     required this.onDelete,
+    required this.onShare,
   });
 
   final Notebook item;
   final VoidCallback onTap;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -643,13 +649,17 @@ class _DocumentTile extends StatelessWidget {
       key: ValueKey('catalog-document:${item.uid}'),
       title: item.title,
       onTap: onTap,
-      actions: const [
-        PopupMenuItem(value: 0, child: Text('Rename')),
-        PopupMenuItem(value: 1, child: Text('Delete')),
+      actions: [
+        const PopupMenuItem(value: 0, child: Text('Rename')),
+        if (kIsWeb && item.kind != NotebookKind.planner)
+          const PopupMenuItem(value: 2, child: Text('Share')),
+        const PopupMenuItem(value: 1, child: Text('Delete')),
       ],
       onAction: (action) {
         if (action == 0) {
           onRename();
+        } else if (action == 2) {
+          onShare();
         } else {
           onDelete();
         }

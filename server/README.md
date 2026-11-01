@@ -100,3 +100,23 @@ oddzielna decyzja dotycząca szyfrowania danych w spoczynku i E2EE.
 
 Szczegółowa lista kroków wdrożenia poprawek bezpieczeństwa znajduje się
 w `server/SECURITY_DEPLOY.md`.
+
+
+## Wspólna sesja nauki w Web
+
+Wdróż migrację `0004_study_shares.sql` poleceniem
+`scripts/apply-migrations.sh` **przed restartem nowego API**.
+Wymagane jest konto z włączoną synchronizacją Web. API odrzuca
+próbę współdzielenia dokumentu, którego nie ma jeszcze w bibliotece
+kontowej (HTTP 409). Po zamknięciu nie usuwa oryginalnego notatnika ani
+folderu: unieważnia dostęp i usuwa tylko chwilowy podgląd PNG.
+
+Backend przechowuje obrazy w prywatnym `data/study-shares/` (UID 1000).
+Cloudflare Tunnel ma kierować istniejące
+`app.nanotateczki.pl` i `api.nanotateczki.pl` do
+`http://caddy:8080`. W Cloudflare sprawdź Network → WebSockets.
+Nie cache'uj `/v1/study-shares/*`; nie wystawiaj portów 5432, 8000, 8080
+na routerze. Zbuduj Flutter Web z
+`--dart-define=BACKEND_URL=https://api.nanotateczki.pl`.
+Otwórz link w innej przeglądarce (bez zalogowanego konta), sprawdź
+hasło, odświeżanie obrazu, przedłużenie i zakończenie sesji.

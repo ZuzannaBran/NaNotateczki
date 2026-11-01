@@ -13,6 +13,8 @@ import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../data/sync/account_session_controller.dart';
+import '../../../data/sync/live_web_sync_service.dart';
+import '../../../data/sync/study_share_service.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
 import '../../editor/state/editor_controller.dart';
@@ -23,6 +25,8 @@ import '../../notebook/presentation/notebook_screen.dart';
 import '../../planner/presentation/study_timer_widgets.dart';
 import '../../planner/presentation/task_list_screen.dart';
 import '../../planner/state/study_planner_controller.dart';
+import '../../share/presentation/study_share_capture.dart';
+import '../../share/presentation/study_share_dialog.dart';
 import 'library_account_slot.dart';
 import 'library_catalog.dart';
 import 'library_controller.dart';
@@ -53,6 +57,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   double _navigationPaneWidth = 320;
   bool _isShowingCorruptRecoveryDialog = false;
   bool _isShowingAccountOnboarding = false;
+  ActiveStudyShare? _activeShare;
+  StudyShareService? _studyShareService;
   final ValueNotifier<bool> _sidebarMenuOpen = ValueNotifier<bool>(false);
   final GlobalKey<ScaffoldState> _compactScaffoldKey =
       GlobalKey<ScaffoldState>();
@@ -451,6 +457,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         onDeleteFolder: (folder) => _confirmDeleteFolder(controller, folder),
         onRenameItem: (item) => _promptRenameItem(controller, item),
         onDeleteItem: (item) => _confirmDeleteItem(controller, item),
+        onShareItem: _shareItem,
       );
     }
     return _LibraryWorkspace(
@@ -460,6 +467,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
       showCompactTimer: showCompactTimer,
       onOpenNavigation: onOpenNavigation,
       onSettings: _openCatalogSettings,
+      share: _activeShare?.documentUid == selectedItem?.uid
+          ? _activeShare : null,
+      shareService: _studyShareService,
     );
   }
 
@@ -556,6 +566,56 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _catalogFolder = item.folder;
     });
     controller.selectItem(item.uid);
+  }
+
+
+  Future<void> _shareItem(Notebook item) async {
+    if (!kIsWeb || item.kind == NotebookKind.planner) {
+      return;
+    }
+    if (_activeShare != null && _activeShare!.documentUid != item.uid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('End the current session before sharing another.'),
+        ),
+      );
+      return;
+    }
+    final session = context.read<AccountSessionController?>();
+    final sync = context.read<LiveWebSyncService?>();
+    if (session == null || sync == null || !session.isSignedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign in to share a study session.')),
+      );
+      return;
+    }
+    final service = _studyShareService ??= StudyShareService(
+      session: session,
+      liveSync: sync,
+      repository: context.read<NotebookRepository>(),
+    );
+    await showStudyShareDialog(
+      context,
+      document: item,
+      service: service,
+      active: _activeShare,
+      onChanged: (share) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _activeShare = share;
+          _showCatalog = false;
+          _catalogFolder = item.folder;
+        });
+        context.read<LibraryController>().selectItem(item.uid);
+      },
+      onEnded: () {
+        if (mounted) {
+          setState(() => _activeShare = null);
+        }
+      },
+    );
   }
 
   void _openCatalogSettings() {
@@ -914,7 +974,7 @@ class _NameInputDialogState extends State<_NameInputDialog> {
   }
 }
 
-enum _TreeRowAction { editCover, rename, delete }
+enum _TreeRowAction { editCover, rename, share, delete }
 
 const TextStyle _sidebarTextStyle = TextStyle(
   fontSize: AppTypography.document,
@@ -1307,6 +1367,11 @@ class _LibraryTreePaneState extends State<_LibraryTreePane> {
                 onDelete: () => context
                     .findAncestorStateOfType<_LibraryScreenState>()
                     ?._confirmDeleteItem(controller, item),
+                onShare: kIsWeb && item.kind != NotebookKind.planner
+                    ? () => context
+                        .findAncestorStateOfType<_LibraryScreenState>()
+                        ?._shareItem(item)
+                    : null,
               ),
         ],
       ),
@@ -1501,6 +1566,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
     required this.onTap,
     required this.onRename,
     required this.onDelete,
+    this.onShare,
   });
 
   final Notebook item;
@@ -1508,6 +1574,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final VoidCallback? onShare;
 
   Widget _buildRow(BuildContext context, {required bool dragging, Key? key}) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -1553,6 +1620,7 @@ class _LibraryTreeItemRow extends StatelessWidget {
                   iconSize: 17,
                   onRename: onRename,
                   onDelete: onDelete,
+                  onShare: onShare,
                 ),
               ],
             ),
@@ -1763,12 +1831,14 @@ class _TreeRowActions extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     this.onEdit,
+    this.onShare,
   });
 
   final BuildContext rowContext;
   final String tooltip;
   final double iconSize;
   final VoidCallback? onEdit;
+  final VoidCallback? onShare;
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
@@ -1782,6 +1852,7 @@ class _TreeRowActions extends StatelessWidget {
         for (final (value, label) in [
           if (onEdit != null) (_TreeRowAction.editCover, 'Edit cover'),
           (_TreeRowAction.rename, 'Rename'),
+          if (onShare != null) (_TreeRowAction.share, 'Share'),
           (_TreeRowAction.delete, 'Delete'),
         ])
           PopupMenuItem<_TreeRowAction>(
@@ -1801,6 +1872,9 @@ class _TreeRowActions extends StatelessWidget {
     switch (action) {
       case _TreeRowAction.editCover:
         onEdit?.call();
+        return;
+      case _TreeRowAction.share:
+        onShare?.call();
         return;
       case _TreeRowAction.rename:
         onRename();
@@ -1835,6 +1909,8 @@ class _LibraryWorkspace extends StatelessWidget {
     required this.showToolbar,
     required this.showCompactTimer,
     required this.onSettings,
+    this.share,
+    this.shareService,
     this.onOpenNavigation,
     super.key,
   });
@@ -1843,6 +1919,8 @@ class _LibraryWorkspace extends StatelessWidget {
   final bool showToolbar;
   final bool showCompactTimer;
   final VoidCallback onSettings;
+  final ActiveStudyShare? share;
+  final StudyShareService? shareService;
   final VoidCallback? onOpenNavigation;
 
   @override
@@ -1873,19 +1951,27 @@ class _LibraryWorkspace extends StatelessWidget {
     return ChangeNotifierProvider(
       key: ValueKey('${item!.uid}:${item!.folder}'),
       create: (_) => EditorController(repository: repository, notebook: item!),
-      child: isBoard
-          ? BoardScreen(
-              title: item!.title,
-              showToolbar: showToolbar,
-              showCompactTimer: showCompactTimer,
-              onOpenNavigation: onOpenNavigation,
-            )
-          : NotebookScreen(
-              title: item!.title,
-              showToolbar: showToolbar,
-              showCompactTimer: showCompactTimer,
-              onOpenNavigation: onOpenNavigation,
-            ),
+      child: Builder(builder: (context) {
+        final canvas = isBoard
+            ? BoardScreen(
+                title: item!.title,
+                showToolbar: showToolbar,
+                showCompactTimer: showCompactTimer,
+                onOpenNavigation: onOpenNavigation,
+              )
+            : NotebookScreen(
+                title: item!.title,
+                showToolbar: showToolbar,
+                showCompactTimer: showCompactTimer,
+                onOpenNavigation: onOpenNavigation,
+              );
+        if (share != null && shareService != null && kIsWeb) {
+          return StudyShareCapture(
+            share: share!, service: shareService!, child: canvas,
+          );
+        }
+        return canvas;
+      }),
     );
   }
 }

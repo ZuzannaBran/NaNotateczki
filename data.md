@@ -207,3 +207,29 @@ narzędziem `age`. Skrypt nie wdraża retencji i nie zastępuje testu odtworzeni
 - PostgreSQL: niezmienne migracje w `server/migrations/` (w tym
   `0003_username.sql`); zastosowanej
   migracji nie edytuje się, tylko dodaje następną.
+
+
+## Współdzielona sesja nauki Web
+
+Sesja jest tylko sposobem na wyświetlenie kanwy na żywo zaproszonym
+osobom; nie jest alternatywnym magazynem dokumentów ani nowym właścicielem
+notatnika. Projekt, jego UID, folder, wszystkie strony i lokalny backup
+pozostają w bibliotece autora. Udostępnianie nie usuwa ani nie przenosi
+oryginalnego projektu.
+
+Właściciel musi być zalogowany i mieć włączoną synchronizację Web.
+Przed utworzeniem linku i przed ręcznym zakończeniem sesji aplikacja
+wykonuje flush edytora i repozytorium, czeka na synchronizację z kontem,
+a w przypadku błędu/pending odmawia potwierdzenia zapisu. Backend dodatkowo
+weryfikuje, że udostępniany dokument jest aktywnym rekordem konta
+`synced_notebooks`. Zakończenie sesji tylko blokuje bilety gości i kasuje
+chwilowy obraz PNG; nie dotyka rekordu notatnika.
+
+Zaproszenie jest linkiem `/share/<session UUID>` oraz osobno
+przekazanym hasłem, bez obowiązku zakładania konta. Hasło sesji ma hash
+Argon2id; bilet uczestnika jest wyłącznie w pamięci przeglądarki i pozwala
+pobierać jedynie prywatny obraz udostępnionej kanwy. Nie udostępnia
+biblioteki, SQLite ani tokenów konta autora. Uczestnicy mają wyłącznie
+podgląd. Obraz aktualizuje się przez WebSocket i chroniony REST.
+Sesja wygasa po 4 godzinach; w ostatnich 5 minutach właściciel dostaje
+ostrzeżenie i może przedłużyć o kolejne 4 godziny bez zmiany linku.
