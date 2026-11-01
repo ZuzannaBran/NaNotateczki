@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 
 import 'package:program/core/storage/text_storage.dart';
+import 'package:program/core/theme/app_typography.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/backup/remote_backup_scheduler.dart';
 import 'package:program/data/backup/remote_backup_service.dart';
@@ -30,6 +31,32 @@ void _expectAccountActionSpacing(
   expect(second, findsOneWidget);
   final gap = tester.getRect(second).top - tester.getRect(first).bottom;
   expect(gap, greaterThanOrEqualTo(12));
+}
+
+void _expectAccountFieldLayout(
+  WidgetTester tester,
+  String fieldKey,
+  String label,
+) {
+  final input = find.byKey(ValueKey(fieldKey));
+  final caption = find.byKey(ValueKey('account-field-label-$label'));
+
+  expect(input, findsOneWidget);
+  expect(caption, findsOneWidget);
+  expect(tester.getRect(caption).bottom, lessThan(tester.getRect(input).top));
+
+  final text = tester.widget<Text>(caption);
+  expect(text.style?.fontSize, AppTypography.document);
+  expect(text.style?.fontWeight, FontWeight.w600);
+
+  final decoration = tester.widget<TextFormField>(input).decoration!;
+  expect(decoration.labelText, isNull);
+  expect(decoration.floatingLabelBehavior, FloatingLabelBehavior.never);
+  expect(decoration.filled, isNot(true));
+  expect(
+    (decoration.border! as OutlineInputBorder).borderRadius,
+    BorderRadius.circular(12),
+  );
 }
 
 void main() {
@@ -120,6 +147,16 @@ void main() {
         tester,
         find.byKey(const ValueKey('account-login-submit')),
         find.widgetWithText(TextButton, 'Back'),
+      );
+      _expectAccountFieldLayout(
+        tester,
+        'account-username',
+        'Username',
+      );
+      _expectAccountFieldLayout(
+        tester,
+        'account-password',
+        'Password',
       );
       expect(
         tester
@@ -218,6 +255,11 @@ void main() {
         find.byKey(const ValueKey('account-local-submit')),
         find.widgetWithText(TextButton, 'Back'),
       );
+      _expectAccountFieldLayout(
+        tester,
+        'account-local-name',
+        'Your name',
+      );
       await tester.enterText(
         find.byKey(const ValueKey('account-local-name')),
         'Local Zuzanna',
@@ -282,6 +324,21 @@ void main() {
         tester,
         find.byKey(const ValueKey('account-change-password-submit')),
         find.widgetWithText(TextButton, 'Back'),
+      );
+      _expectAccountFieldLayout(
+        tester,
+        'account-current-password',
+        'Current password',
+      );
+      _expectAccountFieldLayout(
+        tester,
+        'account-new-password',
+        'New password',
+      );
+      _expectAccountFieldLayout(
+        tester,
+        'account-new-password-confirmation',
+        'Repeat new password',
       );
       await tester.enterText(
         find.byKey(const ValueKey('account-current-password')),
@@ -424,11 +481,27 @@ void main() {
       find.byKey(const ValueKey('account-register-submit')),
       find.widgetWithText(TextButton, 'Back'),
     );
+    _expectAccountFieldLayout(
+      tester,
+      'account-username',
+      'Username',
+    );
+    _expectAccountFieldLayout(
+      tester,
+      'account-password',
+      'Password',
+    );
+    _expectAccountFieldLayout(
+      tester,
+      'account-password-confirmation',
+      'Repeat password',
+    );
     await tester.enterText(
       find.byKey(const ValueKey('account-username')),
       'test_user',
     );
     expect(find.text('Username'), findsOneWidget);
+    _expectAccountFieldLayout(tester, 'account-username', 'Username');
     await tester.enterText(
       find.byKey(const ValueKey('account-password')),
       '1234567',
@@ -468,6 +541,11 @@ void main() {
       tester,
       find.byKey(const ValueKey('account-local-submit')),
       find.widgetWithText(TextButton, 'Back'),
+    );
+    _expectAccountFieldLayout(
+      tester,
+      'account-local-name',
+      'Your name',
     );
     await tester.enterText(
       find.byKey(const ValueKey('account-local-name')),
