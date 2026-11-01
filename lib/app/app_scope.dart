@@ -307,6 +307,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               repository: repository,
               apiClient: apiClient,
               session: accountSession,
+              enableRealtime: true,
             );
         _liveSync = liveSync;
         _backupScheduler ??= _BackupScheduler(
