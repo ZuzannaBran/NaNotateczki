@@ -252,7 +252,10 @@ void main() {
       await tester.pump();
 
       expect(session.isSignedIn, isTrue);
-      expect(backup.isEnabled, isTrue);
+      // AppScope enables backups only after recovering remote account data.
+      expect(backup.isEnabled, isFalse);
+      backup.enableForSignedInAccount();
+      await tester.pump();
       _expectAccountHeaderTypography(tester);
       _expectAccountDialogTypography(tester);
       final profileName = tester.widget<Text>(
