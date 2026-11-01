@@ -22,6 +22,7 @@ import '../data/sync/account_session_controller.dart';
 import '../data/sync/api_client.dart';
 import '../data/sync/cloud_sync_service.dart';
 import '../data/sync/live_web_sync_service.dart';
+import '../features/editor/state/ink_color_presets.dart';
 import '../features/library/presentation/library_controller.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notebook/data/notebook_repository.dart';
@@ -69,6 +70,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     _backupScheduler?.dispose();
     _remoteBackupScheduler?.dispose();
     _liveSync?.dispose();
+    final scheduler = _remoteBackupScheduler;
+    if (scheduler != null) {
+      SharedRecentColors.revision.removeListener(scheduler.markDirty);
+    }
     _libraryController?.dispose();
     _preferences?.dispose();
     _studyPlanner?.dispose();
@@ -325,6 +330,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (newAccountSession) {
           preferences.addListener(remoteBackupScheduler.markDirty);
           planner.addListener(remoteBackupScheduler.markDirty);
+          SharedRecentColors.revision.addListener(
+            remoteBackupScheduler.markDirty,
+          );
           accountSession.addListener(() {
             if (accountSession.isSignedIn && !accountSession.isBusy) {
               unawaited(_startAccountSync());
