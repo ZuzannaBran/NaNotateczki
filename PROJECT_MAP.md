@@ -80,7 +80,9 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   niezależny od migracji bazy notatek.
 - Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
   backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
-- 31: `AppScope`; 38: `_AppScopeState`; 91: `didRequestAppExit`.
+- 31: `AppScope`; 38: `_AppScopeState`; 96: `didRequestAppExit`;
+  `_startAccountSync` automatycznie odtwarza stan po logowaniu i restarcie
+  na wszystkich platformach, zanim uruchomi backup.
 - 301: `AppUiScale`; 349: `_ExitGuardOverlay`;
   372: `_FinishingExitOverlay`; 480: `_BackupScheduler`;
   676: `flushForExit`.
@@ -286,14 +288,17 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/remote_backup_service.dart` (164 linie)
+### `lib/data/backup/remote_backup_service.dart` (około 395 linii)
 
 Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
-zadania i planer, liczy SHA-256, wykonuje pending → upload → finalize i uznaje
+zadania, planer, ustawienia, Recent i preferencję backupu; liczy SHA-256,
+wykonuje pending → upload → finalize i uznaje
 wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
 
 - 12: `RemoteBackupReceipt`; 24: `RemoteBackupService`;
-  38: `uploadVerifiedSnapshot`.
+  38: `uploadVerifiedSnapshot`; `hydrateFromLatestAccountBackup` pobiera
+  najnowszy zweryfikowany backup, weryfikuje SHA i importuje go tylko
+  do pustej biblioteki, o ile serwer nie ma już historii zmian.
 
 ### `lib/data/backup/remote_backup_scheduler.dart` (347 linii)
 
@@ -363,13 +368,15 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   247: `_restorePersistedSession`; 313: `_persistRefreshCredential`;
   343: `changePassword`; 396: `useLocalProfile`.
   Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
-- `lib/data/sync/live_web_sync_service.dart` (613): jawna polityka pierwszej
+- `lib/data/sync/live_web_sync_service.dart` (około 730): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
-  tylko jako sygnał; własny push nie przesuwa kursora zdarzeń z innych
+  tylko jako sygnał na wszystkich platformach; własny push nie przesuwa
+  kursora zdarzeń z innych
   urządzeń. `start`/`stop` zerują pamięciowy stan konta, a zapis stanu używa
   utrwalonego `userId`, więc kursor, rewizje i outbox nie przechodzą między
-  kontami.
+  kontami. Normalizuje ścieżki obrazów, zapobiegając fałszywym konfliktom
+  między Linuxem, Web, iOS i Androidem.
   16: `InitialSyncPolicy`; 18: `LiveWebSyncService`; `start`, `enqueue`, `syncNow`; po reconnect i wznowieniu aplikacji REST uzupełnia utracone sygnały WebSocket;
   Przy odbiorze zmian gości najpierw opróżnia edytor właściciela i wysyła
   jego oczekujące operacje ścieżką serwerowego scalenia, zanim zastosuje
@@ -649,6 +656,8 @@ brak pływających etykiet oraz wypełnionego tła pola;
 ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
 loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
+  Automatyczne inicjowanie synchronizacji należy do `AppScope`, także na
+  platformach natywnych; ręczne polityki pozostają awaryjnym wyborem.
 
 - 20: `showLibraryAccountDialog`; 49: `LibraryAccountSlot`;
   154: `_AccountAvatar`; 186: `_AccountDialog`;
@@ -1758,6 +1767,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   Testy używają izolowanego natywnego katalogu dla preferencji i logów błędów,
   aby regresje nie generowały `MissingPluginException`.
 - `test/cloud_sync_service_test.dart`: dodatkowe konflikty czasów i ID.
+- `test/account_cross_device_backup_test.dart`: transfer zweryfikowanych
+  notatników, preferencji konta, Recent i opóźnienia backupu na nowe
+  urządzenie; odrzucenie uszkodzonego payloadu przed zapisem.
 - `test/cross_platform/eraser_stress_test.dart`: deterministyczne sekwencje
   gumki z kontrolą unikalności i niepowracania raz usuniętych ID.
 - `test/library_controller_lifecycle_test.dart`: dispose podczas
