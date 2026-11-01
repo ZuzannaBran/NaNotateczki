@@ -52,6 +52,14 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? lastSuccessfulSync;
   Future<void> Function()? onRemoteApplied;
 
+  void reportStartupFailure(Object error) {
+    if (_disposed) {
+      return;
+    }
+    lastError = error.toString();
+    notifyListeners();
+  }
+
   bool get isStarted => _started;
   bool get hasPendingChanges => _pending.isNotEmpty;
   int remoteApplyEpoch = 0;
