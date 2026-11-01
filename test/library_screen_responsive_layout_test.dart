@@ -400,6 +400,40 @@ void main() {
 
     expect(find.text('Project A'), findsWidgets);
     expect(treeItem, findsOneWidget);
+    final folderRow = find.byKey(
+      const ValueKey('library-folder-row:Project A'),
+    );
+    expect(folderRow, findsOneWidget);
+    for (final icon in [
+      Icons.folder_outlined,
+      Icons.folder_open_outlined,
+    ]) {
+      expect(
+        find.descendant(of: folderRow, matching: find.byIcon(icon)),
+        findsNothing,
+      );
+    }
+    expect(
+      find.descendant(
+        of: folderRow,
+        matching: find.byTooltip('Collapse Project A'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: folderRow, matching: find.byTooltip('Folder actions')),
+      findsOneWidget,
+    );
+    for (final icon in [
+      Icons.description_outlined,
+      Icons.dashboard_outlined,
+      Icons.check_box_outlined,
+    ]) {
+      expect(
+        find.descendant(of: treeItem, matching: find.byIcon(icon)),
+        findsNothing,
+      );
+    }
     expect(
       find.descendant(of: treeItem, matching: find.text('Nested note')),
       findsOneWidget,
