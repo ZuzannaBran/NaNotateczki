@@ -46,7 +46,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   RemoteBackupScheduler? _remoteBackupScheduler;
   LiveWebSyncService? _liveSync;
   LibraryController? _libraryController;
+  AppPreferencesController? _preferences;
+  StudyPlannerController? _studyPlanner;
   _BackupScheduler? _backupScheduler;
+  Future<void>? _accountBootstrap;
+  String? _bootstrappedAccount;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
   Future<void>? _exitDrain;
   bool _allowExit = false;
@@ -66,6 +70,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     _remoteBackupScheduler?.dispose();
     _liveSync?.dispose();
     _libraryController?.dispose();
+    _preferences?.dispose();
+    _studyPlanner?.dispose();
     _accountSession?.dispose();
     _apiClient?.close();
     final backupService = _backupService;
@@ -153,6 +159,74 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_startAccountSync());
+    }
+  }
+
+  Future<void> _startAccountSync() {
+    final session = _accountSession;
+    final backup = _remoteBackupService;
+    final scheduler = _remoteBackupScheduler;
+    final sync = _liveSync;
+    final library = _libraryController;
+    final preferences = _preferences;
+    final planner = _studyPlanner;
+    if (!mounted ||
+        session == null ||
+        !session.isSignedIn ||
+        session.isBusy ||
+        backup == null ||
+        scheduler == null ||
+        sync == null ||
+        library == null ||
+        preferences == null ||
+        planner == null) {
+      return Future<void>.value();
+    }
+    final userId = session.userId!;
+    if (_bootstrappedAccount == userId) {
+      return Future<void>.value();
+    }
+    final running = _accountBootstrap;
+    if (running != null) {
+      return running;
+    }
+    final future = () async {
+      try {
+        final restored = await backup.hydrateFromLatestAccountBackup();
+        if (!mounted || session.userId != userId) {
+          return;
+        }
+        if (restored) {
+          await library.reloadFromAccount();
+          await preferences.load();
+          await planner.load();
+        }
+        await sync.start(InitialSyncPolicy.mergeSafely);
+        if (!mounted || session.userId != userId) {
+          return;
+        }
+        _bootstrappedAccount = userId;
+        scheduler.enableForSignedInAccount();
+      } catch (error, stackTrace) {
+        AppErrorLog.instance.record(
+          error,
+          stackTrace,
+          source: 'AppScope.startAccountSync',
+        );
+      }
+    }();
+    _accountBootstrap = future;
+    return future.whenComplete(() {
+      if (identical(_accountBootstrap, future)) {
+        _accountBootstrap = null;
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<DatabaseOpenResult>(
       future: _openFuture,
@@ -219,15 +293,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               session: accountSession,
             );
         _remoteBackupScheduler = remoteBackupScheduler;
-        if (newAccountSession) {
-          unawaited(
-            accountSession.loadProfile().then((_) {
-              if (mounted && accountSession.isSignedIn) {
-                remoteBackupScheduler.enableForSignedInAccount();
-              }
-            }),
-          );
-        }
         final liveSync =
             _liveSync ??
             LiveWebSyncService(
@@ -252,14 +317,35 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             );
         _libraryController = libraryController;
         liveSync.onRemoteApplied = libraryController.loadItems;
+        final preferences =
+            _preferences ?? (AppPreferencesController()..load());
+        _preferences = preferences;
+        final planner = _studyPlanner ?? (StudyPlannerController()..load());
+        _studyPlanner = planner;
+        if (newAccountSession) {
+          preferences.addListener(remoteBackupScheduler.markDirty);
+          planner.addListener(remoteBackupScheduler.markDirty);
+          accountSession.addListener(() {
+            if (accountSession.isSignedIn && !accountSession.isBusy) {
+              unawaited(_startAccountSync());
+            } else if (!accountSession.isSignedIn) {
+              _bootstrappedAccount = null;
+            }
+          });
+          unawaited(accountSession.loadProfile().then((_) {
+            if (mounted) {
+              return _startAccountSync();
+            }
+          }));
+        }
 
         return MultiProvider(
           providers: [
-            ChangeNotifierProvider(
-              create: (_) => AppPreferencesController()..load(),
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
             ),
-            ChangeNotifierProvider(
-              create: (_) => StudyPlannerController()..load(),
+            ChangeNotifierProvider<StudyPlannerController>.value(
+              value: planner,
             ),
             Provider<NotebookRepository>.value(value: repository),
             Provider<LocalBackupService>.value(value: backupService),
