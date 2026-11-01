@@ -59,7 +59,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (749 linii)
+### `lib/app/app_scope.dart` (757 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -343,14 +343,24 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
   Domyślny adres dla wszystkich platform to `https://api.nanotateczki.pl`;
   `BACKEND_URL` może go nadpisać w buildach lokalnych/testowych.
-- `lib/data/sync/account_session_controller.dart` (369): trwały profil
-  pierwszego uruchomienia i trybu lokalnego, rejestracja/logowanie, zmiana
-  hasła, rotacja sesji oraz tokeny wyłącznie w pamięci. Plik profilu zawiera
-  tylko tryb, lokalną nazwę i ostatni e-mail.
-  8: `AccountDataMode`; 10: `AccountSessionController`; `loadProfile`, loginy 3–32 znaków,
-  trwałe przypisanie lokalnej biblioteki do jednego `userId` (blokada przełączenia konta),
-  współdzielone odświeżanie tokenu i brak powiadomień po dispose;
-  154: `changePassword`; 205: `useLocalProfile`. Nowe hasła: 8–128.
+- `lib/data/sync/account_credential_store.dart`: `AccountCredentialStore`
+  pozwala w testach używać pamięci; implementacja
+  `SecureAccountCredentialStore` korzysta z `flutter_secure_storage`
+  dla natywnych systemów oraz Web.
+- `lib/data/sync/account_session_controller.dart` (530): trwały profil
+  pierwszego uruchomienia i trybu lokalnego, rejestracja/logowanie,
+  rotacja refresh tokenów i ich bezpieczne utrwalanie poza
+  `account_profile.json`. Przy starcie odświeża zapisaną sesję,
+  sprawdza `boundUserId`, login i adres API; offline nie wymusza
+  logowania, a odrzucony token usuwa. Login i wylogowanie są
+  serializowane z operacjami na magazynie sekretów; ponowny login
+  nie traci danych lokalnych. `shouldShowStartupDialog` tylko przy
+  nieukończonym onboardingu.
+  10: `AccountDataMode`; 12: `AccountSessionController`;
+  84: `_loadProfile`; 223: `_refreshSession`;
+  247: `_restorePersistedSession`; 313: `_persistRefreshCredential`;
+  343: `changePassword`; 396: `useLocalProfile`.
+  Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
 - `lib/data/sync/live_web_sync_service.dart` (613): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
@@ -609,13 +619,15 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1832: `_LibraryWorkspace`;
   1943: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (1096 linii)
+### `lib/features/library/presentation/library_account_slot.dart` (1101 linii)
 
-Przestrzenny onboarding `Create account`/`Sign in`/`Try local` z
-wyśrodkowaną nazwą NaNotateczki, podglądem haseł i spójnymi odstępami
+Onboarding `Create account`/`Sign in`/`Try local` z jednym
+nagłówkiem NaNotateczki i tekstem Welcome poniżej, bez podwójnego tytułu,
+podglądem haseł i spójnymi odstępami
 12 px między przyciskami konta, formularzy i akcji synchronizacji.
-Pasek konta oraz nagłówki dialogów i profilu używają tej samej typografii
-`AppHeaderDivider.titleStyle` co nagłówek Study timer (18 px, waga 600);
+Nazwa użytkownika w pasku konta używa kompaktowego 14 px i wagi 400,
+tak jak nazwy dokumentów w drzewku. Nagłówki dialogów i profilu
+pozostają w stylu `AppHeaderDivider.titleStyle` (18 px, waga 600);
 opisy statusu, trybu konta i polityk synchronizacji to 12 px w kolorze
 `onSurfaceVariant`. Nagłówek sekcji synchronizacji to 16 px, waga 600.
 Globalny motyw dostarcza Georgia (lub systemowy zamiennik).
@@ -634,10 +646,10 @@ loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
 
 - 20: `showLibraryAccountDialog`; 49: `LibraryAccountSlot`;
-  149: `_AccountAvatar`; 181: `_AccountDialog`;
-  194: `_AccountDialogState`; 684: `_usernameField`;
-  705: `_accountLabeledField`; 900: `_backupNow`;
-  937: `_changePassword`.
+  154: `_AccountAvatar`; 186: `_AccountDialog`;
+  199: `_AccountDialogState`; 689: `_usernameField`;
+  710: `_accountLabeledField`; 905: `_backupNow`;
+  942: `_changePassword`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
@@ -1512,8 +1524,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   oraz Georgia w obu motywach. Ręczna kontrola na Linux/web i w wąskim
   sidebarze jest opisana w `docs/TEST_MATRIX.md`.
 - `test/account_session_controller_test.dart`: krótsze nowe hasła i logowanie
-  istniejących kont, trwały profil lokalny bez
-  sekretów, preferowany tryb konta, dokładny kontrakt zmiany hasła i błędy API.
+  istniejących kont, trwały profil lokalny bez sekretów, odtwarzanie sesji
+  po restarcie, rotację refresh tokenu, logowanie offline bez dialogu,
+  usuwanie odrzuconego tokenu, preferowany tryb i kontrakt zmiany hasła.
 - `server/api/tests/`: nowe limity haseł, Argon2/JWT,
   integralność envelope, izolacja urządzeń w
   schemacie i brak publicznych portów bazy/API w Compose.
