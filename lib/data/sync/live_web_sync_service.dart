@@ -22,6 +22,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     required this.repository,
     required this.apiClient,
     required this.session,
+    this.enableRealtime = true,
   }) {
     WidgetsBinding.instance.addObserver(this);
   }
@@ -29,6 +30,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   final NotebookRepository repository;
   final ApiClient apiClient;
   final AccountSessionController session;
+  final bool enableRealtime;
   final Map<String, int> _revisions = <String, int>{};
   final Map<String, Map<String, dynamic>> _bases = {};
   final Set<String> _pending = <String>{};
@@ -97,7 +99,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _started = true;
     await _saveState();
     await syncNow();
-    if (kIsWeb) {
+    if (enableRealtime) {
       unawaited(_connectRealtime());
     }
     notifyListeners();
@@ -146,7 +148,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (error.statusCode == 401) {
         try {
           await session.refresh();
-          if (kIsWeb) {
+          if (enableRealtime) {
             unawaited(_connectRealtime());
           }
           await _runSyncPass();
