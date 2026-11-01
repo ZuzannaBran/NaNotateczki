@@ -81,3 +81,20 @@ To oddzielny **scenariusz ręczny, nie wynik zaliczonego testu**.
 Cloudflare, dwóch osobnych instancji Flutter Web, pełnego odtwarzania
 sesji właściciela po odświeżeniu strony ani pomiaru wydajności przy
 dużych kanwach. Nie traktuj tych scenariuszy jako zaliczonych.
+
+## Dodatkowe regresje przed wdrożeniem
+
+- Właściciel i gość modyfikują niezależne kreski podczas starej rewizji:
+  `change_events.content` musi być identyczne z zatwierdzonym
+  `synced_notebooks.content`, a nie z żądaniem pojedynczego urządzenia.
+- Spreparowana `baseNotebook` musi zwrócić 409, również jeśli klient podaje
+  istniejący UID; serwer sprawdza historyczną rewizję w PostgreSQL.
+- Dwie aktywne sesje tego samego UID są zabronione; skasowanie dokumentu
+  kończy aktywną sesję, a WebSocket gościa odbiera `ended`.
+- Gdy owner kończy udostępnianie, DELETE musi poprzedzać oczekiwanie
+  na lokalny backup/synchronizację.
+- Po odświeżeniu gościa i odcięciu sieci sprawdź utratę ostatnich
+  niepotwierdzonych operacji. Trwały outbox gościa nie jest obecnie wdrożony.
+
+Zmiany obejmują testy regresyjne, ale wykonanie `pytest`, `flutter test`,
+PostgreSQL i testów przeglądarek pozostaje **niepotwierdzone**.
