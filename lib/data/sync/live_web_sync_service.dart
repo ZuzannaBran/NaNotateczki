@@ -39,6 +39,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _socketSubscription;
   Future<void>? _activeSync;
+  Future<void>? _starting;
   bool _applyingRemote = false;
   bool _started = false;
   bool _disposed = false;
@@ -53,7 +54,21 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   bool get hasPendingChanges => _pending.isNotEmpty;
   int remoteApplyEpoch = 0;
 
-  Future<void> start(InitialSyncPolicy policy) async {
+  Future<void> start(InitialSyncPolicy policy) {
+    final running = _starting;
+    if (running != null) {
+      return running;
+    }
+    final future = _startInitial(policy);
+    _starting = future;
+    return future.whenComplete(() {
+      if (identical(_starting, future)) {
+        _starting = null;
+      }
+    });
+  }
+
+  Future<void> _startInitial(InitialSyncPolicy policy) async {
     final userId = session.userId;
     if (!session.isSignedIn || userId == null) {
       throw StateError('Live synchronization requires a signed-in account.');
@@ -72,6 +87,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final cursor = bootstrap['cursor'];
     if (rawRecords is! List<dynamic> || cursor is! num) {
       throw const FormatException('Malformed sync bootstrap response.');
+    }
+    if (_activeUserId != userId || !session.isSignedIn) {
+      return;
     }
     final remote = rawRecords.map(_decodeRemoteRecord).toList();
     await _applyInitialPolicy(policy, remote);
