@@ -91,6 +91,18 @@ class AccountSettingsSyncService {
         final knownValue = known?['value'];
         if (known != null && local != null &&
             !_equivalent(local, knownValue)) {
+          if (serverEntry != null &&
+              _equivalent(local, remoteValue)) {
+            entries[category] = {
+              'revision': remoteRevision,
+              'value': remoteValue,
+            };
+            await writeStoredText(
+              key,
+              jsonEncode({'version': 1, 'settings': entries}),
+            );
+            continue;
+          }
           if (remoteRevision != knownRevision &&
               !_equivalent(remoteValue, knownValue)) {
             throw StateError(
