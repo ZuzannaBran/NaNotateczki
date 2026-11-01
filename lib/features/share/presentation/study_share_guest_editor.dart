@@ -103,6 +103,8 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         (_) => unawaited(_refresh()),
       );
       setState(() => _status = 'Editing · All changes saved');
+      // Close the gap between the initial HTTP read and WebSocket auth.
+      unawaited(_refresh());
     } on ApiException catch (error) {
       if (error.statusCode == 401 || error.statusCode == 410) {
         widget.onEnded();
