@@ -105,22 +105,33 @@ Szczegółowa lista kroków wdrożenia poprawek bezpieczeństwa znajduje się
 w `server/SECURITY_DEPLOY.md`.
 
 
-## Wspólna sesja nauki w Web
+## Wspólna edycja na Web
 
-Wdróż migrację `0004_study_shares.sql` poleceniem
-`scripts/apply-migrations.sh` **przed restartem nowego API**.
-Hasło sesji może mieć jeden znak (maksymalnie 128); nie może być puste.
-Wymagane jest konto z włączoną synchronizacją Web. API odrzuca
-próbę współdzielenia dokumentu, którego nie ma jeszcze w bibliotece
-kontowej (HTTP 409). Po zamknięciu nie usuwa oryginalnego notatnika ani
-folderu: unieważnia dostęp i usuwa tylko chwilowy podgląd PNG.
+Przed wdrożeniem API zastosuj **obie** migracje:
+`0004_study_shares.sql` i `0005_study_share_edit_clock.sql`.
+Nie modyfikuj migracji już zastosowanych. Użyj:
+`scripts/apply-migrations.sh` przed `docker compose up -d --build api caddy`.
 
-Backend przechowuje obrazy w prywatnym `data/study-shares/` (UID 1000).
-Cloudflare Tunnel ma kierować istniejące
+Właściciel musi mieć konto i włączony Web sync. Gość dołącza wyłącznie
+linkiem `/share/<UUID>` i hasłem 1–128 znaków. Otrzymuje prawdziwy edytor,
+ale uprawnienie zapisu ograniczone do jednego oryginalnego UID. Po
+zakończeniu albo wygaśnięciu (4 godziny) otrzyma HTTP 410.
+Przedłużenie w ostatnich 15 minutach dodaje 4 godziny bez nowego linku.
+
+Goście i właściciel wysyłają zmiany do `synced_notebooks` przez REST,
+a WebSocket sygnalizuje rewizje niemal natychmiast. Serwer łączy niezależne
+obiekty; dla zmian tego samego obiektu stosuje kolejność przyjęcia z
+dokładnością do mikrosekund, a w remisie rozmiar modyfikacji. Metadane
+konfliktu pozostają w `study_shares.edit_clock`. Właściciel odzyskuje
+aktywną sesję po odświeżeniu. Gość po odświeżeniu ponownie wpisuje hasło.
+Stary endpoint PNG pozostaje tylko dla zgodności wstecznej.
+
+Cloudflare Tunnel powinien kierować
 `app.nanotateczki.pl` i `api.nanotateczki.pl` do
-`http://caddy:8080`. W Cloudflare sprawdź Network → WebSockets.
-Nie cache'uj `/v1/study-shares/*`; nie wystawiaj portów 5432, 8000, 8080
-na routerze. Zbuduj Flutter Web z
+`http://caddy:8080`. Włącz WebSocket i wyłącz cache dla
+`/v1/study-shares/*`. Zbuduj Flutter Web z
 `--dart-define=BACKEND_URL=https://api.nanotateczki.pl`.
-Otwórz link w innej przeglądarce (bez zalogowanego konta), sprawdź
-hasło, odświeżanie obrazu, przedłużenie i zakończenie sesji.
+Nie wystawiaj portów PostgreSQL ani API na routerze. Test E2E
+w dwóch prawdziwych przeglądarkach jest wymagany przed produkcją:
+rysowanie jednoczesne, edycja tego samego pola, restart hosta,
+przedłużenie, wygaśnięcie i odcięcie gościa.

@@ -213,7 +213,7 @@ class LibraryController extends ChangeNotifier {
           _activeNotebook = selectedItemId == null
               ? null
               : _itemById(selectedItemId!);
-        } else if (_activeNotebook == null && selectedItemId != null) {
+        } else if (selectedItemId != null) {
           _activeNotebook = _itemById(selectedItemId!);
         }
       } else {

@@ -12,6 +12,9 @@ import 'package:program/data/sync/account_session_controller.dart';
 import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/live_web_sync_service.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/note_page.dart';
+import 'package:program/features/notebook/domain/notebook.dart';
+import 'package:program/features/notebook/domain/notebook_kind.dart';
 
 import 'support/native_test_documents.dart';
 
@@ -80,6 +83,86 @@ void main() {
     await sync.start(InitialSyncPolicy.downloadRemote);
 
     expect(changesCalls, 2);
+  });
+
+  test('guest changes replace original without creating conflict copies',
+      () async {
+    final now = DateTime.utc(2026, 11, 1, 12);
+    final initial = Notebook(
+      uid: 'shared-uid',
+      title: 'Shared document',
+      kind: NotebookKind.notebook,
+      folder: 'Studies',
+      createdAt: now,
+      updatedAt: now,
+      pages: [
+        NotePage(
+          id: 'page-1',
+          title: 'Page',
+          textBlocks: [],
+          imageBlocks: [],
+          inkStrokes: [],
+          isBookmarked: false,
+        ),
+      ],
+    );
+    final changed = initial.copyWith(
+      updatedAt: now.add(const Duration(minutes: 1)),
+      pages: [initial.pages.single.copyWith(isBookmarked: true)],
+    );
+    var polls = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return _sessionResponse();
+        }
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response(jsonEncode({
+            'cursor': 0,
+            'notebooks': [{
+              'uid': initial.uid, 'revision': 1, 'deleted': false,
+              'notebook': NotebookRepository.encodeNotebook(initial),
+            }],
+          }), 200);
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          polls++;
+          return http.Response(jsonEncode(polls == 1
+              ? {'cursor': 0, 'changes': []}
+              : {
+                  'cursor': 1,
+                  'changes': [{
+                    'uid': initial.uid, 'revision': 2, 'deleted': false,
+                    'notebook': NotebookRepository.encodeNotebook(changed),
+                  }],
+                }), 200);
+        }
+        fail('Unexpected request: ${request.method} ${request.url}');
+      }),
+    );
+    final session = AccountSessionController(client);
+    await session.login('owner', 'password123');
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = NotebookRepository(database);
+    final sync = LiveWebSyncService(
+      repository: repository, apiClient: client, session: session,
+    );
+    addTearDown(() async {
+      sync.dispose();
+      session.dispose();
+      await database.close();
+      client.close();
+    });
+    await sync.start(InitialSyncPolicy.downloadRemote);
+    final epoch = sync.remoteApplyEpoch;
+    await sync.syncNow();
+
+    final stored = await repository.fetchNotebooks();
+    expect(stored, hasLength(1));
+    expect(stored.single.uid, 'shared-uid');
+    expect(stored.single.pages.single.isBookmarked, isTrue);
+    expect(sync.remoteApplyEpoch, greaterThan(epoch));
   });
 
   test('resuming Web sync reconciles missed realtime notifications', () async {

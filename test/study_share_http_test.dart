@@ -125,6 +125,93 @@ void main() {
     expect(jsonDecode(captured.body), {'password': 'x'});
   });
 
+  test('guest reads only a ticket-scoped shared document', () async {
+    late http.Request captured;
+    const notebook = <String, dynamic>{
+      'uid': 'shared-uid', 'kind': 0, 'title': 'Biology',
+      'folder': 'Studies', 'createdAt': '2026-11-01T12:00:00Z',
+      'updatedAt': '2026-11-01T12:00:00Z', 'pages': [],
+    };
+    final api = _api((request) async {
+      captured = request;
+      return http.Response(
+        jsonEncode({'notebook': notebook, 'revision': 7}),
+        200,
+      );
+    });
+    final guest = StudyShareGuestClient(apiClient: api);
+    addTearDown(guest.close);
+
+    final document = await guest.readDocument(_sessionId, 'guest-ticket');
+    expect(document.revision, 7);
+    expect(document.notebook, notebook);
+    expect(captured.url.path, '/v1/study-shares/$_sessionId/document');
+    expect(captured.method, 'GET');
+    expect(captured.headers['authorization'], 'Bearer guest-ticket');
+  });
+
+  test('guest writes document edits using ticket and previous snapshot', () async {
+    late http.Request captured;
+    const original = <String, dynamic>{
+      'uid': 'shared-uid', 'kind': 0, 'title': 'Biology',
+      'folder': 'Studies', 'createdAt': '2026-11-01T12:00:00Z',
+      'updatedAt': '2026-11-01T12:00:00Z', 'pages': [],
+    };
+    final updated = <String, dynamic>{
+      ...original,
+      'pages': [
+        {'id': 'page-1', 'textBlocks': [], 'imageBlocks': [],
+         'inkStrokes': []},
+      ],
+    };
+    final api = _api((request) async {
+      captured = request;
+      return http.Response(
+        jsonEncode({'notebook': updated, 'revision': 8}),
+        200,
+      );
+    });
+    final guest = StudyShareGuestClient(apiClient: api);
+    addTearDown(guest.close);
+    final result = await guest.writeDocument(
+      _sessionId, 'guest-ticket',
+      baseRevision: 7, baseNotebook: original, notebook: updated,
+    );
+    expect(result.revision, 8);
+    expect(result.notebook, updated);
+    expect(captured.method, 'PUT');
+    expect(captured.url.path, '/v1/study-shares/$_sessionId/document');
+    expect(captured.headers['authorization'], 'Bearer guest-ticket');
+    final submitted = jsonDecode(captured.body) as Map<String, dynamic>;
+    expect(submitted['baseRevision'], 7);
+    expect(submitted['baseNotebook'], original);
+    expect(submitted['notebook'], updated);
+  });
+
+  test('guest edit revoked while joining or saving stays HTTP 410', () async {
+    final guest = StudyShareGuestClient(
+      apiClient: _api((_) async => http.Response(
+        jsonEncode({'detail': 'Session has ended.'}), 410,
+      )),
+    );
+    addTearDown(guest.close);
+    await expectLater(
+      guest.readDocument(_sessionId, 'guest-ticket'),
+      throwsA(isA<ApiException>().having(
+        (error) => error.statusCode, 'status', 410,
+      )),
+    );
+    await expectLater(
+      guest.writeDocument(
+        _sessionId, 'guest-ticket',
+        baseRevision: 1, baseNotebook: {}, notebook: {},
+      ),
+      throwsA(isA<ApiException>().having(
+        (error) => error.statusCode, 'status', 410,
+      )),
+    );
+  });
+
   test('wrong guest password remains an HTTP 401', () async {
     final guest = StudyShareGuestClient(
       apiClient: _api((_) async => http.Response(
@@ -278,6 +365,27 @@ void main() {
     expect(captured.headers['content-type'], 'image/png');
   });
 
+  test('owner restores an active session after a page reload', () async {
+    final harness = await _makeOwner((request) async {
+      expect(request.url.path, '/v1/study-shares/active');
+      expect(request.method, 'GET');
+      expect(request.headers['authorization'], 'Bearer owner-access-token');
+      return http.Response(jsonEncode({
+        'sessions': [{
+          'id': _sessionId,
+          'documentUid': 'original-uid',
+          'title': 'Original note',
+          'expiresAt': '2027-01-01T00:00:00Z',
+        }],
+      }), 200);
+    });
+    final sessions = await harness.service.activeShares();
+    expect(sessions, hasLength(1));
+    expect(sessions.single.id, _sessionId);
+    expect(sessions.single.documentUid, 'original-uid');
+    expect(sessions.single.link, contains('/share/$_sessionId'));
+  });
+
   test('extension preserves the original invitation and document', () async {
     final harness = await _makeOwner((request) async {
       expect(request.method, 'POST');
@@ -337,8 +445,14 @@ void main() {
     );
   });
 
-  test('logged-in owner cannot share without starting Web sync', () async {
-    final harness = await _makeOwner((_) async {
+  test('owner can revoke guests even without running Web sync', () async {
+    var deleted = false;
+    final harness = await _makeOwner((request) async {
+      if (request.method == 'DELETE' &&
+          request.url.path == '/v1/study-shares/$_sessionId') {
+        deleted = true;
+        return http.Response('', 204);
+      }
       fail('An unsynchronized notebook must not be shared.');
     });
 
@@ -350,10 +464,8 @@ void main() {
       ),
       throwsA(isA<StateError>()),
     );
-    await expectLater(
-      harness.service.end(_activeShare()),
-      throwsA(isA<StateError>()),
-    );
+    await harness.service.end(_activeShare());
+    expect(deleted, isTrue);
   });
 
   test('share link is created only after uploading owner document', () async {

@@ -59,6 +59,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   bool _isShowingAccountOnboarding = false;
   ActiveStudyShare? _activeShare;
   StudyShareService? _studyShareService;
+  String? _shareRestoredForAccount;
+  bool _restoringShare = false;
   final ValueNotifier<bool> _sidebarMenuOpen = ValueNotifier<bool>(false);
   final GlobalKey<ScaffoldState> _compactScaffoldKey =
       GlobalKey<ScaffoldState>();
@@ -116,7 +118,31 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<LibraryController>();
     final accountSession = context.watch<AccountSessionController?>();
+    final liveSync = context.watch<LiveWebSyncService?>();
     final selectedItem = controller.selectedItem();
+    final share = _activeShare;
+    if (share != null &&
+        (share.expiresAt.isBefore(DateTime.now().toUtc()) ||
+            accountSession?.isSignedIn != true)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && identical(_activeShare, share)) {
+          setState(() {
+            _activeShare = null;
+            _studyShareService = null;
+          });
+        }
+      });
+    }
+    if (kIsWeb && accountSession != null && liveSync != null &&
+        accountSession.isSignedIn &&
+        !_restoringShare && _activeShare == null &&
+        _shareRestoredForAccount != accountSession.userId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_restoreShare(accountSession, liveSync));
+        }
+      });
+    }
     final headerDividerColor = AppHeaderDivider.colorOf(context);
     _maybeShowCorruptRecoveryDialog(controller);
     _maybeShowAccountOnboarding(accountSession);
@@ -476,6 +502,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           setState(() => _activeShare = updated);
         }
       },
+      remoteEpoch: context.read<LiveWebSyncService?>()?.remoteApplyEpoch ?? 0,
     );
   }
 
@@ -572,6 +599,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _catalogFolder = item.folder;
     });
     controller.selectItem(item.uid);
+  }
+
+  Future<void> _restoreShare(
+    AccountSessionController session,
+    LiveWebSyncService sync,
+  ) async {
+    final userId = session.userId;
+    if (_restoringShare || userId == null ||
+        _shareRestoredForAccount == userId || !session.isSignedIn) {
+      return;
+    }
+    _restoringShare = true;
+    _shareRestoredForAccount = userId;
+    try {
+      final service = StudyShareService(
+        session: session,
+        liveSync: sync,
+        repository: context.read<NotebookRepository>(),
+      );
+      final shares = await service.activeShares();
+      if (mounted && session.userId == userId && shares.isNotEmpty) {
+        _studyShareService = service;
+        setState(() => _activeShare = shares.first);
+      }
+    } catch (error) {
+      debugPrint('Could not restore shared study session: $error');
+    } finally {
+      _restoringShare = false;
+    }
   }
 
   Future<void> _shareItem(Notebook item) async {
@@ -1917,6 +1973,7 @@ class _LibraryWorkspace extends StatelessWidget {
     this.share,
     this.shareService,
     required this.onShareExtended,
+    required this.remoteEpoch,
     this.onOpenNavigation,
     super.key,
   });
@@ -1928,6 +1985,7 @@ class _LibraryWorkspace extends StatelessWidget {
   final ActiveStudyShare? share;
   final StudyShareService? shareService;
   final ValueChanged<ActiveStudyShare> onShareExtended;
+  final int remoteEpoch;
   final VoidCallback? onOpenNavigation;
 
   @override
@@ -1956,8 +2014,14 @@ class _LibraryWorkspace extends StatelessWidget {
     final repository = context.read<NotebookRepository>();
     final isBoard = item!.kind == NotebookKind.board;
     return ChangeNotifierProvider(
-      key: ValueKey('${item!.uid}:${item!.folder}'),
-      create: (_) => EditorController(repository: repository, notebook: item!),
+      key: ValueKey('${item!.uid}:${item!.folder}:$remoteEpoch'),
+      create: (_) => EditorController(
+        repository: repository,
+        notebook: item!,
+        saveDebounce: share == null
+            ? EditorController.defaultSaveDebounce
+            : const Duration(milliseconds: 100),
+      ),
       child: Builder(
         builder: (context) {
           final canvas = isBoard

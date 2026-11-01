@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import '../../core/storage/app_save_coordinator.dart';
@@ -102,6 +103,28 @@ class StudyShareService {
     );
   }
 
+  Future<List<ActiveStudyShare>> activeShares() async {
+    await _refreshIfNeeded();
+    final response = await session.apiClient.get(
+      '/v1/study-shares/active',
+    );
+    final json = response.decodeJson();
+    if (json is! Map<String, dynamic> || json['sessions'] is! List) {
+      throw const FormatException('Invalid active shares response.');
+    }
+    return (json['sessions'] as List).map((item) {
+      if (item is! Map<String, dynamic>) {
+        throw const FormatException('Invalid session record.');
+      }
+      return ActiveStudyShare(
+        id: item['id'] as String,
+        documentUid: item['documentUid'] as String,
+        title: item['title'] as String,
+        expiresAt: DateTime.parse(item['expiresAt'] as String),
+      );
+    }).toList();
+  }
+
   Future<void> publish(ActiveStudyShare share, Uint8List png) async {
     await _refreshIfNeeded();
     await session.apiClient.request(
@@ -128,11 +151,44 @@ class StudyShareService {
   }
 
   Future<void> end(ActiveStudyShare share) async {
-    await ensureSavedOnAccount(share.documentUid);
+    await _refreshIfNeeded();
+    // Try to drain the owner's edits, but never block guest revocation
+    // because a document was deleted or background sync failed.
+    try {
+      await AppSaveCoordinator.instance.flushPending();
+      await repository.waitForPendingSaves();
+      if (liveSync.isStarted) {
+        await liveSync.syncNow();
+      }
+    } catch (_) {
+      // Revoking a guest's permissions takes precedence over sync.
+    }
     await session.apiClient.request(
       'DELETE',
       '/v1/study-shares/${share.id}',
       body: const <int>[],
+    );
+  }
+}
+
+class SharedStudyDocument {
+  const SharedStudyDocument({
+    required this.notebook,
+    required this.revision,
+  });
+
+  final Map<String, dynamic> notebook;
+  final int revision;
+
+  factory SharedStudyDocument.fromResponse(Object? body) {
+    if (body is! Map<String, dynamic> ||
+        body['notebook'] is! Map<String, dynamic> ||
+        body['revision'] is! int) {
+      throw const FormatException('Invalid shared document response.');
+    }
+    return SharedStudyDocument(
+      notebook: body['notebook'] as Map<String, dynamic>,
+      revision: body['revision'] as int,
     );
   }
 }
@@ -164,6 +220,40 @@ class StudyShareGuestClient {
       headers: {'Authorization': 'Bearer $ticket'},
     );
     return response.bodyBytes;
+  }
+
+  Future<SharedStudyDocument> readDocument(
+    String id,
+    String ticket,
+  ) async {
+    final response = await _api.request(
+      'GET',
+      '/v1/study-shares/$id/document',
+      authenticated: false,
+      headers: {'Authorization': 'Bearer $ticket'},
+    );
+    return SharedStudyDocument.fromResponse(response.decodeJson());
+  }
+
+  Future<SharedStudyDocument> writeDocument(
+    String id,
+    String ticket, {
+    required int baseRevision,
+    required Map<String, dynamic> baseNotebook,
+    required Map<String, dynamic> notebook,
+  }) async {
+    final response = await _api.request(
+      'PUT',
+      '/v1/study-shares/$id/document',
+      authenticated: false,
+      headers: {'Authorization': 'Bearer $ticket'},
+      body: utf8.encode(jsonEncode({
+        'baseRevision': baseRevision,
+        'baseNotebook': baseNotebook,
+        'notebook': notebook,
+      })),
+    );
+    return SharedStudyDocument.fromResponse(response.decodeJson());
   }
 
   Uri eventsUri(String id) {

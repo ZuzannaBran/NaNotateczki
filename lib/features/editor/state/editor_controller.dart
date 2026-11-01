@@ -76,9 +76,13 @@ bool _sameInkStrokeIds(List<InkStroke> a, List<InkStroke> b) {
 class EditorController extends ChangeNotifier {
   static const double minViewScale = 0.25;
   static const double maxViewScale = 4.0;
-  static const Duration _inkSaveDebounceDelay = Duration(seconds: 2);
+  static const Duration defaultSaveDebounce = Duration(seconds: 2);
 
-  EditorController({required this.repository, required this.notebook}) {
+  EditorController({
+    required this.repository,
+    required this.notebook,
+    this.saveDebounce = defaultSaveDebounce,
+  }) {
     if (notebook.kind == NotebookKind.planner) {
       throw UnsupportedError('Planner items do not use the drawing editor.');
     }
@@ -94,6 +98,7 @@ class EditorController extends ChangeNotifier {
 
   final NotebookRepository repository;
   final Notebook notebook;
+  final Duration saveDebounce;
   final Uuid _uuid = const Uuid();
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -3088,7 +3093,7 @@ class EditorController extends ChangeNotifier {
       return;
     }
     _notebookSaveDebounce?.cancel();
-    _notebookSaveDebounce = Timer(_inkSaveDebounceDelay, () {
+    _notebookSaveDebounce = Timer(saveDebounce, () {
       _notebookSaveDebounce = null;
       if (InkActivityTracker.instance.isBusy) {
         _armSaveTimer();

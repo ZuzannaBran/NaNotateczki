@@ -1877,40 +1877,42 @@ dart compile js -O4 -o web/drift_worker.dart.js web/drift_worker.dart
 Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
 
-## 13. Wspólne sesje Web
+## 13. Wspólna edycja sesji Web
 
-- `lib/data/sync/study_share_service.dart`: tworzenie/publikacja/przedłużanie
-  i zakończenie sesji po potwierdzeniu trwałego zapisu właściciela
-  przez LiveWebSync; osobny, anonimowy klient gościa.
-- `lib/features/share/presentation/study_share_dialog.dart`: formularz
-  linku i hasła, kopiowanie, wygaśnięcie i przedłużenie, spójny AlertDialog.
-- `lib/features/share/presentation/study_share_capture.dart`: ograniczone
-  rozmiarowo PNG istniejącego edytora, poza głównym wątkiem sieciowym,
-  bez udostępniania biblioteki.
-- `lib/features/share/presentation/study_share_guest_screen.dart`: wejście
-  przez link bez konta, WebSocket i okresowa kontrola najnowszego obrazu.
-- `lib/main.dart`: trasa `/share/{id}` rozpoznawana przed inicjalizacją
-  prywatnej biblioteki. Zwykły start aplikacji bez zmian.
-- `lib/features/library/presentation/library_catalog.dart` oraz
-  `library_screen.dart`: Share w menu dokumentu dla Web; inne platformy
-  i istniejące akcje zachowane; aktywne udostępnienie korzysta z
-  działającego EditorController.
-- `server/api/app/routers/study_shares.py`: oddzielne API sesji i
-  podglądu, ograniczenia, autoryzacja i wygaśnięcie; migracja
-  `server/migrations/0004_study_shares.sql`. Przy kończeniu sesji
-  powiadomienie WebSocket `ended` jest wysyłane już uwierzytelnionym
-  gościom przed ponownym sprawdzeniem unieważnionego biletu.
-- `test/study_share_service_test.dart`: trwałość identyfikatora dokumentu,
-  walidacja jednoznakowego i pustego hasła sesji w dialogu oraz
-  izolowany ekran wejścia gościa.
-- `test/study_share_http_test.dart`: klient gościa, bilety, HTTP/WSS,
-  autoryzacja właściciela, odmowa utworzenia linku przy błędzie sync
-  i zachowanie oryginalnego notebooka po zamknięciu udostępniania.
-- `server/api/tests/test_study_shares_flow.py`: testy API HTTP/WebSocket
-  z izolowaną atrapą SQLAlchemy: hasła, owner, obrazy PNG, izolacja
-  sesji, rate limiting, wygaśnięcie, przedłużanie, CORS, sygnał `ended`.
-- `server/scripts/smoke-local-api.py`: opcjonalny pełny smoke HTTP na
-  działającym PostgreSQL obejmuje także cykl udostępniania i odwołanie
-  dostępu, bez uruchamiania GitHub Actions.
-- `server/TESTING.md`: instrukcje testów kontraktowych, smoke i ręcznych
-  scenariuszy dwóch przeglądarek oraz ograniczenia weryfikacji HTTPS/WSS.
+- `lib/data/sync/study_share_service.dart`: utworzenie, odzyskiwanie,
+  przedłużanie i zakończenie sesji oraz uwierzytelniony bilet gościa
+  do odczytu/zapisu całego dokumentu; brak dostępu do konta autora.
+- `lib/features/share/presentation/study_share_dialog.dart`: link,
+  hasło, zakończenie i przedłużenie.
+- `lib/features/share/presentation/study_share_capture.dart`: nakładka
+  ostrzeżenia końca sesji bez kosztownych screenshotów PNG.
+- `lib/features/share/presentation/study_share_guest_screen.dart`: logowanie
+  hasłem, WebSocket, odnowienie połączenia, odcięcie dostępu.
+- `lib/features/share/presentation/study_share_guest_editor.dart`:
+  prawdziwy BoardScreen/NotebookScreen, zapis zmian do serwera,
+  odtwarzanie scalonej wersji i status niesynchronizowanych zmian.
+- `study_share_memory_db_stub.dart` i `study_share_memory_db_web.dart`:
+  osobna baza SQLite w pamięci, bez podpinania biblioteki konta.
+- `lib/features/library/presentation/library_screen.dart`: aktywna sesja
+  i jej odzyskanie po ponownym uruchomieniu. Zmiana epoki remote sync
+  odtwarza widok kanwy ze zaktualizowanego oryginału.
+- `lib/data/sync/live_web_sync_service.dart`: 90 ms debounce sync,
+  bazowe snapshoty do trójstronnego scalania zmian właściciela.
+- `lib/features/editor/state/editor_controller.dart`: parametr
+  `saveDebounce` – 100 ms w sesji, domyślnie 2 s poza sesją.
+- `lib/features/notebook/data/notebook_repository.dart`: kontrolowany
+  import potwierdzonej aktualizacji serwera i brak cichego nadpisania
+  niesynchronizowanej pracy.
+- `server/api/app/routers/study_shares.py`: dostęp i zapisy gości
+  tylko do jednego UID; pierwszeństwo serwerowego czasu mikrosekundowego,
+  większa zmiana przy remisie, blokada po zakończeniu.
+- `server/api/app/routers/sync.py`: właściciel edytuje przez te same
+  zasady scalania i rozsyła sygnały WebSocket gościom.
+- `server/migrations/0005_study_share_edit_clock.sql`: trwały zegar
+  rozstrzygania konfliktów.
+- `test/study_share_http_test.dart`: kontrakt HTTP gościa i odcięcie,
+  przedłużanie i zakończenie mimo awarii synchronizacji.
+- `test/live_web_sync_service_test.dart`: powrót zmian gości do
+  oryginału właściciela, bez konfliktowych kopii bez potrzeby.
+- `server/api/tests/test_study_shares_flow.py`: REST/WebSocket,
+  edycja, izolacja, pierwszeństwo i remis zmian.

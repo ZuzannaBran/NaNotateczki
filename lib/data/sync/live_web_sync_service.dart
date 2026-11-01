@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/error/app_error_log.dart';
+import '../../core/storage/app_save_coordinator.dart';
 import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/notebook.dart';
@@ -29,6 +30,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   final ApiClient apiClient;
   final AccountSessionController session;
   final Map<String, int> _revisions = <String, int>{};
+  final Map<String, Map<String, dynamic>> _bases = {};
   final Set<String> _pending = <String>{};
   final Map<String, String> _idempotencyKeys = <String, String>{};
   Timer? _drainTimer;
@@ -49,6 +51,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   bool get isStarted => _started;
   bool get hasPendingChanges => _pending.isNotEmpty;
+  int remoteApplyEpoch = 0;
 
   Future<void> start(InitialSyncPolicy policy) async {
     final userId = session.userId;
@@ -92,7 +95,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     }
     unawaited(_saveState());
     _drainTimer?.cancel();
-    _drainTimer = Timer(const Duration(milliseconds: 600), () {
+    _drainTimer = Timer(const Duration(milliseconds: 90), () {
       unawaited(syncNow());
     });
     notifyListeners();
@@ -210,6 +213,11 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final imports = <Notebook>[];
     for (final record in remote) {
       _revisions[record.uid] = record.revision;
+      if (record.notebook != null) {
+        _bases[record.uid] = NotebookRepository.encodeNotebook(
+          record.notebook!,
+        );
+      }
       if (record.deleted || record.notebook == null) {
         continue;
       }
@@ -268,16 +276,31 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
               {
                 'expectedRevision': expectedRevision,
                 'notebook': NotebookRepository.encodeNotebook(notebook),
+                if (_bases[uid] case final Map<String, dynamic> base)
+                  'baseNotebook': base,
               },
               headers: {'Idempotency-Key': idempotencyKey},
             );
       final result = _requireJsonObject(response.decodeJson());
       _revisions[uid] = (result['revision'] as num).toInt();
+      if (result['notebook'] case final Map<String, dynamic> merged) {
+        _bases[uid] = merged;
+      } else if (notebook != null) {
+        _bases[uid] = NotebookRepository.encodeNotebook(notebook);
+      } else {
+        _bases.remove(uid);
+      }
       final current = await repository.getNotebook(uid);
       final currentNotebook = current == null
           ? null
           : jsonEncode(NotebookRepository.encodeNotebook(current));
       if (currentNotebook == sentNotebook) {
+        if (result['notebook'] case final Map<String, dynamic> merged) {
+          if (jsonEncode(merged) != sentNotebook) {
+            final authoritative = repository.decodeBackupStrict([merged]).single;
+            await _applyRemoteImports([authoritative]);
+          }
+        }
         _pending.remove(uid);
         _idempotencyKeys.remove(uid);
       } else {
@@ -291,8 +314,14 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       final conflict = _conflictPayload(error.payload);
       final record = _decodeRemoteRecord(conflict);
       _revisions[uid] = record.revision;
+      if (record.notebook != null) {
+        _bases[uid] = NotebookRepository.encodeNotebook(record.notebook!);
+      }
       if (!record.deleted && record.notebook != null) {
-        await _applyRemoteImports([record.notebook!]);
+        await _applyRemoteImports(
+          [record.notebook!],
+          preserveLocalUids: {uid},
+        );
       }
       _pending.remove(uid);
       _idempotencyKeys.remove(uid);
@@ -310,7 +339,13 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (rawChanges is! List<dynamic> || latestCursor is! num) {
         throw const FormatException('Malformed sync changes response.');
       }
-      final imports = <Notebook>[];
+      if (rawChanges.isNotEmpty) {
+        // Persist in-progress text before applying another user's edits.
+        await AppSaveCoordinator.instance.flushPending();
+        await repository.waitForPendingSaves();
+      }
+      final imports = <String, Notebook>{};
+      final preserveLocal = <String>{};
       for (final raw in rawChanges) {
         final record = _decodeRemoteRecord(raw);
         final ownRevision = _revisions[record.uid] ?? 0;
@@ -320,9 +355,13 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         final local = await repository.getNotebook(record.uid);
         if (_pending.contains(record.uid) && local != null) {
           if (record.notebook != null) {
-            imports.add(_conflictCopy(record.notebook!, 'server'));
+            imports[record.uid] = record.notebook!;
+            preserveLocal.add(record.uid);
           }
+          _pending.remove(record.uid);
+          _idempotencyKeys.remove(record.uid);
         } else if (record.deleted) {
+          imports.remove(record.uid);
           if (local != null) {
             _applyingRemote = true;
             try {
@@ -332,12 +371,22 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
             }
           }
         } else if (record.notebook != null) {
-          imports.add(record.notebook!);
+          imports[record.uid] = record.notebook!;
         }
         _revisions[record.uid] = record.revision;
+        if (record.deleted || record.notebook == null) {
+          _bases.remove(record.uid);
+        } else {
+          _bases[record.uid] = NotebookRepository.encodeNotebook(
+            record.notebook!,
+          );
+        }
       }
       if (imports.isNotEmpty) {
-        await _applyRemoteImports(imports);
+        await _applyRemoteImports(
+          imports.values.toList(),
+          preserveLocalUids: preserveLocal,
+        );
       }
       _cursor = latestCursor.toInt();
       if (rawChanges.length < 500) {
@@ -346,32 +395,44 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _applyRemoteImports(List<Notebook> notebooks) async {
+  Future<void> _applyRemoteImports(
+    List<Notebook> notebooks, {
+    Set<String> preserveLocalUids = const <String>{},
+  }) async {
     final replacements = <Notebook>[];
     _applyingRemote = true;
     try {
       for (final notebook in notebooks) {
         final existing = await repository.getNotebook(notebook.uid);
-        if (existing == null) {
-          replacements.add(notebook);
+        if (existing != null && _sameNotebook(existing, notebook)) {
           continue;
         }
-        if (_sameNotebook(existing, notebook)) {
-          continue;
+        if (existing != null &&
+            preserveLocalUids.contains(notebook.uid)) {
+          // Preserve concurrent local edits without replacing the
+          // authoritative document's UID or folder.
+          final preserved = _conflictCopy(existing, 'this device');
+          await repository.importNotebooksAtomically([preserved]);
+          _pending.add(preserved.uid);
+          _idempotencyKeys[preserved.uid] = const Uuid().v4();
         }
-        await repository.importNotebooksAtomically([
-          _conflictCopy(existing, 'this device'),
-        ]);
-        await repository.deleteNotebook(existing.uid);
         replacements.add(notebook);
       }
       if (replacements.isNotEmpty) {
-        await repository.importNotebooksAtomically(replacements);
+        // This data was validated by the authenticated sync endpoint.
+        // Unlike ordinary imports, legitimate remote deletions must apply.
+        await repository.importNotebooksAtomically(
+          replacements,
+          verifiedRemoteSync: true,
+        );
       }
     } finally {
       _applyingRemote = false;
     }
-    await onRemoteApplied?.call();
+    if (replacements.isNotEmpty) {
+      remoteApplyEpoch++;
+      await onRemoteApplied?.call();
+    }
   }
 
   Future<void> _connectRealtime() async {
@@ -578,6 +639,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _cursor = 0;
     _reconnectAttempt = 0;
     _revisions.clear();
+    _bases.clear();
     _pending.clear();
     _idempotencyKeys.clear();
     lastError = null;

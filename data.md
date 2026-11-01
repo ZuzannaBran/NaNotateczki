@@ -225,27 +225,35 @@ narzędziem `age`. Skrypt nie wdraża retencji i nie zastępuje testu odtworzeni
   migracji nie edytuje się, tylko dodaje następną.
 
 
-## Współdzielona sesja nauki Web
+## Wspólna edycja sesji Web
 
-Sesja jest tylko sposobem na wyświetlenie kanwy na żywo zaproszonym
-osobom; nie jest alternatywnym magazynem dokumentów ani nowym właścicielem
-notatnika. Projekt, jego UID, folder, wszystkie strony i lokalny backup
-pozostają w bibliotece autora. Udostępnianie nie usuwa ani nie przenosi
-oryginalnego projektu.
+Właściciel udostępnia istniejący notebook lub board na 4 godziny.
+Link `/share/<UUID>` i hasło 1–128 znaków pozwalają gościowi edytować
+**wyłącznie ten dokument** bez konta. Token gościa nie daje dostępu
+do folderów, innych notatek, backupów ani API właściciela. Dane gościa
+są trzymane w osobnej bazie SQLite WASM w pamięci, a nie w IndexedDB konta.
 
-Właściciel musi być zalogowany i mieć włączoną synchronizację Web.
-Przed utworzeniem linku i przed ręcznym zakończeniem sesji aplikacja
-wykonuje flush edytora i repozytorium, czeka na synchronizację z kontem,
-a w przypadku błędu/pending odmawia potwierdzenia zapisu. Backend dodatkowo
-weryfikuje, że udostępniany dokument jest aktywnym rekordem konta
-`synced_notebooks`. Zakończenie sesji tylko blokuje bilety gości i kasuje
-chwilowy obraz PNG; nie dotyka rekordu notatnika.
+Każda potwierdzona zmiana trafia w transakcji PostgreSQL do istniejącego
+`synced_notebooks` pod **oryginalnym UID i folderem**; zmiana nie tworzy
+osobnego pliku lub dokumentu. Zapis powiadamia klientów przez WebSocket,
+a odpytywanie zapasowe służy wyłącznie na wypadek utraty połączenia.
+Gdy sesja jest aktywna, edytor ma krótszy debounce 100 ms, synchronizacja
+90 ms, a gość wysyła zapisane zmiany po dodatkowych 35 ms.
+Nie jest to gwarancja latencji Internetu, Cloudflare czy renderowania.
 
-Zaproszenie jest linkiem `/share/<session UUID>` oraz osobno
-przekazanym hasłem, bez obowiązku zakładania konta. Hasło sesji może mieć od 1 do 128 znaków i ma hash
-Argon2id; bilet uczestnika jest wyłącznie w pamięci przeglądarki i pozwala
-pobierać jedynie prywatny obraz udostępnionej kanwy. Nie udostępnia
-biblioteki, SQLite ani tokenów konta autora. Uczestnicy mają wyłącznie
-podgląd. Obraz aktualizuje się przez WebSocket i chroniony REST.
-Sesja wygasa po 4 godzinach; w ostatnich 5 minutach właściciel dostaje
-ostrzeżenie i może przedłużyć o kolejne 4 godziny bez zmiany linku.
+Serwer scala zmiany niezależnych obiektów (kreski, pola tekstowe, obrazy)
+bez nadpisywania ich. Gdy ten sam obiekt zmieniono jednocześnie, wygrywa
+wcześniejszy czas przyjęcia przez serwer z dokładnością do mikrosekund.
+W identycznej mikrosekundzie rozstrzyga większy rozmiar zmiany względem
+wspólnej wersji początkowej. Rozstrzygnięcia są utrwalane w
+`study_shares.edit_clock` (migracja `0005_study_share_edit_clock.sql`).
+Zegary urządzeń nie są używane. Zmiany lokalne w konflikcie z
+potwierdzonymi z serwera wymagają bezpiecznego rozdzielenia, nigdy
+cichego usuwania treści.
+
+Po restarcie strony właściciel może odzyskać aktywną sesję z API;
+po stronie gościa ponowne wejście wymaga podania hasła. Przedłużenie
+w ostatnich 15 minutach dodaje 4 godziny i zachowuje link oraz bilety.
+Ręczne zakończenie unieważnia bilety niezwłocznie, nawet gdy zapis
+lokalny jest zablokowany. Po wygaśnięciu serwer zwraca HTTP 410
+i żadne nowe operacje nie są przyjmowane.
