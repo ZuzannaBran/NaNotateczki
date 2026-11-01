@@ -258,41 +258,38 @@ class RemoteBackupService {
         changed = true;
       }
     }
-    final freshDevice = local.isEmpty;
-    if (freshDevice) {
-      changed = await _restoreAccountFile(
-            'library_folders.json',
-            payload['libraryState'],
-            allowDefaultFolders: true,
-          ) ||
-          changed;
-      changed = await _restoreAccountFile(
-            'study_planner.json',
-            payload['studyPlannerState'],
-            allowEmptyPlanner: true,
-          ) ||
-          changed;
-      changed = await _restoreAccountFile(
-            'app_prefs.json',
-            payload['appPreferences'],
-          ) ||
-          changed;
-      changed = await _restoreAccountFile(
-            'editor_prefs.json',
-            payload['editorPreferences'],
-          ) ||
-          changed;
-      changed = await _restoreAccountFile(
-            'shared_recent_colors.json',
-            payload['recentColors'],
-          ) ||
-          changed;
-      changed = await _restoreAccountFile(
-            _backupPreferenceKey(userId),
-            payload['backupPreferences'],
-          ) ||
-          changed;
-    }
+    changed = await _restoreAccountFile(
+          'library_folders.json',
+          payload['libraryState'],
+          allowDefaultFolders: true,
+        ) ||
+        changed;
+    changed = await _restoreAccountFile(
+          'study_planner.json',
+          payload['studyPlannerState'],
+          allowEmptyPlanner: true,
+        ) ||
+        changed;
+    changed = await _restoreAccountFile(
+          'app_prefs.json',
+          payload['appPreferences'],
+        ) ||
+        changed;
+    changed = await _restoreAccountFile(
+          'editor_prefs.json',
+          payload['editorPreferences'],
+        ) ||
+        changed;
+    changed = await _restoreAccountFile(
+          'shared_recent_colors.json',
+          payload['recentColors'],
+        ) ||
+        changed;
+    changed = await _restoreAccountFile(
+          _backupPreferenceKey(userId),
+          payload['backupPreferences'],
+        ) ||
+        changed;
     if (session.userId == userId) {
       await writeStoredText(
         hydrationKey,
