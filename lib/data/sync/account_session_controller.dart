@@ -158,6 +158,7 @@ class AccountSessionController extends ChangeNotifier {
         'Use a separate browser profile or app installation.',
       );
     }
+    _sessionGeneration++;
     isBusy = true;
     error = null;
     _notifyIfActive();
@@ -258,7 +259,7 @@ class AccountSessionController extends ChangeNotifier {
           data['username'] != lastAccountUsername ||
           data['refreshToken'] is! String ||
           (data['refreshToken'] as String).isEmpty) {
-        await _queueCredential(null);
+        await _discardRestoredCredential(generation);
         return;
       }
       final response = await apiClient.postJson('/v1/auth/refresh', {
@@ -273,7 +274,7 @@ class AccountSessionController extends ChangeNotifier {
         data['userId'] as String,
         data['username'] as String,
       )) {
-        await _queueCredential(null);
+        await _discardRestoredCredential(generation);
         return;
       }
       _applySession(incoming);
@@ -281,13 +282,21 @@ class AccountSessionController extends ChangeNotifier {
     } on ApiException catch (failure) {
       if (failure.statusCode == 400 ||
           failure.statusCode == 401 ||
-          failure.statusCode == 403) {
-        await _queueCredential(null);
+          failure.statusCode == 403 ||
+          failure.statusCode == 409 ||
+          failure.statusCode == 422) {
+        await _discardRestoredCredential(generation);
       }
     } on FormatException {
-      await _queueCredential(null);
+      await _discardRestoredCredential(generation);
     } catch (_) {
       // Offline and unavailable keyrings do not block local notebooks.
+    }
+  }
+
+  Future<void> _discardRestoredCredential(int generation) async {
+    if (!_disposed && generation == _sessionGeneration) {
+      await _queueCredential(null);
     }
   }
 
