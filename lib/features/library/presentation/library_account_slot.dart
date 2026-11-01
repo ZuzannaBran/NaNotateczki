@@ -47,7 +47,7 @@ Future<void> showLibraryAccountDialog(
 }
 
 class LibraryAccountSlot extends StatelessWidget {
-  const LibraryAccountSlot({super.key, this.liveSyncAvailable = kIsWeb});
+  const LibraryAccountSlot({super.key, this.liveSyncAvailable = true});
 
   final bool liveSyncAvailable;
 
@@ -850,7 +850,7 @@ class _AccountDialogState extends State<_AccountDialog> {
       if (!mounted) {
         return;
       }
-      context.read<RemoteBackupScheduler>().enableForSignedInAccount();
+      // AppScope restores the account before enabling new backups.
       _passwordController.clear();
       _passwordConfirmationController.clear();
       if (widget.liveSyncAvailable) {
