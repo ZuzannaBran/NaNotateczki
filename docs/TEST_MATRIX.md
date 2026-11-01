@@ -27,6 +27,33 @@ a platform as tested until its actual Actions job succeeds.
 - The desktop matrix also runs merged catalog/planner UI, typography and
   planner lifecycle regressions directly on Linux, Windows and macOS.
 
+## Account and study timer typography (November 2026)
+
+Automated regression: `test/library_account_slot_test.dart` checks that
+the account sidebar title, account dialog titles and profile title use
+`AppHeaderDivider.titleStyle` (18 px, weight 600), the same style as
+`Study timer`. Account status and mode details use the small 12 px
+secondary style; `AppTheme.light` and `AppTheme.dark` both specify
+Georgia. No test here certifies the availability of Georgia on every OS.
+
+Repeatable manual acceptance on Linux, Windows, macOS and browser:
+
+1. Open the sidebar with a signed-in account. Compare the account name
+   against `Study timer`: both must have the same visual font, size and
+   weight. The backup status must match the timer subtitle (12 px).
+2. Open account settings and the Sign in, Create account, Local mode and
+   Change password dialogs. Titles must match the timer heading; labels
+   stay above inputs at 14 px, including after typing.
+3. In light and dark themes, check the account profile title (18 px),
+   mode and sync descriptions (12 px), and secondary section headings.
+4. Repeat at a narrow sidebar, mobile drawer and 75–150% UI scale.
+   Confirm that long account names elide instead of overlapping the
+   18 px settings icon, and account status stays legible.
+5. Compare the same screen on Linux and web. If Georgia is unavailable,
+   both timer and account must fall back to the same serif family.
+
+These checks are not marked as passed without execution.
+
 ## Image and imported PDF transform gestures (October 2026)
 
 Synthetic pointer regression: `test/image_pdf_transform_regression_test.dart`
