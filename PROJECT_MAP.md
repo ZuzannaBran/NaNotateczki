@@ -603,7 +603,7 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1844: `_LibraryWorkspace`;
   1955: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (1044 linii)
+### `lib/features/library/presentation/library_account_slot.dart` (1082 linie)
 
 Przestrzenny onboarding `Create account`/`Sign in`/`Try local` z
 wyśrodkowaną nazwą NaNotateczki, podglądem haseł i spójnymi odstępami
@@ -619,12 +619,11 @@ ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
 loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
 
-- 12: `showLibraryAccountDialog`; 41: `LibraryAccountSlot`;
-  146: `_AccountAvatar`;
-  178: `_AccountDialog`;
-  191: `_AccountDialogState`;
-  827: `_backupNow`;
-  864: `_changePassword`.
+- 14: `showLibraryAccountDialog`; 43: `LibraryAccountSlot`;
+  148: `_AccountAvatar`; 180: `_AccountDialog`;
+  193: `_AccountDialogState`; 676: `_usernameField`;
+  697: `_accountLabeledField`; 892: `_backupNow`;
+  929: `_changePassword`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
