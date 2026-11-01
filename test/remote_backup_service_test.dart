@@ -54,7 +54,7 @@ void main() {
                 'refreshToken': 'refresh-token-with-at-least-forty-characters',
                 'expiresIn': 600,
                 'userId': 'user-1',
-                'email': 'user@example.com',
+                'username': 'test_user',
               }),
               200,
             );
@@ -82,7 +82,7 @@ void main() {
         }),
       );
       final session = AccountSessionController(apiClient);
-      await session.login('user@example.com', 'a-secure-password');
+      await session.login('test_user', 'a-secure-password');
       final service = RemoteBackupService(
         repository: repository,
         apiClient: apiClient,
@@ -128,7 +128,7 @@ void main() {
               'refreshToken': 'refresh-token-with-at-least-forty-characters',
               'expiresIn': 600,
               'userId': 'user-1',
-              'email': 'user@example.com',
+              'username': 'test_user',
             }),
             200,
           );
@@ -156,7 +156,7 @@ void main() {
       }),
     );
     final session = AccountSessionController(apiClient);
-    await session.login('user@example.com', 'a-secure-password');
+    await session.login('test_user', 'a-secure-password');
     scheduler = RemoteBackupScheduler(
       service: RemoteBackupService(
         repository: repository,
@@ -185,21 +185,21 @@ void main() {
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
-        final isAccountA = body['email'] == 'a@example.com';
+        final isAccountA = body['username'] == 'account_a';
         return http.Response(
           jsonEncode({
             'accessToken': isAccountA ? 'access-a' : 'access-b',
             'refreshToken': 'refresh-token-with-at-least-forty-characters',
             'expiresIn': 600,
             'userId': isAccountA ? 'user-a' : 'user-b',
-            'email': body['email'],
+            'username': body['username'],
           }),
           200,
         );
       }),
     );
     final session = AccountSessionController(apiClient);
-    await session.login('a@example.com', 'a-secure-password');
+    await session.login('account_a', 'a-secure-password');
     final service = _RecordingRemoteBackupService(
       repository: repository,
       apiClient: apiClient,
@@ -214,7 +214,7 @@ void main() {
     await scheduler.stop();
     session.useLocalOnly();
 
-    await session.login('b@example.com', 'b-secure-password');
+    await session.login('account_b', 'b-secure-password');
     expect(scheduler.lastVerifiedBackup, isNull);
     expect(scheduler.lastError, isNull);
     scheduler.enableForSignedInAccount();

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/native.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -67,7 +68,7 @@ void main() {
     addTearDown(database.close);
     final repository = NotebookRepository(database);
     final session = AccountSessionController(client);
-    await session.login('user@example.com', 'a-secure-password');
+    await session.login('test_user', 'a-secure-password');
     final sync = LiveWebSyncService(
       repository: repository,
       apiClient: client,
@@ -78,6 +79,46 @@ void main() {
     await sync.start(InitialSyncPolicy.downloadRemote);
 
     expect(changesCalls, 2);
+  });
+
+  test('resuming Web sync reconciles missed realtime notifications', () async {
+    var changeRequests = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return _sessionResponse();
+        }
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response(jsonEncode({'cursor': 0, 'notebooks': []}), 200);
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          changeRequests++;
+          return http.Response(jsonEncode({'cursor': 0, 'changes': []}), 200);
+        }
+        fail('Unexpected request');
+      }),
+    );
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final session = AccountSessionController(client);
+    await session.login('test_user', 'a-secure-password');
+    final sync = LiveWebSyncService(
+      repository: NotebookRepository(database),
+      apiClient: client,
+      session: session,
+    );
+    addTearDown(sync.dispose);
+    await sync.start(InitialSyncPolicy.downloadRemote);
+    final initialRequests = changeRequests;
+
+    sync.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await sync.syncNow();
+
+    expect(changeRequests, greaterThan(initialRequests));
+    await sync.stop();
+    session.dispose();
+    client.close();
   });
 
   test('does not skip concurrent remote events after its own push', () async {
@@ -114,7 +155,7 @@ void main() {
     final repository = NotebookRepository(database);
     await repository.createNotebook();
     final session = AccountSessionController(client);
-    await session.login('user@example.com', 'a-secure-password');
+    await session.login('test_user', 'a-secure-password');
     final sync = LiveWebSyncService(
       repository: repository,
       apiClient: client,
@@ -138,10 +179,10 @@ void main() {
       httpClient: MockClient((request) async {
         if (request.url.path == '/v1/auth/login') {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
-          final isAccountA = body['email'] == 'a@example.com';
+          final isAccountA = body['username'] == 'account_a';
           return _sessionResponse(
             userId: isAccountA ? 'user-a' : 'user-b',
-            email: body['email']! as String,
+            username: body['username']! as String,
             accessToken: isAccountA ? 'access-a' : 'access-b',
           );
         }
@@ -176,14 +217,14 @@ void main() {
     );
     addTearDown(sync.dispose);
 
-    await session.login('a@example.com', 'a-secure-password');
+    await session.login('account_a', 'a-secure-password');
     await sync.start(InitialSyncPolicy.uploadLocal);
     await repository.deleteNotebook(notebook.uid);
     sync.enqueue([NotebookRepositoryChange.full(notebook.uid)]);
     await sync.stop();
 
     session.useLocalOnly();
-    await session.login('b@example.com', 'b-secure-password');
+    await session.login('account_b', 'b-secure-password');
     await sync.start(InitialSyncPolicy.downloadRemote);
 
     expect(accountBDeletes, 0);
@@ -196,7 +237,7 @@ void main() {
 
 http.Response _sessionResponse({
   String userId = 'user-1',
-  String email = 'user@example.com',
+  String username = 'test_user',
   String accessToken = 'access',
 }) {
   return http.Response(
@@ -205,7 +246,7 @@ http.Response _sessionResponse({
       'refreshToken': 'refresh-token-with-at-least-forty-characters',
       'expiresIn': 600,
       'userId': userId,
-      'email': email,
+      'username': username,
     }),
     200,
   );

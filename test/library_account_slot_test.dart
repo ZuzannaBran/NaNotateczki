@@ -152,8 +152,8 @@ void main() {
       );
       await tester.pump();
       await tester.enterText(
-        find.byKey(const ValueKey('account-email')),
-        'user@example.com',
+        find.byKey(const ValueKey('account-username')),
+        'test_user',
       );
       await tester.enterText(
         find.byKey(const ValueKey('account-password')),
@@ -243,8 +243,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('account-sign-in-choice')));
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.byKey(const ValueKey('account-email')),
-        'user@example.com',
+        find.byKey(const ValueKey('account-username')),
+        'test_user',
       );
       await tester.enterText(
         find.byKey(const ValueKey('account-password')),
@@ -425,10 +425,10 @@ void main() {
       find.widgetWithText(TextButton, 'Back'),
     );
     await tester.enterText(
-      find.byKey(const ValueKey('account-email')),
-      'user@example.com',
+      find.byKey(const ValueKey('account-username')),
+      'test_user',
     );
-    expect(find.text('Username'), findsNothing);
+    expect(find.text('Username'), findsOneWidget);
     await tester.enterText(
       find.byKey(const ValueKey('account-password')),
       '1234567',
@@ -546,12 +546,12 @@ class _FakeAccountSessionController extends AccountSessionController {
   String? newPassword;
 
   @override
-  Future<void> login(String rawEmail, String password) async {
+  Future<void> login(String rawUsername, String password) async {
     mode = AccountDataMode.account;
     preferredMode = AccountDataMode.account;
     onboardingComplete = true;
     userId = 'user-1';
-    email = rawEmail.trim().toLowerCase();
+    username = rawUsername.trim().toLowerCase();
     apiClient.setAccessToken('access');
     notifyListeners();
   }

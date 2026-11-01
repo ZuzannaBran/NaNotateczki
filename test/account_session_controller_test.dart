@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -62,7 +63,7 @@ void main() {
                 'refreshToken': 'refresh-token-with-at-least-forty-characters',
                 'expiresIn': 600,
                 'userId': 'user-1',
-                'email': 'user@example.com',
+                'username': 'test_user',
               }),
               201,
             );
@@ -79,7 +80,7 @@ void main() {
       final session = AccountSessionController(client);
       await session.loadProfile();
 
-      await session.register('USER@example.com', 'first-secure-password');
+      await session.register('TEST_USER', 'first-secure-password');
       await session.changePassword(
         'first-secure-password',
         'second-secure-password',
@@ -92,7 +93,7 @@ void main() {
       expect(session.isSignedIn, isTrue);
       expect(session.preferredMode, AccountDataMode.account);
       final encoded = stored[AccountSessionController.profileStorageKey]!;
-      expect(encoded, contains('user@example.com'));
+      expect(encoded, contains('test_user'));
       expect(encoded, isNot(contains('access-secret')));
       expect(encoded, isNot(contains('refresh-token')));
       expect(encoded, isNot(contains('secure-password')));
@@ -100,10 +101,25 @@ void main() {
       final restored = AccountSessionController(client);
       await restored.loadProfile();
       expect(restored.preferredMode, AccountDataMode.account);
-      expect(restored.lastAccountEmail, 'user@example.com');
+      expect(restored.lastAccountUsername, 'test_user');
       expect(restored.shouldShowStartupDialog, isTrue);
     },
   );
+
+  test('late profile read does not notify a disposed controller', () async {
+    final pending = Completer<String?>();
+    textStorageReadOverride = (_) => pending.future;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) async => http.Response('', 500)),
+    );
+    final session = AccountSessionController(client);
+    final load = session.loadProfile();
+    session.dispose();
+    pending.complete(null);
+    await load;
+    client.close();
+  });
 
   test('registers with eight characters and accepts legacy logins', () async {
     final requests = <String, Object?>{};
@@ -118,19 +134,19 @@ void main() {
             'refreshToken': 'refresh-token',
             'expiresIn': 600,
             'userId': 'user-1',
-            'email': 'user@example.com',
+            'username': 'test_user',
           }),
           request.url.path.endsWith('/register') ? 201 : 200,
         );
       }),
     );
     final session = AccountSessionController(client);
-    await session.register('user@example.com', '12345678');
-    await session.login('user@example.com', 'short');
+    await session.register('test_user', '12345678');
+    await session.login('test_user', 'short');
     expect(requests['/v1/auth/register'], '12345678');
     expect(requests['/v1/auth/login'], 'short');
     await expectLater(
-      session.register('user@example.com', '1234567'),
+      session.register('test_user', '1234567'),
       throwsA(isA<FormatException>()),
     );
     client.close();
@@ -149,7 +165,7 @@ void main() {
                 'refreshToken': 'refresh-token-with-at-least-forty-characters',
                 'expiresIn': 600,
                 'userId': 'user-1',
-                'email': 'user@example.com',
+                'username': 'test_user',
               }),
               200,
             );
@@ -161,7 +177,7 @@ void main() {
         }),
       );
       final session = AccountSessionController(client);
-      await session.login('user@example.com', 'first-secure-password');
+      await session.login('test_user', 'first-secure-password');
 
       await expectLater(
         session.changePassword('wrong-password', 'second-secure-password'),
