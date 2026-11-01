@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -193,7 +195,7 @@ class _AccountDialogState extends State<_AccountDialog> {
   final _registerFormKey = GlobalKey<FormState>();
   final _localFormKey = GlobalKey<FormState>();
   final _passwordFormKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmationController = TextEditingController();
   final _localNameController = TextEditingController();
@@ -210,7 +212,7 @@ class _AccountDialogState extends State<_AccountDialog> {
   void initState() {
     super.initState();
     final session = context.read<AccountSessionController>();
-    _emailController.text = session.lastAccountEmail ?? session.email ?? '';
+    _usernameController.text = session.lastAccountUsername ?? session.username ?? '';
     _localNameController.text = session.localDisplayName ?? '';
     _view = widget.startupRequired
         ? _AccountView.landing
@@ -221,7 +223,7 @@ class _AccountDialogState extends State<_AccountDialog> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     _passwordConfirmationController.dispose();
     _localNameController.dispose();
@@ -350,7 +352,7 @@ class _AccountDialogState extends State<_AccountDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _emailField(),
+          _usernameField(),
           const SizedBox(height: 18),
           _passwordField(_passwordController),
           if (_actionMessage != null) _MessageText(_actionMessage!),
@@ -381,7 +383,7 @@ class _AccountDialogState extends State<_AccountDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _emailField(),
+          _usernameField(),
           const SizedBox(height: 18),
           _passwordField(_passwordController, newPassword: true),
           const SizedBox(height: 18),
@@ -512,7 +514,30 @@ class _AccountDialogState extends State<_AccountDialog> {
             _backupStatus(backup),
             key: const ValueKey('remote-backup-status'),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Expanded(child: Text('Back up after inactivity')),
+              const SizedBox(width: 12),
+              DropdownButton<int>(
+                key: const ValueKey('account-backup-idle'),
+                value: backup.idleSeconds,
+                onChanged: _isWorking ? null : (seconds) {
+                  if (seconds != null) {
+                    unawaited(_setBackupIdle(seconds));
+                  }
+                },
+                items: const [
+                  DropdownMenuItem(value: 30, child: Text('30 sec')),
+                  DropdownMenuItem(value: 120, child: Text('2 min')),
+                  DropdownMenuItem(value: 300, child: Text('5 min')),
+                  DropdownMenuItem(value: 900, child: Text('15 min')),
+                  DropdownMenuItem(value: 1800, child: Text('30 min')),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             key: const ValueKey('account-backup-now'),
             onPressed: _isWorking || backup.isUploading ? null : _backupNow,
@@ -645,18 +670,20 @@ class _AccountDialogState extends State<_AccountDialog> {
     );
   }
 
-  Widget _emailField() {
+  Widget _usernameField() {
     return TextFormField(
-      key: const ValueKey('account-email'),
-      controller: _emailController,
+      key: const ValueKey('account-username'),
+      controller: _usernameController,
       enabled: !_isWorking,
-      keyboardType: TextInputType.emailAddress,
-      autofillHints: const [AutofillHints.email],
+      keyboardType: TextInputType.text,
+      autofillHints: const [AutofillHints.username],
       textInputAction: TextInputAction.next,
-      decoration: _accountInputDecoration('E-mail'),
-      validator: (value) => value == null || !value.contains('@')
-          ? 'Enter a valid e-mail address.'
-          : null,
+      decoration: _accountInputDecoration('Username'),
+      validator: (value) => AccountSessionController.usernamePattern.hasMatch(
+        value?.trim() ?? '',
+      )
+          ? null
+          : 'Use 3–32 letters, numbers or underscores.',
     );
   }
 
@@ -770,9 +797,9 @@ class _AccountDialogState extends State<_AccountDialog> {
     try {
       final session = context.read<AccountSessionController>();
       if (register) {
-        await session.register(_emailController.text, _passwordController.text);
+        await session.register(_usernameController.text, _passwordController.text);
       } else {
-        await session.login(_emailController.text, _passwordController.text);
+        await session.login(_usernameController.text, _passwordController.text);
       }
       if (!mounted) {
         return;
@@ -821,6 +848,14 @@ class _AccountDialogState extends State<_AccountDialog> {
       _showFailure(failure);
     } finally {
       _stopWorking();
+    }
+  }
+
+  Future<void> _setBackupIdle(int seconds) async {
+    try {
+      await context.read<RemoteBackupScheduler>().setIdleSeconds(seconds);
+    } catch (failure) {
+      _showFailure(failure);
     }
   }
 
