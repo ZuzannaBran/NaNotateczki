@@ -15,7 +15,11 @@ import '../sync/account_session_controller.dart';
 import 'remote_backup_service.dart';
 
 class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
-  RemoteBackupScheduler({required this.service, required this.session}) {
+  RemoteBackupScheduler({
+    required this.service,
+    required this.session,
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now {
     WidgetsBinding.instance.addObserver(this);
     session.addListener(_sessionChanged);
     _dirty = true;
@@ -29,8 +33,9 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
 
   final RemoteBackupService service;
   final AccountSessionController session;
+  final DateTime Function() _now;
   Timer? _timer;
-  DateTime _lastActivityAt = DateTime.now();
+  late DateTime _lastActivityAt = _now();
   DateTime? _retryNotBefore;
   int _idleSeconds = defaultIdleSeconds;
   int _preferenceGeneration = 0;
@@ -61,7 +66,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     _enabled = true;
     _dirty = true;
     _changeGeneration++;
-    _lastActivityAt = DateTime.now();
+    _lastActivityAt = _now();
     _retryNotBefore = null;
     _scheduleIdle();
     unawaited(_loadPreference(userId));
@@ -162,7 +167,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
       if (_accountUserId == accountUserId) {
         lastError = error.toString();
         _dirty = true;
-        _retryNotBefore = DateTime.now().add(failureRetry);
+        _retryNotBefore = _now().add(failureRetry);
       }
       AppErrorLog.instance.record(
         error,
@@ -195,16 +200,16 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
       return false;
     }
     if (_retryNotBefore != null &&
-        DateTime.now().isBefore(_retryNotBefore!)) {
+        _now().isBefore(_retryNotBefore!)) {
       return false;
     }
-    return DateTime.now().difference(_lastActivityAt) >=
+    return _now().difference(_lastActivityAt) >=
         Duration(seconds: _idleSeconds);
   }
 
   void _recordActivity() {
     if (_enabled && !_disposed) {
-      _lastActivityAt = DateTime.now();
+      _lastActivityAt = _now();
     }
   }
 
@@ -229,7 +234,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     if (!_enabled || !_dirty || _uploading || _disposed) {
       return;
     }
-    final now = DateTime.now();
+    final now = _now();
     final idleRemaining =
         Duration(seconds: _idleSeconds) - now.difference(_lastActivityAt);
     final retryRemaining = _retryNotBefore == null
