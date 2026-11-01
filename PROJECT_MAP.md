@@ -597,18 +597,24 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   1844: `_LibraryWorkspace`;
   1955: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (896 linii)
+### `lib/features/library/presentation/library_account_slot.dart` (1024 linii)
 
 Przestrzenny onboarding `Create account`/`Sign in`/`Try local` z
 wyśrodkowaną nazwą NaNotateczki, podglądem haseł i większymi odstępami.
-Dolny pasek pokazuje konto i stan backupu oraz synchronizacji. Rejestracja i zmiana hasła wymagają zgodnego powtórzenia;
+Dolny pasek pokazuje konto i stan backupu oraz synchronizacji. Inicjał konta
+ma subtelne okrągłe obramowanie w panelu i dialogu; ikona ustawień ma 18 px
+przy zachowanym rozmiarze obszaru kliknięcia. Rejestracja i zmiana hasła
+wymagają zgodnego powtórzenia;
 ustawienia pozwalają wymusić backup, zmienić hasło i przełączać tryb. Po
 loginie włącza scheduler, na Web wymaga bezpiecznej polityki pierwszego sync,
 a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
 
 - 12: `showLibraryAccountDialog`; 41: `LibraryAccountSlot`;
-  158: `_AccountDialog`; 171: `_AccountDialogState`;
-  803: `_backupNow`; 840: `_changePassword`.
+  146: `_AccountAvatar`;
+  184: `_AccountDialog`;
+  197: `_AccountDialogState`;
+  833: `_backupNow`;
+  870: `_changePassword`.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1277 linii)
 
@@ -1467,7 +1473,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany oraz brak
   przenoszenia outboxu i rewizji między kontami.
 - `test/library_account_slot_test.dart`: centrowanie nazwy, podgląd i limit
-  hasła; dostęp do konta w szerokim sidebarze
+  hasła, obramowanie awatara w obu miejscach i rozmiar ikony ustawień;
+  dostęp do konta w szerokim sidebarze
   i mobilnym drawerze, onboarding/rejestracja z powtórzeniem hasła, lokalna
   nazwa i inicjał, logowanie, ręczny backup, pierwsza polityka Web, zmiana
   hasła oraz kolejność zatrzymania usług przed wyczyszczeniem sesji.

@@ -430,6 +430,27 @@ void main() {
     expect(find.text('Welcome'), findsNothing);
     expect(find.text('Zuzanna'), findsOneWidget);
     expect(find.text('Z'), findsOneWidget);
+    final sidebarAvatar = find.byKey(const ValueKey('account-avatar'));
+    final sidebarDecoration =
+        tester.widget<Container>(sidebarAvatar).decoration! as BoxDecoration;
+    expect(sidebarDecoration.shape, BoxShape.circle);
+    expect(sidebarDecoration.border, isNotNull);
+    expect(tester.getSize(sidebarAvatar), const Size(32, 32));
+
+    final settingsIcon = find.descendant(
+      of: find.byKey(const ValueKey('account-settings-button')),
+      matching: find.byIcon(Icons.settings_outlined),
+    );
+    expect(tester.widget<Icon>(settingsIcon).size, 18);
+
+    await tester.tap(find.byKey(const ValueKey('account-settings-button')));
+    await tester.pumpAndSettle();
+    final dialogAvatar = find.byKey(const ValueKey('account-dialog-avatar'));
+    final dialogDecoration =
+        tester.widget<Container>(dialogAvatar).decoration! as BoxDecoration;
+    expect(dialogDecoration.shape, BoxShape.circle);
+    expect(dialogDecoration.border, isNotNull);
+    expect(tester.getSize(dialogAvatar), const Size(40, 40));
     expect(find.byKey(const ValueKey('account-remote-status')), findsNothing);
     expect(
       find.byKey(const ValueKey('account-settings-button')),

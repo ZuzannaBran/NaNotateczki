@@ -51,7 +51,6 @@ class LibraryAccountSlot extends StatelessWidget {
     if (session == null || backup == null || sync == null) {
       return const SizedBox.shrink();
     }
-    final colors = Theme.of(context).colorScheme;
     final subtitle = session.isSignedIn
         ? _remoteSubtitle(backup, sync, DateTime.now())
         : null;
@@ -62,18 +61,9 @@ class LibraryAccountSlot extends StatelessWidget {
         padding: const EdgeInsets.only(left: 14, right: 4),
         child: Row(
           children: [
-            CircleAvatar(
+            _AccountAvatar(
               key: const ValueKey('account-avatar'),
-              radius: 16,
-              backgroundColor: colors.surfaceContainerHigh,
-              foregroundColor: colors.onSurface,
-              child: Text(
-                session.avatarLetter,
-                style: const TextStyle(
-                  fontSize: AppTypography.folder,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              letter: session.avatarLetter,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -105,7 +95,7 @@ class LibraryAccountSlot extends StatelessWidget {
             IconButton(
               key: const ValueKey('account-settings-button'),
               tooltip: 'Account settings',
-              icon: const Icon(Icons.settings_outlined),
+              icon: const Icon(Icons.settings_outlined, size: 18),
               onPressed: () => showLibraryAccountDialog(
                 context,
                 liveSyncAvailable: liveSyncAvailable,
@@ -150,6 +140,42 @@ class LibraryAccountSlot extends StatelessWidget {
       return '${difference.inHours}h ago';
     }
     return '${difference.inDays}d ago';
+  }
+}
+
+class _AccountAvatar extends StatelessWidget {
+  const _AccountAvatar({
+    super.key,
+    required this.letter,
+    this.radius = 16,
+  });
+
+  final String letter;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHigh,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: colors.onSurface.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Text(
+        letter,
+        style: TextStyle(
+          color: colors.onSurface,
+          fontSize: AppTypography.folder,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
   }
 }
 
@@ -463,7 +489,11 @@ class _AccountDialogState extends State<_AccountDialog> {
             padding: const EdgeInsets.all(18),
             child: Row(
               children: [
-                CircleAvatar(child: Text(session.avatarLetter)),
+                _AccountAvatar(
+                  key: const ValueKey('account-dialog-avatar'),
+                  letter: session.avatarLetter,
+                  radius: 20,
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
