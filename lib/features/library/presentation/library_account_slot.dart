@@ -86,7 +86,7 @@ class LibraryAccountSlot extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    key: const ValueKey('account-remote-status'),
+                    key: const ValueKey('account-status'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: _accountSecondaryTextStyle(context),
