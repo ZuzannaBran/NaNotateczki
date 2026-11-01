@@ -331,18 +331,24 @@ void main() {
     expect(tester.getSize(feedback), originalSize);
     expect(child, findsNothing);
     expect(
-      find.descendant(
-        of: feedback,
-        matching: find.byIcon(Icons.folder_outlined),
-      ),
+      find.descendant(of: feedback, matching: find.text('Source')),
       findsOneWidget,
     );
+    for (final icon in [
+      Icons.folder_outlined,
+      Icons.folder_open_outlined,
+    ]) {
+      expect(
+        find.descendant(of: feedback, matching: find.byIcon(icon)),
+        findsNothing,
+      );
+    }
     expect(
       find.descendant(
         of: feedback,
-        matching: find.byIcon(Icons.folder_open_outlined),
+        matching: find.byTooltip('Expand Source'),
       ),
-      findsNothing,
+      findsOneWidget,
     );
 
     final initialFeedbackLeft = tester.getTopLeft(feedback).dx;
