@@ -214,7 +214,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     for (final record in remote) {
       _revisions[record.uid] = record.revision;
       if (record.notebook != null) {
-        _bases[record.uid] = NotebookRepository.encodeNotebook(
+        _bases[record.uid] = _encodeSyncNotebook(
           record.notebook!,
         );
       }
@@ -250,7 +250,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final notebook = await repository.getNotebook(uid);
     final sentNotebook = notebook == null
         ? null
-        : jsonEncode(NotebookRepository.encodeNotebook(notebook));
+        : jsonEncode(_encodeSyncNotebook(notebook));
     final expectedRevision = _revisions[uid] ?? 0;
     if (notebook == null && expectedRevision == 0) {
       _pending.remove(uid);
@@ -275,7 +275,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
               '/v1/sync/notebooks/${Uri.encodeComponent(uid)}',
               {
                 'expectedRevision': expectedRevision,
-                'notebook': NotebookRepository.encodeNotebook(notebook),
+                'notebook': _encodeSyncNotebook(notebook),
                 if (_bases[uid] case final Map<String, dynamic> base)
                   'baseNotebook': base,
               },
@@ -286,17 +286,18 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (result['notebook'] case final Map<String, dynamic> merged) {
         _bases[uid] = merged;
       } else if (notebook != null) {
-        _bases[uid] = NotebookRepository.encodeNotebook(notebook);
+        _bases[uid] = _encodeSyncNotebook(notebook);
       } else {
         _bases.remove(uid);
       }
       final current = await repository.getNotebook(uid);
       final currentNotebook = current == null
           ? null
-          : jsonEncode(NotebookRepository.encodeNotebook(current));
+          : jsonEncode(_encodeSyncNotebook(current));
       if (currentNotebook == sentNotebook) {
         if (result['notebook'] case final Map<String, dynamic> merged) {
-          if (jsonEncode(merged) != sentNotebook) {
+          if (jsonEncode(_normalizePortableImagePaths(merged)) !=
+              sentNotebook) {
             final authoritative = repository.decodeBackupStrict([merged]).single;
             await _applyRemoteImports([authoritative]);
           }
@@ -315,7 +316,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       final record = _decodeRemoteRecord(conflict);
       _revisions[uid] = record.revision;
       if (record.notebook != null) {
-        _bases[uid] = NotebookRepository.encodeNotebook(record.notebook!);
+        _bases[uid] = _encodeSyncNotebook(record.notebook!);
       }
       if (!record.deleted && record.notebook != null) {
         await _applyRemoteImports(
@@ -383,7 +384,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         if (record.deleted || record.notebook == null) {
           _bases.remove(record.uid);
         } else {
-          _bases[record.uid] = NotebookRepository.encodeNotebook(
+          _bases[record.uid] = _encodeSyncNotebook(
             record.notebook!,
           );
         }
@@ -532,9 +533,42 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     throw const FormatException('Conflict response has no remote copy.');
   }
 
+  /// Prevents absolute image paths from leaking between devices and from
+  /// producing false conflicts when native imports relocate image files.
+  Map<String, dynamic> _encodeSyncNotebook(Notebook notebook) =>
+      _normalizePortableImagePaths(
+        NotebookRepository.encodeNotebook(notebook),
+      );
+
+  static Map<String, dynamic> _normalizePortableImagePaths(
+    Map<String, dynamic> encoded,
+  ) {
+    final pages = encoded['pages'];
+    if (pages is! List<dynamic>) {
+      return encoded;
+    }
+    for (final page in pages) {
+      if (page is! Map<String, dynamic>) {
+        continue;
+      }
+      final images = page['imageBlocks'];
+      if (images is! List<dynamic>) {
+        continue;
+      }
+      for (final image in images) {
+        if (image is Map<String, dynamic> &&
+            image['bytes'] is String &&
+            (image['bytes'] as String).isNotEmpty) {
+          image['path'] = '';
+        }
+      }
+    }
+    return encoded;
+  }
+
   bool _sameNotebook(Notebook first, Notebook second) {
-    return jsonEncode(NotebookRepository.encodeNotebook(first)) ==
-        jsonEncode(NotebookRepository.encodeNotebook(second));
+    return jsonEncode(_encodeSyncNotebook(first)) ==
+        jsonEncode(_encodeSyncNotebook(second));
   }
 
   Notebook _conflictCopy(Notebook source, String origin) {
