@@ -241,6 +241,13 @@ Gdy sesja jest aktywna, edytor ma krótszy debounce 100 ms, synchronizacja
 90 ms, a gość wysyła zapisane zmiany po dodatkowych 35 ms.
 Nie jest to gwarancja latencji Internetu, Cloudflare czy renderowania.
 
+Serwer weryfikuje `baseRevision` i `baseNotebook` względem
+niezmiennej historii `change_events`; indeks na rewizję pochodzi z migracji
+`0006_change_events_document_revision.sql`. Tylko jedna aktywna sesja
+może dotyczyć konkretnego UID. Właściciel usuwa oryginał i jednocześnie
+unieważnia sesję w tej samej transakcji. Feed właściciela zapisuje
+scalony stan dokumentu, nie stan pojedynczego żądania.
+
 Serwer scala zmiany niezależnych obiektów (kreski, pola tekstowe, obrazy)
 bez nadpisywania ich. Gdy ten sam obiekt zmieniono jednocześnie, wygrywa
 wcześniejszy czas przyjęcia przez serwer z dokładnością do mikrosekund.
@@ -257,3 +264,12 @@ w ostatnich 15 minutach dodaje 4 godziny i zachowuje link oraz bilety.
 Ręczne zakończenie unieważnia bilety niezwłocznie, nawet gdy zapis
 lokalny jest zablokowany. Po wygaśnięciu serwer zwraca HTTP 410
 i żadne nowe operacje nie są przyjmowane.
+
+### Granica bezpieczeństwa niedokończonego wdrożenia
+
+Wspólna edycja Web nadal jest WIP: gość przechowuje dane robocze
+w bazie SQLite w pamięci. Nie ma trwałego outboxu między zamknięciem
+i ponownym otwarciem karty, więc zapis w toku lub konflikt może nie zostać
+odzyskany. Przed włączeniem produkcyjnym wymagane są testy Flutter,
+FastAPI, PostgreSQL, równoczesna edycja w dwóch przeglądarkach oraz testy
+odzyskiwania i latencji. Na serwerze wymagane są migracje 0004, 0005 i 0006.
