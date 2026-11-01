@@ -6,8 +6,8 @@ import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 
 import 'package:program/core/storage/text_storage.dart';
-import 'package:program/core/theme/app_typography.dart';
 import 'package:program/core/theme/app_theme.dart';
+import 'package:program/core/theme/app_typography.dart';
 import 'package:program/core/widgets/app_header_divider.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/backup/remote_backup_scheduler.dart';
@@ -507,6 +507,10 @@ void main() {
     expect(find.text('Welcome'), findsOneWidget);
     _expectAccountDialogTypography(tester);
     expect(find.text('NaNotateczki'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('NaNotateczki')).style,
+      AppHeaderDivider.titleStyle,
+    );
     final welcomeCopy = tester.widget<Text>(
       find.byKey(const ValueKey('account-welcome-description')),
     );
