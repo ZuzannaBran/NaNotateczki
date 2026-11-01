@@ -121,6 +121,57 @@ void main() {
     client.close();
   });
 
+  test('concurrent backup and Web refresh rotate the token only once', () async {
+    final responsePending = Completer<http.Response>();
+    var refreshCalls = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'old-access',
+              'refreshToken': 'old-refresh',
+              'expiresIn': 1,
+              'userId': 'user-1',
+              'username': 'test_user',
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/auth/refresh') {
+          refreshCalls++;
+          return responsePending.future;
+        }
+        fail('Unexpected authentication endpoint.');
+      }),
+    );
+    final session = AccountSessionController(client);
+    await session.login('test_user', 'password');
+    final first = session.refresh();
+    final second = session.refresh();
+    await Future<void>.delayed(Duration.zero);
+    expect(refreshCalls, 1);
+
+    responsePending.complete(
+      http.Response(
+        jsonEncode({
+          'accessToken': 'new-access',
+          'refreshToken': 'new-refresh',
+          'expiresIn': 600,
+          'userId': 'user-1',
+          'username': 'test_user',
+        }),
+        200,
+      ),
+    );
+    await Future.wait([first, second]);
+    expect(session.debugRefreshToken, 'new-refresh');
+    expect(client.accessToken, 'new-access');
+    session.dispose();
+    client.close();
+  });
+
   test('registers with eight characters and accepts legacy logins', () async {
     final requests = <String, Object?>{};
     final client = ApiClient(
