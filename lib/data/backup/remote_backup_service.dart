@@ -143,6 +143,12 @@ class RemoteBackupService {
     if (!session.isSignedIn || userId == null) {
       throw StateError('Account backup recovery requires sign-in.');
     }
+    final hydrationKey = 'account_backup_hydrated_' +
+        sha256.convert(utf8.encode(userId)).toString().substring(0, 16) +
+        '.json';
+    if (await readStoredText(hydrationKey) != null) {
+      return false;
+    }
     final listing = _jsonObject(
       (await apiClient.get('/v1/backups')).decodeJson(),
     );
@@ -286,6 +292,12 @@ class RemoteBackupService {
             payload['backupPreferences'],
           ) ||
           changed;
+    }
+    if (session.userId == userId) {
+      await writeStoredText(
+        hydrationKey,
+        jsonEncode({'version': 1, 'backupId': backupId}),
+      );
     }
     return changed;
   }
