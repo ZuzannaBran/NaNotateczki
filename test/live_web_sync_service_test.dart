@@ -648,6 +648,83 @@ void main() {
     client.close();
   });
 
+  test('passive device downloads remote edits without local writes', () async {
+    final remote = Notebook(
+      uid: 'from-device-a',
+      title: 'Edited on device A',
+      kind: NotebookKind.notebook,
+      folder: 'Courses',
+      createdAt: DateTime.utc(2026, 11, 2),
+      updatedAt: DateTime.utc(2026, 11, 2, 12),
+      pages: [
+        NotePage(
+          id: 'remote-page',
+          title: 'Remote content',
+          textBlocks: [],
+          imageBlocks: [],
+          inkStrokes: [],
+          isBookmarked: false,
+        ),
+      ],
+    );
+    var remoteChanged = false;
+    var imported = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response('{"cursor":0,"notebooks":[]}', 200);
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          if (!remoteChanged) {
+            return http.Response('{"cursor":0,"changes":[]}', 200);
+          }
+          return http.Response(jsonEncode({
+            'cursor': 1,
+            'changes': [{
+              'uid': remote.uid,
+              'revision': 1,
+              'deleted': false,
+              'notebook': NotebookRepository.encodeNotebook(remote),
+            }],
+          }), 200);
+        }
+        fail('Passive device must not upload an unchanged notebook.');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(
+      database,
+      onChanged: (changes) => imported += changes.length,
+    );
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'passive-device';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+    await sync.start(InitialSyncPolicy.downloadRemote);
+    expect(imported, 0);
+    expect(sync.hasPendingChanges, isFalse);
+
+    remoteChanged = true;
+    await sync.syncNow();
+
+    expect(sync.lastError, isNull);
+    expect(imported, 1);
+    expect(sync.hasPendingChanges, isFalse);
+    final notebooks = await repository.fetchNotebooks();
+    expect(notebooks.single.uid, remote.uid);
+    expect(notebooks.single.pages.single.title, 'Remote content');
+  });
+
   test('does not skip concurrent remote events after its own push', () async {
     var changesCalls = 0;
     final client = ApiClient(
