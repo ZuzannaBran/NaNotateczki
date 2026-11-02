@@ -83,7 +83,8 @@ void main() {
     expect(page.inkStrokes.single.id, isNot('stroke'));
     expect(source.pages.single.imageBlocks.single.path, '/old/device.png');
     expect(source.title, 'Course');
-  });  test('local account copy renames only matching folder and kind', () {
+  });
+  test('local account copy renames only matching folder and kind', () {
     final now = DateTime.utc(2026, 11, 2);
     final page = NotePage(
       id: 'local-page',
@@ -149,5 +150,4 @@ void main() {
     expect(imported.title, 'Work (3)');
     expect(imported.uid, isNot(source.uid));
   });
-
 }

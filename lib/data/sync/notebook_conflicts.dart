@@ -43,7 +43,6 @@ Notebook numberedNotebookCopy(Notebook source, Iterable<Notebook> existing) {
   );
 }
 
-
 /// Creates a separate account document from a local source without
 /// overwriting an existing title in the same folder and notebook kind.
 /// The caller is responsible for durable, idempotent import checkpoints.
