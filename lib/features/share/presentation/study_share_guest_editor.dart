@@ -11,6 +11,7 @@ import '../../../data/sync/study_share_guest_outbox.dart';
 import '../../../data/sync/study_share_service.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/state/editor_controller.dart';
+import '../../editor/state/page_background.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
@@ -27,6 +28,7 @@ class StudyShareGuestEditor extends StatefulWidget {
     required this.client,
     required this.updateRevision,
     required this.onEnded,
+    required this.onHostDarkMode,
     super.key,
   });
 
@@ -35,6 +37,7 @@ class StudyShareGuestEditor extends StatefulWidget {
   final StudyShareGuestClient client;
   final int updateRevision;
   final VoidCallback onEnded;
+  final ValueChanged<bool> onHostDarkMode;
 
   @override
   State<StudyShareGuestEditor> createState() => _StudyShareGuestEditorState();
@@ -61,7 +64,6 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
   bool _refreshing = false;
   bool _closed = false;
   String? _error;
-  String _status = 'Connecting to shared document';
 
   @override
   void initState() {
@@ -131,11 +133,8 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         const Duration(seconds: 15),
         (_) => unawaited(_refresh()),
       );
-      setState(() {
-        _status = recovered
-            ? 'Restored unsent changes · Saving'
-            : 'Editing · All changes saved';
-      });
+      _applyAppearance(document);
+      setState(() {});
       if (recovered) {
         _pushTimer = Timer(
           const Duration(milliseconds: 35),
@@ -173,7 +172,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       const Duration(milliseconds: 35),
       () => unawaited(_push()),
     );
-    setState(() => _status = 'Unsaved changes');
+
   }
 
   Future<void> _persistPending() {
@@ -233,9 +232,6 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       return;
     }
     _sending = true;
-    if (mounted) {
-      setState(() => _status = 'Saving changes');
-    }
     try {
       await _editor?.flushPendingSaves();
       await _repository!.waitForPendingSaves();
@@ -255,9 +251,6 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       final submitted = NotebookRepository.encodeNotebook(notebook);
       if (jsonEncode(submitted['pages']) == jsonEncode(original['pages'])) {
         await _clearPending();
-        if (mounted) {
-          setState(() => _status = 'All changes saved');
-        }
         return;
       }
       final answer = await widget.client.writeDocument(
@@ -283,16 +276,13 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
             _error =
                 'A concurrent edit took precedence. Your changes '
                 'remain in this tab but were not fully saved.';
-            _status = 'Changes not saved';
           });
         }
         return;
       }
-      if (mounted) {
-        setState(() {
-          _status = _dirty ? 'Unsaved changes' : 'All changes saved';
-          _error = null;
-        });
+      _applyAppearance(answer);
+      if (_error != null && mounted) {
+        setState(() => _error = null);
       }
       // The server can merge changes from several participants.
       if (!_dirty &&
@@ -312,7 +302,6 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
                     'Your local changes are preserved; resolve the conflict '
                     'before leaving this tab.'
               : error.message;
-          _status = 'Changes not saved';
         });
         if (error.statusCode != 409) {
           _retry();
@@ -323,7 +312,6 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       if (mounted) {
         setState(() {
           _error = '$error';
-          _status = 'Changes not saved';
         });
         _retry();
       }
@@ -351,7 +339,6 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     if (_closed ||
         _sending ||
         _refreshing ||
-        _dirty ||
         _repository == null ||
         _editor == null) {
       return;
@@ -362,7 +349,11 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         widget.shareId,
         widget.ticket,
       );
-      if (latest.revision <= _revision || !mounted || _dirty) {
+      if (!mounted) {
+        return;
+      }
+      _applyAppearance(latest);
+      if (latest.revision <= _revision || _dirty) {
         return;
       }
       // Flush any text still being edited before changing the controller.
@@ -387,6 +378,27 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     }
   }
 
+  void _applyAppearance(SharedStudyDocument snapshot) {
+    final appearance = snapshot.appearance;
+    if (appearance == null) {
+      return;
+    }
+    final darkMode = appearance['darkMode'];
+    if (darkMode is bool) {
+      widget.onHostDarkMode(darkMode);
+    }
+    final style = appearance['backgroundStyle'];
+    final spacing = appearance['backgroundSpacing'];
+    if (style is int && spacing is num) {
+      _editor?.applySharedBackgroundSettings(
+        PageBackgroundSettings.fromJson({
+          'style': style,
+          'spacing': spacing,
+        }),
+      );
+    }
+  }
+
   Future<void> _installRemote(SharedStudyDocument snapshot) async {
     if (_repository == null || !mounted || _closed) {
       return;
@@ -396,17 +408,32 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       _deferRemote(snapshot);
       return;
     }
+    _applyAppearance(snapshot);
+    final local = NotebookRepository.encodeNotebook(editor.notebook);
+    if (jsonEncode(local['pages']) ==
+        jsonEncode(snapshot.notebook['pages'])) {
+      _deferredRemote = null;
+      _remoteRetryTimer?.cancel();
+      _base = snapshot.notebook;
+      _revision = snapshot.revision;
+      return;
+    }
     _suppressChanges = true;
     try {
-      final updated = _decode(snapshot.notebook);
-      await _repository!.importNotebooksAtomically([
-        updated,
-      ], verifiedRemoteSync: true);
-      if (!mounted || _dirty) {
+      await _repository!.waitForPendingSaves();
+      if (!mounted || _dirty || !editor.canApplyConfirmedRemoteNotebook) {
+        _deferRemote(snapshot);
         return;
       }
-      // The editor owns the guest's page, pan and zoom. Refresh the pages
-      // without disposing it or remounting the board/notebook viewport.
+      final updated = _decode(snapshot.notebook);
+      await _repository!.importNotebooksAtomically(
+        [updated],
+        verifiedRemoteSync: true,
+      );
+      if (!mounted || _dirty || !editor.canApplyConfirmedRemoteNotebook) {
+        _deferRemote(snapshot);
+        return;
+      }
       if (!editor.applyConfirmedRemoteNotebook(updated)) {
         _deferRemote(snapshot);
         return;
@@ -415,10 +442,9 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       _remoteRetryTimer?.cancel();
       _base = snapshot.notebook;
       _revision = snapshot.revision;
-      setState(() {
-        _status = 'All changes saved';
-        _error = null;
-      });
+      if (_error != null) {
+        setState(() => _error = null);
+      }
     } finally {
       _suppressChanges = false;
     }
@@ -508,21 +534,23 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     }
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            children: [
-              Text('Shared editing · $_status'),
-              if (_outboxFailed)
-                const Text('Browser recovery is currently unavailable.'),
-              if (_error != null)
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-            ],
+        if (_error != null || _outboxFailed)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              children: [
+                if (_outboxFailed)
+                  const Text('Browser recovery is currently unavailable.'),
+                if (_error != null)
+                  Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
         Expanded(
           child: ChangeNotifierProvider<EditorController>.value(
             value: editor,

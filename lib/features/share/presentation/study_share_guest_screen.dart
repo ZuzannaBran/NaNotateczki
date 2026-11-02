@@ -13,10 +13,23 @@ import 'study_share_guest_editor.dart';
 bool isTerminalShareSocketClose(int? code) =>
     code == 4401 || code == 4403 || code == 4410;
 
-class StudyShareGuestApp extends StatelessWidget {
+class StudyShareGuestApp extends StatefulWidget {
   const StudyShareGuestApp({required this.sessionId, super.key});
 
   final String sessionId;
+
+  @override
+  State<StudyShareGuestApp> createState() => _StudyShareGuestAppState();
+}
+
+class _StudyShareGuestAppState extends State<StudyShareGuestApp> {
+  bool _hostDarkMode = false;
+
+  void _changeHostTheme(bool darkMode) {
+    if (mounted && _hostDarkMode != darkMode) {
+      setState(() => _hostDarkMode = darkMode);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,15 +37,24 @@ class StudyShareGuestApp extends StatelessWidget {
       title: 'NaNotateczki – Study session',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      home: _StudyShareGuestScreen(sessionId: sessionId),
+      darkTheme: AppTheme.dark(),
+      themeMode: _hostDarkMode ? ThemeMode.dark : ThemeMode.light,
+      home: _StudyShareGuestScreen(
+        sessionId: widget.sessionId,
+        onHostDarkMode: _changeHostTheme,
+      ),
     );
   }
 }
 
 class _StudyShareGuestScreen extends StatefulWidget {
-  const _StudyShareGuestScreen({required this.sessionId});
+  const _StudyShareGuestScreen({
+    required this.sessionId,
+    required this.onHostDarkMode,
+  });
 
   final String sessionId;
+  final ValueChanged<bool> onHostDarkMode;
 
   @override
   State<_StudyShareGuestScreen> createState() => _StudyShareGuestScreenState();
@@ -123,6 +145,7 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
                 setState(() => _documentUpdates++);
                 break;
               case 'document_changed':
+              case 'appearance_changed':
                 setState(() => _documentUpdates++);
                 break;
               case 'extended':
@@ -280,11 +303,8 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
                       updateRevision: _documentUpdates,
                       onEnded: () =>
                           _endView('This session is no longer available.'),
+                      onHostDarkMode: widget.onHostDarkMode,
                     ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: Text('Shared editing · changes belong to the host'),
                   ),
                 ],
               ),

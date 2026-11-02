@@ -1051,6 +1051,17 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Applies the host's background without persisting guest preferences.
+  void applySharedBackgroundSettings(PageBackgroundSettings settings) {
+    final current = currentBackgroundSettings;
+    if (current.style == settings.style &&
+        current.spacing == settings.spacing) {
+      return;
+    }
+    _localBackgrounds[notebook.uid] = settings;
+    backgroundSettingsListenable.value = settings;
+  }
+
   void setCurrentBackgroundSettings(PageBackgroundSettings settings) {
     final previous = currentBackgroundSettings;
     if (_localBackgrounds.containsKey(notebook.uid) &&

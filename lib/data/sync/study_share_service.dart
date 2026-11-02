@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../../core/storage/app_save_coordinator.dart';
+import '../../features/editor/state/page_background.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import 'account_session_controller.dart';
 import 'api_client.dart';
@@ -133,6 +134,23 @@ class StudyShareService {
     );
   }
 
+  /// Appearance is independent from document content revisions.
+  Future<void> updateAppearance(
+    ActiveStudyShare share, {
+    required bool darkMode,
+    required PageBackgroundSettings background,
+  }) async {
+    await _refreshIfNeeded();
+    await session.apiClient.putJson(
+      '/v1/study-shares/${share.id}/appearance',
+      {
+        'darkMode': darkMode,
+        'backgroundStyle': background.style.index,
+        'backgroundSpacing': background.spacing,
+      },
+    );
+  }
+
   Future<ActiveStudyShare> extend(ActiveStudyShare share) async {
     await _refreshIfNeeded();
     final response = await session.apiClient.postJson(
@@ -169,10 +187,15 @@ class StudyShareService {
 }
 
 class SharedStudyDocument {
-  const SharedStudyDocument({required this.notebook, required this.revision});
+  const SharedStudyDocument({
+    required this.notebook,
+    required this.revision,
+    this.appearance,
+  });
 
   final Map<String, dynamic> notebook;
   final int revision;
+  final Map<String, dynamic>? appearance;
 
   factory SharedStudyDocument.fromResponse(Object? body) {
     if (body is! Map<String, dynamic> ||
@@ -180,9 +203,14 @@ class SharedStudyDocument {
         body['revision'] is! int) {
       throw const FormatException('Invalid shared document response.');
     }
+    final appearance = body['appearance'];
+    if (appearance != null && appearance is! Map<String, dynamic>) {
+      throw const FormatException('Invalid shared appearance.');
+    }
     return SharedStudyDocument(
       notebook: body['notebook'] as Map<String, dynamic>,
       revision: body['revision'] as int,
+      appearance: appearance as Map<String, dynamic>?,
     );
   }
 }
