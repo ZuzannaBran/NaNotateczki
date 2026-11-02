@@ -132,7 +132,9 @@ class StudySession {
     'kind': kind.name,
     'title': title,
     'description': description,
-    'scheduledAt': scheduledAt.toIso8601String(),
+    'scheduledAt': kind == StudyEntryKind.event && allDay
+        ? scheduledAt.toIso8601String()
+        : scheduledAt.toUtc().toIso8601String(),
     'minutes': minutes,
     'technique': technique.name,
     'focusBlocks': focusBlocks,
@@ -141,9 +143,9 @@ class StudySession {
     'phase': phase.name,
     'round': round,
     'remainingSeconds': remainingSeconds,
-    'deadline': deadline?.toIso8601String(),
-    'startedAt': startedAt?.toIso8601String(),
-    'finishedAt': finishedAt?.toIso8601String(),
+    'deadline': deadline?.toUtc().toIso8601String(),
+    'startedAt': startedAt?.toUtc().toIso8601String(),
+    'finishedAt': finishedAt?.toUtc().toIso8601String(),
     'productivity': productivity,
     'allDay': kind == StudyEntryKind.event && allDay,
     'eventEndDate': eventEndDate?.toIso8601String(),
@@ -873,10 +875,16 @@ class StudyPlannerController extends ChangeNotifier {
           (content is! Map<String, dynamic> || content['id'] != id)) {
         throw const FormatException('Invalid remote planner entry');
       }
+      final normalized = deleted
+          ? null
+          : StudySession.fromJson({
+              ...content as Map<String, dynamic>,
+              'modifiedAt': time.toIso8601String(),
+            }).toJson();
       if (oldTime != null &&
           time.isAtSameMomentAs(oldTime) &&
           existing!['deleted'] == deleted &&
-          jsonEncode(existing['entry']) == jsonEncode(content)) {
+          jsonEncode(existing['entry']) == jsonEncode(normalized)) {
         continue;
       }
       _sessions.removeWhere((entry) => entry.id == id);
