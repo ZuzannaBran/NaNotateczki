@@ -103,6 +103,33 @@ void main() {
     );
   });
 
+  test('simultaneous edits of the same task retain both versions', () {
+    final task = {'id': 'task-1', 'title': 'Read', 'completed': false};
+    final merged = mergeAccountLibraryState(
+      base: {
+        'plannerTasks': {'planner-1': [task]},
+      },
+      local: {
+        'plannerTasks': {
+          'planner-1': [{...task, 'title': 'Read chapter 3'}],
+        },
+      },
+      remote: {
+        'plannerTasks': {
+          'planner-1': [{...task, 'title': 'Read chapter 5'}],
+        },
+      },
+    );
+    final tasks = merged['plannerTasks']['planner-1'] as List;
+    expect(tasks, hasLength(2));
+    expect(tasks.any((task) => task['title'] == 'Read chapter 5'), isTrue);
+    expect(
+      tasks.any((task) => task['title'] == 'Read chapter 3 (1)'),
+      isTrue,
+    );
+    expect(tasks.map((task) => task['id']).toSet(), hasLength(2));
+  });
+
   test('first device sync does not erase a different local folder', () {
     final merged = mergeAccountLibraryState(
       base: null,
