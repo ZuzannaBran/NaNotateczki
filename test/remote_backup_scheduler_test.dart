@@ -72,6 +72,7 @@ void main() {
     now = now.add(const Duration(seconds: 20));
     await tester.pump(const Duration(seconds: 20));
     scheduler.markDirty();
+    scheduler.recordUserInteraction();
     now = now.add(const Duration(seconds: 29));
     await tester.pump(const Duration(seconds: 29));
     expect(service.calls, 0);
