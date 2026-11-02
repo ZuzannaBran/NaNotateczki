@@ -237,7 +237,7 @@ void main() {
     },
   );
 
-  test('server deletion during an offline edit preserves one draft', () async {
+  test('a later offline edit restores the original deleted UID', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -268,7 +268,9 @@ void main() {
         }
         if (request.method == 'PUT') {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
-          if (rejectUpdate && body['notebook']['uid'] == note.uid) {
+          if (rejectUpdate &&
+              body['notebook']['uid'] == note.uid &&
+              body['restoreDeleted'] != true) {
             return http.Response(
               jsonEncode({
                 'detail': {
@@ -282,7 +284,10 @@ void main() {
             );
           }
           return http.Response(
-            jsonEncode({'revision': 1, 'notebook': body['notebook']}),
+            jsonEncode({
+              'revision': body['restoreDeleted'] == true ? 3 : 1,
+              'notebook': body['notebook'],
+            }),
             200,
           );
         }
@@ -308,11 +313,11 @@ void main() {
     sync.enqueue([NotebookRepositoryChange.full(note.uid)]);
     await sync.syncNow();
 
-    expect(await repository.getNotebook(note.uid), isNull);
     final remaining = await repository.fetchNotebooks();
     expect(remaining, hasLength(1));
-    expect(remaining.single.title, 'Edited offline (1)');
-    expect(remaining.single.uid, isNot(note.uid));
+    expect(remaining.single.uid, note.uid);
+    expect(remaining.single.title, 'Edited offline');
+    expect(sync.hasPendingChanges, isFalse);
   });
 
   test('drains every full page of the server change feed', () async {
