@@ -368,7 +368,15 @@ Wymagana migracja PostgreSQL: `0008_planner_entries.sql`.
 ## Wyjście i dodatkowa reguła usunięcie–edycja (2026-11-02)
 
 Po zalogowaniu domyślny automatyczny backup następuje po 30 sekundach
-bezczynności, do wyboru także 15/60/120/300/900/1800 sekund. Ustawienie
+bezczynności, do wyboru także 15/60/120/300/900/1800 sekund.
+Przed każdym zdalnym snapshotem aplikacja uzgadnia najpierw wszystkie
+zmiany notatników, ustawień konta i planera z serwerem. Niepowodzenie
+synchronizacji blokuje wysłanie nieaktualnego snapshotu; zachowuje
+oczekujący backup do ponowienia. Brak własnych zmian nie zatrzymuje
+WebSocket ani awaryjnego pobierania feedu co 45 sekund. Zmiany pobrane
+z innego urządzenia również oznaczają backup jako oczekujący, bez
+resetowania czasu bezczynności. Brak różnic w obu kierunkach oznacza,
+że nie trzeba tworzyć kolejnej identycznej kopii. Ustawienie
 jest zapamiętywane lokalnie i synchronizowane na konto.
 Normalne zamknięcie natywnej aplikacji próbuje najpierw opróżnić lokalne
 zapisy, uzgodnić live sync i uzyskać zweryfikowany snapshot serwerowy.
