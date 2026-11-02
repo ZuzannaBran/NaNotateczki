@@ -254,6 +254,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
   Future<void> _syncAccountSettings() async {
     try {
+      // A planner task may still be in its short local save debounce.
+      // Flush it before reading library_folders.json for cloud sync.
+      await _libraryController?.flushPlannerTasks();
       await _accountSettingsSync?.syncNow();
     } catch (error, stackTrace) {
       AppErrorLog.instance.record(
