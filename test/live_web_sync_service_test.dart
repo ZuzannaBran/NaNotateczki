@@ -838,9 +838,11 @@ void main() {
     await firstFinished.future;
     await sync.stop();
 
-    final state = jsonDecode(
-      stored.values.singleWhere((value) => value.contains('"pending"')),
-    ) as Map<String, dynamic>;
+    final state =
+        jsonDecode(
+              stored.values.singleWhere((value) => value.contains('"pending"')),
+            )
+            as Map<String, dynamic>;
     expect(state['pending'], containsAll([first.uid, second.uid]));
   });
 

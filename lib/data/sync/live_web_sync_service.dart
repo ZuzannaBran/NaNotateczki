@@ -878,10 +878,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         }),
       );
     });
-    _offlineQueueTail = write.catchError((
-      Object error,
-      StackTrace stackTrace,
-    ) {
+    _offlineQueueTail = write.catchError((Object error, StackTrace stackTrace) {
       AppErrorLog.instance.record(
         error,
         stackTrace,
