@@ -2103,8 +2103,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 ## 13. Wspólna edycja sesji Web
 
 - `lib/data/sync/study_share_service.dart`: utworzenie, odzyskiwanie,
-  przedłużanie i zakończenie sesji oraz uwierzytelniony bilet gościa
-  do odczytu/zapisu całego dokumentu; brak dostępu do konta autora.
+  przedłużanie i zakończenie sesji, uwierzytelniony bilet gościa i
+  odrębną publikację trybu light/dark oraz stylu tła hosta bez
+  zmiany rewizji treści; brak dostępu do konta autora.
   Zapis gościa zachowuje niezmienioną datę utworzenia z bazy serwera,
   nawet gdy edytor odczytał tę samą chwilę w lokalnej strefie czasowej.
 - `lib/features/share/presentation/study_share_dialog.dart`: link,
@@ -2112,10 +2113,13 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `lib/features/share/presentation/study_share_capture.dart`: nakładka
   ostrzeżenia końca sesji bez kosztownych screenshotów PNG.
 - `lib/features/share/presentation/study_share_guest_screen.dart`: logowanie
-  hasłem, WebSocket, odnowienie połączenia, odcięcie dostępu.
+  hasłem, WebSocket, odnowienie połączenia, odcięcie dostępu i
+  motyw aktualizowany zgodnie z hostem po `appearance_changed`.
 - `lib/features/share/presentation/study_share_guest_editor.dart`:
   prawdziwy BoardScreen/NotebookScreen, zapis zmian do serwera,
   odtwarzanie scalonej wersji, retry i wznowienie zachowanego outboxu.
+  Pasek zapisu jest ukryty; komunikaty pojawiają się tylko przy błędzie.
+  Odbiór identycznych stron nie powoduje ponownego rysowania.
 - `lib/data/sync/study_share_guest_outbox.dart`: izolowany per link trwały
   zapis ostatniej niepotwierdzonej wersji, bez biletu lub hasła gościa.
   `test/study_share_guest_outbox_test.dart`: reload, izolacja i walidacja.
@@ -2130,10 +2134,15 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   test `study_share_web_assets_test.dart`.
 - `lib/features/library/presentation/library_screen.dart`: aktywna sesja
   i jej odzyskanie po ponownym uruchomieniu. Zmiana epoki remote sync
-  odtwarza widok kanwy ze zaktualizowanego oryginału.
+  odtwarza widok kanwy ze zaktualizowanego oryginału. Host blokuje
+  odbiór rewizji w aktywnej edycji i publikuje wygląd z debounce 120 ms.
 - `lib/data/sync/shared_edit_conflicts.dart`:
   `hasRejectedSharedEdits` sprawdza, czy serwer potwierdził wszystkie
   zmodyfikowane przez gościa obiekty (z ignorowaniem zmian niezależnych).
+- `test/study_share_http_test.dart`: motyw i tło bez zmiany rewizji.
+- `test/live_web_sync_service_test.dart`: ochrona aktywnego pisania hosta.
+- `server/api/tests/test_study_shares_flow.py`: walidacja wyglądu
+  i autoryzacja właściciela bez migracji SQL (`edit_clock`).
 - `test/shared_edit_conflicts_test.dart`: odrzucone edycje tekstu,
   kreski i usunięcia oraz scalanie niezależnych obiektów.
 - `lib/data/sync/live_web_sync_service.dart`: 90 ms debounce sync,

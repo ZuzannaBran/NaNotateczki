@@ -377,6 +377,13 @@ Każda potwierdzona zmiana trafia w transakcji PostgreSQL do istniejącego
 `synced_notebooks` pod **oryginalnym UID i folderem**; zmiana nie tworzy
 osobnego pliku lub dokumentu. Zapis powiadamia klientów przez WebSocket,
 a odpytywanie zapasowe służy wyłącznie na wypadek utraty połączenia.
+Host synchronizuje jasny/ciemny motyw i styl tła (Plain, Grid, Lines oraz
+odstęp) przez osobne `PUT /v1/study-shares/{id}/appearance`. API zapisuje
+ten stan w `study_shares.edit_clock['_appearance']` (bez migracji SQL)
+i rozsyła `appearance_changed` po WebSocket. Gość pobiera wygląd przez
+`GET /document` niezależnie od rewizji treści. Zwykły pasek potwierdzeń
+zapisu został usunięty; błędy nadal są wyświetlane.
+
 Gdy sesja jest aktywna, edytor zapisuje zakończony ruch po 20 ms,
 host uruchamia synchronizację bez dodatkowego debounce, a gość wysyła
 zapisane zmiany po dodatkowych 35 ms. Dodatkowy 2-sekundowy cooldown
@@ -387,6 +394,8 @@ Nie jest to gwarancja latencji Internetu, Cloudflare czy renderowania.
 Synchronizacja treści nie przenosi stanu viewportu: host i każdy gość
 zachowują własną stronę, zoom, pan i pozycję scrolla. Gdy w trakcie
 gestu nadejdzie rewizja, odbiór jest odroczony bez odmontowania edytora.
+Host ponawia odbiór po 120 ms, dopóki trwa lokalna edycja, zamiast
+chwilowo podmieniać widoczne fragmenty.
 
 Serwer weryfikuje `baseRevision` i `baseNotebook` względem
 niezmiennej historii `change_events`; indeks na rewizję pochodzi z migracji
