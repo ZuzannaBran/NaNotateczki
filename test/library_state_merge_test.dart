@@ -32,7 +32,9 @@ void main() {
     final merged = mergeAccountLibraryState(
       base: base,
       local: base,
-      remote: {'folders': ['Notes']},
+      remote: {
+        'folders': ['Notes'],
+      },
     );
     expect(merged['folders'], ['Notes']);
   });
@@ -45,10 +47,16 @@ void main() {
       'deadline': null,
       'deadlineHasTime': false,
     };
-    final base = {'plannerTasks': {'notebook-1': [task]}};
+    final base = {
+      'plannerTasks': {
+        'notebook-1': [task],
+      },
+    };
     final local = {
       'plannerTasks': {
-        'notebook-1': [{...task, 'completed': true}],
+        'notebook-1': [
+          {...task, 'completed': true},
+        ],
       },
     };
     final remote = {
@@ -71,18 +79,22 @@ void main() {
   });
 
   test('remote task deletion preserves only an edited numbered draft', () {
-    final task = {
-      'id': 'task-1',
-      'title': 'Read',
-      'completed': false,
-    };
-    final base = {'plannerTasks': {'notebook-1': [task]}};
-    final local = {
+    final task = {'id': 'task-1', 'title': 'Read', 'completed': false};
+    final base = {
       'plannerTasks': {
-        'notebook-1': [{...task, 'title': 'Read chapter 1'}],
+        'notebook-1': [task],
       },
     };
-    final remote = {'plannerTasks': {'notebook-1': <dynamic>[]}};
+    final local = {
+      'plannerTasks': {
+        'notebook-1': [
+          {...task, 'title': 'Read chapter 1'},
+        ],
+      },
+    };
+    final remote = {
+      'plannerTasks': {'notebook-1': <dynamic>[]},
+    };
 
     final merged = mergeAccountLibraryState(
       base: base,
@@ -107,34 +119,41 @@ void main() {
     final task = {'id': 'task-1', 'title': 'Read', 'completed': false};
     final merged = mergeAccountLibraryState(
       base: {
-        'plannerTasks': {'planner-1': [task]},
+        'plannerTasks': {
+          'planner-1': [task],
+        },
       },
       local: {
         'plannerTasks': {
-          'planner-1': [{...task, 'title': 'Read chapter 3'}],
+          'planner-1': [
+            {...task, 'title': 'Read chapter 3'},
+          ],
         },
       },
       remote: {
         'plannerTasks': {
-          'planner-1': [{...task, 'title': 'Read chapter 5'}],
+          'planner-1': [
+            {...task, 'title': 'Read chapter 5'},
+          ],
         },
       },
     );
     final tasks = merged['plannerTasks']['planner-1'] as List;
     expect(tasks, hasLength(2));
     expect(tasks.any((task) => task['title'] == 'Read chapter 5'), isTrue);
-    expect(
-      tasks.any((task) => task['title'] == 'Read chapter 3 (1)'),
-      isTrue,
-    );
+    expect(tasks.any((task) => task['title'] == 'Read chapter 3 (1)'), isTrue);
     expect(tasks.map((task) => task['id']).toSet(), hasLength(2));
   });
 
   test('first device sync does not erase a different local folder', () {
     final merged = mergeAccountLibraryState(
       base: null,
-      local: {'folders': ['Local']},
-      remote: {'folders': ['Remote']},
+      local: {
+        'folders': ['Local'],
+      },
+      remote: {
+        'folders': ['Remote'],
+      },
     );
     expect(merged['folders'], ['Local', 'Remote']);
   });
