@@ -2017,43 +2017,124 @@ class _LibraryWorkspace extends StatelessWidget {
       );
     }
 
-    final repository = context.read<NotebookRepository>();
-    final isBoard = item!.kind == NotebookKind.board;
-    return ChangeNotifierProvider(
-      key: ValueKey('${item!.uid}:${item!.folder}:$remoteEpoch'),
-      create: (_) => EditorController(
-        repository: repository,
-        notebook: item!,
-        saveDebounce: share == null
-            ? EditorController.defaultSaveDebounce
-            : const Duration(milliseconds: 100),
-      ),
-      child: Builder(
-        builder: (context) {
-          final canvas = isBoard
-              ? BoardScreen(
-                  title: item!.title,
-                  showToolbar: showToolbar,
-                  showCompactTimer: showCompactTimer,
-                  onOpenNavigation: onOpenNavigation,
-                )
-              : NotebookScreen(
-                  title: item!.title,
-                  showToolbar: showToolbar,
-                  showCompactTimer: showCompactTimer,
-                  onOpenNavigation: onOpenNavigation,
-                );
-          if (share != null && shareService != null && kIsWeb) {
-            return StudyShareCapture(
-              share: share!,
-              service: shareService!,
-              onExtended: onShareExtended,
+    return _PersistentWorkspaceEditor(
+      key: ValueKey(item!.uid),
+      item: item!,
+      repository: context.read<NotebookRepository>(),
+      remoteEpoch: remoteEpoch,
+      showToolbar: showToolbar,
+      showCompactTimer: showCompactTimer,
+      onOpenNavigation: onOpenNavigation,
+      share: share,
+      shareService: shareService,
+      onShareExtended: onShareExtended,
+    );
+  }
+}
+
+/// Keeps the local viewport alive when a remote revision is received.
+class _PersistentWorkspaceEditor extends StatefulWidget {
+  const _PersistentWorkspaceEditor({
+    required this.item,
+    required this.repository,
+    required this.remoteEpoch,
+    required this.showToolbar,
+    required this.showCompactTimer,
+    required this.onOpenNavigation,
+    required this.share,
+    required this.shareService,
+    required this.onShareExtended,
+    super.key,
+  });
+
+  final Notebook item;
+  final NotebookRepository repository;
+  final int remoteEpoch;
+  final bool showToolbar;
+  final bool showCompactTimer;
+  final VoidCallback? onOpenNavigation;
+  final ActiveStudyShare? share;
+  final StudyShareService? shareService;
+  final ValueChanged<ActiveStudyShare> onShareExtended;
+
+  @override
+  State<_PersistentWorkspaceEditor> createState() =>
+      _PersistentWorkspaceEditorState();
+}
+
+class _PersistentWorkspaceEditorState
+    extends State<_PersistentWorkspaceEditor> {
+  late final EditorController _editor = EditorController(
+    repository: widget.repository,
+    notebook: widget.item,
+    saveDebounce: _shareDebounce,
+  );
+
+  Duration get _shareDebounce => widget.share == null
+      ? EditorController.defaultSaveDebounce
+      : const Duration(milliseconds: 20);
+
+  @override
+  void didUpdateWidget(covariant _PersistentWorkspaceEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _editor.saveDebounce = _shareDebounce;
+    if (oldWidget.remoteEpoch != widget.remoteEpoch) {
+      unawaited(_refreshRemoteContent(widget.remoteEpoch));
+    }
+  }
+
+  Future<void> _refreshRemoteContent(int epoch) async {
+    // The sync service already resolved server conflicts in the repository.
+    // Never discard a gesture or a text edit still being committed.
+    await _editor.flushPendingSaves();
+    if (!mounted || widget.remoteEpoch != epoch) {
+      return;
+    }
+    final current = await widget.repository.getNotebook(widget.item.uid);
+    if (!mounted || widget.remoteEpoch != epoch || current == null) {
+      return;
+    }
+    if (!_editor.applyConfirmedRemoteNotebook(current)) {
+      // A new gesture began while we were reading; the next remote
+      // notification or account refresh can apply its confirmed revision.
+      return;
+    }
+  }
+
+  @override
+  void dispose() {
+    _editor.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final canvas = item.kind == NotebookKind.board
+        ? BoardScreen(
+            title: item.title,
+            showToolbar: widget.showToolbar,
+            showCompactTimer: widget.showCompactTimer,
+            onOpenNavigation: widget.onOpenNavigation,
+          )
+        : NotebookScreen(
+            title: item.title,
+            showToolbar: widget.showToolbar,
+            showCompactTimer: widget.showCompactTimer,
+            onOpenNavigation: widget.onOpenNavigation,
+          );
+    return ChangeNotifierProvider<EditorController>.value(
+      value: _editor,
+      child: widget.share != null &&
+              widget.shareService != null &&
+              kIsWeb
+          ? StudyShareCapture(
+              share: widget.share!,
+              service: widget.shareService!,
+              onExtended: widget.onShareExtended,
               child: canvas,
-            );
-          }
-          return canvas;
-        },
-      ),
+            )
+          : canvas,
     );
   }
 }
