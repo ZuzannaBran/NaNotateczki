@@ -33,6 +33,10 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
 
   final RemoteBackupService service;
   final AccountSessionController session;
+
+  /// Reconciles confirmed remote state before taking a device snapshot.
+  /// A failed reconciliation must not mark an outdated snapshot as verified.
+  Future<void> Function()? reconcileBeforeBackup;
   final DateTime Function() _now;
   Timer? _timer;
   late DateTime _lastActivityAt = _now();
@@ -182,9 +186,17 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     _timer?.cancel();
     _timer = null;
     _uploading = true;
-    final uploadGeneration = _changeGeneration;
     notifyListeners();
     try {
+      await reconcileBeforeBackup?.call();
+      if (!_enabled ||
+          !session.isSignedIn ||
+          _accountUserId != accountUserId) {
+        return;
+      }
+      // Changes downloaded by reconciliation are part of this snapshot,
+      // not a reason to schedule a redundant second upload.
+      final uploadGeneration = _changeGeneration;
       final receipt = await service.uploadVerifiedSnapshot(
         deviceId: await _deviceId(accountUserId),
       );
