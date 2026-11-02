@@ -23,6 +23,46 @@ void main() {
     textStorageWriteOverride = null;
   });
 
+  test('sends account-start signal before remote session restore', () async {
+    final events = <String>[];
+    textStorageReadOverride = (key) async {
+      if (key != AccountSessionController.profileStorageKey) {
+        return null;
+      }
+      return jsonEncode({
+        'version': 1,
+        'onboardingComplete': true,
+        'preferredMode': 'account',
+        'boundUserId': 'user-1',
+        'lastAccountUsername': 'test_user',
+      });
+    };
+    credentials.value = jsonEncode({
+      'version': 1,
+      'backend': 'https://api.example.com',
+      'userId': 'user-1',
+      'username': 'test_user',
+      'refreshToken': 'stored-refresh-token',
+    });
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        events.add('refresh');
+        return http.Response('{"detail":"unavailable"}', 503);
+      }),
+    );
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+      onBeforeAccountRestore: () => events.add('wake'),
+    );
+    await session.loadProfile();
+    expect(events, ['wake', 'refresh']);
+    expect(session.profileLoaded, isTrue);
+    session.dispose();
+    client.close();
+  });
+
   test('persists a local display name without credentials', () async {
     final stored = <String, String>{};
     textStorageReadOverride = (key) async => stored[key];

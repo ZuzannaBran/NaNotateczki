@@ -13,12 +13,14 @@ class AccountSessionController extends ChangeNotifier {
   AccountSessionController(
     this.apiClient, {
     AccountCredentialStore? credentialStore,
+    this.onBeforeAccountRestore,
   }) : _credentialStore =
            credentialStore ?? const SecureAccountCredentialStore();
 
   static const profileStorageKey = 'account_profile.json';
 
   final ApiClient apiClient;
+  final VoidCallback? onBeforeAccountRestore;
   final AccountCredentialStore _credentialStore;
   Future<void> _credentialQueue = Future<void>.value();
   int _sessionGeneration = 0;
@@ -107,6 +109,7 @@ class AccountSessionController extends ChangeNotifier {
       if (preferredMode == AccountDataMode.account &&
           onboardingComplete &&
           _boundUserId != null) {
+        onBeforeAccountRestore?.call();
         await _restorePersistedSession();
       }
     } catch (failure) {

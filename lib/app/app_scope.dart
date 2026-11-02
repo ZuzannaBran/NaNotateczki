@@ -399,7 +399,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _activityWake ??= AppActivityWakeService(apiClient: apiClient);
         final newAccountSession = _accountSession == null;
         final accountSession =
-            _accountSession ?? AccountSessionController(apiClient);
+            _accountSession ??
+            AccountSessionController(
+              apiClient,
+              onBeforeAccountRestore: () {
+                _activityWake?.setEnabled(true);
+              },
+            );
         _accountSession = accountSession;
         _diagnosticsUpload ??= DiagnosticsUploadService(
           apiClient: apiClient,
