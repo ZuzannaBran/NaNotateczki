@@ -28,9 +28,7 @@ void main() {
       isTrue,
     );
     expect(
-      AppActivityWakeService.isIntentionalPointer(
-        const PointerScrollEvent(),
-      ),
+      AppActivityWakeService.isIntentionalPointer(const PointerScrollEvent()),
       isTrue,
     );
   });
