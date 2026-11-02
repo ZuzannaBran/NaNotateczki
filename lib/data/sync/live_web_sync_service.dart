@@ -35,6 +35,8 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, int> _revisions = <String, int>{};
   final Map<String, Map<String, dynamic>> _bases = {};
   final Set<String> _pending = <String>{};
+  final Set<String> _preStartPending = <String>{};
+  Future<void> _offlineQueueTail = Future<void>.value();
   final Map<String, String> _idempotencyKeys = <String, String>{};
   final Set<String> _restorePending = <String>{};
   Timer? _drainTimer;
@@ -101,7 +103,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     }
     _resetAccountState();
     _activeUserId = userId;
+    await _offlineQueueTail;
     await _loadState(userId);
+    _pending.addAll(_preStartPending);
     final bootstrap = await _getJsonObject('/v1/sync/bootstrap');
     final rawRecords = bootstrap['notebooks'];
     final cursor = bootstrap['cursor'];
@@ -115,7 +119,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     await _applyInitialPolicy(policy, remote);
     _cursor = cursor.toInt();
     _started = true;
+    await _offlineQueueTail;
     await _saveState();
+    _preStartPending.clear();
     await syncNow();
     if (enableRealtime) {
       unawaited(_connectRealtime());
@@ -124,7 +130,21 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void enqueue(Iterable<NotebookRepositoryChange> changes) {
-    if (!_started || _applyingRemote || !session.isSignedIn) {
+    if (_applyingRemote || !session.isSignedIn) {
+      return;
+    }
+    final incoming = changes.map((change) => change.uid).toSet();
+    if (incoming.isEmpty) {
+      return;
+    }
+    if (!_started) {
+      final userId = session.userId;
+      if (userId == null) {
+        return;
+      }
+      _preStartPending.addAll(incoming);
+      _pending.addAll(incoming);
+      unawaited(_persistPreStartChanges(userId, incoming));
       return;
     }
     var sharedChange = false;
@@ -142,6 +162,50 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       () => unawaited(syncNow()),
     );
     notifyListeners();
+  }
+
+  Future<void> _persistPreStartChanges(
+    String userId,
+    Set<String> changedUids,
+  ) {
+    final operation = _offlineQueueTail.catchError((Object _) {}).then((
+      _,
+    ) async {
+      final key = _stateKey(userId);
+      final raw = await readStoredText(key);
+      final decoded = raw == null
+          ? <String, dynamic>{'version': 1, 'cursor': 0}
+          : jsonDecode(raw);
+      if (decoded is! Map<String, dynamic> || decoded['version'] != 1) {
+        throw const FormatException('Invalid saved account outbox.');
+      }
+      final previous = decoded['pending'];
+      final keys = decoded['idempotencyKeys'];
+      final pending = <String>{
+        if (previous is List<dynamic>) ...previous.whereType<String>(),
+        ...changedUids,
+      };
+      final idempotency = <String, dynamic>{
+        if (keys is Map<String, dynamic>) ...keys,
+        for (final uid in changedUids) uid: const Uuid().v4(),
+      };
+      await writeStoredText(
+        key,
+        jsonEncode({
+          ...decoded,
+          'pending': pending.toList()..sort(),
+          'idempotencyKeys': idempotency,
+        }),
+      );
+    });
+    _offlineQueueTail = operation;
+    return operation.catchError((Object error, StackTrace stackTrace) {
+      AppErrorLog.instance.record(
+        error,
+        stackTrace,
+        source: 'LiveWebSyncService.persistOfflineOutbox',
+      );
+    });
   }
 
   Future<void> syncNow() {
@@ -830,7 +894,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _socketSubscription = null;
     _channel = null;
     await _activeSync;
+    await _offlineQueueTail;
     _resetAccountState();
+    _preStartPending.clear();
     notifyListeners();
   }
 
