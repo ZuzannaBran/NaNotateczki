@@ -429,6 +429,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                 _backupScheduler?.schedule(changes: changes);
                 _remoteBackupScheduler?.markDirty();
                 _liveSync?.enqueue(changes);
+                if (changes.isEmpty) {
+                  // Folder, cover and task metadata live in library_folders.
+                  _scheduleAccountSettingsSync();
+                }
               },
             );
         _repository = repository;
@@ -509,6 +513,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           apiClient: apiClient,
           session: accountSession,
           onRemoteApplied: () async {
+            await libraryController.reloadFromAccount();
             await preferences.load();
             await remoteBackupScheduler.refreshAccountPreference();
           },
