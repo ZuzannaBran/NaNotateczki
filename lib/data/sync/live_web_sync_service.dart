@@ -622,8 +622,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         throw const FormatException('Sync cursor did not advance.');
       }
       _cursor = latestCursor.toInt();
-      if (hasMore == false ||
-          (hasMore == null && rawChanges.length < 500)) {
+      if (hasMore == false || (hasMore == null && rawChanges.length < 500)) {
         return;
       }
     }
