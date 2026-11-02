@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
+
 import 'api_client.dart';
 
 /// Sends a best-effort wake request at startup and after continued activity.
@@ -8,6 +10,12 @@ class AppActivityWakeService {
     : _now = now ?? DateTime.now;
 
   static const interval = Duration(minutes: 30);
+
+  /// Hover and unpressed pointer movement must not wake the server.
+  static bool isIntentionalPointer(PointerEvent event) =>
+      event is PointerDownEvent ||
+      event is PointerSignalEvent ||
+      (event is PointerMoveEvent && event.buttons != 0);
 
   final ApiClient apiClient;
   final DateTime Function() _now;
