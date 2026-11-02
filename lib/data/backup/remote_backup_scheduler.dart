@@ -27,8 +27,8 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     HardwareKeyboard.instance.addHandler(_onKey);
   }
 
-  static const defaultIdleSeconds = 120;
-  static const supportedIdleSeconds = <int>[30, 60, 120, 300, 900, 1800];
+  static const defaultIdleSeconds = 30;
+  static const supportedIdleSeconds = <int>[15, 30, 60, 120, 300, 900, 1800];
   static const failureRetry = Duration(minutes: 5);
 
   final RemoteBackupService service;
