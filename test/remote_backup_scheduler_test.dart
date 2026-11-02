@@ -219,14 +219,18 @@ void main() {
 
     final downloaded = numberedNotebookCopy(initial, [initial]);
     expect(downloaded.uid, isNot(initial.uid));
-    expect(downloaded.pages.map((page) => page.id).toSet(),
-        isNot(contains(initial.pages.first.id)));
+    expect(
+      downloaded.pages.map((page) => page.id).toSet(),
+      isNot(contains(initial.pages.first.id)),
+    );
     await repository.importNotebooksAtomically([
       downloaded,
     ], verifiedRemoteSync: true);
     final imported = await repository.fetchNotebooks();
-    expect(imported.map((notebook) => notebook.uid).toSet(),
-        containsAll([initial.uid, downloaded.uid]));
+    expect(
+      imported.map((notebook) => notebook.uid).toSet(),
+      containsAll([initial.uid, downloaded.uid]),
+    );
     expect(scheduler.hasPendingBackup, isTrue);
     // No new user input: the downloaded change must upload after 30 seconds.
     now = now.add(const Duration(seconds: 31));
