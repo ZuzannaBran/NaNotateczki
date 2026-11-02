@@ -155,6 +155,19 @@ void main() {
       expect(jsonDecode(stored['app_prefs.json']!)['darkMode'], true);
       expect((await repo2.fetchNotebooks()).single.uid, notebook.uid);
 
+      // An intentional offline deletion must not be resurrected by either
+      // the same snapshot or a newly uploaded snapshot from another device.
+      await repo2.deleteNotebook(notebook.uid);
+      await recovery.hydrateFromLatestAccountBackup();
+      expect(await repo2.getNotebook(notebook.uid), isNull);
+      stored['server_sync_state_$accountSuffix.json'] = jsonEncode({
+        'version': 1,
+        'pending': [notebook.uid],
+      });
+      latestBackupId = '123e4567-e89b-12d3-a456-426614174003';
+      await recovery.hydrateFromLatestAccountBackup();
+      expect(await repo2.getNotebook(notebook.uid), isNull);
+
       stored.clear();
       bootstrapCursor = 1;
       final db3 = NotesDatabase(NativeDatabase.memory());
