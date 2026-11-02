@@ -40,6 +40,7 @@ class AccountSessionController extends ChangeNotifier {
   String? error;
   Future<void>? _profileLoad;
   Future<void>? _refreshInProgress;
+  Future<void>? _restoreInProgress;
   bool _disposed = false;
 
   static final usernamePattern = RegExp(
@@ -110,7 +111,7 @@ class AccountSessionController extends ChangeNotifier {
           onboardingComplete &&
           _boundUserId != null) {
         onBeforeAccountRestore?.call();
-        await _restorePersistedSession();
+        await retryPersistedSession();
       }
     } catch (failure) {
       if (!_disposed) {
@@ -245,6 +246,31 @@ class AccountSessionController extends ChangeNotifier {
     _applySession(incoming);
     await _persistRefreshCredential();
     _notifyIfActive();
+  }
+
+  /// Retries a remembered login after an offline startup, without prompting.
+  /// The single-flight guard protects rotating tokens from concurrent retries.
+  Future<void> retryPersistedSession() {
+    if (_disposed ||
+        isSignedIn ||
+        isBusy ||
+        preferredMode != AccountDataMode.account ||
+        !onboardingComplete ||
+        _boundUserId == null) {
+      return Future<void>.value();
+    }
+    final running = _restoreInProgress;
+    if (running != null) {
+      return running;
+    }
+    final operation = _restorePersistedSession();
+    _restoreInProgress = operation;
+    return operation.whenComplete(() {
+      if (identical(_restoreInProgress, operation)) {
+        _restoreInProgress = null;
+      }
+      _notifyIfActive();
+    });
   }
 
   Future<void> _restorePersistedSession() async {
