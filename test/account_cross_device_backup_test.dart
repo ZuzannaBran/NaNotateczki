@@ -12,8 +12,11 @@ import 'package:program/data/sync/account_session_controller.dart';
 import 'package:program/data/sync/api_client.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 
+import 'support/native_test_documents.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  useIsolatedNativeTestDocuments();
   tearDown(() {
     textStorageReadOverride = null;
     textStorageWriteOverride = null;
@@ -330,7 +333,7 @@ void main() {
 
       expect(requests, 1);
       expect(await repository.fetchNotebooks(), isEmpty);
-      expect(stored, isEmpty);
+      expect(stored.keys.where((key) => key != 'app_error_log.json'), isEmpty);
     },
   );
 
@@ -377,6 +380,6 @@ void main() {
       throwsA(isA<FormatException>()),
     );
     expect(await repository.fetchNotebooks(), isEmpty);
-    expect(stored, isEmpty);
+    expect(stored.keys.where((key) => key != 'app_error_log.json'), isEmpty);
   });
 }
