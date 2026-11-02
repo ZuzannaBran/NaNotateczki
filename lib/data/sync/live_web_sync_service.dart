@@ -36,6 +36,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, Map<String, dynamic>> _bases = {};
   final Set<String> _pending = <String>{};
   final Map<String, String> _idempotencyKeys = <String, String>{};
+  final Set<String> _restorePending = <String>{};
   Timer? _drainTimer;
   Timer? _reconnectTimer;
   Timer? _fallbackTimer;
@@ -271,19 +272,18 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           // A confirmed remote deletion is not itself a content conflict.
           // Preserve a numbered copy only for unfinished offline edits.
           if (_pending.contains(record.uid)) {
-            final preserved = await _conflictCopy(
-              localNotebook,
-              reserved: imports,
-            );
-            imports.add(preserved);
-            _pending.add(preserved.uid);
-            _idempotencyKeys[preserved.uid] = const Uuid().v4();
+            // An unsent local edit is accepted after this deletion.
+            // Keep the original UID and explicitly rebase on the tombstone.
+            _restorePending.add(record.uid);
+          } else {
+            remoteDeletes.add(record.uid);
           }
-          remoteDeletes.add(record.uid);
         }
-        _pending.remove(record.uid);
-        _idempotencyKeys.remove(record.uid);
-        _bases.remove(record.uid);
+        if (!_restorePending.contains(record.uid)) {
+          _pending.remove(record.uid);
+          _idempotencyKeys.remove(record.uid);
+          _bases.remove(record.uid);
+        }
         continue;
       }
       final localNotebook = localByUid[record.uid];
@@ -369,6 +369,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
               {
                 'expectedRevision': expectedRevision,
                 'notebook': encodedNotebook,
+                if (_restorePending.contains(uid)) 'restoreDeleted': true,
                 if (_bases[uid] case final Map<String, dynamic> base)
                   'baseNotebook': base,
               },
@@ -376,6 +377,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
             );
       final result = _requireJsonObject(response.decodeJson());
       _revisions[uid] = (result['revision'] as num).toInt();
+      _restorePending.remove(uid);
       if (result['notebook'] case final Map<String, dynamic> merged) {
         _bases[uid] = merged;
       } else if (notebook != null) {
@@ -472,23 +474,24 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         final local = await repository.getNotebook(record.uid);
         if (record.deleted) {
           imports.remove(record.uid);
-          if (local != null) {
-            if (_pending.contains(record.uid)) {
-              final preserved = await _conflictCopy(local);
-              imports[preserved.uid] = preserved;
-              _pending.add(preserved.uid);
-              _idempotencyKeys[preserved.uid] = const Uuid().v4();
+          if (local != null && _pending.contains(record.uid)) {
+            // Server accepts the retried edit after this tombstone.
+            _restorePending.add(record.uid);
+            _idempotencyKeys[record.uid] = const Uuid().v4();
+          } else {
+            if (local != null) {
+              _applyingRemote = true;
+              try {
+                await repository.deleteNotebook(record.uid);
+              } finally {
+                _applyingRemote = false;
+              }
+              removedRemote = true;
             }
-            _applyingRemote = true;
-            try {
-              await repository.deleteNotebook(record.uid);
-            } finally {
-              _applyingRemote = false;
-            }
-            removedRemote = true;
+            _restorePending.remove(record.uid);
+            _pending.remove(record.uid);
+            _idempotencyKeys.remove(record.uid);
           }
-          _pending.remove(record.uid);
-          _idempotencyKeys.remove(record.uid);
         } else if (_pending.contains(record.uid) && local != null) {
           if (record.notebook != null) {
             imports[record.uid] = record.notebook!;
@@ -759,6 +762,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _cursor = (json['cursor'] as num?)?.toInt() ?? 0;
     final revisions = json['revisions'];
     final pending = json['pending'];
+    final restorePending = json['restorePending'];
     final keys = json['idempotencyKeys'];
     if (revisions is Map<String, dynamic>) {
       for (final entry in revisions.entries) {
@@ -769,6 +773,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     }
     if (pending is List<dynamic>) {
       _pending.addAll(pending.whereType<String>());
+    }
+    if (restorePending is List<dynamic>) {
+      _restorePending.addAll(restorePending.whereType<String>());
     }
     if (keys is Map<String, dynamic>) {
       for (final entry in keys.entries) {
@@ -791,6 +798,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         'cursor': _cursor,
         'revisions': _revisions,
         'pending': _pending.toList()..sort(),
+        'restorePending': _restorePending.toList()..sort(),
         'idempotencyKeys': _idempotencyKeys,
       }),
     );
@@ -826,6 +834,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _revisions.clear();
     _bases.clear();
     _pending.clear();
+    _restorePending.clear();
     _idempotencyKeys.clear();
     lastError = null;
     lastSuccessfulSync = null;
