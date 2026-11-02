@@ -869,7 +869,7 @@ void main() {
     expect(changesCalls, 2);
   });
 
-  test('a write during bootstrap survives the persisted outbox merge', () async {
+  test('bootstrap preserves a pending local edit', () async {
     final stored = <String, String>{};
     textStorageReadOverride = (key) async => stored[key];
     textStorageWriteOverride = (key, value) async => stored[key] = value;
