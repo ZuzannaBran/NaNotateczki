@@ -104,7 +104,8 @@ class AccountSettingsSyncService {
             : 0;
         final knownValue = known?['value'];
         if (category == 'libraryState') {
-          applied = await _syncLibraryState(
+          applied =
+              await _syncLibraryState(
                 userId: userId,
                 key: key,
                 fileKey: fileKey,
@@ -212,7 +213,8 @@ class AccountSettingsSyncService {
         local: local,
         remote: remoteValue,
       );
-      final shouldUpload = local != null &&
+      final shouldUpload =
+          local != null &&
           (currentRemote == null || !_equivalent(desired, remoteValue));
       if (shouldUpload) {
         try {
