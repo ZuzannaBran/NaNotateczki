@@ -294,7 +294,7 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/remote_backup_service.dart` (504 linie)
+### `lib/data/backup/remote_backup_service.dart` (523 linie)
 
 Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
 zadania, planer, ustawienia, Recent i preferencję backupu; liczy SHA-256,
@@ -309,9 +309,11 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
   Odmienny szkic z backupu zachowuje jako kopię obok rewizji konta;
   nie wskrzesza dokumentów oznaczonych jako usunięte.
   Łączy foldery i zachowuje zadania przy właściwej kopii planera.
-  Nie nadpisuje istniejących preferencji ani historii planera; po udanym
-  sprawdzeniu zapisuje znacznik, aby nie pobierać wielkiego backupu
-  podczas każdego restartu.
+  Nie nadpisuje istniejących preferencji ani historii planera. Każdy start
+  konta sprawdza i weryfikuje najnowszy verified backup, także po wcześniejszym
+  odzyskaniu danych. Znacznik backupId zapobiega dublowaniu kopii konfliktowych
+  podczas ponownego przetwarzania tego samego snapshotu; pusta biblioteka
+  może zostać odzyskana ponownie.
 
 - `lib/data/backup/backup_payload_bytes.dart`: 6: `backupPayloadBytes`
   wycina oryginalne UTF-8 payloadu z już poprawnego JSON, bez zmiany
@@ -321,7 +323,8 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
 
 Jawnie włączany scheduler zalogowanego konta: po zmianach wysyła verified
 snapshot po ustawionym okresie bezczynności (domyślnie 120 sekund), po błędzie
-ponawia po 5 minutach; resume rozpoczyna nowe oczekiwanie na bezczynność.
+ponawia po 5 minutach; dostępne opóźnienia: 30, 60, 120, 300, 900,
+1800 sekund. Resume rozpoczyna nowe oczekiwanie na bezczynność.
 Samo logowanie nie włącza wysyłki. Stan wyniku i błędu jest czyszczony przy
 zmianie konta, a losowy `deviceId` ma osobny plik per `userId`.
 
