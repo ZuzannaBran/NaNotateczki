@@ -32,7 +32,6 @@ void main() {
     addTearDown(database.close);
     final repository = NotebookRepository(database);
     final original = await repository.createNotebook();
-    var copiedToServer = false;
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
@@ -55,14 +54,6 @@ void main() {
         if (request.url.path == '/v1/sync/changes') {
           return http.Response('{"cursor":1,"changes":[]}', 200);
         }
-        if (request.method == 'PUT' &&
-            request.url.path.startsWith('/v1/sync/notebooks/')) {
-          final payload = jsonDecode(request.body) as Map<String, dynamic>;
-          expect(payload['expectedRevision'], 0);
-          expect(payload['notebook']['uid'], isNot(original.uid));
-          copiedToServer = true;
-          return http.Response('{"revision":1}', 200);
-        }
         fail('Unexpected account synchronization request');
       }),
     )..setAccessToken('token');
@@ -83,9 +74,7 @@ void main() {
 
     expect(await repository.getNotebook(original.uid), isNull);
     final saved = await repository.fetchNotebooks();
-    expect(saved, hasLength(1));
-    expect(saved.single.uid, isNot(original.uid));
-    expect(saved.single.title, '${original.title} (1)');
-    expect(copiedToServer, isTrue);
+    expect(saved, isEmpty);
+    expect(sync.hasPendingChanges, isFalse);
   });
 }
