@@ -36,13 +36,25 @@ class AccountSettingsSyncService {
     if (previous != null) {
       return previous;
     }
-    final operation = _syncNow();
+    final operation = _syncWithRefresh();
     _running = operation;
     return operation.whenComplete(() {
       if (identical(_running, operation)) {
         _running = null;
       }
     });
+  }
+
+  Future<void> _syncWithRefresh() async {
+    try {
+      await _syncNow();
+    } on ApiException catch (error) {
+      if (error.statusCode != 401 || !session.isSignedIn) {
+        rethrow;
+      }
+      await session.refresh();
+      await _syncNow();
+    }
   }
 
   Future<void> _syncNow() async {
