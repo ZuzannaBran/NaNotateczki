@@ -399,7 +399,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         }
 
         final result = snapshot.data!;
-        _databaseWasReset = result.wasReset || result.freshFile;
+        if (_repository == null) {
+          _databaseWasReset = result.wasReset || result.freshFile;
+        }
         final repository =
             _repository ??
             NotebookRepository(
