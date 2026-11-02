@@ -241,8 +241,13 @@ void main() {
         .convert(utf8.encode('account-B'))
         .toString()
         .substring(0, 16);
-    expect(stored['server_sync_state_$suffixA.json'], contains('A-only-document'));
-    expect(stored['server_sync_state_$suffixB.json'], isNot(contains('A-only-document')));
+    expect(
+      stored['server_sync_state_$suffixA.json'],
+      contains('A-only-document'),
+    );
+    expect(
+      stored['server_sync_state_$suffixB.json'],
+      isNot(contains('A-only-document')),
+    );
   });
-
 }
