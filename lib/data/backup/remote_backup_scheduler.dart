@@ -44,6 +44,8 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   bool _enabled = false;
   bool _uploading = false;
   bool _disposed = false;
+  bool _foreground = WidgetsBinding.instance.lifecycleState == null ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
   Future<void>? _activeUpload;
   String? _accountUserId;
   RemoteBackupReceipt? lastVerifiedBackup;
@@ -217,8 +219,11 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
         Duration(seconds: _idleSeconds);
   }
 
+  /// Counts intentional user input, not mouse hover or background activity.
+  void recordUserInteraction() => _recordActivity();
+
   void _recordActivity() {
-    if (_enabled && !_disposed) {
+    if (_enabled && !_disposed && _foreground) {
       _lastActivityAt = _now();
     }
   }
@@ -332,11 +337,10 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        _enabled &&
-        _dirty &&
-        session.isSignedIn) {
-      _recordActivity();
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground && _enabled && _dirty && session.isSignedIn) {
+      // Time in the background is inactivity; never restart the idle clock
+      // merely because the app became visible again.
       _scheduleIdle();
     }
   }
