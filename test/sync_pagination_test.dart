@@ -133,7 +133,10 @@ void main() {
       final loaded = await repository.fetchNotebooks();
       expect(loaded, hasLength(9));
       expect(loaded.map((entry) => entry.uid).toSet(), hasLength(9));
-      expect(requested.where((url) => url.contains('/bootstrap')), hasLength(2));
+      expect(
+        requested.where((url) => url.contains('/bootstrap')),
+        hasLength(2),
+      );
       expect(requested.where((url) => url.contains('/changes')), hasLength(2));
       expect(sync.hasPendingChanges, isFalse);
     },
