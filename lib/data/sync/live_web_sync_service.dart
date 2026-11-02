@@ -329,7 +329,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _push(String uid) async {
+  Future<void> _push(String uid, {bool retriedConflict = false}) async {
     final notebook = await repository.getNotebook(uid);
     final encodedNotebook = notebook == null
         ? null
@@ -345,6 +345,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       encodedNotebook['createdAt'] = baseCreatedAt;
     }
     final expectedRevision = _revisions[uid] ?? 0;
+    final restoringDeleted = _restorePending.contains(uid);
     if (notebook == null && expectedRevision == 0) {
       _pending.remove(uid);
       _idempotencyKeys.remove(uid);
@@ -417,22 +418,30 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (record.deleted) {
         _bases.remove(uid);
         if (notebook != null) {
-          // The server deleted this UID while our edit was pending. Keep
-          // the unsynced draft as a separate recoverable document.
-          final preserved = await _conflictCopy(notebook);
-          await _applyRemoteImports([preserved]);
-          _pending.add(preserved.uid);
-          _idempotencyKeys[preserved.uid] = const Uuid().v4();
-          _applyingRemote = true;
-          try {
-            await repository.deleteNotebook(uid);
-          } finally {
-            _applyingRemote = false;
+          _restorePending.add(uid);
+          _pending.add(uid);
+          _idempotencyKeys[uid] = const Uuid().v4();
+          if (retriedConflict || restoringDeleted) {
+            // An additional concurrent deletion won the race. Keep the
+            // unsent local edit and report the conflict; do not lose it.
+            rethrow;
           }
-          remoteApplyEpoch++;
-          await onRemoteApplied?.call();
+          await _push(uid, retriedConflict: true);
+          return;
         }
+        // This local deletion was already accepted on another device.
+        _restorePending.remove(uid);
       } else if (record.notebook != null) {
+        if (notebook == null) {
+          _pending.add(uid);
+          _idempotencyKeys[uid] = const Uuid().v4();
+          if (retriedConflict) {
+            rethrow;
+          }
+          // A deletion accepted after an edit wins in server order.
+          await _push(uid, retriedConflict: true);
+          return;
+        }
         await _applyRemoteImports([record.notebook!], preserveLocalUids: {uid});
       }
       _pending.remove(uid);
