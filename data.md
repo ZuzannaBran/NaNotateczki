@@ -11,13 +11,16 @@ offline również po zalogowaniu.
   i nie wykonuje żadnego połączenia z API.
 - Konto powstaje dopiero po jawnym logowaniu. Na Linuxie, Web, Androidzie
   i iOS aplikacja automatycznie uruchamia bezpieczne scalanie `mergeSafely`,
-  odtwarzając najpierw brakujące dane ze zweryfikowanego backupu.
+  zawsze sprawdzając najnowszy zweryfikowany backup przy logowaniu i starcie
+  zapamiętanej sesji, a następnie odtwarzając brakujące dane.
 - Odtwarzanie backupu dołącza brakujące notatniki, pomija identyczne,
   a odmienną wersję zachowuje w tym samym folderze z pierwszym wolnym
   numerem `(1)`, `(2)` itd. Kopia ma nowe UID i ID wszystkich obiektów.
   Nie zastępuje istniejącego notatnika; pierwszeństwo nad backupem mają
   zdarzenia synchronizacji i tombstones. Foldery są łączone, a zadania
-  konfliktowego planera trafiają pod UID jego kopii.
+  konfliktowego planera trafiają pod UID jego kopii. Backup jest pobierany
+  i weryfikowany przy każdym starcie konta; ponowny import już przetworzonego
+  identyfikatora jest pomijany, jeśli lokalna biblioteka nadal istnieje.
 - Scheduler backupu włącza się dopiero po inicjalizacji konta i sync.
   Po wylogowaniu aplikacja zatrzymuje sync i backup przed wyczyszczeniem sesji.
 - `account_profile.json` przechowuje ukończenie onboardingu,
