@@ -168,8 +168,7 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 5. Błąd nie usuwa wcześniejszego poprawnego snapshotu. Scheduler ponawia próbę
    nie wcześniej niż po 5 minutach. Zmieniony snapshot wysyła po ustalonym
    okresie bezczynności (domyślnie 2 minuty; opcje: 30 s, 1 min,
-   2 min, 5 min, 15 min i 30 min); aktywny
-   aktywne kliknięcia, przewijanie, rysik i pisanie (także edytor Quill
+   2 min, 5 min, 15 min i 30 min); aktywne kliknięcia, przewijanie, rysik i pisanie (także edytor Quill
    z klawiaturą ekranową) przesuwają termin. Hover, otrzymane aktualizacje
    serwera i zdarzenia z ukrytej karty nie resetują licznika. Wznowienie
    aplikacji nie resetuje czasu bezczynności; natywny system może jednak
@@ -234,14 +233,21 @@ lokalny stan i rejestruje konflikt.
 Odpytywanie odbywa się przy starcie, po zmianie, wznowieniu aplikacji
 i co 45 sekund. Brak nowego endpointu na starej wersji serwera
 nie może blokować synchronizacji notatników ani tworzenia backupu.
-Serwer wymaga migracji `0007_account_settings.sql`. Dodanie kategorii
-`libraryState` wymaga także nowej migracji `0009_account_settings_library_state.sql`;
-sam klient nie synchronizuje jeszcze folderów przez tę kategorię.
+Serwer wymaga migracji `0007_account_settings.sql`. Synchronizacja folderów,
+okładek i zadań wykorzystuje dodatkową kategorię `libraryState`, wymagającą
+migracji `0009_account_settings_library_state.sql`. Klient uzgadnia JSON
+z użyciem ostatniego potwierdzonego stanu jako wspólnej bazy; usuwa elementy
+pominięte po znanej rewizji i zachowuje różne lokalne edycje zadania jako
+kopię z numerem `(1)`. Nie stosuje nadpisania pliku, jeżeli powstały nowe
+lokalne zmiany w trakcie żądania REST. Operacje równoległe wymagają nadal
+pełnych testów end-to-end z PostgreSQL i dwoma klientami.
 
-Foldery, zadania i historia planera pozostają w zweryfikowanych
-snapshotach urządzeń, a nie w feedzie preferencji. Wydarzenia i sesje
-planera mają dodatkowo własny feed synchronizacji wpisów (opis poniżej).
-Foldery i zadania nadal nie mają pełnej synchronizacji na żywo.
+Foldery i zadania występują również w snapshotach backupu, ale ich
+bieżące metadane są uzgadniane przez rewizjonowaną kategorię
+`libraryState` w `/v1/account-settings`. Zdarzenia i Study Sessions mają
+niezależny feed per wpis. Dla folderów i zadań odświeżenie odbywa się
+po zmianie, wznowieniu oraz okresowo; nie jest jeszcze gwarantowany
+natychmiastowy odbiór każdej zmiany między urządzeniami.
 
 ## Zabezpieczenia
 
