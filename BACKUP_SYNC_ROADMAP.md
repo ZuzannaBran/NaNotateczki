@@ -79,6 +79,12 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
    po 409 oraz jedna wersjonowana polityka backend + lokalny cache.
    Klient odnawia obecnie wygasły access JWT przed ponownym sync ustawień.
 8. **Harmonogram, tło i retencja — CZĘŚCIOWO.**
+   Zanim powstanie serwerowy snapshot, klient pobiera i uzgadnia najnowszy
+   stan notatników, ustawień konta i planera. Zmiany z drugiego urządzenia
+   generują dirty backup mimo braku interakcji na pierwszym. Awaria pull
+   zachowuje pending i uniemożliwia zatwierdzenie starej kopii.
+   Jeśli nie ma żadnych zmian (lokalnych ani zdalnych), nie duplikuje
+   identycznych snapshotów; sam feed sprawdzany jest niezależnie od backupu.
    Dodano 15 s oraz nowy domyślny interwał 30 s (API i UI). Przy normalnym
    zamknięciu zalogowanej aplikacji natywny exit guard blokuje wyjście do
    zakończenia zweryfikowanego backupu i pokazuje spinner + Retry.
@@ -146,3 +152,9 @@ jako zaliczonych bez wyniku `success`.
   po ponownym starcie kolejka wywołuje retry, nie usuwa sprawnej kopii.
 - Ten sam błąd synchronizacji zgłoszony wiele razy: jednorazowy komunikat,
   rearm po poprawnym zakończeniu operacji i nowym błędzie.
+
+- Urządzenie A bez dotykania aplikacji, urządzenie B zmienia dokument:
+  A pobiera zmianę i odkłada ją do zweryfikowanego backupu po 30 s bezczynności.
+- A ma lokalnie czysty stan, ale pobranie zmian API nie działa:
+  nie wysyła kopii, która mogłaby być starsza od danych na B;
+  zachowuje retry i błędy diagnostyczne.
