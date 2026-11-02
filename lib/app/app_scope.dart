@@ -267,8 +267,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final remote = _remoteBackupScheduler;
     if (_accountSession?.isSignedIn != true ||
         remote == null ||
-        !remote.isEnabled ||
-        !remote.hasPendingBackup) {
+        !remote.isEnabled) {
+      return;
+    }
+    if (!remote.hasPendingBackup &&
+        !AppSaveCoordinator.instance.hasPendingWork &&
+        !(_repository?.hasPendingSaves ?? false)) {
       return;
     }
     try {
