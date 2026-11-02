@@ -47,6 +47,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void>? _activeSync;
   bool _syncRequestedWhileRunning = false;
   String? _sharedDocumentUid;
+  String? _remoteGuardUid;
+  bool Function()? _remoteApplyGuard;
+  Timer? _remoteApplyRetry;
   Future<void>? _starting;
   bool _applyingRemote = false;
   bool _started = false;
@@ -74,6 +77,43 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// Only an active shared document bypasses the normal sync debounce.
   void setSharedDocumentUid(String? uid) {
     _sharedDocumentUid = uid;
+  }
+
+  /// Defers shared revisions until the visible host editor is idle.
+  void setSharedRemoteApplyGuard(String uid, bool Function() isSafe) {
+    _remoteGuardUid = uid;
+    _remoteApplyGuard = isSafe;
+  }
+
+  void clearSharedRemoteApplyGuard(String uid) {
+    if (_remoteGuardUid == uid) {
+      _remoteGuardUid = null;
+      _remoteApplyGuard = null;
+      _remoteApplyRetry?.cancel();
+    }
+  }
+
+  bool _shouldDeferSharedRevision(List<dynamic> changes) {
+    final uid = _sharedDocumentUid;
+    final guard = _remoteApplyGuard;
+    if (uid == null || _remoteGuardUid != uid || guard == null) {
+      return false;
+    }
+    final hasNewRevision = changes.any(
+      (raw) =>
+          raw is Map &&
+          raw['uid'] == uid &&
+          raw['revision'] is num &&
+          (raw['revision'] as num).toInt() > (_revisions[uid] ?? 0),
+    );
+    return hasNewRevision && !guard();
+  }
+
+  void _retrySharedRevision() {
+    _remoteApplyRetry?.cancel();
+    _remoteApplyRetry = Timer(const Duration(milliseconds: 120), () {
+      unawaited(syncNow());
+    });
   }
 
   Future<void> start(InitialSyncPolicy policy) {
@@ -574,6 +614,10 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (rawChanges is! List<dynamic> || latestCursor is! num) {
         throw const FormatException('Malformed sync changes response.');
       }
+      if (_shouldDeferSharedRevision(rawChanges)) {
+        _retrySharedRevision();
+        return;
+      }
       if (rawChanges.isNotEmpty) {
         // Capture in-progress host edits before applying guest changes.
         await AppSaveCoordinator.instance.flushPending();
@@ -583,6 +627,10 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         // CAS still protects ordinary, non-shared documents.
         for (final uid in _pending.toList()) {
           await _push(uid);
+        }
+        if (_shouldDeferSharedRevision(rawChanges)) {
+          _retrySharedRevision();
+          return;
         }
       }
       final imports = <String, Notebook>{};
@@ -1058,6 +1106,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _reconnectAttempt = 0;
     _syncRequestedWhileRunning = false;
     _sharedDocumentUid = null;
+    _remoteApplyRetry?.cancel();
+    _remoteGuardUid = null;
+    _remoteApplyGuard = null;
     _revisions.clear();
     _bases.clear();
     _pending.clear();
@@ -1072,6 +1123,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _drainTimer?.cancel();
     _reconnectTimer?.cancel();
     _fallbackTimer?.cancel();
+    _remoteApplyRetry?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_socketSubscription?.cancel());
     unawaited(_channel?.sink.close());

@@ -2068,11 +2068,92 @@ class _PersistentWorkspaceEditor extends StatefulWidget {
 class _PersistentWorkspaceEditorState
     extends State<_PersistentWorkspaceEditor> {
   Timer? _remoteRefreshRetry;
+  Timer? _appearanceTimer;
+  bool _publishingAppearance = false;
+  bool _appearanceChangedWhilePublishing = false;
+  String? _lastAppearanceKey;
+  LiveWebSyncService? _registeredSync;
   late final EditorController _editor = EditorController(
     repository: widget.repository,
     notebook: widget.item,
     saveDebounce: _shareDebounce,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _editor.backgroundSettingsListenable.addListener(_scheduleAppearance);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _registeredSync = context.read<LiveWebSyncService?>();
+    _registerRemoteGuard();
+    _scheduleAppearance();
+  }
+
+  void _registerRemoteGuard() {
+    final sync = _registeredSync;
+    if (sync == null) {
+      return;
+    }
+    if (widget.share != null && kIsWeb) {
+      sync.setSharedRemoteApplyGuard(
+        widget.item.uid,
+        () => _editor.canApplyConfirmedRemoteNotebook,
+      );
+    } else {
+      sync.clearSharedRemoteApplyGuard(widget.item.uid);
+    }
+  }
+
+  void _scheduleAppearance() {
+    _appearanceTimer?.cancel();
+    if (!mounted || widget.share == null || !kIsWeb) {
+      return;
+    }
+    _appearanceTimer = Timer(
+      const Duration(milliseconds: 120),
+      () => unawaited(_publishAppearance()),
+    );
+  }
+
+  Future<void> _publishAppearance() async {
+    final share = widget.share;
+    final service = widget.shareService;
+    if (!mounted || share == null || service == null) {
+      return;
+    }
+    if (_publishingAppearance) {
+      _appearanceChangedWhilePublishing = true;
+      return;
+    }
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final background = _editor.currentBackgroundSettings;
+    final key =
+        '${share.id}:$dark:${background.style.index}:${background.spacing}';
+    if (_lastAppearanceKey == key) {
+      return;
+    }
+    _publishingAppearance = true;
+    try {
+      await service.updateAppearance(
+        share,
+        darkMode: dark,
+        background: background,
+      );
+      _lastAppearanceKey = key;
+    } catch (error) {
+      debugPrint('Could not sync shared appearance: $error');
+    } finally {
+      _publishingAppearance = false;
+      if (_appearanceChangedWhilePublishing) {
+        _appearanceChangedWhilePublishing = false;
+        _scheduleAppearance();
+      }
+    }
+  }
 
   Duration get _shareDebounce => widget.share == null
       ? EditorController.defaultSaveDebounce
@@ -2082,6 +2163,11 @@ class _PersistentWorkspaceEditorState
   void didUpdateWidget(covariant _PersistentWorkspaceEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     _editor.saveDebounce = _shareDebounce;
+    if (oldWidget.share?.id != widget.share?.id) {
+      _lastAppearanceKey = null;
+      _registerRemoteGuard();
+      _scheduleAppearance();
+    }
     if (oldWidget.remoteEpoch != widget.remoteEpoch) {
       _remoteRefreshRetry?.cancel();
       unawaited(_refreshRemoteContent(widget.remoteEpoch));
@@ -2117,6 +2203,9 @@ class _PersistentWorkspaceEditorState
   @override
   void dispose() {
     _remoteRefreshRetry?.cancel();
+    _appearanceTimer?.cancel();
+    _editor.backgroundSettingsListenable.removeListener(_scheduleAppearance);
+    _registeredSync?.clearSharedRemoteApplyGuard(widget.item.uid);
     _editor.dispose();
     super.dispose();
   }
