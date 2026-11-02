@@ -301,9 +301,16 @@ Każda potwierdzona zmiana trafia w transakcji PostgreSQL do istniejącego
 `synced_notebooks` pod **oryginalnym UID i folderem**; zmiana nie tworzy
 osobnego pliku lub dokumentu. Zapis powiadamia klientów przez WebSocket,
 a odpytywanie zapasowe służy wyłącznie na wypadek utraty połączenia.
-Gdy sesja jest aktywna, edytor ma krótszy debounce 100 ms, synchronizacja
-90 ms, a gość wysyła zapisane zmiany po dodatkowych 35 ms.
+Gdy sesja jest aktywna, edytor zapisuje zakończony ruch po 20 ms,
+host uruchamia synchronizację bez dodatkowego debounce, a gość wysyła
+zapisane zmiany po dodatkowych 35 ms. Dodatkowy 2-sekundowy cooldown
+rysika nie obowiązuje dla shared session; nie wolno jednak zapisywać
+niezakończonego gestu. Powiadomienia WebSocket pobudzają odbiorców
+natychmiast, a poprzedni request nie może zgubić nowego ruchu.
 Nie jest to gwarancja latencji Internetu, Cloudflare czy renderowania.
+Synchronizacja treści nie przenosi stanu viewportu: host i każdy gość
+zachowują własną stronę, zoom, pan i pozycję scrolla. Gdy w trakcie
+gestu nadejdzie rewizja, odbiór jest odroczony bez odmontowania edytora.
 
 Serwer weryfikuje `baseRevision` i `baseNotebook` względem
 niezmiennej historii `change_events`; indeks na rewizję pochodzi z migracji
@@ -357,3 +364,26 @@ w każdej sekundzie, tylko przy zmianach stanu. Po błędzie połączenia wpisy
 pozostają w pliku i są ponawiane. Przy zmianach offline na dwóch urządzeniach
 kolejność zależy od poprawnego ustawienia zegara UTC obu systemów.
 Wymagana migracja PostgreSQL: `0008_planner_entries.sql`.
+
+## Wyjście i dodatkowa reguła usunięcie–edycja (2026-11-02)
+
+Po zalogowaniu domyślny automatyczny backup następuje po 30 sekundach
+bezczynności, do wyboru także 15/60/120/300/900/1800 sekund. Ustawienie
+jest zapamiętywane lokalnie i synchronizowane na konto.
+Normalne zamknięcie natywnej aplikacji próbuje najpierw opróżnić lokalne
+zapisy, uzgodnić live sync i uzyskać zweryfikowany snapshot serwerowy.
+W czasie uploadu widoczny jest spinner. Jeśli upload się nie uda, aplikacja
+pozostaje otwarta i proponuje Retry backup. Wymuszone zakończenie przez
+system, awaria zasilania oraz zamknięcie karty Web NIE są gwarantowanym
+miejscem na końcowe HTTP; przy detached i Web hidden jest tylko
+best-effort flush, potem retry przy następnym uruchomieniu.
+
+Tombstone pozostaje autorytatywny wobec starego backupu i urządzenia bez
+niepotwierdzonych edycji. Jeśli drugie urządzenie posiada oczekującą
+rzeczywistą zmianę, po otrzymaniu tombstone wykonuje jawny retry
+`restoreDeleted` z aktualną rewizją CAS. Po zaakceptowaniu przez serwer
+przywrócony zostaje oryginalny UID i folder dla wszystkich urządzeń,
+bez kopii `(1)`. Zwykłe odtworzenie backupu nie wysyła tego znacznika.
+Kolejność przyjęcia na serwerze, nie arbitralny czas backupu, rozstrzyga
+konkurujące operacje. Wspólna sesja udostępniania zakończona przez
+usunięcie nie jest automatycznie przywracana wraz z dokumentem.
