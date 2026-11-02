@@ -277,6 +277,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
     final future = () async {
       try {
+        await _plannerReady;
         final restored = await backup.hydrateFromLatestAccountBackup();
         if (!mounted || session.userId != userId) {
           return;
@@ -289,7 +290,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         // Settings use their own versioned account record rather than
         // replacing a newer device preference with a stale backup.
         await _syncAccountSettings();
-        await _plannerReady;
         await sync.start(InitialSyncPolicy.mergeSafely);
         await _plannerSync?.syncNow();
         if (!mounted || session.userId != userId) {
