@@ -449,7 +449,7 @@ jobs:
 
   android-emulator:
     name: Android - real emulator end-to-end
-    if: github.event_name != 'pull_request'
+    if: ${{ github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     steps:

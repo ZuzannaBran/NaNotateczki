@@ -915,9 +915,11 @@ class _AccountDialogState extends State<_AccountDialog> {
   Future<void> _logout() async {
     _startWorking();
     final session = context.read<AccountSessionController>();
+    final sync = context.read<LiveWebSyncService>();
+    final backup = context.read<RemoteBackupScheduler>();
     try {
-      await context.read<LiveWebSyncService>().stop();
-      await context.read<RemoteBackupScheduler>().stop();
+      await sync.stop();
+      await backup.stop();
       await session.logout();
     } catch (failure) {
       // The server may be offline; local logout must still reach the

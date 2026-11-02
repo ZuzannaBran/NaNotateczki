@@ -134,7 +134,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       after = next as String?;
     } while (after != null);
     await _applyInitialPolicy(policy, remote);
-    _cursor = initialCursor!;
+    _cursor = initialCursor;
     _started = true;
     await _offlineQueueTail;
     await _saveState();
@@ -177,7 +177,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         sharedChange = true;
       }
     }
-    unawaited(_saveState().catchError((Object _, StackTrace __) {}));
+    unawaited(_saveState().catchError((Object _, StackTrace _) {}));
     _drainTimer?.cancel();
     _drainTimer = Timer(
       sharedChange ? Duration.zero : const Duration(milliseconds: 90),
