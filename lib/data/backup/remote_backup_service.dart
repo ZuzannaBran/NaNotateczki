@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../core/error/app_error_log.dart';
 import '../../core/storage/app_save_coordinator.dart';
 import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
@@ -23,6 +24,18 @@ class RemoteBackupReceipt {
   final String backupId;
   final String checksum;
   final DateTime verifiedAt;
+}
+
+class _VerifiedRecoverySnapshot {
+  const _VerifiedRecoverySnapshot({
+    required this.backupId,
+    required this.payload,
+    required this.notebooks,
+  });
+
+  final String backupId;
+  final Map<String, dynamic> payload;
+  final List<Notebook> notebooks;
 }
 
 class RemoteBackupService {
@@ -164,51 +177,10 @@ class RemoteBackupService {
     if (backups.isEmpty) {
       return false;
     }
-    final latest = _jsonObject(backups.first);
-    final backupId = latest['backupId'];
-    final expectedHash = latest['sha256'];
-    final expectedSize = latest['sizeBytes'];
-    if (backupId is! String ||
-        !RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(backupId) ||
-        expectedHash is! String ||
-        expectedSize is! int ||
-        expectedSize > maximumSnapshotBytes ||
-        expectedSize <= 0) {
-      throw const FormatException('Invalid verified backup metadata.');
-    }
-
-    final bytes = (await apiClient.request(
-      'GET',
-      '/v1/backups/$backupId/download',
-      requestTimeout: const Duration(minutes: 2),
-      maxResponseBytes: maximumSnapshotBytes,
-    )).bodyBytes;
-    if (session.userId != userId ||
-        bytes.length != expectedSize ||
-        sha256.convert(bytes).toString() != expectedHash) {
-      throw const FormatException('Account backup integrity check failed.');
-    }
-    final envelope = _jsonObject(jsonDecode(utf8.decode(bytes)));
-    if (envelope['format'] != 'nanotateczki-server-backup' ||
-        envelope['version'] != formatVersion ||
-        envelope['checksumAlgorithm'] != 'sha256' ||
-        envelope['deviceId'] != latest['deviceId']) {
-      throw const FormatException('Unsupported account backup envelope.');
-    }
-    final payload = _jsonObject(envelope['payload']);
-    final wireChecksum = sha256.convert(backupPayloadBytes(bytes)).toString();
-    if (wireChecksum != envelope['checksum'] &&
-        sha256.convert(utf8.encode(jsonEncode(payload))).toString() !=
-            envelope['checksum']) {
-      throw const FormatException('Account backup payload was modified.');
-    }
-    final rawNotebooks = payload['notebooks'];
-    if (rawNotebooks is! List<dynamic> ||
-        payload['libraryState'] is! Map<String, dynamic> ||
-        payload['studyPlannerState'] is! Map<String, dynamic>) {
-      throw const FormatException('Incomplete account backup.');
-    }
-    final recoveredNotebooks = repository.decodeBackupStrict(rawNotebooks);
+    final verified = await _findValidRecoverySnapshot(backups, userId);
+    final backupId = verified.backupId;
+    final payload = verified.payload;
+    final recoveredNotebooks = verified.notebooks;
     // Check the newest verified snapshot at every sign-in, including when
     // this device already restored an older one. Reprocessing the same
     // snapshot would create duplicate numbered conflict copies.
@@ -369,6 +341,259 @@ class RemoteBackupService {
       );
     }
     return changed;
+  }
+
+  Future<_VerifiedRecoverySnapshot> _findValidRecoverySnapshot(
+    List<dynamic> backups,
+    String expectedUserId,
+  ) async {
+    Object? lastFailure;
+    for (final candidate in backups) {
+      if (!session.isSignedIn || session.userId != expectedUserId) {
+        throw StateError('Account changed during backup recovery.');
+      }
+      try {
+        final latest = _jsonObject(candidate);
+        final backupId = latest['backupId'];
+        final expectedHash = latest['sha256'];
+        final expectedSize = latest['sizeBytes'];
+        if (backupId is! String ||
+            !RegExp(r'^[0-9a-fA-F-]{36}
+    final suffix = sha256
+        .convert(utf8.encode(userId))
+        .toString()
+        .substring(0, 16);
+    return 'server_backup_preferences_$suffix.json';
+  }
+
+  static Object _plannerTasks(Map<String, dynamic> library, String uid) {
+    final tasks = library['plannerTasks'];
+    return tasks is Map ? tasks[uid] ?? const [] : const [];
+  }
+
+  static Future<bool> _mergeLibraryState(
+    Map<String, dynamic> recovered,
+    Map<String, String> recoveredUids,
+  ) async {
+    if (recovered.isEmpty) {
+      return false;
+    }
+    final current = _jsonObject(
+      _decodeOptionalObject(await readStoredText('library_folders.json')),
+    );
+    final merged = <String, dynamic>{...recovered, ...current};
+    for (final field in ['folders', 'recentCoverColors']) {
+      if (recovered[field] is List) {
+        merged[field] = {
+          if (current[field] is List) ...current[field] as List,
+          ...recovered[field] as List,
+        }.toList();
+      }
+    }
+    if (recovered['covers'] is Map) {
+      merged['covers'] = {
+        ...recovered['covers'] as Map,
+        if (current['covers'] is Map) ...current['covers'] as Map,
+      };
+    }
+    final tasks = <String, dynamic>{
+      if (current['plannerTasks'] is Map)
+        ...Map<String, dynamic>.from(current['plannerTasks'] as Map),
+    };
+    for (final entry in recoveredUids.entries) {
+      if (!tasks.containsKey(entry.value)) {
+        tasks[entry.value] = _plannerTasks(recovered, entry.key);
+      }
+    }
+    if (current['plannerTasks'] is Map || recovered['plannerTasks'] is Map) {
+      merged['plannerTasks'] = tasks;
+    }
+    if (jsonEncode(merged) == jsonEncode(current)) {
+      return false;
+    }
+    await writeStoredText('library_folders.json', jsonEncode(merged));
+    return true;
+  }
+
+  static bool _sameContent(Notebook left, Notebook right) {
+    Map<String, dynamic> comparable(Notebook note) {
+      final encoded = NotebookRepository.encodeNotebook(note)
+        ..remove('createdAt')
+        ..remove('updatedAt');
+      for (final page in encoded['pages'] as List) {
+        for (final image in page['imageBlocks'] as List) {
+          if (image['bytes'] is String &&
+              (image['bytes'] as String).isNotEmpty) {
+            image['path'] = '';
+          }
+        }
+      }
+      return encoded;
+    }
+
+    return jsonEncode(comparable(left)) == jsonEncode(comparable(right));
+  }
+
+  static List<int> _decodeRecentColors(String raw) {
+    final decoded = jsonDecode(raw);
+    if (decoded is! List<dynamic> || decoded.any((item) => item is! int)) {
+      throw const FormatException('Invalid recent color history.');
+    }
+    return decoded.cast<int>().take(12).toList();
+  }
+
+  static Future<bool> _restoreAccountFile(
+    String key,
+    Object? value, {
+    bool allowDefaultFolders = false,
+    bool allowEmptyPlanner = false,
+  }) async {
+    if (value == null ||
+        (value is Map && value.isEmpty) ||
+        (value is List && value.isEmpty)) {
+      return false;
+    }
+    final stored = await readStoredText(key);
+    if (stored != null && stored.trim().isNotEmpty) {
+      if (!allowDefaultFolders && !allowEmptyPlanner) {
+        return false;
+      }
+      try {
+        final previous = jsonDecode(stored);
+        if (allowDefaultFolders) {
+          if (previous is! Map ||
+              previous['folders'] is! List ||
+              (previous['folders'] as List).any(
+                (folder) => folder != 'Notes',
+              ) ||
+              (previous['plannerTasks'] is Map &&
+                  (previous['plannerTasks'] as Map).isNotEmpty) ||
+              (previous['covers'] is Map &&
+                  (previous['covers'] as Map).isNotEmpty) ||
+              (previous['recentCoverColors'] is List &&
+                  (previous['recentCoverColors'] as List).isNotEmpty)) {
+            return false;
+          }
+        }
+        if (allowEmptyPlanner &&
+            (previous is! Map ||
+                previous['sessions'] is! List ||
+                (previous['sessions'] as List).isNotEmpty)) {
+          return false;
+        }
+      } catch (_) {
+        // Unknown local state is not overwritten.
+        return false;
+      }
+    }
+    await writeStoredText(key, jsonEncode(value));
+    return true;
+  }
+
+  static Object _decodeOptionalObject(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return const <String, dynamic>{};
+    }
+    final decoded = jsonDecode(value);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Application state is not a JSON object.');
+    }
+    return decoded;
+  }
+
+  static Map<String, dynamic> _jsonObject(Object? raw) {
+    if (raw is! Map<String, dynamic>) {
+      throw const FormatException('Server returned malformed JSON.');
+    }
+    return raw;
+  }
+}
+
+({String checksum, Uint8List bytes}) _encodeSnapshot(
+  Map<String, dynamic> data,
+) {
+  final payload = data['payload'] as Map<String, dynamic>;
+  final deviceId = data['deviceId'] as String;
+  final checksum = sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+  final envelope = <String, dynamic>{
+    'format': 'nanotateczki-server-backup',
+    'version': RemoteBackupService.formatVersion,
+    'createdAt': DateTime.now().toUtc().toIso8601String(),
+    'deviceId': deviceId,
+    'checksumAlgorithm': 'sha256',
+    'checksum': checksum,
+    'payload': payload,
+  };
+  final bytes = Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
+  return (checksum: checksum, bytes: bytes);
+}
+).hasMatch(backupId) ||
+            expectedHash is! String ||
+            expectedSize is! int ||
+            expectedSize > maximumSnapshotBytes ||
+            expectedSize <= 0) {
+          throw const FormatException('Invalid verified backup metadata.');
+        }
+
+        final bytes = (await apiClient.request(
+          'GET',
+          '/v1/backups/$backupId/download',
+          requestTimeout: const Duration(minutes: 2),
+          maxResponseBytes: maximumSnapshotBytes,
+        )).bodyBytes;
+        if (session.userId != expectedUserId) {
+          throw StateError('Account changed during backup download.');
+        }
+        if (bytes.length != expectedSize ||
+            sha256.convert(bytes).toString() != expectedHash) {
+          throw const FormatException('Account backup checksum failed.');
+        }
+        final envelope = _jsonObject(jsonDecode(utf8.decode(bytes)));
+        if (envelope['format'] != 'nanotateczki-server-backup' ||
+            envelope['version'] != formatVersion ||
+            envelope['checksumAlgorithm'] != 'sha256' ||
+            envelope['deviceId'] != latest['deviceId']) {
+          throw const FormatException('Unsupported backup envelope.');
+        }
+        final payload = _jsonObject(envelope['payload']);
+        final wireHash = sha256.convert(backupPayloadBytes(bytes)).toString();
+        if (wireHash != envelope['checksum'] &&
+            sha256.convert(utf8.encode(jsonEncode(payload))).toString() !=
+                envelope['checksum']) {
+          throw const FormatException('Backup payload checksum failed.');
+        }
+        final raw = payload['notebooks'];
+        if (raw is! List<dynamic> ||
+            payload['libraryState'] is! Map<String, dynamic> ||
+            payload['studyPlannerState'] is! Map<String, dynamic>) {
+          throw const FormatException('Incomplete account backup.');
+        }
+        final notebooks = repository.decodeBackupStrict(raw);
+        return _VerifiedRecoverySnapshot(
+          backupId: backupId,
+          payload: payload,
+          notebooks: notebooks,
+        );
+      } on ApiException catch (error, stackTrace) {
+        if (error.statusCode != 404 && error.statusCode != 503) {
+          rethrow;
+        }
+        lastFailure = error;
+        AppErrorLog.instance.record(
+          error,
+          stackTrace,
+          source: 'RemoteBackupService.unavailableVerifiedBackup',
+        );
+      } on FormatException catch (error, stackTrace) {
+        lastFailure = error;
+        AppErrorLog.instance.record(
+          error,
+          stackTrace,
+          source: 'RemoteBackupService.invalidVerifiedBackup',
+        );
+      }
+    }
+    throw StateError('No valid account backup can be restored: $lastFailure');
   }
 
   static String _backupPreferenceKey(String userId) {
