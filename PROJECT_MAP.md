@@ -1651,6 +1651,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i `deviceId` między osobnymi sesjami kont.
 - `test/live_web_sync_service_test.dart`: pobranie wszystkich stron feedu po
   500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany,
+  zachowanie zapisów pojawiających się w czasie bootstrapu konta,
   pasywne pobieranie notatnika z innego urządzenia bez lokalnych zapisów,
   brak przenoszenia outboxu i rewizji między kontami, natychmiastowe
   wysłanie kopii konfliktowej po odpowiedzi HTTP 409.

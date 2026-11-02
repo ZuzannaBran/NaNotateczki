@@ -140,6 +140,14 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (userId == null) {
         return;
       }
+      if (_activeUserId == userId) {
+        // An edit during bootstrap must survive the final state write.
+        // The on-disk outbox alone may be overwritten by _saveState().
+        for (final uid in incoming) {
+          _pending.add(uid);
+          _idempotencyKeys.putIfAbsent(uid, () => const Uuid().v4());
+        }
+      }
       unawaited(_persistPreStartChanges(userId, incoming));
       return;
     }

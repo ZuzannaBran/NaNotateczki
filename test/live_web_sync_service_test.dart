@@ -869,6 +869,84 @@ void main() {
     expect(changesCalls, 2);
   });
 
+  test('a write during bootstrap survives the persisted outbox merge', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final created = await repository.createNotebook(title: 'Existing');
+    final notebook = (await repository.getNotebook(created.uid))!;
+    final bootstrapStarted = Completer<void>();
+    final releaseBootstrap = Completer<void>();
+    var writes = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          bootstrapStarted.complete();
+          await releaseBootstrap.future;
+          return http.Response(
+            jsonEncode({
+              'cursor': 1,
+              'notebooks': [
+                {
+                  'uid': notebook.uid,
+                  'revision': 1,
+                  'deleted': false,
+                  'notebook': NotebookRepository.encodeNotebook(notebook),
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":1,"changes":[]}', 200);
+        }
+        if (request.method == 'PUT') {
+          writes++;
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['expectedRevision'], 1);
+          expect(body['notebook']['uid'], notebook.uid);
+          return http.Response(
+            jsonEncode({'revision': 2, 'notebook': body['notebook']}),
+            200,
+          );
+        }
+        fail('Unexpected request: ${request.method} ${request.url}');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'bootstrap-race';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+
+    final starting = sync.start(InitialSyncPolicy.mergeSafely);
+    await bootstrapStarted.future;
+    sync.enqueue([NotebookRepositoryChange.full(notebook.uid)]);
+    releaseBootstrap.complete();
+    await starting;
+
+    expect(sync.lastError, isNull);
+    expect(writes, 1);
+    expect(sync.hasPendingChanges, isFalse);
+    await sync.stop();
+    final persisted = stored.values
+        .where((value) => value.contains('"pending"'))
+        .single;
+    expect(jsonDecode(persisted)['pending'], isEmpty);
+  });
+
   test('overlapping outbox writes preserve the latest pending UIDs', () async {
     final stored = <String, String>{};
     final releaseFirst = Completer<void>();
