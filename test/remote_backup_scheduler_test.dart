@@ -89,6 +89,48 @@ void main() {
     await database.close();
   });
 
+  testWidgets('background changes and resume do not reset idle delay', (
+    tester,
+  ) async {
+    var now = DateTime.utc(2026, 11, 1);
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) async => http.Response('', 500)),
+    );
+    final database = NotesDatabase(NativeDatabase.memory());
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'background-account'
+      ..username = 'background_account';
+    final service = _TrackingService(
+      repository: NotebookRepository(database),
+      apiClient: client,
+      session: session,
+    );
+    final scheduler = RemoteBackupScheduler(
+      service: service,
+      session: session,
+      now: () => now,
+    );
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    scheduler.enableForSignedInAccount();
+    await scheduler.setIdleSeconds(30);
+    scheduler.didChangeAppLifecycleState(AppLifecycleState.paused);
+    now = now.add(const Duration(seconds: 40));
+    scheduler.recordUserInteraction();
+    scheduler.markDirty();
+    scheduler.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+    expect(service.calls, 1);
+
+    await scheduler.stop();
+    scheduler.dispose();
+    session.dispose();
+    client.close();
+    await database.close();
+  });
+
   testWidgets('upload pending on network does not block UI frames', (
     tester,
   ) async {
