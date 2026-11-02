@@ -160,7 +160,8 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
    Starszy wariant checksumy kompaktowego JSON pozostaje obsługiwany.
 5. Błąd nie usuwa wcześniejszego poprawnego snapshotu. Scheduler ponawia próbę
    nie wcześniej niż po 5 minutach. Zmieniony snapshot wysyła po ustalonym
-   okresie bezczynności (domyślnie 2 minuty, zakres 30 s–30 min); aktywny
+   okresie bezczynności (domyślnie 2 minuty; opcje: 30 s, 1 min,
+   2 min, 5 min, 15 min i 30 min); aktywny
    rysik, mysz i klawiatura przesuwają termin. Preferencja jest lokalna i
    odrębna dla każdego konta. Serializacja i SHA-256 na platformach natywnych
    działają poza głównym isolate. Przycisk `Back up now` jawnie oznacza snapshot jako wymagany i uruchamia go
