@@ -72,10 +72,14 @@ class StudySession {
     this.repeat = StudyRepeat.none,
     this.repeatEvery = 1,
     this.seriesId,
-  }) : focusBlocks = (focusBlocks ?? technique.rounds).clamp(1, 12).toInt();
+    DateTime? modifiedAt,
+  }) : modifiedAt = modifiedAt ??
+           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+       focusBlocks = (focusBlocks ?? technique.rounds).clamp(1, 12).toInt();
 
   final String id;
   final StudyEntryKind kind;
+  DateTime modifiedAt;
   String title;
   String description;
   DateTime scheduledAt;
@@ -124,6 +128,7 @@ class StudySession {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'modifiedAt': modifiedAt.toUtc().toIso8601String(),
     'kind': kind.name,
     'title': title,
     'description': description,
@@ -169,6 +174,7 @@ class StudySession {
     );
     return StudySession(
       id: json['id'] as String,
+      modifiedAt: date(json['modifiedAt'])?.toUtc(),
       kind: parseEnum(
         StudyEntryKind.values,
         json['kind'],
@@ -237,6 +243,8 @@ class StudyPlannerController extends ChangeNotifier {
   final DateTime Function() _clock;
   final bool _autoTick;
   final List<StudySession> _sessions = [];
+  final Map<String, DateTime> _tombstones = {};
+  final Map<String, String> _knownContents = {};
   Timer? _ticker;
   Future<void> _saveTail = Future<void>.value();
   final ValueNotifier<int> savedRevision = ValueNotifier<int>(0);
@@ -434,9 +442,22 @@ class StudyPlannerController extends ChangeNotifier {
         return;
       }
       var recoveredReviews = false;
+      _tombstones.clear();
+      _knownContents.clear();
       if (value != null) {
         final decoded = jsonDecode(value) as Map<String, dynamic>;
         final entries = decoded['sessions'] as List<dynamic>;
+        final deleted = decoded['tombstones'];
+        if (deleted is Map<String, dynamic>) {
+          for (final item in deleted.entries) {
+            final time = item.value is String
+                ? DateTime.tryParse(item.value as String)?.toUtc()
+                : null;
+            if (time != null) {
+              _tombstones[item.key] = time;
+            }
+          }
+        }
         _sessions
           ..clear()
           ..addAll(
@@ -444,6 +465,9 @@ class StudyPlannerController extends ChangeNotifier {
               (entry) => StudySession.fromJson(entry as Map<String, dynamic>),
             ),
           );
+        for (final entry in _sessions) {
+          _knownContents[entry.id] = _contentSignature(entry);
+        }
         final running = _sessions
             .where(
               (s) =>
@@ -759,11 +783,134 @@ class StudyPlannerController extends ChangeNotifier {
   StudySession _find(String id) =>
       _sessions.firstWhere((session) => session.id == id);
 
+  static String _contentSignature(StudySession entry) {
+    final value = Map<String, dynamic>.from(entry.toJson());
+    value.remove('modifiedAt');
+    return jsonEncode(value);
+  }
+
+  DateTime _nextModification(DateTime? previous) {
+    final now = _clock().toUtc();
+    if (previous != null && !now.isAfter(previous)) {
+      return previous.add(const Duration(microseconds: 1));
+    }
+    return now;
+  }
+
   void _changed() {
+    final next = <String, String>{};
+    for (final entry in _sessions) {
+      final signature = _contentSignature(entry);
+      if (_knownContents[entry.id] != signature) {
+        entry.modifiedAt = _nextModification(entry.modifiedAt);
+      }
+      next[entry.id] = signature;
+      _tombstones.remove(entry.id);
+    }
+    for (final id in _knownContents.keys) {
+      if (!next.containsKey(id)) {
+        _tombstones[id] = _nextModification(_tombstones[id]);
+      }
+    }
+    _knownContents
+      ..clear()
+      ..addAll(next);
+    _persist();
+  }
+
+  /// Per-entry state includes deletion tombstones for offline reconciliation.
+  Map<String, Map<String, dynamic>> get syncRecords {
+    final records = <String, Map<String, dynamic>>{};
+    for (final entry in _sessions) {
+      records[entry.id] = {
+        'id': entry.id,
+        'modifiedAt': entry.modifiedAt.toUtc().toIso8601String(),
+        'deleted': false,
+        'entry': entry.toJson(),
+      };
+    }
+    for (final item in _tombstones.entries) {
+      records[item.key] = {
+        'id': item.key,
+        'modifiedAt': item.value.toUtc().toIso8601String(),
+        'deleted': true,
+        'entry': null,
+      };
+    }
+    return records;
+  }
+
+  /// Accepts newer records and server-authoritative timestamp ties.
+  void applyRemoteRecords(Iterable<Map<String, dynamic>> incoming) {
+    if (!isLoaded || _disposed) {
+      return;
+    }
+    var changed = false;
+    final local = syncRecords;
+    for (final record in incoming) {
+      final id = record['id'];
+      final rawTime = record['modifiedAt'];
+      final deleted = record['deleted'];
+      if (id is! String ||
+          rawTime is! String ||
+          deleted is! bool ||
+          id.isEmpty) {
+        throw const FormatException('Invalid remote planner record');
+      }
+      final time = DateTime.tryParse(rawTime)?.toUtc();
+      if (time == null) {
+        throw const FormatException('Invalid remote planner timestamp');
+      }
+      final existing = local[id];
+      final oldTime = existing == null
+          ? null
+          : DateTime.tryParse(existing['modifiedAt'] as String)?.toUtc();
+      if (oldTime != null && time.isBefore(oldTime)) {
+        continue;
+      }
+      final content = record['entry'];
+      if (!deleted &&
+          (content is! Map<String, dynamic> || content['id'] != id)) {
+        throw const FormatException('Invalid remote planner entry');
+      }
+      if (oldTime != null &&
+          time.isAtSameMomentAs(oldTime) &&
+          existing!['deleted'] == deleted &&
+          jsonEncode(existing['entry']) == jsonEncode(content)) {
+        continue;
+      }
+      _sessions.removeWhere((entry) => entry.id == id);
+      if (deleted) {
+        _tombstones[id] = time;
+      } else {
+        final value = Map<String, dynamic>.from(
+          content as Map<String, dynamic>,
+        );
+        value['modifiedAt'] = time.toIso8601String();
+        _sessions.add(StudySession.fromJson(value));
+        _tombstones.remove(id);
+      }
+      changed = true;
+    }
+    if (changed) {
+      _knownContents
+        ..clear()
+        ..addEntries(_sessions.map(
+          (entry) => MapEntry(entry.id, _contentSignature(entry)),
+        ));
+      _persist();
+    }
+  }
+
+  void _persist() {
     notifyListeners();
     final snapshot = jsonEncode({
-      'version': 1,
+      'version': 2,
       'sessions': _sessions.map((s) => s.toJson()).toList(),
+      'tombstones': {
+        for (final item in _tombstones.entries)
+          item.key: item.value.toUtc().toIso8601String(),
+      },
     });
     _pendingWrites++;
     _saveTail = _saveTail
