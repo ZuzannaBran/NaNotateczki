@@ -2078,7 +2078,10 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   tę kategorię przez CAS i wymaga jej wdrożenia na serwerze.
 - Serwer `api/app/routers/study_shares.py`: WebSocket subskrybuje sygnały
   zakończenia przed uwierzytelnieniem biletu, aby nie zgubić odwołania sesji.
-  `api/tests/test_study_shares_flow.py`: test kolejności.
+  `api/tests/test_study_shares_flow.py`: test kolejności i zamknięcia
+  okna wyścigu WebSocket. `server/api/app/routers/backups.py`
+  porządkuje zweryfikowane snapshoty według czasu weryfikacji,
+  z testem regresyjnym w `test_backup_validation.py`.
 
 ## 13. Wspólna edycja sesji Web
 
