@@ -122,6 +122,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final liveSync = context.watch<LiveWebSyncService?>();
     final selectedItem = controller.selectedItem();
     final share = _activeShare;
+    liveSync?.setSharedDocumentUid(
+      kIsWeb && share != null ? share.documentUid : null,
+    );
     if (share != null &&
         (share.expiresAt.isBefore(DateTime.now().toUtc()) ||
             accountSession?.isSignedIn != true)) {
