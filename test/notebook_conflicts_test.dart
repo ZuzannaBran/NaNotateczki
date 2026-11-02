@@ -83,5 +83,71 @@ void main() {
     expect(page.inkStrokes.single.id, isNot('stroke'));
     expect(source.pages.single.imageBlocks.single.path, '/old/device.png');
     expect(source.title, 'Course');
+  });  test('local account copy renames only matching folder and kind', () {
+    final now = DateTime.utc(2026, 11, 2);
+    final page = NotePage(
+      id: 'local-page',
+      title: 'Original',
+      textBlocks: [],
+      imageBlocks: [],
+      inkStrokes: [],
+      isBookmarked: false,
+    );
+    final source = Notebook(
+      uid: 'local-id',
+      title: 'Notes',
+      kind: NotebookKind.notebook,
+      folder: 'Classes',
+      createdAt: now,
+      updatedAt: now,
+      pages: [page],
+    );
+    final titles = [
+      source.copyWith(uid: 'server-1'),
+      source.copyWith(uid: 'server-2', title: 'Notes (1)'),
+      source.copyWith(
+        uid: 'other-folder',
+        title: 'Notes (2)',
+        folder: 'Personal',
+      ),
+      source.copyWith(
+        uid: 'other-kind',
+        title: 'Notes (2)',
+        kind: NotebookKind.board,
+      ),
+    ];
+    final imported = copyLocalNotebookToAccount(source, titles);
+    expect(imported.title, 'Notes (2)');
+    expect(imported.folder, source.folder);
+    expect(imported.uid, isNot(source.uid));
+    expect(imported.pages.single.id, isNot(page.id));
+    expect(imported.createdAt, now);
+    expect(imported.updatedAt, now);
+    expect(source.title, 'Notes');
+    final differentFolder = copyLocalNotebookToAccount(
+      source.copyWith(folder: 'Elsewhere'),
+      titles,
+    );
+    expect(differentFolder.title, 'Notes');
   });
+
+  test('account copy increments an existing numbered local name', () {
+    final time = DateTime.utc(2026, 11, 2);
+    final source = Notebook(
+      uid: 'local',
+      title: 'Work (1)',
+      kind: NotebookKind.notebook,
+      folder: 'School',
+      createdAt: time,
+      updatedAt: time,
+      pages: [],
+    );
+    final imported = copyLocalNotebookToAccount(source, [
+      source.copyWith(uid: 'remote'),
+      source.copyWith(uid: 'remote2', title: 'work (2)'),
+    ]);
+    expect(imported.title, 'Work (3)');
+    expect(imported.uid, isNot(source.uid));
+  });
+
 }
