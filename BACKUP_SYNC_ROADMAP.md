@@ -38,7 +38,9 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
    Dodano `Log out` i powrót do wyboru trybu po ponownym uruchomieniu;
    usunięto ikonę `Back up now`. Serwer domyślnie wydaje rotowane
    refresh tokeny na 3650 dni (stare wygasłe tokeny wymagają logowania).
-   Dopilnować bezpiecznego odnawiania po utracie odpowiedzi i w wielu kartach.
+   Po starcie offline klient ponawia zapamiętaną sesję po wznowieniu lub
+   okresowo na widocznym ekranie; równoległe próby mają single-flight.
+   Nadal dopilnować bezpiecznego odnawiania po utracie odpowiedzi i w wielu kartach.
 4. **Wykrywanie aktywności — poprawki i testy dopisane, CI niepotwierdzone.**
    Zmiana danych z sync nie zeruje bezczynności. Ukryta karta nie liczy
    interakcji. Wpisy w Quill liczą także klawiaturę ekranową.
@@ -47,8 +49,8 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
    Weryfikowana utrata SQLite pozwala ponownie odtworzyć już pobrany backup.
    Błąd pobrania nie blokuje live sync ani nie uruchamia backupu niekompletnego
    stanu. Backend sortuje kopie po czasie weryfikacji.
-   Nadal trzeba dodać fallback na starszą poprawną kopię oraz test
-   atomowego odtwarzania uszkodzonego payloadu.
+   Dodano fallback i test: niepoprawna najnowsza kopia ustępuje starszej
+   prawidłowej. Pozostaje test atomowego odtwarzania uszkodzonego payloadu.
 6. **Synchronizacja folderów, okładek, zadań — NIEUKOŃCZONA.**
    Client nie włącza jeszcze kategorii `libraryState` ani nie zapisuje
    bezpiecznych tombstones/zmian per wpis; nie wolno wdrażać surowego
