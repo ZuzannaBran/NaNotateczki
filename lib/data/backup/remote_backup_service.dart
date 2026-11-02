@@ -593,7 +593,7 @@ class RemoteBackupService {
         );
       }
     }
-    throw StateError('No valid account backup can be restored: $lastFailure');
+    throw FormatException('No valid account backup can be restored: $lastFailure');
   }
 
   static String _backupPreferenceKey(String userId) {
