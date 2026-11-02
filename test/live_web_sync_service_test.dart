@@ -1020,7 +1020,7 @@ void main() {
     expect(changesCalls, 2);
   });
 
-  test('bootstrap preserves a pending local edit', () async {
+  test('bootstrap ignores a pending no-op without duplicating the document', () async {
     final stored = <String, String>{};
     textStorageReadOverride = (key) async => stored[key];
     textStorageWriteOverride = (key, value) async => stored[key] = value;
@@ -1089,7 +1089,7 @@ void main() {
     await starting;
 
     expect(sync.lastError, isNull);
-    expect(writes, 1);
+    expect(writes, 0);
     expect(sync.hasPendingChanges, isFalse);
     await sync.stop();
     final persisted = stored.values

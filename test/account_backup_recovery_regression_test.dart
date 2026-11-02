@@ -95,7 +95,7 @@ void main() {
   });
 
   test(
-    'a newer backup draft is kept beside an existing account revision',
+    'an older backup draft cannot override a live account revision',
     () async {
       final source = await _repository().createNotebook(title: 'Course');
       final draft = source.copyWith(
@@ -119,13 +119,9 @@ void main() {
         ],
       );
 
-      expect(await service.hydrateFromLatestAccountBackup(), isTrue);
-      final recovered = (await repo.fetchNotebooks()).single;
-      expect(recovered.title, 'Course (1)');
-      expect(recovered.uid, isNot(source.uid));
-      expect(recovered.folder, source.folder);
-      expect(recovered.pages.single.title, 'Backup draft');
-      expect(await repo.getNotebook(source.uid), isNull);
+      expect(await service.hydrateFromLatestAccountBackup(), isFalse);
+      // Live account sync supplies this UID; the backup may not duplicate it.
+      expect(await repo.fetchNotebooks(), isEmpty);
     },
   );
 

@@ -78,7 +78,7 @@ void main() {
     expect(saved, isEmpty);
     expect(sync.hasPendingChanges, isFalse);
   });
-  test('pending edit restores tombstoned original after reconnect', () async {
+  test('pending edit of deleted original becomes a numbered copy', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -99,7 +99,7 @@ void main() {
     };
     textStorageReadOverride = (key) async => stored[key];
     textStorageWriteOverride = (key, value) async => stored[key] = value;
-    var restored = false;
+    var uploadedCopy = false;
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
@@ -124,11 +124,12 @@ void main() {
         }
         if (request.method == 'PUT') {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
-          expect(body['expectedRevision'], 2);
-          expect(body['restoreDeleted'], isTrue);
-          expect(body['notebook']['uid'], original.uid);
-          restored = true;
-          return http.Response('{"revision":3}', 200);
+          expect(body['expectedRevision'], 0);
+          expect(body['restoreDeleted'], isNot(true));
+          expect(body['notebook']['uid'], isNot(original.uid));
+          expect(body['notebook']['title'], 'Edited after deletion (1)');
+          uploadedCopy = true;
+          return http.Response('{"revision":1}', 200);
         }
         fail('Unexpected sync endpoint: ${request.url}');
       }),
@@ -148,12 +149,12 @@ void main() {
 
     await sync.start(InitialSyncPolicy.mergeSafely);
 
-    expect(restored, isTrue);
+    expect(uploadedCopy, isTrue);
     expect(sync.hasPendingChanges, isFalse);
     final saved = await repository.fetchNotebooks();
     expect(saved, hasLength(1));
-    expect(saved.single.uid, original.uid);
-    expect(saved.single.title, 'Edited after deletion');
+    expect(saved.single.uid, isNot(original.uid));
+    expect(saved.single.title, 'Edited after deletion (1)');
   });
 
   test(
