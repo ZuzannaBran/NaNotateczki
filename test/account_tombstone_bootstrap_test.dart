@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -77,4 +78,82 @@ void main() {
     expect(saved, isEmpty);
     expect(sync.hasPendingChanges, isFalse);
   });
+  test('pending edit restores tombstoned original after reconnect', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final original = await repository.createNotebook(title: 'Offline note');
+    final edited = original.copyWith(title: 'Edited after deletion');
+    await repository.saveNotebook(edited);
+    final suffix = sha256
+        .convert(utf8.encode('account-1'))
+        .toString()
+        .substring(0, 16);
+    final stored = <String, String>{
+      'server_sync_state_$suffix.json': jsonEncode({
+        'version': 1,
+        'cursor': 0,
+        'revisions': {original.uid: 1},
+        'pending': [original.uid],
+      }),
+    };
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    var restored = false;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response(
+            jsonEncode({
+              'cursor': 2,
+              'notebooks': [
+                {
+                  'uid': original.uid,
+                  'revision': 2,
+                  'deleted': true,
+                  'notebook': null,
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":2,"changes":[]}', 200);
+        }
+        if (request.method == 'PUT') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['expectedRevision'], 2);
+          expect(body['restoreDeleted'], isTrue);
+          expect(body['notebook']['uid'], original.uid);
+          restored = true;
+          return http.Response('{"revision":3}', 200);
+        }
+        fail('Unexpected sync endpoint: ${request.url}');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-1';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+
+    await sync.start(InitialSyncPolicy.mergeSafely);
+
+    expect(restored, isTrue);
+    expect(sync.hasPendingChanges, isFalse);
+    final saved = await repository.fetchNotebooks();
+    expect(saved, hasLength(1));
+    expect(saved.single.uid, original.uid);
+    expect(saved.single.title, 'Edited after deletion');
+  });
+
 }
