@@ -42,3 +42,33 @@ Notebook numberedNotebookCopy(Notebook source, Iterable<Notebook> existing) {
     ],
   );
 }
+
+
+/// Creates a separate account document from a local source without
+/// overwriting an existing title in the same folder and notebook kind.
+/// The caller is responsible for durable, idempotent import checkpoints.
+Notebook copyLocalNotebookToAccount(
+  Notebook source,
+  Iterable<Notebook> existing,
+) {
+  final reserved = existing
+      .where((item) => item.folder == source.folder && item.kind == source.kind)
+      .map((item) => item.title.trim().toLowerCase())
+      .toSet();
+  final originalTitle = source.title.trim();
+  var uniqueTitle = originalTitle;
+  if (reserved.contains(uniqueTitle.toLowerCase())) {
+    final stem = originalTitle.replaceFirst(RegExp(r' \(\d+\)$'), '');
+    var number = 1;
+    while (reserved.contains('$stem ($number)'.toLowerCase())) {
+      number++;
+    }
+    uniqueTitle = '$stem ($number)';
+  }
+  final copy = numberedNotebookCopy(source, const <Notebook>[]);
+  return copy.copyWith(
+    title: uniqueTitle,
+    createdAt: source.createdAt,
+    updatedAt: source.updatedAt,
+  );
+}
