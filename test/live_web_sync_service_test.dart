@@ -1020,7 +1020,7 @@ void main() {
     expect(changesCalls, 2);
   });
 
-  test('bootstrap ignores a pending no-op without duplicating the document', () async {
+  test('bootstrap drops unchanged pending state', () async {
     final stored = <String, String>{};
     textStorageReadOverride = (key) async => stored[key];
     textStorageWriteOverride = (key, value) async => stored[key] = value;
