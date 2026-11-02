@@ -56,8 +56,8 @@ List<int> _recentColors(Object? raw) {
   return raw.whereType<int>().toSet().take(12).toList();
 }
 
-bool _equal(Object? a, Object? b) => jsonEncode(_canonical(a)) ==
-    jsonEncode(_canonical(b));
+bool _equal(Object? a, Object? b) =>
+    jsonEncode(_canonical(a)) == jsonEncode(_canonical(b));
 
 Object? _canonical(Object? value) {
   if (value is Map) {
@@ -90,10 +90,10 @@ Map<String, dynamic> _mergeNamedValues(
       result[key] = local[key];
       continue;
     }
-    final localChanged = inLocal != inBase ||
-        (inLocal && !_equal(local[key], base[key]));
-    final remoteChanged = inRemote != inBase ||
-        (inRemote && !_equal(remote[key], base[key]));
+    final localChanged =
+        inLocal != inBase || (inLocal && !_equal(local[key], base[key]));
+    final remoteChanged =
+        inRemote != inBase || (inRemote && !_equal(remote[key], base[key]));
     if (localChanged && !remoteChanged && inLocal) {
       result[key] = local[key];
     } else if (remoteChanged && !localChanged && inRemote) {
@@ -133,8 +133,10 @@ Map<String, dynamic> _mergeTaskGroups(
   final groups = {...base.keys, ...local.keys, ...remote.keys}.toList()..sort();
   for (final uid in groups) {
     // A removed planner's tasks must not be restored by an offline device.
-    if (baseKnown && base.containsKey(uid) &&
-        !remote.containsKey(uid) && !local.containsKey(uid)) {
+    if (baseKnown &&
+        base.containsKey(uid) &&
+        !remote.containsKey(uid) &&
+        !local.containsKey(uid)) {
       continue;
     }
     final entries = _mergeNamedValues(
@@ -150,15 +152,13 @@ Map<String, dynamic> _mergeTaskGroups(
       final changed = _taskIndex(local[uid]);
       final server = _taskIndex(remote[uid]);
       for (final id in old.keys) {
-        final localEdited = changed.containsKey(id) &&
-            !_equal(changed[id], old[id]);
-        final remoteEdited = server.containsKey(id) &&
-            !_equal(server[id], old[id]);
-        final bothEditedDifferently = localEdited &&
-            remoteEdited &&
-            !_equal(changed[id], server[id]);
-        if (localEdited &&
-            (!server.containsKey(id) || bothEditedDifferently)) {
+        final localEdited =
+            changed.containsKey(id) && !_equal(changed[id], old[id]);
+        final remoteEdited =
+            server.containsKey(id) && !_equal(server[id], old[id]);
+        final bothEditedDifferently =
+            localEdited && remoteEdited && !_equal(changed[id], server[id]);
+        if (localEdited && (!server.containsKey(id) || bothEditedDifferently)) {
           final original = changed[id] as Map<String, dynamic>;
           final signature = sha256
               .convert(utf8.encode(jsonEncode(_canonical(original))))
