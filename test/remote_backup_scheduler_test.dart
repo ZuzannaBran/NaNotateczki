@@ -179,6 +179,64 @@ void main() {
     await database.close();
   });
 
+  testWidgets('remote import triggers backup without local user activity', (
+    tester,
+  ) async {
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) async => http.Response('', 500)),
+    );
+    final database = NotesDatabase(NativeDatabase.memory());
+    late final RemoteBackupScheduler scheduler;
+    final repository = NotebookRepository(
+      database,
+      onChanged: (_) => scheduler.markDirty(),
+    );
+    final initial = await repository.createNotebook();
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'remote-import-account';
+    final service = _TrackingService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+    );
+    scheduler = RemoteBackupScheduler(service: service, session: session);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    scheduler.enableForSignedInAccount();
+    var reconciliations = 0;
+    scheduler.reconcileBeforeBackup = () async {
+      reconciliations++;
+    };
+    await scheduler.uploadNow();
+    expect(service.calls, 1);
+    expect(scheduler.hasPendingBackup, isFalse);
+
+    await repository.importNotebooksAtomically([
+      initial.copyWith(uid: 'downloaded-from-device-a'),
+    ], verifiedRemoteSync: true);
+    expect(scheduler.hasPendingBackup, isTrue);
+    await scheduler.uploadNow();
+    expect(reconciliations, 2);
+    expect(service.calls, 2);
+    expect(scheduler.hasPendingBackup, isFalse);
+
+    scheduler.markDirty();
+    scheduler.reconcileBeforeBackup = () async {
+      throw StateError('Unable to fetch latest account changes');
+    };
+    await scheduler.uploadNow();
+    expect(service.calls, 2);
+    expect(scheduler.hasPendingBackup, isTrue);
+    expect(scheduler.lastError, contains('Unable to fetch latest'));
+
+    await scheduler.stop();
+    scheduler.dispose();
+    session.dispose();
+    client.close();
+    await database.close();
+  });
+
   testWidgets('upload pending on network does not block UI frames', (
     tester,
   ) async {
