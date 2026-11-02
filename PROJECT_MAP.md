@@ -2027,6 +2027,10 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `test/study_share_guest_outbox_test.dart`: reload, izolacja i walidacja.
 - `study_share_memory_db_stub.dart` i `study_share_memory_db_web.dart`:
   osobna baza SQLite w pamięci, bez podpinania biblioteki konta.
+- `lib/data/sync/study_share_guest_vfs.dart`: rejestruje domyślny
+  `InMemoryFileSystem` przed otwarciem SQLite WASM gościa; nie używa
+  IndexedDB konta. Regresja: `test/study_share_guest_vfs_test.dart`
+  (unit) i `test/study_share_guest_database_test.dart` (Chrome, prawdziwy WASM).
 - `lib/data/sync/study_share_web_assets.dart`: poprawna absolutna ścieżka
   modułu SQLite WASM przy bezpośrednim otwarciu zagnieżdżonego /share/UID;
   test `study_share_web_assets_test.dart`.

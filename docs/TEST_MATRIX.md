@@ -970,3 +970,28 @@ Origin-less WebSocket connection and that a browser with foreign Origin
 cannot subscribe. The macOS SDK download and runner shutdown are external
 infrastructure failures; rerun on the actual hosted runners is required
 before calling their outcome verified.
+
+## Shared guest SQLite VFS regression — 2 November 2026
+
+The guest editor uses a fresh SQLite WASM instance and a default
+`InMemoryFileSystem`, not the account's IndexedDB. Without registering the
+VFS, opening a shared editor fails with `SqliteException: no such vfs`.
+
+- Run `flutter test test/study_share_guest_vfs_test.dart` to verify the
+  in-memory VFS is registered as the default.
+- Run `flutter test --platform chrome test/study_share_guest_database_test.dart`
+  where `/sqlite3.wasm` is served to the browser test. This opens a real
+  WASM database, creates a table, round-trips data and verifies that a
+  second guest database cannot see the first one's content. A failure to
+  serve the WASM asset must not be reported as a passing database test.
+- For production acceptance, open a valid `/share/UUID` link in a clean
+  browser, submit the session password, edit a page, and check that the
+  original host document is updated. Reload the link and repeat. Confirm
+  there is no `no such vfs` error, no account IndexedDB access and no
+  request for `/share/sqlite3.wasm`. Repeat with two guests editing
+  independent objects and verify both edits persist.
+- On Ubuntu, the Linux `flutter_secure_storage` build requires
+  `sudo apt install libsecret-1-dev pkg-config` before `flutter run -d linux`.
+
+These are regression/acceptance instructions, not a claim that a browser
+or the deployed session was tested.
