@@ -110,10 +110,12 @@ jobs:
         shell: bash
         run: |
           umask 077
-          printf 'POSTGRES_PASSWORD=%s\\nAPP_DB_PASSWORD=%s\\nJWT_SECRET=%s\\nBASE_DOMAIN=example.invalid\\n' \\
-            "$(openssl rand -hex 24)" \\
-            "$(openssl rand -hex 24)" \\
-            "$(openssl rand -hex 48)" > .env
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+            echo "APP_DB_PASSWORD=$(openssl rand -hex 24)"
+            echo "JWT_SECRET=$(openssl rand -hex 48)"
+            echo "BASE_DOMAIN=example.invalid"
+          } > .env
           mkdir -p data/backups
           sudo chown -R 1000:1000 data
       - name: Start PostgreSQL and apply all migrations
