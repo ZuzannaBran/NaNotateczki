@@ -566,6 +566,27 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           session: accountSession,
           planner: planner,
         );
+        remoteBackupScheduler.reconcileBeforeBackup = () async {
+          if (!liveSync.isStarted) {
+            throw StateError('Account sync must start before remote backup.');
+          }
+          // Pull changes even when this device has made no local edits.
+          await liveSync.syncNow();
+          if (liveSync.lastError != null || liveSync.hasPendingChanges) {
+            throw StateError(
+              'Pending notebook changes must sync before remote backup.',
+            );
+          }
+          await libraryController.flushPlannerTasks();
+          await _accountSettingsSync?.syncNow();
+          if (_accountSettingsSync?.lastError != null) {
+            throw StateError('Account preferences have not synchronized.');
+          }
+          await _plannerSync?.syncNow();
+          if (_plannerSync?.lastError != null) {
+            throw StateError('Planner has not synchronized.');
+          }
+        };
         _accountSettingsSync ??= AccountSettingsSyncService(
           apiClient: apiClient,
           session: accountSession,
@@ -573,6 +594,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             await libraryController.reloadFromAccount();
             await preferences.load();
             await remoteBackupScheduler.refreshAccountPreference();
+            // Metadata and preferences downloaded from another device
+            // also belong in the next verified snapshot.
+            remoteBackupScheduler.markDirty();
           },
         );
         if (newAccountSession) {
