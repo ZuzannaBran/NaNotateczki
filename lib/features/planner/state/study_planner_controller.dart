@@ -438,6 +438,8 @@ class StudyPlannerController extends ChangeNotifier {
     if (_disposed) {
       return;
     }
+    _ticker?.cancel();
+    _ticker = null;
     try {
       final value = await _read(storageKey);
       if (_disposed) {
