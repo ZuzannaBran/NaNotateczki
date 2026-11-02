@@ -49,8 +49,7 @@ class DiagnosticsUploadService {
       return;
     }
     final remaining = _retryNotBefore?.difference(DateTime.now());
-    final delay = remaining != null &&
-            remaining > const Duration(seconds: 12)
+    final delay = remaining != null && remaining > const Duration(seconds: 12)
         ? remaining
         : const Duration(seconds: 12);
     _timer = Timer(delay, () {

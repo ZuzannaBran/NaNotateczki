@@ -27,9 +27,7 @@ void main() {
     await tester.pumpWidget(
       Provider<ApiClient>.value(
         value: api,
-        child: const MaterialApp(
-          home: Scaffold(body: ContactCreatorTab()),
-        ),
+        child: const MaterialApp(home: Scaffold(body: ContactCreatorTab())),
       ),
     );
     await tester.enterText(

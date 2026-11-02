@@ -338,11 +338,7 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: AppLabeledField(
-        label: label,
-        labelKey: labelKey,
-        child: child,
-      ),
+      child: AppLabeledField(label: label, labelKey: labelKey, child: child),
     );
   }
 
@@ -379,7 +375,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   controller: _title,
                   autofocus: true,
                   maxLength: 100,
-                  decoration: appFormFieldDecoration().copyWith(counterText: ''),
+                  decoration: appFormFieldDecoration().copyWith(
+                    counterText: '',
+                  ),
                 ),
               ),
               _labeledField(
@@ -391,7 +389,9 @@ class _StudySessionDialogState extends State<_StudySessionDialog> {
                   minLines: 3,
                   maxLines: 3,
                   maxLength: 500,
-                  decoration: appFormFieldDecoration().copyWith(counterText: ''),
+                  decoration: appFormFieldDecoration().copyWith(
+                    counterText: '',
+                  ),
                 ),
               ),
               const SizedBox(height: 8),

@@ -42,9 +42,6 @@ InputDecoration appFormFieldDecoration({Widget? suffixIcon}) {
       borderRadius: BorderRadius.all(Radius.circular(12)),
     ),
     floatingLabelBehavior: FloatingLabelBehavior.never,
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: 16,
-      vertical: 17,
-    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
   );
 }

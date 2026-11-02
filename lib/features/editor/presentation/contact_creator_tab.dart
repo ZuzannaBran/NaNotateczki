@@ -58,21 +58,17 @@ class _ContactCreatorTabState extends State<ContactCreatorTab> {
       _error = null;
     });
     try {
-      await context.read<ApiClient>().postJson(
-        '/v1/reports/feedback',
-        {
-          'system': _system,
-          'issue': _issueController.text.trim(),
-        },
-        authenticated: false,
-      );
+      await context.read<ApiClient>().postJson('/v1/reports/feedback', {
+        'system': _system,
+        'issue': _issueController.text.trim(),
+      }, authenticated: false);
       if (!mounted) {
         return;
       }
       _issueController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report sent. Thank you.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Report sent. Thank you.')));
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -122,10 +118,7 @@ class _ContactCreatorTabState extends State<ContactCreatorTab> {
                       decoration: appFormFieldDecoration(),
                       items: [
                         for (final system in _systems)
-                          DropdownMenuItem(
-                            value: system,
-                            child: Text(system),
-                          ),
+                          DropdownMenuItem(value: system, child: Text(system)),
                       ],
                       onChanged: _sending
                           ? null
@@ -147,10 +140,9 @@ class _ContactCreatorTabState extends State<ContactCreatorTab> {
                       minLines: 5,
                       maxLines: 8,
                       maxLength: 5000,
-                      validator: (text) =>
-                          (text?.trim().length ?? 0) < 5
-                              ? 'Please describe the issue.'
-                              : null,
+                      validator: (text) => (text?.trim().length ?? 0) < 5
+                          ? 'Please describe the issue.'
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 12),
