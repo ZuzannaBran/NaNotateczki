@@ -8,7 +8,8 @@ void main() {
         .readAsLinesSync()
         .map((line) => line.trim())
         .where((line) => line.isNotEmpty && !line.startsWith('#'));
-    expect(rules, contains('/share/* /index.html 200'));
+    expect(rules, contains('/share/* / 200'));
+    expect(rules, isNot(contains('/share/* /index.html 200')));
     expect(rules, isNot(contains('/share/* / 302')));
   });
 }

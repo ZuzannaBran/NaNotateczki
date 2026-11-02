@@ -23,6 +23,7 @@ import 'support/native_test_documents.dart';
 
 void main() {
   useIsolatedNativeTestDocuments();
+  useInMemoryTestTextStorage();
 
   testWidgets(
     'background switches repaint without notifying the whole editor',

@@ -17,6 +17,7 @@ import 'support/native_test_documents.dart';
 
 void main() {
   useIsolatedNativeTestDocuments();
+  useInMemoryTestTextStorage();
 
   testWidgets('safe insets and navigation adapt to phones and tablets', (
     tester,

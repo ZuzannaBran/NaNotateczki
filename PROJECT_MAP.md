@@ -1553,14 +1553,23 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
 - `tool/vendor_flutter_fonts.py`: odtwarza komplet czcionek z tabeli SDK,
   zachowuje ścieżki, licencje, wersję silnika i sumy SHA-256.
 - `tool/package_cloudflare_web.py`: sprawdza kompletność produkcyjnego builda,
-  zgodność tabeli fontów z silnikiem i limit plików Cloudflare; tworzy ZIP
-  z `index.html` w katalogu głównym oraz `nanotateczki-release.json`.
+  zgodność tabeli fontów z silnikiem i limity uploadu; z `build/web/` tworzy
+  odchudzony `build/cloudflare-worker/` i ZIP. Pomija diagnostykę i nieużywane
+  renderery, spłaszcza katalogi fontów z rewrite zachowującym ich adresy.
+  `nanotateczki-release.json` identyfikuje całą paczkę.
+- `wrangler.jsonc`: statyczny Worker z fallbackiem SPA; Flutter nie jest
+  skryptem wykonywanym po stronie Workera.
+- `test/cloudflare_web_package_test.py`: selekcja rendererów, zachowanie
+  bajtów fontów po spłaszczeniu i limity plików uploadu.
 - `test/web_runtime_assets_test.dart`: lokalne adresy startowe i kompletność
   dystrybucji PDF.js i czcionek silnika weryfikowana sumami SHA-256.
 - `.github/scripts/test_web_local_assets.mjs`: gotowy build w izolowanym
   Chrome, zablokowane CDN-y; pierwsza klatka Fluttera, render PDF przez worker,
   mapa znaków i fonty emoji/JP/Arabic/math dla `/`, `/share/UID` i `/app/`;
-  `WEB_BUILD_DIR` pozwala sprawdzić wypakowaną paczkę; job web w CI.
+  `WEB_BUILD_DIR` wskazuje wypakowaną paczkę, `WEB_ORIGIN` rzeczywisty serwer.
+- `.github/scripts/test_cloudflare_worker.mjs`: dry-run Wrangler 4.156.1,
+  walidacja dwóch reguł rewrite i nagłówków, lokalny Workers oraz Chrome;
+  niezależny od konta Cloudflare, wykonywany w jobie web CI.
 
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
@@ -1696,8 +1705,9 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
   marginesy systemowe, dostęp do drawer/edytora, układy 320/390/768/844/
   1024/1440 px i zachowanie kontrolera przy zmianie orientacji.
 - `test/library_screen_responsive_layout_test.dart`: używa
-  `useIsolatedNativeTestDocuments` także w testach popup i okładek,
-  aby asynchroniczny startup nie rzucał `MissingPluginException`.
+  `useIsolatedNativeTestDocuments` i pamięciowego text storage także
+  w testach popup i okładek, aby startup nie rzucał `MissingPluginException`,
+  a natywne I/O uruchomione w FakeAsync nie blokowało `tearDownAll`.
   `test/library_screen_responsive_layout_test.dart`:
   szeroki układ, drzewo folderów i przełączanie widoczności toolbaru
   boarda/notebooka z kontrolką pod strzałką panelu; regresja pionowego
@@ -1869,6 +1879,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   adapter PathProvider; opcjonalny pamięciowy tekstowy storage zapobiega
   zablokowaniu FakeAsync przez natywne I/O w testach widgetowych. Nie
   przekierowuje danych użytkownika.
+  Testy geometrii biblioteki, edytora, adaptacyjnego layoutu i tekstowych
+  overlayów korzystają z pamięciowego adaptera; rzeczywistą trwałość zapisu
+  nadal weryfikują osobne zestawy repozytorium i `test/production/`.
 - `.github/scripts/flutter_integration_retry.sh` i
   `.github/scripts/test_flutter_integration_retry.sh`: ponowny start testu
   Android wyłącznie po błędzie inicjalizacji DDS; osobny test regresji

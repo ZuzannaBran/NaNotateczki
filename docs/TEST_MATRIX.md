@@ -486,6 +486,7 @@ flutter test integration_test/app_smoke_test.dart -d linux
 flutter build web --release --no-web-resources-cdn
 python3 tool/package_cloudflare_web.py
 node .github/scripts/test_web_local_assets.mjs
+node .github/scripts/test_cloudflare_worker.mjs
 ```
 
 GitHub Actions: `.github/workflows/cross_platform_tests.yml`. A local Linux
@@ -501,6 +502,16 @@ It waits for Flutter's first-frame event, renders a PDF with the bundled
 module worker, loads a packed CMap, and decodes emoji, Japanese, Arabic
 and mathematical glyphs with bundled fonts at `/`, a share deep link and
 a subpath deployment. `WEB_BUILD_DIR` can point at an extracted upload ZIP.
+`WEB_ORIGIN` selects an actual server rather than the built-in test server.
+`test_cloudflare_worker.mjs` runs Wrangler 4.156.1 dry-run and local Workers,
+rejects invalid redirect/header warnings, and runs the browser tests against
+that runtime. Upload artifact: `build/cloudflare-worker/` plus its ZIP.
+The invalid `/share/* /index.html 200` rule is covered by a failing-before
+regression and replaced by `/share/* / 200`, validated by Workers.
+The library/editor/adaptive-layout/text-overlay widget fixtures use isolated
+directories and in-memory text preferences. Native text I/O started inside
+FakeAsync can otherwise leave `tearDownAll` waiting indefinitely; actual
+on-disk persistence remains covered by repository and production tests.
 `test/web_runtime_assets_test.dart` also verifies the PDF and all 725 engine
 font checksums in the regular Flutter suite. The packaging script verifies
 that the bundled font table matches the built engine and includes all

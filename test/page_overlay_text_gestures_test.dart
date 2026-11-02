@@ -33,6 +33,7 @@ import 'support/native_test_documents.dart';
 
 void main() {
   useIsolatedNativeTestDocuments();
+  useInMemoryTestTextStorage();
   test('transform handle hit area scales with frame size', () {
     const style = ObjectTransformHudStyle();
 

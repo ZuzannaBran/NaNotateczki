@@ -192,7 +192,9 @@ jobs:
       - name: Compile complete web application
         run: flutter build web --release --no-web-resources-cdn
       - name: Validate runtime assets and package the Cloudflare upload
-        run: python3 tool/package_cloudflare_web.py
+        run: |
+          python3 -B -m unittest discover -s test -p 'cloudflare_web_package_test.py' -v
+          python3 tool/package_cloudflare_web.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -200,6 +202,11 @@ jobs:
         env:
           CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
         run: node .github/scripts/test_web_local_assets.mjs
+      - name: Verify Cloudflare Workers deployment and local runtime
+        env:
+          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: node .github/scripts/test_cloudflare_worker.mjs
       - uses: actions/upload-artifact@v6
         with:
           name: nanotateczki-cloudflare-upload

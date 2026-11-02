@@ -30,20 +30,24 @@ Z katalogu NaNotateczki:
 flutter build web --release --no-web-resources-cdn \
   --dart-define=BACKEND_URL=https://api.nanotateczki.pl
 python3 tool/package_cloudflare_web.py
-test -s build/web/index.html
-test -s build/web/main.dart.js
-test -s build/web/sqlite3.wasm
-test -s build/web/drift_worker.dart.js
-test -s build/web/_redirects
-test -s build/web/canvaskit/canvaskit.wasm
-test -s build/web/vendor/pdfjs/4.6.82/pdf.min.mjs
-test -s build/web/vendor/pdfjs/4.6.82/pdf.worker.min.mjs
-test -s build/web/vendor/flutter-fonts/manifest.json
-test -s build/web/nanotateczki-release.json
+test -s build/cloudflare-worker/index.html
+test -s build/cloudflare-worker/main.dart.js
+test -s build/cloudflare-worker/sqlite3.wasm
+test -s build/cloudflare-worker/drift_worker.dart.js
+test -s build/cloudflare-worker/_redirects
+test -s build/cloudflare-worker/canvaskit/canvaskit.wasm
+test -s build/cloudflare-worker/vendor/pdfjs/4.6.82/pdf.min.mjs
+test -s build/cloudflare-worker/vendor/pdfjs/4.6.82/pdf.worker.min.mjs
+test -s build/cloudflare-worker/vendor/flutter-fonts/manifest.json
+test -s build/cloudflare-worker/nanotateczki-release.json
 ```
 
-Publikowany katalog to **cała zawartość `build/web/`**, łącznie z
+Publikowany katalog to **cała zawartość `build/cloudflare-worker/`**, łącznie z
 `_redirects`, `assets/`, `canvaskit/`, `vendor/`, plikami JS i WASM.
+Tworzy go `package_cloudflare_web.py` z surowego wyniku Fluttera `build/web/`.
+Pomija mapy diagnostyczne i silniki niewymienione jako renderery tego builda.
+Wszystkie czcionki są zachowane, a ich katalogi są spłaszczone; dodatkowa
+reguła rewrite zachowuje oryginalne adresy wymagane przez Fluttera.
 Nie publikuj źródeł `lib/` zamiast builda. Nie mieszaj pojedynczych plików
 z dwóch buildów. Alternatywnie wgraj wygenerowany
 `build/nanotateczki-cloudflare-<release_id>.zip`: ma `index.html` bezpośrednio
@@ -53,11 +57,13 @@ albo tabela czcionek nie odpowiada wersji silnika w buildzie.
 Aktualny `web/_redirects` jest kopiowany do builda:
 
 ```text
-/share/* /index.html 200
+/share/* / 200
 ```
 
 To wewnętrzny rewrite, nie przekierowanie 301/302 do `/`.
 Identyfikator sesji musi zostać w pasku adresu.
+Cel `/` jest poprawnie walidowany przez Workers. Reguła z celem
+`/index.html` była odrzucana jako pętla przez walidator Workers.
 
 `web/flutter_bootstrap.js` wymusza lokalny CanvasKit i inicjuje lokalny
 PDF.js wraz z workerem i mapami znaków przed startem Fluttera. Gelasio jest
@@ -79,6 +85,7 @@ Po buildzie wykonaj (Node 22+ i Chrome):
 
 ```bash
 node .github/scripts/test_web_local_assets.mjs
+node .github/scripts/test_cloudflare_worker.mjs
 ```
 
 Test uruchamia lokalny serwer i izolowany profil Chrome, blokuje gstatic,
@@ -86,6 +93,15 @@ Google Fonts i jsDelivr, sprawdza pierwszą klatkę Fluttera, render PDF przez
 rzeczywisty worker, lokalną mapę znaków oraz fonty emoji, japońskie, arabskie
 i matematyczne dla `/`, `/share/UID` i `/app/share/UID`.
 Nie łączy się z kontem ani nie zmienia danych produkcyjnych.
+Drugi test używa przypiętego Wrangler 4.156.1: wykonuje `deploy --dry-run`,
+uruchamia lokalny runtime Workers i sprawdza aplikację w Chrome. Przerywa
+pracę przy błędnych regułach `_redirects`/`_headers` i weryfikuje rzeczywiste
+HTTP 200, MIME WASM/JS, PDF oraz lokalne fonty. Nie publikuje na koncie.
+
+Limity darmowych Workers Static Assets: 20 000 plików na wersję i 25 MiB
+na pojedynczy plik. To oddzielne limity od kodu wykonywanego przez Workera.
+Ten projekt hostuje Fluttera jako pliki statyczne, zgodnie z `wrangler.jsonc`.
+Dokumentacja: https://developers.cloudflare.com/workers/platform/limits/
 
 ## 2. Zaktualizuj backend na HP
 
@@ -184,8 +200,8 @@ Nie zmieniaj domeny API na domenę frontendu.
 ### Cloudflare Pages
 
 1. Otwórz istniejący projekt w Cloudflare → Workers & Pages.
-2. Opublikuj nową produkcyjną wersję z całym `build/web/`, wraz z `_redirects`.
-   W integracji Git ustaw katalog wynikowy na `build/web`.
+2. Opublikuj nową produkcyjną wersję z całym `build/cloudflare-worker/`, wraz z `_redirects`.
+   W integracji Git ustaw katalog wynikowy na `build/cloudflare-worker`.
 3. Domena niestandardowa projektu ma wskazywać `app.nanotateczki.pl`.
 4. Upewnij się, że Functions lub nadrzędny Worker nie przechwytują
    `/share/*` i nie zwracają własnego 404 przed obsługą plików statycznych.
@@ -196,14 +212,14 @@ https://developers.cloudflare.com/pages/configuration/redirects/
 
 ### Cloudflare Workers z plikami statycznymi
 
-1. Opublikuj cały `build/web`, z `_redirects`, w istniejącym Workerze domeny.
+1. Opublikuj cały `build/cloudflare-worker`, z `_redirects`, w istniejącym Workerze domeny.
 2. Dla wdrożenia przez Wrangler połącz poniższe pole z istniejącą
    konfiguracją `wrangler.jsonc`; zachowaj jej `name`, powiązania i trasy:
 
 ```json
 {
   "assets": {
-    "directory": "./build/web",
+    "directory": "./build/cloudflare-worker",
     "not_found_handling": "single-page-application"
   }
 }
@@ -212,6 +228,10 @@ https://developers.cloudflare.com/pages/configuration/redirects/
 Ścieżka jest względem pliku konfiguracyjnego, więc powyższy przykład zakłada
 `wrangler.jsonc` w katalogu głównym aplikacji. Następnie użyj istniejącego
 procesu wdrożenia lub `npx wrangler deploy --config wrangler.jsonc`.
+Repozytoryjna konfiguracja ma nazwę `nanotateczki-web`. Przy aktualizacji
+istniejącego Workera przekaż `--name JEGO_RZECZYWISTA_NAZWA`, zachowując
+istniejące przypisanie domeny. Nie ustawiaj `main.dart.js` jako skryptu Workera:
+to kod wykonywany w przeglądarce, serwowany przez `assets.directory`.
 Jeśli własny Worker działa przed assets, musi przekazać te żądania do
 assets zamiast samodzielnie zwracać 404. Nie zastępuj istniejących bindings.
 
@@ -276,7 +296,7 @@ opublikowaniem frontendu z zakładką Contact the creator.
 ## 4. Potwierdź wynik po wdrożeniu
 
 Najpierw otwórz `https://app.nanotateczki.pl/nanotateczki-release.json`.
-Pole `release_id` musi być identyczne z lokalnym `build/web/nanotateczki-release.json`
+Pole `release_id` musi być identyczne z lokalnym `build/cloudflare-worker/nanotateczki-release.json`
 i nazwą wgranego ZIP-a. Odpowiedź 404, HTML zamiast JSON lub inny identyfikator
 oznaczają, że domena nadal nie serwuje tej paczki. Sprawdź aktywną wersję,
 przypisanie domeny do właściwego Workera/Pages i cache hostingu.

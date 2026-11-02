@@ -63,6 +63,7 @@ Future<Color> _sampleRenderedPixel(
 
 void main() {
   useIsolatedNativeTestDocuments();
+  useInMemoryTestTextStorage();
 
   testWidgets('library switches from sidebar to drawer at 960 pixels', (
     tester,

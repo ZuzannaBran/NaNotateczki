@@ -7,9 +7,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const buildRoot = path.resolve(process.env.WEB_BUILD_DIR ?? 'build/web');
+const buildRoot = path.resolve(process.env.WEB_BUILD_DIR ?? 'build/cloudflare-worker');
+const externalOrigin = process.env.WEB_ORIGIN;
 const profile = await mkdtemp(path.join(tmpdir(), 'nanotateczki-web-test-'));
 const requests = [];
+const responses = [];
 const browserErrors = [];
 const mimeTypes = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
@@ -26,6 +28,9 @@ const server = http.createServer(async (request, response) => {
       response.writeHead(200, { 'Content-Type': 'text/html' }).end(html);
       return;
     }
+    if (pathname.startsWith('/vendor/flutter-fonts/') && pathname.endsWith('.woff2')) {
+      pathname = `/vendor/flutter-fonts/files/${path.posix.basename(pathname)}`;
+    }
     const file = path.resolve(buildRoot, `.${pathname}`);
     assert(file.startsWith(`${buildRoot}${path.sep}`));
     const bytes = await readFile(file);
@@ -36,9 +41,11 @@ const server = http.createServer(async (request, response) => {
     response.writeHead(404).end();
   }
 });
-server.listen(0, '127.0.0.1');
-await once(server, 'listening');
-const origin = `http://127.0.0.1:${server.address().port}`;
+if (!externalOrigin) {
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+}
+const origin = externalOrigin?.replace(/\/$/, '') ?? `http://127.0.0.1:${server.address().port}`;
 const chrome = spawn(process.env.CHROME_EXECUTABLE ?? 'google-chrome', [
   '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
   '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank',
@@ -111,6 +118,7 @@ try {
   socket.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data);
     if (message.method === 'Network.requestWillBeSent') requests.push(message.params.request.url);
+    if (message.method === 'Network.responseReceived') responses.push(message.params.response);
     if (message.method === 'Runtime.exceptionThrown') browserErrors.push(message.params);
     if (message.method === 'Network.loadingFailed') browserErrors.push(message.params);
     if (!message.id) return;
@@ -133,8 +141,10 @@ try {
   await send('Network.setBlockedURLs', {
     urls: ['*://*.gstatic.com/*', '*://fonts.googleapis.com/*', '*://cdn.jsdelivr.net/*'],
   });
-  for (const route of ['/', '/share/test-session', '/app/share/test-session']) {
+  const routes = externalOrigin ? ['/', '/share/test-session'] : ['/', '/share/test-session', '/app/share/test-session'];
+  for (const route of routes) {
     const requestStart = requests.length;
+    const responseStart = responses.length;
     await send('Page.navigate', { url: `${origin}${route}` });
     await waitFor(() => evaluate(
       `Boolean(window.__flutterFirstFrame && window.flutterCanvasKit && globalThis.pdfjsLib &&
@@ -187,9 +197,14 @@ try {
     })()`);
     assert.equal(fontResult.length, 4);
     const pageRequests = requests.slice(requestStart);
+    const pageResponses = responses.slice(responseStart);
     assert(pageRequests.some(url => url.includes('/canvaskit/') && url.endsWith('.wasm')));
     assert(pageRequests.some(url => url.endsWith('/pdf.worker.min.mjs')));
     assert(!pageRequests.some(url => /gstatic\.com|fonts\.googleapis\.com|cdn\.jsdelivr\.net/.test(url)));
+    assert(pageResponses.some(response => response.url === `${origin}${route}` && response.status === 200));
+    assert(pageResponses.some(response => response.url.endsWith('.wasm') && response.mimeType === 'application/wasm'));
+    assert(pageResponses.some(response => response.url.endsWith('/pdf.min.mjs') && /javascript/.test(response.mimeType)));
+    assert(!pageResponses.some(response => response.url.startsWith(origin) && response.status >= 400));
     console.log(`PASS ${route}: first Flutter frame, PDF render, CMap and multilingual font glyphs; CDN blocked`);
   }
 } finally {
@@ -198,7 +213,9 @@ try {
   const stopped = once(chrome, 'exit');
   chrome.kill();
   await stopped;
-  server.closeAllConnections();
-  await new Promise(resolve => server.close(resolve));
+  if (server.listening) {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
   await rm(profile, { recursive: true, force: true });
 }

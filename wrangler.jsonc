@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "nanotateczki-web",
+  "compatibility_date": "2026-11-02",
+  "assets": {
+    "directory": "./build/cloudflare-worker",
+    "not_found_handling": "single-page-application"
+  }
+}
