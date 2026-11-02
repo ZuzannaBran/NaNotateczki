@@ -155,6 +155,17 @@ void main() {
       expect(jsonDecode(stored['app_prefs.json']!)['darkMode'], true);
       expect((await repo2.fetchNotebooks()).single.uid, notebook.uid);
 
+      // A database reset must re-import even if the hydration marker survived.
+      // This is different from deliberately deleting a document offline.
+      await repo2.deleteNotebook(notebook.uid);
+      expect(
+        await recovery.hydrateFromLatestAccountBackup(
+          databaseWasReset: true,
+        ),
+        isTrue,
+      );
+      expect((await repo2.fetchNotebooks()).single.uid, notebook.uid);
+
       // An intentional offline deletion must not be resurrected by either
       // the same snapshot or a newly uploaded snapshot from another device.
       await repo2.deleteNotebook(notebook.uid);
