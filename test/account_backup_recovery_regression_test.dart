@@ -89,7 +89,8 @@ void main() {
       service.hydrateFromLatestAccountBackup(),
       throwsFormatException,
     );
-    expect(stored, isEmpty);
+    // Corrupt backups may be logged, but must not mutate account data.
+    expect(stored.keys.where((key) => key != 'app_error_log.json'), isEmpty);
     expect(await repo.fetchNotebooks(), isEmpty);
   });
 
