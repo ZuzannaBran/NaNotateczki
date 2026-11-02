@@ -232,6 +232,7 @@ class RemoteBackupService {
       // Recoveries must inspect every tombstone, not only the first page.
       final records = <dynamic>[];
       String? after;
+      int? initialCursor;
       do {
         final bootstrapResponse = await apiClient.request(
           'GET',
@@ -245,6 +246,7 @@ class RemoteBackupService {
         if (batch is! List<dynamic> || cursor is! num) {
           throw const FormatException('Malformed sync bootstrap response.');
         }
+        initialCursor ??= cursor.toInt();
         final next = bootstrap['next'];
         if (next != null &&
             (next is! String ||
@@ -260,7 +262,7 @@ class RemoteBackupService {
         after = next as String?;
       } while (after != null);
       // An empty historic feed may have compacted tombstones; never replay it.
-      if (records.isNotEmpty || cursor == 0) {
+      if (records.isNotEmpty || initialCursor == 0) {
         final authoritative = {
           for (final raw in records) _jsonObject(raw)['uid']: _jsonObject(raw),
         };
