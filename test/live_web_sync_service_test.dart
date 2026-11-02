@@ -186,52 +186,56 @@ void main() {
   test(
     'remote tombstone deletes unchanged local note without a copy',
     () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    final note = await repository.createNotebook(title: 'Deleted remotely');
-    var writes = 0;
-    final client = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((request) async {
-        if (request.url.path == '/v1/sync/bootstrap') {
-          return http.Response(jsonEncode({
-            'cursor': 1,
-            'notebooks': [
-              {
-                'uid': note.uid,
-                'revision': 2,
-                'deleted': true,
-                'notebook': null,
-              },
-            ],
-          }), 200);
-        }
-        if (request.url.path == '/v1/sync/changes') {
-          return http.Response('{"cursor":1,"changes":[]}', 200);
-        }
-        writes++;
-        fail('A confirmed deletion must not be re-uploaded.');
-      }),
-    )..setAccessToken('token');
-    addTearDown(client.close);
-    final session = AccountSessionController(client)
-      ..mode = AccountDataMode.account
-      ..userId = 'account-1';
-    addTearDown(session.dispose);
-    final sync = LiveWebSyncService(
-      repository: repository,
-      apiClient: client,
-      session: session,
-      enableRealtime: false,
-    );
-    addTearDown(sync.dispose);
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final note = await repository.createNotebook(title: 'Deleted remotely');
+      var writes = 0;
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/v1/sync/bootstrap') {
+            return http.Response(
+              jsonEncode({
+                'cursor': 1,
+                'notebooks': [
+                  {
+                    'uid': note.uid,
+                    'revision': 2,
+                    'deleted': true,
+                    'notebook': null,
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/v1/sync/changes') {
+            return http.Response('{"cursor":1,"changes":[]}', 200);
+          }
+          writes++;
+          fail('A confirmed deletion must not be re-uploaded.');
+        }),
+      )..setAccessToken('token');
+      addTearDown(client.close);
+      final session = AccountSessionController(client)
+        ..mode = AccountDataMode.account
+        ..userId = 'account-1';
+      addTearDown(session.dispose);
+      final sync = LiveWebSyncService(
+        repository: repository,
+        apiClient: client,
+        session: session,
+        enableRealtime: false,
+      );
+      addTearDown(sync.dispose);
 
-    await sync.start(InitialSyncPolicy.mergeSafely);
-    expect(await repository.fetchNotebooks(), isEmpty);
-    expect(sync.hasPendingChanges, isFalse);
-    expect(writes, 0);
-  });
+      await sync.start(InitialSyncPolicy.mergeSafely);
+      expect(await repository.fetchNotebooks(), isEmpty);
+      expect(sync.hasPendingChanges, isFalse);
+      expect(writes, 0);
+    },
+  );
 
   test('server deletion during an offline edit preserves one draft', () async {
     final database = NotesDatabase(NativeDatabase.memory());
@@ -243,17 +247,20 @@ void main() {
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
         if (request.url.path == '/v1/sync/bootstrap') {
-          return http.Response(jsonEncode({
-            'cursor': 1,
-            'notebooks': [
-              {
-                'uid': note.uid,
-                'revision': 1,
-                'deleted': false,
-                'notebook': NotebookRepository.encodeNotebook(note),
-              },
-            ],
-          }), 200);
+          return http.Response(
+            jsonEncode({
+              'cursor': 1,
+              'notebooks': [
+                {
+                  'uid': note.uid,
+                  'revision': 1,
+                  'deleted': false,
+                  'notebook': NotebookRepository.encodeNotebook(note),
+                },
+              ],
+            }),
+            200,
+          );
         }
         if (request.url.path == '/v1/sync/changes') {
           return http.Response('{"cursor":1,"changes":[]}', 200);
@@ -261,19 +268,22 @@ void main() {
         if (request.method == 'PUT') {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           if (rejectUpdate && body['notebook']['uid'] == note.uid) {
-            return http.Response(jsonEncode({
-              'detail': {
-                'uid': note.uid,
-                'revision': 2,
-                'deleted': true,
-                'notebook': null,
-              },
-            }), 409);
+            return http.Response(
+              jsonEncode({
+                'detail': {
+                  'uid': note.uid,
+                  'revision': 2,
+                  'deleted': true,
+                  'notebook': null,
+                },
+              }),
+              409,
+            );
           }
-          return http.Response(jsonEncode({
-            'revision': 1,
-            'notebook': body['notebook'],
-          }), 200);
+          return http.Response(
+            jsonEncode({'revision': 1, 'notebook': body['notebook']}),
+            200,
+          );
         }
         fail('Unexpected request: ${request.url}');
       }),
