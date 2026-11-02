@@ -142,7 +142,9 @@ class RemoteBackupService {
 
   /// Adds missing documents and keeps conflicting versions as numbered copies.
   /// Account sync history takes precedence over an older device snapshot.
-  Future<bool> hydrateFromLatestAccountBackup() async {
+  Future<bool> hydrateFromLatestAccountBackup({
+    bool databaseWasReset = false,
+  }) async {
     final userId = session.userId;
     if (!session.isSignedIn || userId == null) {
       throw StateError('Account backup recovery requires sign-in.');
@@ -224,13 +226,10 @@ class RemoteBackupService {
         // An invalid checkpoint must not prevent account recovery.
       }
     }
-    if (previousBackupId == backupId) {
-      // A restored marker can survive loss of the SQLite database. Do not
-      // treat it as proof that the documents themselves still exist.
-      final localNotebooks = await repository.fetchNotebooks();
-      if (recoveredNotebooks.isEmpty || localNotebooks.isNotEmpty) {
-        return false;
-      }
+    if (previousBackupId == backupId && !databaseWasReset) {
+      // Empty libraries can result from intentional deletions. Only a
+      // verified database reset may bypass an existing hydration marker.
+      return false;
     }
     // An offline deletion still waiting in the sync outbox must not be
     // undone by a newer device snapshot during account bootstrap.
