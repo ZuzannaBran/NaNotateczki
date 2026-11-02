@@ -24,6 +24,7 @@ import '../data/sync/api_client.dart';
 import '../data/sync/cloud_sync_service.dart';
 import '../data/sync/diagnostics_upload_service.dart';
 import '../data/sync/live_web_sync_service.dart';
+import '../data/sync/planner_sync_service.dart';
 import '../features/editor/state/ink_color_presets.dart';
 import '../features/library/presentation/library_controller.dart';
 import '../features/library/presentation/library_screen.dart';
@@ -49,6 +50,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   RemoteBackupScheduler? _remoteBackupScheduler;
   LiveWebSyncService? _liveSync;
   AccountSettingsSyncService? _accountSettingsSync;
+  PlannerSyncService? _plannerSync;
+  Future<void>? _plannerReady;
+  Timer? _plannerDebounce;
   DiagnosticsUploadService? _diagnosticsUpload;
   Timer? _settingsPoll;
   Timer? _settingsDebounce;
@@ -76,6 +80,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _settingsPoll?.cancel();
     _settingsDebounce?.cancel();
+    _plannerDebounce?.cancel();
+    _plannerSync?.stop();
     _backupScheduler?.dispose();
     _remoteBackupScheduler?.dispose();
     _liveSync?.dispose();
@@ -91,6 +97,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (scheduler != null) {
       _studyPlanner?.savedRevision.removeListener(scheduler.markDirty);
     }
+    _studyPlanner?.savedRevision.removeListener(_schedulePlannerSync);
     _studyPlanner?.dispose();
     _diagnosticsUpload?.dispose();
     _accountSession?.dispose();
@@ -184,6 +191,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(_startAccountSync());
       unawaited(_syncAccountSettings());
+      unawaited(_syncPlanner());
     }
   }
 
@@ -213,6 +221,28 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         error,
         stackTrace,
         source: 'AppScope.syncAccountSettings',
+      );
+    }
+  }
+
+  void _schedulePlannerSync() {
+    _plannerDebounce?.cancel();
+    _plannerDebounce = Timer(const Duration(milliseconds: 200), () {
+      unawaited(_syncPlanner());
+    });
+  }
+
+  Future<void> _syncPlanner() async {
+    if (_bootstrappedAccount == null || _plannerSync == null) {
+      return;
+    }
+    try {
+      await _plannerSync!.syncNow();
+    } catch (error, stackTrace) {
+      AppErrorLog.instance.record(
+        error,
+        stackTrace,
+        source: 'AppScope.syncPlanner',
       );
     }
   }
@@ -259,7 +289,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         // Settings use their own versioned account record rather than
         // replacing a newer device preference with a stale backup.
         await _syncAccountSettings();
+        await _plannerReady;
         await sync.start(InitialSyncPolicy.mergeSafely);
+        await _plannerSync?.syncNow();
         if (!mounted || session.userId != userId) {
           return;
         }
@@ -269,6 +301,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _settingsPoll?.cancel();
         _settingsPoll = Timer.periodic(const Duration(seconds: 45), (_) {
           unawaited(_syncAccountSettings());
+          unawaited(_syncPlanner());
         });
       } catch (error, stackTrace) {
         sync.reportStartupFailure(error);
@@ -383,11 +416,18 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             );
         _libraryController = libraryController;
         liveSync.onRemoteApplied = libraryController.loadItems;
+        liveSync.onPlannerChanged = _syncPlanner;
         final preferences =
             _preferences ?? (AppPreferencesController()..load());
         _preferences = preferences;
-        final planner = _studyPlanner ?? (StudyPlannerController()..load());
+        final planner = _studyPlanner ?? StudyPlannerController();
         _studyPlanner = planner;
+        _plannerReady ??= planner.load();
+        _plannerSync ??= PlannerSyncService(
+          apiClient: apiClient,
+          session: accountSession,
+          planner: planner,
+        );
         _accountSettingsSync ??= AccountSettingsSyncService(
           apiClient: apiClient,
           session: accountSession,
@@ -402,6 +442,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           SharedRecentColors.revision.addListener(_scheduleAccountSettingsSync);
           remoteBackupScheduler.addListener(_onBackupDelayChanged);
           planner.savedRevision.addListener(remoteBackupScheduler.markDirty);
+          planner.savedRevision.addListener(_schedulePlannerSync);
           SharedRecentColors.revision.addListener(
             remoteBackupScheduler.markDirty,
           );
@@ -412,6 +453,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               _bootstrappedAccount = null;
               _settingsPoll?.cancel();
               _settingsDebounce?.cancel();
+              _plannerDebounce?.cancel();
+              _plannerSync?.stop();
               _accountSettingsSync?.stop();
             }
           });
