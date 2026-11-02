@@ -2069,6 +2069,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `lib/data/sync/live_web_sync_service.dart`: remote tombstone usuwa
   oryginał bez kopii, jeśli nie ma oczekujących edycji; HTTP 409 przy
   usunięciu chroni lokalny niezapisany szkic jako numerowaną kopię.
+- `test/remote_backup_scheduler_test.dart`: wymuszony pierwszy upload,
+  po imporcie zdalnym automatyczny upload dopiero po 30 s bezczynności;
+  test osobno sprawdza odmowę weryfikacji przy błędzie pull.
 - `test/live_web_sync_service_test.dart`,
   `test/account_cross_device_backup_test.dart`,
   `test/remote_backup_scheduler_test.dart`,

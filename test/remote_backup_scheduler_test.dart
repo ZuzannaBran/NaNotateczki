@@ -179,6 +179,7 @@ void main() {
   testWidgets('remote import triggers backup without local user activity', (
     tester,
   ) async {
+    var now = DateTime.utc(2026, 11, 2);
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((_) async => http.Response('', 500)),
@@ -197,7 +198,11 @@ void main() {
       apiClient: client,
       session: session,
     );
-    scheduler = RemoteBackupScheduler(service: service, session: session);
+    scheduler = RemoteBackupScheduler(
+      service: service,
+      session: session,
+      now: () => now,
+    );
     final initial = await repository.createNotebook();
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
@@ -205,20 +210,20 @@ void main() {
     scheduler.reconcileBeforeBackup = () async {
       reconciliations++;
     };
-    await scheduler.uploadNow();
+    // The first upload is user-forced; automatic uploads wait for idle time.
+    await scheduler.backupNow();
     expect(scheduler.lastError, isNull);
-    expect(
-      service.calls,
-      1,
-      reason: 'Upload failed before reaching the service: ${scheduler.lastError}',
-    );
+    expect(service.calls, 1);
     expect(scheduler.hasPendingBackup, isFalse);
 
     await repository.importNotebooksAtomically([
       initial.copyWith(uid: 'downloaded-from-device-a'),
     ], verifiedRemoteSync: true);
     expect(scheduler.hasPendingBackup, isTrue);
-    await scheduler.uploadNow();
+    // No new user input: the downloaded change must upload after 30 seconds.
+    now = now.add(const Duration(seconds: 31));
+    await tester.pump(const Duration(seconds: 31));
+    await tester.pump();
     expect(reconciliations, 2);
     expect(service.calls, 2);
     expect(scheduler.hasPendingBackup, isFalse);
@@ -227,7 +232,7 @@ void main() {
     scheduler.reconcileBeforeBackup = () async {
       throw StateError('Unable to fetch latest account changes');
     };
-    await scheduler.uploadNow();
+    await scheduler.backupNow();
     expect(service.calls, 2);
     expect(scheduler.hasPendingBackup, isTrue);
     expect(scheduler.lastError, contains('Unable to fetch latest'));
