@@ -12,7 +12,10 @@ void main() {
         'title': 'Page',
         'isBookmarked': false,
         'inkStrokes': [
-          {'id': 'old', 'points': [1]},
+          {
+            'id': 'old',
+            'points': [1],
+          },
         ],
         'textBlocks': <dynamic>[],
         'imageBlocks': <dynamic>[],
@@ -52,7 +55,10 @@ void main() {
     final local = note();
     final remote = note();
     (local['pages'] as List).first['inkStrokes'] = [
-      {'id': 'old', 'points': [1, 2]},
+      {
+        'id': 'old',
+        'points': [1, 2],
+      },
     ];
     (remote['pages'] as List).first['inkStrokes'] = <dynamic>[];
     expect(mergeNotebookChanges(base, local, remote), isNull);

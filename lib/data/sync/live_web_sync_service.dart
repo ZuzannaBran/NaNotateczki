@@ -890,10 +890,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         jsonEncode(_encodeSyncNotebook(second));
   }
 
-  bool _sameEncodedNotebook(
-    Notebook notebook,
-    Map<String, dynamic> base,
-  ) =>
+  bool _sameEncodedNotebook(Notebook notebook, Map<String, dynamic> base) =>
       jsonEncode(_encodeSyncNotebook(notebook)) ==
       jsonEncode(_normalizeSyncNotebook(base));
 
