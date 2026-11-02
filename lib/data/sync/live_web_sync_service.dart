@@ -168,9 +168,8 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     String userId,
     Set<String> changedUids,
   ) {
-    final operation = _offlineQueueTail.catchError((Object _) {}).then((
-      _,
-    ) async {
+    final operation = _offlineQueueTail.catchError((Object _) {}).then(
+      (_) async {
       final key = _stateKey(userId);
       final raw = await readStoredText(key);
       final decoded = raw == null
@@ -197,15 +196,19 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           'idempotencyKeys': idempotency,
         }),
       );
-    });
-    _offlineQueueTail = operation;
-    return operation.catchError((Object error, StackTrace stackTrace) {
+      },
+    );
+    _offlineQueueTail = operation.catchError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
       AppErrorLog.instance.record(
         error,
         stackTrace,
         source: 'LiveWebSyncService.persistOfflineOutbox',
       );
     });
+    return _offlineQueueTail;
   }
 
   Future<void> syncNow() {
