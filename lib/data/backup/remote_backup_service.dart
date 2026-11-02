@@ -224,10 +224,24 @@ class RemoteBackupService {
         // An invalid checkpoint must not prevent account recovery.
       }
     }
-    if (previousBackupId == backupId &&
-        (recoveredNotebooks.isEmpty ||
-            (await repository.fetchNotebooks()).isNotEmpty)) {
+    if (previousBackupId == backupId) {
       return false;
+    }
+    // An offline deletion still waiting in the sync outbox must not be
+    // undone by a newer device snapshot during account bootstrap.
+    final syncText = await readStoredText('server_sync_state_$suffix.json');
+    final pendingSyncChanges = <String>{};
+    if (syncText != null) {
+      try {
+        final syncState = jsonDecode(syncText);
+        if (syncState is Map && syncState['pending'] is List) {
+          pendingSyncChanges.addAll(
+            (syncState['pending'] as List).whereType<String>(),
+          );
+        }
+      } on FormatException {
+        // An invalid sync checkpoint cannot authorize a destructive import.
+      }
     }
     if (session.userId != userId) {
       return false;
@@ -263,7 +277,8 @@ class RemoteBackupService {
         final remoteByUid = {for (final note in remoteNotes) note.uid: note};
         final imports = <Notebook>[];
         for (final recovered in recoveredNotebooks) {
-          if (authoritative[recovered.uid]?['deleted'] == true) {
+          if (pendingSyncChanges.contains(recovered.uid) ||
+              authoritative[recovered.uid]?['deleted'] == true) {
             continue;
           }
           final existing = local.where((note) => note.uid == recovered.uid);
