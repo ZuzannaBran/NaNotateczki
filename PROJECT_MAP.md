@@ -59,7 +59,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (922 linie)
+### `lib/app/app_scope.dart` (1016 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -80,13 +80,13 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   niezależny od migracji bazy notatek.
 - Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
   backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
-- 33: `AppScope`; 40: `_AppScopeState`; 115: `didRequestAppExit`;
+- 36: `AppScope`; 43: `_AppScopeState`; 130: `didRequestAppExit`;
   `_startAccountSync` automatycznie odtwarza stan po logowaniu i restarcie
   na wszystkich platformach, zanim uruchomi backup.
-- 205: `_syncAccountSettings`; 217: `_startAccountSync`;
-  474: `AppUiScale`; 522: `_ExitGuardOverlay`;
-  545: `_FinishingExitOverlay`; 653: `_BackupScheduler`;
-  849: `flushForExit`.
+- 235: `_syncAccountSettings`; 269: `_startAccountSync`;
+  568: `AppUiScale`; 616: `_ExitGuardOverlay`;
+  639: `_FinishingExitOverlay`; 747: `_BackupScheduler`;
+  943: `flushForExit`.
 
 ## 3. Core
 

@@ -200,8 +200,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
   void _updateActivityWakePermission(AccountSessionController session) {
     _activityWake?.setEnabled(
-      session.profileLoaded &&
-          session.preferredMode == AccountDataMode.account,
+      session.profileLoaded && session.preferredMode == AccountDataMode.account,
     );
   }
 

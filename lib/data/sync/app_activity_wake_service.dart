@@ -4,10 +4,8 @@ import 'api_client.dart';
 
 /// Sends a best-effort wake request at startup and after continued activity.
 class AppActivityWakeService {
-  AppActivityWakeService({
-    required this.apiClient,
-    DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+  AppActivityWakeService({required this.apiClient, DateTime Function()? now})
+    : _now = now ?? DateTime.now;
 
   static const interval = Duration(minutes: 30);
 
