@@ -183,8 +183,7 @@ void main() {
     expect(await repository.fetchNotebooks(), hasLength(2));
   });
 
-  test('remote tombstone deletes unchanged local note without a copy', (
-    ) async {
+  test('remote tombstone deletes unchanged local note without a copy', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
