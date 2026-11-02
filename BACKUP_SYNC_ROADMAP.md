@@ -49,8 +49,8 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
   jako nadrzędnych. **Ustawienia istniejącego konta zawsze wygrywają**:
   preferencje aplikacji i edytora, motyw, kolory recent, czułość,
   `backupPreferences` i pozostałe ustawienia konta. Brakująca wartość
-  po stronie konta może przyjąć lokalną wartość tylko jako jawnie
-  zdefiniowany fallback bez zmiany już zapisanej preferencji.
+  po stronie konta stosuje ustawienie domyślne konta; nie pobiera
+  lokalnej wartości w trybie importu.
 - Kalendarz i Study Sessions w wariancie importu to **suma rekordów**:
   istniejące wydarzenia i sesje konta pozostają nietknięte,
   lokalne wydarzenia i sesje (także zakończone, postęp timera,
@@ -66,6 +66,9 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
 - Backup automatyczny: 15 s / 30 s / 1 / 2 / 5 / 15 / 30 minut,
   domyślnie 30 s.
   Preferencje docelowo są jedną wersjonowaną polityką serwerową per konto.
+  W wyborze kopiowania Local → konto preferencje konta mają absolutne
+  pierwszeństwo; brakujące wartości stosują domyślne ustawienia konta,
+  nie lokalne nadpisania.
 
 ## Krytyczny etap: separacja lokalnego profilu od konta — NIEZAIMPLEMENTOWANY
 

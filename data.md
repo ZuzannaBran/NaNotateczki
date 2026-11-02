@@ -75,6 +75,43 @@ i rewizję. Zadania powiązane z notatnikiem/mapą folderów zachowują
 odniesienia po mapowaniu UID. Kompletność i atomowość migracji wymagają
 testów na Linux/Web/Android/iOS; to nie jest jeszcze gwarancja działania.
 
+## Docelowe zasady migracji Local → konto (jeszcze NIE wdrożone)
+
+Obecna implementacja nadal wykorzystuje wspólne `notes.sqlite` i klucze
+plików `localOnly`/konta, automatycznie wywołuje `mergeSafely` po loginie.
+Nie wolno uznawać tej implementacji za bezpieczną separację. Przed nowym
+flow logowania konieczna jest osobna przestrzeń danych dla Local i każdego
+konta oraz atomowa migracja poprzedniego magazynu.
+
+Przy pierwszym logowaniu użytkownik wybiera, czy zachować całość Local
+w izolacji, czy **skopiować** dane do konta. Izolacja pozostawia Local
+nienaruszone (wraz z kalendarzem, sesjami nauki, plikami, assetami,
+ustawieniami i backupami) i pokazuje wyłącznie dane serwerowe na koncie.
+Po powrocie do Local otwiera się ten sam lokalny magazyn.
+
+Przy kopiowaniu stosować następujący priorytet:
+
+- **Ustawienia konta zawsze są autorytatywne**. Nie przenosić
+  lokalnych preferencji ponad ustawienia i domyślne wartości konta:
+  motywu, ustawień edytora, kolorów recent, parametrów backupu
+  oraz innych preferencji.
+- **Wydarzenia kalendarza i Study Sessions się dodają**: zachować
+  wszystkie istniejące rekordy konta, następnie dołączyć lokalne
+  wydarzenia, cykliczne wpisy, sesje planowane i ukończone, postęp,
+  czasy i terminy. To nie jest podmiana całego `study_planner.json`.
+  Takie same tytuły albo godziny nie oznaczają automatycznej kolizji.
+  W razie kolizji ID różnych rekordów wydać nowe, zachować relacje
+  serii i checkpoint mapowania; drugi import nie może tworzyć duplikatów.
+- **Dokumenty i foldery**: zachować już istniejące obiekty konta;
+  przenoszone dokumenty przy kolizji tytułu w tym samym folderze
+  dostają `(1)`, `(2)` itd. W innym folderze wolno zachować nazwę.
+  Kopie wymagają własnego UID i ID obiektów, obrazy/PDF muszą pozostać
+  czytelne. Nie przenosić aktywnych sesji udostępniania linkiem.
+
+Warunkiem zatwierdzenia transferu są zweryfikowana synchronizacja
+i trwały checkpoint źródło → cel. Awaria podczas kopiowania nie może
+usunąć Local ani powtórnie importować danych.
+
 ## Dane lokalne na platformach natywnych
 
 Wewnętrzne pliki są w prywatnym `Application Support` danej platformy,
