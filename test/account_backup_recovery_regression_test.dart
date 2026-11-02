@@ -151,37 +151,29 @@ void main() {
     },
   );
 
-  test('tombstone on a later bootstrap page blocks stale backup replay',
-      () async {
-    final source = await _repository().createNotebook(title: 'Deleted');
-    final repo = _repository();
-    final service = _service(
-      repo,
-      jsonEncode({
-        'notebooks': [NotebookRepository.encodeNotebook(source)],
-        'libraryState': {},
-        'studyPlannerState': {},
-      }),
-      bootstrapPageSize: 1,
-      records: [
-        {
-          'uid': '!earlier',
-          'revision': 1,
-          'deleted': true,
-          'notebook': null,
-        },
-        {
-          'uid': source.uid,
-          'revision': 3,
-          'deleted': true,
-          'notebook': null,
-        },
-      ],
-    );
+  test(
+    'tombstone on a later bootstrap page blocks stale backup replay',
+    () async {
+      final source = await _repository().createNotebook(title: 'Deleted');
+      final repo = _repository();
+      final service = _service(
+        repo,
+        jsonEncode({
+          'notebooks': [NotebookRepository.encodeNotebook(source)],
+          'libraryState': {},
+          'studyPlannerState': {},
+        }),
+        bootstrapPageSize: 1,
+        records: [
+          {'uid': '!earlier', 'revision': 1, 'deleted': true, 'notebook': null},
+          {'uid': source.uid, 'revision': 3, 'deleted': true, 'notebook': null},
+        ],
+      );
 
-    await service.hydrateFromLatestAccountBackup();
-    expect(await repo.fetchNotebooks(), isEmpty);
-  });
+      await service.hydrateFromLatestAccountBackup();
+      expect(await repo.fetchNotebooks(), isEmpty);
+    },
+  );
 
   test(
     'a planner conflict keeps both task lists under their document IDs',
@@ -278,8 +270,8 @@ RemoteBackupService _service(
         final batch = bootstrapPageSize == null
             ? records
             : records.skip(start).take(bootstrapPageSize).toList();
-        final next = bootstrapPageSize != null &&
-                start + batch.length < records.length
+        final next =
+            bootstrapPageSize != null && start + batch.length < records.length
             ? batch.last['uid'] as String
             : null;
         return http.Response(
