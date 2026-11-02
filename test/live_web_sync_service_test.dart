@@ -183,6 +183,126 @@ void main() {
     expect(await repository.fetchNotebooks(), hasLength(2));
   });
 
+  test('remote tombstone deletes unchanged local note without a copy', (
+    ) async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final note = await repository.createNotebook(title: 'Deleted remotely');
+    var writes = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response(jsonEncode({
+            'cursor': 1,
+            'notebooks': [
+              {
+                'uid': note.uid,
+                'revision': 2,
+                'deleted': true,
+                'notebook': null,
+              },
+            ],
+          }), 200);
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":1,"changes":[]}', 200);
+        }
+        writes++;
+        fail('A confirmed deletion must not be re-uploaded.');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-1';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+
+    await sync.start(InitialSyncPolicy.mergeSafely);
+    expect(await repository.fetchNotebooks(), isEmpty);
+    expect(sync.hasPendingChanges, isFalse);
+    expect(writes, 0);
+  });
+
+  test('server deletion during an offline edit preserves one draft', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final note = await repository.createNotebook(title: 'Shared draft');
+    var rejectUpdate = false;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response(jsonEncode({
+            'cursor': 1,
+            'notebooks': [
+              {
+                'uid': note.uid,
+                'revision': 1,
+                'deleted': false,
+                'notebook': NotebookRepository.encodeNotebook(note),
+              },
+            ],
+          }), 200);
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":1,"changes":[]}', 200);
+        }
+        if (request.method == 'PUT') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          if (rejectUpdate && body['notebook']['uid'] == note.uid) {
+            return http.Response(jsonEncode({
+              'detail': {
+                'uid': note.uid,
+                'revision': 2,
+                'deleted': true,
+                'notebook': null,
+              },
+            }), 409);
+          }
+          return http.Response(jsonEncode({
+            'revision': 1,
+            'notebook': body['notebook'],
+          }), 200);
+        }
+        fail('Unexpected request: ${request.url}');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-1';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+
+    await sync.start(InitialSyncPolicy.mergeSafely);
+    rejectUpdate = true;
+    await repository.saveNotebook(note.copyWith(title: 'Edited offline'));
+    sync.enqueue([NotebookRepositoryChange.full(note.uid)]);
+    await sync.syncNow();
+
+    expect(await repository.getNotebook(note.uid), isNull);
+    final remaining = await repository.fetchNotebooks();
+    expect(remaining, hasLength(1));
+    expect(remaining.single.title, 'Edited offline (1)');
+    expect(remaining.single.uid, isNot(note.uid));
+  });
+
   test('drains every full page of the server change feed', () async {
     var changesCalls = 0;
     final client = ApiClient(
