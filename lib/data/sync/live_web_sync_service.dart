@@ -151,7 +151,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         sharedChange = true;
       }
     }
-    unawaited(_saveState());
+    unawaited(_saveState().catchError((Object _, StackTrace __) {}));
     _drainTimer?.cancel();
     _drainTimer = Timer(
       sharedChange ? Duration.zero : const Duration(milliseconds: 90),
@@ -860,17 +860,35 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     if (userId == null) {
       return Future<void>.value();
     }
-    return writeStoredText(
-      _stateKey(userId),
-      jsonEncode({
-        'version': 1,
-        'cursor': _cursor,
-        'revisions': _revisions,
-        'pending': _pending.toList()..sort(),
-        'restorePending': _restorePending.toList()..sort(),
-        'idempotencyKeys': _idempotencyKeys,
-      }),
-    );
+    // Serialize state writes with the pre-start outbox. Otherwise a slow
+    // older write can finish last and erase newer pending notebook changes.
+    final write = _offlineQueueTail.catchError((Object _) {}).then((_) async {
+      if (_activeUserId != userId) {
+        return;
+      }
+      await writeStoredText(
+        _stateKey(userId),
+        jsonEncode({
+          'version': 1,
+          'cursor': _cursor,
+          'revisions': _revisions,
+          'pending': _pending.toList()..sort(),
+          'restorePending': _restorePending.toList()..sort(),
+          'idempotencyKeys': _idempotencyKeys,
+        }),
+      );
+    });
+    _offlineQueueTail = write.catchError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
+      AppErrorLog.instance.record(
+        error,
+        stackTrace,
+        source: 'LiveWebSyncService.persistOutbox',
+      );
+    });
+    return write;
   }
 
   static Map<String, dynamic> _requireJsonObject(Object? raw) {

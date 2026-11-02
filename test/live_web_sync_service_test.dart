@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
@@ -776,6 +777,71 @@ void main() {
     await sync.syncNow();
 
     expect(changesCalls, 2);
+  });
+
+  test('overlapping outbox writes preserve the latest pending UIDs', () async {
+    final stored = <String, String>{};
+    final releaseFirst = Completer<void>();
+    final firstStarted = Completer<void>();
+    final firstFinished = Completer<void>();
+    var blockNext = false;
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async {
+      if (key.startsWith('server_sync_state_') && blockNext) {
+        blockNext = false;
+        firstStarted.complete();
+        await releaseFirst.future;
+        stored[key] = value;
+        firstFinished.complete();
+        return;
+      }
+      stored[key] = value;
+    };
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response('{"cursor":0,"notebooks":[]}', 200);
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":0,"changes":[]}', 200);
+        }
+        fail('Unexpected request: ${request.method} ${request.url}');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'outbox-write-order';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+    await sync.start(InitialSyncPolicy.downloadRemote);
+
+    blockNext = true;
+    final first = await repository.createNotebook(title: 'First');
+    sync.enqueue([NotebookRepositoryChange.full(first.uid)]);
+    await firstStarted.future;
+    final second = await repository.createNotebook(title: 'Second');
+    sync.enqueue([NotebookRepositoryChange.full(second.uid)]);
+    // Allow the second write to overtake the first in the old implementation.
+    await Future<void>.delayed(Duration.zero);
+    releaseFirst.complete();
+    await firstFinished.future;
+    await sync.stop();
+
+    final state = jsonDecode(
+      stored.values.singleWhere((value) => value.contains('"pending"')),
+    ) as Map<String, dynamic>;
+    expect(state['pending'], containsAll([first.uid, second.uid]));
   });
 
   test('stop and start do not carry account A outbox into account B', () async {

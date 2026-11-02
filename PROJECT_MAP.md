@@ -430,7 +430,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
   tylko jako sygnał na wszystkich platformach; własny push nie przesuwa
   kursora zdarzeń z innych
-  urządzeń. `start`/`stop` zerują pamięciowy stan konta, a zapis stanu używa
+  urządzeń. Zapisy outboxu i kursora są serializowane wraz z kolejką
+  sprzed startu, żeby starszy zapis nie wymazał nowszych UID.
+  `start`/`stop` zerują pamięciowy stan konta, a zapis stanu używa
   utrwalonego `userId`, więc kursor, rewizje i outbox nie przechodzą między
   kontami. Normalizuje ścieżki obrazów oraz daty dokumentu do UTC,
   zapobiegając fałszywym konfliktom między Linuxem, Web, iOS i Androidem.
