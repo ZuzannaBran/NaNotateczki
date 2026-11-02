@@ -557,11 +557,10 @@ class _AccountDialogState extends State<_AccountDialog> {
             ],
           ),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
+          OutlinedButton(
             key: const ValueKey('account-backup-now'),
             onPressed: _isWorking || backup.isUploading ? null : _backupNow,
-            icon: const Icon(Icons.cloud_upload_outlined),
-            label: const Text('Back up now'),
+            child: const Text('Back up now'),
           ),
           if (widget.liveSyncAvailable) ...[
             const SizedBox(height: 20),
@@ -622,6 +621,12 @@ class _AccountDialogState extends State<_AccountDialog> {
             key: const ValueKey('account-switch-local'),
             onPressed: _isWorking ? null : () => _show(_AccountView.local),
             child: const Text('Switch to local mode'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            key: const ValueKey('account-logout'),
+            onPressed: _isWorking ? null : _logout,
+            child: const Text('Log out'),
           ),
         ] else ...[
           const Text(
@@ -878,6 +883,29 @@ class _AccountDialogState extends State<_AccountDialog> {
     } catch (failure) {
       _showFailure(failure);
     } finally {
+      _stopWorking();
+    }
+  }
+
+  Future<void> _logout() async {
+    _startWorking();
+    final session = context.read<AccountSessionController>();
+    try {
+      await context.read<LiveWebSyncService>().stop();
+      await context.read<RemoteBackupScheduler>().stop();
+      await session.logout();
+    } catch (failure) {
+      // The server may be offline; local logout must still reach the
+      // welcome screen and must never retain a usable local session.
+      if (session.isSignedIn) {
+        _showFailure(failure);
+        return;
+      }
+      _showFailure(failure);
+    } finally {
+      if (!session.isSignedIn && mounted) {
+        _show(_AccountView.landing);
+      }
       _stopWorking();
     }
   }
