@@ -44,6 +44,7 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
 4. **Wykrywanie aktywności — poprawki i testy dopisane, CI niepotwierdzone.**
    Zmiana danych z sync nie zeruje bezczynności. Ukryta karta nie liczy
    interakcji. Wpisy w Quill liczą także klawiaturę ekranową.
+   Wake API ignoruje hover i ruch kursora bez wciśniętego przycisku.
    Do przetestowania inne pola tekstowe i rzeczywiste zawieszenie aplikacji.
 5. **Odtwarzanie backupu — poprawki i testy dopisane, CI niepotwierdzone.**
    Weryfikowana utrata SQLite pozwala ponownie odtworzyć już pobrany backup.
@@ -51,10 +52,13 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
    stanu. Backend sortuje kopie po czasie weryfikacji.
    Dodano fallback i test: niepoprawna najnowsza kopia ustępuje starszej
    prawidłowej. Pozostaje test atomowego odtwarzania uszkodzonego payloadu.
-6. **Synchronizacja folderów, okładek, zadań — NIEUKOŃCZONA.**
-   Client nie włącza jeszcze kategorii `libraryState` ani nie zapisuje
-   bezpiecznych tombstones/zmian per wpis; nie wolno wdrażać surowego
-   nadpisywania JSON bez rozwiązania konfliktów offline i utraty usunięć.
+6. **Synchronizacja folderów, okładek, zadań — CZĘŚCIOWO.**
+   Klient obsługuje `libraryState` i CAS z automatycznym scalaniem
+   znanych folderów, okładek i zadań, potwierdzonymi usunięciami oraz
+   kopiami `(1)` dla konfliktujących zadań. Zabezpiecza zmiany lokalne
+   podczas żądania REST. Dodać testy end-to-end z PostgreSQL,
+   dwoma urządzeniami i rename/move podfolderów oraz dopracować
+   usunięcia i metadane plików przy niepełnych snapshotach.
 7. **Konflikty ustawień i jedna polityka backupu — NIEUKOŃCZONE.**
    Potrzebne trójstronne uzgadnianie niezależnych ustawień, idempotencja
    po 409 oraz jedna wersjonowana polityka backend + lokalny cache.
