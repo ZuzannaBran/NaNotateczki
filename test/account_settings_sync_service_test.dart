@@ -105,6 +105,37 @@ void main() {
     },
   );
 
+  test('expired access token is refreshed without signing out', () async {
+    textStorageReadOverride = (_) async => null;
+    textStorageWriteOverride = (_, _) async {};
+    var calls = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        calls++;
+        if (request.headers['authorization'] != 'Bearer renewed') {
+          return http.Response('{"detail":"Expired token"}', 401);
+        }
+        return http.Response('{"settings":{}}', 200);
+      }),
+    )..setAccessToken('expired');
+    addTearDown(client.close);
+    final session = _RefreshingSession(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-a';
+    addTearDown(session.dispose);
+    final sync = AccountSettingsSyncService(
+      apiClient: client,
+      session: session,
+    );
+
+    await sync.syncNow();
+    expect(session.refreshCalls, 1);
+    expect(session.isSignedIn, isTrue);
+    expect(calls, 2);
+    expect(sync.lastError, isNull);
+  });
+
   test('accepted update survives a lost client response', () async {
     final stored = <String, String>{'app_prefs.json': '{"darkMode":true}'};
     textStorageReadOverride = (key) async => stored[key];
@@ -206,4 +237,16 @@ void main() {
     expect(writes, 0);
     expect(jsonDecode(files['app_prefs.json']!)['darkMode'], false);
   });
+}
+
+class _RefreshingSession extends AccountSessionController {
+  _RefreshingSession(super.apiClient);
+
+  int refreshCalls = 0;
+
+  @override
+  Future<void> refresh() async {
+    refreshCalls++;
+    apiClient.setAccessToken('renewed');
+  }
 }
