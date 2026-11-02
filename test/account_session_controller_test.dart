@@ -241,6 +241,17 @@ void main() {
       await restarted.logout();
       expect(credentials.value, isNull);
       expect(restarted.isSignedIn, isFalse);
+      expect(restarted.onboardingComplete, isFalse);
+      expect(restarted.shouldShowStartupDialog, isTrue);
+      final signedOut = AccountSessionController(
+        client,
+        credentialStore: credentials,
+      );
+      await signedOut.loadProfile();
+      expect(signedOut.isSignedIn, isFalse);
+      expect(signedOut.shouldShowStartupDialog, isTrue);
+      expect(signedOut.lastAccountUsername, 'test_user');
+      signedOut.dispose();
       initial.dispose();
       restarted.dispose();
       client.close();
