@@ -54,6 +54,10 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
     await tester.pump();
+    expect(RemoteBackupScheduler.defaultIdleSeconds, 30);
+    expect(scheduler.idleSeconds, 30);
+    await scheduler.setIdleSeconds(15);
+    expect(scheduler.idleSeconds, 15);
     await scheduler.setIdleSeconds(60);
     expect(scheduler.idleSeconds, 60);
     await scheduler.setIdleSeconds(30);
