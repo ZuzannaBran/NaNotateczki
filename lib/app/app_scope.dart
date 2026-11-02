@@ -595,8 +595,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                       child: Listener(
                         behavior: HitTestBehavior.translucent,
                         onPointerDown: (_) => _activityWake?.noteActivity(),
-                        onPointerMove: (_) => _activityWake?.noteActivity(),
-                        onPointerHover: (_) => _activityWake?.noteActivity(),
+                        onPointerMove: (event) {
+                          if (AppActivityWakeService.isIntentionalPointer(
+                            event,
+                          )) {
+                            _activityWake?.noteActivity();
+                          }
+                        },
                         onPointerSignal: (_) => _activityWake?.noteActivity(),
                         child: _ExitGuardOverlay(
                           finishingExit: _finishingExit,
