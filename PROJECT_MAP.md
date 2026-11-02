@@ -1544,12 +1544,21 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
 - `web/sqlite3.wasm`: binarium SQLite dla web.
 - `web/flutter_bootstrap.js`: lokalny CanvasKit oraz PDF.js 4.6.82 z workerem
   i kompletem map znaków w `web/vendor/pdfjs/`; adresy względem `base href`,
-  inicjalizacja globalnych opcji pdfx przed uruchomieniem Fluttera.
+  inicjalizacja globalnych opcji pdfx przed uruchomieniem Fluttera. Lokalny
+  `fontFallbackBaseUrl` i `web/vendor/flutter-fonts/` zachowują pełną tabelę
+  czcionek silnika, również emoji i inne alfabety, bez zmiany Gelasio w UI.
+- `web/_headers`: MIME JS/WASM oraz rewalidacja plików startowych hostingu.
+- `tool/vendor_flutter_fonts.py`: odtwarza komplet czcionek z tabeli SDK,
+  zachowuje ścieżki, licencje, wersję silnika i sumy SHA-256.
+- `tool/package_cloudflare_web.py`: sprawdza kompletność produkcyjnego builda,
+  zgodność tabeli fontów z silnikiem i limit plików Cloudflare; tworzy ZIP
+  z `index.html` w katalogu głównym oraz `nanotateczki-release.json`.
 - `test/web_runtime_assets_test.dart`: lokalne adresy startowe i kompletność
-  dystrybucji PDF.js weryfikowana sumami SHA-256.
+  dystrybucji PDF.js i czcionek silnika weryfikowana sumami SHA-256.
 - `.github/scripts/test_web_local_assets.mjs`: gotowy build w izolowanym
-  Chrome, zablokowane CDN-y; klatka Fluttera, render PDF przez worker i mapa
-  znaków dla `/`, `/share/UID` oraz wdrożenia pod `/app/`; job web w CI.
+  Chrome, zablokowane CDN-y; pierwsza klatka Fluttera, render PDF przez worker,
+  mapa znaków i fonty emoji/JP/Arabic/math dla `/`, `/share/UID` i `/app/`;
+  `WEB_BUILD_DIR` pozwala sprawdzić wypakowaną paczkę; job web w CI.
 
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:

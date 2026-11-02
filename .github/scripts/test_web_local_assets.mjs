@@ -7,13 +7,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const buildRoot = path.resolve('build/web');
+const buildRoot = path.resolve(process.env.WEB_BUILD_DIR ?? 'build/web');
 const profile = await mkdtemp(path.join(tmpdir(), 'nanotateczki-web-test-'));
 const requests = [];
 const browserErrors = [];
 const mimeTypes = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
-  '.wasm': 'application/wasm', '.json': 'application/json',
+  '.wasm': 'application/wasm', '.json': 'application/json', '.woff2': 'font/woff2',
 };
 const server = http.createServer(async (request, response) => {
   try {
@@ -70,6 +70,9 @@ async function waitFor(check, description) {
     body: document.body.innerHTML.slice(0, 7000),
     canvasKit: Boolean(window.flutterCanvasKit),
     pdf: Boolean(globalThis.pdfjsLib),
+    firstFrame: window.__flutterFirstFrame,
+    probeInstalled: window.__flutterFrameProbeInstalled,
+    glassPane: document.querySelector('flt-glass-pane')?.shadowRoot?.innerHTML.slice(0, 2000),
   })`));
   console.error(browserErrors);
   throw new Error(`Timed out: ${description}`);
@@ -120,14 +123,21 @@ try {
   });
   await send('Network.enable');
   await send('Runtime.enable');
+  await send('Page.enable');
+  await send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `window.__flutterFrameProbeInstalled = true;
+    window.addEventListener('flutter-first-frame', () => {
+      window.__flutterFirstFrame = true;
+    });`,
+  });
   await send('Network.setBlockedURLs', {
-    urls: ['*://*.gstatic.com/*', '*://cdn.jsdelivr.net/*'],
+    urls: ['*://*.gstatic.com/*', '*://fonts.googleapis.com/*', '*://cdn.jsdelivr.net/*'],
   });
   for (const route of ['/', '/share/test-session', '/app/share/test-session']) {
     const requestStart = requests.length;
     await send('Page.navigate', { url: `${origin}${route}` });
     await waitFor(() => evaluate(
-      `Boolean(window.flutterCanvasKit && globalThis.pdfjsLib &&
+      `Boolean(window.__flutterFirstFrame && window.flutterCanvasKit && globalThis.pdfjsLib &&
         document.querySelector('flt-glass-pane')?.shadowRoot?.querySelector('canvas'))`,
     ), `Flutter frame at ${route}`);
     const result = await evaluate(`(async () => {
@@ -152,11 +162,35 @@ try {
     assert(result.mapSize > 1000);
     const prefix = route.startsWith('/app/') ? '/app/' : '/';
     assert.equal(result.cMapUrl, `${origin}${prefix}vendor/pdfjs/4.6.82/cmaps/`);
+    const fontResult = await evaluate(`(async () => {
+      const base = new URL('vendor/flutter-fonts/', document.baseURI);
+      const manifest = await (await fetch(new URL('manifest.json', base))).json();
+      const supported = [];
+      for (const [family, character] of [
+        ['notocoloremoji', '😀'], ['notosansjp', '日'],
+        ['notosansarabic', 'ع'], ['notosansmath', '∑'],
+      ]) {
+        let found = false;
+        for (const name of Object.keys(manifest.files).filter(name => name.startsWith(family + '/'))) {
+          const bytes = await (await fetch(new URL(name, base))).arrayBuffer();
+          const typeface = flutterCanvasKit.Typeface.MakeFreeTypeFaceFromData(bytes);
+          if (!typeface) throw new Error('Invalid local font: ' + name);
+          const font = new flutterCanvasKit.Font(typeface, 18);
+          found = font.getGlyphIDs(character).some(id => id !== 0);
+          font.delete(); typeface.delete();
+          if (found) break;
+        }
+        if (!found) throw new Error('Missing local glyph: ' + character);
+        supported.push(character);
+      }
+      return supported;
+    })()`);
+    assert.equal(fontResult.length, 4);
     const pageRequests = requests.slice(requestStart);
     assert(pageRequests.some(url => url.includes('/canvaskit/') && url.endsWith('.wasm')));
     assert(pageRequests.some(url => url.endsWith('/pdf.worker.min.mjs')));
-    assert(!pageRequests.some(url => /gstatic\.com|cdn\.jsdelivr\.net/.test(url)));
-    console.log(`PASS ${route}: Flutter frame, PDF worker/render and local CMap; CDN blocked`);
+    assert(!pageRequests.some(url => /gstatic\.com|fonts\.googleapis\.com|cdn\.jsdelivr\.net/.test(url)));
+    console.log(`PASS ${route}: first Flutter frame, PDF render, CMap and multilingual font glyphs; CDN blocked`);
   }
 } finally {
   if (socket) socket.close();

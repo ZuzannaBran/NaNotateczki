@@ -484,6 +484,7 @@ flutter test test --coverage # Full local suite (export tests may be slower)
 flutter test --platform chrome test/cross_platform
 flutter test integration_test/app_smoke_test.dart -d linux
 flutter build web --release --no-web-resources-cdn
+python3 tool/package_cloudflare_web.py
 node .github/scripts/test_web_local_assets.mjs
 ```
 
@@ -496,10 +497,14 @@ integration tests must run with an emulator, simulator or real device connected.
 The local-assets browser check requires Node 22+ and Chrome (`google-chrome`
 on PATH, or `CHROME_EXECUTABLE`). It tests the production build with gstatic
 and jsDelivr blocked, using a temporary browser profile and a local server.
-It verifies a Flutter frame, a PDF rendered by the bundled module worker,
-and a local packed CMap at `/`, a share deep link and a subpath deployment.
-`test/web_runtime_assets_test.dart` also verifies the vendor checksums in
-the regular Flutter suite.
+It waits for Flutter's first-frame event, renders a PDF with the bundled
+module worker, loads a packed CMap, and decodes emoji, Japanese, Arabic
+and mathematical glyphs with bundled fonts at `/`, a share deep link and
+a subpath deployment. `WEB_BUILD_DIR` can point at an extracted upload ZIP.
+`test/web_runtime_assets_test.dart` also verifies the PDF and all 725 engine
+font checksums in the regular Flutter suite. The packaging script verifies
+that the bundled font table matches the built engine and includes all
+runtime assets in an upload ZIP with `index.html` at its root.
 
 After deployment, repeat in a clean browser profile with DevTools request
 blocking for `*gstatic.com*` and `*cdn.jsdelivr.net*`: open `/`, then a real

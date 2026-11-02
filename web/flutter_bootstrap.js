@@ -21,6 +21,8 @@
   await _flutter.loader.load({
     config: {
       canvasKitBaseUrl: new URL('canvaskit/', document.baseURI).href,
+      fontFallbackBaseUrl:
+        new URL('vendor/flutter-fonts/', document.baseURI).href,
     },
   });
 })();
