@@ -2164,6 +2164,25 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   Nie usuwać oznaczenia WIP.
 
 
+### Stronicowanie konta i ochrona pamięci (2026-11-02)
+
+- `lib/data/sync/live_web_sync_service.dart`: bootstrap wznawiany przez `next`
+  oraz feed zmian przez `hasMore`, z kompatybilnością dla starszych API.
+  Jedna odpowiedź może mieć 32 MiB przy dużej notatce. Pierwszy kursor
+  bootstrapu zachowuje się do pobrania dalszych zmian REST.
+- `lib/data/backup/remote_backup_service.dart`: recovery odczytuje komplet
+  stron bootstrapu przed odtwarzaniem starego snapshotu.
+- `test/sync_pagination_test.dart` i
+  `test/account_backup_recovery_regression_test.dart`: wielostronicowe
+  pobieranie, nieprzywracanie skasowanych dokumentów.
+- `server/api/app/routers/sync.py`: maksymalnie 5 rekordów i miękki limit
+  8 MiB na stronę; `server/api/tests/test_sync_pagination.py`.
+- `server/api/app/routers/backups.py`: serializacja kosztownej finalizacji
+  backupów, test `test_backup_finalization_memory.py`.
+- `server/api/app/routers/study_shares.py`: zakończenie Share wysyła `ended`
+  również po błędzie sprzątania prywatnego PNG; regresja
+  `test_share_revoke_cleanup.py`.
+
 ## Synchronizacja kalendarza między urządzeniami
 
 - `lib/features/planner/state/study_planner_controller.dart`:
