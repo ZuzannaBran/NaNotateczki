@@ -170,32 +170,32 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   ) {
     final operation = _offlineQueueTail.catchError((Object _) {}).then(
       (_) async {
-      final key = _stateKey(userId);
-      final raw = await readStoredText(key);
-      final decoded = raw == null
-          ? <String, dynamic>{'version': 1, 'cursor': 0}
-          : jsonDecode(raw);
-      if (decoded is! Map<String, dynamic> || decoded['version'] != 1) {
-        throw const FormatException('Invalid saved account outbox.');
-      }
-      final previous = decoded['pending'];
-      final keys = decoded['idempotencyKeys'];
-      final pending = <String>{
-        if (previous is List<dynamic>) ...previous.whereType<String>(),
-        ...changedUids,
-      };
-      final idempotency = <String, dynamic>{
-        if (keys is Map<String, dynamic>) ...keys,
-        for (final uid in changedUids) uid: const Uuid().v4(),
-      };
-      await writeStoredText(
-        key,
-        jsonEncode({
-          ...decoded,
-          'pending': pending.toList()..sort(),
-          'idempotencyKeys': idempotency,
-        }),
-      );
+        final key = _stateKey(userId);
+        final raw = await readStoredText(key);
+        final decoded = raw == null
+            ? <String, dynamic>{'version': 1, 'cursor': 0}
+            : jsonDecode(raw);
+        if (decoded is! Map<String, dynamic> || decoded['version'] != 1) {
+          throw const FormatException('Invalid saved account outbox.');
+        }
+        final previous = decoded['pending'];
+        final keys = decoded['idempotencyKeys'];
+        final pending = <String>{
+          if (previous is List<dynamic>) ...previous.whereType<String>(),
+          ...changedUids,
+        };
+        final idempotency = <String, dynamic>{
+          if (keys is Map<String, dynamic>) ...keys,
+          for (final uid in changedUids) uid: const Uuid().v4(),
+        };
+        await writeStoredText(
+          key,
+          jsonEncode({
+            ...decoded,
+            'pending': pending.toList()..sort(),
+            'idempotencyKeys': idempotency,
+          }),
+        );
       },
     );
     _offlineQueueTail = operation.catchError((
