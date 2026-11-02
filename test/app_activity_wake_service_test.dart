@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -5,6 +6,35 @@ import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/app_activity_wake_service.dart';
 
 void main() {
+  test('mouse hover is not deliberate activity but click and drag are', () {
+    expect(
+      AppActivityWakeService.isIntentionalPointer(const PointerHoverEvent()),
+      isFalse,
+    );
+    expect(
+      AppActivityWakeService.isIntentionalPointer(
+        const PointerMoveEvent(buttons: 0),
+      ),
+      isFalse,
+    );
+    expect(
+      AppActivityWakeService.isIntentionalPointer(
+        const PointerMoveEvent(buttons: kPrimaryButton),
+      ),
+      isTrue,
+    );
+    expect(
+      AppActivityWakeService.isIntentionalPointer(const PointerDownEvent()),
+      isTrue,
+    );
+    expect(
+      AppActivityWakeService.isIntentionalPointer(
+        const PointerScrollEvent(),
+      ),
+      isTrue,
+    );
+  });
+
   test('pings at start, then only on activity after 30 minutes', () async {
     var now = DateTime.utc(2026, 11, 2, 10);
     final requests = <http.Request>[];
