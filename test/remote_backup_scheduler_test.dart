@@ -192,7 +192,6 @@ void main() {
       database,
       onChanged: (_) => scheduler.markDirty(),
     );
-    final initial = await repository.createNotebook();
     final session = AccountSessionController(client)
       ..mode = AccountDataMode.account
       ..userId = 'remote-import-account';
@@ -202,6 +201,7 @@ void main() {
       session: session,
     );
     scheduler = RemoteBackupScheduler(service: service, session: session);
+    final initial = await repository.createNotebook();
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
     var reconciliations = 0;
