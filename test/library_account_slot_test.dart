@@ -382,6 +382,45 @@ void main() {
       }
       await tester.pump();
       expect(sync.isStarted, isTrue);
+      expect(find.byKey(const ValueKey('account-logout')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('account-backup-now')),
+          matching: find.byType(Icon),
+        ),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('account-logout')));
+      for (var i = 0; i < 100 && session.isSignedIn; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pumpAndSettle();
+      expect(session.isSignedIn, isFalse);
+      expect(sync.isStarted, isFalse);
+      expect(backup.isEnabled, isFalse);
+      expect(find.byKey(const ValueKey('account-sign-in-choice')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('account-sign-in-choice')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('account-username')),
+        'test_user',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('account-password')),
+        'a-secure-password',
+      );
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('account-login-submit')),
+          )
+          .onPressed!();
+      for (var i = 0; i < 100 && !session.isSignedIn; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pump();
+      expect(session.isSignedIn, isTrue);
 
       await tester.tap(find.byKey(const ValueKey('account-change-password')));
       await tester.pumpAndSettle();
