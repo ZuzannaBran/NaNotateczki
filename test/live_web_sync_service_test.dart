@@ -188,7 +188,8 @@ void main() {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
-    final original = await repository.createNotebook(title: 'Course');
+    final created = await repository.createNotebook(title: 'Course');
+    final original = (await repository.getNotebook(created.uid))!;
     final remote = original.copyWith(title: 'Remote edit');
     final writes = <Map<String, dynamic>>[];
     final client = ApiClient(
@@ -252,6 +253,7 @@ void main() {
     addTearDown(sync.dispose);
 
     await sync.start(InitialSyncPolicy.mergeSafely);
+    expect(writes, isEmpty);
     await repository.saveNotebook(original.copyWith(title: 'Local edit'));
     sync.enqueue([NotebookRepositoryChange.full(original.uid)]);
     await sync.syncNow();
