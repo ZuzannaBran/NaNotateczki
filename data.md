@@ -45,6 +45,36 @@ offline również po zalogowaniu.
   domyślnie na 3650 dni; uprawnienia mogą zostać odwołane po zmianie hasła
   lub przez administratora.
 
+### Kontrakt przejścia Local → Account (wymaganie; wdrożenie w toku)
+
+Przy pierwszym świadomym przejściu z Local do konta użytkownik musi
+wybrać `Add local data to this account` albo `Keep local data separate`.
+Do czasu wyboru nie wolno uruchomić automatycznego importu, backupu
+ani synchronizacji danych Local do konta. Magazyn Local musi pozostać
+niezależny i dostępny po powrocie do Local. Istniejące instalacje
+z danymi już przypisanymi do `boundUserId` wymagają bezpiecznej migracji
+bez automatycznego uznania tych danych za Local.
+
+**Po wybraniu importu: ustawienia konta są nadrzędne**, w tym preferencje
+aplikacji i edytora, motyw, kolory, Recent i serwerowa polityka backupu.
+Lokalne ustawienia pozostają wyłącznie w zachowanym profilu Local.
+Lokalne notatniki i foldery są dołączane bez nadpisywania stanu konta;
+kolizje nazw dokumentów w tym samym folderze rozwiązują `(1)`, `(2)`
+itd., z trwałą mapą źródłowych UID dla idempotentnego ponawiania.
+
+**Kalendarz i Study Sessions łączą się addytywnie**: zachować wszystkie
+istniejące wydarzenia i sesje konta, dodać brakujące z Local, bez
+nadpisywania postępu, terminów, statusów ani informacji o powtarzaniu
+wpisów konta. Nazwy wydarzeń/sesji mogą się powtarzać. Jeśli źródłowy
+identyfikator jest już wykorzystany przez inny wpis, importer nadaje
+przenoszonemu wpisowi nowy identyfikator i aktualizuje powiązania.
+Ta sama operacja importu powtórzona po awarii nie dodaje kopii tych
+samych wpisów. Serwerowe tombstones nie są omijane przez stary backup;
+intencjonalnie importowany lokalny wpis musi otrzymać własną tożsamość
+i rewizję. Zadania powiązane z notatnikiem/mapą folderów zachowują
+odniesienia po mapowaniu UID. Kompletność i atomowość migracji wymagają
+testów na Linux/Web/Android/iOS; to nie jest jeszcze gwarancja działania.
+
 ## Dane lokalne na platformach natywnych
 
 Wewnętrzne pliki są w prywatnym `Application Support` danej platformy,

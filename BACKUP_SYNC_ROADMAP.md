@@ -276,10 +276,13 @@ obrazów także nie mają izolacji według trybu. Obecny automatyczny
 że zmiana samego formularza zapewnia izolację.
 
 **Docelowy dialog po pomyślnym uwierzytelnieniu, PRZED sync i backupem:**
-- `Add local data to this account`: jawne skopiowanie całej biblioteki
-  Local (notatniki/strony/obrazy, foldery/podfoldery, okładki, zadania,
-  kalendarz, Study Sessions), bez usuwania źródłowej biblioteki;
-  nie wolno nadpisać danych konta ani wysłać częściowo przeniesionej bazy.
+- `Add local data to this account`: jawne skopiowanie danych Local
+  (notatniki/strony/obrazy, foldery/podfoldery, okładki, zadania,
+  kalendarz, Study Sessions), bez usuwania biblioteki źródłowej;
+  **ustawienia konta zawsze mają pierwszeństwo** — nie importować
+  lokalnego motywu, kolorów Recent, ustawień edytora, backupu ani
+  pozostałych preferencji zamiast serwerowych ustawień konta.
+  Nie wolno nadpisać danych konta ani wysłać częściowo przeniesionej bazy.
 - `Keep local data separate`: Local pozostaje nienaruszone i niewidoczne
   w koncie. Synchronizacja/backup konta operują WYŁĄCZNIE na koncie.
   Powrót do Local pokazuje dokładnie zachowany stan Local.
@@ -317,9 +320,30 @@ obrazów także nie mają izolacji według trybu. Obecny automatyczny
    identyczny, już przetworzony import nie tworzy kolejnej kopii.
    Nazwy folderów/podfolderów oraz odniesienia zadań i okładek
    scalać bez łamania ścieżek, a nie spłaszczać hierarchii.
-6. Po zalogowaniu do kolejnego konta zabezpieczyć prywatność: żadnego
+6. Kalendarz i Study Sessions importować addytywnie: wydarzenia, serie
+   powtarzalne, postęp i statusy istniejące na koncie zostają bez zmian.
+   Dołączać tylko brakujące lokalne wpisy. Kolizje niezależnych rekordów
+   o tym samym ID: nowy ID dla kopiowanego wpisu, z zachowaniem relacji.
+   Identyczne wcześniej zaimportowane wpisy pomijać przez trwałą mapę
+   identyfikatorów importu. Nie tworzyć duplikatów po restarcie/ponowieniu.
+   Dwa wpisy o takiej samej nazwie mogą istnieć; sufiksy (1)/(2) dotyczą
+   kolizji nazw dokumentów, nie wydarzeń.
+7. Po zalogowaniu do kolejnego konta zabezpieczyć prywatność: żadnego
    wysłania danych z poprzedniego konta, bez pomylenia cache,
    outboxów, markerów czy obrazów.
+
+**Dodatkowe regresje:** Konto ma własny motyw, recent colors, ustawienia
+edytora i `BackupPolicy`; Local ma inne wartości → po imporcie wszystkie
+ustawienia konta pozostają dokładnie takie same, również po restarcie
+i synchronizacji z drugim urządzeniem. Konto ma wydarzenie `A` i sesję
+`S`, Local ma wydarzenie `B` i sesję `T` → konto ma `A+B` oraz
+`S+T`; oba źródłowe kontenery Local zostają nienaruszone.
+Ten sam tytuł/termin, ale różne rekordy → zachować oba. Ten sam
+rekord z identycznym pochodzeniem → jeden wpis po powtórzeniu importu.
+Konflikt ID dwóch różnych rekordów → dwa różne ID po przeniesieniu,
+z zachowaniem harmonogramu, powtarzalności i postępu sesji.
+Skasowany wpis konta nie może zostać odtworzony przypadkiem ze starego
+backupu.
 
 **Wymagane regresje:** lokalny dokument `X` + konto z `X`
 → na koncie `X` i `X (1)`, Local ma nadal `X`; powtórzenie
