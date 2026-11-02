@@ -121,8 +121,9 @@ void main() {
     scheduler.recordUserInteraction();
     scheduler.markDirty();
     scheduler.didChangeAppLifecycleState(AppLifecycleState.resumed);
-    await tester.pump();
-    await tester.pump();
+    // Wait for the asynchronous upload, not just for its timer callback.
+    // A backgrounded user interaction must not restart the idle clock.
+    await scheduler.uploadNow();
     expect(service.calls, 1);
 
     await scheduler.stop();
