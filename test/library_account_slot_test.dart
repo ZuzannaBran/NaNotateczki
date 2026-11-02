@@ -399,7 +399,10 @@ void main() {
       expect(session.isSignedIn, isFalse);
       expect(sync.isStarted, isFalse);
       expect(backup.isEnabled, isFalse);
-      expect(find.byKey(const ValueKey('account-sign-in-choice')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('account-sign-in-choice')),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const ValueKey('account-sign-in-choice')));
       await tester.pumpAndSettle();
