@@ -336,7 +336,11 @@ zmianie konta, a losowy `deviceId` ma osobny plik per `userId`.
   `ensureVerifiedForExit` blokuje normalne wyjście, jeżeli snapshot nie jest zweryfikowany;
   102: `refreshAccountPreference`; 130: `uploadNow`; 144: `backupNow`.
   Licznik generacji nie pozwala zgubić zmiany wykonanej
-  podczas trwającego uploadu.
+  podczas trwającego uploadu. `reconcileBeforeBackup` odczytuje z serwera
+  notatniki, ustawienia i planner przed wykonaniem snapshotu;
+  błąd uzgodnienia zachowuje `dirty` i blokuje nieaktualny backup.
+  Czysty lokalnie klient nadal pobiera remote przez live sync
+  (WebSocket i 45-sekundowy fallback), a import zmiany oznacza backup jako dirty.
 
 ### `lib/data/backup/backup_eraser_flattening.dart` (12 linii)
 
@@ -1626,7 +1630,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/api_client_test.dart`: odrzucenie HTTP/sekretów w URL, Bearer/request
   ID i zachowanie struktury odpowiedzi 409.
 - `test/remote_backup_scheduler_test.dart`: odstęp bezczynności 15/30 s,
-  nieblokujący upload podczas oczekiwania na serwer i weryfikacja przed exit.
+  nieblokujący upload podczas oczekiwania na serwer, weryfikacja przed exit
+  i backup po imporcie ze zdalnego urządzenia bez lokalnych kliknięć;
+  nieudane uzgodnienie blokuje przestarzały snapshot.
 - `test/shared_editor_viewport_test.dart`: zachowanie lokalnej strony, zoomu
   i pan podczas odbioru obcych zmian.
 - `test/one_shot_error_notice_test.dart`: błąd wyświetlany jednokrotnie
@@ -1636,8 +1642,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   gdy dane zmienią się podczas ręcznego `backupNow`, a także izolacja stanu
   i `deviceId` między osobnymi sesjami kont.
 - `test/live_web_sync_service_test.dart`: pobranie wszystkich stron feedu po
-  500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany oraz brak
-  przenoszenia outboxu i rewizji między kontami.
+  500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany,
+  pasywne pobieranie notatnika z innego urządzenia bez lokalnych zapisów,
+  brak przenoszenia outboxu i rewizji między kontami.
 - `test/library_account_slot_test.dart`: centrowanie nazwy, podgląd i limit
   hasła, brak awatara w pasku konta (pozostaje w dialogu), wyrównanie
   statusu z nazwą, rozmiar ikony ustawień i odstępy przycisków;
