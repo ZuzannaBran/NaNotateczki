@@ -20,7 +20,10 @@ offline również po zalogowaniu.
   zdarzenia synchronizacji i tombstones. Foldery są łączone, a zadania
   konfliktowego planera trafiają pod UID jego kopii. Backup jest pobierany
   i weryfikowany przy każdym starcie konta; ponowny import już przetworzonego
-  identyfikatora jest pomijany, jeśli lokalna biblioteka nadal istnieje.
+  identyfikatora jest pomijany, chyba że system stwierdzi utratę lokalnej
+  bazy SQLite. Puste konto po świadomym usunięciu nie oznacza utraty bazy.
+  Błąd odzyskiwania jest logowany, nie blokuje live sync i blokuje wysyłkę
+  potencjalnie niekompletnego snapshotu do czasu poprawnego odzyskania.
 - Scheduler backupu włącza się dopiero po inicjalizacji konta i sync.
   Po wylogowaniu aplikacja zatrzymuje sync i backup przed wyczyszczeniem sesji.
 - `account_profile.json` przechowuje ukończenie onboardingu,
@@ -35,8 +38,12 @@ offline również po zalogowaniu.
   rotowany token i dopiero wtedy przywraca sesję. Nie utrwala hasła
   ani access tokenu. Brak sieci nie czyści tokenu i nie blokuje lokalnej
   biblioteki; odrzucenie odnowienia unieważnia zapisany token.
-  Onboarding uruchamia się tylko przy pierwszej konfiguracji profilu,
-  nie przy każdym ponownym uruchomieniu aplikacji.
+  Onboarding uruchamia się tylko przy pierwszej konfiguracji profilu
+  i po jawnym wylogowaniu. Przycisk `Log out` unieważnia odświeżanie sesji,
+  czyści poświadczenia, zachowuje przypisanie lokalnej biblioteki do konta
+  i wraca do wyboru trybu. Serwer wydaje nowe rotowane refresh tokeny
+  domyślnie na 3650 dni; uprawnienia mogą zostać odwołane po zmianie hasła
+  lub przez administratora.
 
 ## Dane lokalne na platformach natywnych
 
@@ -162,8 +169,11 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
    nie wcześniej niż po 5 minutach. Zmieniony snapshot wysyła po ustalonym
    okresie bezczynności (domyślnie 2 minuty; opcje: 30 s, 1 min,
    2 min, 5 min, 15 min i 30 min); aktywny
-   rysik, mysz i klawiatura przesuwają termin. Preferencja jest lokalna i
-   odrębna dla każdego konta. Serializacja i SHA-256 na platformach natywnych
+   aktywne kliknięcia, przewijanie, rysik i pisanie (także edytor Quill
+   z klawiaturą ekranową) przesuwają termin. Hover, otrzymane aktualizacje
+   serwera i zdarzenia z ukrytej karty nie resetują licznika. Wznowienie
+   aplikacji nie resetuje czasu bezczynności; natywny system może jednak
+   wstrzymywać same timery w tle. Preferencja jest synchronizowana per konto. Serializacja i SHA-256 na platformach natywnych
    działają poza głównym isolate. Przycisk `Back up now` jawnie oznacza snapshot jako wymagany i uruchamia go
    od razu.
 
@@ -189,8 +199,10 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 
 - Zapis używa `expectedRevision` i `Idempotency-Key`; serwer wykonuje CAS.
 - Sukces i wpis `change_events` powstają w jednej transakcji PostgreSQL.
-- `409 Conflict` nigdy nie nadpisuje po cichu. Klient zachowuje osobny
-  dokument z dopiskiem `Conflict`, a następnie stosuje stan serwera.
+- `409 Conflict` nigdy nie nadpisuje po cichu. Przy konflikcie
+  rzeczywistych edycji klient zachowuje numerowaną kopię lokalnego szkicu.
+  Tombstone bez oczekujących lokalnych edycji usuwa dokument na urządzeniu
+  bez tworzenia kopii. Wersja serwera pozostaje oryginałem.
 - Usunięcia są tombstonami. Outbox znika dopiero po potwierdzonym commicie.
 - Po reconnect klient zawsze wywołuje `/v1/sync/changes?after=<cursor>`.
 - Na wszystkich platformach po wznowieniu aplikacji i zapasowo co 45 sekund
@@ -222,7 +234,9 @@ lokalny stan i rejestruje konflikt.
 Odpytywanie odbywa się przy starcie, po zmianie, wznowieniu aplikacji
 i co 45 sekund. Brak nowego endpointu na starej wersji serwera
 nie może blokować synchronizacji notatników ani tworzenia backupu.
-Serwer wymaga migracji `0007_account_settings.sql`.
+Serwer wymaga migracji `0007_account_settings.sql`. Dodanie kategorii
+`libraryState` wymaga także nowej migracji `0009_account_settings_library_state.sql`;
+sam klient nie synchronizuje jeszcze folderów przez tę kategorię.
 
 Foldery, zadania i historia planera pozostają w zweryfikowanych
 snapshotach urządzeń, a nie w feedzie preferencji. Wydarzenia i sesje
@@ -307,7 +321,9 @@ po stronie gościa ponowne wejście wymaga podania hasła. Przedłużenie
 w ostatnich 15 minutach dodaje 4 godziny i zachowuje link oraz bilety.
 Ręczne zakończenie unieważnia bilety niezwłocznie, nawet gdy zapis
 lokalny jest zablokowany. Po wygaśnięciu serwer zwraca HTTP 410
-i żadne nowe operacje nie są przyjmowane.
+i żadne nowe operacje nie są przyjmowane. WebSocket subskrybuje sygnały
+zakończenia przed sprawdzeniem biletu; zapobiega to utracie zdarzenia
+`ended` przy równoczesnym odebraniu dostępu.
 
 ### Granica bezpieczeństwa niedokończonego wdrożenia
 
