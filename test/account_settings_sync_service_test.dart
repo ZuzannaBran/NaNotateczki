@@ -105,85 +105,86 @@ void main() {
     },
   );
 
-  test('an edit during library upload remains local and syncs next pass', (
-    ) async {
-    final files = <String, String>{
-      'library_folders.json': jsonEncode({
-        'folders': ['Local'],
+  test(
+    'an edit during library upload remains local and syncs next pass',
+    () async {
+      final files = <String, String>{
+        'library_folders.json': jsonEncode({
+          'folders': ['Local'],
+          'covers': {},
+          'plannerTasks': {},
+          'recentCoverColors': [],
+        }),
+      };
+      textStorageReadOverride = (key) async => files[key];
+      textStorageWriteOverride = (key, value) async => files[key] = value;
+      var remoteRevision = 1;
+      Map<String, dynamic> remoteValue = {
+        'folders': ['Remote'],
         'covers': {},
         'plannerTasks': {},
         'recentCoverColors': [],
-      }),
-    };
-    textStorageReadOverride = (key) async => files[key];
-    textStorageWriteOverride = (key, value) async => files[key] = value;
-    var remoteRevision = 1;
-    Map<String, dynamic> remoteValue = {
-      'folders': ['Remote'],
-      'covers': {},
-      'plannerTasks': {},
-      'recentCoverColors': [],
-    };
-    var puts = 0;
-    final client = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((request) async {
-        if (request.method == 'GET') {
-          return http.Response(jsonEncode({
-            'settings': {
-              'libraryState': {
-                'revision': remoteRevision,
-                'value': remoteValue,
-              },
-            },
-          }), 200);
-        }
-        expect(request.url.path, '/v1/account-settings/libraryState');
-        final body = jsonDecode(request.body) as Map<String, dynamic>;
-        expect(body['expectedRevision'], remoteRevision);
-        puts++;
-        if (puts == 1) {
-          // The editor changes the local file while REST is in flight.
-          files['library_folders.json'] = jsonEncode({
-            'folders': ['Local', 'During upload'],
-            'covers': {},
-            'plannerTasks': {},
-            'recentCoverColors': [],
-          });
-        }
-        remoteRevision++;
-        remoteValue = Map<String, dynamic>.from(
-          body['value'] as Map<String, dynamic>,
-        );
-        return http.Response(jsonEncode({
-          'revision': remoteRevision,
-          'value': remoteValue,
-        }), 200);
-      }),
-    )..setAccessToken('token');
-    addTearDown(client.close);
-    final session = AccountSessionController(client)
-      ..mode = AccountDataMode.account
-      ..userId = 'account-a';
-    addTearDown(session.dispose);
-    final sync = AccountSettingsSyncService(
-      apiClient: client,
-      session: session,
-    );
+      };
+      var puts = 0;
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          if (request.method == 'GET') {
+            return http.Response(
+              jsonEncode({
+                'settings': {
+                  'libraryState': {
+                    'revision': remoteRevision,
+                    'value': remoteValue,
+                  },
+                },
+              }),
+              200,
+            );
+          }
+          expect(request.url.path, '/v1/account-settings/libraryState');
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['expectedRevision'], remoteRevision);
+          puts++;
+          if (puts == 1) {
+            // The editor changes the local file while REST is in flight.
+            files['library_folders.json'] = jsonEncode({
+              'folders': ['Local', 'During upload'],
+              'covers': {},
+              'plannerTasks': {},
+              'recentCoverColors': [],
+            });
+          }
+          remoteRevision++;
+          remoteValue = Map<String, dynamic>.from(
+            body['value'] as Map<String, dynamic>,
+          );
+          return http.Response(
+            jsonEncode({'revision': remoteRevision, 'value': remoteValue}),
+            200,
+          );
+        }),
+      )..setAccessToken('token');
+      addTearDown(client.close);
+      final session = AccountSessionController(client)
+        ..mode = AccountDataMode.account
+        ..userId = 'account-a';
+      addTearDown(session.dispose);
+      final sync = AccountSettingsSyncService(
+        apiClient: client,
+        session: session,
+      );
 
-    await sync.syncNow();
-    final afterFirst =
-        jsonDecode(files['library_folders.json']!) as Map<String, dynamic>;
-    expect(afterFirst['folders'], contains('During upload'));
+      await sync.syncNow();
+      final afterFirst =
+          jsonDecode(files['library_folders.json']!) as Map<String, dynamic>;
+      expect(afterFirst['folders'], contains('During upload'));
 
-    await sync.syncNow();
-    expect(puts, 2);
-    expect(remoteValue['folders'], [
-      'During upload',
-      'Local',
-      'Remote',
-    ]);
-  });
+      await sync.syncNow();
+      expect(puts, 2);
+      expect(remoteValue['folders'], ['During upload', 'Local', 'Remote']);
+    },
+  );
 
   test('expired access token is refreshed without signing out', () async {
     textStorageReadOverride = (_) async => null;
