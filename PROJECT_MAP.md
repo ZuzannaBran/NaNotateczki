@@ -1549,6 +1549,8 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
   `server/scripts/apply-migrations.sh` pilnuje rejestru i SHA-256 migracji,
   a `server/scripts/backup-server.sh` tworzy sprawdzony backup PostgreSQL i
   plików na osobny nośnik, opcjonalnie szyfrowany przez `age`.
+  GitHub Actions uruchamia także prawdziwe HTTP E2E na odizolowanym
+  PostgreSQL: migracje, konto, sync, study share, PNG i verified backup.
 
 - `LICENSE.md`: niezmieniony oficjalny tekst PolyForm Noncommercial 1.0.0
   obejmujący prawa licencjodawcy do oryginalnych elementów projektu.

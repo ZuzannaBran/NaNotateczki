@@ -96,6 +96,51 @@ jobs:
           cd server
           python -m pytest -q api/tests
 
+  postgres-http-e2e:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    name: PostgreSQL HTTP smoke (account, sync, sharing, backup)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare isolated database and backup storage
+        shell: bash
+        run: |
+          umask 077
+          printf 'POSTGRES_PASSWORD=%s\\nAPP_DB_PASSWORD=%s\\nJWT_SECRET=%s\\nBASE_DOMAIN=example.invalid\\n' \\
+            "$(openssl rand -hex 24)" \\
+            "$(openssl rand -hex 24)" \\
+            "$(openssl rand -hex 48)" > .env
+          mkdir -p data/backups
+          sudo chown -R 1000:1000 data
+      - name: Start PostgreSQL and apply all migrations
+        run: |
+          docker compose up -d db
+          bash scripts/apply-migrations.sh
+      - name: Start real HTTP API
+        run: docker compose -f compose.yaml -f compose.local.yaml up -d --build api
+      - name: Wait for API readiness
+        shell: bash
+        run: |
+          for attempt in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:18080/ready; then
+              exit 0
+            fi
+            sleep 3
+          done
+          exit 1
+      - name: Exercise account, sync, study share and verified backup
+        run: python3 scripts/smoke-local-api.py
+      - name: Collect backend diagnostics on failure
+        if: failure()
+        run: docker compose -f compose.yaml -f compose.local.yaml logs --tail=100 api db
+      - name: Destroy isolated PostgreSQL volume
+        if: always()
+        run: docker compose -f compose.yaml -f compose.local.yaml down -v
+
   stylus-input:
     if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: Stylus and palm input regression (isolated)
