@@ -52,6 +52,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   String? lastError;
   DateTime? lastSuccessfulSync;
   Future<void> Function()? onRemoteApplied;
+  Future<void> Function()? onPlannerChanged;
 
   void reportStartupFailure(Object error) {
     if (_disposed) {
@@ -519,7 +520,24 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       );
       _reconnectAttempt = 0;
       _socketSubscription = channel.stream.listen(
-        (_) => unawaited(syncNow()),
+        (event) {
+          if (event is String) {
+            try {
+              final decoded = jsonDecode(event);
+              if (decoded is Map &&
+                  decoded['type'] == 'planner_changed') {
+                final callback = onPlannerChanged;
+                if (callback != null) {
+                  unawaited(callback());
+                }
+                return;
+              }
+            } catch (_) {
+              // Unknown messages fall back to normal notebook polling.
+            }
+          }
+          unawaited(syncNow());
+        },
         onError: (Object error, StackTrace stackTrace) {
           AppErrorLog.instance.record(
             error,
@@ -549,7 +567,10 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _reconnectAttempt++;
     final seconds = (1 << _reconnectAttempt.clamp(0, 5)).clamp(2, 30);
     _reconnectTimer = Timer(Duration(seconds: seconds), () {
-      unawaited(_connectRealtime().then((_) => syncNow()));
+      unawaited(_connectRealtime().then((_) async {
+        await syncNow();
+        await onPlannerChanged?.call();
+      }));
     });
   }
 
