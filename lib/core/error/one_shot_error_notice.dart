@@ -1,0 +1,16 @@
+/// Presents a service error once until that service recovers.
+class OneShotErrorNotice {
+  final Expando<String> _lastSeen = Expando<String>();
+
+  bool shouldPresent(Object source, String? message) {
+    if (message == null || message.isEmpty) {
+      _lastSeen[source] = null;
+      return false;
+    }
+    if (_lastSeen[source] == message) {
+      return false;
+    }
+    _lastSeen[source] = message;
+    return true;
+  }
+}
