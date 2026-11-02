@@ -729,7 +729,20 @@ void main() {
           (outerCell.decoration! as BoxDecoration).border! as Border;
       final innerBorder =
           (innerCell.decoration! as BoxDecoration).border! as Border;
-      expect(outerBorder.right, innerBorder.right);
+      final outerIndex = days.indexOf(other) % 7;
+      final innerIndex = days.indexOf(inside) % 7;
+      expect(
+        outerBorder.right,
+        outerIndex == 6
+            ? BorderSide.none
+            : BorderSide(color: theme.colorScheme.outlineVariant),
+      );
+      expect(
+        innerBorder.right,
+        innerIndex == 6
+            ? BorderSide.none
+            : BorderSide(color: theme.colorScheme.outlineVariant),
+      );
       expect(tester.takeException(), isNull);
     });
   }

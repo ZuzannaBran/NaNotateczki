@@ -88,7 +88,7 @@ jobs:
       - name: Verify backend contract, migrations and security
         env:
           DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
-          APP_ORIGIN: https://app.example.invalid
+          APP_ORIGIN: https://app.example.test
           JWT_SECRET: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdef
         run: |
           cd server
