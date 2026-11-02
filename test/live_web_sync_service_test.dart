@@ -254,7 +254,11 @@ void main() {
 
     await sync.start(InitialSyncPolicy.mergeSafely);
     expect(writes, isEmpty);
-    await repository.saveNotebook(original.copyWith(title: 'Local edit'));
+    final edited = original.copyWith(
+      title: 'Local edit',
+      updatedAt: original.updatedAt.add(const Duration(minutes: 1)),
+    );
+    expect(await repository.saveNotebook(edited), isTrue);
     sync.enqueue([NotebookRepositoryChange.full(original.uid)]);
     await sync.syncNow();
 
