@@ -2067,6 +2067,7 @@ class _PersistentWorkspaceEditor extends StatefulWidget {
 
 class _PersistentWorkspaceEditorState
     extends State<_PersistentWorkspaceEditor> {
+  Timer? _remoteRefreshRetry;
   late final EditorController _editor = EditorController(
     repository: widget.repository,
     notebook: widget.item,
@@ -2082,15 +2083,15 @@ class _PersistentWorkspaceEditorState
     super.didUpdateWidget(oldWidget);
     _editor.saveDebounce = _shareDebounce;
     if (oldWidget.remoteEpoch != widget.remoteEpoch) {
+      _remoteRefreshRetry?.cancel();
       unawaited(_refreshRemoteContent(widget.remoteEpoch));
     }
   }
 
   Future<void> _refreshRemoteContent(int epoch) async {
-    // The sync service already resolved server conflicts in the repository.
-    // Never discard a gesture or a text edit still being committed.
-    await _editor.flushPendingSaves();
-    if (!mounted || widget.remoteEpoch != epoch) {
+    // Never interrupt an active stroke or Quill edit to apply a revision.
+    if (!_editor.canApplyConfirmedRemoteNotebook) {
+      _retryRemoteContent(epoch);
       return;
     }
     final current = await widget.repository.getNotebook(widget.item.uid);
@@ -2098,14 +2099,24 @@ class _PersistentWorkspaceEditorState
       return;
     }
     if (!_editor.applyConfirmedRemoteNotebook(current)) {
-      // A new gesture began while we were reading; the next remote
-      // notification or account refresh can apply its confirmed revision.
+      _retryRemoteContent(epoch);
+    }
+  }
+
+  void _retryRemoteContent(int epoch) {
+    if (!mounted || widget.remoteEpoch != epoch) {
       return;
     }
+    _remoteRefreshRetry?.cancel();
+    _remoteRefreshRetry = Timer(
+      const Duration(milliseconds: 150),
+      () => unawaited(_refreshRemoteContent(epoch)),
+    );
   }
 
   @override
   void dispose() {
+    _remoteRefreshRetry?.cancel();
     _editor.dispose();
     super.dispose();
   }
