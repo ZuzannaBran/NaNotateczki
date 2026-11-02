@@ -449,7 +449,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       encodedNotebook['createdAt'] = baseCreatedAt;
     }
     final expectedRevision = _revisions[uid] ?? 0;
-    final restoringDeleted = _restorePending.contains(uid);
     if (notebook == null && expectedRevision == 0) {
       _pending.remove(uid);
       _idempotencyKeys.remove(uid);
