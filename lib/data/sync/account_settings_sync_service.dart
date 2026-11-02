@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import '../../core/storage/text_storage.dart';
 import 'account_session_controller.dart';
 import 'api_client.dart';
+import 'library_state_merge.dart';
 
 /// Synchronizes account preferences without overwriting unsent local edits.
 class AccountSettingsSyncService {
@@ -24,6 +25,7 @@ class AccountSettingsSyncService {
     'editorPreferences',
     'recentColors',
     'backupPreferences',
+    'libraryState',
   ];
   Future<void>? _running;
   bool _applying = false;
@@ -101,6 +103,19 @@ class AccountSettingsSyncService {
             ? known!['revision'] as int
             : 0;
         final knownValue = known?['value'];
+        if (category == 'libraryState') {
+          applied = await _syncLibraryState(
+                userId: userId,
+                key: key,
+                fileKey: fileKey,
+                entries: entries,
+                known: known,
+                local: local,
+                serverEntry: serverEntry,
+              ) ||
+              applied;
+          continue;
+        }
         if (known != null && local != null && !_equivalent(local, knownValue)) {
           if (serverEntry != null && _equivalent(local, remoteValue)) {
             entries[category] = {
@@ -173,6 +188,86 @@ class AccountSettingsSyncService {
     }
   }
 
+  Future<bool> _syncLibraryState({
+    required String userId,
+    required String key,
+    required String fileKey,
+    required Map<String, dynamic> entries,
+    required Map<String, dynamic>? known,
+    required Object? local,
+    required Map<String, dynamic>? serverEntry,
+  }) async {
+    if (local == null && serverEntry == null) {
+      return false;
+    }
+    var currentRemote = serverEntry;
+    for (var attempt = 0; attempt < 4; attempt++) {
+      if (!session.isSignedIn || session.userId != userId) {
+        return false;
+      }
+      final revision = currentRemote?['revision'] as int? ?? 0;
+      final remoteValue = currentRemote?['value'];
+      final desired = mergeAccountLibraryState(
+        base: known?['value'],
+        local: local,
+        remote: remoteValue,
+      );
+      final shouldUpload = local != null &&
+          (currentRemote == null || !_equivalent(desired, remoteValue));
+      if (shouldUpload) {
+        try {
+          currentRemote = _object(
+            (await apiClient.putJson('/v1/account-settings/libraryState', {
+              'expectedRevision': revision,
+              'value': desired,
+            })).decodeJson(),
+          );
+        } on ApiException catch (error) {
+          if (error.statusCode != 409 || attempt == 3) {
+            rethrow;
+          }
+          final fresh = _object(
+            (await apiClient.get('/v1/account-settings')).decodeJson(),
+          );
+          final settings = _object(fresh['settings']);
+          currentRemote = settings['libraryState'] is Map<String, dynamic>
+              ? settings['libraryState'] as Map<String, dynamic>
+              : null;
+          continue;
+        }
+      }
+      final resolved = currentRemote == null
+          ? desired
+          : _object(currentRemote['value']);
+      var applied = false;
+      if (session.isSignedIn && session.userId == userId &&
+          !_equivalent(local, resolved)) {
+        _applying = true;
+        try {
+          if (known == null && local != null) {
+            await _savePreimportCopy(userId, 'libraryState', local);
+          }
+          await writeStoredText(fileKey, jsonEncode(resolved));
+          applied = true;
+        } finally {
+          _applying = false;
+        }
+      }
+      if (currentRemote != null) {
+        entries['libraryState'] = {
+          'revision': currentRemote['revision'],
+          'value': resolved,
+        };
+      }
+      await writeStoredText(
+        key,
+        jsonEncode({'version': 1, 'settings': entries}),
+      );
+      return applied;
+    }
+    throw StateError('Account library metadata changed during sync.');
+  }
+
   void stop() {
     lastError = null;
   }
@@ -212,6 +307,7 @@ class AccountSettingsSyncService {
       'appPreferences' => 'app_prefs.json',
       'editorPreferences' => 'editor_prefs.json',
       'recentColors' => 'shared_recent_colors.json',
+      'libraryState' => 'library_folders.json',
       'backupPreferences' => 'server_backup_preferences_${_hash(userId)}.json',
       _ => throw ArgumentError.value(category),
     };
