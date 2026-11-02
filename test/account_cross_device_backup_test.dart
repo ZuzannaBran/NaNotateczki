@@ -89,16 +89,19 @@ void main() {
       addTearDown(db2.close);
       final repo2 = NotebookRepository(db2);
       var downloads = 0;
+      var backupListings = 0;
+      var latestBackupId = backupId;
       var bootstrapCursor = 0;
       final client2 = ApiClient(
         baseUri: Uri.parse('https://api.example.com'),
         httpClient: MockClient((request) async {
           if (request.url.path == '/v1/backups') {
+            backupListings++;
             return http.Response(
               jsonEncode({
                 'backups': [
                   {
-                    'backupId': backupId,
+                    'backupId': latestBackupId,
                     'deviceId': deviceId,
                     'sha256': sha256.convert(bytes!).toString(),
                     'sizeBytes': bytes!.length,
@@ -139,7 +142,17 @@ void main() {
       stored['app_prefs.json'] = '{"darkMode":false}';
       await recovery.hydrateFromLatestAccountBackup();
       expect(jsonDecode(stored['app_prefs.json']!)['darkMode'], false);
-      expect(downloads, 1);
+      expect(downloads, 2);
+      expect(backupListings, 2);
+      expect((await repo2.fetchNotebooks()).single.uid, notebook.uid);
+
+      // A later verified snapshot must be restored on the next sign-in.
+      latestBackupId = '123e4567-e89b-12d3-a456-426614174002';
+      stored.remove('app_prefs.json');
+      expect(await recovery.hydrateFromLatestAccountBackup(), true);
+      expect(downloads, 3);
+      expect(backupListings, 3);
+      expect(jsonDecode(stored['app_prefs.json']!)['darkMode'], true);
       expect((await repo2.fetchNotebooks()).single.uid, notebook.uid);
 
       stored.clear();
