@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/core/error/app_error_log.dart';
+import 'package:program/core/storage/text_storage.dart';
 
 import 'support/native_test_documents.dart';
 
@@ -7,7 +10,7 @@ void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('repeated errors are grouped without hiding other errors', () {
+  test('repeated errors are grouped without hiding other errors', () async {
     final log = AppErrorLog.instance;
     log.clear();
     addTearDown(log.clear);
@@ -26,6 +29,14 @@ void main() {
     expect(log.length, 2);
     expect(log.entries.first.source, 'editor');
     expect(log.entries.last.occurrences, 90);
+
+    // Pending saves must settle before the isolated test directory is removed.
+    await waitForPendingTextStorageOperations();
+    final stored = await readStoredText('app_error_log.json');
+    expect(stored, isNotNull);
+    final entries = jsonDecode(stored!) as List<dynamic>;
+    expect(entries, hasLength(2));
+    expect((entries.last as Map<String, dynamic>)['occurrences'], 90);
   });
 
   test('entry serialization keeps counts and accepts legacy logs', () {

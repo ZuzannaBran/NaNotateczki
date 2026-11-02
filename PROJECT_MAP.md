@@ -178,11 +178,13 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   opcjonalne podmiany odczytu/zapisu dla testów oraz możliwość wskazania
   katalogu natywnego (używana przez backup folderów); produkcja używa
   prywatnego katalogu aplikacji.
-- `lib/core/storage/text_storage_io.dart` (108): odczyty i zapisy małych
+- `lib/core/storage/text_storage_io.dart`: odczyty i zapisy małych
   plików współdzielą kolejkę operacji per klucz i katalog; operacja trafia
   do niej przed asynchronicznym rozwiązaniem ścieżki, więc zachowuje kolejność
   wywołań i zapobiega usuwaniu aktywnego `.tmp` przez równoległy odczyt
-  backupu. Zapis nadal jest atomowy przez `.tmp`/`.previous` z recovery.
+  backupu. `waitForPendingTextStorageOperations` pozwala testom czekać na
+  zakończenie kolejki przed usunięciem katalogu. Zapis nadal jest atomowy
+  przez `.tmp`/`.previous` z recovery.
 - `lib/core/storage/text_storage_web.dart` (9): odpowiednik w `localStorage`.
   3: `readStoredText`; 7: `writeStoredText`.
 - `lib/core/error/app_error_log.dart` (180): trwały bufor błędów z ostatnich
@@ -1863,6 +1865,7 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   w rzeczywistej bazie danej platformy; działa wyłącznie z flagą
   `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.
 - `test/support/native_test_documents.dart`: katalog testowy i natywny
+  oczekujący na zakończenie kolejki I/O przed sprzątaniem.
   adapter PathProvider; opcjonalny pamięciowy tekstowy storage zapobiega
   zablokowaniu FakeAsync przez natywne I/O w testach widgetowych. Nie
   przekierowuje danych użytkownika.
@@ -1906,6 +1909,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   Release wymaga prywatnego `android/key.properties` poza CI i jawnym trybem
   debug-signing; konfiguracja odrzuca niepełne klucze i brak keystore.
   Release uruchamia R8; nie wyłączaj shrinkingu dla całej aplikacji.
+- `.github/scripts/android_emulator_preflight.sh`: sprawdza dostępne miejsce
+  po instalacji AVD; emulator używa partycji 1536M, aby uniknąć
+  wyczerpania miejsca runnera.
 - `.github/scripts/android_emulator_tests.sh`: jedną komendą Flutter
   uruchamia 3 scenariusze bez trzykrotnej kompilacji; czeka na `adb` i
   `sys.boot_completed`, następnie uruchamia obydwa testy integracyjne.

@@ -5,6 +5,13 @@ import 'app_data_directory.dart';
 
 final Map<String, Future<void>> _operationTails = <String, Future<void>>{};
 
+/// Waits for native storage operations already queued by callers.
+Future<void> waitForPendingTextStorageOperations() async {
+  while (_operationTails.isNotEmpty) {
+    await Future.wait(_operationTails.values.toList());
+  }
+}
+
 Future<T> _withStorageLock<T>(
   String key, {
   required String? directoryPath,

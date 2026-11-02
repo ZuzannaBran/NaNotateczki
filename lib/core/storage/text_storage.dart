@@ -23,3 +23,7 @@ Future<void> writeStoredText(
       ? override(key, value)
       : platform.writeStoredText(key, value, directoryPath: directoryPath);
 }
+
+/// Waits for queued native storage operations to finish.
+Future<void> waitForPendingTextStorageOperations() =>
+    platform.waitForPendingTextStorageOperations();

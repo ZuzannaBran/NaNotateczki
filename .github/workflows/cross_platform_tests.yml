@@ -13,9 +13,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: cross-platform-v3-${{ github.workflow }}-${{ github.ref }}
+  group: cross-platform-v3-${{ github.workflow }}-${{ github.ref }}-${{ contains(github.event.head_commit.message, '[ci:failed-only]') && 'failed-only' || 'full' }}
   cancel-in-progress: true
 
+# A [ci:failed-only] push rechecks only the two previously failing CI jobs.
 jobs:
   analyze-and-unit:
     name: Dart analysis, regressions and coverage
@@ -76,6 +77,7 @@ jobs:
           if-no-files-found: ignore
 
   backend-unit:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: Python API and deployment contract
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -95,6 +97,7 @@ jobs:
           python -m pytest -q api/tests
 
   stylus-input:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: Stylus and palm input regression (isolated)
     runs-on: ubuntu-24.04
     timeout-minutes: 18
@@ -127,6 +130,7 @@ jobs:
           --reporter expanded --timeout 90s
 
   adaptive-layout:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: Phone, tablet and desktop layout regressions
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -149,6 +153,7 @@ jobs:
             --reporter expanded --timeout 3m --concurrency 2
 
   export-render:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: PNG/PDF production renderer
     runs-on: ubuntu-24.04
     timeout-minutes: 12
@@ -164,6 +169,7 @@ jobs:
         run: flutter test test/production/export_render_test.dart --reporter expanded --timeout 2m
 
   web:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: Chrome, JavaScript/IndexedDB and web bootstrap
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -215,6 +221,7 @@ jobs:
             --chrome-binary="${{ steps.chrome.outputs.chrome-path }}"
 
   wasm-audit:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: WebAssembly compatibility audit (non-blocking)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -242,6 +249,7 @@ jobs:
           fi
 
   desktop:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: ${{ matrix.platform }} - desktop bootstrap and release
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
@@ -327,6 +335,7 @@ jobs:
         run: flutter build ${{ matrix.platform }} --release
 
   android-build:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: Android APK compilation
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -348,6 +357,7 @@ jobs:
         run: flutter build apk --release
 
   ios-build:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     name: iOS simulator compilation (no signing)
     runs-on: macos-15
     timeout-minutes: 50
@@ -416,11 +426,14 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
+          disk-size: 1536M
+          emulator-boot-timeout: 300
+          pre-emulator-launch-script: bash .github/scripts/android_emulator_preflight.sh
           script: bash .github/scripts/android_emulator_tests.sh
 
   ios-simulator:
     name: iOS - ${{ matrix.device }} simulator end-to-end
-    if: github.event_name != 'pull_request'
+    if: ${{ github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[ci:failed-only]') }}
     runs-on: macos-15
     timeout-minutes: 70
     strategy:

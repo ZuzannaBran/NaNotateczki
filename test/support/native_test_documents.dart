@@ -29,7 +29,7 @@ void useIsolatedNativeTestDocuments() {
   });
 
   tearDownAll(() async {
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await waitForPendingTextStorageOperations();
     PathProviderPlatform.instance = originalProvider;
     if (await directory.exists()) {
       await directory.delete(recursive: true);

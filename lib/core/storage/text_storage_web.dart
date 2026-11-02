@@ -11,3 +11,6 @@ Future<void> writeStoredText(
 }) async {
   web.window.localStorage.setItem(key, value);
 }
+
+/// Web writes finish synchronously in localStorage.
+Future<void> waitForPendingTextStorageOperations() async {}
