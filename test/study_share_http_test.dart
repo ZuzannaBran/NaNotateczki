@@ -11,6 +11,7 @@ import 'package:program/data/sync/account_session_controller.dart';
 import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/live_web_sync_service.dart';
 import 'package:program/data/sync/study_share_service.dart';
+import 'package:program/features/editor/state/page_background.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 
 import 'support/native_test_documents.dart';
@@ -125,6 +126,29 @@ void main() {
     expect(captured.url.query, isEmpty);
     expect(captured.headers.containsKey('authorization'), isFalse);
     expect(jsonDecode(captured.body), {'password': 'x'});
+  });
+
+  test('guest reads appearance independently from document revision', () async {
+    const appearance = {
+      'darkMode': true,
+      'backgroundStyle': 1,
+      'backgroundSpacing': 32.0,
+    };
+    final api = _api(
+      (_) async => http.Response(
+        jsonEncode({
+          'notebook': <String, dynamic>{'uid': 'shared'},
+          'revision': 7,
+          'appearance': appearance,
+        }),
+        200,
+      ),
+    );
+    final guest = StudyShareGuestClient(apiClient: api);
+    addTearDown(guest.close);
+    final document = await guest.readDocument(_sessionId, 'guest-ticket');
+    expect(document.revision, 7);
+    expect(document.appearance, appearance);
   });
 
   test('guest reads only a ticket-scoped shared document', () async {
@@ -405,6 +429,33 @@ void main() {
       expect(captured.headers['content-type'], 'image/png');
     },
   );
+
+  test('host sends theme and background outside document edits', () async {
+    late http.Request captured;
+    final harness = await _makeOwner((request) async {
+      captured = request;
+      return http.Response(
+        '{"appearance":{"darkMode":true}}',
+        200,
+      );
+    });
+    await harness.service.updateAppearance(
+      _activeShare(),
+      darkMode: true,
+      background: const PageBackgroundSettings(
+        style: PageBackgroundStyle.lines,
+        spacing: 24,
+      ),
+    );
+    expect(captured.method, 'PUT');
+    expect(captured.url.path, '/v1/study-shares/$_sessionId/appearance');
+    expect(captured.headers['authorization'], 'Bearer owner-access-token');
+    expect(jsonDecode(captured.body), {
+      'darkMode': true,
+      'backgroundStyle': 2,
+      'backgroundSpacing': 24.0,
+    });
+  });
 
   test('owner restores an active session after a page reload', () async {
     final harness = await _makeOwner((request) async {

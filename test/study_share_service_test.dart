@@ -99,6 +99,7 @@ void main() {
     );
     expect(find.text('Session password'), findsOneWidget);
     expect(find.text('Join'), findsOneWidget);
+    expect(find.textContaining('Shared editing ·'), findsNothing);
   });
 }
 
