@@ -179,6 +179,7 @@ void main() {
       final afterFirst =
           jsonDecode(files['library_folders.json']!) as Map<String, dynamic>;
       expect(afterFirst['folders'], contains('During upload'));
+      expect(afterFirst['folders'], contains('Remote'));
 
       await sync.syncNow();
       expect(puts, 2);
