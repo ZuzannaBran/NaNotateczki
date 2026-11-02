@@ -45,6 +45,20 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
   Konflikty **nazwy w tym samym folderze** otrzymują kolejne
   wolne sufiksy `(1)`, `(2)` itd., niezależnie od UID; nazwy
   innych folderów nie kolidują. Nie wolno nadpisać istniejącej notatki.
+- Wariant `Copy local data to account` nie importuje lokalnych ustawień
+  jako nadrzędnych. **Ustawienia istniejącego konta zawsze wygrywają**:
+  preferencje aplikacji i edytora, motyw, kolory recent, czułość,
+  `backupPreferences` i pozostałe ustawienia konta. Brakująca wartość
+  po stronie konta może przyjąć lokalną wartość tylko jako jawnie
+  zdefiniowany fallback bez zmiany już zapisanej preferencji.
+- Kalendarz i Study Sessions w wariancie importu to **suma rekordów**:
+  istniejące wydarzenia i sesje konta pozostają nietknięte,
+  lokalne wydarzenia i sesje (także zakończone, postęp timera,
+  cykliczność, terminy i kolory) są dopisywane. Kolizja identyfikatorów
+  różnych obiektów wymaga nowego ID wraz z odtworzeniem relacji serii;
+  jednak same identyczne nazwy albo godziny nie powodują utraty
+  rekordu. Checkpoint źródło → docelowe ID zapobiega duplikatom przy
+  ponowieniu migracji. Nie dotyczy sesji współdzielonych przez link.
 
 - Bezczynność oznacza brak kliknięć, interakcji rysikiem, przewijania i
   pisania (również klawiaturą ekranową). Hover i zdarzenia z ukrytej karty
@@ -84,7 +98,15 @@ Wymagania implementacyjne:
    lokalną bez mieszania danych; nowe konto nie czyta starych tokenów.
 6. `Copy local data to account`: import traktować jako nowe operacje
    konta; przypisać bezkolizyjne UID/ID obiektów, skopiować assety
-   i metadane, zachować relacje plannerów oraz folderów. Nazwy w ramach
+   i metadane, zachować relacje plannerów oraz folderów.
+   Lokalnych ustawień nie importować nad już istniejące: stan konta
+   jest autorytatywny dla motywu, pióra, preferencji backupu,
+   innych ustawień oraz recent colors. Istniejące wydarzenia i Study
+   Sessions konta zachować, a lokalne dopisać wraz z postępem,
+   ukończeniami, powtórzeniami i terminami. W razie kolizji
+   identyfikatora przydzielić nowy i zapisać idempotentne mapowanie;
+   kolizja tytułu wydarzenia nie oznacza duplikatu do usunięcia.
+   Nazwy notatników w ramach
    tej samej ścieżki folderu i tego samego typu dokumentu porównać
    po normalizacji Unicode/casefold i wybrać pierwszy wolny suffix
    `(1)`, `(2)` itd. Istniejący suffix także uwzględniać.
@@ -101,6 +123,10 @@ Wymagania implementacyjne:
    różne foldery, pliki `Notatka (1)`, równoczesny inny klient,
    duże obrazy, przerwanie migracji w połowie, brak miejsca, restart,
    odmowa autoryzacji, odnowienie tokenu, powrót do local i ponowny login.
+   Dodatkowo: przeciwstawne lokalne/kontowe ustawienia (wygrywa konto),
+   wydarzenia i sesje o tej samej nazwie/terminie (zachować oba),
+   ukończona sesja z postępem i seriami powtórzeń, kolizja ID oraz
+   dwukrotny import (bez duplikatów).
 
 ## Etapy i status
 
@@ -306,7 +332,11 @@ obrazów także nie mają izolacji według trybu. Obecny automatyczny
    otworzyć właściwą bazę i odświeżyć Provider-y bez przeciekania stanu.
    Zmiana trybu nie może być ukrytym `Log out`; jawne wylogowanie usuwa
    token, a powrót do Local jest odrębnym wyborem workspace.
-4. Transfer do konta wykonywać jako **copy**, nie move. Utworzyć trwały
+4. Transfer do konta wykonywać jako **copy**, nie move.
+   Nie przenosić lokalnych preferencji na istniejące konto: ustawienia
+   konta mają pierwszeństwo. Kalendarz i Study Sessions łączyć
+   addytywnie, zachowując dane konta i dopisując lokalne rekordy,
+   postęp oraz historię. Powtórzony import ma być bezduplikatowy. Utworzyć trwały
    checkpoint importu i mapowanie źródłowy UID → docelowy UID, żeby
    ponowienie po przerwaniu nie duplikowało notatników ani mediów.
    Potwierdzenie następuje dopiero po pełnym sync i verified backup.
