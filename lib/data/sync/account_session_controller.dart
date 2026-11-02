@@ -386,6 +386,12 @@ class AccountSessionController extends ChangeNotifier {
     } finally {
       useLocalOnly();
       await _credentialQueue;
+      // Explicit sign-out returns to onboarding on the next launch.
+      // Keep the account binding to protect this installation's library.
+      preferredMode = AccountDataMode.localOnly;
+      onboardingComplete = false;
+      await _saveProfile();
+      _notifyIfActive();
     }
   }
 
