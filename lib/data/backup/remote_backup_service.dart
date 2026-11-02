@@ -27,13 +27,9 @@ class RemoteBackupReceipt {
 }
 
 class _VerifiedRecoverySnapshot {
-  const _VerifiedRecoverySnapshot({
-    required this.backupId,
-    required this.payload,
-    required this.notebooks,
-  });
+  const _VerifiedRecoverySnapshot(this.id, this.payload, this.notebooks);
 
-  final String backupId;
+  final String id;
   final Map<String, dynamic> payload;
   final List<Notebook> notebooks;
 }
@@ -177,8 +173,8 @@ class RemoteBackupService {
     if (backups.isEmpty) {
       return false;
     }
-    final verified = await _findValidRecoverySnapshot(backups, userId);
-    final backupId = verified.backupId;
+    final verified = await _findValidBackup(backups, userId);
+    final backupId = verified.id;
     final payload = verified.payload;
     final recoveredNotebooks = verified.notebooks;
     // Check the newest verified snapshot at every sign-in, including when
@@ -343,21 +339,21 @@ class RemoteBackupService {
     return changed;
   }
 
-  Future<_VerifiedRecoverySnapshot> _findValidRecoverySnapshot(
+  Future<_VerifiedRecoverySnapshot> _findValidBackup(
     List<dynamic> backups,
     String expectedUserId,
   ) async {
     Object? lastFailure;
-    for (final candidate in backups) {
+    for (final rawBackup in backups) {
       if (!session.isSignedIn || session.userId != expectedUserId) {
         throw StateError('Account changed during backup recovery.');
       }
       try {
-        final latest = _jsonObject(candidate);
-        final backupId = latest['backupId'];
-        final expectedHash = latest['sha256'];
-        final expectedSize = latest['sizeBytes'];
-        if (backupId is! String ||
+        final backup = _jsonObject(rawBackup);
+        final id = backup['backupId'];
+        final expectedHash = backup['sha256'];
+        final expectedSize = backup['sizeBytes'];
+        if (id is! String ||
             !RegExp(r'^[0-9a-fA-F-]{36}
     final suffix = sha256
         .convert(utf8.encode(userId))
@@ -527,17 +523,16 @@ class RemoteBackupService {
   final bytes = Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
   return (checksum: checksum, bytes: bytes);
 }
-).hasMatch(backupId) ||
+).hasMatch(id) ||
             expectedHash is! String ||
             expectedSize is! int ||
-            expectedSize > maximumSnapshotBytes ||
-            expectedSize <= 0) {
+            expectedSize <= 0 ||
+            expectedSize > maximumSnapshotBytes) {
           throw const FormatException('Invalid verified backup metadata.');
         }
-
         final bytes = (await apiClient.request(
           'GET',
-          '/v1/backups/$backupId/download',
+          '/v1/backups/$id/download',
           requestTimeout: const Duration(minutes: 2),
           maxResponseBytes: maximumSnapshotBytes,
         )).bodyBytes;
@@ -546,33 +541,32 @@ class RemoteBackupService {
         }
         if (bytes.length != expectedSize ||
             sha256.convert(bytes).toString() != expectedHash) {
-          throw const FormatException('Account backup checksum failed.');
+          throw const FormatException('Account backup integrity check failed.');
         }
         final envelope = _jsonObject(jsonDecode(utf8.decode(bytes)));
         if (envelope['format'] != 'nanotateczki-server-backup' ||
             envelope['version'] != formatVersion ||
             envelope['checksumAlgorithm'] != 'sha256' ||
-            envelope['deviceId'] != latest['deviceId']) {
-          throw const FormatException('Unsupported backup envelope.');
+            envelope['deviceId'] != backup['deviceId']) {
+          throw const FormatException('Unsupported account backup envelope.');
         }
         final payload = _jsonObject(envelope['payload']);
-        final wireHash = sha256.convert(backupPayloadBytes(bytes)).toString();
-        if (wireHash != envelope['checksum'] &&
+        final checksum = sha256.convert(backupPayloadBytes(bytes)).toString();
+        if (checksum != envelope['checksum'] &&
             sha256.convert(utf8.encode(jsonEncode(payload))).toString() !=
                 envelope['checksum']) {
-          throw const FormatException('Backup payload checksum failed.');
+          throw const FormatException('Account backup payload was modified.');
         }
-        final raw = payload['notebooks'];
-        if (raw is! List<dynamic> ||
+        final rawNotes = payload['notebooks'];
+        if (rawNotes is! List<dynamic> ||
             payload['libraryState'] is! Map<String, dynamic> ||
             payload['studyPlannerState'] is! Map<String, dynamic>) {
           throw const FormatException('Incomplete account backup.');
         }
-        final notebooks = repository.decodeBackupStrict(raw);
         return _VerifiedRecoverySnapshot(
-          backupId: backupId,
-          payload: payload,
-          notebooks: notebooks,
+          id,
+          payload,
+          repository.decodeBackupStrict(rawNotes),
         );
       } on ApiException catch (error, stackTrace) {
         if (error.statusCode != 404 && error.statusCode != 503) {
@@ -593,9 +587,7 @@ class RemoteBackupService {
         );
       }
     }
-    throw FormatException(
-      'No valid account backup can be restored: $lastFailure',
-    );
+    throw FormatException('No valid account backup: $lastFailure');
   }
 
   static String _backupPreferenceKey(String userId) {
