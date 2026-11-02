@@ -151,6 +151,38 @@ void main() {
     },
   );
 
+  test('tombstone on a later bootstrap page blocks stale backup replay',
+      () async {
+    final source = await _repository().createNotebook(title: 'Deleted');
+    final repo = _repository();
+    final service = _service(
+      repo,
+      jsonEncode({
+        'notebooks': [NotebookRepository.encodeNotebook(source)],
+        'libraryState': {},
+        'studyPlannerState': {},
+      }),
+      bootstrapPageSize: 1,
+      records: [
+        {
+          'uid': '!earlier',
+          'revision': 1,
+          'deleted': true,
+          'notebook': null,
+        },
+        {
+          'uid': source.uid,
+          'revision': 3,
+          'deleted': true,
+          'notebook': null,
+        },
+      ],
+    );
+
+    await service.hydrateFromLatestAccountBackup();
+    expect(await repo.fetchNotebooks(), isEmpty);
+  });
+
   test(
     'a planner conflict keeps both task lists under their document IDs',
     () async {
@@ -207,6 +239,7 @@ RemoteBackupService _service(
   String payload, {
   String? checksum,
   List<Map<String, dynamic>> records = const [],
+  int? bootstrapPageSize,
 }) {
   const deviceId = '123e4567-e89b-12d3-a456-426614174000';
   const backupId = '123e4567-e89b-12d3-a456-426614174001';
@@ -238,8 +271,23 @@ RemoteBackupService _service(
         return http.Response.bytes(bytes, 200);
       }
       if (request.url.path == '/v1/sync/bootstrap') {
+        final after = request.url.queryParameters['after'];
+        final start = after == null
+            ? 0
+            : records.indexWhere((item) => item['uid'] == after) + 1;
+        final batch = bootstrapPageSize == null
+            ? records
+            : records.skip(start).take(bootstrapPageSize).toList();
+        final next = bootstrapPageSize != null &&
+                start + batch.length < records.length
+            ? batch.last['uid'] as String
+            : null;
         return http.Response(
-          jsonEncode({'cursor': records.isEmpty ? 0 : 1, 'notebooks': records}),
+          jsonEncode({
+            'cursor': records.isEmpty ? 0 : 1,
+            'notebooks': batch,
+            'next': next,
+          }),
           200,
         );
       }
