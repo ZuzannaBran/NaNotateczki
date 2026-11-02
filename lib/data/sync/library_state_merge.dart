@@ -94,10 +94,15 @@ Map<String, dynamic> _mergeNamedValues(
         inLocal != inBase || (inLocal && !_equal(local[key], base[key]));
     final remoteChanged =
         inRemote != inBase || (inRemote && !_equal(remote[key], base[key]));
-    if (localChanged && !remoteChanged && inLocal) {
-      result[key] = local[key];
-    } else if (remoteChanged && !localChanged && inRemote) {
-      result[key] = remote[key];
+    if (localChanged && !remoteChanged) {
+      // Absence is a confirmed deletion relative to the known base.
+      if (inLocal) {
+        result[key] = local[key];
+      }
+    } else if (remoteChanged && !localChanged) {
+      if (inRemote) {
+        result[key] = remote[key];
+      }
     } else if (localChanged && remoteChanged) {
       // Deletion takes precedence over concurrent edits to the same key.
       if (inLocal && inRemote) {
