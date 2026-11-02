@@ -239,8 +239,16 @@ class AccountSettingsSyncService {
       final resolved = currentRemote == null
           ? desired
           : _object(currentRemote['value']);
+      // The user may have edited planner tasks or folders while REST was
+      // in flight. Never replace newer local bytes with our older snapshot.
+      final latestText = await readStoredText(fileKey);
+      final latestLocal = latestText == null || latestText.isEmpty
+          ? null
+          : jsonDecode(latestText);
       var applied = false;
-      if (session.isSignedIn && session.userId == userId &&
+      if (session.isSignedIn &&
+          session.userId == userId &&
+          _equivalent(latestLocal, local) &&
           !_equivalent(local, resolved)) {
         _applying = true;
         try {
