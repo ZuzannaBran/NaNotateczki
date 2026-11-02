@@ -105,18 +105,36 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _activeUserId = userId;
     await _offlineQueueTail;
     await _loadState(userId);
-    final bootstrap = await _getJsonObject('/v1/sync/bootstrap');
-    final rawRecords = bootstrap['notebooks'];
-    final cursor = bootstrap['cursor'];
-    if (rawRecords is! List<dynamic> || cursor is! num) {
-      throw const FormatException('Malformed sync bootstrap response.');
-    }
-    if (_activeUserId != userId || !session.isSignedIn) {
-      return;
-    }
-    final remote = rawRecords.map(_decodeRemoteRecord).toList();
+    final remote = <_RemoteNotebookRecord>[];
+    String? after;
+    int? initialCursor;
+    do {
+      final page = await _getJsonObject(
+        '/v1/sync/bootstrap',
+        query: after == null ? null : {'after': after},
+      );
+      final records = page['notebooks'];
+      final cursor = page['cursor'];
+      if (records is! List<dynamic> || cursor is! num || cursor < 0) {
+        throw const FormatException('Malformed sync bootstrap response.');
+      }
+      initialCursor ??= cursor.toInt();
+      if (_activeUserId != userId || !session.isSignedIn) {
+        return;
+      }
+      final next = page['next'];
+      if (next != null &&
+          (next is! String ||
+              next.isEmpty ||
+              records.isEmpty ||
+              (after != null && next.compareTo(after) <= 0))) {
+        throw const FormatException('Invalid sync bootstrap cursor.');
+      }
+      remote.addAll(records.map(_decodeRemoteRecord));
+      after = next as String?;
+    } while (after != null);
     await _applyInitialPolicy(policy, remote);
-    _cursor = cursor.toInt();
+    _cursor = initialCursor!;
     _started = true;
     await _offlineQueueTail;
     await _saveState();
@@ -596,8 +614,16 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         remoteApplyEpoch++;
         await onRemoteApplied?.call();
       }
+      final hasMore = response['hasMore'];
+      if (hasMore != null && hasMore is! bool) {
+        throw const FormatException('Invalid sync pagination flag.');
+      }
+      if (hasMore == true && latestCursor.toInt() <= _cursor) {
+        throw const FormatException('Sync cursor did not advance.');
+      }
       _cursor = latestCursor.toInt();
-      if (rawChanges.length < 500) {
+      if (hasMore == false ||
+          (hasMore == null && rawChanges.length < 500)) {
         return;
       }
     }
@@ -718,7 +744,14 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     String path, {
     Map<String, String>? query,
   }) async {
-    final response = await apiClient.get(path, query: query);
+    // A single permitted document may approach the 16 MiB write limit.
+    // Server pages normally stay smaller than 8 MiB.
+    final response = await apiClient.request(
+      'GET',
+      path,
+      query: query,
+      maxResponseBytes: 32 * 1024 * 1024,
+    );
     return _requireJsonObject(response.decodeJson());
   }
 
