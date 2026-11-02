@@ -57,83 +57,85 @@ void main() {
     textStorageWriteOverride = null;
   });
 
-  test('all bootstrap and change pages are imported with original cursor',
-      () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    final requested = <String>[];
-    final client = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((request) async {
-        requested.add(request.url.toString());
-        if (request.url.path == '/v1/sync/bootstrap') {
-          final after = request.url.queryParameters['after'];
-          if (after == null) {
+  test(
+    'all bootstrap and change pages are imported with original cursor',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final requested = <String>[];
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          requested.add(request.url.toString());
+          if (request.url.path == '/v1/sync/bootstrap') {
+            final after = request.url.queryParameters['after'];
+            if (after == null) {
+              return http.Response(
+                jsonEncode({
+                  'cursor': 10,
+                  'notebooks': [record(0), record(1), record(2)],
+                  'next': 'uid-002',
+                }),
+                200,
+              );
+            }
+            expect(after, 'uid-002');
             return http.Response(
               jsonEncode({
-                'cursor': 10,
-                'notebooks': [record(0), record(1), record(2)],
-                'next': 'uid-002',
+                'cursor': 11,
+                'notebooks': [record(3), record(4), record(5)],
+                'next': null,
               }),
               200,
             );
           }
-          expect(after, 'uid-002');
-          return http.Response(
-            jsonEncode({
-              'cursor': 11,
-              'notebooks': [record(3), record(4), record(5)],
-              'next': null,
-            }),
-            200,
-          );
-        }
-        if (request.url.path == '/v1/sync/changes') {
-          final after = request.url.queryParameters['after'];
-          if (after == '10') {
+          if (request.url.path == '/v1/sync/changes') {
+            final after = request.url.queryParameters['after'];
+            if (after == '10') {
+              return http.Response(
+                jsonEncode({
+                  'cursor': 12,
+                  'changes': [record(6), record(7)],
+                  'hasMore': true,
+                }),
+                200,
+              );
+            }
+            expect(after, '12');
             return http.Response(
               jsonEncode({
-                'cursor': 12,
-                'changes': [record(6), record(7)],
-                'hasMore': true,
+                'cursor': 13,
+                'changes': [record(8)],
+                'hasMore': false,
               }),
               200,
             );
           }
-          expect(after, '12');
-          return http.Response(
-            jsonEncode({
-              'cursor': 13,
-              'changes': [record(8)],
-              'hasMore': false,
-            }),
-            200,
-          );
-        }
-        fail('Unexpected request: ${request.url}');
-      }),
-    )..setAccessToken('token');
-    addTearDown(client.close);
-    final session = AccountSessionController(client)
-      ..mode = AccountDataMode.account
-      ..userId = 'account-1';
-    addTearDown(session.dispose);
-    final sync = LiveWebSyncService(
-      repository: repository,
-      apiClient: client,
-      session: session,
-      enableRealtime: false,
-    );
-    addTearDown(sync.dispose);
-    await sync.start(InitialSyncPolicy.mergeSafely);
+          fail('Unexpected request: ${request.url}');
+        }),
+      )..setAccessToken('token');
+      addTearDown(client.close);
+      final session = AccountSessionController(client)
+        ..mode = AccountDataMode.account
+        ..userId = 'account-1';
+      addTearDown(session.dispose);
+      final sync = LiveWebSyncService(
+        repository: repository,
+        apiClient: client,
+        session: session,
+        enableRealtime: false,
+      );
+      addTearDown(sync.dispose);
+      await sync.start(InitialSyncPolicy.mergeSafely);
 
-    expect(sync.lastError, isNull);
-    final loaded = await repository.fetchNotebooks();
-    expect(loaded, hasLength(9));
-    expect(loaded.map((entry) => entry.uid).toSet(), hasLength(9));
-    expect(requested.where((url) => url.contains('/bootstrap')), hasLength(2));
-    expect(requested.where((url) => url.contains('/changes')), hasLength(2));
-    expect(sync.hasPendingChanges, isFalse);
-  });
+      expect(sync.lastError, isNull);
+      final loaded = await repository.fetchNotebooks();
+      expect(loaded, hasLength(9));
+      expect(loaded.map((entry) => entry.uid).toSet(), hasLength(9));
+      expect(requested.where((url) => url.contains('/bootstrap')), hasLength(2));
+      expect(requested.where((url) => url.contains('/changes')), hasLength(2));
+      expect(sync.hasPendingChanges, isFalse);
+    },
+  );
 }
