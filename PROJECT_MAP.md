@@ -323,8 +323,8 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
 ### `lib/data/backup/remote_backup_scheduler.dart` (zmienny indeks)
 
 Jawnie włączany scheduler zalogowanego konta: po zmianach wysyła verified
-snapshot po ustawionym okresie bezczynności (domyślnie 120 sekund), po błędzie
-ponawia po 5 minutach; dostępne opóźnienia: 30, 60, 120, 300, 900,
+snapshot po ustawionym okresie bezczynności (domyślnie 30 sekund), po błędzie
+ponawia po 5 minutach; dostępne opóźnienia: 15, 30, 60, 120, 300, 900,
 1800 sekund. Resume nie resetuje czasu bezczynności; ukryta karta nie przesuwa czasu
 interakcji, a modyfikacje danych przez synchronizację nie są uznawane za
 aktywność użytkownika. Kliknięcia, sprzętowe klawisze i Quill z soft keyboard
@@ -332,7 +332,8 @@ rejestrują aktywność.
 Samo logowanie nie włącza wysyłki. Stan wyniku i błędu jest czyszczony przy
 zmianie konta, a losowy `deviceId` ma osobny plik per `userId`.
 
-- 17: `RemoteBackupScheduler`; logika bezczynności i zapis per konto; `enableForSignedInAccount`, `setIdleSeconds`, `backupNow`;
+- 17: `RemoteBackupScheduler`; logika bezczynności i zapis per konto; `enableForSignedInAccount`, `setIdleSeconds`, `backupNow`,
+  `ensureVerifiedForExit` blokuje normalne wyjście, jeżeli snapshot nie jest zweryfikowany;
   102: `refreshAccountPreference`; 130: `uploadNow`; 144: `backupNow`.
   Licznik generacji nie pozwala zgubić zmiany wykonanej
   podczas trwającego uploadu.
@@ -437,7 +438,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Przy odbiorze zmian gości najpierw opróżnia edytor właściciela i wysyła
   jego oczekujące operacje ścieżką serwerowego scalenia, zanim zastosuje
   feed, aby niezależne zmiany nie tworzyły kopii konfliktowej.
-  118: `enqueue`; 134: `syncNow`; 749: `stop`.
+  `setSharedDocumentUid` wybiera natychmiastowy tryb sync dla active share;
+  reentrancy nie gubi zmian podczas poprzedniego requestu. `restoreDeleted`
+  po CAS tombstone ponawia oczekującą edycję pod oryginalnym UID.
+  `enqueue`, `syncNow`, `stop`.
 - `lib/data/sync/notebook_conflicts.dart`: 6: `numberedNotebookCopy`
   zachowuje treść w tym samym folderze pod pierwszą wolną nazwą `(1)` itd.,
   nadając nowe UID dokumentu, stron, tekstów, obrazów i kresek.
@@ -567,7 +571,12 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 - 749: `moveItemToFolder`; 796: `selectFolder`; 924: `_loadFolders`;
   986: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
-### `lib/features/library/presentation/library_screen.dart` (2204 linie)
+### `lib/features/library/presentation/library_screen.dart` (aktualizowany)
+`_PersistentWorkspaceEditor` utrzymuje lokalny `EditorController` przez
+zmiany rewizji serwerowej; zamiast tworzyć nowy kontroler po każdym sync,
+odracza import podczas aktywnego gestu, a po nim odświeża tylko treść.
+`StudyShareGuestEditor` stosuje ten sam mechanizm i własny viewport.
+
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo
 `MediaQuery.sizeOf`, aby zachować desktopowe wyrównanie menu po resize.
@@ -1080,7 +1089,11 @@ Model tła Plain/Grid/Lines i jego serializacja.
 ### `lib/features/editor/state/editor_controller.dart` (3207 linii)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
-preferencje, viewport i zapis. Dostaje już znormalizowany ink z repozytorium;
+preferencje, viewport i zapis. `applyConfirmedRemoteNotebook` odświeża
+zatwierdzone strony w tym samym kontrolerze, zachowując lokalny zoom, pan
+i aktualną stronę; w trakcie gestu lub dirty save odmawia nadpisania.
+W aktywnej wspólnej sesji zapis skończonego gestu nie czeka dodatkowych
+2 sekund cooldown rysika. Dostaje już znormalizowany ink z repozytorium;
 `addInkStroke` odrzuca próbę zapisania narzędzia gumki jako stroke'a.
 Rejestruje się w `AppSaveCoordinator`;
 `flushPendingSaves` commit'uje aktywną edycję tekstu, anuluje debounce,
@@ -1612,7 +1625,12 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   SQLite ścieżek obrazów po przeniesieniu katalogu danych.
 - `test/api_client_test.dart`: odrzucenie HTTP/sekretów w URL, Bearer/request
   ID i zachowanie struktury odpowiedzi 409.
-- `test/remote_backup_scheduler_test.dart`: odstęp bezczynności, nieblokujący upload podczas oczekiwania na serwer.
+- `test/remote_backup_scheduler_test.dart`: odstęp bezczynności 15/30 s,
+  nieblokujący upload podczas oczekiwania na serwer i weryfikacja przed exit.
+- `test/shared_editor_viewport_test.dart`: zachowanie lokalnej strony, zoomu
+  i pan podczas odbioru obcych zmian.
+- `test/one_shot_error_notice_test.dart`: błąd wyświetlany jednokrotnie
+  i rearm po poprawnym połączeniu.
 - `test/remote_backup_service_test.dart`: kompletny snapshot v2 z biblioteką
   i planerem, wymaganie potwierdzonego `verified` oraz zachowanie flagi dirty,
   gdy dane zmienią się podczas ręcznego `backupNow`, a także izolacja stanu
@@ -2135,3 +2153,14 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
 - `test/planner_sync_service_test.dart`: dwie instalacje i wspólny backend,
   dodanie, edycja, usunięcie oraz rozstrzygnięcie zmian offline.
+
+### Weryfikacja wyjścia i błędów (2026-11-02)
+
+- `lib/app/app_scope.dart`: `didRequestAppExit` blokuje zwykłe zamknięcie
+  zalogowanego konta do `RemoteBackupScheduler.ensureVerifiedForExit`.
+  `_ExitGuardOverlay` pokazuje spinner oraz Retry backup przy porażce.
+  Przy detached i Web hidden uruchamia awaryjny best-effort upload.
+  Nie gwarantuje dokończenia HTTP po zabiciu procesu.
+- `lib/core/error/one_shot_error_notice.dart`: śledzi nowe incydenty
+  usług per instancja; `library_account_slot.dart` nie odtwarza
+  zastanych wcześniej komunikatów po otwarciu dialogu.
