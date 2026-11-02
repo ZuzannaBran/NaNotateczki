@@ -225,7 +225,12 @@ class RemoteBackupService {
       }
     }
     if (previousBackupId == backupId) {
-      return false;
+      // A restored marker can survive loss of the SQLite database. Do not
+      // treat it as proof that the documents themselves still exist.
+      final localNotebooks = await repository.fetchNotebooks();
+      if (recoveredNotebooks.isEmpty || localNotebooks.isNotEmpty) {
+        return false;
+      }
     }
     // An offline deletion still waiting in the sync outbox must not be
     // undone by a newer device snapshot during account bootstrap.
