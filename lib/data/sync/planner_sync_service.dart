@@ -1,0 +1,143 @@
+import 'dart:async';
+
+import '../../features/planner/state/study_planner_controller.dart';
+import 'account_session_controller.dart';
+import 'api_client.dart';
+
+/// Reconciles per-entry account calendar state including offline deletions.
+class PlannerSyncService {
+  PlannerSyncService({
+    required this.apiClient,
+    required this.session,
+    required this.planner,
+  });
+
+  final ApiClient apiClient;
+  final AccountSessionController session;
+  final StudyPlannerController planner;
+
+  Future<void>? _running;
+  bool _resyncRequested = false;
+  bool _stopped = false;
+  String? lastError;
+
+  void stop() {
+    _stopped = true;
+    lastError = null;
+  }
+
+  Future<void> syncNow() {
+    final previous = _running;
+    if (previous != null) {
+      _resyncRequested = true;
+      return previous;
+    }
+    _stopped = false;
+    final operation = _reconcile();
+    _running = operation;
+    return operation.whenComplete(() {
+      if (identical(_running, operation)) {
+        _running = null;
+      }
+    });
+  }
+
+  Future<void> _reconcile() async {
+    do {
+      _resyncRequested = false;
+      try {
+        await _syncPass();
+        lastError = null;
+      } on ApiException catch (error) {
+        if (error.statusCode != 401 || !session.isSignedIn) {
+          lastError = error.toString();
+          rethrow;
+        }
+        await session.refresh();
+        await _syncPass();
+        lastError = null;
+      } catch (error) {
+        lastError = error.toString();
+        rethrow;
+      }
+    } while (_resyncRequested && !_stopped && session.isSignedIn);
+  }
+
+  static DateTime _modified(Map<String, dynamic> record) {
+    final raw = record['modifiedAt'];
+    final time = raw is String ? DateTime.tryParse(raw)?.toUtc() : null;
+    if (time == null) {
+      throw const FormatException('Invalid planner sync timestamp');
+    }
+    return time;
+  }
+
+  Future<void> _syncPass() async {
+    final user = session.userId;
+    if (user == null || !session.isSignedIn || !planner.isLoaded || _stopped) {
+      return;
+    }
+    await planner.flush();
+    final remote = <String, Map<String, dynamic>>{};
+    String? after;
+    do {
+      final response = await apiClient.get(
+        '/v1/planner/entries',
+        query: after == null ? null : {'after': after},
+      );
+      if (_stopped || session.userId != user) {
+        return;
+      }
+      final decoded = response.decodeJson();
+      if (decoded is! Map<String, dynamic> || decoded['entries'] is! List) {
+        throw const FormatException('Invalid planner sync response');
+      }
+      for (final raw in decoded['entries'] as List) {
+        if (raw is! Map<String, dynamic> || raw['id'] is! String) {
+          throw const FormatException('Invalid planner sync entry');
+        }
+        _modified(raw);
+        remote[raw['id'] as String] = raw;
+      }
+      final next = decoded['next'];
+      if (next != null && (next is! String || next == after)) {
+        throw const FormatException('Invalid planner sync cursor');
+      }
+      after = next as String?;
+    } while (after != null);
+
+    if (_stopped || session.userId != user) {
+      return;
+    }
+    planner.applyRemoteRecords(remote.values);
+    await planner.flush();
+
+    for (final item in planner.syncRecords.entries) {
+      if (_stopped || session.userId != user) {
+        return;
+      }
+      final onServer = remote[item.key];
+      if (onServer != null &&
+          !_modified(item.value).isAfter(_modified(onServer))) {
+        continue;
+      }
+      final response = await apiClient.putJson(
+        '/v1/planner/entries/${Uri.encodeComponent(item.key)}',
+        {
+          'modifiedAt': item.value['modifiedAt'],
+          'deleted': item.value['deleted'],
+          'entry': item.value['entry'],
+        },
+      );
+      if (_stopped || session.userId != user) {
+        return;
+      }
+      final accepted = response.decodeJson();
+      if (accepted is! Map<String, dynamic>) {
+        throw const FormatException('Invalid planner write acknowledgment');
+      }
+      planner.applyRemoteRecords([accepted]);
+    }
+    await planner.flush();
+  }
+}
