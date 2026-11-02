@@ -197,6 +197,11 @@ class EditorController extends ChangeNotifier {
     return _inkPageRevisions.putIfAbsent(pageId, () => ValueNotifier<int>(0));
   }
 
+  bool get canApplyConfirmedRemoteNotebook =>
+      !_isDisposed &&
+      !_hasPendingSaveWork &&
+      !InkActivityTracker.instance.hasActiveContacts;
+
   /// Updates confirmed document content without changing local navigation.
   ///
   /// The caller must apply the server snapshot to the repository first.
@@ -205,9 +210,7 @@ class EditorController extends ChangeNotifier {
     if (incoming.uid != notebook.uid) {
       throw ArgumentError('Remote notebook UID does not match the editor.');
     }
-    if (_isDisposed ||
-        _hasPendingSaveWork ||
-        InkActivityTracker.instance.hasActiveContacts) {
+    if (!canApplyConfirmedRemoteNotebook) {
       return false;
     }
     final selectedPageId = currentPage.id;
@@ -3126,7 +3129,11 @@ class EditorController extends ChangeNotifier {
     _notebookSaveDebounce?.cancel();
     _notebookSaveDebounce = Timer(saveDebounce, () {
       _notebookSaveDebounce = null;
-      if (InkActivityTracker.instance.isBusy) {
+      // A shared session sends each committed stroke without the normal
+      // two-second ink cooldown. Never save while a contact is still down.
+      final ink = InkActivityTracker.instance;
+      if (ink.hasActiveContacts ||
+          (saveDebounce >= defaultSaveDebounce && ink.isBusy)) {
         _armSaveTimer();
         return;
       }
