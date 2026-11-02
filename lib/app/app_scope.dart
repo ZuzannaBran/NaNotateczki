@@ -64,6 +64,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   StudyPlannerController? _studyPlanner;
   _BackupScheduler? _backupScheduler;
   Future<void>? _accountBootstrap;
+  Timer? _rememberedLoginRetry;
+  bool _appIsForeground = true;
   String? _bootstrappedAccount;
   bool _databaseWasReset = false;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
@@ -77,6 +79,17 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
     FrameTimingTracker.instance.initialize();
+    _rememberedLoginRetry = Timer.periodic(
+      const Duration(seconds: 45),
+      (_) {
+        if (_appIsForeground) {
+          final session = _accountSession;
+          if (session != null) {
+            unawaited(session.retryPersistedSession());
+          }
+        }
+      },
+    );
   }
 
   @override
@@ -85,6 +98,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     _activityWake?.dispose();
     _settingsPoll?.cancel();
+    _rememberedLoginRetry?.cancel();
     _settingsDebounce?.cancel();
     _plannerDebounce?.cancel();
     _plannerSync?.stop();
@@ -207,8 +221,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _activityWake?.setForeground(state == AppLifecycleState.resumed);
-    if (state == AppLifecycleState.resumed) {
+    _appIsForeground = state == AppLifecycleState.resumed;
+    _activityWake?.setForeground(_appIsForeground);
+    if (_appIsForeground) {
+      final session = _accountSession;
+      if (session != null) {
+        unawaited(session.retryPersistedSession());
+      }
       unawaited(_startAccountSync());
       unawaited(_syncAccountSettings());
       unawaited(_syncPlanner());
