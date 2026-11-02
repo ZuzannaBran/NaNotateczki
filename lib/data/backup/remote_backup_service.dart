@@ -273,8 +273,11 @@ class RemoteBackupService {
         final remoteByUid = {for (final note in remoteNotes) note.uid: note};
         final imports = <Notebook>[];
         for (final recovered in recoveredNotebooks) {
+          // A backup cannot override a newer synchronized version
+          // or resurrect an entry absent from a nonempty sync journal.
           if (pendingSyncChanges.contains(recovered.uid) ||
-              authoritative[recovered.uid]?['deleted'] == true) {
+              authoritative.containsKey(recovered.uid) ||
+              initialCursor != 0) {
             continue;
           }
           final existing = local.where((note) => note.uid == recovered.uid);

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -344,8 +345,10 @@ class _AccountDialogState extends State<_AccountDialog> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Welcome. Choose how you want to use NaNotateczki. '
-          'You can switch modes later in account settings.',
+          kIsWeb
+              ? 'Welcome. Sign in to access your account library.'
+              : 'Welcome. Choose how you want to use NaNotateczki. '
+                    'You can switch modes later in account settings.',
           key: const ValueKey('account-welcome-description'),
           textAlign: TextAlign.center,
           style: _accountSecondaryTextStyle(
@@ -368,13 +371,15 @@ class _AccountDialogState extends State<_AccountDialog> {
           onPressed: _isWorking ? null : () => _show(_AccountView.signIn),
           child: const Text('Sign in'),
         ),
-        const SizedBox(height: 12),
-        TextButton(
-          key: const ValueKey('account-local-choice'),
-          style: TextButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-          onPressed: _isWorking ? null : () => _show(_AccountView.local),
-          child: const Text('Try local'),
-        ),
+        if (!kIsWeb) ...[
+          const SizedBox(height: 12),
+          TextButton(
+            key: const ValueKey('account-local-choice'),
+            style: TextButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            onPressed: _isWorking ? null : () => _show(_AccountView.local),
+            child: const Text('Try local'),
+          ),
+        ],
       ],
     );
   }
@@ -596,7 +601,9 @@ class _AccountDialogState extends State<_AccountDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            if (!sync.isStarted) ...[
+            if (kIsWeb && !sync.isStarted)
+              const Text('Account sync starts automatically on Web.')
+            else if (!sync.isStarted) ...[
               const Text(
                 'Sync starts automatically. These recovery options are '
                 'available if a retry is needed.',
@@ -640,12 +647,14 @@ class _AccountDialogState extends State<_AccountDialog> {
             onPressed: _isWorking ? null : () => _show(_AccountView.password),
             child: const Text('Change password'),
           ),
-          const SizedBox(height: 12),
-          TextButton(
-            key: const ValueKey('account-switch-local'),
-            onPressed: _isWorking ? null : () => _show(_AccountView.local),
-            child: const Text('Switch to local mode'),
-          ),
+          if (!kIsWeb) ...[
+            const SizedBox(height: 12),
+            TextButton(
+              key: const ValueKey('account-switch-local'),
+              onPressed: _isWorking ? null : () => _show(_AccountView.local),
+              child: const Text('Switch to local mode'),
+            ),
+          ],
           const SizedBox(height: 12),
           OutlinedButton(
             key: const ValueKey('account-logout'),

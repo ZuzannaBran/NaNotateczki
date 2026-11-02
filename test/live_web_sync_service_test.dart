@@ -116,7 +116,7 @@ void main() {
     expect(sync.hasPendingChanges, isFalse);
   });
 
-  test('bootstrap uploads both versions of a numbered conflict', () async {
+  test('bootstrap uses remote document without creating a duplicate', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -174,14 +174,11 @@ void main() {
     await sync.start(InitialSyncPolicy.mergeSafely);
 
     expect(sync.lastError, isNull);
-    expect(writes, hasLength(2));
-    final copy = writes.singleWhere(
-      (body) => body['notebook']['title'] == 'Course (1)',
-    );
-    expect(copy['expectedRevision'], 0);
-    expect(copy['notebook']['folder'], original.folder);
-    expect(copy['notebook']['pages'].single['title'], 'Server version');
-    expect(await repository.fetchNotebooks(), hasLength(2));
+    expect(writes, isEmpty);
+    final notebooks = await repository.fetchNotebooks();
+    expect(notebooks, hasLength(1));
+    expect(notebooks.single.uid, original.uid);
+    expect(notebooks.single.pages.single.title, 'Server version');
   });
 
   test('uploads a conflict copy in the same pass after a 409', () async {
