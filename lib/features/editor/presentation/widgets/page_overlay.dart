@@ -14,6 +14,7 @@ import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:provider/provider.dart';
 
 import '../../../../core/input/soft_keyboard.dart';
+import '../../../../data/backup/remote_backup_scheduler.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/resizable_frame.dart';
 import '../../../notebook/domain/drawing_tool.dart';
@@ -1499,6 +1500,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _docSubscription = _quillController.document.changes.listen((event) {
       if (_isNormalizing) {
         return;
+      }
+      if (mounted && _focusNode.hasFocus) {
+        // Soft keyboards do not always emit hardware key events.
+        context.read<RemoteBackupScheduler?>()?.recordUserInteraction();
       }
       final rawText = _quillController.document.toPlainText();
       final trailingNewlines = _countTrailingNewlines(rawText);
