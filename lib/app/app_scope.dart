@@ -291,7 +291,15 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         // replacing a newer device preference with a stale backup.
         await _syncAccountSettings();
         await sync.start(InitialSyncPolicy.mergeSafely);
-        await _plannerSync?.syncNow();
+        try {
+          await _plannerSync?.syncNow();
+        } catch (error, stackTrace) {
+          AppErrorLog.instance.record(
+            error,
+            stackTrace,
+            source: 'AppScope.initialPlannerSync',
+          );
+        }
         if (!mounted || session.userId != userId) {
           return;
         }
