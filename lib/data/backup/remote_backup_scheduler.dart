@@ -93,7 +93,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   void markDirty() {
     _dirty = true;
     _changeGeneration++;
-    _recordActivity();
+    // Data arriving from remote sync is not a user interaction.
     _scheduleIdle();
     if (!_disposed) {
       notifyListeners();
