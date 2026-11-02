@@ -15,6 +15,7 @@ import '../../features/notebook/domain/notebook.dart';
 import '../sync/account_session_controller.dart';
 import '../sync/api_client.dart';
 import 'notebook_conflicts.dart';
+import 'notebook_merge.dart';
 
 enum InitialSyncPolicy { uploadLocal, downloadRemote, mergeSafely }
 
@@ -348,6 +349,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final imports = <Notebook>[];
     final remoteDeletes = <String>[];
     for (final record in remote) {
+      final previousBase = _bases[record.uid];
       final localNotebook = localByUid[record.uid];
       _revisions[record.uid] = record.revision;
       if (record.notebook != null) {
@@ -355,14 +357,13 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       }
       if (record.deleted || record.notebook == null) {
         if (localNotebook != null) {
-          if (_pending.contains(record.uid)) {
+          if (_hasUnsentEdit(record.uid, localNotebook, previousBase)) {
             final copy = await _conflictCopy(
               localNotebook,
               reserved: imports,
             );
             imports.add(copy);
-            _pending.add(copy.uid);
-            _idempotencyKeys[copy.uid] = const Uuid().v4();
+            _queueConflictCopy(copy.uid);
           }
           remoteDeletes.add(record.uid);
         }
@@ -381,14 +382,33 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         _idempotencyKeys.remove(record.uid);
         continue;
       }
+      if (previousBase != null &&
+          _sameEncodedNotebook(localNotebook, previousBase)) {
+        imports.add(record.notebook!);
+        _pending.remove(record.uid);
+        _idempotencyKeys.remove(record.uid);
+        continue;
+      }
+      if (previousBase != null) {
+        final merged = _mergeWithRemote(
+          previousBase,
+          localNotebook,
+          record.baseNotebook!,
+        );
+        if (merged != null) {
+          imports.add(merged);
+          _pending.add(record.uid);
+          _idempotencyKeys[record.uid] = const Uuid().v4();
+          continue;
+        }
+      }
       if (_pending.contains(record.uid)) {
         final copy = await _conflictCopy(
           localNotebook,
           reserved: imports,
         );
         imports.add(copy);
-        _pending.add(copy.uid);
-        _idempotencyKeys[copy.uid] = const Uuid().v4();
+        _queueConflictCopy(copy.uid);
       }
       imports.add(record.notebook!);
       _pending.remove(record.uid);
@@ -445,6 +465,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       uid,
       () => const Uuid().v4(),
     );
+    final previousBase = _bases[uid];
     try {
       final response = notebook == null
           ? await apiClient.request(
@@ -508,11 +529,11 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (record.deleted) {
         _bases.remove(uid);
         if (notebook != null) {
-          final copy = await _conflictCopy(notebook);
-          await _applyRemoteImports([copy]);
-          _pending.add(copy.uid);
-          _idempotencyKeys[copy.uid] = const Uuid().v4();
-          _syncRequestedWhileRunning = true;
+          if (_hasUnsentEdit(uid, notebook, previousBase)) {
+            final copy = await _conflictCopy(notebook);
+            await _applyRemoteImports([copy]);
+            _queueConflictCopy(copy.uid);
+          }
           _applyingRemote = true;
           try {
             await repository.deleteNotebook(uid);
@@ -532,6 +553,20 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           }
           await _push(uid, retriedConflict: true);
           return;
+        }
+        if (previousBase != null && !retriedConflict) {
+          final merged = _mergeWithRemote(
+            previousBase,
+            notebook,
+            record.baseNotebook!,
+          );
+          if (merged != null) {
+            await _applyRemoteImports([merged]);
+            _pending.add(uid);
+            _idempotencyKeys[uid] = const Uuid().v4();
+            await _push(uid, retriedConflict: true);
+            return;
+          }
         }
         await _applyRemoteImports([record.notebook!], preserveLocalUids: {uid});
       }
@@ -575,12 +610,10 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         if (record.deleted) {
           imports.remove(record.uid);
           if (local != null) {
-            if (_pending.contains(record.uid)) {
+            if (_hasUnsentEdit(record.uid, local, _bases[record.uid])) {
               final copy = await _conflictCopy(local);
               imports[copy.uid] = copy;
-              _pending.add(copy.uid);
-              _idempotencyKeys[copy.uid] = const Uuid().v4();
-              _syncRequestedWhileRunning = true;
+              _queueConflictCopy(copy.uid);
             }
             _applyingRemote = true;
             try {
@@ -595,11 +628,22 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           _idempotencyKeys.remove(record.uid);
         } else if (_pending.contains(record.uid) && local != null) {
           if (record.notebook != null) {
-            imports[record.uid] = record.notebook!;
-            preserveLocal.add(record.uid);
+            final base = _bases[record.uid];
+            final merged = base == null
+                ? null
+                : _mergeWithRemote(base, local, record.baseNotebook!);
+            if (merged != null) {
+              imports[record.uid] = merged;
+              _pending.add(record.uid);
+              _idempotencyKeys[record.uid] = const Uuid().v4();
+              _syncRequestedWhileRunning = true;
+            } else {
+              imports[record.uid] = record.notebook!;
+              preserveLocal.add(record.uid);
+              _pending.remove(record.uid);
+              _idempotencyKeys.remove(record.uid);
+            }
           }
-          _pending.remove(record.uid);
-          _idempotencyKeys.remove(record.uid);
         } else if (record.notebook != null) {
           imports[record.uid] = record.notebook!;
         }
@@ -852,6 +896,47 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         jsonEncode(_encodeSyncNotebook(second));
   }
 
+  bool _sameEncodedNotebook(
+    Notebook notebook,
+    Map<String, dynamic> base,
+  ) =>
+      jsonEncode(_encodeSyncNotebook(notebook)) ==
+      jsonEncode(_normalizeSyncNotebook(base));
+
+  bool _hasUnsentEdit(
+    String uid,
+    Notebook notebook,
+    Map<String, dynamic>? base,
+  ) =>
+      _pending.contains(uid) &&
+      (base == null || !_sameEncodedNotebook(notebook, base));
+
+  Notebook? _mergeWithRemote(
+    Map<String, dynamic> base,
+    Notebook local,
+    Map<String, dynamic> remote,
+  ) {
+    final merged = mergeNotebookChanges(
+      _normalizeSyncNotebook(base),
+      _encodeSyncNotebook(local),
+      _normalizeSyncNotebook(remote),
+    );
+    if (merged == null) {
+      return null;
+    }
+    try {
+      return repository.decodeBackupStrict([merged]).single;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  void _queueConflictCopy(String uid) {
+    _pending.add(uid);
+    _idempotencyKeys[uid] = const Uuid().v4();
+    _syncRequestedWhileRunning = true;
+  }
+
   Future<Notebook> _conflictCopy(
     Notebook source, {
     Iterable<Notebook> reserved = const [],
@@ -881,6 +966,14 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final pending = json['pending'];
     final restorePending = json['restorePending'];
     final keys = json['idempotencyKeys'];
+    final bases = json['bases'];
+    if (bases is Map<String, dynamic>) {
+      for (final entry in bases.entries) {
+        if (entry.value is Map<String, dynamic>) {
+          _bases[entry.key] = entry.value as Map<String, dynamic>;
+        }
+      }
+    }
     if (revisions is Map<String, dynamic>) {
       for (final entry in revisions.entries) {
         if (entry.value is num) {
@@ -920,6 +1013,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           'version': 1,
           'cursor': _cursor,
           'revisions': _revisions,
+          'bases': _bases,
           'pending': _pending.toList()..sort(),
           'restorePending': _restorePending.toList()..sort(),
           'idempotencyKeys': _idempotencyKeys,

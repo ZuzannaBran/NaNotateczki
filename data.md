@@ -267,9 +267,13 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 - Sukces i wpis `change_events` powstają w jednej transakcji PostgreSQL.
 - `409 Conflict` nigdy nie nadpisuje po cichu. Przy konflikcie
   rzeczywistych edycji klient zachowuje numerowaną kopię lokalnego szkicu.
-  Tombstone bez oczekujących lokalnych edycji usuwa dokument na urządzeniu
-  bez tworzenia kopii. Wersja serwera pozostaje oryginałem.
+  Tombstone usuwa oryginalny UID. Tylko rzeczywiście odmienna niesłana
+  edycja daje kopię konfliktową; usunięty UID nie odradza się automatycznie.
 - Usunięcia są tombstonami. Outbox znika dopiero po potwierdzonym commicie.
+- Trójstronne scalanie tej samej rewizji łączy niezależne dopiski,
+  usunięcia i edycje obiektów bez tworzenia dodatkowych dokumentów.
+  Baza JSON dokumentu i rewizja są utrwalane razem po każdym sync.
+  Web automatycznie pobiera konto bez wyboru trybu Local.
 - Po reconnect klient zawsze wywołuje `/v1/sync/changes?after=<cursor>`.
 - Na wszystkich platformach po wznowieniu aplikacji i zapasowo co 45 sekund
   (10 sekund po błędzie) weryfikuje zmiany przez REST. Ścieżki obrazów

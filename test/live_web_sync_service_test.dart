@@ -181,6 +181,94 @@ void main() {
     expect(notebooks.single.pages.single.title, 'Server version');
   });
 
+  test('offline page edit and remote metadata merge into one UID', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final original = await repository.createNotebook(title: 'Course');
+    final base = (await repository.getNotebook(original.uid))!;
+    final edited = base.copyWith(
+      title: 'Local title',
+      updatedAt: base.updatedAt.add(const Duration(minutes: 2)),
+    );
+    await repository.saveNotebook(edited);
+    final remote = base.copyWith(
+      pages: [base.pages.single.copyWith(isBookmarked: true)],
+      updatedAt: base.updatedAt.add(const Duration(minutes: 1)),
+    );
+    textStorageReadOverride = (key) async {
+      if (!key.startsWith('server_sync_state_')) {
+        return null;
+      }
+      return jsonEncode({
+        'version': 1,
+        'cursor': 1,
+        'revisions': {base.uid: 1},
+        'pending': [base.uid],
+        'bases': {base.uid: NotebookRepository.encodeNotebook(base)},
+      });
+    };
+    var writes = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response(
+            jsonEncode({
+              'cursor': 2,
+              'notebooks': [
+                {
+                  'uid': base.uid,
+                  'revision': 2,
+                  'deleted': false,
+                  'notebook': NotebookRepository.encodeNotebook(remote),
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":2,"changes":[]}', 200);
+        }
+        if (request.method == 'PUT') {
+          writes++;
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['expectedRevision'], 2);
+          expect(body['notebook']['uid'], base.uid);
+          expect(body['notebook']['title'], 'Local title');
+          expect(body['notebook']['pages'].single['isBookmarked'], isTrue);
+          return http.Response(
+            jsonEncode({'revision': 3, 'notebook': body['notebook']}),
+            200,
+          );
+        }
+        fail('Unexpected request');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-merge';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+
+    await sync.start(InitialSyncPolicy.mergeSafely);
+    expect(sync.lastError, isNull);
+    expect(writes, 1);
+    final notebooks = await repository.fetchNotebooks();
+    expect(notebooks, hasLength(1));
+    expect(notebooks.single.uid, base.uid);
+    expect(notebooks.single.title, 'Local title');
+    expect(notebooks.single.pages.single.isBookmarked, isTrue);
+  });
+
   test('uploads a conflict copy in the same pass after a 409', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);

@@ -444,10 +444,15 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Przy odbiorze zmian gości najpierw opróżnia edytor właściciela i wysyła
   jego oczekujące operacje ścieżką serwerowego scalenia, zanim zastosuje
   feed, aby niezależne zmiany nie tworzyły kopii konfliktowej.
+  Ostatnią bazę zatwierdzonego dokumentu zapisuje razem z rewizją,
+  aby móc scalać niezależne edycje także po restarcie.
   `setSharedDocumentUid` wybiera natychmiastowy tryb sync dla active share;
   reentrancy nie gubi zmian podczas poprzedniego requestu. `restoreDeleted`
   po CAS tombstone ponawia oczekującą edycję pod oryginalnym UID.
   `enqueue`, `syncNow`, `stop`.
+- `lib/data/sync/notebook_merge.dart`: trójstronne scalanie niezależnych
+  zmian pól oraz obiektów o osobnych ID; kolizje wymagają kopii.
+- `test/notebook_merge_test.dart`: dopiski, usuwanie i jawne konflikty.
 - `lib/data/sync/notebook_conflicts.dart`: `numberedNotebookCopy`
   zachowuje treść w tym samym folderze pod numerowaną nazwą i nadaje
   nowe UID dokumentu, stron, tekstów, obrazów i kresek.
