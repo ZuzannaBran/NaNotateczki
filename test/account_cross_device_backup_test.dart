@@ -208,6 +208,82 @@ void main() {
   );
 
   test(
+    'falls back to older verified backup if newest is corrupt',
+    () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    const deviceId = '123e4567-e89b-12d3-a456-426614174000';
+    const brokenId = '123e4567-e89b-12d3-a456-426614174011';
+    const validId = '123e4567-e89b-12d3-a456-426614174012';
+    final payload = <String, dynamic>{
+      'notebooks': <dynamic>[],
+      'libraryState': <String, dynamic>{
+        'folders': <String>['Recovered'],
+      },
+      'studyPlannerState': <String, dynamic>{
+        'version': 1,
+        'sessions': <dynamic>[],
+      },
+      'appPreferences': <String, dynamic>{'darkMode': true},
+    };
+    final payloadHash = sha256.convert(utf8.encode(jsonEncode(payload)));
+    final bytes = utf8.encode(jsonEncode({
+      'format': 'nanotateczki-server-backup',
+      'version': 2,
+      'deviceId': deviceId,
+      'checksumAlgorithm': 'sha256',
+      'checksum': payloadHash.toString(),
+      'payload': payload,
+    }));
+    final hash = sha256.convert(bytes).toString();
+    final downloaded = <String>[];
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/backups') {
+          return http.Response(jsonEncode({
+            'backups': [
+              for (final id in [brokenId, validId])
+                {
+                  'backupId': id,
+                  'deviceId': deviceId,
+                  'sha256': hash,
+                  'sizeBytes': bytes.length,
+                },
+            ],
+          }), 200);
+        }
+        if (request.url.path.endsWith('/download')) {
+          final id = request.url.pathSegments[2];
+          downloaded.add(id);
+          return http.Response.bytes(
+            id == brokenId ? <int>[1, 2, 3] : bytes,
+            200,
+          );
+        }
+        fail('Unexpected request: ${request.url}');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-1';
+    addTearDown(session.dispose);
+    final recovery = RemoteBackupService(
+      repository: NotebookRepository(database),
+      apiClient: client,
+      session: session,
+    );
+
+    expect(await recovery.hydrateFromLatestAccountBackup(), isTrue);
+    expect(downloaded, [brokenId, validId]);
+    expect(jsonDecode(stored['app_prefs.json']!)['darkMode'], true);
+  });
+
+  test(
     'rejects invalid backup identifier before downloading or writing',
     () async {
       final stored = <String, String>{};
