@@ -1650,7 +1650,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/live_web_sync_service_test.dart`: pobranie wszystkich stron feedu po
   500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany,
   pasywne pobieranie notatnika z innego urządzenia bez lokalnych zapisów,
-  brak przenoszenia outboxu i rewizji między kontami.
+  brak przenoszenia outboxu i rewizji między kontami, natychmiastowe
+  wysłanie kopii konfliktowej po odpowiedzi HTTP 409.
 - `test/library_account_slot_test.dart`: centrowanie nazwy, podgląd i limit
   hasła, brak awatara w pasku konta (pozostaje w dialogu), wyrównanie
   statusu z nazwą, rozmiar ikony ustawień i odstępy przycisków;

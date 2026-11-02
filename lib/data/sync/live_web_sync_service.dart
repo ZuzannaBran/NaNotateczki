@@ -614,6 +614,8 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           await repository.importNotebooksAtomically([preserved]);
           _pending.add(preserved.uid);
           _idempotencyKeys[preserved.uid] = const Uuid().v4();
+          // A conflict copy created during a push needs another sync pass.
+          _syncRequestedWhileRunning = true;
         }
         replacements.add(notebook);
       }

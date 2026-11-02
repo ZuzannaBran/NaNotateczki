@@ -184,6 +184,94 @@ void main() {
     expect(await repository.fetchNotebooks(), hasLength(2));
   });
 
+  test('uploads a conflict copy in the same pass after a 409', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final original = await repository.createNotebook(title: 'Course');
+    final remote = original.copyWith(title: 'Remote edit');
+    final writes = <Map<String, dynamic>>[];
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response(
+            jsonEncode({
+              'cursor': 1,
+              'notebooks': [
+                {
+                  'uid': original.uid,
+                  'revision': 1,
+                  'deleted': false,
+                  'notebook': NotebookRepository.encodeNotebook(original),
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":1,"changes":[]}', 200);
+        }
+        if (request.method == 'PUT') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          writes.add(body);
+          if (body['notebook']['uid'] == original.uid) {
+            return http.Response(
+              jsonEncode({
+                'detail': {
+                  'uid': original.uid,
+                  'revision': 2,
+                  'deleted': false,
+                  'notebook': NotebookRepository.encodeNotebook(remote),
+                },
+              }),
+              409,
+            );
+          }
+          expect(body['expectedRevision'], 0);
+          return http.Response(
+            jsonEncode({'revision': 1, 'notebook': body['notebook']}),
+            200,
+          );
+        }
+        fail('Unexpected request: ${request.url}');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-1';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+
+    await sync.start(InitialSyncPolicy.mergeSafely);
+    await repository.saveNotebook(original.copyWith(title: 'Local edit'));
+    sync.enqueue([NotebookRepositoryChange.full(original.uid)]);
+    await sync.syncNow();
+
+    expect(sync.lastError, isNull);
+    expect(sync.hasPendingChanges, isFalse);
+    expect(writes, hasLength(2));
+    final notebooks = await repository.fetchNotebooks();
+    expect(notebooks, hasLength(2));
+    expect(
+      notebooks.singleWhere((item) => item.uid == original.uid).title,
+      'Remote edit',
+    );
+    final copy = notebooks.singleWhere((item) => item.uid != original.uid);
+    expect(copy.title, 'Local edit (1)');
+    expect(copy.folder, original.folder);
+    expect(copy.pages.single.id, isNot(original.pages.single.id));
+    expect(writes.last['notebook']['uid'], copy.uid);
+  });
+
   test(
     'remote tombstone deletes unchanged local note without a copy',
     () async {
