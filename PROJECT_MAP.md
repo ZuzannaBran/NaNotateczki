@@ -294,7 +294,7 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/remote_backup_service.dart` (539 linii)
+### `lib/data/backup/remote_backup_service.dart` (aktualizowany)
 
 Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
 zadania, planer, ustawienia, Recent i preferencję backupu; liczy SHA-256,
@@ -310,8 +310,9 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
   nie wskrzesza dokumentów oznaczonych jako usunięte.
   Łączy foldery i zachowuje zadania przy właściwej kopii planera.
   Nie nadpisuje istniejących preferencji ani historii planera. Każdy start
-  konta sprawdza i weryfikuje najnowszy verified backup, także po wcześniejszym
-  odzyskaniu danych. Znacznik backupId zapobiega dublowaniu kopii konfliktowych
+  konta sprawdza najnowszy verified backup; po potwierdzonej utracie SQLite
+  może przywrócić identyczny backupId mimo wcześniejszego checkpointu.
+  Błąd odzyskania nie zatrzymuje inicjalizacji live sync. Znacznik backupId zapobiega dublowaniu kopii konfliktowych
   podczas ponownego przetwarzania tego samego snapshotu. Oczekujące offline
   usunięcia z outboxu mają pierwszeństwo nad snapshotem.
 
@@ -319,12 +320,15 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
   wycina oryginalne UTF-8 payloadu z już poprawnego JSON, bez zmiany
   zapisu liczb, Unicode i escape'ów podczas sprawdzania SHA-256.
 
-### `lib/data/backup/remote_backup_scheduler.dart` (354 linie)
+### `lib/data/backup/remote_backup_scheduler.dart` (zmienny indeks)
 
 Jawnie włączany scheduler zalogowanego konta: po zmianach wysyła verified
 snapshot po ustawionym okresie bezczynności (domyślnie 120 sekund), po błędzie
 ponawia po 5 minutach; dostępne opóźnienia: 30, 60, 120, 300, 900,
-1800 sekund. Resume rozpoczyna nowe oczekiwanie na bezczynność.
+1800 sekund. Resume nie resetuje czasu bezczynności; ukryta karta nie przesuwa czasu
+interakcji, a modyfikacje danych przez synchronizację nie są uznawane za
+aktywność użytkownika. Kliknięcia, sprzętowe klawisze i Quill z soft keyboard
+rejestrują aktywność.
 Samo logowanie nie włącza wysyłki. Stan wyniku i błędu jest czyszczony przy
 zmianie konta, a losowy `deviceId` ma osobny plik per `userId`.
 
@@ -398,9 +402,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   247: `_restorePersistedSession`; 313: `_persistRefreshCredential`;
   343: `changePassword`; 396: `useLocalProfile`.
   Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
-- `lib/data/sync/account_settings_sync_service.dart` (224 linie):
+- `lib/data/sync/account_settings_sync_service.dart` (aktualizowany):
   11: `AccountSettingsSyncService`; 34: `syncNow`; 164: `stop`.
-  `AccountSettingsSyncService.syncNow` uzgadnia rewizje ustawień konta
+  `AccountSettingsSyncService.syncNow` odnawia wygasły access JWT i uzgadnia rewizje ustawień konta
   (`appPreferences`, `editorPreferences`, `recentColors`,
   `backupPreferences`). Zapisuje potwierdzone wartości per konto,
   nie nadpisuje konfliktujących zmian, przechowuje lokalną kopię
@@ -409,7 +413,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   oraz wysyłkę po zmianie preferencji, recent i czasu backupu.
 - `test/account_settings_sync_service_test.dart`: dwa urządzenia,
   wysyłka, odtworzenie, odrzucenie równoczesnego nadpisania.
-- `lib/data/sync/live_web_sync_service.dart` (802 linie): jawna polityka pierwszej
+- `lib/data/sync/live_web_sync_service.dart` (aktualizowany): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
   tylko jako sygnał na wszystkich platformach; własny push nie przesuwa
@@ -2008,6 +2012,34 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   przeglądarce, dopuszcza brak `Origin` w kliencie natywnym;
   JWT pozostaje obowiązkowy. Regresja:
   `server/api/tests/test_native_realtime.py`.
+
+## Uzupełnienia 2026-11-02: bezpieczne przywracanie i sesje
+
+- `lib/app/app_scope.dart`: recovery backupu ma niezależną obsługę błędów;
+  przy błędzie live sync nadal startuje, ale nie jest wysyłany potencjalnie
+  niekompletny nowy backup; ponowienie po wznowieniu aplikacji.
+- `lib/data/sync/account_session_controller.dart`: jawne wylogowanie
+  trwale przywraca ekran wyboru trybu bez usuwania przypisania biblioteki.
+- `lib/features/library/presentation/library_account_slot.dart`:
+  `account-logout`, a przycisk `account-backup-now` bez ikony.
+- `lib/features/editor/presentation/widgets/page_overlay.dart`:
+  wpisy w edytorze Quill również oznaczają aktywność dla schedulera.
+- `lib/data/sync/live_web_sync_service.dart`: remote tombstone usuwa
+  oryginał bez kopii, jeśli nie ma oczekujących edycji; HTTP 409 przy
+  usunięciu chroni lokalny niezapisany szkic jako numerowaną kopię.
+- `test/live_web_sync_service_test.dart`,
+  `test/account_cross_device_backup_test.dart`,
+  `test/remote_backup_scheduler_test.dart`,
+  `test/library_account_slot_test.dart`,
+  `test/account_session_controller_test.dart` oraz
+  `test/account_settings_sync_service_test.dart`: nowe scenariusze regresji.
+- `BACKUP_SYNC_ROADMAP.md`: kontrolna lista etapów ukończonych i pozostałych.
+- Serwer `migrations/0009_account_settings_library_state.sql` dodaje
+  brakującą kategorię `libraryState` do constraint; klient nie jest jeszcze
+  gotowy do pełnej synchronizacji tej kategorii.
+- Serwer `api/app/routers/study_shares.py`: WebSocket subskrybuje sygnały
+  zakończenia przed uwierzytelnieniem biletu, aby nie zgubić odwołania sesji.
+  `api/tests/test_study_shares_flow.py`: test kolejności.
 
 ## 13. Wspólna edycja sesji Web
 
