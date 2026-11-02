@@ -152,9 +152,6 @@ class RemoteBackupService {
         .toString()
         .substring(0, 16);
     final hydrationKey = 'account_backup_hydrated_$suffix.json';
-    if (await readStoredText(hydrationKey) != null) {
-      return false;
-    }
     final listing = _jsonObject(
       (await apiClient.get('/v1/backups')).decodeJson(),
     );
@@ -210,6 +207,28 @@ class RemoteBackupService {
       throw const FormatException('Incomplete account backup.');
     }
     final recoveredNotebooks = repository.decodeBackupStrict(rawNotebooks);
+    // Check the newest verified snapshot at every sign-in, including when
+    // this device already restored an older one. Reprocessing the same
+    // snapshot would create duplicate numbered conflict copies.
+    final previousHydration = await readStoredText(hydrationKey);
+    String? previousBackupId;
+    if (previousHydration != null) {
+      try {
+        final previous = jsonDecode(previousHydration);
+        if (previous is Map<String, dynamic> &&
+            previous['version'] == 1 &&
+            previous['backupId'] is String) {
+          previousBackupId = previous['backupId'] as String;
+        }
+      } on FormatException {
+        // An invalid checkpoint must not prevent account recovery.
+      }
+    }
+    if (previousBackupId == backupId &&
+        (recoveredNotebooks.isEmpty ||
+            (await repository.fetchNotebooks()).isNotEmpty)) {
+      return false;
+    }
     if (session.userId != userId) {
       return false;
     }
