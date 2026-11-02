@@ -15,10 +15,7 @@ void main() {
     final notices = OneShotErrorNotice();
     final service = Object();
     notices.acknowledge(service, 'Previous network error');
-    expect(
-      notices.shouldPresent(service, 'Previous network error'),
-      isFalse,
-    );
+    expect(notices.shouldPresent(service, 'Previous network error'), isFalse);
     expect(notices.shouldPresent(service, 'New network error'), isTrue);
     expect(notices.shouldPresent(service, 'New network error'), isFalse);
   });

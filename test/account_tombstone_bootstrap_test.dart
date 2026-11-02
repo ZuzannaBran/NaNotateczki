@@ -156,43 +156,44 @@ void main() {
     expect(saved.single.title, 'Edited after deletion');
   });
 
-  test('editing before the first online sync persists an offline outbox', (
-  ) async {
-    final stored = <String, String>{};
-    textStorageReadOverride = (key) async => stored[key];
-    textStorageWriteOverride = (key, value) async => stored[key] = value;
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    final notebook = await repository.createNotebook();
-    final client = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((_) async => http.Response('', 503)),
-    )..setAccessToken('token');
-    addTearDown(client.close);
-    final session = AccountSessionController(client)
-      ..mode = AccountDataMode.account
-      ..userId = 'account-1';
-    addTearDown(session.dispose);
-    final sync = LiveWebSyncService(
-      repository: repository,
-      apiClient: client,
-      session: session,
-      enableRealtime: false,
-    );
-    addTearDown(sync.dispose);
-    sync.enqueue([NotebookRepositoryChange.full(notebook.uid)]);
-    await sync.stop();
+  test(
+    'editing before the first online sync persists an offline outbox',
+    () async {
+      final stored = <String, String>{};
+      textStorageReadOverride = (key) async => stored[key];
+      textStorageWriteOverride = (key, value) async => stored[key] = value;
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final notebook = await repository.createNotebook();
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((_) async => http.Response('', 503)),
+      )..setAccessToken('token');
+      addTearDown(client.close);
+      final session = AccountSessionController(client)
+        ..mode = AccountDataMode.account
+        ..userId = 'account-1';
+      addTearDown(session.dispose);
+      final sync = LiveWebSyncService(
+        repository: repository,
+        apiClient: client,
+        session: session,
+        enableRealtime: false,
+      );
+      addTearDown(sync.dispose);
+      sync.enqueue([NotebookRepositoryChange.full(notebook.uid)]);
+      await sync.stop();
 
-    final suffix = sha256
-        .convert(utf8.encode('account-1'))
-        .toString()
-        .substring(0, 16);
-    final state = jsonDecode(
-      stored['server_sync_state_$suffix.json']!,
-    ) as Map<String, dynamic>;
-    expect(state['pending'], contains(notebook.uid));
-    expect(state['version'], 1);
-  });
-
+      final suffix = sha256
+          .convert(utf8.encode('account-1'))
+          .toString()
+          .substring(0, 16);
+      final state =
+          jsonDecode(stored['server_sync_state_$suffix.json']!)
+              as Map<String, dynamic>;
+      expect(state['pending'], contains(notebook.uid));
+      expect(state['version'], 1);
+    },
+  );
 }

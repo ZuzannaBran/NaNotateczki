@@ -679,15 +679,20 @@ void main() {
           if (!remoteChanged) {
             return http.Response('{"cursor":0,"changes":[]}', 200);
           }
-          return http.Response(jsonEncode({
-            'cursor': 1,
-            'changes': [{
-              'uid': remote.uid,
-              'revision': 1,
-              'deleted': false,
-              'notebook': NotebookRepository.encodeNotebook(remote),
-            }],
-          }), 200);
+          return http.Response(
+            jsonEncode({
+              'cursor': 1,
+              'changes': [
+                {
+                  'uid': remote.uid,
+                  'revision': 1,
+                  'deleted': false,
+                  'notebook': NotebookRepository.encodeNotebook(remote),
+                },
+              ],
+            }),
+            200,
+          );
         }
         fail('Passive device must not upload an unchanged notebook.');
       }),

@@ -392,8 +392,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       return;
     }
     final editor = _editor;
-    if (_dirty || editor == null ||
-        !editor.canApplyConfirmedRemoteNotebook) {
+    if (_dirty || editor == null || !editor.canApplyConfirmedRemoteNotebook) {
       _deferRemote(snapshot);
       return;
     }

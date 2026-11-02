@@ -189,9 +189,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
     try {
       await reconcileBeforeBackup?.call();
-      if (!_enabled ||
-          !session.isSignedIn ||
-          _accountUserId != accountUserId) {
+      if (!_enabled || !session.isSignedIn || _accountUserId != accountUserId) {
         return;
       }
       // Changes downloaded by reconciliation are part of this snapshot,

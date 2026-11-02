@@ -165,10 +165,7 @@ void main() {
 
     scheduler.markDirty();
     service.failure = StateError('Network offline');
-    await expectLater(
-      scheduler.ensureVerifiedForExit(),
-      throwsStateError,
-    );
+    await expectLater(scheduler.ensureVerifiedForExit(), throwsStateError);
     expect(scheduler.hasPendingBackup, isTrue);
     expect(scheduler.lastError, contains('Network offline'));
 
