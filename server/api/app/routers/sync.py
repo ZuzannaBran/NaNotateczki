@@ -160,9 +160,15 @@ async def put_notebook(
         )
         session.add(record)
     else:
-        if active_share is not None and record.deleted_at is not None:
-            await conflict(record, uid)
-        if active_share is not None and body.baseNotebook is not None:
+        # A stale write cannot silently revive a tombstone. An explicitly
+        # retried local edit may restore the same UID after observing the
+        # deletion revision. The owner lock makes acceptance order decisive.
+        if record.deleted_at is not None:
+            if not body.restoreDeleted or body.expectedRevision != record.revision:
+                await conflict(record, uid)
+            if active_share is not None:
+                await conflict(record, uid)
+        if record.deleted_at is None and active_share is not None and body.baseNotebook is not None:
             from .study_shares import merge_share_document, require_verified_base
 
             if body.baseNotebook.get("uid") != uid:
@@ -176,7 +182,7 @@ async def put_notebook(
                 clock, received_at,
             )
             active_share.edit_clock = clock
-        elif record.revision != body.expectedRevision:
+        elif record.deleted_at is None and record.revision != body.expectedRevision:
             await conflict(record, uid)
         record.revision += 1
         record.content = merged_notebook

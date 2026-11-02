@@ -42,6 +42,12 @@ def test_rejects_unknown_and_invalid_settings():
         api.validate_settings("recentColors", [-1])
     with pytest.raises(ValueError):
         api.validate_settings("recentColors", [0] * 13)
+    assert api.validate_settings("backupPreferences", {
+        "version": 1, "idleSeconds": 15
+    })["idleSeconds"] == 15
+    assert api.validate_settings("backupPreferences", {
+        "version": 1, "idleSeconds": 60
+    })["idleSeconds"] == 60
     with pytest.raises(ValueError):
         api.validate_settings("backupPreferences", {
             "version": 1, "idleSeconds": 1
@@ -189,3 +195,22 @@ def test_read_settings_is_scoped_to_authenticated_owner():
             },
         },
     }
+
+
+def test_library_state_category_has_postgresql_migration():
+    from pathlib import Path
+
+    migrations = Path(__file__).resolve().parents[2] / "migrations"
+    original = (migrations / "0007_account_settings.sql").read_text()
+    upgrade = (migrations / "0009_account_settings_library_state.sql").read_text()
+    assert "libraryState" not in original
+    assert "DROP CONSTRAINT account_settings_category_check" in upgrade
+    assert "ADD CONSTRAINT account_settings_category_check" in upgrade
+    assert "'libraryState'" in upgrade
+    assert "libraryState" in api.Category.__args__
+    assert api.validate_settings("libraryState", {
+        "folders": ["Notes"],
+        "covers": {},
+        "plannerTasks": {},
+        "recentCoverColors": [],
+    })["folders"] == ["Notes"]
