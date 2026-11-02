@@ -117,7 +117,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         _editor = EditorController(
           repository: _repository!,
           notebook: notebook,
-          saveDebounce: const Duration(milliseconds: 100),
+          saveDebounce: const Duration(milliseconds: 20),
         );
       } finally {
         _suppressChanges = false;
@@ -393,22 +393,24 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     if (_dirty || !mounted) {
       return;
     }
+    final editor = _editor;
+    if (editor == null || !editor.canApplyConfirmedRemoteNotebook) {
+      return;
+    }
     _suppressChanges = true;
     try {
       final updated = _decode(snapshot.notebook);
-      _editor?.dispose();
-      _editor = null;
       await _repository!.importNotebooksAtomically([
         updated,
       ], verifiedRemoteSync: true);
-      if (!mounted) {
+      if (!mounted || _dirty) {
         return;
       }
-      _editor = EditorController(
-        repository: _repository!,
-        notebook: updated,
-        saveDebounce: const Duration(milliseconds: 100),
-      );
+      // The editor owns the guest's page, pan and zoom. Refresh the pages
+      // without disposing it or remounting the board/notebook viewport.
+      if (!editor.applyConfirmedRemoteNotebook(updated)) {
+        return;
+      }
       _base = snapshot.notebook;
       _revision = snapshot.revision;
       setState(() {
