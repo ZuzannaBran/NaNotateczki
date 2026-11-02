@@ -44,7 +44,8 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   bool _enabled = false;
   bool _uploading = false;
   bool _disposed = false;
-  bool _foreground = WidgetsBinding.instance.lifecycleState == null ||
+  bool _foreground =
+      WidgetsBinding.instance.lifecycleState == null ||
       WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
   Future<void>? _activeUpload;
   String? _accountUserId;
