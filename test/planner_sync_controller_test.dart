@@ -4,8 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:program/features/planner/state/study_planner_controller.dart';
 
 void main() {
-  test('deletion tombstones survive restart and reject old offline edits',
-      () async {
+  test(
+    'deletion tombstones survive restart and reject old offline edits',
+    () async {
     final files = <String, String>{};
     var now = DateTime.utc(2026, 11, 2, 9);
     StudyPlannerController fresh() => StudyPlannerController(
@@ -49,7 +50,8 @@ void main() {
       2,
     );
     second.dispose();
-  });
+    },
+  );
 
   test('separate entries merge and older timestamps are ignored', () async {
     final files = <String, String>{};

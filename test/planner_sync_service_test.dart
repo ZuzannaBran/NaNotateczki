@@ -9,8 +9,9 @@ import 'package:program/data/sync/planner_sync_service.dart';
 import 'package:program/features/planner/state/study_planner_controller.dart';
 
 void main() {
-  test('two systems reconcile creates, edits, deletes and late conflicts',
-      () async {
+  test(
+    'two systems reconcile creates, edits, deletes and late conflicts',
+    () async {
     final server = <String, Map<String, dynamic>>{};
     final transport = MockClient((request) async {
       if (request.method == 'GET') {
@@ -152,5 +153,6 @@ void main() {
     for (final api in apis) {
       api.close();
     }
-  });
+    },
+  );
 }

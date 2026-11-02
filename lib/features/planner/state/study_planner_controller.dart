@@ -73,8 +73,8 @@ class StudySession {
     this.repeatEvery = 1,
     this.seriesId,
     DateTime? modifiedAt,
-  }) : modifiedAt = modifiedAt ??
-           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+  }) : modifiedAt =
+           modifiedAt ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
        focusBlocks = (focusBlocks ?? technique.rounds).clamp(1, 12).toInt();
 
   final String id;
@@ -905,9 +905,11 @@ class StudyPlannerController extends ChangeNotifier {
     if (changed) {
       _knownContents
         ..clear()
-        ..addEntries(_sessions.map(
-          (entry) => MapEntry(entry.id, _contentSignature(entry)),
-        ));
+        ..addEntries(
+          _sessions.map(
+            (entry) => MapEntry(entry.id, _contentSignature(entry)),
+          ),
+        );
       _persist();
     }
   }
