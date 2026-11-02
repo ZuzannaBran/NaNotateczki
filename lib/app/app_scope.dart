@@ -65,6 +65,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   _BackupScheduler? _backupScheduler;
   Future<void>? _accountBootstrap;
   String? _bootstrappedAccount;
+  bool _databaseWasReset = false;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
   Future<void>? _exitDrain;
   bool _allowExit = false;
@@ -297,7 +298,20 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final future = () async {
       try {
         await _plannerReady;
-        final restored = await backup.hydrateFromLatestAccountBackup();
+        var restored = false;
+        Object? recoveryFailure;
+        try {
+          restored = await backup.hydrateFromLatestAccountBackup(
+            databaseWasReset: _databaseWasReset,
+          );
+        } catch (error, stackTrace) {
+          recoveryFailure = error;
+          AppErrorLog.instance.record(
+            error,
+            stackTrace,
+            source: 'AppScope.accountBackupRecovery',
+          );
+        }
         if (!mounted || session.userId != userId) {
           return;
         }
@@ -322,6 +336,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (!mounted || session.userId != userId) {
           return;
         }
+        if (recoveryFailure != null) {
+          // Keep live sync available but do not upload a potentially
+          // incomplete replacement snapshot. Retry recovery on resume.
+          sync.reportStartupFailure(recoveryFailure);
+          return;
+        }
+        _databaseWasReset = false;
         _bootstrappedAccount = userId;
         scheduler.enableForSignedInAccount();
         _observedIdleSeconds = scheduler.idleSeconds;
@@ -378,6 +399,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         }
 
         final result = snapshot.data!;
+        _databaseWasReset = result.wasReset || result.freshFile;
         final repository =
             _repository ??
             NotebookRepository(
