@@ -32,12 +32,75 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
 - Logowanie na urządzeniu jest zapamiętywane; jawny `Log out` usuwa token
   i wraca do wyboru trybu. Zmiana hasła i administracyjne unieważnienie sesji
   pozostają celowymi wyjątkami.
+- Przy pierwszym logowaniu z danych `localOnly` użytkownik wybiera
+  `Copy local data to account` albo `Keep local data separate`.
+  Do zakończenia decyzji nie wolno automatycznie uruchamiać merge,
+  live sync, backupu konta ani przywracania nad lokalną bazą.
+- `Keep local data separate`: konto ma odrębny profil danych,
+  a lokalne notatki, foldery, okładki, obrazy/PDF, planner, ustawienia,
+  recent colors i lokalny backup pozostają nietknięte; po przejściu
+  na `localOnly` wraca dokładnie jego stan sprzed logowania.
+- `Copy local data to account`: kopia jest bezstratna i idempotentna,
+  bez kasowania profilu lokalnego przed potwierdzeniem synchronizacji.
+  Konflikty **nazwy w tym samym folderze** otrzymują kolejne
+  wolne sufiksy `(1)`, `(2)` itd., niezależnie od UID; nazwy
+  innych folderów nie kolidują. Nie wolno nadpisać istniejącej notatki.
+
 - Bezczynność oznacza brak kliknięć, interakcji rysikiem, przewijania i
   pisania (również klawiaturą ekranową). Hover i zdarzenia z ukrytej karty
   nie są aktywnością. Backup po powrocie z tła nie zeruje licznika.
 - Backup automatyczny: 15 s / 30 s / 1 / 2 / 5 / 15 / 30 minut,
   domyślnie 30 s.
   Preferencje docelowo są jedną wersjonowaną polityką serwerową per konto.
+
+## Krytyczny etap: separacja lokalnego profilu od konta — NIEZAIMPLEMENTOWANY
+
+Ten etap należy wykonać **przed** uznaniem przejścia
+`localOnly` ↔ `account` za bezpieczne. Obecnie `AppScope` otwiera
+jedną `NotesDatabase.open()`, a `text_storage` ma wspólne klucze.
+`AccountSessionController._authenticate` ustawia konto zanim
+`_startAccountSync` zacznie `mergeSafely`. To nie daje pełnej izolacji.
+
+Wymagania implementacyjne:
+
+1. Zapisać dwie jawne przestrzenie danych: `local` i
+   `account/<stable userId>`. Oddzielić SQLite/IndexedDB, obrazy,
+   foldery, planner, recent, preferencje i historię backupu. Dane konta
+   nie mogą być odczytywane przez tryb lokalny ani odwrotnie.
+2. Zapisać migrację starej instalacji przed przełączeniem profilu
+   (atomowo lub z dziennikiem i możliwością rollback): snapshot lokalny
+   weryfikowany checksumą, stan `pending/committed`, nie usuwać źródła.
+3. Przy pierwszym zalogowaniu z lokalnej biblioteki wymusić wybór
+   `Copy local data to account` / `Keep local data separate`.
+   Rozwiązanie musi obsługiwać zarówno rejestrację, jak i login
+   do konta zawierającego już dokumenty. Decyzja jest trwała
+   dla danego powiązania i nie może pojawiać się przy każdym restarcie.
+4. Zatrzymać auto-start bootstrap, WebSocket, upload oraz automatyczny
+   remote backup do zakończenia wyboru i bezpiecznego przełączenia
+   repozytorium oraz podpiętych kontrolerów.
+5. `Keep local data separate`: zachować lokalne bazy i pliki bez zmian;
+   uruchomić dedykowaną przestrzeń konta i pobrać tylko jej stan z serwera.
+   Po wylogowaniu/przełączeniu na local przywrócić źródłową przestrzeń
+   lokalną bez mieszania danych; nowe konto nie czyta starych tokenów.
+6. `Copy local data to account`: import traktować jako nowe operacje
+   konta; przypisać bezkolizyjne UID/ID obiektów, skopiować assety
+   i metadane, zachować relacje plannerów oraz folderów. Nazwy w ramach
+   tej samej ścieżki folderu i tego samego typu dokumentu porównać
+   po normalizacji Unicode/casefold i wybrać pierwszy wolny suffix
+   `(1)`, `(2)` itd. Istniejący suffix także uwzględniać.
+   W innych folderach wolno zachować tę samą nazwę.
+7. Import ma być idempotentny: po awarii, przerwanym HTTP lub powrocie
+   do aplikacji nie może ponowić duplikatów. Oznaczyć źródło/operację,
+   potwierdzić jej rewizje na serwerze przed zamknięciem migracji,
+   zachować profil lokalny jako recovery aż do zweryfikowania.
+8. Wylogowanie z konta nie może wywołać importu lokalnych notatek do
+   konta ani usuwać lokalnych danych; restart po zmianie profilu ładuje
+   ten sam wcześniej wybrany magazyn.
+9. Testy regresyjne na Linux/Web/Android/iOS: pusty/pełny lokalny
+   profil, konto puste/pełne, identyczne nazwy w tym samym folderze,
+   różne foldery, pliki `Notatka (1)`, równoczesny inny klient,
+   duże obrazy, przerwanie migracji w połowie, brak miejsca, restart,
+   odmowa autoryzacji, odnowienie tokenu, powrót do local i ponowny login.
 
 ## Etapy i status
 
@@ -52,7 +115,7 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
    aktualnej rewizji, bez kopii `(1)`. Kolejny konflikt pozostawia
    operację w outboxie do ponowienia. Sprawdzić prawdziwe równoległe
    operacje i historię zdarzeń na PostgreSQL.
-3. **Trwała sesja i UI — poprawki i testy dopisane, CI niepotwierdzone.**
+3. **Trwała sesja i UI — częściowo, separacja local/account NIEUKOŃCZONA.**
    Dodano `Log out` i powrót do wyboru trybu po ponownym uruchomieniu;
    usunięto ikonę `Back up now`. Serwer domyślnie wydaje rotowane
    refresh tokeny na 3650 dni (stare wygasłe tokeny wymagają logowania).
@@ -166,6 +229,10 @@ jako zaliczonych bez wyniku `success`.
 ## Otwarte zadania — priorytet po stabilizacji CI
 
 ### P0 — bezpieczeństwo danych i poprawność
+- Wdrożyć izolację `localOnly`/konto i decyzję podczas pierwszego
+  logowania; do czasu wdrożenia obecne `mergeSafely` nie spełnia
+  wymagania separacji. Nie wypuszczać tej ścieżki na produkcję jako
+  bezpiecznego przełączania profilu.
 - Zweryfikować wszystkie wyniki aktualnego CI Fluttera, poprawić wykryte
   błędy analyzer/testów. Nowe commity anulują poprzedni workflow; dopiero
   pełny `success` na aktualnym SHA jest kryterium zamknięcia.
