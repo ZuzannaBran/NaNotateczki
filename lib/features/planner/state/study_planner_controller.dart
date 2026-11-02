@@ -880,7 +880,7 @@ class StudyPlannerController extends ChangeNotifier {
       final normalized = deleted
           ? null
           : StudySession.fromJson({
-              ...content as Map<String, dynamic>,
+              ...(content as Map<String, dynamic>),
               'modifiedAt': time.toIso8601String(),
             }).toJson();
       if (oldTime != null &&

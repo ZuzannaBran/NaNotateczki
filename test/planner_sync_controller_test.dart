@@ -70,14 +70,14 @@ void main() {
     final stale = Map<String, dynamic>.from(old);
     stale['modifiedAt'] = '2020-01-01T00:00:00Z';
     stale['entry'] = {
-      ...old['entry'] as Map<String, dynamic>,
+      ...(old['entry'] as Map<String, dynamic>),
       'title': 'Stale',
     };
     controller.applyRemoteRecords([stale]);
     expect(controller.sessions.single.title, 'Focus');
 
     final remoteEntry = {
-      ...old['entry'] as Map<String, dynamic>,
+      ...(old['entry'] as Map<String, dynamic>),
       'id': 'remote',
       'title': 'Remote focus',
     };
