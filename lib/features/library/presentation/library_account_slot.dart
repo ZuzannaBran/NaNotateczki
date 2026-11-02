@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/error/one_shot_error_notice.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
@@ -197,6 +198,9 @@ class _AccountDialog extends StatefulWidget {
 }
 
 class _AccountDialogState extends State<_AccountDialog> {
+  static final _serviceNotices = OneShotErrorNotice();
+  String? _newServiceError;
+
   final _signInFormKey = GlobalKey<FormState>();
   final _registerFormKey = GlobalKey<FormState>();
   final _localFormKey = GlobalKey<FormState>();
@@ -218,6 +222,11 @@ class _AccountDialogState extends State<_AccountDialog> {
   void initState() {
     super.initState();
     final session = context.read<AccountSessionController>();
+    _serviceNotices.acknowledge(session, session.error);
+    final backup = context.read<RemoteBackupScheduler>();
+    _serviceNotices.acknowledge(backup, backup.lastError);
+    final sync = context.read<LiveWebSyncService>();
+    _serviceNotices.acknowledge(sync, sync.lastError);
     _usernameController.text =
         session.lastAccountUsername ?? session.username ?? '';
     _localNameController.text = session.localDisplayName ?? '';
@@ -250,8 +259,21 @@ class _AccountDialogState extends State<_AccountDialog> {
     final session = context.watch<AccountSessionController>();
     final backup = context.watch<RemoteBackupScheduler>();
     final sync = context.watch<LiveWebSyncService>();
-    final error =
-        _actionError ?? session.error ?? backup.lastError ?? sync.lastError;
+    for (final (source, message) in <(Object, String?)>[
+      (session, session.error),
+      (backup, backup.lastError),
+      (sync, sync.lastError),
+    ]) {
+      if (_serviceNotices.shouldPresent(source, message)) {
+        _newServiceError = message;
+      }
+    }
+    if (session.error == null &&
+        backup.lastError == null &&
+        sync.lastError == null) {
+      _newServiceError = null;
+    }
+    final error = _actionError ?? _newServiceError;
     final canClose = !widget.startupRequired;
 
     final colors = Theme.of(context).colorScheme;
