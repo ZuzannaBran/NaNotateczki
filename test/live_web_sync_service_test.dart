@@ -417,7 +417,68 @@ void main() {
     },
   );
 
-  test('a later offline edit restores the original deleted UID', () async {
+  test('pending unchanged note obeys bootstrap tombstone', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final note = await repository.createNotebook(title: 'Removed elsewhere');
+    final base = (await repository.getNotebook(note.uid))!;
+    textStorageReadOverride = (key) async {
+      if (!key.startsWith('server_sync_state_')) {
+        return null;
+      }
+      return jsonEncode({
+        'version': 1,
+        'cursor': 1,
+        'revisions': {note.uid: 1},
+        'pending': [note.uid],
+        'bases': {note.uid: NotebookRepository.encodeNotebook(base)},
+      });
+    };
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response(
+            jsonEncode({
+              'cursor': 2,
+              'notebooks': [
+                {
+                  'uid': note.uid,
+                  'revision': 2,
+                  'deleted': true,
+                  'notebook': null,
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":2,"changes":[]}', 200);
+        }
+        fail('A tombstone must not trigger restore or a duplicate.');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'pending-unchanged-deletion';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+    await sync.start(InitialSyncPolicy.mergeSafely);
+    expect(sync.lastError, isNull);
+    expect(await repository.fetchNotebooks(), isEmpty);
+    expect(sync.hasPendingChanges, isFalse);
+  });
+
+  test('offline edit of deleted document becomes a conflict copy', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -495,8 +556,8 @@ void main() {
 
     final remaining = await repository.fetchNotebooks();
     expect(remaining, hasLength(1));
-    expect(remaining.single.uid, note.uid);
-    expect(remaining.single.title, 'Edited offline');
+    expect(remaining.single.uid, isNot(note.uid));
+    expect(remaining.single.title, 'Edited offline (1)');
     expect(sync.hasPendingChanges, isFalse);
   });
 

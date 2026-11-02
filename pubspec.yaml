@@ -35,6 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.9
   crypto: ^3.0.7
+  collection: ^1.19.1
   drift: ^2.34.0
   image_picker: ^1.1.2
   http: ^1.6.0

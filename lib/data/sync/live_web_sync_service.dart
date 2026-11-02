@@ -358,10 +358,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (record.deleted || record.notebook == null) {
         if (localNotebook != null) {
           if (_hasUnsentEdit(record.uid, localNotebook, previousBase)) {
-            final copy = await _conflictCopy(
-              localNotebook,
-              reserved: imports,
-            );
+            final copy = await _conflictCopy(localNotebook, reserved: imports);
             imports.add(copy);
             _queueConflictCopy(copy.uid);
           }
@@ -403,10 +400,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         }
       }
       if (_pending.contains(record.uid)) {
-        final copy = await _conflictCopy(
-          localNotebook,
-          reserved: imports,
-        );
+        final copy = await _conflictCopy(localNotebook, reserved: imports);
         imports.add(copy);
         _queueConflictCopy(copy.uid);
       }
@@ -996,6 +990,27 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Bound durable merge ancestors so Web localStorage cannot exhaust quota.
+  Map<String, Map<String, dynamic>> _basesForStorage() {
+    const byteLimit = 1024 * 1024;
+    const perNotebookLimit = 256 * 1024;
+    var usedBytes = 0;
+    final saved = <String, Map<String, dynamic>>{};
+    for (final uid in {..._pending, ..._bases.keys}) {
+      final base = _bases[uid];
+      if (base == null) {
+        continue;
+      }
+      final bytes = utf8.encode(jsonEncode(base)).length;
+      if (bytes > perNotebookLimit || usedBytes + bytes > byteLimit) {
+        continue;
+      }
+      saved[uid] = base;
+      usedBytes += bytes;
+    }
+    return saved;
+  }
+
   Future<void> _saveState() {
     final userId = _activeUserId;
     if (userId == null) {
@@ -1013,7 +1028,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           'version': 1,
           'cursor': _cursor,
           'revisions': _revisions,
-          'bases': _bases,
+          'bases': _basesForStorage(),
           'pending': _pending.toList()..sort(),
           'restorePending': _restorePending.toList()..sort(),
           'idempotencyKeys': _idempotencyKeys,

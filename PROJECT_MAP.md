@@ -445,7 +445,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   jego oczekujące operacje ścieżką serwerowego scalenia, zanim zastosuje
   feed, aby niezależne zmiany nie tworzyły kopii konfliktowej.
   Ostatnią bazę zatwierdzonego dokumentu zapisuje razem z rewizją,
-  aby móc scalać niezależne edycje także po restarcie.
+  aby móc scalać niezależne edycje także po restarcie; stan bazowy
+  jest limitowany do 1 MiB, a pojedynczy dokument do 256 KiB.
   `setSharedDocumentUid` wybiera natychmiastowy tryb sync dla active share;
   reentrancy nie gubi zmian podczas poprzedniego requestu. `restoreDeleted`
   po CAS tombstone ponawia oczekującą edycję pod oryginalnym UID.
