@@ -242,6 +242,7 @@ void main() {
     addTearDown(database.close);
     final repository = NotebookRepository(database);
     final note = await repository.createNotebook(title: 'Shared draft');
+    final persisted = (await repository.getNotebook(note.uid))!;
     var rejectUpdate = false;
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
@@ -255,7 +256,7 @@ void main() {
                   'uid': note.uid,
                   'revision': 1,
                   'deleted': false,
-                  'notebook': NotebookRepository.encodeNotebook(note),
+                  'notebook': NotebookRepository.encodeNotebook(persisted),
                 },
               ],
             }),
