@@ -404,15 +404,22 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
 - `lib/data/sync/account_settings_sync_service.dart` (aktualizowany):
   11: `AccountSettingsSyncService`; 34: `syncNow`; 164: `stop`.
-  `AccountSettingsSyncService.syncNow` odnawia wygasły access JWT i uzgadnia rewizje ustawień konta
-  (`appPreferences`, `editorPreferences`, `recentColors`,
-  `backupPreferences`). Zapisuje potwierdzone wartości per konto,
-  nie nadpisuje konfliktujących zmian, przechowuje lokalną kopię
-  sprzed pierwszego importu i normalizuje kolejność pól JSON.
+  `AccountSettingsSyncService.syncNow` odnawia wygasły access JWT
+  i uzgadnia rewizje konta: `appPreferences`, `editorPreferences`,
+  `recentColors`, `backupPreferences` oraz `libraryState`.
+  Biblioteka obsługuje CAS i ponowienie po 409 z trójstronnym
+  scalaniem folderów, okładek i zadań oraz zachowaniem lokalnych zmian
+  powstałych podczas uploadu. Pozostałe ustawienia nie nadpisują
+  automatycznie konfliktujących edycji. Zachowuje kopię sprzed importu.
   `AppScope` uruchamia odczyt po logowaniu, przy wznowieniu i co 45 s
   oraz wysyłkę po zmianie preferencji, recent i czasu backupu.
+- `lib/data/sync/library_state_merge.dart`: trójstronne porównanie
+  `libraryState` według ostatniej zatwierdzonej rewizji; zachowuje
+  niezależne dodatki, tombstones oraz numerowane konflikty zadań.
+- `test/library_state_merge_test.dart`: równoczesne edycje zadań,
+  usunięcia i niezależne zmiany folderów.
 - `test/account_settings_sync_service_test.dart`: dwa urządzenia,
-  wysyłka, odtworzenie, odrzucenie równoczesnego nadpisania.
+  retry access JWT i zabezpieczenie edycji lokalnej podczas żądania REST.
 - `lib/data/sync/live_web_sync_service.dart` (aktualizowany): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
@@ -2035,8 +2042,8 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `test/account_settings_sync_service_test.dart`: nowe scenariusze regresji.
 - `BACKUP_SYNC_ROADMAP.md`: kontrolna lista etapów ukończonych i pozostałych.
 - Serwer `migrations/0009_account_settings_library_state.sql` dodaje
-  brakującą kategorię `libraryState` do constraint; klient nie jest jeszcze
-  gotowy do pełnej synchronizacji tej kategorii.
+  brakującą kategorię `libraryState` do constraint; klient synchronizuje
+  tę kategorię przez CAS i wymaga jej wdrożenia na serwerze.
 - Serwer `api/app/routers/study_shares.py`: WebSocket subskrybuje sygnały
   zakończenia przed uwierzytelnieniem biletu, aby nie zgubić odwołania sesji.
   `api/tests/test_study_shares_flow.py`: test kolejności.
