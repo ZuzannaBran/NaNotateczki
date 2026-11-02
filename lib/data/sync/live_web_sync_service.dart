@@ -42,6 +42,8 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _socketSubscription;
   Future<void>? _activeSync;
+  bool _syncRequestedWhileRunning = false;
+  String? _sharedDocumentUid;
   Future<void>? _starting;
   bool _applyingRemote = false;
   bool _started = false;
@@ -65,6 +67,11 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   bool get isStarted => _started;
   bool get hasPendingChanges => _pending.isNotEmpty;
   int remoteApplyEpoch = 0;
+
+  /// Only an active shared document bypasses the normal sync debounce.
+  void setSharedDocumentUid(String? uid) {
+    _sharedDocumentUid = uid;
+  }
 
   Future<void> start(InitialSyncPolicy policy) {
     final running = _starting;
@@ -119,21 +126,27 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     if (!_started || _applyingRemote || !session.isSignedIn) {
       return;
     }
+    var sharedChange = false;
     for (final change in changes) {
       _pending.add(change.uid);
       _idempotencyKeys.putIfAbsent(change.uid, () => const Uuid().v4());
+      if (change.uid == _sharedDocumentUid) {
+        sharedChange = true;
+      }
     }
     unawaited(_saveState());
     _drainTimer?.cancel();
-    _drainTimer = Timer(const Duration(milliseconds: 90), () {
-      unawaited(syncNow());
-    });
+    _drainTimer = Timer(
+      sharedChange ? Duration.zero : const Duration(milliseconds: 90),
+      () => unawaited(syncNow()),
+    );
     notifyListeners();
   }
 
   Future<void> syncNow() {
     final running = _activeSync;
     if (running != null) {
+      _syncRequestedWhileRunning = true;
       return running;
     }
     final future = _syncNow();
@@ -217,10 +230,15 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _runSyncPass() async {
-    await _reconcileChanges();
-    for (final uid in _pending.toList()) {
-      await _push(uid);
-    }
+    do {
+      _syncRequestedWhileRunning = false;
+      await _reconcileChanges();
+      for (final uid in _pending.toList()) {
+        await _push(uid);
+      }
+      // A new stroke can be persisted while a previous request is in
+      // flight. Do not make it wait for the 45-second fallback poll.
+    } while (_syncRequestedWhileRunning && _started && session.isSignedIn);
   }
 
   Future<void> _applyInitialPolicy(
@@ -803,6 +821,8 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _activeUserId = null;
     _cursor = 0;
     _reconnectAttempt = 0;
+    _syncRequestedWhileRunning = false;
+    _sharedDocumentUid = null;
     _revisions.clear();
     _bases.clear();
     _pending.clear();
