@@ -69,6 +69,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   String? _bootstrappedAccount;
   bool _databaseWasReset = false;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
+  final ValueNotifier<String?> _exitFailure = ValueNotifier<String?>(null);
   Future<void>? _exitDrain;
   bool _allowExit = false;
   bool _openErrorRecorded = false;
@@ -124,6 +125,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       unawaited(backupService.dispose());
     }
     _finishingExit.dispose();
+    _exitFailure.dispose();
     super.dispose();
   }
 
@@ -162,6 +164,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       return;
     }
 
+    _exitFailure.value = null;
     _finishingExit.value = true;
     try {
       await InkActivityTracker.instance.waitForNoActiveContacts();
@@ -211,6 +214,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       }
 
       _allowExit = true;
+      _exitFailure.value = null;
       final response = await ServicesBinding.instance.exitApplication(
         ui.AppExitType.required,
       );
@@ -228,6 +232,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         source: 'AppScope.finishPendingWorkAndExit',
       );
       if (mounted) {
+        _exitFailure.value = 'Backup could not finish: $error';
         _finishingExit.value = false;
       }
     } finally {
@@ -663,6 +668,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                         onPointerSignal: (_) => _activityWake?.noteActivity(),
                         child: _ExitGuardOverlay(
                           finishingExit: _finishingExit,
+                          exitFailure: _exitFailure,
+                          onRetry: () {
+                            _exitDrain ??= _finishPendingWorkAndExit();
+                          },
                           child: child ?? const SizedBox.shrink(),
                         ),
                       ),
@@ -728,9 +737,16 @@ class AppUiScale extends StatelessWidget {
 }
 
 class _ExitGuardOverlay extends StatelessWidget {
-  const _ExitGuardOverlay({required this.finishingExit, required this.child});
+  const _ExitGuardOverlay({
+    required this.finishingExit,
+    required this.exitFailure,
+    required this.onRetry,
+    required this.child,
+  });
 
   final ValueListenable<bool> finishingExit;
+  final ValueListenable<String?> exitFailure;
+  final VoidCallback onRetry;
   final Widget child;
 
   @override
@@ -738,12 +754,41 @@ class _ExitGuardOverlay extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: finishingExit,
       builder: (context, isFinishingExit, _) {
-        return Stack(
-          children: [
-            child,
-            if (isFinishingExit)
-              const Positioned.fill(child: _FinishingExitOverlay()),
-          ],
+        return ValueListenableBuilder<String?>(
+          valueListenable: exitFailure,
+          builder: (context, failure, _) {
+            return Stack(
+              children: [
+                child,
+                if (isFinishingExit)
+                  const Positioned.fill(child: _FinishingExitOverlay())
+                else if (failure != null)
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: 24,
+                    child: Center(
+                      child: Card(
+                        elevation: 8,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(failure, textAlign: TextAlign.center),
+                              TextButton(
+                                onPressed: onRetry,
+                                child: const Text('Retry backup'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         );
       },
     );
