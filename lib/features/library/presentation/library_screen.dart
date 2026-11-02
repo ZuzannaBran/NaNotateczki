@@ -2128,9 +2128,7 @@ class _PersistentWorkspaceEditorState
           );
     return ChangeNotifierProvider<EditorController>.value(
       value: _editor,
-      child: widget.share != null &&
-              widget.shareService != null &&
-              kIsWeb
+      child: widget.share != null && widget.shareService != null && kIsWeb
           ? StudyShareCapture(
               share: widget.share!,
               service: widget.shareService!,
