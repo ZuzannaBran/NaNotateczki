@@ -149,6 +149,23 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     return uploadNow(manual: true);
   }
 
+  /// A normal exit is allowed only after a verified account snapshot.
+  Future<void> ensureVerifiedForExit() async {
+    if (!_enabled || !session.isSignedIn) {
+      throw StateError('Remote backup is unavailable for this account.');
+    }
+    for (var attempt = 0; attempt < 3; attempt++) {
+      await backupNow();
+      if (!_dirty && lastVerifiedBackup != null && lastError == null) {
+        return;
+      }
+      if (lastError != null) {
+        throw StateError('Remote backup failed: $lastError');
+      }
+    }
+    throw StateError('Remote backup could not be verified before exit.');
+  }
+
   Future<void> _uploadNow({required bool manual}) async {
     if (!_enabled || !session.isSignedIn || !_dirty || _uploading) {
       return;
