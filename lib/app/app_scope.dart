@@ -79,17 +79,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
     FrameTimingTracker.instance.initialize();
-    _rememberedLoginRetry = Timer.periodic(
-      const Duration(seconds: 45),
-      (_) {
-        if (_appIsForeground) {
-          final session = _accountSession;
-          if (session != null) {
-            unawaited(session.retryPersistedSession());
-          }
+    _rememberedLoginRetry = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (_appIsForeground) {
+        final session = _accountSession;
+        if (session != null) {
+          unawaited(session.retryPersistedSession());
         }
-      },
-    );
+      }
+    });
   }
 
   @override
