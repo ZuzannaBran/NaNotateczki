@@ -256,6 +256,13 @@ void main() {
       expect(backup.isEnabled, isFalse);
       backup.enableForSignedInAccount();
       await tester.pump();
+      final idleOptions = tester
+          .widget<DropdownButton<int>>(
+            find.byKey(const ValueKey('account-backup-idle')),
+          )
+          .items!
+          .map((item) => item.value);
+      expect(idleOptions, containsAll([30, 60, 120, 300, 900, 1800]));
       _expectAccountHeaderTypography(tester);
       _expectAccountDialogTypography(tester);
       final profileName = tester.widget<Text>(
