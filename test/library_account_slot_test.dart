@@ -425,6 +425,10 @@ void main() {
       await tester.pump();
       expect(session.isSignedIn, isTrue);
 
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('account-change-password')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('account-change-password')));
       await tester.pumpAndSettle();
       _expectAccountActionSpacing(
