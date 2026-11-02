@@ -27,16 +27,20 @@ Poniższa procedura wymaga dostępu administracyjnego użytkownika.
 Z katalogu NaNotateczki:
 
 ```bash
-flutter build web --release --dart-define=BACKEND_URL=https://api.nanotateczki.pl
+flutter build web --release --no-web-resources-cdn \
+  --dart-define=BACKEND_URL=https://api.nanotateczki.pl
 test -s build/web/index.html
 test -s build/web/main.dart.js
 test -s build/web/sqlite3.wasm
 test -s build/web/drift_worker.dart.js
 test -s build/web/_redirects
+test -s build/web/canvaskit/canvaskit.wasm
+test -s build/web/vendor/pdfjs/4.6.82/pdf.min.mjs
+test -s build/web/vendor/pdfjs/4.6.82/pdf.worker.min.mjs
 ```
 
 Publikowany katalog to **cała zawartość `build/web/`**, łącznie z
-`_redirects`, `assets/`, `canvaskit/`, plikami JS i WASM.
+`_redirects`, `assets/`, `canvaskit/`, `vendor/`, plikami JS i WASM.
 Nie publikuj źródeł `lib/` zamiast builda. Nie mieszaj pojedynczych plików
 z dwóch buildów. Aktualny `web/_redirects` jest kopiowany do builda:
 
@@ -46,6 +50,24 @@ z dwóch buildów. Aktualny `web/_redirects` jest kopiowany do builda:
 
 To wewnętrzny rewrite, nie przekierowanie 301/302 do `/`.
 Identyfikator sesji musi zostać w pasku adresu.
+
+`web/flutter_bootstrap.js` wymusza lokalny CanvasKit i inicjuje lokalny
+PDF.js wraz z workerem i mapami znaków przed startem Fluttera. Adresy
+uwzględniają `<base href>`, także przy wejściu bezpośrednio w `/share/UID`.
+Nie nadpisuj `_flutter.buildConfig` ręcznie: generuje go Flutter.
+Hosting musi zwracać pliki `.mjs` jako JavaScript, a `.wasm` jako
+`application/wasm`; odpowiedź HTML zamiast brakującego assetu jest błędem.
+
+Po buildzie wykonaj (Node 22+ i Chrome):
+
+```bash
+node .github/scripts/test_web_local_assets.mjs
+```
+
+Test uruchamia lokalny serwer i izolowany profil Chrome, blokuje gstatic
+i jsDelivr, sprawdza klatkę Fluttera, render PDF przez rzeczywisty worker
+oraz lokalną mapę znaków dla `/`, `/share/UID` i `/app/share/UID`.
+Nie łączy się z kontem ani nie zmienia danych produkcyjnych.
 
 ## 2. Zaktualizuj backend na HP
 

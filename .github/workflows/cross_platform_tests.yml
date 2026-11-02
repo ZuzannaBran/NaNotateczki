@@ -184,7 +184,14 @@ jobs:
       - name: Browser-compatible regressions
         run: flutter test --platform chrome test/cross_platform --reporter expanded
       - name: Compile complete web application
-        run: flutter build web --release
+        run: flutter build web --release --no-web-resources-cdn
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify built app and PDF rendering without external CDNs
+        env:
+          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
+        run: node .github/scripts/test_web_local_assets.mjs
       - name: Browser end-to-end bootstrap
         shell: bash
         run: |

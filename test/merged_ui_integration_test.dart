@@ -12,6 +12,7 @@ import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/core/input/touch_navigation_scroll_physics.dart';
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
+import 'package:program/core/theme/app_typography.dart';
 import 'package:program/core/widgets/app_header_divider.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -379,7 +380,7 @@ void main() {
           );
           expect(
             DefaultTextStyle.of(tester.element(label)).style.fontFamily,
-            'Georgia',
+            AppTypography.fontFamily,
           );
           await _snapshot(
             tester,

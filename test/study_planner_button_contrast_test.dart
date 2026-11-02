@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
+import 'package:program/core/theme/app_typography.dart';
 import 'package:program/features/planner/presentation/study_action_theme.dart';
 
 void main() {
@@ -49,7 +50,7 @@ void main() {
           DefaultTextStyle.of(
             tester.element(find.text(label)),
           ).style.fontFamily,
-          'Georgia',
+          AppTypography.fontFamily,
           reason: '$label must inherit the application typography',
         );
       }

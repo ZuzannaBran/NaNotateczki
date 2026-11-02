@@ -397,7 +397,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   oraz wysyłkę po zmianie preferencji, recent i czasu backupu.
 - `test/account_settings_sync_service_test.dart`: dwa urządzenia,
   wysyłka, odtworzenie, odrzucenie równoczesnego nadpisania.
-- `lib/data/sync/live_web_sync_service.dart` (780 linii): jawna polityka pierwszej
+- `lib/data/sync/live_web_sync_service.dart` (802 linie): jawna polityka pierwszej
   synchronizacji, trwały mały outbox/kursor, CAS, idempotencja, tombstones,
   kopie konfliktowe, pełne stronicowanie REST reconciliation i WebSocket
   tylko jako sygnał na wszystkich platformach; własny push nie przesuwa
@@ -409,12 +409,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Bazowy snapshot zachowuje dokładną odpowiedź serwera, bez normalizacji,
   ponieważ API weryfikuje go względem niezmiennej historii rewizji.
   Niezmieniona data utworzenia zachowuje oryginalny zapis bazy także w PUT.
-  18: `InitialSyncPolicy`; 20: `LiveWebSyncService`; 67: `start`;
+  19: `InitialSyncPolicy`; 21: `LiveWebSyncService`; 69: `start`;
   po reconnect i wznowieniu aplikacji REST uzupełnia utracone sygnały WebSocket;
   Przy odbiorze zmian gości najpierw opróżnia edytor właściciela i wysyła
   jego oczekujące operacje ścieżką serwerowego scalenia, zanim zastosuje
   feed, aby niezależne zmiany nie tworzyły kopii konfliktowej.
-  117: `enqueue`; 133: `syncNow`; 727: `stop`.
+  118: `enqueue`; 134: `syncNow`; 749: `stop`.
 - `lib/data/sync/notebook_conflicts.dart`: 6: `numberedNotebookCopy`
   zachowuje treść w tym samym folderze pod pierwszą wolną nazwą `(1)` itd.,
   nadając nowe UID dokumentu, stron, tekstów, obrazów i kresek.
@@ -1535,6 +1535,14 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
 - `web/drift_worker.dart` (5): źródło workera Drift. 3: `main`.
 - `web/drift_worker.dart.js`: skompilowany worker.
 - `web/sqlite3.wasm`: binarium SQLite dla web.
+- `web/flutter_bootstrap.js`: lokalny CanvasKit oraz PDF.js 4.6.82 z workerem
+  i kompletem map znaków w `web/vendor/pdfjs/`; adresy względem `base href`,
+  inicjalizacja globalnych opcji pdfx przed uruchomieniem Fluttera.
+- `test/web_runtime_assets_test.dart`: lokalne adresy startowe i kompletność
+  dystrybucji PDF.js weryfikowana sumami SHA-256.
+- `.github/scripts/test_web_local_assets.mjs`: gotowy build w izolowanym
+  Chrome, zablokowane CDN-y; klatka Fluttera, render PDF przez worker i mapa
+  znaków dla `/`, `/share/UID` oraz wdrożenia pod `/app/`; job web w CI.
 
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
@@ -1581,7 +1589,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   Sprawdza też osobne, nieruchome podpisy i obramowanie pól we wszystkich
   formularzach konta, również po wpisaniu tekstu. Dodatkowa regresja
   porównuje nagłówki paska i dialogów z timerem, opis statusu 12 px
-  oraz Georgia w obu motywach. Ręczna kontrola na Linux/web i w wąskim
+  oraz wspólny `AppTypography.fontFamily` w obu motywach. Ręczna kontrola na Linux/web i w wąskim
   sidebarze jest opisana w `docs/TEST_MATRIX.md`.
 - `test/account_session_controller_test.dart`: krótsze nowe hasła i logowanie
   istniejących kont, trwały profil lokalny bez sekretów, odtwarzanie sesji

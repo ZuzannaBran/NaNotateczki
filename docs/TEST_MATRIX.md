@@ -483,7 +483,8 @@ dart analyze
 flutter test test --coverage # Full local suite (export tests may be slower)
 flutter test --platform chrome test/cross_platform
 flutter test integration_test/app_smoke_test.dart -d linux
-flutter build web --release
+flutter build web --release --no-web-resources-cdn
+node .github/scripts/test_web_local_assets.mjs
 ```
 
 GitHub Actions: `.github/workflows/cross_platform_tests.yml`. A local Linux
@@ -491,6 +492,21 @@ integration run needs an active X display; headless CI uses `xvfb-run -a`.
 The browser end-to-end test needs ChromeDriver on port 4444, with the
 matching Chrome for Testing binary passed through `--chrome-binary`. Mobile native
 integration tests must run with an emulator, simulator or real device connected.
+
+The local-assets browser check requires Node 22+ and Chrome (`google-chrome`
+on PATH, or `CHROME_EXECUTABLE`). It tests the production build with gstatic
+and jsDelivr blocked, using a temporary browser profile and a local server.
+It verifies a Flutter frame, a PDF rendered by the bundled module worker,
+and a local packed CMap at `/`, a share deep link and a subpath deployment.
+`test/web_runtime_assets_test.dart` also verifies the vendor checksums in
+the regular Flutter suite.
+
+After deployment, repeat in a clean browser profile with DevTools request
+blocking for `*gstatic.com*` and `*cdn.jsdelivr.net*`: open `/`, then a real
+`/share/UID`, import a PDF (including one with CJK text), and verify pages,
+text and images. Confirm `.mjs`/`.wasm` assets return JavaScript/WASM rather
+than the SPA HTML fallback. This hosting check is manual; the local check
+does not certify the deployed Cloudflare configuration.
 
 ## Evidence requirements
 

@@ -121,14 +121,12 @@ class PlannerSyncService {
           !_modified(item.value).isAfter(_modified(onServer))) {
         continue;
       }
-      final response = await apiClient.putJson(
-        '/v1/planner/entries/${Uri.encodeComponent(item.key)}',
-        {
-          'modifiedAt': item.value['modifiedAt'],
-          'deleted': item.value['deleted'],
-          'entry': item.value['entry'],
-        },
-      );
+      final response = await apiClient
+          .putJson('/v1/planner/entries/${Uri.encodeComponent(item.key)}', {
+            'modifiedAt': item.value['modifiedAt'],
+            'deleted': item.value['deleted'],
+            'entry': item.value['entry'],
+          });
       if (_stopped || session.userId != user) {
         return;
       }

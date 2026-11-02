@@ -115,11 +115,11 @@ void main() {
     textStorageWriteOverride = null;
   });
 
-  test('account and timer typography share Georgia in both modes', () {
+  test('account and timer share application typography in both modes', () {
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {
-      expect(theme.textTheme.titleLarge?.fontFamily, 'Georgia');
-      expect(theme.textTheme.bodyMedium?.fontFamily, 'Georgia');
-      expect(theme.textTheme.bodySmall?.fontFamily, 'Georgia');
+      expect(theme.textTheme.titleLarge?.fontFamily, AppTypography.fontFamily);
+      expect(theme.textTheme.bodyMedium?.fontFamily, AppTypography.fontFamily);
+      expect(theme.textTheme.bodySmall?.fontFamily, AppTypography.fontFamily);
       expect(AppHeaderDivider.titleStyle.fontSize, AppTypography.heading);
       expect(AppHeaderDivider.titleStyle.fontWeight, FontWeight.w600);
     }

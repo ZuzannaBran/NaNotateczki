@@ -71,7 +71,7 @@ void main() {
       'SemiBoldItalic',
       'BoldItalic',
     ]) {
-      final asset = 'assets/fonts/Gelasio-${variant}.ttf';
+      final asset = 'assets/fonts/Gelasio-$variant.ttf';
       final bytes = await rootBundle.load(asset);
       expect(bytes.lengthInBytes, greaterThan(100000), reason: asset);
     }

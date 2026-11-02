@@ -524,8 +524,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           if (event is String) {
             try {
               final decoded = jsonDecode(event);
-              if (decoded is Map &&
-                  decoded['type'] == 'planner_changed') {
+              if (decoded is Map && decoded['type'] == 'planner_changed') {
                 final callback = onPlannerChanged;
                 if (callback != null) {
                   unawaited(callback());
@@ -567,10 +566,12 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _reconnectAttempt++;
     final seconds = (1 << _reconnectAttempt.clamp(0, 5)).clamp(2, 30);
     _reconnectTimer = Timer(Duration(seconds: seconds), () {
-      unawaited(_connectRealtime().then((_) async {
-        await syncNow();
-        await onPlannerChanged?.call();
-      }));
+      unawaited(
+        _connectRealtime().then((_) async {
+          await syncNow();
+          await onPlannerChanged?.call();
+        }),
+      );
     });
   }
 
