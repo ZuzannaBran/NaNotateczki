@@ -54,6 +54,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
     await tester.pump();
+    await scheduler.setIdleSeconds(60);
+    expect(scheduler.idleSeconds, 60);
     await scheduler.setIdleSeconds(30);
 
     final schedulingWatch = Stopwatch()..start();
