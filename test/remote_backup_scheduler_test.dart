@@ -12,6 +12,7 @@ import 'package:program/data/backup/remote_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/account_session_controller.dart';
 import 'package:program/data/sync/api_client.dart';
+import 'package:program/data/sync/notebook_conflicts.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 
 void main() {
@@ -216,9 +217,16 @@ void main() {
     expect(service.calls, 1);
     expect(scheduler.hasPendingBackup, isFalse);
 
+    final downloaded = numberedNotebookCopy(initial, [initial]);
+    expect(downloaded.uid, isNot(initial.uid));
+    expect(downloaded.pages.map((page) => page.id).toSet(),
+        isNot(contains(initial.pages.first.id)));
     await repository.importNotebooksAtomically([
-      initial.copyWith(uid: 'downloaded-from-device-a'),
+      downloaded,
     ], verifiedRemoteSync: true);
+    final imported = await repository.fetchNotebooks();
+    expect(imported.map((notebook) => notebook.uid).toSet(),
+        containsAll([initial.uid, downloaded.uid]));
     expect(scheduler.hasPendingBackup, isTrue);
     // No new user input: the downloaded change must upload after 30 seconds.
     now = now.add(const Duration(seconds: 31));
