@@ -268,9 +268,10 @@ class _AccountDialogState extends State<_AccountDialog> {
         _newServiceError = message;
       }
     }
-    if (session.error == null &&
-        backup.lastError == null &&
-        sync.lastError == null) {
+    if (_newServiceError != null &&
+        session.error != _newServiceError &&
+        backup.lastError != _newServiceError &&
+        sync.lastError != _newServiceError) {
       _newServiceError = null;
     }
     final error = _actionError ?? _newServiceError;
@@ -836,6 +837,7 @@ class _AccountDialogState extends State<_AccountDialog> {
     setState(() {
       _view = view;
       _actionError = null;
+      _newServiceError = null;
       _actionMessage = null;
     });
   }
@@ -1014,6 +1016,7 @@ class _AccountDialogState extends State<_AccountDialog> {
     setState(() {
       _isWorking = true;
       _actionError = null;
+      _newServiceError = null;
       _actionMessage = null;
     });
   }
