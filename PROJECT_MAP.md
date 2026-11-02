@@ -1890,7 +1890,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   Release wymaga prywatnego `android/key.properties` poza CI i jawnym trybem
   debug-signing; konfiguracja odrzuca niepełne klucze i brak keystore.
   Release uruchamia R8; nie wyłączaj shrinkingu dla całej aplikacji.
-- `.github/scripts/android_emulator_tests.sh`: czeka na `adb` i
+- `.github/scripts/android_emulator_tests.sh`: jedną komendą Flutter
+  uruchamia 3 scenariusze bez trzykrotnej kompilacji; czeka na `adb` i
   `sys.boot_completed`, następnie uruchamia obydwa testy integracyjne.
   Runner emulatora wywołuje pojedynczą komendę Bash, zamiast interpretować
   instrukcje pętli oddzielnie przez `/bin/sh`.
@@ -2012,6 +2013,8 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `server/api/app/routers/study_shares.py`: dostęp i zapisy gości
   tylko do jednego UID, sprawdzanie bazowych rewizji w historii serwera
   oraz ochrona przed wieloma sesjami tego samego dokumentu;
+  WebSocket gościa akceptuje natywny brak `Origin` wyłącznie z ważnym
+  ticketem, a obcy browser Origin nadal blokuje;
   mikrosekundowe pierwszeństwo i blokada po zakończeniu.
 - `server/api/app/routers/sync.py`: właściciel edytuje przez te same
   zasady scalania; dziennik zdarzeń otrzymuje scalony dokument. Usunięcie

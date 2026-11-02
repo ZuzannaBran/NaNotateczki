@@ -928,3 +928,29 @@ Testy automatyczne: `test/planner_sync_controller_test.dart`,
 `test/planner_sync_service_test.dart`,
 `server/api/tests/test_planner_sync.py`.
 Brak wyniku testu fizycznych urządzeń nie oznacza zaliczenia.
+
+## CI regression hardening — 2 November 2026
+
+- API sharing tests derive the allowed WebSocket/CORS origin from
+  `get_settings()` instead of an environment-specific test literal.
+  A native guest can connect without an `Origin` header only with a valid
+  share ticket. Browsers supplying a different `Origin` still receive 4403.
+- A no-body `DELETE` may omit `Content-Length`. An explicit chunked
+  request without `Content-Length` remains rejected with 411; it must not
+  revoke a session. Regression: `test_study_shares_flow.py`.
+- macOS Flutter SDK setup retries once after a transient download failure,
+  including the macOS desktop, iOS compilation and simulator jobs; both
+  failed attempts must still fail the job.
+- Android emulator CI compiles the debug APK before booting the virtual
+  device and runs the three integration suites in one Flutter invocation.
+  This reduces Gradle pressure while the emulator is running.
+
+Validation without GitHub Actions: in `server/`, run
+`python -m pytest -q api/tests/test_study_shares_flow.py`; on a machine with
+Flutter SDK, run `flutter test integration_test -d <device>` with
+`--dart-define=NANOTATECZKI_ISOLATED_CI=true`. Confirm on a real native
+device that a ticket-authenticated guest receives changes after an
+Origin-less WebSocket connection and that a browser with foreign Origin
+cannot subscribe. The macOS SDK download and runner shutdown are external
+infrastructure failures; rerun on the actual hosted runners is required
+before calling their outcome verified.
