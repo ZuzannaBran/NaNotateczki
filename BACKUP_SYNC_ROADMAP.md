@@ -264,6 +264,74 @@ jako zaliczonych bez wyniku `success`.
   snapshotów; przywrócenie z najnowszego poprawnego backupu i starszego
   fallbacku, w tym uszkodzone pliki, brak miejsca i wielkie archiwa.
 
+### P0 — wybór przy logowaniu: co zrobić z danymi lokalnymi
+
+**NIEZAIMPLEMENTOWANE — blokuje uznanie przejścia Local → Account za bezpieczne.**
+Dziś `AppScope` otwiera jedną `notes.sqlite` (Web: jedną IndexedDB),
+a `AccountSessionController` zmienia tylko stan uwierzytelnienia.
+`library_folders.json`, `study_planner.json`, ustawienia i zasoby
+obrazów także nie mają izolacji według trybu. Obecny automatyczny
+`mergeSafely` po zalogowaniu może więc wysłać dane z Local bez wyboru;
+`Switch to local` nie przywraca niezależnego magazynu. Nie należy udawać,
+że zmiana samego formularza zapewnia izolację.
+
+**Docelowy dialog po pomyślnym uwierzytelnieniu, PRZED sync i backupem:**
+- `Add local data to this account`: jawne skopiowanie całej biblioteki
+  Local (notatniki/strony/obrazy, foldery/podfoldery, okładki, zadania,
+  kalendarz, Study Sessions), bez usuwania źródłowej biblioteki;
+  nie wolno nadpisać danych konta ani wysłać częściowo przeniesionej bazy.
+- `Keep local data separate`: Local pozostaje nienaruszone i niewidoczne
+  w koncie. Synchronizacja/backup konta operują WYŁĄCZNIE na koncie.
+  Powrót do Local pokazuje dokładnie zachowany stan Local.
+  Wybór i stan migracji zapamiętać per konto/instalacja; nie pytać
+  ponownie przy każdym odnowieniu tokenu.
+
+**Warstwa danych i migracja:**
+1. Zrobić osobne magazyny dla Local i konta: nazwy plików SQLite oraz
+   IndexedDB muszą być izolowane; analogicznie `library_folders`,
+   `study_planner`, preferencje, Recent, obrazy/asset-y, eksporty
+   robocze, backupy i outboxy. Nie wystarczy filtrować widoku po UID.
+   Lokalny tryb nie może wysyłać nic do API.
+2. Pierwotną `notes.sqlite` i istniejące pliki migrować atomowo
+   do właściwego magazynu na podstawie trwałego `boundUserId`.
+   **Starsze urządzenia już przypisane do konta nie mogą być
+   bezwarunkowo potraktowane jako Local.** Przed migracją zweryfikować
+   kopię, zapisać dziennik `pending/committed` i zapewnić recovery
+   po crashu między kopiowaniem a przełączeniem aktywnego workspace.
+3. Rozdzielić przełączenie aktywnego magazynu od samego uwierzytelnienia.
+   `AppScope` musi zamknąć stare kontrolery, opróżnić kolejki zapisu,
+   otworzyć właściwą bazę i odświeżyć Provider-y bez przeciekania stanu.
+   Zmiana trybu nie może być ukrytym `Log out`; jawne wylogowanie usuwa
+   token, a powrót do Local jest odrębnym wyborem workspace.
+4. Transfer do konta wykonywać jako **copy**, nie move. Utworzyć trwały
+   checkpoint importu i mapowanie źródłowy UID → docelowy UID, żeby
+   ponowienie po przerwaniu nie duplikowało notatników ani mediów.
+   Potwierdzenie następuje dopiero po pełnym sync i verified backup.
+   Błąd pozostawia Local bez zmian, a konto w stanie bezpiecznym
+   do wznowienia. Rozważyć limit 64 MiB backupu.
+5. Kolizje nazw w **tym samym folderze**: zachować istniejący dokument
+   konta, a przenoszony nazwać `Nazwa (1)`, potem `Nazwa (2)` itd.,
+   wybierając pierwszy wolny numer (uwzględnić istniejące sufiksy,
+   wielkość liter, spacje i równoczesny import). Kolizja UID z inną
+   treścią wymaga nowego UID i nowych ID stron/obiektów/assetów;
+   identyczny, już przetworzony import nie tworzy kolejnej kopii.
+   Nazwy folderów/podfolderów oraz odniesienia zadań i okładek
+   scalać bez łamania ścieżek, a nie spłaszczać hierarchii.
+6. Po zalogowaniu do kolejnego konta zabezpieczyć prywatność: żadnego
+   wysłania danych z poprzedniego konta, bez pomylenia cache,
+   outboxów, markerów czy obrazów.
+
+**Wymagane regresje:** lokalny dokument `X` + konto z `X`
+→ na koncie `X` i `X (1)`, Local ma nadal `X`; powtórzenie
+transferu nie daje `X (2)`. Istniejące `X (1)` i `X (3)`
+→ użyć pierwszego wolnego `X (2)`. Odizolowanie → konto widzi
+tylko dane konta, powrót Local bez Internetu pokazuje dokładnie
+pierwotne dane. Testy: obrazy, duże notatniki, podfoldery, zadania,
+wydarzenia, cofanie, restart po każdej fazie migracji, zanik miejsca,
+dwie karty Web, logout/login i dwie równoległe próby przeniesienia.
+Przetestować Linux/Web/Android/iOS i starszą instalację przypisaną
+już do konta.
+
 ### P2 — cykl życia i komfort
 - Worker Android/iOS i ograniczenia Web; na Web nie można zagwarantować
   uploadu przy zamknięciu karty. Przetestować exit spinner, Retry,
