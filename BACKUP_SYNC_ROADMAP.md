@@ -12,16 +12,31 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
   może wskrzeszać usuniętych danych.
 - Niepotwierdzone edycje offline są zachowywane. Kopię `(1)` tworzymy tylko
   dla rzeczywistego konfliktu edycji, a nie zwykłego usunięcia.
+- Konflikt usunięcie–edycja: klient potwierdza tombstone przed ponowieniem
+  rzeczywiście oczekującej edycji. Serwer akceptuje ją przez jawne
+  `restoreDeleted` i CAS nowej rewizji, zachowując oryginalny UID. Kolejność
+  przyjęcia przez serwer jest decydująca; zegar urządzenia ani backup
+  nie mogą samodzielnie wskrzeszać dokumentu. Jeżeli nie ma edycji,
+  usunięcie obowiązuje wszędzie. Późniejszy DELETE wymaga nowej rewizji.
 - Współdzielona sesja jest osobnym mechanizmem: goście edytują *oryginał*
   u hosta pod jego UID i folderem, bez tworzenia kopii `(1)` przy scalaniu
   niezależnych obiektów. Po zakończeniu brak dostępu gości.
+- W shared session każda lokalnie zapisana operacja (kreska, tekst,
+  gumka, przesunięcie) musi wywoływać natychmiastowe wysłanie rewizji,
+  bez cyklicznego 2-sekundowego odpytywania. WebSocket powiadamia pozostałych.
+- Host i każdy gość utrzymują niezależny viewport, zoom, scroll,
+  aktywną stronę, fokus i zaznaczenie. Odbiór nowych danych nie może
+  odmontowywać lokalnego edytora ani zmieniać widoku innego uczestnika.
+- Stare błędy nie pojawiają się ponownie przy otwarciu ustawień.
+  Nowy incydent pokazać raz; historię zachować w logach diagnostycznych.
 - Logowanie na urządzeniu jest zapamiętywane; jawny `Log out` usuwa token
   i wraca do wyboru trybu. Zmiana hasła i administracyjne unieważnienie sesji
   pozostają celowymi wyjątkami.
 - Bezczynność oznacza brak kliknięć, interakcji rysikiem, przewijania i
   pisania (również klawiaturą ekranową). Hover i zdarzenia z ukrytej karty
   nie są aktywnością. Backup po powrocie z tła nie zeruje licznika.
-- Backup automatyczny: 30 s / 1 / 2 / 5 / 15 / 30 minut, domyślnie 2 min.
+- Backup automatyczny: 15 s / 30 s / 1 / 2 / 5 / 15 / 30 minut,
+  domyślnie 30 s.
   Preferencje docelowo są jedną wersjonowaną polityką serwerową per konto.
 
 ## Etapy i status
@@ -63,16 +78,25 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
    Potrzebne trójstronne uzgadnianie niezależnych ustawień, idempotencja
    po 409 oraz jedna wersjonowana polityka backend + lokalny cache.
    Klient odnawia obecnie wygasły access JWT przed ponownym sync ustawień.
-8. **Harmonogram, tło i retencja — NIEUKOŃCZONE.**
-   Platformy różnie ograniczają tło; natywny worker + wznowienie i kolejka
-   są potrzebne. Dodać atomową retencję snapshotów, kontrolę miejsca,
-   czyszczenie nieukończonych uploadów, limit wielkości i weryfikację restore.
-9. **Współdzielone sesje — audyt częściowy, CI niepotwierdzony.**
+8. **Harmonogram, tło i retencja — CZĘŚCIOWO.**
+   Dodano 15 s oraz nowy domyślny interwał 30 s (API i UI). Przy normalnym
+   zamknięciu zalogowanej aplikacji natywny exit guard blokuje wyjście do
+   zakończenia zweryfikowanego backupu i pokazuje spinner + Retry.
+   Przy `detached` i Web `hidden` podejmowana jest próba awaryjna.
+   Zabicie procesu i zamknięcie karty nie gwarantują wykonania HTTP;
+   zaległe dane muszą być ponawiane po uruchomieniu. Nadal potrzebne są:
+   natywny worker, atomowa retencja snapshotów, kontrola miejsca,
+   czyszczenie niedokończonych uploadów i testy restore.
+9. **Współdzielone sesje — poprawki płynności i viewportu, CI w trakcie.**
    Naprawiono wyścig rejestracji zdarzenia `ended` przed autoryzacją
    WebSocket i dodano test. Pozostają rzeczywiste testy host + dwóch gości
    na dwóch przeglądarkach, przerywanie sieci, równoczesne operacje na
    tym samym obiekcie, wznowienie, przedłużenie, wygaśnięcie i odwołanie.
    Niezależnych obiektów nie wolno scalać przez kopie konfliktowe.
+   Dodano natychmiastowy drain po lokalnym zapisie i w trakcie lotu innych
+   requestów. Gość i host aktualizują strony w istniejącym kontrolerze
+   zamiast resetować viewport. Pozostają pomiary latencji na dwóch
+   przeglądarkach i weryfikacja zmian podczas aktywnego gestu.
 10. **Testy końcowe i wdrożenie — NIEUKOŃCZONE.**
     Python API + prawdziwy PostgreSQL, Flutter na Linux/Web/Android/iOS,
     minimum 2 urządzenia, restart i usunięcie lokalnej bazy, awaria serwera
@@ -103,3 +127,22 @@ jako zaliczonych bez wyniku `success`.
   karta i powrót; backup nie blokuje interfejsu i nie gubi zmian w trakcie.
 - Gość A + gość B + host edytują równocześnie jeden dokument; stan u hosta
   jest scalony i gość traci dostęp natychmiast po `End session`.
+
+## Dodatkowe scenariusze edge-case
+
+- A usuwa, B nie edytuje: oba urządzenia usuwają; stary backup nie przywraca.
+- A usuwa, B ma niezapisany draft: po wysłaniu i potwierdzeniu tombstone
+  serwer przyjmuje świadomy retry; ten sam UID i folder wracają wszystkim.
+- B edytuje i zapis zostaje przyjęty przed A DELETE: późniejszy DELETE po
+  odczytaniu nowej rewizji usuwa dokument, bez automatycznego odtworzenia.
+- A i B równocześnie usuwają/edytują: CAS 409 + maksymalnie jedna próba
+  rekonsyliacji; przy kolejnych konfliktach operacja pozostaje w outboxie,
+  z czytelnym statusem zamiast utraty danych.
+- Host i dwóch gości: niezależna strona, zoom, przewinięcie i zaznaczenie,
+  podczas gdy każda zakończona edycja jest natychmiast transmitowana.
+- Zamknięcie online z aktywnym kontem: overlay do zweryfikowanego uploadu;
+  brak Internetu: pozostaje w aplikacji i przycisk Retry.
+- Utrata procesu lub Web przed `finalize`: brak gwarancji uploadu;
+  po ponownym starcie kolejka wywołuje retry, nie usuwa sprawnej kopii.
+- Ten sam błąd synchronizacji zgłoszony wiele razy: jednorazowy komunikat,
+  rearm po poprawnym zakończeniu operacji i nowym błędzie.
