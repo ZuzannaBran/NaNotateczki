@@ -546,6 +546,7 @@ class _AccountDialogState extends State<_AccountDialog> {
                         }
                       },
                 items: const [
+                  DropdownMenuItem(value: 15, child: Text('15 sec')),
                   DropdownMenuItem(value: 30, child: Text('30 sec')),
                   DropdownMenuItem(value: 60, child: Text('1 min')),
                   DropdownMenuItem(value: 120, child: Text('2 min')),
