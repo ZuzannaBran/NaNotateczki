@@ -128,6 +128,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   }
 
   bool get _hasPendingExitWork {
+    // Signed-in devices must attempt a verified remote snapshot on exit,
+    // even when the local save queue is currently empty.
+    if (_accountSession?.isSignedIn == true) {
+      return true;
+    }
     final repository = _repository;
     final backupService = _backupService;
     final scheduler = _backupScheduler;
@@ -176,6 +181,35 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       await scheduler.flushForExit();
       await backupService.waitUntilIdle();
 
+      if (_accountSession?.isSignedIn == true) {
+        final remote = _remoteBackupScheduler;
+        if (remote == null) {
+          throw StateError('Remote backup is not available.');
+        }
+        if (!remote.isEnabled) {
+          remote.enableForSignedInAccount();
+        }
+        // First publish local changes; then snapshot the final state.
+        await _liveSync?.syncNow();
+        if (_liveSync?.hasPendingChanges == true) {
+          throw StateError('Account changes are still awaiting sync.');
+        }
+        for (var attempt = 0; attempt < 3; attempt++) {
+          await remote.backupNow();
+          if (!remote.hasPendingBackup &&
+              remote.lastVerifiedBackup != null &&
+              remote.lastError == null) {
+            break;
+          }
+          if (remote.lastError != null) {
+            throw StateError('Remote backup failed: ${remote.lastError}');
+          }
+        }
+        if (remote.hasPendingBackup || remote.lastVerifiedBackup == null) {
+          throw StateError('Remote backup could not be verified before exit.');
+        }
+      }
+
       _allowExit = true;
       final response = await ServicesBinding.instance.exitApplication(
         ui.AppExitType.required,
@@ -220,6 +254,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appIsForeground = state == AppLifecycleState.resumed;
     _activityWake?.setForeground(_appIsForeground);
+    if (state == AppLifecycleState.detached ||
+        (kIsWeb && state == AppLifecycleState.hidden)) {
+      // A best-effort emergency backup: operating systems and browsers may
+      // kill the process before network I/O completes.
+      unawaited(_attemptEmergencyBackup());
+    }
     if (_appIsForeground) {
       final session = _accountSession;
       if (session != null) {
@@ -228,6 +268,27 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       unawaited(_startAccountSync());
       unawaited(_syncAccountSettings());
       unawaited(_syncPlanner());
+    }
+  }
+
+  Future<void> _attemptEmergencyBackup() async {
+    final remote = _remoteBackupScheduler;
+    if (_accountSession?.isSignedIn != true ||
+        remote == null ||
+        !remote.isEnabled ||
+        !remote.hasPendingBackup) {
+      return;
+    }
+    try {
+      await AppSaveCoordinator.instance.flushPending();
+      await _repository?.waitForPendingSaves();
+      await remote.backupNow();
+    } catch (error, stackTrace) {
+      AppErrorLog.instance.record(
+        error,
+        stackTrace,
+        source: 'AppScope.emergencyBackup',
+      );
     }
   }
 
