@@ -38,10 +38,7 @@ void main() {
     );
     addTearDown(editor.dispose);
     editor.setCurrentPage(1);
-    editor.setViewTransform(
-      pan: const Offset(83, -47),
-      scale: 1.6,
-    );
+    editor.setViewTransform(pan: const Offset(83, -47), scale: 1.6);
     final remote = notebook.copyWith(
       title: 'Updated by participant B',
       pages: [
