@@ -2047,6 +2047,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `server/migrations/0007_account_settings.sql`: izolowany per konto
   magazyn preferencji, kontrola CAS i powiadomienie WebSocket;
   stan portowany również do repozytorium `NaNotateczki-serwer`.
+- `server/api/app/main.py`: 3 MiB na żądania `libraryState` zgodnie z
+  produkcyjnym API; `server/api/app/settings.py`: długoterminowy refresh
+  konta (3650 dni), test w `server/api/tests/test_security.py`.
 - `server/api/app/routers/realtime.py`: weryfikuje `Origin` w
   przeglądarce, dopuszcza brak `Origin` w kliencie natywnym;
   JWT pozostaje obowiązkowy. Regresja:

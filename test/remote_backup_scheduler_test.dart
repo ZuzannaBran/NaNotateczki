@@ -206,7 +206,12 @@ void main() {
       reconciliations++;
     };
     await scheduler.uploadNow();
-    expect(service.calls, 1);
+    expect(scheduler.lastError, isNull);
+    expect(
+      service.calls,
+      1,
+      reason: 'Upload failed before reaching the service: ${scheduler.lastError}',
+    );
     expect(scheduler.hasPendingBackup, isFalse);
 
     await repository.importNotebooksAtomically([
