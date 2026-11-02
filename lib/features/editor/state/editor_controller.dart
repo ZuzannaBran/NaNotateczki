@@ -98,7 +98,7 @@ class EditorController extends ChangeNotifier {
 
   final NotebookRepository repository;
   Notebook notebook;
-  final Duration saveDebounce;
+  Duration saveDebounce;
   final Uuid _uuid = const Uuid();
   final ImagePicker _imagePicker = ImagePicker();
 
