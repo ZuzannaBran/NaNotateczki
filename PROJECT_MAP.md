@@ -367,6 +367,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
   Domyślny adres dla wszystkich platform to `https://api.nanotateczki.pl`;
   `BACKEND_URL` może go nadpisać w buildach lokalnych/testowych.
+- `lib/data/sync/app_activity_wake_service.dart`: wysyła bez danych
+  użytkownika nieautoryzowany GET /health przy starcie trybu konta, a potem
+  najwyżej raz na 30 minut pod warunkiem kolejnej aktywności myszki,
+  dotyku, rysika, przewijania lub klawiatury. Nie działa w localOnly,
+  nie używa timera, nie blokuje UI; błędy sieci są ignorowane.
+- `test/app_activity_wake_service_test.dart`: throttling, inactive/localOnly
+  oraz żądanie bez tokenu.
 - `lib/data/sync/diagnostics_upload_service.dart`: podczas zalogowanej sesji nasłuchuje trzech lokalnych logów i przesyła aktualny snapshot po 12 s bezczynności; błędy ponawia po 5 min, nie blokuje aplikacji; jeden trwały UUID urządzenia.
 - `lib/data/sync/account_credential_store.dart`: `AccountCredentialStore`
   pozwala w testach używać pamięci; implementacja

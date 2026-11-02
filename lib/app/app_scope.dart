@@ -21,6 +21,7 @@ import '../data/drift/notes_database.dart';
 import '../data/sync/account_session_controller.dart';
 import '../data/sync/account_settings_sync_service.dart';
 import '../data/sync/api_client.dart';
+import '../data/sync/app_activity_wake_service.dart';
 import '../data/sync/cloud_sync_service.dart';
 import '../data/sync/diagnostics_upload_service.dart';
 import '../data/sync/live_web_sync_service.dart';
@@ -45,6 +46,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   LocalBackupService? _backupService;
   CloudSyncService? _cloudSync;
   ApiClient? _apiClient;
+  AppActivityWakeService? _activityWake;
   AccountSessionController? _accountSession;
   RemoteBackupService? _remoteBackupService;
   RemoteBackupScheduler? _remoteBackupScheduler;
@@ -72,12 +74,15 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
     FrameTimingTracker.instance.initialize();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
+    _activityWake?.dispose();
     _settingsPoll?.cancel();
     _settingsDebounce?.cancel();
     _plannerDebounce?.cancel();
@@ -186,8 +191,23 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
   }
 
+  bool _handleGlobalKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      _activityWake?.noteActivity();
+    }
+    return false;
+  }
+
+  void _updateActivityWakePermission(AccountSessionController session) {
+    _activityWake?.setEnabled(
+      session.profileLoaded &&
+          session.preferredMode == AccountDataMode.account,
+    );
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _activityWake?.setForeground(state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
       unawaited(_startAccountSync());
       unawaited(_syncAccountSettings());
@@ -376,6 +396,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _cloudSync = cloudSync;
         final apiClient = _apiClient ?? ApiClient();
         _apiClient = apiClient;
+        _activityWake ??= AppActivityWakeService(apiClient: apiClient);
         final newAccountSession = _accountSession == null;
         final accountSession =
             _accountSession ?? AccountSessionController(apiClient);
@@ -455,6 +476,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             remoteBackupScheduler.markDirty,
           );
           accountSession.addListener(() {
+            _updateActivityWakePermission(accountSession);
             if (accountSession.isSignedIn && !accountSession.isBusy) {
               unawaited(_startAccountSync());
             } else if (!accountSession.isSignedIn) {
@@ -469,6 +491,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           unawaited(
             accountSession.loadProfile().then((_) {
               if (mounted) {
+                _updateActivityWakePermission(accountSession);
                 return _startAccountSync();
               }
             }),
@@ -513,9 +536,16 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                         : AppTheme.light(accentColor: preferences.accentColor),
                     child: AppUiScale(
                       scale: preferences.uiScale,
-                      child: _ExitGuardOverlay(
-                        finishingExit: _finishingExit,
-                        child: child ?? const SizedBox.shrink(),
+                      child: Listener(
+                        behavior: HitTestBehavior.translucent,
+                        onPointerDown: (_) => _activityWake?.noteActivity(),
+                        onPointerMove: (_) => _activityWake?.noteActivity(),
+                        onPointerHover: (_) => _activityWake?.noteActivity(),
+                        onPointerSignal: (_) => _activityWake?.noteActivity(),
+                        child: _ExitGuardOverlay(
+                          finishingExit: _finishingExit,
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   );
