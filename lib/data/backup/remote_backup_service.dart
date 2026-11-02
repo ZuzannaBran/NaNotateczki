@@ -229,14 +229,36 @@ class RemoteBackupService {
     // The sync journal, including tombstones, takes precedence over backup.
     // Replaying a snapshot after a deletion would resurrect old documents.
     if (recoveredNotebooks.isNotEmpty) {
-      final bootstrap = _jsonObject(
-        (await apiClient.get('/v1/sync/bootstrap')).decodeJson(),
-      );
-      final records = bootstrap['notebooks'];
-      final cursor = bootstrap['cursor'];
-      if (records is! List<dynamic> || cursor is! num) {
-        throw const FormatException('Malformed sync bootstrap response.');
-      }
+      // Recoveries must inspect every tombstone, not only the first page.
+      final records = <dynamic>[];
+      String? after;
+      do {
+        final bootstrapResponse = await apiClient.request(
+          'GET',
+          '/v1/sync/bootstrap',
+          query: after == null ? null : {'after': after},
+          maxResponseBytes: 32 * 1024 * 1024,
+        );
+        final bootstrap = _jsonObject(bootstrapResponse.decodeJson());
+        final batch = bootstrap['notebooks'];
+        final cursor = bootstrap['cursor'];
+        if (batch is! List<dynamic> || cursor is! num) {
+          throw const FormatException('Malformed sync bootstrap response.');
+        }
+        final next = bootstrap['next'];
+        if (next != null &&
+            (next is! String ||
+                next.isEmpty ||
+                batch.isEmpty ||
+                (after != null && next.compareTo(after) <= 0))) {
+          throw const FormatException('Invalid recovery bootstrap cursor.');
+        }
+        records.addAll(batch);
+        if (session.userId != userId || !session.isSignedIn) {
+          return false;
+        }
+        after = next as String?;
+      } while (after != null);
       // An empty historic feed may have compacted tombstones; never replay it.
       if (records.isNotEmpty || cursor == 0) {
         final authoritative = {
