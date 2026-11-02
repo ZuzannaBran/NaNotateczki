@@ -35,7 +35,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, int> _revisions = <String, int>{};
   final Map<String, Map<String, dynamic>> _bases = {};
   final Set<String> _pending = <String>{};
-  final Set<String> _preStartPending = <String>{};
+
   Future<void> _offlineQueueTail = Future<void>.value();
   final Map<String, String> _idempotencyKeys = <String, String>{};
   final Set<String> _restorePending = <String>{};
@@ -105,7 +105,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _activeUserId = userId;
     await _offlineQueueTail;
     await _loadState(userId);
-    _pending.addAll(_preStartPending);
     final bootstrap = await _getJsonObject('/v1/sync/bootstrap');
     final rawRecords = bootstrap['notebooks'];
     final cursor = bootstrap['cursor'];
@@ -121,7 +120,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _started = true;
     await _offlineQueueTail;
     await _saveState();
-    _preStartPending.clear();
     await syncNow();
     if (enableRealtime) {
       unawaited(_connectRealtime());
@@ -142,8 +140,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (userId == null) {
         return;
       }
-      _preStartPending.addAll(incoming);
-      _pending.addAll(incoming);
       unawaited(_persistPreStartChanges(userId, incoming));
       return;
     }
@@ -896,7 +892,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     await _activeSync;
     await _offlineQueueTail;
     _resetAccountState();
-    _preStartPending.clear();
     notifyListeners();
   }
 

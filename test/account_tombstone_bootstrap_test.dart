@@ -196,4 +196,53 @@ void main() {
       expect(state['version'], 1);
     },
   );
+  test('a pre-start offline outbox never crosses account boundaries', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response('{"cursor":0,"notebooks":[]}', 200);
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":0,"changes":[]}', 200);
+        }
+        fail('An offline change from another account was sent to the API.');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-A';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+
+    sync.enqueue([const NotebookRepositoryChange.full('A-only-document')]);
+    session.userId = 'account-B';
+    await sync.start(InitialSyncPolicy.mergeSafely);
+    expect(sync.hasPendingChanges, isFalse);
+
+    final suffixA = sha256
+        .convert(utf8.encode('account-A'))
+        .toString()
+        .substring(0, 16);
+    final suffixB = sha256
+        .convert(utf8.encode('account-B'))
+        .toString()
+        .substring(0, 16);
+    expect(stored['server_sync_state_$suffixA.json'], contains('A-only-document'));
+    expect(stored['server_sync_state_$suffixB.json'], isNot(contains('A-only-document')));
+  });
+
 }
