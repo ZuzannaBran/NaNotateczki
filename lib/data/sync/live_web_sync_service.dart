@@ -250,15 +250,22 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (record.deleted || record.notebook == null) {
         final localNotebook = localByUid[record.uid];
         if (localNotebook != null) {
-          final preserved = await _conflictCopy(
-            localNotebook,
-            reserved: imports,
-          );
-          imports.add(preserved);
-          _pending.add(preserved.uid);
-          _idempotencyKeys[preserved.uid] = const Uuid().v4();
+          // A confirmed remote deletion is not itself a content conflict.
+          // Preserve a numbered copy only for unfinished offline edits.
+          if (_pending.contains(record.uid)) {
+            final preserved = await _conflictCopy(
+              localNotebook,
+              reserved: imports,
+            );
+            imports.add(preserved);
+            _pending.add(preserved.uid);
+            _idempotencyKeys[preserved.uid] = const Uuid().v4();
+          }
           remoteDeletes.add(record.uid);
         }
+        _pending.remove(record.uid);
+        _idempotencyKeys.remove(record.uid);
+        _bases.remove(record.uid);
         continue;
       }
       final localNotebook = localByUid[record.uid];
@@ -387,7 +394,25 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       if (record.notebook != null) {
         _bases[uid] = record.baseNotebook!;
       }
-      if (!record.deleted && record.notebook != null) {
+      if (record.deleted) {
+        _bases.remove(uid);
+        if (notebook != null) {
+          // The server deleted this UID while our edit was pending. Keep
+          // the unsynced draft as a separate recoverable document.
+          final preserved = await _conflictCopy(notebook);
+          await _applyRemoteImports([preserved]);
+          _pending.add(preserved.uid);
+          _idempotencyKeys[preserved.uid] = const Uuid().v4();
+          _applyingRemote = true;
+          try {
+            await repository.deleteNotebook(uid);
+          } finally {
+            _applyingRemote = false;
+          }
+          remoteApplyEpoch++;
+          await onRemoteApplied?.call();
+        }
+      } else if (record.notebook != null) {
         await _applyRemoteImports([record.notebook!], preserveLocalUids: {uid});
       }
       _pending.remove(uid);
@@ -419,6 +444,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       }
       final imports = <String, Notebook>{};
       final preserveLocal = <String>{};
+      var removedRemote = false;
       for (final raw in rawChanges) {
         final record = _decodeRemoteRecord(raw);
         final ownRevision = _revisions[record.uid] ?? 0;
@@ -426,23 +452,32 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           continue;
         }
         final local = await repository.getNotebook(record.uid);
-        if (_pending.contains(record.uid) && local != null) {
-          if (record.notebook != null) {
-            imports[record.uid] = record.notebook!;
-            preserveLocal.add(record.uid);
-          }
-          _pending.remove(record.uid);
-          _idempotencyKeys.remove(record.uid);
-        } else if (record.deleted) {
+        if (record.deleted) {
           imports.remove(record.uid);
           if (local != null) {
+            if (_pending.contains(record.uid)) {
+              final preserved = await _conflictCopy(local);
+              imports[preserved.uid] = preserved;
+              _pending.add(preserved.uid);
+              _idempotencyKeys[preserved.uid] = const Uuid().v4();
+            }
             _applyingRemote = true;
             try {
               await repository.deleteNotebook(record.uid);
             } finally {
               _applyingRemote = false;
             }
+            removedRemote = true;
           }
+          _pending.remove(record.uid);
+          _idempotencyKeys.remove(record.uid);
+        } else if (_pending.contains(record.uid) && local != null) {
+          if (record.notebook != null) {
+            imports[record.uid] = record.notebook!;
+            preserveLocal.add(record.uid);
+          }
+          _pending.remove(record.uid);
+          _idempotencyKeys.remove(record.uid);
         } else if (record.notebook != null) {
           imports[record.uid] = record.notebook!;
         }
@@ -458,6 +493,10 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           imports.values.toList(),
           preserveLocalUids: preserveLocal,
         );
+      }
+      if (removedRemote) {
+        remoteApplyEpoch++;
+        await onRemoteApplied?.call();
       }
       _cursor = latestCursor.toInt();
       if (rawChanges.length < 500) {
