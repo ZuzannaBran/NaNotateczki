@@ -137,6 +137,48 @@ void main() {
     await database.close();
   });
 
+  testWidgets('normal account exit requires a verified remote snapshot', (
+    tester,
+  ) async {
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) async => http.Response('', 500)),
+    );
+    final database = NotesDatabase(NativeDatabase.memory());
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'exit-account';
+    final service = _TrackingService(
+      repository: NotebookRepository(database),
+      apiClient: client,
+      session: session,
+    );
+    final scheduler = RemoteBackupScheduler(service: service, session: session);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    scheduler.enableForSignedInAccount();
+    expect(scheduler.hasPendingBackup, isTrue);
+
+    await scheduler.ensureVerifiedForExit();
+    expect(service.calls, 1);
+    expect(scheduler.hasPendingBackup, isFalse);
+    expect(scheduler.lastVerifiedBackup, isNotNull);
+
+    scheduler.markDirty();
+    service.failure = StateError('Network offline');
+    await expectLater(
+      scheduler.ensureVerifiedForExit(),
+      throwsStateError,
+    );
+    expect(scheduler.hasPendingBackup, isTrue);
+    expect(scheduler.lastError, contains('Network offline'));
+
+    await scheduler.stop();
+    scheduler.dispose();
+    session.dispose();
+    client.close();
+    await database.close();
+  });
+
   testWidgets('upload pending on network does not block UI frames', (
     tester,
   ) async {
@@ -184,6 +226,7 @@ class _TrackingService extends RemoteBackupService {
 
   int calls = 0;
   Completer<RemoteBackupReceipt>? pending;
+  Object? failure;
   static final receipt = RemoteBackupReceipt(
     backupId: 'backup-test',
     checksum: 'sha256',
@@ -195,6 +238,9 @@ class _TrackingService extends RemoteBackupService {
     required String deviceId,
   }) async {
     calls++;
+    if (failure != null) {
+      throw failure!;
+    }
     return pending?.future ?? receipt;
   }
 }
