@@ -294,7 +294,7 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
   2116: `_createPageBackupPayload`; 2521: `_BackupPageReference`.
 - 2407: `BackupSnapshotReport`.
 
-### `lib/data/backup/remote_backup_service.dart` (523 linie)
+### `lib/data/backup/remote_backup_service.dart` (539 linii)
 
 Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
 zadania, planer, ustawienia, Recent i preferencję backupu; liczy SHA-256,
@@ -312,8 +312,8 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
   Nie nadpisuje istniejących preferencji ani historii planera. Każdy start
   konta sprawdza i weryfikuje najnowszy verified backup, także po wcześniejszym
   odzyskaniu danych. Znacznik backupId zapobiega dublowaniu kopii konfliktowych
-  podczas ponownego przetwarzania tego samego snapshotu; pusta biblioteka
-  może zostać odzyskana ponownie.
+  podczas ponownego przetwarzania tego samego snapshotu. Oczekujące offline
+  usunięcia z outboxu mają pierwszeństwo nad snapshotem.
 
 - `lib/data/backup/backup_payload_bytes.dart`: 6: `backupPayloadBytes`
   wycina oryginalne UTF-8 payloadu z już poprawnego JSON, bez zmiany
