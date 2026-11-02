@@ -53,6 +53,8 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
   int _revision = 0;
   Timer? _pollTimer;
   Timer? _pushTimer;
+  Timer? _remoteRetryTimer;
+  SharedStudyDocument? _deferredRemote;
   bool _suppressChanges = false;
   bool _dirty = false;
   bool _sending = false;
@@ -386,15 +388,13 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
   }
 
   Future<void> _installRemote(SharedStudyDocument snapshot) async {
-    if (_repository == null || _dirty || !mounted) {
-      return;
-    }
-    await _editor?.flushPendingSaves();
-    if (_dirty || !mounted) {
+    if (_repository == null || !mounted || _closed) {
       return;
     }
     final editor = _editor;
-    if (editor == null || !editor.canApplyConfirmedRemoteNotebook) {
+    if (_dirty || editor == null ||
+        !editor.canApplyConfirmedRemoteNotebook) {
+      _deferRemote(snapshot);
       return;
     }
     _suppressChanges = true;
@@ -409,8 +409,11 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       // The editor owns the guest's page, pan and zoom. Refresh the pages
       // without disposing it or remounting the board/notebook viewport.
       if (!editor.applyConfirmedRemoteNotebook(updated)) {
+        _deferRemote(snapshot);
         return;
       }
+      _deferredRemote = null;
+      _remoteRetryTimer?.cancel();
       _base = snapshot.notebook;
       _revision = snapshot.revision;
       setState(() {
@@ -420,6 +423,23 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     } finally {
       _suppressChanges = false;
     }
+  }
+
+  void _deferRemote(SharedStudyDocument snapshot) {
+    if (_closed || !mounted) {
+      return;
+    }
+    final pending = _deferredRemote;
+    if (pending == null || snapshot.revision >= pending.revision) {
+      _deferredRemote = snapshot;
+    }
+    _remoteRetryTimer?.cancel();
+    _remoteRetryTimer = Timer(const Duration(milliseconds: 150), () {
+      final latest = _deferredRemote;
+      if (latest != null && mounted && !_closed) {
+        unawaited(_installRemote(latest));
+      }
+    });
   }
 
   @override
@@ -435,6 +455,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     _closed = true;
     _pushTimer?.cancel();
     _pollTimer?.cancel();
+    _remoteRetryTimer?.cancel();
     final editor = _editor;
     final database = _database;
     final repository = _repository;
