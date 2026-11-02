@@ -314,3 +314,20 @@ przekraczającej limit magazynu lub wykonanej podczas nagłego zakończenia
 procesu przed zakończeniem zapisu. Przed włączeniem produkcyjnym wymagane są testy Flutter,
 FastAPI, PostgreSQL, równoczesna edycja w dwóch przeglądarkach oraz testy
 odzyskiwania i latencji. Na serwerze wymagane są migracje 0004, 0005 i 0006.
+
+
+## Calendar i Study Sessions: per-entry sync
+
+`study_planner.json` v2 przechowuje `modifiedAt` w UTC, dane wpisów
+i nieusuwalne znaczniki `tombstones`. Stary format v1 jest odczytywany;
+brak timestampu oznacza znacznik epoch, a nie fikcyjną nową edycję.
+Po zalogowaniu, lokalnej zmianie, wznowieniu i co 45 sekund klient pobiera
+stronicowany stan `GET /v1/planner/entries` i wysyła nowsze lokalne wpisy
+do `PUT /v1/planner/entries/{id}`; WebSocket `planner_changed`
+wywołuje natychmiastowe uzgodnienie. Usunięcia są trwałymi tombstones.
+W obrębie jednego ID wygrywa późniejszy znacznik modyfikacji, osobne ID
+scalają się niezależnie. Zegar odliczający sesji nie generuje zapisu
+w każdej sekundzie, tylko przy zmianach stanu. Po błędzie połączenia wpisy
+pozostają w pliku i są ponawiane. Przy zmianach offline na dwóch urządzeniach
+kolejność zależy od poprawnego ustawienia zegara UTC obu systemów.
+Wymagana migracja PostgreSQL: `0008_planner_entries.sql`.

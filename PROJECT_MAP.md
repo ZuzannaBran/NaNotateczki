@@ -2024,3 +2024,19 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - Uwaga: outbox zapisuje ostatni niepotwierdzony snapshot per link;
   testy środowiskowe i wdrożenie nadal wymagają wykonania.
   Nie usuwać oznaczenia WIP.
+
+
+## Synchronizacja kalendarza między urządzeniami
+
+- `lib/features/planner/state/study_planner_controller.dart`:
+  `StudySession.modifiedAt`, `syncRecords`, `applyRemoteRecords`,
+  trwałe `tombstones` i zapis v2.
+- `lib/data/sync/planner_sync_service.dart`: stronicowane pobieranie,
+  scalanie per ID według UTC i zapis nowszych lokalnych zmian.
+- `lib/app/app_scope.dart`: inicjalizacja, listener zapisu, wznowienie
+  i okresowe uzgadnianie; `live_web_sync_service.dart`: `planner_changed`.
+- `test/planner_sync_controller_test.dart`: przypadki offline,
+  ponownego uruchomienia i rozstrzygania konfliktów.
+- `server/api/app/routers/planner.py`,
+  `server/migrations/0008_planner_entries.sql`: osobne rekordy,
+  właściciel konta, trwałe usunięcia, powiadomienia WebSocket.
