@@ -234,7 +234,7 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
    Starszy wariant checksumy kompaktowego JSON pozostaje obsługiwany.
 5. Błąd nie usuwa wcześniejszego poprawnego snapshotu. Scheduler ponawia próbę
    nie wcześniej niż po 5 minutach. Zmieniony snapshot wysyła po ustalonym
-   okresie bezczynności (domyślnie 2 minuty; opcje: 30 s, 1 min,
+   okresie bezczynności (domyślnie 30 sekund; opcje: 15 s, 30 s, 1 min,
    2 min, 5 min, 15 min i 30 min); aktywne kliknięcia, przewijanie, rysik i pisanie (także edytor Quill
    z klawiaturą ekranową) przesuwają termin. Hover, otrzymane aktualizacje
    serwera i zdarzenia z ukrytej karty nie resetują licznika. Wznowienie
@@ -279,8 +279,12 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
   Bazowy snapshot pozostaje identyczny z odpowiedzią serwera. Jeśli data
   utworzenia się nie zmienia, PUT zachowuje jej oryginalny zapis, aby
   nie naruszyć ochrony niezmiennych metadanych współdzielonego dokumentu.
-- Feed jest stronicowany po 500 zdarzeń; klient pobiera wszystkie pełne
-  strony, zanim zacznie wysyłać lokalny outbox.
+- Feed zmian jest stronicowany maksymalnie po 5 zdarzeń i 8 MiB (pojedynczy
+  dokument może przekroczyć miękki limit strony). Odpowiedź zawiera
+  `hasMore`, a klient pobiera wszystkie strony. Bootstrap jest także
+  stronicowany przez `next` (UID), żeby nie wczytywać całego konta jedną
+  odpowiedzią. Odtwarzanie backupu pobiera komplet stron, w tym tombstones,
+  przed rozstrzygnięciem o importowaniu starego dokumentu.
 
 ## Synchronizacja preferencji konta
 
