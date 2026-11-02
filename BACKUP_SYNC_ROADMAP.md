@@ -46,9 +46,12 @@ Stan: 2026-11-02. Gałąź aplikacji: `dev`, serwera: `main`.
    `libraryState` bez edycji zastosowanej migracji `0007`; dodano test.
    Przed wdrożeniem wykonać pełny backup i `scripts/apply-migrations.sh`.
 2. **Usunięcia notatników — poprawki i testy dopisane, CI niepotwierdzone.**
-   Bootstrap usuwa potwierdzone tombstones bez kopii; niezapisany draft
-   zachowuje jako `(1)`, także przy odpowiedzi HTTP 409. Sprawdzić
-   rzeczywiste równoległe operacje i historię zmian na serwerze.
+   Bootstrap usuwa potwierdzone tombstones bez kopii, jeżeli nie ma
+   oczekującej lokalnej edycji. Prawdziwy oczekujący draft po konflikcie
+   próbuje przywrócić ten sam UID przez `restoreDeleted` z CAS
+   aktualnej rewizji, bez kopii `(1)`. Kolejny konflikt pozostawia
+   operację w outboxie do ponowienia. Sprawdzić prawdziwe równoległe
+   operacje i historię zdarzeń na PostgreSQL.
 3. **Trwała sesja i UI — poprawki i testy dopisane, CI niepotwierdzone.**
    Dodano `Log out` i powrót do wyboru trybu po ponownym uruchomieniu;
    usunięto ikonę `Back up now`. Serwer domyślnie wydaje rotowane
@@ -122,7 +125,8 @@ jako zaliczonych bez wyniku `success`.
 
 - A tworzy/edytuje/usuwa notatnik i folder, B widzi to bez restartu.
 - A usuwa, B jest offline i nie zmienia dokumentu: brak kopii `(1)`.
-- A usuwa, B offline edytuje: usunięty oryginał + jedna zachowana kopia.
+- A usuwa, B offline edytuje: po przyjęciu późniejszej edycji
+  ten sam UID zostaje przywrócony wszystkim; brak dodatkowej kopii.
 - A usuwa zadanie lub wydarzenie, B nie przywraca go ze starego backupu.
 - Oba urządzenia zmieniają ten sam folder/zadanie/preferencję jednocześnie.
 - Świeża instalacja i utrata samej SQLite bez utraty markerów backupu.
@@ -158,3 +162,45 @@ jako zaliczonych bez wyniku `success`.
 - A ma lokalnie czysty stan, ale pobranie zmian API nie działa:
   nie wysyła kopii, która mogłaby być starsza od danych na B;
   zachowuje retry i błędy diagnostyczne.
+
+## Otwarte zadania — priorytet po stabilizacji CI
+
+### P0 — bezpieczeństwo danych i poprawność
+- Zweryfikować wszystkie wyniki aktualnego CI Fluttera, poprawić wykryte
+  błędy analyzer/testów. Nowe commity anulują poprzedni workflow; dopiero
+  pełny `success` na aktualnym SHA jest kryterium zamknięcia.
+- Wyjaśnić brak logów oraz `failure` osobnego CI serwera i uruchomić testy
+  na rzeczywistym PostgreSQL, szczególnie migrację 0009 i unikalność rewizji.
+- Testy A/B: edycja po delete, delete po edycji, dwa DELETE równocześnie,
+  edycja offline przed bootstrapem, restart podczas requestu 409,
+  wielu klientów przywracających ten sam UID, brak połączenia z siecią.
+- Przed produkcyjnym wdrożeniem wykonać backup PostgreSQL i sprawdzić restore.
+  Wdrożyć migracje i API przed zaktualizowanymi klientami; zmierzyć zgodność
+  `restoreDeleted` ze starszymi wersjami klienta.
+
+### P1 — współdzielona edycja
+- E2E host + dwóch gości, osobne przeglądarki i niezależne viewporty:
+  zoom, przewijanie, strona, zaznaczenie, edycja Quill i active stroke.
+- Potwierdzić czas dostarczania każdego zatwierdzonego gestu WebSocket;
+  sprawdzić dwie operacje w trakcie jednego uploadu, powrót po rozłączeniu,
+  expiry, Extend, End, delete hosta, osierocony WebSocket i powtórne eventy.
+- Sprawdzić scalanie obiektowe (ink, tekst, obrazy, gumka, move) pod
+  równoległymi zapisami oraz zapis w oryginalnym folderze bez duplikatu.
+
+### P1 — synchronizacja konta i backup
+- Doprowadzić CAS i trójstronne uzgadnianie ustawień, folderów, podfolderów,
+  okładek i zadań do końca; zweryfikować zmianę po stronie B, gdy A jest
+  bierne albo karta A jest ukryta.
+- Dokończyć `BackupPolicy v2`: pojedynczy serwerowy dokument per konto,
+  migracja starych preferencji i offline cache na wszystkich platformach.
+- Zapewnić retry durable po awarii/przerwaniu uploadu i deduplikację
+  snapshotów; przywrócenie z najnowszego poprawnego backupu i starszego
+  fallbacku, w tym uszkodzone pliki, brak miejsca i wielkie archiwa.
+
+### P2 — cykl życia i komfort
+- Worker Android/iOS i ograniczenia Web; na Web nie można zagwarantować
+  uploadu przy zamknięciu karty. Przetestować exit spinner, Retry,
+  zamknięcie offline, wymuszone zabicie procesu i restart.
+- Retencja, limit miejsca, sprzątanie pending uploadów i monitoring backendu.
+- Kontrola jednorazowych komunikatów błędów we wszystkich ekranach;
+  logi diagnostyczne zachowują historię, lecz GUI nie powtarza starego toastu.
