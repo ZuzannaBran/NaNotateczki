@@ -880,3 +880,35 @@ the unit suite and require a configured test server.
 - Bezpośrednie wejście na /share/UUID z nowej karty i po odświeżeniu:
   SQLite WASM musi być pobrany z /sqlite3.wasm (Content-Type application/wasm),
   bez prób pobierania z /share/sqlite3.wasm.
+
+
+## Ręczna weryfikacja Calendar/Study Sessions, gdy CI nie jest uruchamiane
+
+Wymagane: serwer po migracji `0008_planner_entries.sql`, aktualne
+buildy na Linux, Web, Android i iOS oraz dwa zalogowane urządzenia
+na tym samym koncie. Wszystkie operacje sprawdzaj bez odświeżania,
+następnie po pełnym restarcie i utracie/zyskaniu Internetu.
+
+1. Linux tworzy wydarzenie; Web i Android mają zobaczyć tę samą datę,
+   godzinę i kolor. Edycja Web zmienia Linux i iOS, bez duplikatów.
+2. Usuń wydarzenie na iOS. Po reconnect i ponownym zalogowaniu
+   nie może odtworzyć się na żadnym urządzeniu ani ze starego backupu.
+3. Zasymuluj offline na Linux i Web, edytuj ten sam wpis dwa razy
+   z innymi `modifiedAt`. Po połączeniu wygrywa faktycznie późniejsza
+   zmiana; weryfikuj poprawne zegary UTC obu systemów.
+4. Dwie niezależne edycje różnych wydarzeń muszą przetrwać obie.
+5. Uruchom, wstrzymaj, wznowij, zakończ i oceń Study Session.
+   Pozostałe urządzenia powinny otrzymać ten sam stan i wynik.
+6. Zapełnij konto ponad 200 wydarzeniami i sprawdź pełne stronicowanie.
+7. Wyloguj i zaloguj to samo konto; sprawdź kontynuację synchronizacji
+   po awarii sieci i usunięciu wpisu przy zamkniętym drugim urządzeniu.
+8. Porównaj wydarzenia całodniowe i terminy godzinowe na urządzeniach
+   w dwóch różnych strefach czasowych. Zwróć uwagę na lokalną datę.
+9. Zaloguj inne konto w osobnym profilu; wpisy nie mogą być widoczne.
+10. Upewnij się, że niedostępność endpointu planera nie blokuje
+    synchronizacji notatników ani backupów.
+
+Testy automatyczne: `test/planner_sync_controller_test.dart`,
+`test/planner_sync_service_test.dart`,
+`server/api/tests/test_planner_sync.py`.
+Brak wyniku testu fizycznych urządzeń nie oznacza zaliczenia.

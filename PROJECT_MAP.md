@@ -2040,3 +2040,6 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `server/api/app/routers/planner.py`,
   `server/migrations/0008_planner_entries.sql`: osobne rekordy,
   właściciel konta, trwałe usunięcia, powiadomienia WebSocket.
+
+- `test/planner_sync_service_test.dart`: dwie instalacje i wspólny backend,
+  dodanie, edycja, usunięcie oraz rozstrzygnięcie zmian offline.

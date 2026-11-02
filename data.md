@@ -220,10 +220,10 @@ i co 45 sekund. Brak nowego endpointu na starej wersji serwera
 nie może blokować synchronizacji notatników ani tworzenia backupu.
 Serwer wymaga migracji `0007_account_settings.sql`.
 
-Foldery, zadania i historia planera są nadal częścią zweryfikowanych
-snapshotów urządzeń, a nie tego oddzielnego feedu preferencji.
-Ich odzyskanie na nowym urządzeniu nie oznacza jeszcze
-synchronizacji zmian na żywo między wszystkimi aktywnymi urządzeniami.
+Foldery, zadania i historia planera pozostają w zweryfikowanych
+snapshotach urządzeń, a nie w feedzie preferencji. Wydarzenia i sesje
+planera mają dodatkowo własny feed synchronizacji wpisów (opis poniżej).
+Foldery i zadania nadal nie mają pełnej synchronizacji na żywo.
 
 ## Zabezpieczenia
 
