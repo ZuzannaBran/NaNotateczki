@@ -302,6 +302,16 @@ void main() {
       expect(restarted.shouldShowStartupDialog, isFalse);
       expect(restarted.displayName, 'test_user');
       expect(credentials.value, contains('refresh'));
+
+      // Coming online must restore the same device session without login UI.
+      offline = false;
+      await Future.wait([
+        restarted.retryPersistedSession(),
+        restarted.retryPersistedSession(),
+      ]);
+      expect(restarted.isSignedIn, isTrue);
+      expect(restarted.shouldShowStartupDialog, isFalse);
+      expect(credentials.value, contains('refresh'));
       initial.dispose();
       restarted.dispose();
       client.close();
