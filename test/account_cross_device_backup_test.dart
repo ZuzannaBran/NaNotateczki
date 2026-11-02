@@ -159,9 +159,7 @@ void main() {
       // This is different from deliberately deleting a document offline.
       await repo2.deleteNotebook(notebook.uid);
       expect(
-        await recovery.hydrateFromLatestAccountBackup(
-          databaseWasReset: true,
-        ),
+        await recovery.hydrateFromLatestAccountBackup(databaseWasReset: true),
         isTrue,
       );
       expect((await repo2.fetchNotebooks()).single.uid, notebook.uid);
@@ -207,9 +205,7 @@ void main() {
     },
   );
 
-  test(
-    'falls back to older verified backup if newest is corrupt',
-    () async {
+  test('falls back to older verified backup if newest is corrupt', () async {
     final stored = <String, String>{};
     textStorageReadOverride = (key) async => stored[key];
     textStorageWriteOverride = (key, value) async => stored[key] = value;
@@ -228,31 +224,36 @@ void main() {
       'appPreferences': <String, dynamic>{'darkMode': true},
     };
     final payloadHash = sha256.convert(utf8.encode(jsonEncode(payload)));
-    final bytes = utf8.encode(jsonEncode({
-      'format': 'nanotateczki-server-backup',
-      'version': 2,
-      'deviceId': deviceId,
-      'checksumAlgorithm': 'sha256',
-      'checksum': payloadHash.toString(),
-      'payload': payload,
-    }));
+    final bytes = utf8.encode(
+      jsonEncode({
+        'format': 'nanotateczki-server-backup',
+        'version': 2,
+        'deviceId': deviceId,
+        'checksumAlgorithm': 'sha256',
+        'checksum': payloadHash.toString(),
+        'payload': payload,
+      }),
+    );
     final hash = sha256.convert(bytes).toString();
     final downloaded = <String>[];
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
         if (request.url.path == '/v1/backups') {
-          return http.Response(jsonEncode({
-            'backups': [
-              for (final id in [brokenId, validId])
-                {
-                  'backupId': id,
-                  'deviceId': deviceId,
-                  'sha256': hash,
-                  'sizeBytes': bytes.length,
-                },
-            ],
-          }), 200);
+          return http.Response(
+            jsonEncode({
+              'backups': [
+                for (final id in [brokenId, validId])
+                  {
+                    'backupId': id,
+                    'deviceId': deviceId,
+                    'sha256': hash,
+                    'sizeBytes': bytes.length,
+                  },
+              ],
+            }),
+            200,
+          );
         }
         if (request.url.path.endsWith('/download')) {
           final id = request.url.pathSegments[2];
