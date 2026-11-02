@@ -432,6 +432,7 @@ void main() {
         'cursor': 1,
         'revisions': {note.uid: 1},
         'pending': [note.uid],
+        'restorePending': [note.uid],
         'bases': {note.uid: NotebookRepository.encodeNotebook(base)},
       });
     };

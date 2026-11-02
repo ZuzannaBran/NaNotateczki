@@ -39,7 +39,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _offlineQueueTail = Future<void>.value();
   final Map<String, String> _idempotencyKeys = <String, String>{};
-  final Set<String> _restorePending = <String>{};
   Timer? _drainTimer;
   Timer? _reconnectTimer;
   Timer? _fallbackTimer;
@@ -365,7 +364,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           remoteDeletes.add(record.uid);
         }
         _pending.remove(record.uid);
-        _restorePending.remove(record.uid);
         _idempotencyKeys.remove(record.uid);
         _bases.remove(record.uid);
         continue;
@@ -474,7 +472,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
               {
                 'expectedRevision': expectedRevision,
                 'notebook': encodedNotebook,
-                if (_restorePending.contains(uid)) 'restoreDeleted': true,
                 if (_bases[uid] case final Map<String, dynamic> base)
                   'baseNotebook': base,
               },
@@ -482,7 +479,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
             );
       final result = _requireJsonObject(response.decodeJson());
       _revisions[uid] = (result['revision'] as num).toInt();
-      _restorePending.remove(uid);
       if (result['notebook'] case final Map<String, dynamic> merged) {
         _bases[uid] = merged;
       } else if (notebook != null) {
@@ -536,7 +532,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           remoteApplyEpoch++;
           await onRemoteApplied?.call();
         }
-        _restorePending.remove(uid);
       } else if (record.notebook != null) {
         if (notebook == null) {
           _pending.add(uid);
@@ -616,7 +611,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
             }
             removedRemote = true;
           }
-          _restorePending.remove(record.uid);
           _pending.remove(record.uid);
           _idempotencyKeys.remove(record.uid);
         } else if (_pending.contains(record.uid) && local != null) {
@@ -954,7 +948,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _cursor = (json['cursor'] as num?)?.toInt() ?? 0;
     final revisions = json['revisions'];
     final pending = json['pending'];
-    final restorePending = json['restorePending'];
     final keys = json['idempotencyKeys'];
     final bases = json['bases'];
     if (bases is Map<String, dynamic>) {
@@ -973,9 +966,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     }
     if (pending is List<dynamic>) {
       _pending.addAll(pending.whereType<String>());
-    }
-    if (restorePending is List<dynamic>) {
-      _restorePending.addAll(restorePending.whereType<String>());
     }
     if (keys is Map<String, dynamic>) {
       for (final entry in keys.entries) {
@@ -1026,7 +1016,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           'revisions': _revisions,
           'bases': _basesForStorage(),
           'pending': _pending.toList()..sort(),
-          'restorePending': _restorePending.toList()..sort(),
           'idempotencyKeys': _idempotencyKeys,
         }),
       );
@@ -1072,7 +1061,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _revisions.clear();
     _bases.clear();
     _pending.clear();
-    _restorePending.clear();
     _idempotencyKeys.clear();
     lastError = null;
     lastSuccessfulSync = null;

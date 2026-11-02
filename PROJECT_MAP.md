@@ -448,9 +448,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   aby móc scalać niezależne edycje także po restarcie; stan bazowy
   jest limitowany do 1 MiB, a pojedynczy dokument do 256 KiB.
   `setSharedDocumentUid` wybiera natychmiastowy tryb sync dla active share;
-  reentrancy nie gubi zmian podczas poprzedniego requestu. `restoreDeleted`
-  po CAS tombstone ponawia oczekującą edycję pod oryginalnym UID.
-  `enqueue`, `syncNow`, `stop`.
+  reentrancy nie gubi zmian podczas poprzedniego requestu. Usunięta
+  została dawna ścieżka `restoreDeleted`; edycje po tombstone nie
+  wznawiają oryginalnego UID. `enqueue`, `syncNow`, `stop`.
 - `lib/data/sync/notebook_merge.dart`: trójstronne scalanie niezależnych
   zmian pól oraz obiektów o osobnych ID; kolizje wymagają kopii.
 - `test/notebook_merge_test.dart`: dopiski, usuwanie i jawne konflikty.

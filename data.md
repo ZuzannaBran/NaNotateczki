@@ -269,6 +269,7 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
   rzeczywistych edycji klient zachowuje numerowaną kopię lokalnego szkicu.
   Tombstone usuwa oryginalny UID. Tylko rzeczywiście odmienna niesłana
   edycja daje kopię konfliktową; usunięty UID nie odradza się automatycznie.
+  Legacy flaga `restoreDeleted` jest ignorowana, również w zapisanym outboxie.
 - Usunięcia są tombstonami. Outbox znika dopiero po potwierdzonym commicie.
 - Trójstronne scalanie tej samej rewizji łączy niezależne dopiski,
   usunięcia i edycje obiektów bez tworzenia dodatkowych dokumentów.
