@@ -150,9 +150,15 @@ Map<String, dynamic> _mergeTaskGroups(
       final changed = _taskIndex(local[uid]);
       final server = _taskIndex(remote[uid]);
       for (final id in old.keys) {
-        if (!server.containsKey(id) &&
-            changed.containsKey(id) &&
-            !_equal(changed[id], old[id])) {
+        final localEdited = changed.containsKey(id) &&
+            !_equal(changed[id], old[id]);
+        final remoteEdited = server.containsKey(id) &&
+            !_equal(server[id], old[id]);
+        final bothEditedDifferently = localEdited &&
+            remoteEdited &&
+            !_equal(changed[id], server[id]);
+        if (localEdited &&
+            (!server.containsKey(id) || bothEditedDifferently)) {
           final original = changed[id] as Map<String, dynamic>;
           final signature = sha256
               .convert(utf8.encode(jsonEncode(_canonical(original))))
