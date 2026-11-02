@@ -446,9 +446,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   reentrancy nie gubi zmian podczas poprzedniego requestu. `restoreDeleted`
   po CAS tombstone ponawia oczekującą edycję pod oryginalnym UID.
   `enqueue`, `syncNow`, `stop`.
-- `lib/data/sync/notebook_conflicts.dart`: 6: `numberedNotebookCopy`
-  zachowuje treść w tym samym folderze pod pierwszą wolną nazwą `(1)` itd.,
-  nadając nowe UID dokumentu, stron, tekstów, obrazów i kresek.
+- `lib/data/sync/notebook_conflicts.dart`: `numberedNotebookCopy`
+  zachowuje treść w tym samym folderze pod numerowaną nazwą i nadaje
+  nowe UID dokumentu, stron, tekstów, obrazów i kresek.
+  `copyLocalNotebookToAccount` kopiuje lokalny dokument do konta,
+  zachowując tytuł bez konfliktu; kolizja nazw w tym samym folderze
+  i rodzaju otrzymuje pierwszy wolny sufiks `(1)`, `(2)`.
+  Sam helper nie realizuje przełączenia magazynów ani migracji konta.
 
 ## 5. Domena notebooka i repozytorium
 
@@ -1901,7 +1905,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `test/backup_payload_bytes_test.dart`: liczby, Unicode, escape'y i zakres
   top-level payloadu; działa także w Chrome.
 - `test/notebook_conflicts_test.dart`: numeracja w obrębie folderu,
-  nowe ID wszystkich obiektów i zachowanie treści/obrazów.
+  nowe ID wszystkich obiektów i zachowanie treści/obrazów; import Local
+  nie zmienia nazw bez konfliktu i ignoruje obce foldery/rodzaje.
 - `test/web_share_routing_test.dart`: reguła 200 dla `/share/*` w
   `web/_redirects`, kopiowana do paczki hostingu Cloudflare.
 - `test/cross_platform/eraser_stress_test.dart`: deterministyczne sekwencje
