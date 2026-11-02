@@ -247,17 +247,25 @@ class AccountSettingsSyncService {
       final latestLocal = latestText == null || latestText.isEmpty
           ? null
           : jsonDecode(latestText);
+      // Compare any in-flight local edit with the *pre-request* snapshot.
+      // Otherwise a newly fetched remote folder looks like a local deletion.
+      final mergedLocal = _equivalent(latestLocal, local)
+          ? resolved
+          : mergeAccountLibraryState(
+              base: local,
+              local: latestLocal,
+              remote: resolved,
+            );
       var applied = false;
       if (session.isSignedIn &&
           session.userId == userId &&
-          _equivalent(latestLocal, local) &&
-          !_equivalent(local, resolved)) {
+          !_equivalent(latestLocal, mergedLocal)) {
         _applying = true;
         try {
           if (known == null && local != null) {
             await _savePreimportCopy(userId, 'libraryState', local);
           }
-          await writeStoredText(fileKey, jsonEncode(resolved));
+          await writeStoredText(fileKey, jsonEncode(mergedLocal));
           applied = true;
         } finally {
           _applying = false;
