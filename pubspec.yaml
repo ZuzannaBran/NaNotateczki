@@ -83,6 +83,31 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Bundled serif font: identical typography across Flutter platforms.
+  fonts:
+    - family: Gelasio
+      fonts:
+        - asset: assets/fonts/Gelasio-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Gelasio-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Gelasio-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Gelasio-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Gelasio-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/Gelasio-MediumItalic.ttf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/Gelasio-SemiBoldItalic.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/Gelasio-BoldItalic.ttf
+          weight: 700
+          style: italic
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

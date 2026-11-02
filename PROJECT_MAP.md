@@ -109,9 +109,11 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
 - `lib/core/theme/app_typography.dart`: cztery rozmiary tekstu interfejsu
-  (18/16/14/12 px), Georgia z fallbackiem Gelasio / Noto Serif /
-  DejaVu Serif / Liberation Serif / Times New Roman / serif na wszystkich
-  platformach; edytowane dokumenty zachowują własne rozmiary tekstu.
+  (18/16/14/12 px), wbudowane Gelasio (zbliżone do Georgii) z fallbackiem
+  Georgia / Noto Serif / DejaVu Serif / Liberation Serif / Times New Roman /
+  serif; regular/medium/semibold/bold oraz kursywa są lokalnymi assetami
+  `assets/fonts/` (SIL OFL), również na web. Dokumenty z ręcznie
+  wybraną czcionką zachowują własny krój i rozmiar.
 - `lib/core/theme/app_theme.dart`: `AppTheme.light` i `AppTheme.dark`
   z kontrastowymi kontrolkami i nagłówkami. Tekstowe i konturowe
   przyciski jasnego motywu używają `onSurface` zamiast bladego akcentu.
@@ -1780,7 +1782,8 @@ w oknie aplikacji, nie na niewidocznej wysokości przewijanego dokumentu.
 - `test/app_scroll_behavior_test.dart`: brak pasków przewijania w całej
   aplikacji na desktopie przy zachowaniu przewijania dotykiem i kółkiem.
 - `test/widget_test.dart` (20)
-- `test/dark_mode_theme_test.dart` (209): paleta dark, odwracanie jasności
+- `test/dark_mode_theme_test.dart`: rejestracja i dostępność ośmiu
+  wariantów Gelasio w assetach oraz paleta dark, odwracanie jasności
   wszystkich barw HSL, alfa, zachowanie odcieni, przełącznik Visual,
   suwak skali interfejsu oraz podgląd suwaka czułości w System;
   oba bez liczbowych etykiet.

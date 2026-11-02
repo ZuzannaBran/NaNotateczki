@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -39,8 +40,9 @@ void main() {
     }
   });
 
-  test('both themes keep Georgia and a consistent serif fallback', () {
-    expect(AppTypography.fontFamilyFallback.first, 'Gelasio');
+  test('both themes use a bundled Georgia-like serif', () {
+    expect(AppTypography.fontFamily, 'Gelasio');
+    expect(AppTypography.fontFamilyFallback.first, 'Georgia');
     expect(AppTypography.fontFamilyFallback, contains('Noto Serif'));
     expect(AppTypography.fontFamilyFallback, contains('DejaVu Serif'));
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {
@@ -55,6 +57,23 @@ void main() {
           expect(style?.fontFamilyFallback, AppTypography.fontFamilyFallback);
         }
       }
+    }
+  });
+
+  testWidgets('all eight Gelasio font assets are bundled', (tester) async {
+    for (final variant in [
+      'Regular',
+      'Medium',
+      'SemiBold',
+      'Bold',
+      'Italic',
+      'MediumItalic',
+      'SemiBoldItalic',
+      'BoldItalic',
+    ]) {
+      final asset = 'assets/fonts/Gelasio-${variant}.ttf';
+      final bytes = await rootBundle.load(asset);
+      expect(bytes.lengthInBytes, greaterThan(100000), reason: asset);
     }
   });
 
