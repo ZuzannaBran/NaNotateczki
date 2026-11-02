@@ -197,20 +197,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (_liveSync?.hasPendingChanges == true) {
           throw StateError('Account changes are still awaiting sync.');
         }
-        for (var attempt = 0; attempt < 3; attempt++) {
-          await remote.backupNow();
-          if (!remote.hasPendingBackup &&
-              remote.lastVerifiedBackup != null &&
-              remote.lastError == null) {
-            break;
-          }
-          if (remote.lastError != null) {
-            throw StateError('Remote backup failed: ${remote.lastError}');
-          }
-        }
-        if (remote.hasPendingBackup || remote.lastVerifiedBackup == null) {
-          throw StateError('Remote backup could not be verified before exit.');
-        }
+        await remote.ensureVerifiedForExit();
       }
 
       _allowExit = true;
