@@ -132,7 +132,7 @@ w `server/SECURITY_DEPLOY.md`.
 
 ## Wspólna edycja na Web
 
-Przed wdrożeniem API zastosuj migracje:
+Przed wdrożeniem API zastosuj **obie** migracje:
 `0004_study_shares.sql`, `0005_study_share_edit_clock.sql` i
 `0006_change_events_document_revision.sql`.
 Nie modyfikuj migracji już zastosowanych. Użyj:
@@ -165,3 +165,17 @@ Nie wystawiaj portów PostgreSQL ani API na routerze. Test E2E
 w dwóch prawdziwych przeglądarkach jest wymagany przed produkcją:
 rysowanie jednoczesne, edycja tego samego pola, restart hosta,
 przedłużenie, wygaśnięcie i odcięcie gościa.
+
+
+## Synchronizacja kalendarza (migracja 0008)
+
+Wykonaj `scripts/apply-migrations.sh` przed restartem API. Endpoints
+`GET /v1/planner/entries?after=<uid>` (strony po 200) i
+`PUT /v1/planner/entries/<uid>` wymagają tokenu właściciela.
+Zapis jest atomowy, obejmuje osobne wydarzenia i Study Sessions oraz
+trwałe tombstones po usunięciu. `modifiedAt` z lokalnego zegara UTC
+rozstrzyga późniejsze edycje tego samego wpisu; serwer odrzuca starszą
+wersję. Po commicie publikuje `planner_changed` przez WebSocket.
+Po utracie połączenia klient pobiera ponownie pełne strony i uzgadnia
+stan, zachowując zmiany offline. Poprawność kolejności między offline
+urządzeniami zależy od ich zsynchronizowanych zegarów.
