@@ -438,6 +438,76 @@ void main() {
     expect(gateway.cursors.keys.single, first.operationId);
     expect((await store.operation(first.operationId))?.actorSeq, 1);
   });
+  test('remote UI patches run after SQLite commit and retry on failure',
+      () async {
+    gateway.seed(_remote('other-actor', 'remote-patch'));
+    engine.dispose();
+    var attempts = 0;
+    var allowDisplay = false;
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (remote, _) => database.customStatement(
+        'INSERT INTO projection_probe VALUES (?, ?)',
+        [remote.objectId, 'committed'],
+      ),
+      onRemoteCommitted: (remote) async {
+        attempts++;
+        final rows = await database.customSelect(
+          'SELECT value FROM projection_probe WHERE id = ?',
+          variables: [Variable<String>(remote.objectId!)],
+        ).get();
+        expect(rows.single.read<String>('value'), 'committed');
+        if (!allowDisplay) {
+          throw StateError('Editor is busy with a local gesture.');
+        }
+      },
+    );
+    await engine.start();
+    expect(await store.checkpoint('user-A-v2'), 0);
+    expect(attempts, greaterThanOrEqualTo(1));
+    allowDisplay = true;
+    await engine.syncNow();
+    expect(await store.checkpoint('user-A-v2'), 1);
+    expect(attempts, greaterThanOrEqualTo(2));
+    final rows = await database.customSelect(
+      'SELECT value FROM projection_probe WHERE id = ?',
+      variables: [const Variable<String>('remote-patch')],
+    ).get();
+    expect(rows, hasLength(1));
+  });
+
+  test('an ACKed local echo cannot repaint after cursor replay', () async {
+    engine.dispose();
+    var notifications = 0;
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (_, _) async {},
+      onRemoteCommitted: (_) async => notifications++,
+    );
+    final created = await local('own-stroke');
+    await engine.start();
+    expect(await store.isPending(created.operationId), isFalse);
+    expect(await store.isLocalOperation(created.operationId), isTrue);
+    expect(notifications, 0);
+    // ACK and global checkpoint live in separate transactions. Simulate a
+    // checkpoint restored before the already-confirmed local journal entry.
+    await database.customStatement(
+      'UPDATE sync_checkpoints SET server_sequence = 0 WHERE scope = ?',
+      ['user-A-v2'],
+    );
+    await engine.syncNow();
+    expect(await store.checkpoint('user-A-v2'), 1);
+    expect(notifications, 0);
+  });
+
   test('HTTP 410 stops Share and preserves offline outbox', () async {
     await engine.stop();
     engine.dispose();
