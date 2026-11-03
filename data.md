@@ -560,5 +560,13 @@ aktora ani z brakującymi zależnościami. Identyczne retransmisje są
 idempotentne, ale powtórne wykorzystanie ID/actorSeq z innym payloadem jest
 błędem protokołu. Dla tego samego pola wygrywa para logicClock/actorId/
 actorSeq/operationId; tombstone nie pozwala wskrzeszać usuniętego UID.
-Nie ma jeszcze atomowej transakcji Drift/outbox ani obsługi endpointów v2;
-przekazywanie tej kolejki do produkcyjnego zapisu byłoby przedwczesne.
+Nowy bufor waliduje cały zestaw gotowych operacji przed zatwierdzeniem
+zmian w pamięci. Wadliwa zaległa operacja zostaje odizolowana, bez utraty
+poprawnego potwierdzenia. Checkpoint etapu 2 przechowuje komplet zaakceptowanych
+operacji i identyfikatory odrzuconych; nie wolno zastępować go samym licznikiem
+aktora ani kompaktować bez trwałego indeksu ID. Zegar aktora zachowuje
+zaobserwowane zależności również po odtworzeniu.
+Backend posiada opt-in API v2 po etapie 4, ale klient nie ma jeszcze
+atomowej transakcji Drift/outbox z etapu 3. Dotychczasowa synchronizacja
+API v1 i share nadal działają na snapshotach. Nie przełączać użytkowników
+na protokół operacji przed migracją i testami end-to-end.
