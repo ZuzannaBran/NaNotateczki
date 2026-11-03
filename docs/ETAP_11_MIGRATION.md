@@ -13,7 +13,7 @@ serwer i NIE zmienia aktywnej ścieżki SQLite aplikacji.
   konta mogą trafić wyłącznie do accounts/<sha256(userId)[:40]>, a
   nieprzypisane wyłącznie do local/. Import Local → konto jest osobnym
   procesem po wyraźnej decyzji użytkownika.
-- Sprawdza SQLite quick_check, foreign_key_check, user_version 1–5
+- Sprawdza SQLite quick_check, foreign_key_check, user_version 1–6
   i liczby notatników, stron, elementów, outboxu i tombstones.
 - Kopiuje istniejące SQLite, WAL/SHM/journal, ustawienia i dane planera,
   account_profile.json, storage_layout.json, identyfikator urządzenia,
@@ -43,7 +43,7 @@ Można dodatkowo wymagać dokładnego przypisanego konta przez
 --account-id UUID. Nie stosować tej opcji do nieskojarzonych danych Local.
 
 Regresje: python3 -m unittest discover -s tool -p 'test_stage11_migrate.py'.
-Dziewiętnaście scenariuszy dodano; testy wymagają wykonania na checkoutcie: poprawne kopiowanie,
+Dwadzieścia scenariuszy dodano; testy wymagają wykonania na checkoutcie: poprawne kopiowanie,
 izolacja właściciela, brak assetu, restart, odmowa obcego katalogu,
 zmodyfikowane dane oraz symlink w assetach lub celu. Nowe testy:
 stale źródło, pliki `.previous`, ścieżka z `..`, zewnętrzny obraz,
@@ -97,3 +97,10 @@ po ręcznej weryfikacji przenieść nieaktualny katalog w bezpieczne
 miejsce poza przestrzenią aktywnych danych, a następnie powtórzyć
 staging przy wyłączonej aplikacji. Samo przygotowanie kopii nie
 włącza żadnego writer'a v2 i nie wymaga komend na serwerze.
+
+## Uzupełnienie po etapie 12
+
+SQLite v6 rozszerza trwałe lokalne tombstones o `task`. Narzędzie
+`stage11_migrate.py` rozpoznaje `user_version=6`, kopiuje i zachowuje
+źródłowe bajty oraz działa nadal wyłącznie w trybie `staged-not-activated`.
+Test regresyjny sprawdza staging bazy v6 bez zmiany źródła.
