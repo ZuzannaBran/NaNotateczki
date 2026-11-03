@@ -19,6 +19,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     required this.service,
     required this.session,
     DateTime Function()? now,
+    this.exitBackupTimeout = const Duration(minutes: 2),
   }) : _now = now ?? DateTime.now {
     WidgetsBinding.instance.addObserver(this);
     session.addListener(_sessionChanged);
@@ -33,6 +34,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
 
   final RemoteBackupService service;
   final AccountSessionController session;
+  final Duration exitBackupTimeout;
 
   /// Reconciles confirmed remote state before taking a device snapshot.
   /// A failed reconciliation must not mark an outdated snapshot as verified.
@@ -158,14 +160,19 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
     if (!_enabled || !session.isSignedIn) {
       throw StateError('Remote backup is unavailable for this account.');
     }
-    for (var attempt = 0; attempt < 3; attempt++) {
-      await backupNow();
-      if (!_dirty && lastVerifiedBackup != null && lastError == null) {
-        return;
-      }
-      if (lastError != null) {
-        throw StateError('Remote backup failed: $lastError');
-      }
+    try {
+      await backupNow().timeout(exitBackupTimeout);
+    } on TimeoutException {
+      throw StateError(
+        'Remote backup did not finish within '
+        '${exitBackupTimeout.inSeconds} seconds.',
+      );
+    }
+    if (!_dirty && lastVerifiedBackup != null && lastError == null) {
+      return;
+    }
+    if (lastError != null) {
+      throw StateError('Remote backup failed: $lastError');
     }
     throw StateError('Remote backup could not be verified before exit.');
   }

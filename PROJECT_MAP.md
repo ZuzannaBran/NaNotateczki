@@ -335,7 +335,8 @@ Samo logowanie nie włącza wysyłki. Stan wyniku i błędu jest czyszczony przy
 zmianie konta, a losowy `deviceId` ma osobny plik per `userId`.
 
 - 17: `RemoteBackupScheduler`; logika bezczynności i zapis per konto; `enableForSignedInAccount`, `setIdleSeconds`, `backupNow`,
-  `ensureVerifiedForExit` blokuje normalne wyjście, jeżeli snapshot nie jest zweryfikowany;
+  `ensureVerifiedForExit` blokuje normalne wyjście, jeżeli snapshot nie jest zweryfikowany, ale kończy oczekiwanie po kontrolowanym
+  `exitBackupTimeout` zamiast uruchamiać kolejne wielominutowe uploady;
   102: `refreshAccountPreference`; 130: `uploadNow`; 144: `backupNow`.
   Licznik generacji nie pozwala zgubić zmiany wykonanej
   podczas trwającego uploadu. `reconcileBeforeBackup` odczytuje z serwera
@@ -472,7 +473,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Bazowy snapshot zachowuje dokładną odpowiedź serwera, bez normalizacji,
   ponieważ API weryfikuje go względem niezmiennej historii rewizji.
   Niezmieniona data utworzenia zachowuje oryginalny zapis bazy także w PUT.
-  19: `InitialSyncPolicy`; 21: `LiveWebSyncService`; 69: `start`;
+  20: `InitialSyncPolicy`; 26: `sharedDocumentSyncDebounce`; 28:
+  `LiveWebSyncService`; 115: `start`;
   po reconnect i wznowieniu aplikacji REST uzupełnia utracone sygnały WebSocket;
   Przy odbiorze zmian gości najpierw opróżnia edytor właściciela i wysyła
   jego oczekujące operacje ścieżką serwerowego scalenia, zanim zastosuje
@@ -480,7 +482,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Ostatnią bazę zatwierdzonego dokumentu zapisuje razem z rewizją,
   aby móc scalać niezależne edycje także po restarcie; stan bazowy
   jest limitowany do 1 MiB, a pojedynczy dokument do 256 KiB.
-  `setSharedDocumentUid` wybiera natychmiastowy tryb sync dla active share;
+  `setSharedDocumentUid` wybiera 120 ms debounce dla active share, aby
+  pełny snapshot nie był wysyłany dla każdego lokalnego zapisu;
   reentrancy nie gubi zmian podczas poprzedniego requestu. Usunięta
   została dawna ścieżka `restoreDeleted`; edycje po tombstone nie
   wznawiają oryginalnego UID. `enqueue`, `syncNow`, `stop`.
@@ -1686,7 +1689,7 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   a nieudana wysyłka diagnostyki nie generuje kolejnego raportu.
 - `test/remote_backup_scheduler_test.dart`: odstęp bezczynności 15/30 s,
   nieblokujący upload podczas oczekiwania na serwer, weryfikacja przed exit
-  i backup po imporcie ze zdalnego urządzenia bez lokalnych kliknięć;
+  oraz ograniczone oczekiwanie na zawieszony upload; backup po imporcie ze zdalnego urządzenia bez lokalnych kliknięć;
   nieudane uzgodnienie blokuje przestarzały snapshot.
 - `test/editor_screen_responsive_layout_test.dart` i
   `test/board_scene_bounds_test.dart`: regresja Ctrl+scroll pinch touchpada,
@@ -2165,7 +2168,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   prawdziwy BoardScreen/NotebookScreen, zapis zmian do serwera,
   odtwarzanie scalonej wersji, retry i wznowienie zachowanego outboxu.
   Pasek zapisu jest ukryty; komunikaty pojawiają się tylko przy błędzie.
-  Odbiór identycznych stron nie powoduje ponownego rysowania.
+  Odbiór identycznych stron nie powoduje ponownego rysowania. 120 ms
+  `sharedGuestPushDebounce` zapisuje lokalny outbox od razu, ale wysyła
+  ustalony stan zamiast pełnego dokumentu po każdym callbacku.
 - `lib/data/sync/study_share_guest_outbox.dart`: izolowany per link trwały
   zapis ostatniej niepotwierdzonej wersji, bez biletu lub hasła gościa.
   `test/study_share_guest_outbox_test.dart`: reload, izolacja i walidacja.
@@ -2191,7 +2196,10 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   i autoryzacja właściciela bez migracji SQL (`edit_clock`).
 - `test/shared_edit_conflicts_test.dart`: odrzucone edycje tekstu,
   kreski i usunięcia oraz scalanie niezależnych obiektów.
-- `lib/data/sync/live_web_sync_service.dart`: 90 ms debounce sync,
+- `test/shared_edit_delivery_test.dart`: współdzielone dokumenty nie mogą
+  wrócić do natychmiastowego wysyłania pełnego snapshotu po każdym zapisie.
+- `lib/data/sync/live_web_sync_service.dart`: 90 ms debounce zwykłego sync,
+  120 ms dla współdzielonego dokumentu,
   bazowe snapshoty do trójstronnego scalania zmian właściciela.
 - `lib/features/editor/state/editor_controller.dart`: parametr
   `saveDebounce` – 100 ms w sesji, domyślnie 2 s poza sesją.

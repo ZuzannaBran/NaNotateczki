@@ -19,6 +19,12 @@ import 'notebook_merge.dart';
 
 enum InitialSyncPolicy { uploadLocal, downloadRemote, mergeSafely }
 
+/// A shared canvas produces many small local saves while a stroke is being
+/// completed.  The server still serializes every committed revision, but the
+/// network must receive a settled edit rather than a full notebook snapshot
+/// for each save notification.
+const sharedDocumentSyncDebounce = Duration(milliseconds: 120);
+
 class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   LiveWebSyncService({
     required this.repository,
@@ -224,7 +230,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     unawaited(_saveState().catchError((Object _, StackTrace _) {}));
     _drainTimer?.cancel();
     _drainTimer = Timer(
-      sharedChange ? Duration.zero : const Duration(milliseconds: 90),
+      sharedChange
+          ? sharedDocumentSyncDebounce
+          : const Duration(milliseconds: 90),
       () => unawaited(syncNow()),
     );
     notifyListeners();

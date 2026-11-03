@@ -177,6 +177,44 @@ void main() {
     await database.close();
   });
 
+  testWidgets('account exit stops waiting for a stalled remote backup', (
+    tester,
+  ) async {
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) async => http.Response('', 500)),
+    );
+    final database = NotesDatabase(NativeDatabase.memory());
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'stalled-exit-account';
+    final service = _TrackingService(
+      repository: NotebookRepository(database),
+      apiClient: client,
+      session: session,
+    )..pending = Completer<RemoteBackupReceipt>();
+    final scheduler = RemoteBackupScheduler(
+      service: service,
+      session: session,
+      exitBackupTimeout: const Duration(milliseconds: 1),
+    );
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    scheduler.enableForSignedInAccount();
+
+    final exit = scheduler.ensureVerifiedForExit();
+    await tester.pump(const Duration(milliseconds: 2));
+    await expectLater(exit, throwsStateError);
+    expect(scheduler.hasPendingBackup, isTrue);
+    expect(scheduler.lastVerifiedBackup, isNull);
+
+    service.pending!.complete(_TrackingService.receipt);
+    await scheduler.stop();
+    scheduler.dispose();
+    session.dispose();
+    client.close();
+    await database.close();
+  });
+
   testWidgets('remote import triggers backup without local user activity', (
     tester,
   ) async {

@@ -21,6 +21,11 @@ import 'study_share_memory_db_stub.dart'
     if (dart.library.js_interop) 'study_share_memory_db_web.dart'
     as guest_db;
 
+/// Guest edits are stored locally immediately, then sent as one settled
+/// document revision.  Sending complete snapshots for every save callback
+/// made remote canvases repeatedly install intermediate states.
+const sharedGuestPushDebounce = Duration(milliseconds: 120);
+
 /// An independent editor for one invited document, never the user's library.
 class StudyShareGuestEditor extends StatefulWidget {
   const StudyShareGuestEditor({
@@ -142,7 +147,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       setState(() {});
       if (recovered) {
         _pushTimer = Timer(
-          const Duration(milliseconds: 35),
+          sharedGuestPushDebounce,
           () => unawaited(_push()),
         );
       } else {
@@ -174,7 +179,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     unawaited(_persistPending());
     _pushTimer?.cancel();
     _pushTimer = Timer(
-      const Duration(milliseconds: 35),
+      sharedGuestPushDebounce,
       () => unawaited(_push()),
     );
   }
@@ -369,7 +374,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       if (_dirty && _error == null && mounted) {
         _pushTimer?.cancel();
         _pushTimer = Timer(
-          const Duration(milliseconds: 35),
+          sharedGuestPushDebounce,
           () => unawaited(_push()),
         );
       }
@@ -471,7 +476,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     _dirty = true;
     _pushTimer?.cancel();
     _pushTimer = Timer(
-      const Duration(milliseconds: 35),
+      sharedGuestPushDebounce,
       () => unawaited(_push()),
     );
   }
@@ -581,7 +586,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       if (_dirty && !_sending && mounted && !_closed) {
         _pushTimer?.cancel();
         _pushTimer = Timer(
-          const Duration(milliseconds: 35),
+          sharedGuestPushDebounce,
           () => unawaited(_push()),
         );
       }
