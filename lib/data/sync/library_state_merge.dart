@@ -186,7 +186,6 @@ Map<String, dynamic> _mergeTaskGroups(
   return merged;
 }
 
-
 /// Restores only metadata belonging to documents actually recovered.
 ///
 /// A verified device backup is historical, not an authority to resurrect
@@ -238,8 +237,7 @@ Map<String, dynamic> mergeRecoveredLibraryMetadata({
         ...Map<String, dynamic>.from(current['plannerTasks'] as Map),
     };
     for (final entry in recoveredUids.entries) {
-      if (!tasks.containsKey(entry.value) &&
-          archivedTasks[entry.key] is List) {
+      if (!tasks.containsKey(entry.value) && archivedTasks[entry.key] is List) {
         tasks[entry.value] = archivedTasks[entry.key];
       }
     }

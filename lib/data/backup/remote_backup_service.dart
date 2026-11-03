@@ -518,10 +518,7 @@ class RemoteBackupService {
     return decoded.cast<int>().take(12).toList();
   }
 
-  Future<bool> _mergeRecoveredPlanner(
-    Object? source,
-    String userId,
-  ) async {
+  Future<bool> _mergeRecoveredPlanner(Object? source, String userId) async {
     if (source is! Map<String, dynamic>) {
       return false;
     }
@@ -562,8 +559,7 @@ class RemoteBackupService {
         protectedIds.add(item['id'] as String);
       }
       final next = response['next'];
-      if (next != null &&
-          (next is! String || next.isEmpty || next == after)) {
+      if (next != null && (next is! String || next.isEmpty || next == after)) {
         throw const FormatException('Invalid planner recovery cursor.');
       }
       after = next as String?;
@@ -629,12 +625,15 @@ class RemoteBackupService {
     if (await readStoredText('study_planner.json') != rawLocal) {
       throw StateError('Planner changed during backup recovery; retry safely.');
     }
-    await writeStoredText('study_planner.json', jsonEncode({
-      ...local,
-      'version': 2,
-      'sessions': [...keptSessions, ...novelSessions],
-      'tombstones': {...keptTombstones, ...novelTombstones},
-    }));
+    await writeStoredText(
+      'study_planner.json',
+      jsonEncode({
+        ...local,
+        'version': 2,
+        'sessions': [...keptSessions, ...novelSessions],
+        'tombstones': {...keptTombstones, ...novelTombstones},
+      }),
+    );
     return true;
   }
 

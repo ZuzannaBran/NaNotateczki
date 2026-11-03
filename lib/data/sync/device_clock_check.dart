@@ -2,10 +2,7 @@ import 'api_client.dart';
 
 /// Difference between the device's UTC clock and the API clock.
 class DeviceClockDifference {
-  const DeviceClockDifference({
-    required this.offset,
-    required this.roundTrip,
-  });
+  const DeviceClockDifference({required this.offset, required this.roundTrip});
 
   /// Positive means the server is ahead of the device.
   final Duration offset;
@@ -20,10 +17,8 @@ class DeviceClockDifference {
 
 /// Measures clock drift without relying on the device's time zone.
 class DeviceClockCheck {
-  DeviceClockCheck({
-    required this.apiClient,
-    DateTime Function()? clock,
-  }) : _clock = clock ?? DateTime.now;
+  DeviceClockCheck({required this.apiClient, DateTime Function()? clock})
+    : _clock = clock ?? DateTime.now;
 
   final ApiClient apiClient;
   final DateTime Function() _clock;
@@ -37,16 +32,14 @@ class DeviceClockCheck {
     final finishedAt = _clock().toUtc();
 
     if (stopwatch.elapsed > const Duration(seconds: 10) ||
-        (finishedAt.difference(startedAt) - stopwatch.elapsed)
-                .inMilliseconds
+        (finishedAt.difference(startedAt) - stopwatch.elapsed).inMilliseconds
                 .abs() >
             2000) {
       return null;
     }
 
     final decoded = response.decodeJson();
-    if (decoded is! Map<String, dynamic> ||
-        decoded['serverTimeMs'] is! int) {
+    if (decoded is! Map<String, dynamic> || decoded['serverTimeMs'] is! int) {
       throw const FormatException('Invalid API clock response.');
     }
     final serverTime = DateTime.fromMillisecondsSinceEpoch(

@@ -540,9 +540,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     Map<String, dynamic>? encodedNotebook = locallyVisible;
     final lastVisible = _sharedVisibleBases[uid];
     final acceptedBase = _bases[uid];
-    if (lastVisible != null &&
-        locallyVisible != null &&
-        acceptedBase != null) {
+    if (lastVisible != null && locallyVisible != null && acceptedBase != null) {
       // The previously accepted server revision may contain guest objects
       // not installed into the host's active canvas yet. Rebase the local
       // delta onto those objects before transmitting another edit.
@@ -626,8 +624,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       } else {
         // A gesture may have continued while the HTTP request was pending.
         // Its new delta must be rebased on the accepted server snapshot.
-        if (acceptedShared is Map<String, dynamic> &&
-            locallyVisible != null) {
+        if (acceptedShared is Map<String, dynamic> && locallyVisible != null) {
           _sharedVisibleBases[uid] = locallyVisible;
         }
         _pending.add(uid);
@@ -1125,8 +1122,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     if (visibleBases is Map<String, dynamic>) {
       for (final entry in visibleBases.entries) {
         if (entry.value is Map<String, dynamic>) {
-          _sharedVisibleBases[entry.key] =
-              entry.value as Map<String, dynamic>;
+          _sharedVisibleBases[entry.key] = entry.value as Map<String, dynamic>;
         }
       }
     }

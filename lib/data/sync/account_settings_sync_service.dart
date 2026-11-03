@@ -212,7 +212,8 @@ class AccountSettingsSyncService {
       // on the first synchronization of this device. In particular, a
       // historical local folder must not recreate a server-side deletion.
       // Explicit Local -> Account import is handled separately.
-      final desired = known == null &&
+      final desired =
+          known == null &&
               currentRemote != null &&
               remoteValue is Map<String, dynamic>
           ? Map<String, dynamic>.from(remoteValue)

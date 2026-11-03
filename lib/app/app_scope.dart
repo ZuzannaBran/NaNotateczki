@@ -365,7 +365,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       final amount = seconds >= 120
           ? '${(seconds / 60).round()} minutes'
           : '$seconds seconds';
-      final message = 'Device clock is off by about $amount. '
+      final message =
+          'Device clock is off by about $amount. '
           'Enable automatic date and time to avoid sync conflicts.';
       AppErrorLog.instance.record(
         StateError(message),
