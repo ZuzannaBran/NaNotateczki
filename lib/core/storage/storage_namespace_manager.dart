@@ -80,13 +80,17 @@ class StorageNamespaceManager {
 
   StorageNamespace _current;
   int _generation = 0;
+  bool _active = true;
   Future<void> _tail = Future<void>.value();
 
   StorageNamespace get current => _current;
   int get generation => _generation;
+  bool get isActive => _active;
 
   bool accepts(StorageNamespace namespace, int expectedGeneration) =>
-      _current == namespace && _generation == expectedGeneration;
+      _active &&
+      _current == namespace &&
+      _generation == expectedGeneration;
 
   Future<void> switchTo(
     StorageNamespace next, {
@@ -94,14 +98,16 @@ class StorageNamespaceManager {
     required Future<void> Function(StorageNamespace) open,
   }) {
     final result = _tail.then((_) async {
-      if (_current == next) {
+      if (_current == next && _active) {
         return;
       }
-      // Invalidate even responses already in flight before stopping services.
+      // On failure stay fenced off: the old database may already be closed.
+      _active = false;
       _generation++;
       await stopAndFlush();
       await open(next);
       _current = next;
+      _active = true;
       _generation++;
     });
     _tail = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
