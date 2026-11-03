@@ -995,3 +995,43 @@ VFS, opening a shared editor fails with `SqliteException: no such vfs`.
 
 These are regression/acceptance instructions, not a claim that a browser
 or the deployed session was tested.
+
+
+## Operation SyncEngine v2 — manual acceptance (3 November 2026)
+
+The v2 engine is staged behind the v1/v2 migration barrier and is **not**
+enabled for legacy documents. Run unit tests in an isolated workspace:
+
+```bash
+flutter test test/operation_store_test.dart
+flutter test test/operation_gateway_test.dart
+flutter test test/sync_engine_test.dart
+dart analyze
+```
+
+After stages 6, 7 and 11 provide migrated documents, run the following
+against a separate test account on a disposable FastAPI/PostgreSQL instance.
+Never modify a real user's production notebook for these checks.
+
+1. Open the same test document on two real devices (Linux/Web, then
+   Android/Web). Write distinct strokes simultaneously, unplug one
+   network connection, delete an existing stroke on the other and reconnect.
+   Both devices must converge without resurrecting the deleted UID.
+2. Kill one client immediately after server commit but before its HTTP ACK.
+   Restart and check that the same `operationId` is resent or recovered from
+   REST exactly once; the outbox must not disappear before durable ACK.
+3. Inject a projection failure for document A while changing unrelated
+   document B from another actor. B must persist, A must retain its cursor
+   gap and recover on the next safe pull; no checkpoint may skip A.
+4. Drop WebSocket hints and reconnect. REST must fetch every event after
+   the last durable cursor, including across multiple pages.
+5. Change accounts while a request is still in flight, then return.
+   No response may mutate the new namespace; the old outbox must remain.
+6. Check 409 CAUSAL_GAP, 401 refresh, 422 unsupported text operation,
+   unstable network, oversized payload and offline creation of 1001+ edits.
+   There must be no data deletion, silent partial rebase or infinite
+   high-frequency retry.
+
+These scenarios have **not been executed** in this session. The v2 client
+and backend cannot be declared end-to-end ready until the migration and
+domain-specific reducers are implemented and these checks pass.
