@@ -87,11 +87,14 @@ void main() {
     expect(requested, isFalse);
   });
 
-  test('Share transport attaches the same scope to POST and GET', () async {
+  test('Share REST uses a scoped guest ticket, not the account JWT',
+      () async {
     const shareId = '11111111-1111-4111-8111-111111111111';
+    const ticket = '01234567890123456789012345678901234567890123456789';
     final operation = _operation();
     final client = clientFor((request) async {
       expect(request.headers['X-Share-Id'], shareId);
+      expect(request.headers['Authorization'], 'Bearer $ticket');
       if (request.method == 'POST') {
         return http.Response(
           jsonEncode({
@@ -114,7 +117,9 @@ void main() {
         200,
       );
     });
-    final gateway = HttpOperationGateway(client, shareId: shareId);
+    final gateway = HttpOperationGateway(
+      client, shareId: shareId, guestTicket: ticket,
+    );
     expect((await gateway.send([operation])).single.cursor, 2);
     expect((await gateway.readAfter(2)).cursor, 2);
   });
@@ -173,5 +178,55 @@ void main() {
     final page = await HttpOperationGateway(client).readAfter(9);
     expect(page.cursor, 11);
     expect(page.operations.single.operation.operationId, operation.operationId);
+  });
+  test('guest Share REST works without any owner access token', () async {
+    const shareId = '11111111-1111-4111-8111-111111111111';
+    const ticket = '01234567890123456789012345678901234567890123456789';
+    final operation = _operation();
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        expect(request.headers['Authorization'], 'Bearer $ticket');
+        expect(request.headers['X-Share-Id'], shareId);
+        return http.Response(
+          jsonEncode({
+            'cursor': 1,
+            'acknowledgements': [
+              {
+                'operationId': operation.operationId,
+                'cursor': 1,
+                'status': 'applied',
+              },
+            ],
+          }),
+          200,
+        );
+      }),
+    );
+    addTearDown(client.close);
+    final guest = HttpOperationGateway(
+      client, shareId: shareId, guestTicket: ticket,
+    );
+    expect((await guest.send([operation])).single.cursor, 1);
+  });
+
+  test('invalid or missing Share credentials are rejected before HTTP', () {
+    final client = clientFor((_) async => http.Response('{}', 200));
+    const shareId = '11111111-1111-4111-8111-111111111111';
+    const ticket = '01234567890123456789012345678901234567890123456789';
+    expect(
+      () => HttpOperationGateway(client, shareId: shareId),
+      throwsArgumentError,
+    );
+    expect(
+      () => HttpOperationGateway(client, guestTicket: ticket),
+      throwsArgumentError,
+    );
+    expect(
+      () => HttpOperationGateway(
+        client, shareId: shareId, guestTicket: 'bad\nheader',
+      ),
+      throwsArgumentError,
+    );
   });
 }

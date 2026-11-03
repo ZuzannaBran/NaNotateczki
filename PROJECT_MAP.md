@@ -2428,3 +2428,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   copy-on-write atomów i rygorystyczna walidacja rankingu.
 - `test/share_ink_edit_adapter_test.dart` oraz testy sekwencji tekstu:
   ink, gumka, transformacje, kolor, z-order, Unicode, wsady i korupcja.
+
+- `lib/data/sync/operation_gateway.dart` i
+  `lib/data/sync/sync_engine.dart`: opcjonalny ulotny `guestTicket` dla
+  REST/WebSocket operacji v2, parowany z `shareId`; nigdy nie używa
+  JWT konta gościa zamiast biletu. Regresje w
+  `test/operation_gateway_test.dart`.

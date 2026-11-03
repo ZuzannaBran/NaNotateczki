@@ -36,6 +36,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     required this.applyRemote,
     this.apiClient,
     this.shareId,
+    this.guestTicket,
     this.refreshAuthentication,
     this.enableRealtime = true,
     this.pollInterval = const Duration(seconds: 45),
@@ -43,9 +44,17 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     if (actorId.isEmpty || checkpointScope.isEmpty) {
       throw ArgumentError('An actor and isolated checkpoint are required.');
     }
+    if ((shareId == null) != (guestTicket == null) ||
+        (guestTicket != null && refreshAuthentication != null)) {
+      throw ArgumentError('Share requires an ephemeral guest ticket.');
+    }
     if (gateway is HttpOperationGateway &&
         (gateway as HttpOperationGateway).shareId != shareId) {
       throw ArgumentError('Share IDs must match REST and WebSocket.');
+    }
+    if (gateway is HttpOperationGateway &&
+        gateway.guestTicket != guestTicket) {
+      throw ArgumentError('REST and WebSocket credentials must match.');
     }
   }
 
@@ -61,6 +70,9 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   final RemoteOperationReducer applyRemote;
   final ApiClient? apiClient;
   final String? shareId;
+
+  /// Guest ticket stays in memory; it is never part of an operation envelope.
+  final String? guestTicket;
   final Future<void> Function()? refreshAuthentication;
   final bool enableRealtime;
   final Duration pollInterval;
@@ -510,7 +522,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     final api = apiClient;
-    final token = api?.accessToken;
+    final token = guestTicket ?? api?.accessToken;
     if (api == null || token == null || token.isEmpty) {
       return;
     }

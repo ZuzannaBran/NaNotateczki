@@ -107,3 +107,15 @@ Adapter jest celowo opt-in: pełna integracja transakcyjna
 `EditorController` + `OperationStore`, inicjalizacja projektu z migracji,
 transport assetów i testy prawdziwego hosta i gościa są konieczne.
 Serwer blokuje współistnienie dwóch writerów (v1/v2) dla tego samego UID.
+
+## Transport v2: uwierzytelnienie gościa
+
+- `HttpOperationGateway` przyjmuje krótkotrwały `guestTicket` tylko z
+  `shareId`. Wysyła `X-Share-Id` i `Authorization: Bearer` w
+  `POST /v2/operations/batch` oraz `GET /v2/operations`, bez
+  odczytu JWT konta. Mieszane/niekompletne dane są odrzucane.
+- `SyncEngine` używa tego samego biletu w uwierzytelnieniu
+  `/v2/realtime`, weryfikując zgodność konfiguracji REST/WebSocket.
+  Bilet nie trafia do outboxu, projekcji ani checkpointów SQLite.
+- Testy regresyjne obejmują brak tokenu konta, odrębny token konta i
+  niewłaściwy zakres Share. Nie dokonano produkcyjnego przełączenia v1/v2.

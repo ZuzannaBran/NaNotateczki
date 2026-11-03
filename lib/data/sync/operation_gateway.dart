@@ -38,13 +38,34 @@ abstract class OperationGateway {
 
 /// REST v2 is authoritative. WebSocket only signals that REST should run.
 class HttpOperationGateway implements OperationGateway {
-  const HttpOperationGateway(this.apiClient, {this.shareId});
+  HttpOperationGateway(
+    this.apiClient, {
+    this.shareId,
+    this.guestTicket,
+  }) {
+    if ((shareId == null) != (guestTicket == null)) {
+      throw ArgumentError('Share operations require a scoped guest ticket.');
+    }
+    if (guestTicket != null &&
+        (guestTicket!.length < 40 ||
+            guestTicket!.length > 256 ||
+            RegExp(r'[\x00-\x20\x7f]').hasMatch(guestTicket!))) {
+      throw ArgumentError('Invalid guest ticket.');
+    }
+  }
 
   final ApiClient apiClient;
   final String? shareId;
 
-  Map<String, String>? get _shareHeaders =>
-      shareId == null ? null : {'X-Share-Id': shareId!};
+  /// Ephemeral, never written to SQLite, operation payloads or checkpoints.
+  final String? guestTicket;
+
+  Map<String, String>? get _shareHeaders => shareId == null
+      ? null
+      : {
+          'X-Share-Id': shareId!,
+          'Authorization': 'Bearer $guestTicket',
+        };
 
   @override
   Future<List<OperationReceipt>> send(
@@ -66,6 +87,7 @@ class HttpOperationGateway implements OperationGateway {
       '/v2/operations/batch',
       request,
       headers: _shareHeaders,
+      authenticated: guestTicket == null,
     );
     final body = _object(response.decodeJson());
     final entries = body['acknowledgements'];
@@ -112,6 +134,7 @@ class HttpOperationGateway implements OperationGateway {
       '/v2/operations',
       query: {'after': '$cursor'},
       headers: _shareHeaders,
+      authenticated: guestTicket == null,
     );
     final body = _object(response.decodeJson());
     final pageCursor = body['cursor'];
