@@ -89,4 +89,45 @@ void main() {
     };
     expect(hasRejectedSharedEdits(base, submitted, accepted), isFalse);
   });
+  test('a delayed revision never replaces a newer guest acknowledgement', () {
+    final base = _doc(text: 'saved', strokes: []);
+    expect(
+      canInstallSharedGuestRevision(
+        incomingRevision: 7,
+        confirmedRevision: 8,
+        expectedLocal: base,
+        visibleLocal: base,
+      ),
+      isFalse,
+    );
+  });
+
+  test('a stroke still in memory blocks remote replacement', () {
+    final saved = _doc(text: 'saved', strokes: []);
+    final visible = _doc(
+      text: 'saved',
+      strokes: [
+        {'id': 'new-ink', 'points': [1, 2]},
+      ],
+    );
+    expect(
+      canInstallSharedGuestRevision(
+        incomingRevision: 9,
+        confirmedRevision: 8,
+        expectedLocal: saved,
+        visibleLocal: visible,
+      ),
+      isFalse,
+    );
+    expect(
+      canInstallSharedGuestRevision(
+        incomingRevision: 9,
+        confirmedRevision: 8,
+        expectedLocal: visible,
+        visibleLocal: visible,
+      ),
+      isTrue,
+    );
+  });
+
 }
