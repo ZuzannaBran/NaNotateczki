@@ -2233,6 +2233,12 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   scalanie per ID według UTC i wysyłanie usunięć mimo późniejszej daty
   edycji ze starszego urządzenia. Nie wysyła lokalnych wpisów, jeśli
   serwer zwrócił tombstone.
+- `lib/data/backup/remote_backup_service.dart`: stary snapshot
+  `study_planner.json` uzupełnia wyłącznie puste dane lokalne bez tombstones,
+  jeśli autorytatywny endpoint `/v1/planner/entries` nie ma żadnego wpisu
+  (także usuniętego). Czas weryfikacji backupu nie rozstrzyga konfliktów.
+- `test/account_backup_recovery_regression_test.dart`: regresje
+  późno zweryfikowanego backupu wobec lokalnego i serwerowego tombstone.
 - `lib/app/app_scope.dart`: inicjalizacja, listener zapisu, wznowienie
   i okresowe uzgadnianie; `live_web_sync_service.dart`: `planner_changed`.
 - `test/planner_sync_controller_test.dart`: przypadki offline,
