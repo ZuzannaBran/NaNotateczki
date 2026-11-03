@@ -58,6 +58,8 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
   Timer? _pushTimer;
   Timer? _remoteRetryTimer;
   SharedStudyDocument? _deferredRemote;
+  Map<String, dynamic>? _deferredExpectedLocal;
+  bool _installingRemote = false;
   bool _suppressChanges = false;
   bool _dirty = false;
   bool _sending = false;
@@ -224,6 +226,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
   Future<void> _push() async {
     if (_sending ||
         _refreshing ||
+        _installingRemote ||
         _closed ||
         !_dirty ||
         _base == null ||
@@ -268,6 +271,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       // use the authoritative server snapshot, not the submitted one.
       _base = answer.notebook;
       _revision = answer.revision;
+      _discardObsoleteRemote();
       if (rejected) {
         _dirty = true;
         if (mounted) {
@@ -287,7 +291,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       if (!_dirty &&
           jsonEncode(answer.notebook['pages']) !=
               jsonEncode(submitted['pages'])) {
-        await _installRemote(answer);
+        await _installRemote(answer, expectedLocal: submitted);
       }
       await _clearPending();
     } on ApiException catch (error) {
@@ -338,6 +342,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     if (_closed ||
         _sending ||
         _refreshing ||
+        _installingRemote ||
         _repository == null ||
         _editor == null) {
       return;
@@ -355,11 +360,8 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       if (latest.revision <= _revision || _dirty) {
         return;
       }
-      // Flush any text still being edited before changing the controller.
-      await _editor!.flushPendingSaves();
-      if (_dirty || !mounted) {
-        return;
-      }
+      // Never force an active text edit to commit merely to receive a
+      // remote notification. The installer defers until the editor is safe.
       await _installRemote(latest);
     } on ApiException catch (error) {
       if (error.statusCode == 401 || error.statusCode == 410) {
@@ -372,7 +374,11 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       // A push timer may have fired while the remote read was in flight.
       // Re-arm it so the locally saved edit cannot remain dirty forever.
       if (_dirty && !_sending && !_closed && mounted) {
-        _retry();
+        _pushTimer?.cancel();
+        _pushTimer = Timer(
+          const Duration(milliseconds: 35),
+          () => unawaited(_push()),
+        );
       }
     }
   }
@@ -395,68 +401,153 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     }
   }
 
-  Future<void> _installRemote(SharedStudyDocument snapshot) async {
-    if (_repository == null || !mounted || _closed) {
-      return;
-    }
-    final editor = _editor;
-    if (_dirty || editor == null || !editor.canApplyConfirmedRemoteNotebook) {
-      _deferRemote(snapshot);
-      return;
-    }
-    _applyAppearance(snapshot);
-    final local = NotebookRepository.encodeNotebook(editor.notebook);
-    if (jsonEncode(local['pages']) == jsonEncode(snapshot.notebook['pages'])) {
+  Map<String, dynamic> _visibleDocument(EditorController editor) =>
+      NotebookRepository.encodeNotebook(
+        editor.notebook.copyWith(pages: editor.pages),
+      );
+
+  void _discardObsoleteRemote() {
+    final deferred = _deferredRemote;
+    if (deferred != null && deferred.revision < _revision) {
       _deferredRemote = null;
+      _deferredExpectedLocal = null;
       _remoteRetryTimer?.cancel();
-      _base = snapshot.notebook;
-      _revision = snapshot.revision;
-      return;
-    }
-    _suppressChanges = true;
-    try {
-      await _repository!.waitForPendingSaves();
-      if (!mounted || _dirty || !editor.canApplyConfirmedRemoteNotebook) {
-        _deferRemote(snapshot);
-        return;
-      }
-      final updated = _decode(snapshot.notebook);
-      await _repository!.importNotebooksAtomically([
-        updated,
-      ], verifiedRemoteSync: true);
-      if (!mounted || _dirty || !editor.canApplyConfirmedRemoteNotebook) {
-        _deferRemote(snapshot);
-        return;
-      }
-      if (!editor.applyConfirmedRemoteNotebook(updated)) {
-        _deferRemote(snapshot);
-        return;
-      }
-      _deferredRemote = null;
-      _remoteRetryTimer?.cancel();
-      _base = snapshot.notebook;
-      _revision = snapshot.revision;
-      if (_error != null) {
-        setState(() => _error = null);
-      }
-    } finally {
-      _suppressChanges = false;
     }
   }
 
-  void _deferRemote(SharedStudyDocument snapshot) {
-    if (_closed || !mounted) {
+  void _scheduleUnreportedLocalEdit() {
+    if (_dirty || _closed) {
+      return;
+    }
+    // A local mutation can exist in the editor before the repository's
+    // asynchronous onChanged callback runs. It must win over a remote import.
+    _dirty = true;
+    _pushTimer?.cancel();
+    _pushTimer = Timer(
+      const Duration(milliseconds: 35),
+      () => unawaited(_push()),
+    );
+  }
+
+  Future<void> _installRemote(
+    SharedStudyDocument snapshot, {
+    Map<String, dynamic>? expectedLocal,
+  }) async {
+    if (_repository == null || !mounted || _closed) {
+      return;
+    }
+    if (snapshot.revision < _revision) {
+      _discardObsoleteRemote();
+      return;
+    }
+    final editor = _editor;
+    final expected = expectedLocal ?? _base;
+    if (editor == null || expected == null) {
+      return;
+    }
+    if (_dirty || _installingRemote || !editor.canApplyConfirmedRemoteNotebook) {
+      _deferRemote(snapshot, expectedLocal: expectedLocal);
+      return;
+    }
+    final visible = _visibleDocument(editor);
+    if (!canInstallSharedGuestRevision(
+      incomingRevision: snapshot.revision,
+      confirmedRevision: _revision,
+      expectedLocal: expected,
+      visibleLocal: visible,
+    )) {
+      _scheduleUnreportedLocalEdit();
+      _deferRemote(snapshot, expectedLocal: expectedLocal);
+      return;
+    }
+    _applyAppearance(snapshot);
+    if (jsonEncode(visible['pages']) == jsonEncode(snapshot.notebook['pages'])) {
+      _deferredRemote = null;
+      _deferredExpectedLocal = null;
+      _remoteRetryTimer?.cancel();
+      _base = snapshot.notebook;
+      _revision = snapshot.revision;
+      return;
+    }
+
+    // No remote database transaction may start until earlier local writes
+    // have completed. Do not suppress their change notifications while waiting.
+    await _repository!.waitForPendingSaves();
+    if (!mounted || _closed || _dirty ||
+        snapshot.revision < _revision ||
+        !editor.canApplyConfirmedRemoteNotebook) {
+      _deferRemote(snapshot, expectedLocal: expectedLocal);
+      return;
+    }
+    if (!canInstallSharedGuestRevision(
+      incomingRevision: snapshot.revision,
+      confirmedRevision: _revision,
+      expectedLocal: expected,
+      visibleLocal: _visibleDocument(editor),
+    )) {
+      _scheduleUnreportedLocalEdit();
+      _deferRemote(snapshot, expectedLocal: expectedLocal);
+      return;
+    }
+
+    final updated = _decode(snapshot.notebook);
+    _installingRemote = true;
+    try {
+      // Update the visible controller first, synchronously. The subsequent
+      // database import is serialized with local saves for the same UID, so
+      // writing a new stroke while importing cannot overwrite that stroke.
+      if (!editor.applyConfirmedRemoteNotebook(updated)) {
+        _deferRemote(snapshot, expectedLocal: expectedLocal);
+        return;
+      }
+      await _repository!.importNotebooksAtomically(
+        [updated],
+        verifiedRemoteSync: true,
+        notifyChanges: false,
+        serializeWithLocalSaves: true,
+      );
+      _deferredRemote = null;
+      _deferredExpectedLocal = null;
+      _remoteRetryTimer?.cancel();
+      _base = snapshot.notebook;
+      _revision = snapshot.revision;
+      if (_error != null && mounted) {
+        setState(() => _error = null);
+      }
+    } finally {
+      _installingRemote = false;
+      if (_dirty && !_sending && mounted && !_closed) {
+        _pushTimer?.cancel();
+        _pushTimer = Timer(
+          const Duration(milliseconds: 35),
+          () => unawaited(_push()),
+        );
+      }
+    }
+  }
+
+  void _deferRemote(
+    SharedStudyDocument snapshot, {
+    Map<String, dynamic>? expectedLocal,
+  }) {
+    if (_closed || !mounted || snapshot.revision < _revision) {
       return;
     }
     final pending = _deferredRemote;
-    if (pending == null || snapshot.revision >= pending.revision) {
+    if (pending == null ||
+        snapshot.revision > pending.revision ||
+        (snapshot.revision == pending.revision && expectedLocal != null)) {
       _deferredRemote = snapshot;
+      _deferredExpectedLocal = expectedLocal;
     }
     _remoteRetryTimer?.cancel();
     _remoteRetryTimer = Timer(const Duration(milliseconds: 150), () {
       final latest = _deferredRemote;
       if (latest != null && mounted && !_closed) {
-        unawaited(_installRemote(latest));
+        unawaited(_installRemote(
+          latest,
+          expectedLocal: _deferredExpectedLocal,
+        ));
       }
     });
   }
