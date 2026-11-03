@@ -442,6 +442,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   kursora zdarzeń z innych
   urządzeń. Zapisy outboxu i kursora są serializowane wraz z kolejką
   sprzed startu, żeby starszy zapis nie wymazał nowszych UID.
+  Bootstrap przechowuje zweryfikowany kursor już z pierwszej strony;
+  test regresyjny potwierdza jego trwały zapis przy skompaktowanym tombstone.
   `start`/`stop` zerują pamięciowy stan konta, a zapis stanu używa
   utrwalonego `userId`, więc kursor, rewizje i outbox nie przechodzą między
   kontami. Normalizuje ścieżki obrazów oraz daty dokumentu do UTC,

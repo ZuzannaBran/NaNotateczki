@@ -81,6 +81,8 @@ void main() {
     expect(await repository.fetchNotebooks(), isEmpty);
     expect(sync.hasPendingChanges, isFalse);
     await sync.stop();
+    final state = jsonDecode(stored['server_sync_state_$suffix.json']!);
+    expect((state as Map<String, dynamic>)['cursor'], 4);
   });
 
   test('bootstrap tombstone never retains stale original document', () async {

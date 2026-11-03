@@ -173,7 +173,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       remote.addAll(records.map(_decodeRemoteRecord));
       after = next as String?;
     } while (after != null);
-    await _applyInitialPolicy(policy, remote, initialCursor ?? 0);
+    await _applyInitialPolicy(policy, remote, initialCursor);
     _cursor = initialCursor;
     _started = true;
     await _offlineQueueTail;
