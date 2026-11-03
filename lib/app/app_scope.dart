@@ -439,17 +439,21 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         await _plannerReady;
         var restored = false;
         Object? recoveryFailure;
-        try {
-          restored = await backup.hydrateFromLatestAccountBackup(
-            databaseWasReset: _databaseWasReset,
-          );
-        } catch (error, stackTrace) {
-          recoveryFailure = error;
-          AppErrorLog.instance.record(
-            error,
-            stackTrace,
-            source: 'AppScope.accountBackupRecovery',
-          );
+        // Archived backups are disaster recovery, never normal conflict
+        // resolution on every account sign-in.
+        if (_databaseWasReset) {
+          try {
+            restored = await backup.hydrateFromLatestAccountBackup(
+              databaseWasReset: true,
+            );
+          } catch (error, stackTrace) {
+            recoveryFailure = error;
+            AppErrorLog.instance.record(
+              error,
+              stackTrace,
+              source: 'AppScope.accountBackupRecovery',
+            );
+          }
         }
         if (!mounted || session.userId != userId) {
           return;
@@ -539,7 +543,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
         final result = snapshot.data!;
         if (_repository == null) {
-          _databaseWasReset = result.wasReset || result.freshFile;
+          _databaseWasReset = result.wasReset;
         }
         final repository =
             _repository ??

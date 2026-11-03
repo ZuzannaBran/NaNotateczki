@@ -101,6 +101,9 @@ void main() {
           jsonDecode(utf8.decode(uploaded!)) as Map<String, dynamic>;
       final payload = envelope['payload'] as Map<String, dynamic>;
       expect(envelope['version'], 2);
+      expect(envelope['accountId'], 'user-1');
+      expect(envelope['schemaVersion'], database.schemaVersion);
+      expect(envelope['operationCheckpoint'], isEmpty);
       expect(payload['notebooks'], hasLength(1));
       expect(payload['libraryState'], containsPair('folders', ['Notes']));
       expect(payload['studyPlannerState'], containsPair('sessions', isEmpty));
@@ -108,6 +111,101 @@ void main() {
       expect(call, 4);
     },
   );
+
+  test('unacknowledged operations cannot enter a checkpoint backup',
+      () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    await repository.createNotebook();
+    await database.customStatement(
+      'INSERT INTO operations (operation_id, actor_id, actor_seq, '
+      'document_id, kind, envelope_json, logical_clock, schema_version, '
+      'source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        'pending-operation',
+        'actor',
+        1,
+        'document',
+        'document.create',
+        '{}',
+        1,
+        1,
+        'local',
+        0,
+      ],
+    );
+    await database.customStatement(
+      'INSERT INTO operation_outbox (operation_id, queued_at) '
+      'VALUES (?, ?)',
+      ['pending-operation', 0],
+    );
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        fail('Pending operations must prevent backup upload.');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'user-1';
+    addTearDown(session.dispose);
+    final service = RemoteBackupService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+    );
+    await expectLater(
+      service.uploadVerifiedSnapshot(
+        deviceId: '123e4567-e89b-12d3-a456-426614174000',
+      ),
+      throwsA(isA<StateError>()),
+    );
+    final pending = await database.customSelect(
+      'SELECT operation_id FROM operation_outbox',
+    ).get();
+    expect(pending, hasLength(1));
+  });
+
+  test('concurrent settings write aborts inconsistent backup capture',
+      () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    await repository.createNotebook();
+    var reads = 0;
+    textStorageReadOverride = (key) async {
+      if (key != 'app_prefs.json') {
+        return null;
+      }
+      reads++;
+      return reads == 1 ? '{"darkMode":false}' : '{"darkMode":true}';
+    };
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        fail('Mixed-state backup must not reach the server.');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'user-1';
+    addTearDown(session.dispose);
+    final service = RemoteBackupService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+    );
+    await expectLater(
+      service.uploadVerifiedSnapshot(
+        deviceId: '123e4567-e89b-12d3-a456-426614174000',
+      ),
+      throwsA(isA<StateError>()),
+    );
+    expect(reads, 2);
+  });
 
   test('keeps a backup dirty when data changes during upload', () async {
     final database = NotesDatabase(NativeDatabase.memory());

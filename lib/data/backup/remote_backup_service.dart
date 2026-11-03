@@ -65,41 +65,86 @@ class RemoteBackupService {
         )) {
       await session.refresh();
     }
+    final userId = session.userId!;
     await AppSaveCoordinator.instance.flushPending();
     await repository.waitForPendingSaves();
-    final notebooks = await repository.fetchNotebooks();
-    if (repository.lastFetchSkippedCorruptRows) {
-      throw StateError('Remote backup refused unreadable notebook data.');
-    }
-
-    final libraryState = await readStoredText('library_folders.json');
-    final studyPlannerState = await readStoredText('study_planner.json');
-    final preferences = await readStoredText('app_prefs.json');
-    final editorPreferences = await readStoredText('editor_prefs.json');
-    final recentColors = await readStoredText('shared_recent_colors.json');
-    final userId = session.userId!;
-    final backupPreferences = await readStoredText(
+    // Check text-backed state around the SQLite transaction. A concurrent
+    // settings/planner write must not produce a mixed-state backup.
+    final keys = <String>[
+      'library_folders.json',
+      'study_planner.json',
+      'app_prefs.json',
+      'editor_prefs.json',
+      'shared_recent_colors.json',
       _backupPreferenceKey(userId),
-    );
+    ];
+    final files = <String, String?>{};
+    for (final key in keys) {
+      files[key] = await readStoredText(key);
+    }
+    late final List<Notebook> notebooks;
+    late final Map<String, int> operationCheckpoint;
+    await repository.database.transaction(() async {
+      final pending = await repository.database
+          .customSelect('SELECT COUNT(*) AS pending FROM operation_outbox')
+          .getSingle();
+      if (pending.read<int>('pending') != 0) {
+        // Local intents survive in the durable outbox. They must not
+        // masquerade as an acknowledged server snapshot.
+        throw StateError(
+          'Remote backup deferred until local operations are acknowledged.',
+        );
+      }
+      notebooks = await repository.fetchNotebooks();
+      if (repository.lastFetchSkippedCorruptRows) {
+        throw StateError('Remote backup refused unreadable notebook data.');
+      }
+      final rows = await repository.database
+          .customSelect(
+            'SELECT scope, server_sequence FROM sync_checkpoints '
+            'ORDER BY scope',
+          )
+          .get();
+      operationCheckpoint = {
+        for (final row in rows)
+          row.read<String>('scope'): row.read<int>('server_sequence'),
+      };
+    });
+    for (final key in keys) {
+      if (await readStoredText(key) != files[key]) {
+        throw StateError('Account data changed during backup capture.');
+      }
+    }
+    if (!session.isSignedIn || session.userId != userId) {
+      throw StateError('Account changed during backup capture.');
+    }
+    final recentColors = files['shared_recent_colors.json'];
     final payload = <String, dynamic>{
       'notebooks': repository.encodeSelfContainedBackup(notebooks),
-      'libraryState': _decodeOptionalObject(libraryState),
-      'studyPlannerState': _decodeOptionalObject(studyPlannerState),
-      'appPreferences': _decodeOptionalObject(preferences),
-      'editorPreferences': _decodeOptionalObject(editorPreferences),
+      'libraryState': _decodeOptionalObject(files['library_folders.json']),
+      'studyPlannerState': _decodeOptionalObject(files['study_planner.json']),
+      'appPreferences': _decodeOptionalObject(files['app_prefs.json']),
+      'editorPreferences': _decodeOptionalObject(files['editor_prefs.json']),
       'recentColors': recentColors == null
           ? <dynamic>[]
           : _decodeRecentColors(recentColors),
-      'backupPreferences': _decodeOptionalObject(backupPreferences),
+      'backupPreferences': _decodeOptionalObject(
+        files[_backupPreferenceKey(userId)],
+      ),
     };
-    // Native platforms serialize and hash off the UI isolate. On Web the
-    // caller schedules this operation only after user inactivity.
+    // Native platforms serialize and hash off the UI isolate.
     final encoded = await compute(_encodeSnapshot, <String, dynamic>{
       'payload': payload,
       'deviceId': deviceId,
+      'accountId': userId,
+      'schemaVersion': repository.database.schemaVersion,
+      'operationCheckpoint': operationCheckpoint,
     });
     final checksum = encoded.checksum;
     final bytes = encoded.bytes;
+    if (!session.isSignedIn || session.userId != userId) {
+      throw StateError('Account changed during backup encoding.');
+    }
     if (bytes.length > maximumSnapshotBytes) {
       throw StateError('Remote backup exceeds the client safety limit.');
     }
@@ -414,6 +459,24 @@ class RemoteBackupService {
             envelope['deviceId'] != backup['deviceId']) {
           throw const FormatException('Unsupported account backup envelope.');
         }
+        final hasMetadata = envelope.containsKey('accountId') ||
+            envelope.containsKey('schemaVersion') ||
+            envelope.containsKey('operationCheckpoint');
+        if (hasMetadata) {
+          final checkpoint = envelope['operationCheckpoint'];
+          if (envelope['accountId'] != expectedUserId ||
+              envelope['schemaVersion'] is! int ||
+              (envelope['schemaVersion'] as int) <= 0 ||
+              checkpoint is! Map<String, dynamic> ||
+              checkpoint.entries.any(
+                (entry) =>
+                    entry.key.isEmpty ||
+                    entry.value is! int ||
+                    (entry.value as int) < 0,
+              )) {
+            throw const FormatException('Invalid backup operation checkpoint.');
+          }
+        }
         final payload = _jsonObject(envelope['payload']);
         final checksum = sha256.convert(backupPayloadBytes(bytes)).toString();
         if (checksum != envelope['checksum'] &&
@@ -711,12 +774,18 @@ class RemoteBackupService {
 ) {
   final payload = data['payload'] as Map<String, dynamic>;
   final deviceId = data['deviceId'] as String;
+  final accountId = data['accountId'] as String;
+  final schemaVersion = data['schemaVersion'] as int;
+  final checkpoint = data['operationCheckpoint'] as Map<String, int>;
   final checksum = sha256.convert(utf8.encode(jsonEncode(payload))).toString();
   final envelope = <String, dynamic>{
     'format': 'nanotateczki-server-backup',
     'version': RemoteBackupService.formatVersion,
     'createdAt': DateTime.now().toUtc().toIso8601String(),
     'deviceId': deviceId,
+    'accountId': accountId,
+    'schemaVersion': schemaVersion,
+    'operationCheckpoint': checkpoint,
     'checksumAlgorithm': 'sha256',
     'checksum': checksum,
     'payload': payload,
