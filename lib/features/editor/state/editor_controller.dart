@@ -234,6 +234,82 @@ class EditorController extends ChangeNotifier {
     return true;
   }
 
+  /// Displays one committed v2 Share object delta without remounting the editor.
+  ///
+  /// The caller must persist the matching operation in the same transaction
+  /// as its SQLite projection before invoking this method. No local write,
+  /// undo entry, viewport change or whole-notebook import occurs here.
+  bool applyConfirmedShareObjectPatch({
+    required String pageId,
+    required String objectId,
+    InkStroke? stroke,
+    TextBlock? text,
+    ImageBlock? image,
+    bool deleted = false,
+  }) {
+    if (objectId.isEmpty || pageId.isEmpty) {
+      throw ArgumentError('Share object IDs must be nonempty.');
+    }
+    final supplied =
+        (stroke == null ? 0 : 1) +
+        (text == null ? 0 : 1) +
+        (image == null ? 0 : 1);
+    if (supplied != (deleted ? 0 : 1) ||
+        (stroke != null && stroke.id != objectId) ||
+        (text != null && text.id != objectId) ||
+        (image != null && image.id != objectId)) {
+      throw ArgumentError('Expected exactly one matching object or deletion.');
+    }
+    if (!canApplyConfirmedRemoteNotebook ||
+        activeImageBlockId == objectId ||
+        (lassoSelection?.strokeIds.contains(objectId) ?? false) ||
+        (lassoSelection?.textBlockIds.contains(objectId) ?? false) ||
+        (lassoSelection?.imageBlockIds.contains(objectId) ?? false)) {
+      return false;
+    }
+    final index = pages.indexWhere((page) => page.id == pageId);
+    if (index < 0) {
+      return false;
+    }
+    final current = pages[index];
+    final hasInk = stroke != null ||
+        current.inkStrokes.any((entry) => entry.id == objectId);
+    final next = current.copyWith(
+      inkStrokes: [
+        for (final entry in current.inkStrokes)
+          if (entry.id != objectId) entry,
+        if (stroke != null) stroke,
+      ],
+      textBlocks: [
+        for (final entry in current.textBlocks)
+          if (entry.id != objectId) entry,
+        if (text != null) text,
+      ],
+      imageBlocks: [
+        for (final entry in current.imageBlocks)
+          if (entry.id != objectId) entry,
+        if (image != null) image,
+      ],
+    );
+    pages = [
+      for (var i = 0; i < pages.length; i++)
+        if (i == index) next else pages[i],
+    ];
+    notebook = notebook.copyWith(pages: pages);
+    // v2 undo/redo must ultimately emit inverse operations. Until stage 11
+    // binds them, do not allow a stale legacy action to undo remote changes.
+    _undoActions.clear();
+    _redoActions.clear();
+    _notifyHistoryChanged();
+    if (hasInk) {
+      _touchInkPageRevision(pageId);
+    }
+    if (!hasInk || notebook.kind != NotebookKind.board) {
+      notifyListeners();
+    }
+    return true;
+  }
+
   NotePage? pageById(String pageId) {
     for (final page in pages) {
       if (page.id == pageId) {
