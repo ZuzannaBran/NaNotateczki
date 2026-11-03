@@ -24,6 +24,7 @@ import '../data/sync/api_client.dart';
 import '../data/sync/app_activity_wake_service.dart';
 import '../data/sync/cloud_sync_service.dart';
 import '../data/sync/diagnostics_upload_service.dart';
+import '../data/sync/device_clock_check.dart';
 import '../data/sync/live_web_sync_service.dart';
 import '../data/sync/planner_sync_service.dart';
 import '../features/editor/state/ink_color_presets.dart';
@@ -67,6 +68,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   Timer? _rememberedLoginRetry;
   bool _appIsForeground = true;
   String? _bootstrappedAccount;
+  String? _clockCheckedForUser;
+  final GlobalKey<ScaffoldMessengerState> _notificationMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
   bool _databaseWasReset = false;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
   final ValueNotifier<String?> _exitFailure = ValueNotifier<String?>(null);
@@ -364,6 +368,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       return Future<void>.value();
     }
     final userId = session.userId!;
+    if (_clockCheckedForUser != userId) {
+      _clockCheckedForUser = userId;
+      unawaited(_checkAccountClock(userId));
+    }
     if (_bootstrappedAccount == userId) {
       return Future<void>.value();
     }
@@ -615,6 +623,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               unawaited(_startAccountSync());
             } else if (!accountSession.isSignedIn) {
               _bootstrappedAccount = null;
+              _clockCheckedForUser = null;
               _settingsPoll?.cancel();
               _settingsDebounce?.cancel();
               _plannerDebounce?.cancel();
@@ -656,6 +665,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             ),
           ],
           child: MaterialApp(
+            scaffoldMessengerKey: _notificationMessengerKey,
             debugShowCheckedModeBanner: false,
             scrollBehavior: const AppScrollBehavior(),
             title: 'NaNotateczki',
