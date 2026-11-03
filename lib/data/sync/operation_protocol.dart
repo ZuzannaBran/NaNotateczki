@@ -202,6 +202,17 @@ class OperationEnvelope {
         throw const FormatException('Invalid property name.');
       }
     }
+    if (kind == OperationKind.taskCreate &&
+        (value['plannerUid'] is! String ||
+            (value['plannerUid'] as String).isEmpty)) {
+      throw const FormatException('Task requires a plannerUid.');
+    }
+    if (kind.target == OperationTarget.task &&
+        value.containsKey('plannerUid') &&
+        (value['plannerUid'] is! String ||
+            (value['plannerUid'] as String).isEmpty)) {
+      throw const FormatException('Invalid task plannerUid.');
+    }
     if (creating) {
       final targetId = objectId ?? documentId;
       if (value.containsKey('id') && value['id'] != targetId) {
