@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'api_client.dart';
@@ -24,7 +25,7 @@ typedef RemoteOperationReducer = Future<void> Function(
 ///
 /// Legacy v1 snapshot writers must not run for documents driven by this
 /// engine. Enabling the engine for existing v1 accounts requires stage 11.
-class SyncEngine extends ChangeNotifier {
+class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   SyncEngine({
     required this.store,
     required this.gateway,
@@ -32,6 +33,7 @@ class SyncEngine extends ChangeNotifier {
     required this.checkpointScope,
     required this.applyRemote,
     this.apiClient,
+    this.refreshAuthentication,
     this.enableRealtime = true,
     this.pollInterval = const Duration(seconds: 45),
   }) {
@@ -41,6 +43,7 @@ class SyncEngine extends ChangeNotifier {
   }
 
   static const maxBatchSize = 50;
+  static const maxBatchPayloadBytes = 800 * 1024;
   static const maxConcurrentActors = 3;
   static const maxPagesPerPass = 100;
 
@@ -50,6 +53,7 @@ class SyncEngine extends ChangeNotifier {
   final String checkpointScope;
   final RemoteOperationReducer applyRemote;
   final ApiClient? apiClient;
+  final Future<void> Function()? refreshAuthentication;
   final bool enableRealtime;
   final Duration pollInterval;
 
@@ -106,6 +110,7 @@ class SyncEngine extends ChangeNotifier {
       return syncNow();
     }
     _started = true;
+    WidgetsBinding.instance.addObserver(this);
     final generation = ++_generation;
     _poll = Timer.periodic(pollInterval, (_) => requestSync());
     if (enableRealtime && apiClient != null) {
@@ -115,6 +120,7 @@ class SyncEngine extends ChangeNotifier {
   }
 
   Future<void> stop() async {
+    WidgetsBinding.instance.removeObserver(this);
     _started = false;
     ++_generation;
     _requested = false;
@@ -212,7 +218,7 @@ class SyncEngine extends ChangeNotifier {
   Future<void> _pull(int generation) async {
     var cursor = await store.checkpoint(checkpointScope);
     for (var pageNumber = 0; pageNumber < maxPagesPerPass; pageNumber++) {
-      final page = await gateway.readAfter(cursor);
+      final page = await _authorized(() => gateway.readAfter(cursor));
       if (!_isActive(generation)) {
         return;
       }
@@ -276,10 +282,27 @@ class SyncEngine extends ChangeNotifier {
       return;
     }
     final groups = <String, List<OperationEnvelope>>{};
+    final bytesByActor = <String, int>{};
+    final full = <String>{};
     for (final operation in ready) {
-      final group = groups.putIfAbsent(operation.actorId, () => []);
-      if (group.length < maxBatchSize) {
-        group.add(operation);
+      final actor = operation.actorId;
+      if (full.contains(actor)) {
+        continue;
+      }
+      final group = groups.putIfAbsent(actor, () => []);
+      final size = utf8.encode(jsonEncode(operation.toJson())).length;
+      final total = bytesByActor[actor] ?? 0;
+      if (group.length >= maxBatchSize ||
+          (group.isNotEmpty && total + size > maxBatchPayloadBytes)) {
+        full.add(actor);
+        continue;
+      }
+      group.add(operation);
+      bytesByActor[actor] = total + size;
+      if (total + size > maxBatchPayloadBytes) {
+        // An oversized individual operation is retained and rejected by
+        // the transport, never silently bypassed by later actor edits.
+        full.add(actor);
       }
     }
     final selected = groups.entries.take(maxConcurrentActors).toList();
@@ -287,10 +310,11 @@ class SyncEngine extends ChangeNotifier {
       for (final group in selected)
         _sendActor(generation, group.key, group.value),
     ]);
-    if (groups.length > selected.length ||
-        ready.length >= maxBatchSize * selected.length) {
-      // Another pass can flush the remaining batches once the first ACKs
-      // are durable; deferred actors are filtered in OperationStore.
+    final attempted = selected.fold<int>(
+      0,
+      (total, group) => total + group.value.length,
+    );
+    if (ready.length > attempted) {
       _requested = true;
     }
   }
@@ -301,7 +325,7 @@ class SyncEngine extends ChangeNotifier {
     List<OperationEnvelope> batch,
   ) async {
     try {
-      final receipts = await gateway.send(batch);
+      final receipts = await _authorized(() => gateway.send(batch));
       if (!_isActive(generation)) {
         return;
       }
@@ -330,8 +354,18 @@ class SyncEngine extends ChangeNotifier {
       notifyListeners();
       final failures = (_actorFailures[actor] ?? 0) + 1;
       _actorFailures[actor] = failures;
-      final permanent = error is ApiException &&
-          (error.statusCode == 403 || error.statusCode == 422);
+      final causalGap = error is ApiException &&
+          error.statusCode == 409 &&
+          error.payload is Map &&
+          (error.payload as Map)['detail'] is Map &&
+          ((error.payload as Map)['detail'] as Map)['code'] ==
+              'CAUSAL_GAP';
+      final permanent = error is ArgumentError ||
+          (error is ApiException &&
+              (error.statusCode == 403 ||
+                  error.statusCode == 413 ||
+                  error.statusCode == 422 ||
+                  (error.statusCode == 409 && !causalGap)));
       final delay = permanent
           ? const Duration(minutes: 5)
           : _backoff(failures);
@@ -339,6 +373,29 @@ class SyncEngine extends ChangeNotifier {
       // sequences of that actor, not unrelated actors.
       await store.scheduleRetry(batch.first.operationId, delay: delay);
       _scheduleRetry(delay);
+    }
+  }
+
+  Future<T> _authorized<T>(Future<T> Function() action) async {
+    try {
+      return await action();
+    } on ApiException catch (error) {
+      if (error.statusCode != 401 || refreshAuthentication == null) {
+        rethrow;
+      }
+      await refreshAuthentication!();
+      return action();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !_started) {
+      return;
+    }
+    requestSync();
+    if (enableRealtime && apiClient != null && _socket == null) {
+      unawaited(_connectSocket(_generation));
     }
   }
 
