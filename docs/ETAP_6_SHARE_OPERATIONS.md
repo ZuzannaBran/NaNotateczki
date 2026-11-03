@@ -88,3 +88,22 @@ stan końcowy, niezmieniony viewport oraz brak przywrócenia tombstone.
 Zakaz uruchamiania GitHub Actions bez wyraźnej prośby użytkownika nadal
 obowiązuje. W środowisku bez Fluttera/Darta oraz zależności backendu nie
 wolno raportować nowych testów jako wykonanych.
+
+## Kolejna część etapu 6 — zakończone gesty ink
+
+- `ShareInkEditAdapter` planuje przyrostowe `stroke.create`,
+  `object.delete`, `object.transform`, `object.set` i
+  `object.reorder` na poziomie UID, bez wysyłania notebooka.
+  Walidacja payloadu nie pozwala wysłać uszkodzonej kreski ani
+  niemożliwego do obsłużenia narzędzia.
+- Zmiana koloru i punktów jest rozdzielona na niezależne właściwości.
+  Odległe obiekty nie są dotykane; usunięcie pozostaje tombstonem.
+- Naprawiono składnię adaptera tekstu i usunięto kosztowne kopiowanie
+  całego CRDT przy zmianie atomu. Testy obejmują Unicode, granicę 256
+  atomów, zachowanie poprzedniej projekcji, ink oraz z-order.
+
+**Nadal nie jest to produkcyjne przełączenie v2.**
+Adapter jest celowo opt-in: pełna integracja transakcyjna
+`EditorController` + `OperationStore`, inicjalizacja projektu z migracji,
+transport assetów i testy prawdziwego hosta i gościa są konieczne.
+Serwer blokuje współistnienie dwóch writerów (v1/v2) dla tego samego UID.

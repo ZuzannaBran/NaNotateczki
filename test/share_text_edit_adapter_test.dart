@@ -121,8 +121,8 @@ void main() {
 
   test('513 code points split into three insert and delete batches', () {
     final adapter = ShareTextEditAdapter();
-    var state = applyPlan({}, adapter.plan(atoms: {}, newText: 'x' * 513));
-    final changes = adapter.plan(atoms: state, newText: 'y' * 513);
+    var state = applyPlan({}, adapter.plan(atoms: {}, newText: List.filled(513, 'x').join()));
+    final changes = adapter.plan(atoms: state, newText: List.filled(513, 'y').join());
     expect(changes.where((it) => it.kind == OperationKind.textDelete),
         hasLength(3));
     expect(changes.where((it) => it.kind == OperationKind.textInsert),

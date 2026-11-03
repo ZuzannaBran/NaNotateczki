@@ -2415,3 +2415,16 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   zastanych wcześniej komunikatów po otwarciu dialogu.
 
 - `docs/ETAP_0_STAN_WYJSCIOWY.md`: stan wyjściowy zapisu, usuwania, backupu i share oraz granice weryfikacji.
+
+### Ink Share v2 (2026-11-03)
+
+- `lib/data/sync/share_ink_edit_adapter.dart`:
+  `ShareInkEditAdapter.plan` przekłada ukończone zmiany stroke na
+  create/delete/transform/set/reorder, a `decode` waliduje remote ink.
+  Adapter jest opt-in i nie zastępuje jeszcze starego zapisu Share.
+- `lib/data/sync/share_text_edit_adapter.dart`:
+  plain-text CRDT; formatowane delty Quill wymagają osobnego protokołu.
+- `lib/data/sync/operation_text_sequence.dart`:
+  copy-on-write atomów i rygorystyczna walidacja rankingu.
+- `test/share_ink_edit_adapter_test.dart` oraz testy sekwencji tekstu:
+  ink, gumka, transformacje, kolor, z-order, Unicode, wsady i korupcja.
