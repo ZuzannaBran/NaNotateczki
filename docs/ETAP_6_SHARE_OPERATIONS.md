@@ -128,3 +128,24 @@ Gość zatrzymuje REST/polling/WebSocket, dostaje pojedynczy
 jawnego odzyskania. Regresja w `test/sync_engine_test.dart` zabezpiecza
 zachowanie outboxu po 410. Błąd 401 nadal oznacza konieczność uzyskania
 nowego biletu; nie usuwa danych.
+
+## Uzupełnienie: kolejność ink i zakończenie sesji
+
+- `EditorController.applyConfirmedShareObjectPatch` zachowuje pozycję
+  istniejącej kreski podczas zwykłej aktualizacji koloru i geometrii.
+  Zmiana `object.reorder` może przekazać `sortIndex` i wtedy zmienić
+  pozycję. Indeks ujemny oraz indeks bez kreski są odrzucane.
+  Regresja: `test/share_editor_object_patch_test.dart`.
+- Po otrzymaniu operacji remote adapter UI powinien wywołać patch
+  dopiero z `SyncEngine.onRemoteCommitted`. Nie wolno modyfikować
+  `EditorController` z callbacku transakcyjnego `applyRemote`.
+- Serwer rozróżnia nieznany bilet gościa (401) od wcześniej ważnego,
+  ale już wygasłego biletu (410). Kod 410 zatrzymuje `SyncEngine`
+  i nie usuwa niezatwierdzonego outboxu; regresja:
+  `api/tests/test_operations_share_auth.py` w `NaNotateczki-serwer`.
+
+**Nadal wymaga etapów 7, 9, 11, 12 i 13:** trwały magazyn wszystkich
+klientów Share, poprawna migracja UID v1 na v2 bez dwóch writerów,
+transport assetów, obsługa formatowania Quill, emitowanie wszystkich
+akcji edytora, podgląd niedokończonych kresek i pełne E2E. Do tego czasu
+kod pozostaje opt-in; produkcyjny Share wciąż używa starego protokołu.
