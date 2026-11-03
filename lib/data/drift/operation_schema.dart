@@ -110,7 +110,7 @@ const operationTombstoneV4Migration = <String>[
   CREATE TABLE object_tombstones_v4 (
     document_id TEXT NOT NULL,
     target_kind TEXT NOT NULL
-      CHECK(target_kind IN ('document', 'page', 'object', 'folder', 'task')),
+      CHECK(target_kind IN ('document', 'page', 'object', 'folder')),
     page_id TEXT NOT NULL DEFAULT '',
     object_id TEXT NOT NULL,
     operation_id TEXT NOT NULL
