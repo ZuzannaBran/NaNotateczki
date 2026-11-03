@@ -443,12 +443,30 @@ Po zalogowaniu, lokalnej zmianie, wznowieniu i co 45 sekund klient pobiera
 stronicowany stan `GET /v1/planner/entries` i wysyła nowsze lokalne wpisy
 do `PUT /v1/planner/entries/{id}`; WebSocket `planner_changed`
 wywołuje natychmiastowe uzgodnienie. Usunięcia są trwałymi tombstones.
-W obrębie jednego ID wygrywa późniejszy znacznik modyfikacji, osobne ID
-scalają się niezależnie. Zegar odliczający sesji nie generuje zapisu
-w każdej sekundzie, tylko przy zmianach stanu. Po błędzie połączenia wpisy
-pozostają w pliku i są ponawiane. Przy zmianach offline na dwóch urządzeniach
-kolejność zależy od poprawnego ustawienia zegara UTC obu systemów.
+Dla aktywnych wpisów tego samego ID wygrywa późniejszy znacznik
+modyfikacji w UTC, osobne ID scalają się niezależnie. Potwierdzone usunięcie
+jest trwałym tombstone: ma pierwszeństwo nawet nad edycją z zegara
+ustawionego w przyszłość, a stare PUT nie mogą przywrócić tego samego ID.
+UTC usuwa różnicę stref, ale nie rozbieżność zegarów urządzeń; pełne
+rozstrzyganie równoległych aktywnych edycji nadal wymaga rewizji/CAS.
+Zegar odliczający sesji nie generuje zapisu w każdej sekundzie, tylko
+przy zmianach stanu. Po błędzie połączenia wpisy pozostają w pliku
+i są ponawiane.
 Wymagana migracja PostgreSQL: `0008_planner_entries.sql`.
+
+## Pierwszeństwo live sync nad asynchronicznym backupem
+
+Ważna jest chwila lokalnej edycji i przyczynowa rewizja danych, nie czas
+zweryfikowania ani wysłania snapshotu backupu. Backup jest archiwum
+awaryjnym, a nie operacją edycji wpisów konta. Po restarcie urządzenia
+live-sync na serwerze wraz z tombstones jest autorytatywny. Podczas
+odzyskiwania starego `study_planner.json` backup może wypełnić wyłącznie
+pusty lokalny planer, jeśli na serwerze nie istnieje żaden wpis (również
+usunięty) i lokalnie nie zapisano żadnego tombstone.
+W żadnym razie nie wolno ustalać pierwszeństwa poprzez `verifiedAt`.
+Dla dwóch niepowiązanych edycji offline same zegary UTC nadal nie
+gwarantują deterministycznej kolejności; wymagany jest protokół CAS
+na poziomie poszczególnych wpisów.
 
 ## Wyjście i dodatkowa reguła usunięcie–edycja (2026-11-02)
 
