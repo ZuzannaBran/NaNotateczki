@@ -46,6 +46,9 @@ class HttpOperationGateway implements OperationGateway {
   Future<List<OperationReceipt>> send(
     List<OperationEnvelope> operations,
   ) async {
+    for (final operation in operations) {
+      operation.validateForV2Projection();
+    }
     if (operations.isEmpty || operations.length > 50) {
       throw ArgumentError('An operation batch must contain 1-50 entries.');
     }

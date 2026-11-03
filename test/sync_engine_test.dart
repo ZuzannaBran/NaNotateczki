@@ -72,7 +72,7 @@ OperationEnvelope _remote(
     objectId: objectId,
     kind: OperationKind.objectCreate,
     payload: {
-      'properties': {'name': objectId},
+      'value': {'name': objectId},
     },
     dependencies: const [],
     logicalClock: 1,
@@ -127,7 +127,7 @@ void main() {
       objectId: id,
       kind: OperationKind.objectCreate,
       payload: {
-        'properties': {'name': id},
+        'value': {'name': id},
       },
       apply: (_) => database.customStatement(
         'INSERT INTO projection_probe VALUES (?, ?)',
@@ -135,6 +135,30 @@ void main() {
       ),
     );
   }
+
+  test('invalid create is refused before any SQLite or outbox write', () async {
+    await expectLater(
+      engine.writeLocal(
+        documentId: 'document-one',
+        pageId: 'page-one',
+        objectId: 'wrong-payload',
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'properties': {'name': 'wrong-payload'},
+        },
+        apply: (_) => database.customStatement(
+          'INSERT INTO projection_probe VALUES (?, ?)',
+          ['wrong-payload', 'must-not-persist'],
+        ),
+      ),
+      throwsFormatException,
+    );
+    expect(await store.pending(), isEmpty);
+    expect(
+      await database.customSelect('SELECT * FROM projection_probe').get(),
+      isEmpty,
+    );
+  });
 
   test('optimistic projection is durable before an HTTP send', () async {
     final operation = await local('local-1');

@@ -102,6 +102,46 @@ class OperationEnvelope {
     );
   }
 
+  /// Validates payloads supported by the actual v2 PostgreSQL projector.
+  ///
+  /// The envelope itself also supports future text and asset operation kinds.
+  /// Those kinds must not enter a durable outbox until their reducers exist.
+  void validateForV2Projection() {
+    if (kind == OperationKind.textInsert ||
+        kind == OperationKind.textDelete ||
+        kind == OperationKind.assetAttach ||
+        kind == OperationKind.assetDetach) {
+      throw UnsupportedError('This operation has no v2 reducer yet.');
+    }
+    if (kind.wireName.endsWith('.delete')) {
+      if (payload.isNotEmpty) {
+        throw const FormatException('Delete payload must be empty.');
+      }
+      return;
+    }
+    final creating =
+        kind == OperationKind.strokeCreate || kind.wireName.endsWith('.create');
+    final fieldName = creating ? 'value' : 'properties';
+    final value = payload[fieldName];
+    if (value is! Map || value.isEmpty || payload.length != 1) {
+      throw FormatException('Expected a nonempty $fieldName object.');
+    }
+    for (final key in value.keys) {
+      if (key is! String || key.isEmpty || key.length > 128) {
+        throw const FormatException('Invalid property name.');
+      }
+    }
+    if (creating) {
+      final targetId = objectId ?? documentId;
+      if (value.containsKey('id') && value['id'] != targetId) {
+        throw const FormatException('Create payload ID does not match target.');
+      }
+      if (value.containsKey('uid') && value['uid'] != documentId) {
+        throw const FormatException('Create payload UID does not match target.');
+      }
+    }
+  }
+
   Map<String, dynamic> toJson() => {
     'schemaVersion': schemaVersion,
     'operationId': operationId,

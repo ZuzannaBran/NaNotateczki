@@ -61,6 +61,32 @@ void main() {
     expect(ack.single.cursor, 23);
   });
 
+  test('invalid create payload cannot reach the HTTP transport', () async {
+    var requested = false;
+    final client = clientFor((_) async {
+      requested = true;
+      return http.Response('{}', 200);
+    });
+    final original = _operation();
+    final invalid = OperationEnvelope(
+      operationId: original.operationId,
+      actorId: original.actorId,
+      actorSeq: original.actorSeq,
+      documentId: original.documentId,
+      kind: original.kind,
+      payload: const {
+        'properties': {'title': 'Invalid create'},
+      },
+      dependencies: original.dependencies,
+      logicalClock: original.logicalClock,
+    );
+    await expectLater(
+      HttpOperationGateway(client).send([invalid]),
+      throwsFormatException,
+    );
+    expect(requested, isFalse);
+  });
+
   test('a partial ACK batch cannot be accepted', () async {
     final operation = _operation();
     final client = clientFor((_) async {
