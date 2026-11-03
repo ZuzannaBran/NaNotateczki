@@ -106,9 +106,13 @@ class OperationActorClock {
     );
     final observed = json['observedOperations'] as List? ?? [];
     for (final entry in observed) {
-      clock.observe(
-        OperationEnvelope.fromJson(Map<String, dynamic>.from(entry as Map)),
+      final remote = OperationEnvelope.fromJson(
+        Map<String, dynamic>.from(entry as Map),
       );
+      if (remote.logicalClock > clock.logicalClock) {
+        throw const FormatException('Observed frontier exceeds actor clock.');
+      }
+      clock.observe(remote);
     }
     return clock;
   }
