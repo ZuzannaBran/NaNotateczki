@@ -242,6 +242,19 @@ class PendingShareProjection {
     var result = confirmed;
     unresolved.clear();
     for (final op in pending.values) {
+      final targetDeleted = result.tombstones.contains('document') ||
+          (op.pageId != null &&
+              result.tombstones.contains('page:${op.pageId}')) ||
+          (op.objectId != null &&
+              op.pageId != null &&
+              result.tombstones.contains(
+                'object:${op.pageId}:${op.objectId}',
+              ));
+      if (targetDeleted && !op.kind.wireName.endsWith('.delete')) {
+        unresolved[op.operationId] =
+            'The target was deleted remotely; keep this pending edit.';
+        continue;
+      }
       try {
         result = result.apply(op, optimistic: true);
       } catch (error) {
