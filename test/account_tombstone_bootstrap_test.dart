@@ -32,7 +32,9 @@ void main() {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
-    final original = await repository.createNotebook(title: 'Deleted elsewhere');
+    final original = await repository.createNotebook(
+      title: 'Deleted elsewhere',
+    );
     final suffix = sha256
         .convert(utf8.encode('account-1'))
         .toString()
@@ -42,9 +44,7 @@ void main() {
         'version': 1,
         'cursor': 2,
         'revisions': {original.uid: 2},
-        'bases': {
-          original.uid: NotebookRepository.encodeNotebook(original),
-        },
+        'bases': {original.uid: NotebookRepository.encodeNotebook(original)},
         'pending': <String>[],
       }),
     };

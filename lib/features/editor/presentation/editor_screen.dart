@@ -603,7 +603,8 @@ class _EditorScreenState extends State<EditorScreen> {
     if ((HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed) &&
         event.scrollDelta.dy != 0) {
-      final scaleDelta = math.exp(-event.scrollDelta.dy / 200)
+      final scaleDelta = math
+          .exp(-event.scrollDelta.dy / 200)
           .clamp(0.25, 4.0)
           .toDouble();
       GestureBinding.instance.pointerSignalResolver.register(event, (_) {

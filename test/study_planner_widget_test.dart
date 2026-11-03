@@ -1626,12 +1626,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final done = find.byKey(
-        ValueKey('planner-session-tile:${finished.id}'),
-      ).first;
-      final upcoming = find.byKey(
-        ValueKey('planner-session-tile:${planned.id}'),
-      ).first;
+      final done = find
+          .byKey(ValueKey('planner-session-tile:${finished.id}'))
+          .first;
+      final upcoming = find
+          .byKey(ValueKey('planner-session-tile:${planned.id}'))
+          .first;
       final scheme = Theme.of(tester.element(done)).colorScheme;
       final doneColor = tester.widget<Material>(done).color!;
       final upcomingColor = tester.widget<Material>(upcoming).color!;

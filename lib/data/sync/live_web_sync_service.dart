@@ -456,11 +456,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         // A full bootstrap can omit a document after its tombstone has
         // been compacted. Do not resurrect a previously synced UID.
         if (remoteCursor > 0 && _revisions.containsKey(notebook.uid)) {
-          if (_hasUnsentEdit(
-            notebook.uid,
-            notebook,
-            _bases[notebook.uid],
-          )) {
+          if (_hasUnsentEdit(notebook.uid, notebook, _bases[notebook.uid])) {
             final copy = await _conflictCopy(notebook, reserved: imports);
             imports.add(copy);
             _queueConflictCopy(copy.uid);

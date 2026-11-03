@@ -194,7 +194,6 @@ void main() {
     await tester.pump();
     expect(controller.viewScale, zoomedScale);
 
-
     await tester.pumpWidget(app(showToolbar: false));
     await tester.pump();
     expect(toolbar, findsNothing);

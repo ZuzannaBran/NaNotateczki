@@ -362,7 +362,8 @@ class _BoardScreenState extends State<BoardScreen> {
     if ((HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed) &&
         event.scrollDelta.dy != 0) {
-      final factor = math.exp(-event.scrollDelta.dy / 200)
+      final factor = math
+          .exp(-event.scrollDelta.dy / 200)
           .clamp(0.25, 4.0)
           .toDouble();
       controller.zoomBy(factor, focalPoint: event.localPosition);
