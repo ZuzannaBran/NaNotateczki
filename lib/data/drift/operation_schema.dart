@@ -53,7 +53,7 @@ const operationSchemaStatements = <String>[
   CREATE TABLE IF NOT EXISTS object_tombstones (
     document_id TEXT NOT NULL,
     target_kind TEXT NOT NULL
-      CHECK(target_kind IN ('document', 'page', 'object', 'folder')),
+      CHECK(target_kind IN ('document', 'page', 'object', 'folder', 'task')),
     page_id TEXT NOT NULL DEFAULT '',
     object_id TEXT NOT NULL,
     operation_id TEXT NOT NULL
@@ -110,7 +110,7 @@ const operationTombstoneV4Migration = <String>[
   CREATE TABLE object_tombstones_v4 (
     document_id TEXT NOT NULL,
     target_kind TEXT NOT NULL
-      CHECK(target_kind IN ('document', 'page', 'object', 'folder')),
+      CHECK(target_kind IN ('document', 'page', 'object', 'folder', 'task')),
     page_id TEXT NOT NULL DEFAULT '',
     object_id TEXT NOT NULL,
     operation_id TEXT NOT NULL
@@ -130,4 +130,29 @@ const operationTombstoneV4Migration = <String>[
   ''',
   'DROP TABLE object_tombstones',
   'ALTER TABLE object_tombstones_v4 RENAME TO object_tombstones',
+];
+
+ 
+/// v6 adds task tombstones without rewriting accepted operations or IDs.
+const operationTombstoneV6Migration = <String>[
+  '''
+  CREATE TABLE object_tombstones_v6 (
+    document_id TEXT NOT NULL,
+    target_kind TEXT NOT NULL
+      CHECK(target_kind IN ('document', 'page', 'object', 'folder', 'task')),
+    page_id TEXT NOT NULL DEFAULT '',
+    object_id TEXT NOT NULL,
+    operation_id TEXT NOT NULL
+      REFERENCES operations(operation_id) ON DELETE RESTRICT,
+    PRIMARY KEY(document_id, target_kind, page_id, object_id)
+  )
+  ''',
+  '''
+  INSERT INTO object_tombstones_v6
+    (document_id, target_kind, page_id, object_id, operation_id)
+  SELECT document_id, target_kind, page_id, object_id, operation_id
+  FROM object_tombstones
+  ''',
+  'DROP TABLE object_tombstones',
+  'ALTER TABLE object_tombstones_v6 RENAME TO object_tombstones',
 ];
