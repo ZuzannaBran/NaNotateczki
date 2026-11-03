@@ -347,6 +347,59 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _checkAccountClock(String userId) async {
+    final api = _apiClient;
+    if (api == null) {
+      return;
+    }
+    try {
+      final result = await DeviceClockCheck(apiClient: api).measure();
+      if (!mounted ||
+          _accountSession?.userId != userId ||
+          _accountSession?.isSignedIn != true ||
+          result == null ||
+          !result.isSignificant) {
+        return;
+      }
+      final seconds = result.offset.inSeconds.abs();
+      final amount = seconds >= 120
+          ? '${(seconds / 60).round()} minutes'
+          : '$seconds seconds';
+      final message = 'Device clock is off by about $amount. '
+          'Enable automatic date and time to avoid sync conflicts.';
+      AppErrorLog.instance.record(
+        StateError(message),
+        null,
+        source: 'Device clock',
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            _accountSession?.userId != userId ||
+            _accountSession?.isSignedIn != true) {
+          return;
+        }
+        final messenger = _notificationMessengerKey.currentState;
+        if (messenger == null) {
+          return;
+        }
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 15),
+            content: Text(message),
+            action: SnackBarAction(
+              label: 'Dismiss',
+              onPressed: messenger.hideCurrentSnackBar,
+            ),
+          ),
+        );
+      });
+    } catch (_) {
+      // Old API versions, offline mode and unreliable measurements must not
+      // interrupt signing in or synchronization.
+    }
+  }
+
   Future<void> _startAccountSync() {
     final session = _accountSession;
     final backup = _remoteBackupService;
