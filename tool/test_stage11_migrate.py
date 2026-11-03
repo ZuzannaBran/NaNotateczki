@@ -95,6 +95,22 @@ class Stage11MigrationTests(unittest.TestCase):
         with self.assertRaisesRegex(MigrationError, 'inventory changed'):
             stage_migration(self.data)
 
+    def test_bound_account_with_whitespace_is_refused(self):
+        (self.data / 'account_profile.json').write_text(json.dumps({
+            'version': 1, 'boundUserId': ' account-a '}))
+        with self.assertRaises(MigrationError):
+            stage_migration(self.data)
+        self.assertFalse((self.data / 'accounts').exists())
+
+    def test_corrupted_partial_staging_marker_does_not_delete_files(self):
+        partial = self.data / 'local.stage11-incomplete'
+        partial.mkdir()
+        (partial / '.stage11_incomplete').write_bytes(bytes([255]) + b'invalid')
+        (partial / 'private').write_text('keep')
+        with self.assertRaises(MigrationError):
+            stage_migration(self.data)
+        self.assertEqual((partial / 'private').read_text(), 'keep')
+
     def test_directory_in_place_of_profile_is_refused(self):
         (self.data / 'account_profile.json').mkdir()
         with self.assertRaises(MigrationError):

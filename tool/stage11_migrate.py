@@ -103,7 +103,8 @@ def _profile_identity(root: Path, account_id: str | None) -> tuple[str, str | No
                 raise ValueError('Unsupported profile version')
             bound = data.get('boundUserId')
             if bound is not None and (not isinstance(bound, str) or
-                                      not bound.strip() or len(bound) > 512):
+                                      not bound.strip() or bound != bound.strip() or
+                                      len(bound) > 512):
                 raise ValueError('Invalid boundUserId')
         except (ValueError, UnicodeError) as exc:
             raise MigrationError(f'Invalid account profile: {exc}') from exc
@@ -275,7 +276,7 @@ def stage_migration(data: Path, account_id: str | None = None) -> dict:
     if staging.exists():
         incomplete = staging / INCOMPLETE
         if (not _regular_file(incomplete) or
-                incomplete.read_text(encoding='ascii') != 'stage11\n'):
+                incomplete.read_bytes() != b'stage11\n'):
             raise MigrationError('Unrecognized staging directory; refuse deletion')
         shutil.rmtree(staging)
     target.parent.mkdir(parents=True, exist_ok=True)

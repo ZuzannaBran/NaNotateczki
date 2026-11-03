@@ -43,7 +43,7 @@ Można dodatkowo wymagać dokładnego przypisanego konta przez
 --account-id UUID. Nie stosować tej opcji do nieskojarzonych danych Local.
 
 Regresje: python3 -m unittest discover -s tool -p 'test_stage11_migrate.py'.
-Siedemnaście scenariuszy dodano; testy wymagają wykonania na checkoutcie: poprawne kopiowanie,
+Dziewiętnaście scenariuszy dodano; testy wymagają wykonania na checkoutcie: poprawne kopiowanie,
 izolacja właściciela, brak assetu, restart, odmowa obcego katalogu,
 zmodyfikowane dane oraz symlink w assetach lub celu. Nowe testy:
 stale źródło, pliki `.previous`, ścieżka z `..`, zewnętrzny obraz,

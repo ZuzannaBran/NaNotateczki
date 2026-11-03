@@ -2520,7 +2520,7 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   zgodność powiązania konta, zachowanie oryginalnej SQLite i WAL
   w `legacy_sqlite/`, staging do `local/` lub `accounts/<hash>/`,
   pełne sprawdzenie listy plików, manifest staged-not-activated.
-- `tool/test_stage11_migrate.py`: 17 regresji m.in. staging konta,
+- `tool/test_stage11_migrate.py`: 19 regresji m.in. staging konta,
   profile, nowe źródła, osierocone assety, symlinki, resume i WAL.
 - `docs/ETAP_11_MIGRATION.md`: **produkcja v1→v2 nadal nieaktywna**.
   AppScope i Web nie wykonują cutover; wymagane etapy 7/12/13 i migracja
