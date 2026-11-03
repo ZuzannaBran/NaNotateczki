@@ -955,7 +955,7 @@ class _AccountDialogState extends State<_AccountDialog> {
         } catch (_) {
           // The server may be offline, but local credentials are erased
           // in logout's finally block. Never mask local persistence errors.
-          if (!preserveOffline || session.isSignedIn) {
+          if (session.isSignedIn) {
             rethrow;
           }
         }

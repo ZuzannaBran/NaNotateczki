@@ -403,21 +403,39 @@ class AccountSessionController extends ChangeNotifier {
 
   Future<void> logout() async {
     final refreshToken = _refreshToken;
+    Object? remoteFailure;
+    StackTrace? remoteStack;
     try {
       if (refreshToken != null && apiClient.accessToken != null) {
         await apiClient.postJson('/v1/auth/logout', {
           'refreshToken': refreshToken,
         }).timeout(const Duration(seconds: 5));
       }
-    } finally {
-      useLocalOnly();
-      await _credentialQueue;
-      // Explicit sign-out returns to onboarding on the next launch.
-      // Keep the account binding to protect this installation's library.
-      preferredMode = AccountDataMode.localOnly;
-      onboardingComplete = false;
+    } catch (failure, stackTrace) {
+      // Local sign-out must still work without an available server.
+      remoteFailure = failure;
+      remoteStack = stackTrace;
+    }
+
+    // Do not change the visible session until secure credential deletion has
+    // succeeded. An old refresh token must not silently survive account switch.
+    await _queueCredential(null);
+    final previousMode = preferredMode;
+    final previousOnboarding = onboardingComplete;
+    preferredMode = AccountDataMode.localOnly;
+    onboardingComplete = false;
+    try {
       await _saveProfile();
-      _notifyIfActive();
+    } catch (_) {
+      preferredMode = previousMode;
+      onboardingComplete = previousOnboarding;
+      rethrow;
+    }
+    _clearSession();
+    error = null;
+    _notifyIfActive();
+    if (remoteFailure != null) {
+      Error.throwWithStackTrace(remoteFailure, remoteStack!);
     }
   }
 

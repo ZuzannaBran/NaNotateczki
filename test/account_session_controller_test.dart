@@ -369,6 +369,86 @@ void main() {
     },
   );
 
+  test('failed credential deletion keeps account active at logout', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access',
+              'refreshToken': 'refresh',
+              'expiresIn': 600,
+              'userId': 'user-1',
+              'username': 'test_user',
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/auth/logout') {
+          return http.Response('', 204);
+        }
+        fail('Unexpected authentication endpoint.');
+      }),
+    );
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await session.loadProfile();
+    await session.login('test_user', 'password');
+    credentials.failDeletes = true;
+    await expectLater(session.logout(), throwsA(isA<StateError>()));
+    expect(session.isSignedIn, isTrue);
+    expect(session.preferredMode, AccountDataMode.account);
+    expect(credentials.value, contains('refresh'));
+    credentials.failDeletes = false;
+    await session.logout();
+    expect(session.isSignedIn, isFalse);
+    expect(credentials.value, isNull);
+    session.dispose();
+    client.close();
+  });
+
+  test('offline remote logout still clears durable credentials', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access',
+              'refreshToken': 'refresh',
+              'expiresIn': 600,
+              'userId': 'user-1',
+              'username': 'test_user',
+            }),
+            200,
+          );
+        }
+        throw StateError('Server offline');
+      }),
+    );
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await session.loadProfile();
+    await session.login('test_user', 'password');
+    await expectLater(session.logout(), throwsA(isA<StateError>()));
+    expect(session.isSignedIn, isFalse);
+    expect(credentials.value, isNull);
+    expect(session.onboardingComplete, isFalse);
+    session.dispose();
+    client.close();
+  });
+
   test('late profile read does not notify a disposed controller', () async {
     final pending = Completer<String?>();
     textStorageReadOverride = (_) => pending.future;
@@ -636,6 +716,7 @@ class _MemoryAccountCredentialStore implements AccountCredentialStore {
   String? value;
   int writes = 0;
   int deletes = 0;
+  bool failDeletes = false;
 
   @override
   Future<String?> read() async => value;
@@ -648,6 +729,9 @@ class _MemoryAccountCredentialStore implements AccountCredentialStore {
 
   @override
   Future<void> delete() async {
+    if (failDeletes) {
+      throw StateError('Keyring unavailable');
+    }
     value = null;
     deletes++;
   }

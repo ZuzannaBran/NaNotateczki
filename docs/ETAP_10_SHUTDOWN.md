@@ -44,3 +44,14 @@ Nie stanowi to produkcyjnej aktywacji migracji etapów 7/11.
   Nie wykonano ich w środowisku bez SDK. Nie uruchamiać GitHub Actions.
 
 Na serwerze nie ma teraz poleceń do wykonania.
+
+## Domknięcie bezpieczeństwa tokenu
+
+- Wylogowanie nie przełącza już sesji przed pomyślnym usunięciem refresh
+  tokenu z magazynu sekretów. Błąd keyringu pozostawia konto aktywne;
+  możliwa jest bezpieczna ponowna próba.
+- Niepowodzenie serwerowego revoke nie przywraca lokalnego tokenu.
+  Jeśli token został już usunięty, interfejs nie pokazuje fałszywego
+  dialogu sugerującego, że użytkownik nadal jest zalogowany.
+- Regresje w test/account_session_controller_test.dart obejmują
+  awarię usuwania poświadczeń i brak sieci podczas revoke.
