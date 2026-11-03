@@ -146,6 +146,35 @@ void main() {
       expect(first.sessions, isEmpty);
       expect(first.syncRecords[event.id]?['deleted'], true);
 
+      // B's clock is hours ahead of A's. A's deletion must still win
+      // even when B has an unsent local edit timestamped in the future.
+      times[0] = times[1].subtract(const Duration(minutes: 10));
+      final skewed = first.create(
+        title: 'Shared reminder',
+        scheduledAt: DateTime(2026, 11, 5, 10),
+        kind: StudyEntryKind.event,
+      );
+      await syncers[0].syncNow();
+      await syncers[1].syncNow();
+      expect(second.sessions.any((item) => item.id == skewed.id), true);
+
+      times[1] = times[1].add(const Duration(hours: 3));
+      second.edit(
+        skewed.id,
+        title: 'Local B edit',
+        description: '',
+        scheduledAt: DateTime(2026, 11, 5, 11),
+        minutes: 30,
+        technique: StudyTechnique.custom,
+      );
+      times[0] = times[0].add(const Duration(minutes: 1));
+      first.delete(skewed.id);
+      await syncers[0].syncNow();
+      await syncers[1].syncNow();
+      expect(server[skewed.id]?['deleted'], true);
+      expect(second.sessions.where((item) => item.id == skewed.id), isEmpty);
+      expect(second.syncRecords[skewed.id]?['deleted'], true);
+
       for (final service in syncers) {
         service.stop();
       }
