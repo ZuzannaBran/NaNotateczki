@@ -216,6 +216,31 @@ void main() {
     expect((await add('new-identity')).actorSeq, 3);
   });
 
+  test('outbox pagination returns every pending intent in actor order',
+      () async {
+    for (var i = 0; i < 5; i++) {
+      await add('paginated-$i');
+    }
+    expect(
+      (await store.pending(limit: 2))
+          .map((operation) => operation.actorSeq)
+          .toList(),
+      [1, 2],
+    );
+    expect(
+      (await store.pending(limit: 2, offset: 2))
+          .map((operation) => operation.actorSeq)
+          .toList(),
+      [3, 4],
+    );
+    expect(
+      (await store.pending(limit: 2, offset: 4))
+          .map((operation) => operation.actorSeq)
+          .toList(),
+      [5],
+    );
+  });
+
   test('failed remote apply never advances checkpoint', () async {
     final remote = OperationEnvelope(
       operationId: const Uuid().v4(),
