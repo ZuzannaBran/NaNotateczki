@@ -123,24 +123,40 @@ class OperationStore {
               ],
             )
             .get();
-        final causalIds = <String>{
+        final observedIds = <String>{
+          for (final row in observed) row.read<String>('last_operation_id'),
+        };
+        final requiredIds = <String>{
           ...dependencies,
           if (revertsOperationId != null) revertsOperationId,
-          for (final row in observed) row.read<String>('last_operation_id'),
           if (previousId != null) previousId,
-        }.toList()..sort();
-        if (causalIds.length > 256) {
-          throw StateError('Too many causal actor frontiers.');
-        }
+        };
+        final available = <String, OperationEnvelope>{};
         var nextClock = state?['last_clock'] as int? ?? 0;
-        for (final id in causalIds) {
+        for (final id in {...observedIds, ...requiredIds}) {
           final dependency = await operation(id);
-          if (dependency == null) {
-            throw StateError('Missing causal dependency: $id');
+          if (dependency == null || dependency.documentId != documentId) {
+            throw StateError('Invalid document dependency: $id');
           }
+          available[id] = dependency;
           if (dependency.logicalClock > nextClock) {
             nextClock = dependency.logicalClock;
           }
+        }
+        // A frontier already required by another observed operation is
+        // causally implied. Never drop explicit, undo or actor predecessors.
+        final coveredIds = <String>{
+          for (final op in available.values)
+            for (final id in op.dependencies)
+              if (observedIds.contains(id)) id,
+        };
+        final causalIds = <String>{
+          ...requiredIds,
+          for (final id in observedIds)
+            if (!coveredIds.contains(id)) id,
+        }.toList()..sort();
+        if (causalIds.length > 256) {
+          throw StateError('Too many independent causal actor frontiers.');
         }
         final nextSeq = (state?['last_seq'] as int? ?? 0) + 1;
         if (nextSeq > OperationEnvelope.maxSafeInteger ||
@@ -630,6 +646,7 @@ class OperationStore {
   /// Records a durable asset reference; file GC is checkpoint-aware and later.
   Future<void> attachAssetReference({
     required String documentId,
+    required String pageId,
     required String objectId,
     required String assetId,
     required String storagePath,
@@ -637,6 +654,7 @@ class OperationStore {
     required int byteLength,
   }) async {
     if (documentId.isEmpty ||
+        pageId.isEmpty ||
         objectId.isEmpty ||
         assetId.isEmpty ||
         storagePath.isEmpty ||
@@ -644,11 +662,14 @@ class OperationStore {
         !_checksumPattern.hasMatch(checksumSha256)) {
       throw ArgumentError('Invalid asset reference.');
     }
+    // Legacy rows use a plain object ID. New references include the page
+    // in an opaque key, without rewriting existing unverified asset links.
+    final scopedObjectId = 'page:${jsonEncode([pageId, objectId])}';
     final existing = await _row(
       'SELECT storage_path, checksum_sha256, byte_length '
       'FROM asset_references WHERE document_id = ? AND object_id = ? '
       'AND asset_id = ?',
-      [documentId, objectId, assetId],
+      [documentId, scopedObjectId, assetId],
     );
     if (existing != null) {
       if (existing['storage_path'] != storagePath ||
@@ -662,7 +683,14 @@ class OperationStore {
       'INSERT INTO asset_references '
       '(document_id, object_id, asset_id, storage_path, '
       'checksum_sha256, byte_length) VALUES (?, ?, ?, ?, ?, ?)',
-      [documentId, objectId, assetId, storagePath, checksumSha256, byteLength],
+      [
+        documentId,
+        scopedObjectId,
+        assetId,
+        storagePath,
+        checksumSha256,
+        byteLength,
+      ],
     );
   }
 }

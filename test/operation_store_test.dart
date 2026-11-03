@@ -729,4 +729,60 @@ void main() {
     );
     expect((await store.latestSnapshot('document-one'))?.serverSequence, 10);
   });
+
+  test('asset references preserve same object ID across different pages', () async {
+    for (final page in ['first-page', 'second-page']) {
+      await store.attachAssetReference(
+        documentId: 'document-one',
+        pageId: page,
+        objectId: 'shared-object',
+        assetId: 'asset-one',
+        storagePath: 'images/asset-one',
+        checksumSha256: List.filled(64, 'a').join(),
+        byteLength: 5,
+      );
+    }
+    final rows = await database.customSelect(
+      'SELECT object_id FROM asset_references ORDER BY object_id',
+    ).get();
+    expect(rows, hasLength(2));
+    expect(
+      rows.map((row) => row.read<String>('object_id')),
+      containsAll([
+        'page:["first-page","shared-object"]',
+        'page:["second-page","shared-object"]',
+      ]),
+    );
+  });
+
+  test('local journal prunes implied frontiers but keeps causal order', () async {
+    String? parent;
+    for (var i = 0; i < 260; i++) {
+      final id =
+          '\${(i + 1000).toRadixString(16).padLeft(8, '0')}'
+          '-1111-4111-8111-111111111111';
+      final remote = OperationEnvelope(
+        operationId: id,
+        actorId: 'remote-$i',
+        actorSeq: 1,
+        logicalClock: i + 1,
+        documentId: 'document-one',
+        pageId: 'page-one',
+        objectId: 'remote-$i',
+        kind: OperationKind.objectCreate,
+        payload: const {'value': {'x': 1}},
+        dependencies: [if (parent != null) parent],
+      );
+      await store.applyRemote(
+        remote,
+        serverSequence: i + 1,
+        apply: () async {},
+      );
+      parent = id;
+    }
+    final next = await add('local-after-frontier');
+    expect(next.dependencies, [parent]);
+    expect(next.logicalClock, 261);
+  });
+
 }

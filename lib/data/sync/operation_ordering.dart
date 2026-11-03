@@ -11,6 +11,7 @@ import 'operation_protocol.dart';
 class OperationActorClock {
   OperationActorClock({
     required this.actorId,
+    this.documentId,
     this.actorSeq = 0,
     this.logicalClock = 0,
     this.previousOperationId,
@@ -21,12 +22,16 @@ class OperationActorClock {
         actorSeq > OperationEnvelope.maxSafeInteger ||
         logicalClock < 0 ||
         logicalClock > OperationEnvelope.maxSafeInteger ||
-        (actorSeq > 0 && previousOperationId == null)) {
+        (actorSeq > 0 && previousOperationId == null) ||
+        (actorSeq > 0 && documentId == null) ||
+        (documentId != null &&
+            (documentId!.isEmpty || documentId!.length > 128))) {
       throw ArgumentError('Invalid actor checkpoint.');
     }
   }
 
   final String actorId;
+  String? documentId;
   int actorSeq;
   int logicalClock;
   String? previousOperationId;
@@ -35,6 +40,9 @@ class OperationActorClock {
 
   /// Observe only committed, causally available remote operations.
   void observe(OperationEnvelope remote) {
+    if (documentId != null && remote.documentId != documentId) {
+      return;
+    }
     if (remote.actorId != actorId) {
       final previous = _observed[remote.actorId];
       if (previous != null &&
@@ -60,12 +68,23 @@ class OperationActorClock {
     String? revertsOperationId,
     List<String> dependencies = const [],
   }) {
+    if (this.documentId != null && this.documentId != documentId) {
+      throw const FormatException('Actor cannot cross document scope.');
+    }
+    final observed = _observed.values
+        .where((op) => op.documentId == documentId)
+        .toList();
+    final observedIds = observed.map((op) => op.operationId).toSet();
+    final coveredIds = <String>{
+      for (final op in observed)
+        for (final parent in op.dependencies)
+          if (observedIds.contains(parent)) parent,
+    };
     final causalIds = <String>{
       ...dependencies,
       if (revertsOperationId != null) revertsOperationId,
-      ..._observed.values
-          .where((op) => op.documentId == documentId)
-          .map((op) => op.operationId),
+      for (final id in observedIds)
+        if (!coveredIds.contains(id)) id,
       if (previousOperationId != null) previousOperationId!,
     }.toList()..sort();
     if (causalIds.length > 256 ||
@@ -89,11 +108,14 @@ class OperationActorClock {
     actorSeq = operation.actorSeq;
     logicalClock = operation.logicalClock;
     previousOperationId = operation.operationId;
+    this.documentId = documentId;
+    _observed.removeWhere((_, remote) => remote.documentId != documentId);
     return operation;
   }
 
   Map<String, dynamic> toCheckpoint() => {
     'actorId': actorId,
+    if (documentId != null) 'documentId': documentId,
     'actorSeq': actorSeq,
     'logicalClock': logicalClock,
     if (previousOperationId != null) 'previousOperationId': previousOperationId,
@@ -103,6 +125,7 @@ class OperationActorClock {
   factory OperationActorClock.fromCheckpoint(Map<String, dynamic> json) {
     final clock = OperationActorClock(
       actorId: json['actorId'] as String,
+      documentId: json['documentId'] as String?,
       actorSeq: json['actorSeq'] as int,
       logicalClock: json['logicalClock'] as int,
       previousOperationId: json['previousOperationId'] as String?,
@@ -315,13 +338,16 @@ class CausalOperationBuffer {
         final last = latest[candidate.actorId];
         if (last != null &&
             (!candidate.dependencies.contains(last.operationId) ||
-                candidate.logicalClock <= last.logicalClock)) {
+                candidate.logicalClock <= last.logicalClock ||
+                candidate.documentId != last.documentId)) {
           invalid = 'Invalid actor causality.';
         }
         for (final dependency in candidate.dependencies) {
           final parent = accepted[dependency];
           if (parent == null) {
             invalid ??= 'Unverifiable checkpoint dependency.';
+          } else if (candidate.documentId != parent.documentId) {
+            invalid ??= 'Cross-document causal dependency.';
           } else if (candidate.logicalClock <= parent.logicalClock) {
             invalid ??= 'Invalid logical clock.';
           }

@@ -396,7 +396,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 ### Porządkowanie operacji v1 (etap 2)
 
 - `lib/data/sync/operation_ordering.dart`: `OperationActorClock`
-  (Lamport, granice zależności, zapamiętywany frontier zdalnych aktorów),
+  (Lamport, zakres jednego dokumentu zachowany w checkpointcie, redukcja
+  tylko przyczynowo pokrytych frontierów, fail-closed ponad 256 niezależnych),
   `CausalOperationBuffer` (atomowe zatwierdzanie gotowych operacji,
   kwarantanna wadliwych zaległych pakietów, duplikaty i rozgałęzienia),
   `OperationCheckpoint` (pełna historia i odrzucone ID, bez kompaktowania)
@@ -411,6 +412,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/operation_store.dart`: transakcyjny zapis projekcji i
   `OperationEnvelope`, rosnący `actorSeq`, idempotencja, lokalny outbox,
   atomowy ACK, tombstones, checkpointy i checksummed snapshots.
+  Referencje nowych assetów mają klucz z pageId i objectId,
+  bez usuwania starszych odwołań o nieznanej stronie.
   Snapshot jest blokowany, jeśli cofa potwierdzony kursor ACK albo
   istniejący checkpoint snapshotu.
   Zależności są weryfikowane jako należące do tego samego dokumentu. Projekcja

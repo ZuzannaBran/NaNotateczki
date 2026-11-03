@@ -25,6 +25,9 @@ mieć kursora starszego niż ACK tego dokumentu ani cofać najnowszego
 zapisanego checkpointu snapshotu. Nadal wymaga to kompletnego dowodu
 spójności projekcji i zdalnego checkpointu przed aktywacją produkcyjną. Tombstone blokuje
 ponowne użycie ID usuniętego dokumentu, strony lub obiektu.
+Referencje nowych assetów używają niekolizyjnego klucza strony i obiektu
+w istniejącej kolumnie TEXT. Stare referencje bez strony pozostają zachowane;
+nie wolno ich automatycznie usuwać podczas importu ani GC.
 
 Natywne połączenie SQLite używa WAL i `synchronous=FULL`. Backup bazy
 wymaga uwzględnienia WAL/SHM albo użycia spójnego SQLite backup API; nie
@@ -79,3 +82,12 @@ i porównać `operations`, `operation_outbox` oraz widoczną projekcję.
 Analogicznie wykonać crash przed COMMIT: nie może pozostać żadna z tych
 trzech części. Po awarii systemu zbadać `PRAGMA quick_check`
 i `PRAGMA foreign_key_check` na Linuxie, Androidzie oraz Web.
+
+## Granice przyczynowości
+
+Zależności automatycznie obserwowanych aktorów są redukowane wyłącznie,
+gdy zapisany łańcuch jednoznacznie dowodzi, że wcześniejszy frontier
+jest osiągalny z późniejszego. Jawne zależności, poprzednik aktora
+i `revertsOperationId` nigdy nie są usuwane. Ponad 256 **niezależnych**
+frontierów nadal wymaga rozszerzenia protokołu i nie jest obcinane:
+operacja lokalna nie przechodzi do dziennika zamiast utraty przyczynowości.

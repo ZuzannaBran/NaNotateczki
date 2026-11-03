@@ -592,7 +592,10 @@ zmian w pamięci. Wadliwa zaległa operacja zostaje odizolowana, bez utraty
 poprawnego potwierdzenia. Checkpoint etapu 2 przechowuje komplet zaakceptowanych
 operacji i identyfikatory odrzuconych; nie wolno zastępować go samym licznikiem
 aktora ani kompaktować bez trwałego indeksu ID. Zegar aktora zachowuje
-zaobserwowane zależności również po odtworzeniu.
+zaobserwowane zależności również po odtworzeniu i wiąże aktora
+z jednym dokumentem. Pokryte przyczynowo frontiery są redukowane;
+ponad 256 niezależnych zależności nadal zatrzymuje zapis, zamiast
+cichego obcięcia.
 Backend posiada opt-in API v2 po etapie 4 i trwały outbox etapu 5.
 Klient nadal nie ma domenowych reducerów ani migracji produkcyjnej.
 Dotychczasowa synchronizacja

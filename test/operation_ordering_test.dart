@@ -533,4 +533,130 @@ void main() {
       hasLength(1),
     );
   });
+
+  test('actor document binding persists and forbids another document', () {
+    final actor = OperationActorClock(actorId: 'local');
+    final first = actor.next(
+      documentId: 'notebook',
+      kind: OperationKind.objectSet,
+      pageId: 'page',
+      objectId: 'stroke',
+      payload: const {'properties': {'x': 1}},
+    );
+    final restored = OperationActorClock.fromCheckpoint(actor.toCheckpoint());
+    expect(restored.documentId, 'notebook');
+    expect(
+      () => restored.next(
+        documentId: 'private-document',
+        kind: OperationKind.objectSet,
+        pageId: 'page',
+        objectId: 'stroke',
+        payload: const {'properties': {'x': 2}},
+      ),
+      throwsFormatException,
+    );
+    restored.observe(
+      OperationEnvelope(
+        operationId: b1,
+        actorId: 'foreign',
+        actorSeq: 1,
+        logicalClock: 20,
+        documentId: 'private-document',
+        pageId: 'page',
+        objectId: 'stroke',
+        kind: OperationKind.objectSet,
+        payload: const {'properties': {'x': 3}},
+        dependencies: const [],
+      ),
+    );
+    final next = restored.next(
+      documentId: 'notebook',
+      kind: OperationKind.objectSet,
+      pageId: 'page',
+      objectId: 'stroke',
+      payload: const {'properties': {'x': 4}},
+    );
+    expect(next.dependencies, [first.operationId]);
+  });
+
+  test('unscoped nonempty actor checkpoint cannot be restored', () {
+    final actor = OperationActorClock(actorId: 'local');
+    actor.next(
+      documentId: 'notebook',
+      kind: OperationKind.objectSet,
+      pageId: 'page',
+      objectId: 'stroke',
+      payload: const {'properties': {'x': 1}},
+    );
+    final old = actor.toCheckpoint()..remove('documentId');
+    expect(
+      () => OperationActorClock.fromCheckpoint(old),
+      throwsArgumentError,
+    );
+  });
+
+  test('causal buffer rejects cross-document actors and parents', () {
+    final queue = CausalOperationBuffer();
+    final first = op(id: a1, actor: 'A', sequence: 1, clock: 1);
+    expect(queue.ingest(first), [first]);
+    OperationEnvelope different(String id, String actor, int sequence) {
+      return OperationEnvelope(
+        operationId: id,
+        actorId: actor,
+        actorSeq: sequence,
+        documentId: 'private-document',
+        pageId: 'page',
+        objectId: 'stroke',
+        kind: OperationKind.objectSet,
+        payload: const {'properties': {'x': 2}},
+        dependencies: const [a1],
+        logicalClock: 2,
+      );
+    }
+    expect(
+      () => queue.ingest(different(b1, 'B', 1)),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(
+      () => queue.ingest(different(a2, 'A', 2)),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(queue.pendingCount, 0);
+    expect(queue.actorSequences['A'], 1);
+  });
+
+  test('actor clock prunes frontiers covered by another observation', () {
+    final clock = OperationActorClock(actorId: 'local');
+    String? parent;
+    for (var i = 0; i < 260; i++) {
+      final id =
+          '\${(i + 1000).toRadixString(16).padLeft(8, '0')}'
+          '-1111-4111-8111-111111111111';
+      clock.observe(
+        OperationEnvelope(
+          operationId: id,
+          actorId: 'remote-$i',
+          actorSeq: 1,
+          documentId: 'notebook',
+          pageId: 'page',
+          objectId: 'item',
+          kind: OperationKind.objectSet,
+          payload: const {'properties': {'x': 1}},
+          dependencies: [if (parent != null) parent],
+          logicalClock: i + 1,
+        ),
+      );
+      parent = id;
+    }
+    final next = clock.next(
+      documentId: 'notebook',
+      pageId: 'page',
+      objectId: 'item',
+      kind: OperationKind.objectSet,
+      payload: const {'properties': {'x': 2}},
+    );
+    expect(next.dependencies, [parent]);
+    expect(next.logicalClock, 261);
+  });
+
 }
