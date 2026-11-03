@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/operation_gateway.dart';
 import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
@@ -55,6 +56,18 @@ class _FakeGateway implements OperationGateway {
       hasMore: false,
       operations: unread,
     );
+  }
+}
+
+class _RetryGateway extends _FakeGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async {
+    if (operations.first.documentId == 'document-one') {
+      throw const ApiException(422, 'Invalid payload');
+    }
+    throw StateError('Temporary network failure');
   }
 }
 
@@ -264,6 +277,74 @@ void main() {
     expect(second.actorSeq, 1);
     expect(first.actorId, isNot(second.actorId));
     expect(second.dependencies, isNot(contains(first.operationId)));
+  });
+
+  test('a broken pull does not block the outbox of another document',
+      () async {
+    gateway.seed(_remote('actor-bad', 'bad'));
+    await engine.stop();
+    engine.dispose();
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (remote, _) async {
+        if (remote.objectId == 'bad') {
+          throw StateError('Broken projection');
+        }
+      },
+    );
+    final valid = await engine.writeLocal(
+      documentId: 'document-other',
+      pageId: 'page-other',
+      objectId: 'valid',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'name': 'valid'},
+      },
+      apply: (_) => database.customStatement(
+        'INSERT INTO projection_probe VALUES (?, ?)',
+        ['valid', 'local'],
+      ),
+    );
+    await engine.start();
+    expect(gateway.cursors, contains(valid.operationId));
+    expect(await store.isPending(valid.operationId), isFalse);
+    expect(await store.checkpoint('user-A-v2'), 0);
+  });
+
+  test('an earlier actor retry is not hidden by a five-minute retry',
+      () async {
+    await engine.stop();
+    engine.dispose();
+    engine = SyncEngine(
+      store: store,
+      gateway: _RetryGateway(),
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (_, __) async {},
+    );
+    Future<void> addFor(String documentId) async {
+      await engine.writeLocal(
+        documentId: documentId,
+        pageId: 'page',
+        objectId: documentId,
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'value': {'name': 'entry'},
+        },
+        apply: (_) async {},
+      );
+    }
+    await addFor('document-one');
+    await addFor('document-two');
+    await engine.start();
+    final deadline = engine.retryDeadline;
+    expect(deadline, isNotNull);
+    expect(deadline!.difference(DateTime.now()).inSeconds, lessThan(60));
   });
 
   test('deferred predecessor blocks a later actor sequence', () async {

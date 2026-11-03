@@ -68,6 +68,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _poll;
   Timer? _debounce;
   Timer? _retry;
+  DateTime? _retryDueAt;
   Timer? _socketRetry;
   WebSocketChannel? _socket;
   StreamSubscription<dynamic>? _socketSubscription;
@@ -76,6 +77,9 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? lastSuccessfulSync;
 
   bool get isStarted => _started;
+
+  /// Earliest scheduled retry across independent actors and pull failures.
+  DateTime? get retryDeadline => _retryDueAt;
 
   /// Writes the projection and outbox in one transaction before scheduling IO.
   Future<OperationEnvelope> writeLocal({
@@ -151,6 +155,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     _poll = null;
     _debounce = null;
     _retry = null;
+    _retryDueAt = null;
     _socketRetry = null;
     final subscription = _socketSubscription;
     _socketSubscription = null;
@@ -204,7 +209,14 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     while (_isActive(generation) && _requested) {
       _requested = false;
       try {
-        await _pull(generation);
+        // A corrupt remote projection may not hold unrelated local writes
+        // hostage. Always attempt the push, then recheck the blocked pull.
+        try {
+          await _pull(generation);
+        } catch (error) {
+          lastError = error.toString();
+          notifyListeners();
+        }
         if (!_isActive(generation)) {
           return;
         }
@@ -433,11 +445,22 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _scheduleRetry(Duration delay) {
-    if (!_started || _retry?.isActive == true) {
+    if (!_started || _disposed) {
       return;
     }
+    final next = DateTime.now().add(delay);
+    // Preserve the earliest wakeup. A previous permanent error must not
+    // delay a different actor's short transient retry.
+    if (_retry?.isActive == true &&
+        _retryDueAt != null &&
+        !_retryDueAt!.isAfter(next)) {
+      return;
+    }
+    _retry?.cancel();
+    _retryDueAt = next;
     _retry = Timer(delay, () {
       _retry = null;
+      _retryDueAt = null;
       requestSync();
     });
   }
