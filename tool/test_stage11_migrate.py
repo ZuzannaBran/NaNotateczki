@@ -34,6 +34,18 @@ class Stage11MigrationTests(unittest.TestCase):
                        ('img', 'page', str(self.data / 'images' / 'a.png'), None))
         (self.data / 'study_planner.json').write_text('{"sessions":[]}', encoding='utf8')
 
+    def test_sqlite_v6_is_recognized_without_touching_source(self):
+        with sqlite3.connect(self.data / 'notes.sqlite') as db:
+            db.execute('PRAGMA user_version = 6')
+        before = digest(self.data / 'notes.sqlite')
+        report = stage_migration(self.data)
+        self.assertEqual(report['rowCounts']['object_tombstones'], 1)
+        self.assertEqual(digest(self.data / 'notes.sqlite'), before)
+        with sqlite3.connect(self.data / 'local' / 'notes.sqlite') as db:
+            self.assertEqual(db.execute(
+                'PRAGMA user_version'
+            ).fetchone()[0], 6)
+
     def test_local_migration_preserves_source_and_outbox(self):
         before = digest(self.data / 'notes.sqlite')
         report = stage_migration(self.data)
