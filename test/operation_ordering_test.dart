@@ -421,4 +421,28 @@ void main() {
     );
   });
 
+  test('rejected IDs remain blocked after checkpoint restore', () {
+    final queue = CausalOperationBuffer();
+    queue.ingest(op(
+      id: b1, actor: 'B', sequence: 1, clock: 1,
+      dependencies: [a1],
+    ));
+    queue.ingest(op(id: a1, actor: 'A', sequence: 1, clock: 2));
+    final restored = CausalOperationBuffer.fromCheckpoint(
+      OperationCheckpoint.fromJson(queue.exportCheckpoint().toJson()),
+    );
+    expect(restored.rejectedOperations, contains(b1));
+    expect(
+      () => restored.ingest(op(
+        id: b1, actor: 'B', sequence: 1, clock: 3,
+        dependencies: [a1],
+      )),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(restored.ingest(op(
+      id: b2, actor: 'B', sequence: 1, clock: 3,
+      dependencies: [a1],
+    )), hasLength(1));
+  });
+
 }
