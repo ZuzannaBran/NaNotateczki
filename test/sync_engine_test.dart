@@ -470,9 +470,11 @@ void main() {
     await engine.start();
     expect(await store.checkpoint('user-A-v2'), 0);
     expect(attempts, greaterThanOrEqualTo(1));
+    expect(engine.lastError, isNotNull);
     allowDisplay = true;
     await engine.syncNow();
     expect(await store.checkpoint('user-A-v2'), 1);
+    expect(engine.lastError, isNull);
     expect(attempts, greaterThanOrEqualTo(2));
     final rows = await database.customSelect(
       'SELECT value FROM projection_probe WHERE id = ?',
