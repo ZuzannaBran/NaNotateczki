@@ -1,0 +1,76 @@
+# Etap 5 — silnik synchronizacji operacji v2
+
+Status: **silnik i transport zapisane; nie jest to przełączenie produkcyjne**.
+Włączenie dla istniejących notatników wymaga kontrolowanej migracji z etapu
+11. Serwer v2 celowo odrzuca zapis do UID zarządzanego przez v1, więc
+automatyczne włączenie w `AppScope` bez migracji groziłoby utratą zmian.
+
+## Implementacja
+
+- `SyncEngine` przyjmuje `OperationStore`, transport, stabilne `actorId`,
+  unikalny `checkpointScope` magazynu i callback projekcji.
+- `writeLocal` atomowo zapisuje operację, outbox i projekcję w SQLite.
+  Interfejs może wcześniej pokazać gest optymistycznie, ale nie powinien
+  potwierdzać trwałego zapisu przed zakończeniem transakcji.
+- Wysyłka zachowuje `actorSeq`, stosuje paczki do 50 operacji i 800 KiB
+  payloadu oraz maksymalnie 3 niezależnych aktorów jednocześnie.
+  Wyjście powyżej 1 MiB jest dodatkowo blokowane w transporcie.
+- Odpowiedź ACK jest walidowana w całości przed usunięciem pozycji z outboxu.
+  Przerwane HTTP może być ponowione z tymi samymi `operationId`.
+- Odbiór przez stronicowane `GET /v2/operations` korzysta wyłącznie z
+  trwałego kursora. Kursora nie podnosi się do ACK własnego POST.
+  Echo własnej operacji nie uruchamia ponownie projekcji.
+- Kursor globalny przesuwa się wyłącznie do ostatniej **ciągłej** pomyślnie
+  odtworzonej pozycji. Późniejsze, niezależne dokumenty mogą zostać
+  utrwalone wcześniej, a przy ponowieniu są rozpoznawane po `operationId`.
+- Callback projekcji otrzymuje **wszystkie** lokalne operacje oczekujące dla
+  dokumentu, również z odroczonym retry. Implementacja konkretnego
+  edytora ma łączyć zmiany per ID/pole i rebazować te operacje na bieżącym
+  stanie, nie podmieniać całego dokumentu snapshotem.
+- WebSocket v2 wysyła tylko wskazówkę `operations_changed`.
+  REST zawsze weryfikuje stan po reconnect, na foreground i co 45 sekund.
+- Błędy sieci, 409 `CAUSAL_GAP` i brak ACK zachowują outbox. Retry ma
+  wykładniczy backoff z jitterem; błędy nieobsługiwanych operacji nie
+  usuwają danych. Nieudana operacja opóźnia dalsze ruchy jej aktora, nie
+  wszystkich innych aktorów.
+- Dla już zaakceptowanej operacji zdalnej dotyczącej usuniętego UID
+  SQLite zachowuje wpis historii, ale nie odtwarza obiektu.
+- Lokalny `actorSeq` i frontier obserwowanych aktorów są odczytywane
+  w jednej transakcji przed utworzeniem ruchu.
+- `stop()` anuluje timery i socket, czeka na aktywny przebieg oraz
+  unieważnia spóźnione odpowiedzi przez generation token.
+- 401 może uruchomić przekazany callback `refreshAuthentication` i
+  jednokrotnie ponowić to samo żądanie.
+
+## Integracja po przygotowaniu migracji
+
+1. Zainicjalizować trwały `actorId` i odizolowany `checkpointScope`
+   we właściwym magazynie konta, Local albo Share.
+2. Stworzyć `HttpOperationGateway(apiClient)` i `SyncEngine`, w przypadku
+   konta z `refreshAuthentication: session.refresh`.
+3. Zastąpić wywołania mutujące SQLite w edytorze transakcjami
+   `engine.writeLocal(..., apply: ...)` oraz dodać domenowy reducer
+   `applyRemote` aktualizujący konkretne rekordy, z rebase outboxu.
+4. Dopiero po migracji UID odłączyć stare `LiveWebSyncService` / v1 writer
+   dla tych dokumentów. Nigdy nie uruchamiać obu writerów dla tego samego UID.
+5. Share ma wykorzystać ten sam silnik po wprowadzeniu odrębnego magazynu
+   gościa i reducerów tekstu, assetów oraz gestów w etapie 6.
+6. Ukończyć testy prawdziwego Flutter + PostgreSQL + WebSocket na dwóch
+   urządzeniach, zanim zostanie przełączony produkcyjny ruch.
+
+## Regresje dodane do repo
+
+- `test/operation_store_test.dart`: causal frontier, tombstone no-op.
+- `test/sync_engine_test.dart`: trwały optimistic commit, ACK utracony po
+  zatwierdzeniu na serwerze, własne echo, rebase, błędna projekcja jednej
+  pozycji przy poprawnej pozycji innego dokumentu, retry i actorSeq.
+- `test/operation_gateway_test.dart`: JSON v2, Bearer, niepełne ACK,
+  uszkodzony feed oraz prawidłowy kursor.
+
+## Granice weryfikacji
+
+W tym środowisku nie ma lokalnego SDK Flutter/Dart ani dostępu do kontenera
+PostgreSQL użytkownika. Nie uruchomiono `dart analyze`, `flutter test`
+ani testów E2E; nie traktować samych nowych testów jako zaliczonych.
+Nie uruchomiono ręcznie GitHub Actions. Weryfikacja w kodzie obejmuje
+zgodność pól z API v2 serwera i brak zmian w produkcyjnej ścieżce v1.
