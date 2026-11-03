@@ -454,6 +454,71 @@ void main() {
     expect(await store.pending(), hasLength(20));
   });
 
+  test('v4 upgrade retains queued outbox and persists blocked state',
+      () async {
+    final directory = await Directory.systemTemp.createTemp('notes-v4-v5-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/notes.sqlite');
+    final initial = NotesDatabase(NativeDatabase(file));
+    final original = await OperationStore(initial).writeLocal(
+      actorId: 'migration-actor',
+      documentId: 'migration-document',
+      pageId: 'page',
+      objectId: 'object',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'name': 'survive'},
+      },
+      apply: (_) async {},
+    );
+    await initial.close();
+
+    final raw = sqlite.sqlite3.open(file.path);
+    try {
+      raw.execute('ALTER TABLE operation_outbox '
+          'RENAME TO operation_outbox_v5');
+      raw.execute('CREATE TABLE operation_outbox ('
+          'operation_id TEXT NOT NULL PRIMARY KEY '
+          'REFERENCES operations(operation_id) ON DELETE RESTRICT, '
+          'queued_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, '
+          'retry_after INTEGER NOT NULL DEFAULT 0)');
+      raw.execute('INSERT INTO operation_outbox '
+          '(operation_id, queued_at, attempts, retry_after) '
+          'SELECT operation_id, queued_at, attempts, retry_after '
+          'FROM operation_outbox_v5');
+      raw.execute('DROP TABLE operation_outbox_v5');
+      raw.execute('PRAGMA user_version = 4');
+    } finally {
+      raw.dispose();
+    }
+
+    final upgraded = NotesDatabase(NativeDatabase(file));
+    final upgradedStore = OperationStore(upgraded);
+    expect(upgraded.schemaVersion, 5);
+    expect(
+      (await upgradedStore.pending()).single.operationId,
+      original.operationId,
+    );
+    await upgradedStore.markBlocked(original.operationId, 'Permanent 422');
+    await upgraded.close();
+
+    final reopened = NotesDatabase(NativeDatabase(file));
+    try {
+      final restored = OperationStore(reopened);
+      expect(
+        await restored.blockedReason(original.operationId),
+        'Permanent 422',
+      );
+      expect(await restored.pending(), isEmpty);
+      expect(
+        (await restored.pending(includeDeferred: true)).single.operationId,
+        original.operationId,
+      );
+    } finally {
+      await reopened.close();
+    }
+  });
+
   test('v3 upgrades tombstones without losing the deleted page ID',
       () async {
     final directory = await Directory.systemTemp.createTemp('notes-v3-v4-');
