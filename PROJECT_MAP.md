@@ -380,11 +380,19 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   timeoutem, limitem odpowiedzi, Bearer tokenem i request ID.
   HTTP 5xx oraz błędy transportu wpisuje automatycznie do `Errors`
   (`AppErrorLog`), bez treści odpowiedzi i tokenów; wyklucza health
-  oraz sam endpoint diagnostyczny, aby nie powstała pętla raportowania.
+  oraz diagnostyczny pomiar zegara, aby nie powstała pętla raportowania.
   HTTP 4xx, w tym zwykły konflikt 409, nie tworzy wpisu.
   7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
   Domyślny adres dla wszystkich platform to `https://api.nanotateczki.pl`;
   `BACKEND_URL` może go nadpisać w buildach lokalnych/testowych.
+- `lib/data/sync/device_clock_check.dart`: jednorazowy pomiar
+  czasu UTC przy rozpoczęciu zalogowanej sesji przez `GET /v1/time`.
+  `Stopwatch` mierzy RTT; szacowanie środka żądania ma tolerancję
+  60 sekund + połowę RTT, pomija RTT ponad 10 s i skok zegara w trakcie
+  pomiaru. Różnicę wpisuje do Errors i pokazuje SnackBar w `AppScope`
+  bez blokowania synchronizacji. Brak sieci nie generuje alarmu.
+- `test/device_clock_check_test.dart`: aktualny zegar, opóźnienie i
+  przyspieszenie o 2 min, tolerancja i niepoprawna odpowiedź API.
 - `lib/data/sync/app_activity_wake_service.dart`: wysyła bez danych
   użytkownika nieautoryzowany GET /health przy starcie trybu konta, a potem
   najwyżej raz na 30 minut pod warunkiem kolejnej aktywności myszki,
