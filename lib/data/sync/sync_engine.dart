@@ -233,11 +233,19 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
             serverSequence: item.cursor,
             apply: () async {
               // No replacement of the whole document or optimistic edits.
-              final pending = await store.pending(
-                documentId: item.operation.documentId,
-                limit: 1000,
-                includeDeferred: true,
-              );
+              final pending = <OperationEnvelope>[];
+              while (true) {
+                final page = await store.pending(
+                  documentId: item.operation.documentId,
+                  limit: 1000,
+                  offset: pending.length,
+                  includeDeferred: true,
+                );
+                pending.addAll(page);
+                if (page.length < 1000) {
+                  break;
+                }
+              }
               await applyRemote(item.operation, pending);
             },
           );
