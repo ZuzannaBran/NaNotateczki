@@ -171,6 +171,88 @@ void main() {
     },
   );
 
+  test('late backup cannot overwrite local planner deletion', () async {
+    final tombstone = jsonEncode({
+      'version': 2,
+      'sessions': <dynamic>[],
+      'tombstones': {'deleted-event': '2026-11-03T01:00:00Z'},
+    });
+    stored['study_planner.json'] = tombstone;
+    final backup = jsonEncode({
+      'notebooks': <dynamic>[],
+      'libraryState': <String, dynamic>{},
+      'studyPlannerState': {
+        'version': 2,
+        'sessions': [
+          {
+            'id': 'deleted-event',
+            'kind': 'event',
+            'title': 'Stale reminder',
+            'scheduledAt': '2026-11-04T10:00:00Z',
+          },
+        ],
+      },
+    });
+    final service = _service(_repository(), backup);
+    expect(await service.hydrateFromLatestAccountBackup(), isFalse);
+    expect(stored['study_planner.json'], tombstone);
+  });
+
+  test('account planner tombstone blocks stale backup on new device',
+      () async {
+    final backup = jsonEncode({
+      'notebooks': <dynamic>[],
+      'libraryState': <String, dynamic>{},
+      'studyPlannerState': {
+        'version': 2,
+        'sessions': [
+          {
+            'id': 'deleted-event',
+            'kind': 'event',
+            'title': 'Stale reminder',
+            'scheduledAt': '2026-11-04T10:00:00Z',
+          },
+        ],
+      },
+    });
+    final service = _service(
+      _repository(),
+      backup,
+      plannerEntries: [
+        {
+          'id': 'deleted-event',
+          'modifiedAt': '2026-11-03T01:00:00Z',
+          'deleted': true,
+          'entry': null,
+        },
+      ],
+    );
+    expect(await service.hydrateFromLatestAccountBackup(), isFalse);
+    expect(stored.containsKey('study_planner.json'), isFalse);
+  });
+
+  test('legacy planner backup can seed an empty account', () async {
+    final backup = jsonEncode({
+      'notebooks': <dynamic>[],
+      'libraryState': <String, dynamic>{},
+      'studyPlannerState': {
+        'version': 2,
+        'sessions': [
+          {
+            'id': 'legacy-event',
+            'kind': 'event',
+            'title': 'Recovered',
+            'scheduledAt': '2026-11-04T10:00:00Z',
+          },
+        ],
+      },
+    });
+    final service = _service(_repository(), backup);
+    expect(await service.hydrateFromLatestAccountBackup(), isTrue);
+    final saved = jsonDecode(stored['study_planner.json']!);
+    expect(saved['sessions'].single['title'], 'Recovered');
+  });
+
   test(
     'a planner conflict keeps both task lists under their document IDs',
     () async {
@@ -228,6 +310,7 @@ RemoteBackupService _service(
   String? checksum,
   List<Map<String, dynamic>> records = const [],
   int? bootstrapPageSize,
+  List<Map<String, dynamic>> plannerEntries = const [],
 }) {
   const deviceId = '123e4567-e89b-12d3-a456-426614174000';
   const backupId = '123e4567-e89b-12d3-a456-426614174001';
@@ -257,6 +340,9 @@ RemoteBackupService _service(
       }
       if (request.url.path.endsWith('/download')) {
         return http.Response.bytes(bytes, 200);
+      }
+      if (request.url.path == '/v1/planner/entries') {
+        return http.Response(jsonEncode({'entries': plannerEntries, 'next': null}), 200);
       }
       if (request.url.path == '/v1/sync/bootstrap') {
         final after = request.url.queryParameters['after'];
