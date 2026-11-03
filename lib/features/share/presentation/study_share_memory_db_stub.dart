@@ -4,6 +4,9 @@ Future<NotesDatabase> openSharedGuestDatabase() async {
   throw UnsupportedError('Shared guest editing requires Flutter Web.');
 }
 
-Future<NotesDatabase> openSharedGuestOperationDatabase(String shareId) async {
+Future<NotesDatabase> openSharedGuestOperationDatabase(
+  String shareId, {
+  required String guestActorId,
+}) async {
   throw UnsupportedError('Shared guest operations require Flutter Web.');
 }
