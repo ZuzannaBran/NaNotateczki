@@ -171,7 +171,7 @@ void main() {
     gateway.seed(_remote('actor-remote', 'remote-added'));
 
     await engine.start();
-    expect(rebaseObserved, contains([localEdit.operationId]));
+    expect(rebaseObserved.single, [localEdit.operationId]);
     final rows = await database.customSelect(
       'SELECT id FROM projection_probe ORDER BY id',
     ).get();
