@@ -23,6 +23,11 @@ typedef RemoteOperationReducer =
       List<OperationEnvelope> pendingLocal,
     );
 
+/// Notifies the editor only after a remote operation is durable in SQLite.
+/// This callback must be idempotent: a failed notification is retried on replay.
+typedef RemoteOperationCommitted =
+    Future<void> Function(OperationEnvelope remote);
+
 /// The opt-in v2 journal driver. A migrated namespace must own one instance.
 ///
 /// Legacy v1 snapshot writers must not run for documents driven by this
@@ -34,6 +39,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     required this.actorId,
     required this.checkpointScope,
     required this.applyRemote,
+    this.onRemoteCommitted,
     this.apiClient,
     this.shareId,
     this.guestTicket,
@@ -69,6 +75,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   final String actorId;
   final String checkpointScope;
   final RemoteOperationReducer applyRemote;
+  final RemoteOperationCommitted? onRemoteCommitted;
   final ApiClient? apiClient;
   final String? shareId;
 
@@ -296,6 +303,16 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
               await applyRemote(item.operation, pending);
             },
           );
+          if (!_isActive(generation)) {
+            return;
+          }
+          // This runs after the SQLite commit. Failure holds the cursor for
+          // replay; the UI must never be mutated inside a rollbackable write.
+          // ACKed local operations are also echoes and must not repaint.
+          if (!queuedEcho &&
+              !await store.isLocalOperation(item.operation.operationId)) {
+            await onRemoteCommitted?.call(item.operation);
+          }
           if (!_isActive(generation)) {
             return;
           }
