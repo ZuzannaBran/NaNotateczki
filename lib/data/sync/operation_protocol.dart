@@ -52,18 +52,20 @@ class OperationEnvelope {
     required this.actorSeq,
     required this.documentId,
     required this.kind,
-    required this.payload,
-    required this.dependencies,
+    required Map<String, dynamic> payload,
+    required List<String> dependencies,
     required this.logicalClock,
     this.objectId,
     this.pageId,
     this.revertsOperationId,
     this.schemaVersion = currentSchemaVersion,
-  }) {
+  }) : payload = _immutablePayload(payload),
+       dependencies = List.unmodifiable(dependencies) {
     _validate();
   }
 
   static const currentSchemaVersion = 1;
+  static const maxSafeInteger = 9007199254740991;
   static const libraryDocumentId = '@library';
   static final RegExp _uuidPattern = RegExp(
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
@@ -120,6 +122,29 @@ class OperationEnvelope {
   Map<String, dynamic> _copyPayload() =>
       Map<String, dynamic>.from(jsonDecode(jsonEncode(payload)) as Map);
 
+  static Map<String, dynamic> _immutablePayload(Map<String, dynamic> input) {
+    try {
+      final decoded = jsonDecode(jsonEncode(input)) as Map<String, dynamic>;
+      return Map<String, dynamic>.unmodifiable(
+        decoded.map((key, value) => MapEntry(key, _freeze(value))),
+      );
+    } on Object {
+      throw const FormatException('Payload must be valid JSON.');
+    }
+  }
+
+  static Object? _freeze(Object? value) {
+    if (value is Map) {
+      return Map<String, Object?>.unmodifiable(
+        value.map((key, item) => MapEntry(key as String, _freeze(item))),
+      );
+    }
+    if (value is List) {
+      return List<Object?>.unmodifiable(value.map(_freeze));
+    }
+    return value;
+  }
+
   void _validate() {
     if (schemaVersion != currentSchemaVersion) {
       throw FormatException('Unsupported operation schema: $schemaVersion');
@@ -134,7 +159,9 @@ class OperationEnvelope {
         documentId.isEmpty ||
         documentId.length > 128 ||
         actorSeq < 1 ||
-        logicalClock < 1) {
+        actorSeq > maxSafeInteger ||
+        logicalClock < 1 ||
+        logicalClock > maxSafeInteger) {
       throw const FormatException('Invalid actor, sequence, or clock.');
     }
     if (dependencies.length > 256 ||
@@ -149,14 +176,18 @@ class OperationEnvelope {
     }
     if (kind.target == OperationTarget.page &&
         (objectId == null || objectId!.isEmpty || pageId != null)) {
-      throw const FormatException('Page operations require the page object ID.');
+      throw const FormatException(
+        'Page operations require the page object ID.',
+      );
     }
     if (kind.target == OperationTarget.object &&
         (objectId == null ||
             objectId!.isEmpty ||
             pageId == null ||
             pageId!.isEmpty)) {
-      throw const FormatException('Object operations require page and object IDs.');
+      throw const FormatException(
+        'Object operations require page and object IDs.',
+      );
     }
     if (kind.target == OperationTarget.folder &&
         (documentId != libraryDocumentId ||
@@ -168,11 +199,6 @@ class OperationEnvelope {
     if (kind.target != OperationTarget.folder &&
         documentId == libraryDocumentId) {
       throw const FormatException('Library namespace is reserved for folders.');
-    }
-    try {
-      _copyPayload();
-    } on Object {
-      throw const FormatException('Payload must be valid JSON.');
     }
   }
 }

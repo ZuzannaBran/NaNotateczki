@@ -166,7 +166,7 @@ void main() {
         {'color': 'red', 'x': 12});
   });
 
-  test('deletion wins over older and newer edits, including delayed packet', () {
+  test('deletion beats older and newer edits', () {
     final create = op(
       id: a1, actor: 'A', sequence: 1, clock: 1,
       kind: OperationKind.objectCreate,
@@ -213,12 +213,15 @@ void main() {
 
   test('tie break is stable without wall clock', () {
     final first = op(id: a1, actor: 'A', sequence: 1, clock: 7);
-    final second = op(id: b1, actor: 'B', sequence: 1, clock: 7);
+    final second = op(
+      id: b1, actor: 'B', sequence: 1, clock: 7,
+      payload: {'properties': {'color': 'red'}},
+    );
     expect(compareOperationPrecedence(first, second), lessThan(0));
     final projection = OperationPropertyRegister()
       ..apply(second)
       ..apply(first);
-    expect(projection.fieldsFor(first)?['color'], 'blue');
+    expect(projection.fieldsFor(first)?['color'], 'red');
   });
 
   test('queue capacity and checkpoint reject invalid replays', () {

@@ -93,6 +93,49 @@ void main() {
     );
   });
 
+  test('payload is immutable and never aliases original nested lists', () {
+    final points = <int>[1, 2];
+    final envelope = OperationEnvelope(
+      operationId: firstId,
+      actorId: 'device-a',
+      actorSeq: 1,
+      documentId: 'document-1',
+      pageId: 'page-1',
+      objectId: 'stroke-1',
+      kind: OperationKind.strokeCreate,
+      payload: {
+        'value': {'points': points},
+      },
+      dependencies: [],
+      logicalClock: 1,
+    );
+    points.clear();
+    expect(
+      (envelope.toJson()['payload'] as Map)['value']['points'],
+      [1, 2],
+    );
+    expect(
+      () => (envelope.payload['value'] as Map)['points'] = <int>[],
+      throwsUnsupportedError,
+    );
+  });
+
+  test('rejects integers outside JavaScript exact integer range', () {
+    expect(
+      () => OperationEnvelope(
+        operationId: firstId,
+        actorId: 'device-a',
+        actorSeq: OperationEnvelope.maxSafeInteger + 1,
+        documentId: 'document-1',
+        kind: OperationKind.documentSet,
+        payload: {},
+        dependencies: [],
+        logicalClock: 1,
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('undo is a new operation referencing the original', () {
     final undo = OperationEnvelope(
       operationId: secondId,
