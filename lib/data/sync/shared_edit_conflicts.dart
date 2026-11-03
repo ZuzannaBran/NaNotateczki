@@ -100,3 +100,10 @@ bool _sameValue(Object? left, Object? right) {
   }
   return left == right;
 }
+
+/// A server acknowledgment does not imply the editor has displayed it yet.
+/// A deferred import must be compared with the last *visible* snapshot.
+Map<String, dynamic> sharedGuestVisibleBaseline({
+  required Map<String, dynamic> acknowledged,
+  Map<String, dynamic>? notYetInstalled,
+}) => notYetInstalled ?? acknowledged;

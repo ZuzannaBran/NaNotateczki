@@ -613,7 +613,7 @@ tylko przy normalnym starcie istniejącej, zdrowej bazy.
 `_PersistentWorkspaceEditor` utrzymuje lokalny `EditorController` przez
 zmiany rewizji serwerowej; zamiast tworzyć nowy kontroler po każdym sync,
 odracza import podczas aktywnego gestu, a po nim odświeża tylko treść.
-`StudyShareGuestEditor` stosuje ten sam mechanizm i własny viewport.
+`StudyShareGuestEditor` stosuje ten sam mechanizm i własny viewport. Odroczony import gościa zachowuje osobną bazę ostatnio widocznej rewizji, dzięki czemu nowszy sygnał nie interpretuje niewyświetlonego potwierdzenia jako lokalnej edycji; test `shared_edit_conflicts_test.dart`.
 
 
 Nawigacja popup sprawdza rzeczywisty aktywny tryb drawer, nie samo

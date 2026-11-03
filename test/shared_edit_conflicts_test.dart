@@ -89,6 +89,41 @@ void main() {
     };
     expect(hasRejectedSharedEdits(base, submitted, accepted), isFalse);
   });
+  test(
+    'subsequent remote revision uses the visible pre-acknowledgment base',
+    () {
+      final displayed = _doc(text: 'mine', strokes: []);
+      final acknowledged = _doc(
+        text: 'mine',
+        strokes: [
+          {'id': 'remote-ink', 'points': [1, 2]},
+        ],
+      );
+      final expected = sharedGuestVisibleBaseline(
+        acknowledged: acknowledged,
+        notYetInstalled: displayed,
+      );
+      expect(
+        canInstallSharedGuestRevision(
+          incomingRevision: 12,
+          confirmedRevision: 11,
+          expectedLocal: expected,
+          visibleLocal: displayed,
+        ),
+        isTrue,
+      );
+      expect(
+        canInstallSharedGuestRevision(
+          incomingRevision: 12,
+          confirmedRevision: 11,
+          expectedLocal: acknowledged,
+          visibleLocal: displayed,
+        ),
+        isFalse,
+      );
+    },
+  );
+
   test('a delayed revision never replaces a newer guest acknowledgement', () {
     final base = _doc(text: 'saved', strokes: []);
     expect(

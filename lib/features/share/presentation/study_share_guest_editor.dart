@@ -307,6 +307,10 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         _localMergeBase = null;
       }
       if (rejected) {
+        // The rejected delta still belongs to the visible local document.
+        // Do not mark those strokes/text changes as already acknowledged:
+        // the next edit must not silently discard them during a rebase.
+        _localMergeBase = null;
         _dirty = true;
         if (mounted) {
           setState(() {
@@ -402,9 +406,10 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       if (latest.revision <= _revision || _dirty) {
         return;
       }
-      // Never force an active text edit to commit merely to receive a
-      // remote notification. The installer defers until the editor is safe.
-      await _installRemote(latest);
+      // A previous acknowledgment can be newer than the actual visible
+      // document when its installation was deferred during a gesture.
+      // Compare against the last visible baseline, not the server ack.
+      await _installRemote(latest, expectedLocal: _localMergeBase);
     } on ApiException catch (error) {
       if (error.statusCode == 401 || error.statusCode == 410) {
         widget.onEnded();
@@ -484,7 +489,13 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       return;
     }
     final editor = _editor;
-    final expected = expectedLocal ?? _base;
+    final expected = expectedLocal ??
+        (_base == null
+            ? null
+            : sharedGuestVisibleBaseline(
+                acknowledged: _base!,
+                notYetInstalled: _localMergeBase,
+              ));
     if (editor == null || expected == null) {
       return;
     }
@@ -635,13 +646,15 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
               } catch (_) {
                 // Keep any older snapshot if final persistence fails.
               }
-              await widget.client.writeDocument(
-                widget.shareId,
-                widget.ticket,
-                baseRevision: _revision,
-                baseNotebook: _base!,
-                notebook: encoded,
-              );
+              if (_error == null) {
+                await widget.client.writeDocument(
+                  widget.shareId,
+                  widget.ticket,
+                  baseRevision: _revision,
+                  baseNotebook: _base!,
+                  notebook: encoded,
+                );
+              }
             }
           }
         }
