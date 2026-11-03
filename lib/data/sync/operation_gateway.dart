@@ -1,5 +1,7 @@
-import 'operation_protocol.dart';
+import 'dart:convert';
+
 import 'api_client.dart';
+import 'operation_protocol.dart';
 
 /// A server-assigned position for an idempotently committed operation.
 class OperationReceipt {
@@ -47,9 +49,16 @@ class HttpOperationGateway implements OperationGateway {
     if (operations.isEmpty || operations.length > 50) {
       throw ArgumentError('An operation batch must contain 1-50 entries.');
     }
-    final response = await apiClient.postJson('/v2/operations/batch', {
+    final request = {
       'operations': [for (final op in operations) op.toJson()],
-    });
+    };
+    if (utf8.encode(jsonEncode(request)).length > 1024 * 1024) {
+      throw ArgumentError('Operation batch exceeds server request limit.');
+    }
+    final response = await apiClient.postJson(
+      '/v2/operations/batch',
+      request,
+    );
     final body = _object(response.decodeJson());
     final entries = body['acknowledgements'];
     if (entries is! List || entries.length != operations.length) {
