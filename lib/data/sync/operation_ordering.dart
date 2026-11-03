@@ -25,7 +25,21 @@ class OperationActorClock {
   int logicalClock;
   String? previousOperationId;
 
+  final Map<String, OperationEnvelope> _observed = {};
+
+  /// Observe only committed, causally available remote operations.
   void observe(OperationEnvelope remote) {
+    if (remote.actorId != actorId) {
+      final previous = _observed[remote.actorId];
+      if (previous != null &&
+          previous.actorSeq == remote.actorSeq &&
+          previous.operationId != remote.operationId) {
+        throw const FormatException('Forked observed actor sequence.');
+      }
+      if (previous == null || remote.actorSeq > previous.actorSeq) {
+        _observed[remote.actorId] = remote;
+      }
+    }
     if (remote.logicalClock > logicalClock) {
       logicalClock = remote.logicalClock;
     }
@@ -42,8 +56,14 @@ class OperationActorClock {
   }) {
     final causalIds = <String>{
       ...dependencies,
+      ..._observed.values.map((op) => op.operationId),
       if (previousOperationId != null) previousOperationId!,
     }.toList()..sort();
+    if (causalIds.length > 256 ||
+        actorSeq >= OperationEnvelope.maxSafeInteger ||
+        logicalClock >= OperationEnvelope.maxSafeInteger) {
+      throw const FormatException('Actor clock or dependency limit exceeded.');
+    }
     final operation = OperationEnvelope(
       operationId: const Uuid().v4(),
       actorId: actorId,
@@ -69,15 +89,25 @@ class OperationActorClock {
     'logicalClock': logicalClock,
     if (previousOperationId != null)
       'previousOperationId': previousOperationId,
+    'observedOperations': [
+      for (final op in _observed.values) op.toJson(),
+    ],
   };
 
   factory OperationActorClock.fromCheckpoint(Map<String, dynamic> json) {
-    return OperationActorClock(
+    final clock = OperationActorClock(
       actorId: json['actorId'] as String,
       actorSeq: json['actorSeq'] as int,
       logicalClock: json['logicalClock'] as int,
       previousOperationId: json['previousOperationId'] as String?,
     );
+    final observed = json['observedOperations'] as List? ?? [];
+    for (final entry in observed) {
+      clock.observe(
+        OperationEnvelope.fromJson(Map<String, dynamic>.from(entry as Map)),
+      );
+    }
+    return clock;
   }
 }
 
@@ -110,45 +140,96 @@ int compareOperationPrecedence(OperationEnvelope a, OperationEnvelope b) {
   return a.operationId.compareTo(b.operationId);
 }
 
-/// Buffers out-of-order operations across documents in a storage namespace.
+/// A lossless stage-2 checkpoint. Compaction needs a durable ID lookup.
+class OperationCheckpoint {
+  OperationCheckpoint({required List<OperationEnvelope> operations})
+    : operations = List.unmodifiable(operations);
+
+  static const schemaVersion = 1;
+  final List<OperationEnvelope> operations;
+
+  Map<String, dynamic> toJson() => {
+    'schemaVersion': schemaVersion,
+    'operations': [for (final op in operations) op.toJson()],
+  };
+
+  factory OperationCheckpoint.fromJson(Map<String, dynamic> json) {
+    if (json['schemaVersion'] != schemaVersion ||
+        json['operations'] is! List) {
+      throw const FormatException('Invalid operation checkpoint.');
+    }
+    return OperationCheckpoint(
+      operations: [
+        for (final value in json['operations'] as List)
+          OperationEnvelope.fromJson(
+            Map<String, dynamic>.from(value as Map),
+          ),
+      ],
+    );
+  }
+}
+
+/// Buffers causal gaps and atomically acknowledges ready operations.
 ///
-/// [initialActorSequences] and [knownOperationIds] must come from the same
-/// durable checkpoint. A buffered operation is never reported as applied.
-/// No writes occur here: stage 3 will commit projection and cursor together.
+/// Stage 3 will persist accepted operations with their projections in a
+/// single SQLite transaction. Pending operations belong in the outbox.
 class CausalOperationBuffer {
-  CausalOperationBuffer({
-    Map<String, int> initialActorSequences = const {},
-    Set<String> knownOperationIds = const {},
-    this.maximumPending = 10000,
-  }) : _actorSequences = Map.of(initialActorSequences),
-       _knownIds = Set.of(knownOperationIds) {
-    if (maximumPending < 1 ||
-        _actorSequences.values.any((value) => value < 0)) {
-      throw ArgumentError('Invalid causal checkpoint.');
+  CausalOperationBuffer({this.maximumPending = 10000}) {
+    if (maximumPending < 1) {
+      throw ArgumentError('Invalid causal queue capacity.');
     }
   }
 
+  factory CausalOperationBuffer.fromCheckpoint(
+    OperationCheckpoint checkpoint, {
+    int maximumPending = 10000,
+  }) {
+    final queue = CausalOperationBuffer(maximumPending: maximumPending);
+    final operations = [...checkpoint.operations]
+      ..sort(compareOperationPrecedence);
+    for (final operation in operations) {
+      queue.ingest(operation);
+    }
+    if (queue.pendingCount != 0 ||
+        queue._accepted.length != operations.length) {
+      throw const FormatException('Inconsistent causal checkpoint.');
+    }
+    return queue;
+  }
+
   final int maximumPending;
-  final Map<String, int> _actorSequences;
-  final Set<String> _knownIds;
+  final Map<String, int> _actorSequences = {};
+  final Set<String> _knownIds = {};
   final Map<String, OperationEnvelope> _pending = {};
   final Map<String, OperationEnvelope> _accepted = {};
   final Map<String, Map<int, String>> _sequenceIds = {};
   final Map<String, OperationEnvelope> _latestActorOperation = {};
+  final Map<String, String> _rejected = {};
 
   int get pendingCount => _pending.length;
   Map<String, int> get actorSequences => Map.unmodifiable(_actorSequences);
+  Map<String, String> get rejectedOperations => Map.unmodifiable(_rejected);
+
+  OperationCheckpoint exportCheckpoint() {
+    if (_pending.isNotEmpty) {
+      throw const OperationOrderException(
+        'Pending operations must be stored separately.',
+      );
+    }
+    return OperationCheckpoint(
+      operations: _accepted.values.toList()
+        ..sort(compareOperationPrecedence),
+    );
+  }
 
   List<String> missingDependencies(OperationEnvelope operation) =>
       operation.dependencies
           .where((id) => !_knownIds.contains(id))
           .toList(growable: false);
 
-  /// Accepts an envelope, returning only operations with satisfied parents.
-  /// A repeated identical packet is harmless. An ID/actorSeq fork is fatal.
   List<OperationEnvelope> ingest(OperationEnvelope operation) {
-    final existing = _pending[operation.operationId] ??
-        _accepted[operation.operationId];
+    final existing =
+        _pending[operation.operationId] ?? _accepted[operation.operationId];
     if (existing != null) {
       if (!const DeepCollectionEquality().equals(
         existing.toJson(),
@@ -158,69 +239,102 @@ class CausalOperationBuffer {
       }
       return const [];
     }
+    if (_rejected.containsKey(operation.operationId)) {
+      throw const OperationOrderException('Previously rejected operation ID.');
+    }
     if (_knownIds.contains(operation.operationId)) {
-      return const [];
+      throw const OperationOrderException('Missing known operation payload.');
     }
     if (operation.actorSeq <= (_actorSequences[operation.actorId] ?? 0)) {
       throw const OperationOrderException('Sequence precedes checkpoint.');
     }
-    final actorKeys = _sequenceIds.putIfAbsent(
-      operation.actorId,
-      () => <int, String>{},
-    );
-    final previousId = actorKeys[operation.actorSeq];
-    if (previousId != null && previousId != operation.operationId) {
+    final previousId = _sequenceIds[operation.actorId]?[operation.actorSeq];
+    if (previousId != null) {
       throw const OperationOrderException('Actor sequence was forked.');
     }
     if (_pending.length >= maximumPending) {
       throw const OperationOrderException('Causal queue is full.');
     }
-    actorKeys[operation.actorSeq] = operation.operationId;
-    _pending[operation.operationId] = operation;
-    if (_hasDependencyCycle(operation.operationId, <String>{}, <String>{})) {
-      _pending.remove(operation.operationId);
-      actorKeys.remove(operation.actorSeq);
+
+    final pending = Map<String, OperationEnvelope>.of(_pending);
+    final accepted = Map<String, OperationEnvelope>.of(_accepted);
+    final known = Set<String>.of(_knownIds);
+    final sequences = Map<String, int>.of(_actorSequences);
+    final sequenceIds = _sequenceIds.map(
+      (actor, values) => MapEntry(actor, Map<int, String>.of(values)),
+    );
+    final latest = Map<String, OperationEnvelope>.of(_latestActorOperation);
+    final rejected = Map<String, String>.of(_rejected);
+    sequenceIds.putIfAbsent(operation.actorId, () => {})[operation.actorSeq] =
+        operation.operationId;
+    pending[operation.operationId] = operation;
+    if (_hasDependencyCycle(
+      pending,
+      operation.operationId,
+      <String>{},
+      <String>{},
+    )) {
       throw const OperationOrderException('Causal dependency cycle.');
     }
-    return _drainReady();
-  }
 
-  List<OperationEnvelope> _drainReady() {
     final applied = <OperationEnvelope>[];
     while (true) {
-      final ready = _pending.values.where((op) {
-        return op.actorSeq == (_actorSequences[op.actorId] ?? 0) + 1 &&
-            op.dependencies.every(_knownIds.contains);
+      final ready = pending.values.where((op) {
+        return op.actorSeq == (sequences[op.actorId] ?? 0) + 1 &&
+            op.dependencies.every(known.contains);
       }).toList()..sort(compareOperationPrecedence);
       if (ready.isEmpty) {
         break;
       }
-      for (final operation in ready) {
-        final last = _latestActorOperation[operation.actorId];
-        if (last != null &&
-            (!operation.dependencies.contains(last.operationId) ||
-                operation.logicalClock <= last.logicalClock)) {
-          throw const OperationOrderException('Invalid actor causality.');
+      for (final candidate in ready) {
+        if (!pending.containsKey(candidate.operationId)) {
+          continue;
         }
-        for (final dependency in operation.dependencies) {
-          final parent = _accepted[dependency];
-          if (parent != null &&
-              operation.logicalClock <= parent.logicalClock) {
-            throw const OperationOrderException('Invalid logical clock.');
+        String? invalid;
+        final last = latest[candidate.actorId];
+        if (last != null &&
+            (!candidate.dependencies.contains(last.operationId) ||
+                candidate.logicalClock <= last.logicalClock)) {
+          invalid = 'Invalid actor causality.';
+        }
+        for (final dependency in candidate.dependencies) {
+          final parent = accepted[dependency];
+          if (parent == null) {
+            invalid ??= 'Unverifiable checkpoint dependency.';
+          } else if (candidate.logicalClock <= parent.logicalClock) {
+            invalid ??= 'Invalid logical clock.';
           }
         }
-        _pending.remove(operation.operationId);
-        _knownIds.add(operation.operationId);
-        _accepted[operation.operationId] = operation;
-        _actorSequences[operation.actorId] = operation.actorSeq;
-        _latestActorOperation[operation.actorId] = operation;
-        applied.add(operation);
+        if (invalid != null) {
+          if (candidate.operationId == operation.operationId) {
+            throw OperationOrderException(invalid);
+          }
+          pending.remove(candidate.operationId);
+          sequenceIds[candidate.actorId]?.remove(candidate.actorSeq);
+          rejected[candidate.operationId] = invalid;
+          continue;
+        }
+        pending.remove(candidate.operationId);
+        known.add(candidate.operationId);
+        accepted[candidate.operationId] = candidate;
+        sequences[candidate.actorId] = candidate.actorSeq;
+        latest[candidate.actorId] = candidate;
+        applied.add(candidate);
       }
     }
+
+    _pending..clear()..addAll(pending);
+    _accepted..clear()..addAll(accepted);
+    _knownIds..clear()..addAll(known);
+    _actorSequences..clear()..addAll(sequences);
+    _sequenceIds..clear()..addAll(sequenceIds);
+    _latestActorOperation..clear()..addAll(latest);
+    _rejected..clear()..addAll(rejected);
     return applied;
   }
 
   bool _hasDependencyCycle(
+    Map<String, OperationEnvelope> pending,
     String id,
     Set<String> visiting,
     Set<String> finished,
@@ -228,20 +342,21 @@ class CausalOperationBuffer {
     if (visiting.contains(id)) {
       return true;
     }
-    if (!finished.add(id)) {
+    if (finished.contains(id)) {
       return false;
     }
     visiting.add(id);
-    final operation = _pending[id];
+    final operation = pending[id];
     if (operation != null) {
       for (final dependency in operation.dependencies) {
-        if (_pending.containsKey(dependency) &&
-            _hasDependencyCycle(dependency, visiting, finished)) {
+        if (pending.containsKey(dependency) &&
+            _hasDependencyCycle(pending, dependency, visiting, finished)) {
           return true;
         }
       }
     }
     visiting.remove(id);
+    finished.add(id);
     return false;
   }
 }
