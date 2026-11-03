@@ -436,6 +436,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   scalaniem folderów, okładek i zadań oraz zachowaniem lokalnych zmian
   powstałych podczas uploadu. Pozostałe ustawienia nie nadpisują
   automatycznie konfliktujących edycji. Zachowuje kopię sprzed importu.
+  Pierwszy odczyt istniejącego stanu konta ma pierwszeństwo przed
+  niepowiązanym archiwalnym lokalnym plikiem folderów, którego zawartość
+  zostaje zachowana przed importem; test
+  `test/account_settings_sync_service_test.dart`.
   `AppScope` uruchamia odczyt po logowaniu, przy wznowieniu i co 45 s
   oraz wysyłkę po zmianie preferencji, recent i czasu backupu.
 - `lib/data/sync/library_state_merge.dart`: trójstronne porównanie
@@ -458,6 +462,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   utrwalonego `userId`, więc kursor, rewizje i outbox nie przechodzą między
   kontami. Normalizuje ścieżki obrazów oraz daty dokumentu do UTC,
   zapobiegając fałszywym konfliktom między Linuxem, Web, iOS i Androidem.
+  Potwierdzenia własnego PUT podczas share nie nadpisują aktywnego canvasa:
+  zachowują bazę ostatnio widocznego stanu oraz zaakceptowany stan serwera,
+  a kolejne lokalne zmiany są na niego trójstronnie rebazowane. Odroczona
+  rewizja trafia do SQLite dopiero gdy nie ma oczekujących zapisów i aktywnego
+  gestu. Obydwie bazy trafiają do limitowanego checkpointu synchronizacji.
+  Test `test/live_web_sync_service_test.dart` weryfikuje hosta piszącego
+  podczas zmiany gościa i zachowanie obiektów przy kolejnym wysłaniu.
   Bazowy snapshot zachowuje dokładną odpowiedź serwera, bez normalizacji,
   ponieważ API weryfikuje go względem niezmiennej historii rewizji.
   Niezmieniona data utworzenia zachowuje oryginalny zapis bazy także w PUT.

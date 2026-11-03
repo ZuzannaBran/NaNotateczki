@@ -116,6 +116,121 @@ void main() {
     },
   );
 
+  test(
+    'host ack waits for idle and rebases next edit on guest changes',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final created = await repository.createNotebook(title: 'Shared host');
+      final initial = (await repository.getNotebook(created.uid))!;
+      final original = NotebookRepository.encodeNotebook(initial);
+      var canApply = false;
+      var pushCount = 0;
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/v1/sync/bootstrap') {
+            return http.Response(
+              jsonEncode({
+                'cursor': 1,
+                'notebooks': [
+                  {
+                    'uid': initial.uid,
+                    'revision': 1,
+                    'deleted': false,
+                    'notebook': original,
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/v1/sync/changes') {
+            return http.Response(
+              '{"cursor":1,"changes":[],"hasMore":false}',
+              200,
+            );
+          }
+          if (request.method == 'PUT') {
+            pushCount++;
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            final submitted = body['notebook'] as Map<String, dynamic>;
+            final pages = submitted['pages'] as List<dynamic>;
+            final page = pages.single as Map<String, dynamic>;
+            if (pushCount == 1) {
+              expect(page['title'], 'Host 1');
+              final merged = Map<String, dynamic>.from(submitted);
+              merged['pages'] = [
+                {...page, 'isBookmarked': true},
+              ];
+              return http.Response(
+                jsonEncode({'revision': 2, 'notebook': merged}),
+                200,
+              );
+            }
+            expect(pushCount, 2);
+            expect(body['expectedRevision'], 2);
+            expect(page['title'], 'Host 2');
+            expect(page['isBookmarked'], isTrue);
+            return http.Response(
+              jsonEncode({'revision': 3, 'notebook': submitted}),
+              200,
+            );
+          }
+          fail('Unexpected request: ${request.url}');
+        }),
+      )..setAccessToken('token');
+      addTearDown(client.close);
+      final session = AccountSessionController(client)
+        ..mode = AccountDataMode.account
+        ..userId = 'host-rebase-account';
+      addTearDown(session.dispose);
+      final sync = LiveWebSyncService(
+        repository: repository,
+        apiClient: client,
+        session: session,
+        enableRealtime: false,
+      );
+      addTearDown(sync.dispose);
+      await sync.start(InitialSyncPolicy.mergeSafely);
+      sync.setSharedDocumentUid(initial.uid);
+      sync.setSharedRemoteApplyGuard(initial.uid, () => canApply);
+
+      final hostOne = initial.copyWith(
+        pages: [initial.pages.single.copyWith(title: 'Host 1')],
+      );
+      await repository.saveNotebook(hostOne);
+      sync.enqueue([NotebookRepositoryChange.full(initial.uid)]);
+      await sync.syncNow();
+      expect(sync.lastError, isNull);
+      var visible = (await repository.getNotebook(initial.uid))!;
+      expect(visible.pages.single.title, 'Host 1');
+      expect(visible.pages.single.isBookmarked, isFalse);
+
+      final hostTwo = visible.copyWith(
+        pages: [visible.pages.single.copyWith(title: 'Host 2')],
+      );
+      await repository.saveNotebook(hostTwo);
+      sync.enqueue([NotebookRepositoryChange.full(initial.uid)]);
+      await sync.syncNow();
+      expect(sync.lastError, isNull);
+      expect(pushCount, 2);
+      visible = (await repository.getNotebook(initial.uid))!;
+      expect(visible.pages.single.isBookmarked, isFalse);
+
+      canApply = true;
+      await sync.syncNow();
+      final reconciled = (await repository.getNotebook(initial.uid))!;
+      expect(reconciled.uid, initial.uid);
+      expect(reconciled.pages.single.title, 'Host 2');
+      expect(reconciled.pages.single.isBookmarked, isTrue);
+      expect(sync.hasPendingChanges, isFalse);
+      sync.clearSharedRemoteApplyGuard(initial.uid);
+      await sync.stop();
+    },
+  );
+
   test('local and UTC timestamps do not create a sync conflict', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);

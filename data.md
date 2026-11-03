@@ -519,3 +519,23 @@ usunięcie nie jest automatycznie przywracana wraz z dokumentem.
 ### Ochrona usunięć przed archiwalnym backupem
 
 Przy odzyskiwaniu verified snapshotu nie wolno dołączać całej historycznej listy folderów ani okładek. Dopisywane są tylko ścieżki (z przodkami) dokumentów faktycznie odzyskanych po sprawdzeniu aktualnych tombstones; zadania można przenieść wyłącznie dla ich zmapowanych UID. Wylogowanie i przejście konta do Local wymagają najpierw opróżnienia zapisów, synchronizacji oraz potwierdzenia końcowego backupu, a w razie błędu pozostawiają aktywną sesję i jej kolejkę.
+
+## Potwierdzenia share i granice kolejności
+
+Host nie może instalować zaakceptowanej rewizji udostępnionego dokumentu
+podczas aktywnego gestu ani przy nieskończonym zapisie lokalnym.
+Potwierdzenie serwera nie oznacza automatycznie, że nowa rewizja została
+już pokazana. Klient zachowuje ostatnią widoczną bazę i rebazuje kolejny
+lokalny zapis na rewizji zaakceptowanej, unikając usuwania dopisków gościa.
+Różnica w samym `updatedAt` bez różnicy stron nie powinna wywoływać
+ponownego importu i migania.
+
+Serwerowy `GET /v1/time` służy dziś do oceny dryfu zegara.
+Wspólny absolutny czas niezależny od zegarów urządzeń nie istnieje bez
+synchronizacji i granicy błędu pomiaru. Aktualna reguła konfliktu share
+nadal rozstrzyga równoczesne zmiany tego samego obiektu kolejnością
+przyjęcia na serwerze; nie należy przedstawiać jej jako kolejności
+fizycznych ruchów na urządzeniach. Pełna gwarancja pracy lokalnej i
+równoczesnej wymaga operacji per obiekt, identyfikatorów aktorów i zegarów
+logicznych/CRDT oraz inkrementalnego renderingu, bez globalnego
+podmieniania snapshotów. To wymaga osobnej migracji protokołu.

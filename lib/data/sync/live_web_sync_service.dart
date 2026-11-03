@@ -35,6 +35,10 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   final bool enableRealtime;
   final Map<String, int> _revisions = <String, int>{};
   final Map<String, Map<String, dynamic>> _bases = {};
+
+  // Last locally visible state when the server acknowledged remote objects
+  // that cannot yet be installed during an active shared-editor gesture.
+  final Map<String, Map<String, dynamic>> _sharedVisibleBases = {};
   final Set<String> _pending = <String>{};
 
   Future<void> _offlineQueueTail = Future<void>.value();
@@ -359,6 +363,9 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _runSyncPass() async {
     do {
       _syncRequestedWhileRunning = false;
+      for (final uid in _sharedVisibleBases.keys.toList()) {
+        await _installDeferredSharedAcknowledgment(uid);
+      }
       await _reconcileChanges();
       for (final uid in _pending.toList()) {
         await _push(uid);
@@ -396,6 +403,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         _bases[record.uid] = record.baseNotebook!;
       }
       if (record.deleted || record.notebook == null) {
+        _sharedVisibleBases.remove(record.uid);
         if (localNotebook != null) {
           if (_hasUnsentEdit(record.uid, localNotebook, previousBase)) {
             final copy = await _conflictCopy(localNotebook, reserved: imports);
@@ -411,7 +419,32 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       }
       if (localNotebook == null) {
         imports.add(record.notebook!);
+        _sharedVisibleBases.remove(record.uid);
         continue;
+      }
+      final lastVisible = _sharedVisibleBases[record.uid];
+      if (lastVisible != null) {
+        if (_sameEncodedNotebook(localNotebook, lastVisible)) {
+          imports.add(record.notebook!);
+          _sharedVisibleBases.remove(record.uid);
+          _pending.remove(record.uid);
+          _idempotencyKeys.remove(record.uid);
+          continue;
+        }
+        final rebased = _mergeWithRemote(
+          lastVisible,
+          localNotebook,
+          record.baseNotebook!,
+        );
+        if (rebased != null) {
+          imports.add(rebased);
+          _sharedVisibleBases.remove(record.uid);
+          _pending.add(record.uid);
+          _idempotencyKeys[record.uid] = const Uuid().v4();
+          continue;
+        }
+        // Keep the local draft and let the existing critical-conflict path
+        // preserve it as a numbered copy instead of silently erasing it.
       }
       if (_sameNotebook(localNotebook, record.notebook!)) {
         _pending.remove(record.uid);
@@ -490,12 +523,32 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _push(String uid, {bool retriedConflict = false}) async {
     final notebook = await repository.getNotebook(uid);
-    final encodedNotebook = notebook == null
+    final locallyVisible = notebook == null
         ? null
         : _encodeSyncNotebook(notebook);
-    final sentNotebook = encodedNotebook == null
+    final sentNotebook = locallyVisible == null
         ? null
-        : jsonEncode(encodedNotebook);
+        : jsonEncode(locallyVisible);
+    Map<String, dynamic>? encodedNotebook = locallyVisible;
+    final lastVisible = _sharedVisibleBases[uid];
+    final acceptedBase = _bases[uid];
+    if (lastVisible != null &&
+        locallyVisible != null &&
+        acceptedBase != null) {
+      // The previously accepted server revision may contain guest objects
+      // not installed into the host's active canvas yet. Rebase the local
+      // delta onto those objects before transmitting another edit.
+      encodedNotebook = mergeNotebookChanges(
+        _normalizeSyncNotebook(lastVisible),
+        locallyVisible,
+        _normalizeSyncNotebook(acceptedBase),
+      );
+      if (encodedNotebook == null) {
+        throw StateError(
+          'Concurrent shared edits need recovery. Local work is preserved.',
+        );
+      }
+    }
     final baseCreatedAt = _bases[uid]?['createdAt'];
     if (encodedNotebook != null &&
         baseCreatedAt is String &&
@@ -547,18 +600,28 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       final currentNotebook = current == null
           ? null
           : jsonEncode(_encodeSyncNotebook(current));
+      final acceptedShared = result['notebook'];
+      if (acceptedShared is Map<String, dynamic> &&
+          locallyVisible != null &&
+          jsonEncode(acceptedShared['pages']) !=
+              jsonEncode(locallyVisible['pages'])) {
+        _sharedVisibleBases[uid] = locallyVisible!;
+      } else {
+        _sharedVisibleBases.remove(uid);
+      }
       if (currentNotebook == sentNotebook) {
-        if (result['notebook'] case final Map<String, dynamic> merged) {
-          if (jsonEncode(_normalizeSyncNotebook(merged)) != sentNotebook) {
-            final authoritative = repository.decodeBackupStrict([
-              merged,
-            ]).single;
-            await _applyRemoteImports([authoritative]);
-          }
-        }
         _pending.remove(uid);
         _idempotencyKeys.remove(uid);
+        if (_sharedVisibleBases.containsKey(uid)) {
+          await _installDeferredSharedAcknowledgment(uid);
+        }
       } else {
+        // A gesture may have continued while the HTTP request was pending.
+        // Its new delta must be rebased on the accepted server snapshot.
+        if (acceptedShared is Map<String, dynamic> &&
+            locallyVisible != null) {
+          _sharedVisibleBases[uid] = locallyVisible;
+        }
         _pending.add(uid);
         _idempotencyKeys[uid] = const Uuid().v4();
       }
@@ -574,6 +637,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       }
       if (record.deleted) {
         _bases.remove(uid);
+        _sharedVisibleBases.remove(uid);
         if (notebook != null) {
           if (_hasUnsentEdit(uid, notebook, previousBase)) {
             final copy = await _conflictCopy(notebook);
@@ -618,6 +682,40 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       _pending.remove(uid);
       _idempotencyKeys.remove(uid);
     }
+  }
+
+  Future<void> _installDeferredSharedAcknowledgment(String uid) async {
+    final visible = _sharedVisibleBases[uid];
+    final accepted = _bases[uid];
+    if (visible == null || accepted == null || _pending.contains(uid)) {
+      return;
+    }
+    if (_remoteGuardUid == uid && !(_remoteApplyGuard?.call() ?? true)) {
+      _retrySharedRevision();
+      return;
+    }
+    await repository.waitForPendingSaves();
+    if (_pending.contains(uid) ||
+        (_remoteGuardUid == uid && !(_remoteApplyGuard?.call() ?? true))) {
+      _retrySharedRevision();
+      return;
+    }
+    final current = await repository.getNotebook(uid);
+    if (current == null) {
+      _sharedVisibleBases.remove(uid);
+      return;
+    }
+    if (!_sameEncodedNotebook(current, visible)) {
+      // A newly saved local gesture raced with the network acknowledgment.
+      // Send its delta, never replace it with the accepted older snapshot.
+      _pending.add(uid);
+      _idempotencyKeys[uid] = const Uuid().v4();
+      _syncRequestedWhileRunning = true;
+      return;
+    }
+    final remoteNotebook = repository.decodeBackupStrict([accepted]).single;
+    await _applyRemoteImports([remoteNotebook]);
+    _sharedVisibleBases.remove(uid);
   }
 
   Future<void> _reconcileChanges() async {
@@ -1015,6 +1113,15 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final pending = json['pending'];
     final keys = json['idempotencyKeys'];
     final bases = json['bases'];
+    final visibleBases = json['sharedVisibleBases'];
+    if (visibleBases is Map<String, dynamic>) {
+      for (final entry in visibleBases.entries) {
+        if (entry.value is Map<String, dynamic>) {
+          _sharedVisibleBases[entry.key] =
+              entry.value as Map<String, dynamic>;
+        }
+      }
+    }
     if (bases is Map<String, dynamic>) {
       for (final entry in bases.entries) {
         if (entry.value is Map<String, dynamic>) {
@@ -1042,13 +1149,16 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Bound durable merge ancestors so Web localStorage cannot exhaust quota.
-  Map<String, Map<String, dynamic>> _basesForStorage() {
+  Map<String, Map<String, dynamic>> _basesForStorage([
+    Map<String, Map<String, dynamic>>? source,
+  ]) {
     const byteLimit = 1024 * 1024;
     const perNotebookLimit = 256 * 1024;
     var usedBytes = 0;
     final saved = <String, Map<String, dynamic>>{};
-    for (final uid in {..._pending, ..._bases.keys}) {
-      final base = _bases[uid];
+    final candidates = source ?? _bases;
+    for (final uid in {..._pending, ...candidates.keys}) {
+      final base = candidates[uid];
       if (base == null) {
         continue;
       }
@@ -1080,6 +1190,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           'cursor': _cursor,
           'revisions': _revisions,
           'bases': _basesForStorage(),
+          'sharedVisibleBases': _basesForStorage(_sharedVisibleBases),
           'pending': _pending.toList()..sort(),
           'idempotencyKeys': _idempotencyKeys,
         }),
@@ -1128,6 +1239,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     _remoteApplyGuard = null;
     _revisions.clear();
     _bases.clear();
+    _sharedVisibleBases.clear();
     _pending.clear();
     _idempotencyKeys.clear();
     lastError = null;
