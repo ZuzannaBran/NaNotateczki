@@ -5,7 +5,7 @@ import 'package:program/features/planner/state/study_planner_controller.dart';
 
 void main() {
   test(
-    'deletion tombstones survive restart and reject old offline edits',
+    'deletion tombstones survive restart and reject newer stale edits',
     () async {
       final files = <String, String>{};
       var now = DateTime.utc(2026, 11, 2, 9);
@@ -44,7 +44,8 @@ void main() {
           .toIso8601String();
       second.applyRemoteRecords([later]);
       await second.flush();
-      expect(second.sessions.single.title, 'Meeting');
+      expect(second.sessions, isEmpty);
+      expect(second.syncRecords[entry.id]?['deleted'], true);
       expect(
         jsonDecode(files[StudyPlannerController.storageKey]!)['version'],
         2,
