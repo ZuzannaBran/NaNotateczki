@@ -636,3 +636,37 @@ nie wolno uruchamiać dwóch writerów dla jednego dokumentu. Etap 6 musi
 dostarczyć domenowe projektory obiektów i CRDT/OT dla tekstu, a etap 7
 osobne przestrzenie aktora/outboxu dla kont, Local i gościa. Szczegóły
 implementacyjne i niewykonane testy E2E: `docs/ETAP_5_SYNC_ENGINE.md`.
+
+
+## Infrastruktura etapów 7–8 (2026-11-03, niewłączona produkcyjnie)
+
+`StorageNamespace` definiuje docelowe oddzielne lokalne bazy i magazyny:
+`local/`, `accounts/<SHA-256 identyfikatora>/` i
+`shares/<SHA-256 sesji i aktora>/`. Natywne SQLite i text storage obsługują
+zagnieżdżone ścieżki; webowy magazyn SQLite otrzymuje osobny identyfikator
+IndexedDB dla każdej przestrzeni. `StorageNamespaceManager` unieważnia
+opóźnione odpowiedzi sieciowe i po nieudanym przełączeniu pozostaje
+nieaktywny, zamiast ujawniać niepełne dane jako prawidłową bibliotekę.
+
+**Uwaga:** `AppScope` nadal otwiera jedną, dotychczasową bazę `notes.sqlite`,
+a `AccountSessionController` ogranicza logowanie do pierwotnie przypisanego
+konta. Bez bezpiecznej migracji z etapu 11 **nie wolno aktywować** oddzielnych
+magazynów w ścieżce logowania, automatycznie kopiować danych Local ani
+wyłączać istniejącego ograniczenia.
+
+Serwer `NaNotateczki-serwer/main` udostępnia opt-in
+`/v2/planner/entries` (migracja `0011_planner_revisions.sql`):
+porównywanie rewizji CAS, trwałe tombstones oraz identyfikatory operacji
+umożliwiające bezpieczny retry. Nowy `PlannerRevisionLedger` i
+`PlannerSyncService(useRevisions: true)` zachowują checkpoint w magazynie
+konta i nie porównują konfliktów według czasu urządzeń. Stary
+`PlannerSyncService` pozostaje domyślny. Migracja
+`0012_task_tombstones.sql` rozszerza operacyjny dziennik v2 o usunięcia
+pojedynczych zadań. Projekcja `folder.*` pilnuje braku cykli, a `task.*`
+wprowadza niezależne operacje per UID.
+
+Pełna integracja drzew folderów, listy zadań i importu Local → konto
+wymaga nadania istniejącym danym stabilnych identyfikatorów i atomowej
+migracji w etapie 11. Dotychczasowe `library_folders.json` i
+`study_planner.json` nie są zastępowane automatycznie.
+Opis granic: `docs/ETAP_7_8_STORAGE_PLANNER.md`.
