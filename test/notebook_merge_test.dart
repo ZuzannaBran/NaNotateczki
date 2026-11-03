@@ -88,4 +88,55 @@ void main() {
       containsAll(['a', 'b']),
     );
   });
+  test('in-flight guest edits do not delete unseen host ink', () {
+    final submitted = note();
+    final visibleAfterSend = note();
+    final accepted = note();
+    final submittedStrokes =
+        (submitted['pages'] as List).first['inkStrokes'] as List;
+    submittedStrokes.add({'id': 'guest-a', 'points': [2]});
+    final localStrokes =
+        (visibleAfterSend['pages'] as List).first['inkStrokes'] as List;
+    localStrokes.add({'id': 'guest-a', 'points': [2]});
+    localStrokes.add({'id': 'guest-c', 'points': [4]});
+    final acceptedStrokes =
+        (accepted['pages'] as List).first['inkStrokes'] as List;
+    acceptedStrokes.add({'id': 'guest-a', 'points': [2]});
+    acceptedStrokes.add({'id': 'host-b', 'points': [3]});
+
+    final rebased = mergeNotebookChanges(
+      submitted,
+      visibleAfterSend,
+      accepted,
+    )!;
+    final ids = ((rebased['pages'] as List).single['inkStrokes'] as List)
+        .map((stroke) => stroke['id']);
+    expect(ids, containsAll(['old', 'guest-a', 'guest-c', 'host-b']));
+    expect(ids, hasLength(4));
+  });
+
+  test('rebase preserves a deliberate deletion after an acknowledged send', () {
+    final sent = note();
+    final current = note();
+    final accepted = note();
+    (sent['pages'] as List).first['inkStrokes'].add({
+      'id': 'guest-a',
+      'points': [2],
+    });
+    (current['pages'] as List).first['inkStrokes'].add({
+      'id': 'guest-c',
+      'points': [4],
+    });
+    (accepted['pages'] as List).first['inkStrokes'].addAll([
+      {'id': 'guest-a', 'points': [2]},
+      {'id': 'host-b', 'points': [3]},
+    ]);
+
+    final rebased = mergeNotebookChanges(sent, current, accepted)!;
+    final ids = ((rebased['pages'] as List).single['inkStrokes'] as List)
+        .map((stroke) => stroke['id']);
+    expect(ids, containsAll(['old', 'guest-c', 'host-b']));
+    expect(ids, isNot(contains('guest-a')));
+  });
+
 }
