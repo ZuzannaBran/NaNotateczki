@@ -459,6 +459,35 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   nieuruchomione scenariusze E2E. Etap 6 dodaje konkretne reduktory
   edytora/Share, etap 11 przełącza istniejące dokumenty.
 
+### Share v2 — przyrostowe operacje (etap 6, opt-in)
+
+- `lib/data/sync/share_operation_projection.dart`: `ShareOperationProjection`
+  redukuje dokument/strony/obiekty i tombstones według stabilnych ID,
+  bez pełnych snapshotów; `PendingShareProjection` nakłada oczekujące
+  lokalne operacje na potwierdzony stan i ujawnia nierozwiązane usunięcia.
+- `lib/data/sync/operation_text_sequence.dart`:
+  `OperationTextSequence` — RGA/CRDT atomów z deterministycznym
+  porządkiem, kotwicami i usunięciami zachowanymi do replay;
+  `operation_protocol.dart` waliduje `text.insert/delete` i blokuje
+  próby zmiany typu obiektu oraz wewnętrznych danych CRDT.
+  Backend odpowiednik: `api/app/text_sequence.py`, podłączony w
+  `api/app/operation_projection.py` repo NaNotateczki-serwer.
+- `lib/features/share/presentation/study_share_memory_db_web.dart`:
+  `openSharedGuestOperationDatabase(shareId)` otwiera trwały, izolowany
+  per zaproszenie SQLite WASM w IndexedDB (odrębny od bazy v1 i konta).
+- `lib/features/editor/state/editor_controller.dart`:
+  `applyConfirmedShareObjectPatch` aplikuje jeden już utrwalony obiekt
+  bez podmiany kontrolera, historii widoku lub innych stron.
+- Regresje: `test/operation_text_sequence_test.dart`,
+  `test/share_operation_projection_test.dart`,
+  `test/share_operation_guest_database_test.dart` (Chrome),
+  `test/share_editor_object_patch_test.dart`; serwer:
+  `api/tests/test_text_sequence.py`.
+- `docs/ETAP_6_SHARE_OPERATIONS.md`: stan wdrożenia i scenariusze E2E.
+  **Nie podłączono jeszcze do legacy hosta/gościa.** `StudyShareGuestEditor`
+  i `LiveWebSyncService` pozostają w v1 do migracji UID (etap 11);
+  preview strokes, assety i Quill rich-text wymagają dalszej integracji.
+
 ### Nowa synchronizacja serwerowa
 
 - `lib/data/sync/api_client.dart`: klient REST z wymuszeniem HTTPS,
