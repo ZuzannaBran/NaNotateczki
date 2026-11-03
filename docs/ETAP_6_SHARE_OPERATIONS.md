@@ -25,15 +25,19 @@ Nie uruchamiać jednocześnie `LiveWebSyncService` i `SyncEngine` dla jednego UI
    Lamport + actor i trwałymi znacznikami usunięcia. `text.insert` oraz
    `text.delete` są walidowane i odtwarzane na serwerze; zwykłe `object.set`
    nie może nadpisać istniejącego tekstu CRDT.
-4. `openSharedGuestOperationDatabase(shareId)` tworzy osobny, trwały
+4. `ShareTextEditAdapter` mapuje zatwierdzony plain-text edit na
+   `text.insert/delete` atom po atomie, dzieląc wsady po 256 atomów.
+   Nie pozwala zgubić formatowania Quill: nieobsługiwane delty odrzuca.
+   Adapter nie jest jeszcze podpięty do lokalnych callbacków edytora.
+5. `openSharedGuestOperationDatabase(shareId)` tworzy osobny, trwały
    SQLite WASM/IndexedDB dla pary `shareId` + `guestActorId`. Nie wykorzystuje bazy
    konta, natomiast stary edytor v1 nadal korzysta z pamięciowej SQLite
    i osobnego outboxu v1.
-5. `EditorController.applyConfirmedShareObjectPatch` pozwala zaaplikować
+6. `EditorController.applyConfirmedShareObjectPatch` pozwala zaaplikować
    jeden utrwalony obiekt albo usunięcie **bez odmontowania kontrolera**,
    bez resetu zoomu, pan i aktualnej strony. Odmawia, jeśli lokalne zapisy
    lub aktywna edycja wykluczają bezpieczne nałożenie zmiany.
-6. `SyncEngine` z etapu 5 zapewnia trwałe ACK, retry, REST catch-up,
+7. `SyncEngine` z etapu 5 zapewnia trwałe ACK, retry, REST catch-up,
    WebSocket hints i izolację `shareId` na transportach v2. Backend
    weryfikuje zakres dokumentu i uprawnienia gościa; odwołanie dostępu
    obowiązuje także przy zatwierdzaniu batcha.
@@ -67,6 +71,7 @@ Nie uruchamiać jednocześnie `LiveWebSyncService` i `SyncEngine` dla jednego UI
 ## Testy i kontrola
 
 Dodane: `operation_text_sequence_test.dart`,
+`share_text_edit_adapter_test.dart`,
 `share_operation_projection_test.dart`,
 `share_operation_guest_database_test.dart` (Chrome/WASM),
 `share_editor_object_patch_test.dart`;
