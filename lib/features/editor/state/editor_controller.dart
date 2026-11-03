@@ -289,7 +289,7 @@ class EditorController extends ChangeNotifier {
       // Only an explicit layer operation is allowed to move it.
       final index = sortIndex ??
           (previousInkIndex < 0 ? inkStrokes.length : previousInkIndex);
-      inkStrokes.insert(index.clamp(0, inkStrokes.length), stroke);
+      inkStrokes.insert(index.clamp(0, inkStrokes.length).toInt(), stroke);
     }
     final next = current.copyWith(
       inkStrokes: inkStrokes,
