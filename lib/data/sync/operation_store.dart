@@ -323,6 +323,7 @@ class OperationStore {
       OperationTarget.page => (kind: 'page', id: entry.objectId!),
       OperationTarget.object => (kind: 'object', id: entry.objectId!),
       OperationTarget.folder => (kind: 'folder', id: entry.objectId!),
+      OperationTarget.task => (kind: 'task', id: entry.objectId!),
     };
     return isTombstoned(
       document,
@@ -361,6 +362,7 @@ class OperationStore {
       OperationKind.pageDelete => 'page',
       OperationKind.objectDelete => 'object',
       OperationKind.folderDelete => 'folder',
+      OperationKind.taskDelete => 'task',
       _ => null,
     };
     if (targetKind == null) {
