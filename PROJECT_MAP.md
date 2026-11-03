@@ -422,6 +422,30 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   niepotrzebne usuwanie stron i tekstów przy zwykłej edycji.
 - `docs/ETAP_3_SQLITE.md`: wymagania wdrożeniowe i testy crash-recovery.
 
+### Operacyjny silnik v2 (etap 5, opt-in)
+
+- `lib/data/sync/operation_gateway.dart`: `OperationGateway`,
+  `HttpOperationGateway`, `OperationReceipt`, `OperationFeedPage`.
+  Waliduje pełne ACK, identyfikatory, kursory i limit 1 MiB API v2.
+- `lib/data/sync/sync_engine.dart`: `SyncEngine` i
+  `RemoteOperationReducer`. Trwały lokalny outbox, max 50/800 KiB
+  w paczce, niezależne aktory, ACK bez replay, REST catch-up,
+  WebSocket hints, backoff, wznowienie, token generation na stop,
+  odświeżenie sesji i jawny rebase przez callback.
+  Nie podłączać do legacy UID przed etapem 11.
+- `lib/data/sync/operation_store.dart`: `pending(includeDeferred)`,
+  `isPending`, `advanceCheckpoint`; strzeże actorSeq także przy
+  retry, lokalne operacje zależą od trwałych zdalnych frontierów,
+  a zaakceptowane przez serwer opóźnione edycje usuniętego UID
+  pozostają w dzienniku jako no-op.
+- `test/sync_engine_test.dart`, `test/operation_gateway_test.dart`:
+  utracone ACK, echo, rebase, cursor gap, retry, kontrakt JSON.
+- `test/operation_store_test.dart`: dodatkowe regresje frontier i
+  tombstones po przyjętej operacji zdalnej.
+- `docs/ETAP_5_SYNC_ENGINE.md`: granica migracji v1/v2 i
+  nieuruchomione scenariusze E2E. Etap 6 dodaje konkretne reduktory
+  edytora/Share, etap 11 przełącza istniejące dokumenty.
+
 ### Nowa synchronizacja serwerowa
 
 - `lib/data/sync/api_client.dart`: klient REST z wymuszeniem HTTPS,
