@@ -1,7 +1,10 @@
 # NaNotateczki backend
 
-Backend działa z `api/` w katalogu głównym serwera. Jego kopia źródłowa jest
-w `code/NaNotateczki/server/`. API udostępnia konta z nazwą użytkownika jako loginem, hasła Argon2id, krótkie tokeny dostępu, rotowane tokeny
+Źródłem prawdy dla backendu jest repozytorium
+`ZuzannaBran/NaNotateczki-serwer`, gałąź `main`.
+Katalog `NaNotateczki/server/` w repo aplikacji jest zgodnościowym lustrem
+backendu dla istniejących testów; nie należy wdrażać z niego niezależnych zmian.
+Backend działa z `api/` w katalogu głównym serwera. API udostępnia konta z nazwą użytkownika jako loginem, hasła Argon2id, krótkie tokeny dostępu, rotowane tokeny
 odświeżania, synchronizację notatników z rewizjami i dziennikiem zmian, sygnały
 WebSocket oraz zweryfikowane snapshoty urządzeń.
 
@@ -48,7 +51,8 @@ wariant włącza rejestrację tylko dla API dostępnego przez port loopback.
 
 Przed uruchomieniem nowej wersji API wykonaj wszystkie migracje, w tym
 `0002_auth_version.sql`, `0003_username.sql` i
-`0007_account_settings.sql`. Migracja nadaje istniejącym
+`0007_account_settings.sql`, `0008_planner_entries.sql`
+i `0009_account_settings_library_state.sql`. Migracje nadają istniejącym
 kontom login z unikalnej części e-maila lub identyfikatora konta. Rejestracja i nowe hasło przy zmianie wymagają 8–128
 znaków; logowanie nadal akceptuje istniejące hasła 1–256 znaków. Endpoint
 `POST /v1/auth/change-password` wymaga tokenu Bearer oraz JSON z
@@ -69,7 +73,11 @@ zachowując nagłówek Host. Aplikację Web buduj z
 
 ## Backup
 
-Po zalogowaniu klient może uruchomić `RemoteBackupScheduler`. Wysyła
+Po zalogowaniu klient może uruchomić `RemoteBackupScheduler`.
+Domyślny okres odnawialnej sesji urządzenia to 3650 dni (rotacja tokenów).
+Zmiana hasła, ręczne wylogowanie i unieważnienie sesji nadal odbierają dostęp.
+Lista zweryfikowanych backupów jest porządkowana po `verified_at`, aby
+opóźniona finalizacja starszego uploadu była prawidłowo uwzględniana. Wysyła
 zweryfikowany snapshot po zmianach, ponawia błędy i normalnie zapisuje po ustawionym czasie bezczynności. Pliki są prywatne w `data/backups/<user-id>/`; serwer potwierdza rozmiar,
 SHA-256 i strukturę przed oznaczeniem ich jako poprawnych.
 
@@ -79,6 +87,17 @@ Pełna kopia serwera wymaga osobnego fizycznego nośnika. Uruchamiaj regularnie
 `pg_dump -Fc`, snapshoty i manifest SHA-256; nie usuwa starszych kopii.
 Zaplanuj go w systemowym harmonogramie po udostępnieniu nośnika. Przed
 migracją wykonaj pełną kopię i test odtworzenia na osobnej instancji.
+
+## Kontrola zegara klienta
+
+Publiczny `GET /v1/time` zwraca `serverTimeMs`, czyli uniksowy czas
+UTC w milisekundach z zegara serwera. API ustawia `Cache-Control: no-store`.
+Klient porównuje go przy starcie zalogowanej sesji z własnym czasem,
+uwzględniając RTT; rozbieżność większa niż minuta zgłaszana jest do Errors.
+Endpoint nie wymaga tokenu i nie zmienia stanu bazy.
+**Serwer musi mieć poprawnie zsynchronizowany zegar (NTP)**, w przeciwnym
+razie ostrzeżenie klienta nie jest wiarygodne. Po aktualizacji kodu
+wykonaj `docker compose up -d --build api`; migracje SQL nie są potrzebne.
 
 ## Synchronizacja ustawień konta
 
@@ -173,9 +192,15 @@ Wykonaj `scripts/apply-migrations.sh` przed restartem API. Endpoints
 `GET /v1/planner/entries?after=<uid>` (strony po 200) i
 `PUT /v1/planner/entries/<uid>` wymagają tokenu właściciela.
 Zapis jest atomowy, obejmuje osobne wydarzenia i Study Sessions oraz
-trwałe tombstones po usunięciu. `modifiedAt` z lokalnego zegara UTC
-rozstrzyga późniejsze edycje tego samego wpisu; serwer odrzuca starszą
-wersję. Po commicie publikuje `planner_changed` przez WebSocket.
-Po utracie połączenia klient pobiera ponownie pełne strony i uzgadnia
-stan, zachowując zmiany offline. Poprawność kolejności między offline
-urządzeniami zależy od ich zsynchronizowanych zegarów.
+trwałe tombstones po usunięciu. Potwierdzone usunięcie wygrywa z
+niezsynchronizowaną edycją innego urządzenia, także gdy jego zegar jest
+ustawiony w przyszłość. Usuniętego ID nie można przywrócić przez PUT,
+nawet używając historycznej flagi `restoreDeleted` w synchronizacji notatek.
+Dla dwóch aktywnych edycji jednego wpisu `modifiedAt` nadal pochodzi
+z zegara UTC klienta; poprawna kolejność wymaga zsynchronizowanych zegarów
+lub przyszłego CAS per wpis. UTC usuwa różnice stref, ale nie offset zegara.
+Po commicie publikuje `planner_changed` przez WebSocket.
+Backup `verifiedAt` oznacza wyłącznie weryfikację archiwum: nie wolno
+używać go do rozstrzygania kolejności edycji ani do przywracania tombstones.
+Po utracie połączenia klient pobiera pełny stan serwera i uzgadnia go
+z trwałymi lokalnymi zmianami offline.

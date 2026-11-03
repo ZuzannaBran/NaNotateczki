@@ -98,6 +98,54 @@ void main() {
     expect(notifications, hasLength(1));
   });
 
+  test('atomic import respects the notification flag', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final notified = <String>[];
+    final repository = NotebookRepository(
+      database,
+      onChanged: (changes) {
+        notified.addAll(changes.map((change) => change.uid));
+      },
+    );
+    final now = DateTime.utc(2026, 1, 1);
+
+    Notebook makeNotebook(String uid) => Notebook(
+      uid: uid,
+      title: uid,
+      kind: NotebookKind.notebook,
+      folder: 'Notes',
+      createdAt: now,
+      updatedAt: now,
+      pages: [
+        NotePage(
+          id: '$uid-page',
+          title: 'Page',
+          textBlocks: const [],
+          imageBlocks: const [],
+          inkStrokes: const [],
+          isBookmarked: false,
+        ),
+      ],
+    );
+
+    expect(
+      await repository.importNotebooksAtomically(
+        [makeNotebook('quiet')],
+        notifyChanges: false,
+      ),
+      1,
+    );
+    expect(notified, isEmpty);
+    expect(await repository.getNotebook('quiet'), isNotNull);
+
+    expect(
+      await repository.importNotebooksAtomically([makeNotebook('visible')]),
+      1,
+    );
+    expect(notified, ['visible']);
+  });
+
   test(
     'saveRecoveredCopy remaps nested ids to avoid SQLite conflicts',
     () async {

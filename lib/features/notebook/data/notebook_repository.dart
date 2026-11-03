@@ -424,9 +424,11 @@ class NotebookRepository {
       _latestPersistedUpdates[notebook.uid] = notebook.updatedAt;
       _notebookCache[notebook.uid] = notebook;
     }
-    onChanged?.call([
-      for (final item in persisted) NotebookRepositoryChange.full(item.uid),
-    ]);
+    if (notifyChanges) {
+      onChanged?.call([
+        for (final item in persisted) NotebookRepositoryChange.full(item.uid),
+      ]);
+    }
     return persisted.length;
   }
 
