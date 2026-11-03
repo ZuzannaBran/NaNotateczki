@@ -1,17 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uuid/uuid.dart';
 import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
 import 'package:program/features/share/presentation/study_share_memory_db_stub.dart'
     if (dart.library.js_interop) 'package:program/features/share/presentation/study_share_memory_db_web.dart'
     as guest_db;
 
-const firstShare = '00000000-0000-4000-8000-000000000051';
-const secondShare = '00000000-0000-4000-8000-000000000052';
-
 void main() {
   test('guest operation outbox survives reload without leaking to other share',
       () async {
+    final firstShare = const Uuid().v4();
+    final secondShare = const Uuid().v4();
     final first = await guest_db.openSharedGuestOperationDatabase(firstShare);
     String? operationId;
     try {
