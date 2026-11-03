@@ -845,7 +845,10 @@ class StudyPlannerController extends ChangeNotifier {
   }
 
   /// Accepts newer records and server-authoritative timestamp ties.
-  void applyRemoteRecords(Iterable<Map<String, dynamic>> incoming) {
+  void applyRemoteRecords(
+    Iterable<Map<String, dynamic>> incoming, {
+    bool revisionAuthoritative = false,
+  }) {
     if (!isLoaded || _disposed) {
       return;
     }
@@ -874,7 +877,9 @@ class StudyPlannerController extends ChangeNotifier {
       // from a stale active record either.
       if (!deleted &&
           (existing?['deleted'] == true ||
-              (oldTime != null && time.isBefore(oldTime)))) {
+              (!revisionAuthoritative &&
+                  oldTime != null &&
+                  time.isBefore(oldTime)))) {
         continue;
       }
       final content = record['entry'];
