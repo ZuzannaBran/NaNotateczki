@@ -17,10 +17,11 @@ import 'operation_store.dart';
 /// [pendingLocal] includes deferred retries. A reducer must merge remote
 /// fields into the current projection and rebase those intents, rather than
 /// installing a complete server snapshot over optimistic local edits.
-typedef RemoteOperationReducer = Future<void> Function(
-  OperationEnvelope remote,
-  List<OperationEnvelope> pendingLocal,
-);
+typedef RemoteOperationReducer =
+    Future<void> Function(
+      OperationEnvelope remote,
+      List<OperationEnvelope> pendingLocal,
+    );
 
 /// The opt-in v2 journal driver. A migrated namespace must own one instance.
 ///
@@ -426,13 +427,14 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       final failures = (_actorFailures[actor] ?? 0) + 1;
       _actorFailures[actor] = failures;
-      final causalGap = failure is ApiException &&
+      final causalGap =
+          failure is ApiException &&
           failure.statusCode == 409 &&
           failure.payload is Map &&
           (failure.payload as Map)['detail'] is Map &&
-          ((failure.payload as Map)['detail'] as Map)['code'] ==
-              'CAUSAL_GAP';
-      final permanent = failure is ArgumentError ||
+          ((failure.payload as Map)['detail'] as Map)['code'] == 'CAUSAL_GAP';
+      final permanent =
+          failure is ArgumentError ||
           failure is UnsupportedError ||
           failure is FormatException ||
           (failure is ApiException &&
@@ -512,9 +514,9 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     if (api == null || token == null || token.isEmpty) {
       return;
     }
-    final uri = api.resolve('/v2/realtime').replace(
-      scheme: api.baseUri.scheme == 'https' ? 'wss' : 'ws',
-    );
+    final uri = api
+        .resolve('/v2/realtime')
+        .replace(scheme: api.baseUri.scheme == 'https' ? 'wss' : 'ws');
     final socket = WebSocketChannel.connect(uri);
     _socket = socket;
     _socketSubscription = socket.stream.listen(
@@ -535,11 +537,13 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     try {
       await socket.ready.timeout(const Duration(seconds: 10));
       if (_isActive(generation) && identical(_socket, socket)) {
-        socket.sink.add(jsonEncode({
-          'type': 'authenticate',
-          'token': token,
-          if (shareId != null) 'shareId': shareId,
-        }));
+        socket.sink.add(
+          jsonEncode({
+            'type': 'authenticate',
+            'token': token,
+            if (shareId != null) 'shareId': shareId,
+          }),
+        );
         // A missed hint while disconnected is recovered by REST.
         requestSync();
       }

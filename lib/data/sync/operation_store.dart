@@ -57,20 +57,19 @@ class OperationStore {
     }
   }
 
-  Future<Map<String, dynamic>?> _row(
-    String sql,
-    List<Object> args,
-  ) async {
-    final row = await database.customSelect(
-      sql,
-      variables: [
-        for (final value in args)
-          if (value is int)
-            Variable<int>(value)
-          else
-            Variable<String>(value as String),
-      ],
-    ).getSingleOrNull();
+  Future<Map<String, dynamic>?> _row(String sql, List<Object> args) async {
+    final row = await database
+        .customSelect(
+          sql,
+          variables: [
+            for (final value in args)
+              if (value is int)
+                Variable<int>(value)
+              else
+                Variable<String>(value as String),
+          ],
+        )
+        .getSingleOrNull();
     return row?.data;
   }
 
@@ -111,22 +110,23 @@ class OperationStore {
         final previousId = state?['last_operation_id'] as String?;
         // A new local intent observes the durable remote actor frontier.
         // This must be read inside the same transaction as actorSeq.
-        final observed = await database.customSelect(
-          'SELECT actor.last_operation_id FROM operation_actor_state actor '
-          'JOIN operations latest '
-          'ON latest.operation_id = actor.last_operation_id '
-          'WHERE actor.actor_id != ? AND latest.document_id = ? '
-          'ORDER BY actor.actor_id',
-          variables: [
-            Variable<String>(actorId),
-            Variable<String>(documentId),
-          ],
-        ).get();
+        final observed = await database
+            .customSelect(
+              'SELECT actor.last_operation_id FROM operation_actor_state actor '
+              'JOIN operations latest '
+              'ON latest.operation_id = actor.last_operation_id '
+              'WHERE actor.actor_id != ? AND latest.document_id = ? '
+              'ORDER BY actor.actor_id',
+              variables: [
+                Variable<String>(actorId),
+                Variable<String>(documentId),
+              ],
+            )
+            .get();
         final causalIds = <String>{
           ...dependencies,
           if (revertsOperationId != null) revertsOperationId,
-          for (final row in observed)
-            row.read<String>('last_operation_id'),
+          for (final row in observed) row.read<String>('last_operation_id'),
           if (previousId != null) previousId,
         }.toList()..sort();
         if (causalIds.length > 256) {
@@ -234,8 +234,7 @@ class OperationStore {
     }
     for (final id in entry.dependencies) {
       final dependency = await operation(id);
-      if (dependency == null ||
-          dependency.logicalClock >= entry.logicalClock) {
+      if (dependency == null || dependency.logicalClock >= entry.logicalClock) {
         throw StateError('Invalid causal dependency: $id');
       }
     }
@@ -276,12 +275,7 @@ class OperationStore {
       'VALUES (?, ?, ?, ?) ON CONFLICT(actor_id) DO UPDATE SET '
       'last_seq = excluded.last_seq, last_clock = excluded.last_clock, '
       'last_operation_id = excluded.last_operation_id',
-      [
-        entry.actorId,
-        entry.actorSeq,
-        entry.logicalClock,
-        entry.operationId,
-      ],
+      [entry.actorId, entry.actorSeq, entry.logicalClock, entry.operationId],
     );
     if (source == 'local') {
       await database.customStatement(
@@ -329,16 +323,17 @@ class OperationStore {
       throw ArgumentError('Object tombstones require a page ID.');
     }
     return await _row(
-      'SELECT operation_id FROM object_tombstones '
-      'WHERE document_id = ? AND target_kind = ? '
-      'AND page_id = ? AND object_id = ?',
-      [
-        documentId,
-        targetKind,
-        targetKind == 'object' ? pageId! : '',
-        objectId,
-      ],
-    ) != null;
+          'SELECT operation_id FROM object_tombstones '
+          'WHERE document_id = ? AND target_kind = ? '
+          'AND page_id = ? AND object_id = ?',
+          [
+            documentId,
+            targetKind,
+            targetKind == 'object' ? pageId! : '',
+            objectId,
+          ],
+        ) !=
+        null;
   }
 
   Future<void> _writeTombstone(OperationEnvelope entry) async {
@@ -391,18 +386,20 @@ class OperationStore {
               "AND (earlier.status = 'blocked' "
               'OR earlier.retry_after > ?)) ';
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-    final rows = await database.customSelect(
-      'SELECT o.envelope_json FROM operation_outbox x '
-      'JOIN operations o ON o.operation_id = x.operation_id '
-      'WHERE 1 = 1 $ready$filter'
-      'ORDER BY o.actor_id, o.actor_seq LIMIT ? OFFSET ?',
-      variables: [
-        if (!includeDeferred) ...[Variable<int>(now), Variable<int>(now)],
-        if (documentId != null) Variable<String>(documentId),
-        Variable<int>(limit),
-        Variable<int>(offset),
-      ],
-    ).get();
+    final rows = await database
+        .customSelect(
+          'SELECT o.envelope_json FROM operation_outbox x '
+          'JOIN operations o ON o.operation_id = x.operation_id '
+          'WHERE 1 = 1 $ready$filter'
+          'ORDER BY o.actor_id, o.actor_seq LIMIT ? OFFSET ?',
+          variables: [
+            if (!includeDeferred) ...[Variable<int>(now), Variable<int>(now)],
+            if (documentId != null) Variable<String>(documentId),
+            Variable<int>(limit),
+            Variable<int>(offset),
+          ],
+        )
+        .get();
     return [
       for (final row in rows)
         OperationEnvelope.fromJson(
@@ -531,11 +528,7 @@ class OperationStore {
       'VALUES (?, ?, ?) ON CONFLICT(scope) DO UPDATE SET '
       'server_sequence = excluded.server_sequence, '
       'updated_at = excluded.updated_at',
-      [
-        scope,
-        sequence,
-        DateTime.now().toUtc().millisecondsSinceEpoch,
-      ],
+      [scope, sequence, DateTime.now().toUtc().millisecondsSinceEpoch],
     );
   }
 
@@ -591,9 +584,7 @@ class OperationStore {
     });
   }
 
-  Future<StoredDocumentSnapshot?> latestSnapshot(
-    String documentId,
-  ) async {
+  Future<StoredDocumentSnapshot?> latestSnapshot(String documentId) async {
     final row = await _row(
       'SELECT document_id, server_sequence, snapshot_json, checksum_sha256 '
       'FROM document_snapshots WHERE document_id = ? '
@@ -625,8 +616,11 @@ class OperationStore {
     required String checksumSha256,
     required int byteLength,
   }) async {
-    if (documentId.isEmpty || objectId.isEmpty || assetId.isEmpty ||
-        storagePath.isEmpty || byteLength <= 0 ||
+    if (documentId.isEmpty ||
+        objectId.isEmpty ||
+        assetId.isEmpty ||
+        storagePath.isEmpty ||
+        byteLength <= 0 ||
         !_checksumPattern.hasMatch(checksumSha256)) {
       throw ArgumentError('Invalid asset reference.');
     }
@@ -648,14 +642,7 @@ class OperationStore {
       'INSERT INTO asset_references '
       '(document_id, object_id, asset_id, storage_path, '
       'checksum_sha256, byte_length) VALUES (?, ?, ?, ?, ?, ?)',
-      [
-        documentId,
-        objectId,
-        assetId,
-        storagePath,
-        checksumSha256,
-        byteLength,
-      ],
+      [documentId, objectId, assetId, storagePath, checksumSha256, byteLength],
     );
   }
 }

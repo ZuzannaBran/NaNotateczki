@@ -88,15 +88,14 @@ class HttpOperationGateway implements OperationGateway {
           !seen.add(id) ||
           cursor is! int ||
           cursor <= 0 ||
-          (ack['status'] != 'applied' &&
-              ack['status'] != 'duplicate')) {
+          (ack['status'] != 'applied' && ack['status'] != 'duplicate')) {
         throw const FormatException('Invalid operation acknowledgement.');
       }
       result.add(OperationReceipt(id, cursor));
     }
-    if (result.map((receipt) => receipt.cursor).reduce(
-          (current, next) => current > next ? current : next,
-        ) !=
+    if (result
+            .map((receipt) => receipt.cursor)
+            .reduce((current, next) => current > next ? current : next) !=
         batchCursor) {
       throw const FormatException('Inconsistent operation batch cursor.');
     }
@@ -132,9 +131,7 @@ class HttpOperationGateway implements OperationGateway {
       if (sequence is! int || sequence <= lastCursor) {
         throw const FormatException('Non-monotonic feed cursor.');
       }
-      final envelope = OperationEnvelope.fromJson(
-        _object(row['operation']),
-      );
+      final envelope = OperationEnvelope.fromJson(_object(row['operation']));
       operations.add(SequencedOperation(sequence, envelope));
       lastCursor = sequence;
     }

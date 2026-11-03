@@ -15,8 +15,11 @@ class OperationActorClock {
     this.logicalClock = 0,
     this.previousOperationId,
   }) {
-    if (actorId.isEmpty || actorId.length > 128 || actorSeq < 0 ||
-        actorSeq > OperationEnvelope.maxSafeInteger || logicalClock < 0 ||
+    if (actorId.isEmpty ||
+        actorId.length > 128 ||
+        actorSeq < 0 ||
+        actorSeq > OperationEnvelope.maxSafeInteger ||
+        logicalClock < 0 ||
         logicalClock > OperationEnvelope.maxSafeInteger ||
         (actorSeq > 0 && previousOperationId == null)) {
       throw ArgumentError('Invalid actor checkpoint.');
@@ -93,11 +96,8 @@ class OperationActorClock {
     'actorId': actorId,
     'actorSeq': actorSeq,
     'logicalClock': logicalClock,
-    if (previousOperationId != null)
-      'previousOperationId': previousOperationId,
-    'observedOperations': [
-      for (final op in _observed.values) op.toJson(),
-    ],
+    if (previousOperationId != null) 'previousOperationId': previousOperationId,
+    'observedOperations': [for (final op in _observed.values) op.toJson()],
   };
 
   factory OperationActorClock.fromCheckpoint(Map<String, dynamic> json) {
@@ -169,8 +169,7 @@ class OperationCheckpoint {
   };
 
   factory OperationCheckpoint.fromJson(Map<String, dynamic> json) {
-    if (json['schemaVersion'] != schemaVersion ||
-        json['operations'] is! List) {
+    if (json['schemaVersion'] != schemaVersion || json['operations'] is! List) {
       throw const FormatException('Invalid operation checkpoint.');
     }
     final rejected = Map<String, String>.from(
@@ -182,9 +181,7 @@ class OperationCheckpoint {
     return OperationCheckpoint(
       operations: [
         for (final value in json['operations'] as List)
-          OperationEnvelope.fromJson(
-            Map<String, dynamic>.from(value as Map),
-          ),
+          OperationEnvelope.fromJson(Map<String, dynamic>.from(value as Map)),
       ],
       rejectedOperations: rejected,
     );
@@ -241,16 +238,15 @@ class CausalOperationBuffer {
       );
     }
     return OperationCheckpoint(
-      operations: _accepted.values.toList()
-        ..sort(compareOperationPrecedence),
+      operations: _accepted.values.toList()..sort(compareOperationPrecedence),
       rejectedOperations: _rejected,
     );
   }
 
-  List<String> missingDependencies(OperationEnvelope operation) =>
-      operation.dependencies
-          .where((id) => !_knownIds.contains(id))
-          .toList(growable: false);
+  List<String> missingDependencies(OperationEnvelope operation) => operation
+      .dependencies
+      .where((id) => !_knownIds.contains(id))
+      .toList(growable: false);
 
   List<OperationEnvelope> ingest(OperationEnvelope operation) {
     final existing =
@@ -348,13 +344,27 @@ class CausalOperationBuffer {
       }
     }
 
-    _pending..clear()..addAll(pending);
-    _accepted..clear()..addAll(accepted);
-    _knownIds..clear()..addAll(known);
-    _actorSequences..clear()..addAll(sequences);
-    _sequenceIds..clear()..addAll(sequenceIds);
-    _latestActorOperation..clear()..addAll(latest);
-    _rejected..clear()..addAll(rejected);
+    _pending
+      ..clear()
+      ..addAll(pending);
+    _accepted
+      ..clear()
+      ..addAll(accepted);
+    _knownIds
+      ..clear()
+      ..addAll(known);
+    _actorSequences
+      ..clear()
+      ..addAll(sequences);
+    _sequenceIds
+      ..clear()
+      ..addAll(sequenceIds);
+    _latestActorOperation
+      ..clear()
+      ..addAll(latest);
+    _rejected
+      ..clear()
+      ..addAll(rejected);
     return applied;
   }
 
@@ -424,8 +434,8 @@ class OperationPropertyRegister {
     if (_isDeleted(operation)) {
       return;
     }
-    final fields = operation.payload['properties'] ??
-        operation.payload['value'];
+    final fields =
+        operation.payload['properties'] ?? operation.payload['value'];
     if (fields is! Map) {
       throw const FormatException('Projection needs properties or value.');
     }
@@ -441,8 +451,7 @@ class OperationPropertyRegister {
         throw const FormatException('Property names must be strings.');
       }
       final last = versions[name];
-      if (last == null ||
-          compareOperationPrecedence(operation, last) > 0) {
+      if (last == null || compareOperationPrecedence(operation, last) > 0) {
         values[name] = entry.value;
         versions[name] = operation;
       }

@@ -170,8 +170,7 @@ class OperationEnvelope {
     'payload': _copyPayload(),
     'dependencies': List<String>.of(dependencies),
     'logicalClock': logicalClock,
-    if (revertsOperationId != null)
-      'revertsOperationId': revertsOperationId,
+    if (revertsOperationId != null) 'revertsOperationId': revertsOperationId,
   };
 
   /// Return a defensive JSON copy so caller mutations cannot affect a replay.

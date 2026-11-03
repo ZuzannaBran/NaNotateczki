@@ -1952,19 +1952,23 @@ class NotebookRepository {
       database.pageRows,
     )..where((row) => row.uid.equals(normalized.id))).getSingleOrNull();
     if (existing != null && existing.notebookUid != notebookUid) {
-      throw StateError('Page ID belongs to another notebook: '
-          '${normalized.id}');
+      throw StateError(
+        'Page ID belongs to another notebook: '
+        '${normalized.id}',
+      );
     }
 
-    await database.into(database.pageRows).insertOnConflictUpdate(
-      PageRowsCompanion.insert(
-        uid: normalized.id,
-        notebookUid: notebookUid,
-        pageIndex: pageIndex,
-        title: normalized.title,
-        isBookmarked: normalized.isBookmarked,
-      ),
-    );
+    await database
+        .into(database.pageRows)
+        .insertOnConflictUpdate(
+          PageRowsCompanion.insert(
+            uid: normalized.id,
+            notebookUid: notebookUid,
+            pageIndex: pageIndex,
+            title: normalized.title,
+            isBookmarked: normalized.isBookmarked,
+          ),
+        );
     await _deleteMissingPageRows(
       'text_block_rows',
       normalized.id,
@@ -1982,19 +1986,25 @@ class NotebookRepository {
     );
 
     for (final entry in normalized.textBlocks.asMap().entries) {
-      await database.into(database.textBlockRows).insertOnConflictUpdate(
-        _textToCompanion(normalized.id, entry.value, entry.key),
-      );
+      await database
+          .into(database.textBlockRows)
+          .insertOnConflictUpdate(
+            _textToCompanion(normalized.id, entry.value, entry.key),
+          );
     }
     for (final entry in normalized.imageBlocks.asMap().entries) {
-      await database.into(database.imageBlockRows).insertOnConflictUpdate(
-        _imageToCompanion(normalized.id, entry.value, entry.key),
-      );
+      await database
+          .into(database.imageBlockRows)
+          .insertOnConflictUpdate(
+            _imageToCompanion(normalized.id, entry.value, entry.key),
+          );
     }
     for (final entry in normalized.inkStrokes.asMap().entries) {
-      await database.into(database.inkStrokeRows).insertOnConflictUpdate(
-        _strokeToCompanion(normalized.id, entry.value, entry.key),
-      );
+      await database
+          .into(database.inkStrokeRows)
+          .insertOnConflictUpdate(
+            _strokeToCompanion(normalized.id, entry.value, entry.key),
+          );
     }
   }
 
@@ -2003,18 +2013,16 @@ class NotebookRepository {
     String pageUid,
     Set<String> retained,
   ) async {
-    const allowed = {
-      'text_block_rows',
-      'image_block_rows',
-      'ink_stroke_rows',
-    };
+    const allowed = {'text_block_rows', 'image_block_rows', 'ink_stroke_rows'};
     if (!allowed.contains(table)) {
       throw ArgumentError.value(table, 'table');
     }
-    final previous = await database.customSelect(
-      'SELECT uid FROM $table WHERE page_uid = ?',
-      variables: [Variable<String>(pageUid)],
-    ).get();
+    final previous = await database
+        .customSelect(
+          'SELECT uid FROM $table WHERE page_uid = ?',
+          variables: [Variable<String>(pageUid)],
+        )
+        .get();
     for (final row in previous) {
       final uid = row.read<String>('uid');
       if (!retained.contains(uid)) {

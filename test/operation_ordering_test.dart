@@ -41,7 +41,9 @@ void main() {
       pageId: 'page',
       objectId: 'stroke',
       kind: OperationKind.strokeCreate,
-      payload: {'value': {'color': 'blue'}},
+      payload: {
+        'value': {'color': 'blue'},
+      },
     );
     actor.observe(op(id: b1, actor: 'other', sequence: 1, clock: 900));
     final second = actor.next(
@@ -63,19 +65,24 @@ void main() {
     final queue = CausalOperationBuffer();
     final first = op(id: a1, actor: 'A', sequence: 1, clock: 1);
     final second = op(
-      id: a2, actor: 'A', sequence: 2, clock: 2,
+      id: a2,
+      actor: 'A',
+      sequence: 2,
+      clock: 2,
       dependencies: [a1],
     );
     final after = op(
-      id: b1, actor: 'B', sequence: 1, clock: 3,
+      id: b1,
+      actor: 'B',
+      sequence: 1,
+      clock: 3,
       dependencies: [a2],
     );
     expect(queue.ingest(after), isEmpty);
     expect(queue.ingest(second), isEmpty);
     expect(queue.pendingCount, 2);
     expect(queue.missingDependencies(after), [a2]);
-    expect(queue.ingest(first).map((value) => value.operationId),
-        [a1, a2, b1]);
+    expect(queue.ingest(first).map((value) => value.operationId), [a1, a2, b1]);
     expect(queue.pendingCount, 0);
   });
 
@@ -85,10 +92,17 @@ void main() {
     expect(queue.ingest(original), [original]);
     expect(queue.ingest(original), isEmpty);
     expect(
-      () => queue.ingest(op(
-        id: a1, actor: 'A', sequence: 1, clock: 1,
-        payload: {'properties': {'color': 'red'}},
-      )),
+      () => queue.ingest(
+        op(
+          id: a1,
+          actor: 'A',
+          sequence: 1,
+          clock: 1,
+          payload: {
+            'properties': {'color': 'red'},
+          },
+        ),
+      ),
       throwsA(isA<OperationOrderException>()),
     );
     expect(
@@ -107,10 +121,9 @@ void main() {
     final queue = CausalOperationBuffer();
     queue.ingest(op(id: a1, actor: 'A', sequence: 1, clock: 20));
     expect(
-      () => queue.ingest(op(
-        id: b1, actor: 'B', sequence: 1, clock: 19,
-        dependencies: [a1],
-      )),
+      () => queue.ingest(
+        op(id: b1, actor: 'B', sequence: 1, clock: 19, dependencies: [a1]),
+      ),
       throwsA(isA<OperationOrderException>()),
     );
   });
@@ -118,28 +131,48 @@ void main() {
   test('two devices converge under shuffled delivery and clock skew', () {
     final changes = <OperationEnvelope>[
       op(
-        id: a1, actor: 'A', sequence: 1, clock: 1,
+        id: a1,
+        actor: 'A',
+        sequence: 1,
+        clock: 1,
         kind: OperationKind.objectCreate,
         objectId: 'one',
-        payload: {'value': {'color': 'blue', 'x': 0}},
+        payload: {
+          'value': {'color': 'blue', 'x': 0},
+        },
       ),
       op(
-        id: a2, actor: 'A', sequence: 2, clock: 2,
+        id: a2,
+        actor: 'A',
+        sequence: 2,
+        clock: 2,
         objectId: 'one',
-        payload: {'properties': {'x': 12}},
+        payload: {
+          'properties': {'x': 12},
+        },
         dependencies: [a1],
       ),
       op(
-        id: b1, actor: 'B', sequence: 1, clock: 2,
+        id: b1,
+        actor: 'B',
+        sequence: 1,
+        clock: 2,
         objectId: 'one',
-        payload: {'properties': {'color': 'red'}},
+        payload: {
+          'properties': {'color': 'red'},
+        },
         dependencies: [a1],
       ),
       op(
-        id: b2, actor: 'B', sequence: 2, clock: 3,
+        id: b2,
+        actor: 'B',
+        sequence: 2,
+        clock: 3,
         objectId: 'two',
         kind: OperationKind.objectCreate,
-        payload: {'value': {'color': 'green'}},
+        payload: {
+          'value': {'color': 'green'},
+        },
         dependencies: [b1],
       ),
     ];
@@ -157,27 +190,43 @@ void main() {
         }
       }
       expect(queue.pendingCount, 0);
-      expect(projection.fieldsFor(changes.first),
-          original.fieldsFor(changes.first));
-      expect(projection.fieldsFor(changes.last),
-          original.fieldsFor(changes.last));
+      expect(
+        projection.fieldsFor(changes.first),
+        original.fieldsFor(changes.first),
+      );
+      expect(
+        projection.fieldsFor(changes.last),
+        original.fieldsFor(changes.last),
+      );
     }
-    expect(original.fieldsFor(changes.first),
-        {'color': 'red', 'x': 12});
+    expect(original.fieldsFor(changes.first), {'color': 'red', 'x': 12});
   });
 
   test('deletion beats older and newer edits', () {
     final create = op(
-      id: a1, actor: 'A', sequence: 1, clock: 1,
+      id: a1,
+      actor: 'A',
+      sequence: 1,
+      clock: 1,
       kind: OperationKind.objectCreate,
-      payload: {'value': {'x': 1}},
+      payload: {
+        'value': {'x': 1},
+      },
     );
     final edit = op(
-      id: b1, actor: 'B', sequence: 1, clock: 4,
-      payload: {'properties': {'x': 2}},
+      id: b1,
+      actor: 'B',
+      sequence: 1,
+      clock: 4,
+      payload: {
+        'properties': {'x': 2},
+      },
     );
     final deletion = op(
-      id: a2, actor: 'A', sequence: 2, clock: 2,
+      id: a2,
+      actor: 'A',
+      sequence: 2,
+      clock: 2,
       kind: OperationKind.objectDelete,
       payload: {},
       dependencies: [a1],
@@ -191,9 +240,14 @@ void main() {
 
   test('later page or document tombstone hides child objects', () {
     final create = op(
-      id: a1, actor: 'A', sequence: 1, clock: 1,
+      id: a1,
+      actor: 'A',
+      sequence: 1,
+      clock: 1,
       kind: OperationKind.objectCreate,
-      payload: {'value': {'x': 1}},
+      payload: {
+        'value': {'x': 1},
+      },
     );
     final pageDelete = OperationEnvelope(
       operationId: a2,
@@ -214,8 +268,13 @@ void main() {
   test('tie break is stable without wall clock', () {
     final first = op(id: a1, actor: 'A', sequence: 1, clock: 7);
     final second = op(
-      id: b1, actor: 'B', sequence: 1, clock: 7,
-      payload: {'properties': {'color': 'red'}},
+      id: b1,
+      actor: 'B',
+      sequence: 1,
+      clock: 7,
+      payload: {
+        'properties': {'color': 'red'},
+      },
     );
     expect(compareOperationPrecedence(first, second), lessThan(0));
     final projection = OperationPropertyRegister()
@@ -227,17 +286,15 @@ void main() {
   test('causal cycle is rejected before either operation can apply', () {
     final queue = CausalOperationBuffer();
     expect(
-      queue.ingest(op(
-        id: a1, actor: 'A', sequence: 1, clock: 2,
-        dependencies: [b1],
-      )),
+      queue.ingest(
+        op(id: a1, actor: 'A', sequence: 1, clock: 2, dependencies: [b1]),
+      ),
       isEmpty,
     );
     expect(
-      () => queue.ingest(op(
-        id: b1, actor: 'B', sequence: 1, clock: 2,
-        dependencies: [a1],
-      )),
+      () => queue.ingest(
+        op(id: b1, actor: 'B', sequence: 1, clock: 2, dependencies: [a1]),
+      ),
       throwsA(isA<OperationOrderException>()),
     );
     expect(queue.pendingCount, 1);
@@ -255,15 +312,15 @@ void main() {
   test('queue capacity and checkpoint reject invalid replays', () {
     final original = CausalOperationBuffer();
     original.ingest(op(id: a1, actor: 'A', sequence: 1, clock: 1));
-    original.ingest(op(
-      id: a2, actor: 'A', sequence: 2, clock: 2,
-      dependencies: [a1],
-    ));
+    original.ingest(
+      op(id: a2, actor: 'A', sequence: 2, clock: 2, dependencies: [a1]),
+    );
     final checkpoint = OperationCheckpoint.fromJson(
       original.exportCheckpoint().toJson(),
     );
     final queue = CausalOperationBuffer.fromCheckpoint(
-      checkpoint, maximumPending: 1,
+      checkpoint,
+      maximumPending: 1,
     );
     expect(
       () => queue.ingest(op(id: b2, actor: 'A', sequence: 1, clock: 1)),
@@ -279,7 +336,11 @@ void main() {
   test('invalid buffered child does not swallow accepted parent', () {
     final queue = CausalOperationBuffer();
     final bad = op(
-      id: b1, actor: 'B', sequence: 1, clock: 1, dependencies: [a1],
+      id: b1,
+      actor: 'B',
+      sequence: 1,
+      clock: 1,
+      dependencies: [a1],
     );
     expect(queue.ingest(bad), isEmpty);
     final parent = op(id: a1, actor: 'A', sequence: 1, clock: 2);
@@ -287,13 +348,14 @@ void main() {
     expect(queue.rejectedOperations, contains(b1));
     expect(queue.pendingCount, 0);
     final corrected = op(
-      id: b2, actor: 'B', sequence: 1, clock: 3, dependencies: [a1],
+      id: b2,
+      actor: 'B',
+      sequence: 1,
+      clock: 3,
+      dependencies: [a1],
     );
     expect(queue.ingest(corrected), [corrected]);
-    expect(
-      () => queue.ingest(bad),
-      throwsA(isA<OperationOrderException>()),
-    );
+    expect(() => queue.ingest(bad), throwsA(isA<OperationOrderException>()));
   });
 
   test('invalid incoming operation leaves checkpoint unchanged', () {
@@ -301,19 +363,20 @@ void main() {
     queue.ingest(op(id: a1, actor: 'A', sequence: 1, clock: 7));
     final before = queue.exportCheckpoint().toJson();
     expect(
-      () => queue.ingest(op(
-        id: a2, actor: 'A', sequence: 2, clock: 7,
-        dependencies: [a1],
-      )),
+      () => queue.ingest(
+        op(id: a2, actor: 'A', sequence: 2, clock: 7, dependencies: [a1]),
+      ),
       throwsA(isA<OperationOrderException>()),
     );
     expect(queue.exportCheckpoint().toJson(), before);
     expect(queue.pendingCount, 0);
     expect(queue.rejectedOperations, isEmpty);
-    expect(queue.ingest(op(
-      id: a2, actor: 'A', sequence: 2, clock: 8,
-      dependencies: [a1],
-    )), hasLength(1));
+    expect(
+      queue.ingest(
+        op(id: a2, actor: 'A', sequence: 2, clock: 8, dependencies: [a1]),
+      ),
+      hasLength(1),
+    );
   });
 
   test('checkpoint restores predecessor, clocks and exact deduplication', () {
@@ -325,48 +388,60 @@ void main() {
     );
     expect(restored.ingest(parent), isEmpty);
     expect(
-      () => restored.ingest(op(id: a2, actor: 'A',
-        sequence: 2, clock: 16)),
+      () => restored.ingest(op(id: a2, actor: 'A', sequence: 2, clock: 16)),
       throwsA(isA<OperationOrderException>()),
     );
     expect(
-      () => restored.ingest(op(id: a2, actor: 'A',
-        sequence: 2, clock: 15, dependencies: [a1])),
+      () => restored.ingest(
+        op(id: a2, actor: 'A', sequence: 2, clock: 15, dependencies: [a1]),
+      ),
       throwsA(isA<OperationOrderException>()),
     );
     expect(
-      () => restored.ingest(op(id: b1, actor: 'B',
-        sequence: 1, clock: 14, dependencies: [a1])),
+      () => restored.ingest(
+        op(id: b1, actor: 'B', sequence: 1, clock: 14, dependencies: [a1]),
+      ),
       throwsA(isA<OperationOrderException>()),
     );
     expect(
-      () => restored.ingest(op(
-        id: a1, actor: 'A', sequence: 1, clock: 15,
-        payload: {'properties': {'color': 'forged'}},
-      )),
+      () => restored.ingest(
+        op(
+          id: a1,
+          actor: 'A',
+          sequence: 1,
+          clock: 15,
+          payload: {
+            'properties': {'color': 'forged'},
+          },
+        ),
+      ),
       throwsA(isA<OperationOrderException>()),
     );
-    expect(restored.ingest(op(
-      id: b1, actor: 'B', sequence: 1, clock: 16,
-      dependencies: [a1],
-    )), hasLength(1));
+    expect(
+      restored.ingest(
+        op(id: b1, actor: 'B', sequence: 1, clock: 16, dependencies: [a1]),
+      ),
+      hasLength(1),
+    );
   });
 
   test('pending gap cannot be checkpointed as committed history', () {
     final queue = CausalOperationBuffer();
-    queue.ingest(op(
-      id: a2, actor: 'A', sequence: 2, clock: 2,
-      dependencies: [a1],
-    ));
-    expect(() => queue.exportCheckpoint(),
-        throwsA(isA<OperationOrderException>()));
+    queue.ingest(
+      op(id: a2, actor: 'A', sequence: 2, clock: 2, dependencies: [a1]),
+    );
     expect(
-      () => CausalOperationBuffer.fromCheckpoint(OperationCheckpoint(
-        operations: [op(
-          id: a2, actor: 'A', sequence: 2, clock: 2,
-          dependencies: [a1],
-        )],
-      )),
+      () => queue.exportCheckpoint(),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(
+      () => CausalOperationBuffer.fromCheckpoint(
+        OperationCheckpoint(
+          operations: [
+            op(id: a2, actor: 'A', sequence: 2, clock: 2, dependencies: [a1]),
+          ],
+        ),
+      ),
       throwsFormatException,
     );
   });
@@ -376,38 +451,52 @@ void main() {
     final remote = op(id: b1, actor: 'remote', sequence: 1, clock: 20);
     actor.observe(remote);
     final first = actor.next(
-      documentId: 'notebook', pageId: 'page', objectId: 'stroke',
+      documentId: 'notebook',
+      pageId: 'page',
+      objectId: 'stroke',
       kind: OperationKind.objectSet,
-      payload: {'properties': {'x': 1}},
+      payload: {
+        'properties': {'x': 1},
+      },
     );
     expect(first.dependencies, contains(remote.operationId));
     expect(first.logicalClock, 21);
     final restored = OperationActorClock.fromCheckpoint(actor.toCheckpoint());
     final second = restored.next(
-      documentId: 'notebook', pageId: 'page', objectId: 'stroke',
+      documentId: 'notebook',
+      pageId: 'page',
+      objectId: 'stroke',
       kind: OperationKind.objectSet,
-      payload: {'properties': {'x': 2}},
+      payload: {
+        'properties': {'x': 2},
+      },
     );
-    expect(second.dependencies, containsAll([
-      remote.operationId, first.operationId,
-    ]));
+    expect(
+      second.dependencies,
+      containsAll([remote.operationId, first.operationId]),
+    );
   });
   test('actor dependency cap cannot advance its sequence', () {
     final clock = OperationActorClock(actorId: 'local');
     for (var i = 0; i < 257; i++) {
-      final id = '${i.toRadixString(16).padLeft(8, '0')}'
+      final id =
+          '${i.toRadixString(16).padLeft(8, '0')}'
           '-1111-4111-8111-111111111111';
-      clock.observe(op(
-        id: id, actor: 'remote-$i',
-        sequence: 1, clock: 2,
-      ));
+      clock.observe(op(id: id, actor: 'remote-$i', sequence: 1, clock: 2));
     }
     final before = clock.toCheckpoint();
-    expect(() => clock.next(
-      documentId: 'notebook', pageId: 'page', objectId: 'stroke',
-      kind: OperationKind.objectSet,
-      payload: {'properties': {'x': 1}},
-    ), throwsFormatException);
+    expect(
+      () => clock.next(
+        documentId: 'notebook',
+        pageId: 'page',
+        objectId: 'stroke',
+        kind: OperationKind.objectSet,
+        payload: {
+          'properties': {'x': 1},
+        },
+      ),
+      throwsFormatException,
+    );
     expect(clock.toCheckpoint(), before);
   });
 
@@ -423,26 +512,25 @@ void main() {
 
   test('rejected IDs remain blocked after checkpoint restore', () {
     final queue = CausalOperationBuffer();
-    queue.ingest(op(
-      id: b1, actor: 'B', sequence: 1, clock: 1,
-      dependencies: [a1],
-    ));
+    queue.ingest(
+      op(id: b1, actor: 'B', sequence: 1, clock: 1, dependencies: [a1]),
+    );
     queue.ingest(op(id: a1, actor: 'A', sequence: 1, clock: 2));
     final restored = CausalOperationBuffer.fromCheckpoint(
       OperationCheckpoint.fromJson(queue.exportCheckpoint().toJson()),
     );
     expect(restored.rejectedOperations, contains(b1));
     expect(
-      () => restored.ingest(op(
-        id: b1, actor: 'B', sequence: 1, clock: 3,
-        dependencies: [a1],
-      )),
+      () => restored.ingest(
+        op(id: b1, actor: 'B', sequence: 1, clock: 3, dependencies: [a1]),
+      ),
       throwsA(isA<OperationOrderException>()),
     );
-    expect(restored.ingest(op(
-      id: b2, actor: 'B', sequence: 1, clock: 3,
-      dependencies: [a1],
-    )), hasLength(1));
+    expect(
+      restored.ingest(
+        op(id: b2, actor: 'B', sequence: 1, clock: 3, dependencies: [a1]),
+      ),
+      hasLength(1),
+    );
   });
-
 }

@@ -39,9 +39,9 @@ void main() {
       notebook.copyWith(title: 'New title'),
     );
     expect(saved, isTrue);
-    final deletes = await database.customSelect(
-      'SELECT * FROM delete_audit',
-    ).get();
+    final deletes = await database
+        .customSelect('SELECT * FROM delete_audit')
+        .get();
     expect(deletes, isEmpty);
     final current = await repository.getNotebook(notebook.uid);
     expect(current?.pages.single.id, notebook.pages.single.id);
@@ -67,13 +67,10 @@ void main() {
         page.copyWith(textBlocks: [block.copyWith(text: 'draft extended')]),
       ],
     );
-    expect(
-      await repository.saveNotebookPages(edited, {page.id}),
-      isTrue,
-    );
-    final deletes = await database.customSelect(
-      'SELECT * FROM delete_audit',
-    ).get();
+    expect(await repository.saveNotebookPages(edited, {page.id}), isTrue);
+    final deletes = await database
+        .customSelect('SELECT * FROM delete_audit')
+        .get();
     expect(deletes, isEmpty);
     final current = await repository.getNotebook(notebook.uid);
     expect(current?.pages.single.textBlocks.single.text, 'draft extended');

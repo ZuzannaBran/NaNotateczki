@@ -89,10 +89,9 @@ void main() {
       onChanged: (changes) => notifications.add(changes.toList()),
     );
     expect(
-      await quietRepository.restoreNotebooksAtomically(
-        [notebook],
-        notifyChanges: false,
-      ),
+      await quietRepository.restoreNotebooksAtomically([
+        notebook,
+      ], notifyChanges: false),
       1,
     );
     expect(notifications, hasLength(1));
@@ -130,10 +129,9 @@ void main() {
     );
 
     expect(
-      await repository.importNotebooksAtomically(
-        [makeNotebook('quiet')],
-        notifyChanges: false,
-      ),
+      await repository.importNotebooksAtomically([
+        makeNotebook('quiet'),
+      ], notifyChanges: false),
       1,
     );
     expect(notified, isEmpty);

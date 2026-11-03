@@ -22,9 +22,7 @@ OperationEnvelope _operation() => OperationEnvelope(
 );
 
 void main() {
-  ApiClient clientFor(
-    Future<http.Response> Function(http.Request) handler,
-  ) {
+  ApiClient clientFor(Future<http.Response> Function(http.Request) handler) {
     final api = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient(handler),
@@ -40,8 +38,10 @@ void main() {
       expect(request.url.path, '/v2/operations/batch');
       expect(request.headers['Authorization'], 'Bearer test-access-token');
       final body = jsonDecode(request.body) as Map<String, dynamic>;
-      expect((body['operations'] as List).single['operationId'],
-          operation.operationId);
+      expect(
+        (body['operations'] as List).single['operationId'],
+        operation.operationId,
+      );
       return http.Response(
         jsonEncode({
           'cursor': 23,
@@ -133,8 +133,7 @@ void main() {
     );
   });
 
-  test('a malformed or non-monotonic feed cannot advance the cursor',
-      () async {
+  test('a malformed or non-monotonic feed cannot advance the cursor', () async {
     final operation = _operation();
     final client = clientFor((_) async {
       return http.Response(
@@ -173,7 +172,6 @@ void main() {
     });
     final page = await HttpOperationGateway(client).readAfter(9);
     expect(page.cursor, 11);
-    expect(page.operations.single.operation.operationId,
-        operation.operationId);
+    expect(page.operations.single.operation.operationId, operation.operationId);
   });
 }

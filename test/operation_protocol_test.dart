@@ -62,17 +62,11 @@ void main() {
   test('rejects unknown versions and operation kinds', () {
     expect(() => operation(schemaVersion: 2), throwsFormatException);
     final json = operation().toJson()..['type'] = 'document.replace';
-    expect(
-      () => OperationEnvelope.fromJson(json),
-      throwsFormatException,
-    );
+    expect(() => OperationEnvelope.fromJson(json), throwsFormatException);
   });
 
   test('rejects self dependencies and duplicate dependency IDs', () {
-    expect(
-      () => operation(dependencies: [firstId]),
-      throwsFormatException,
-    );
+    expect(() => operation(dependencies: [firstId]), throwsFormatException);
     expect(
       () => operation(dependencies: [secondId, secondId]),
       throwsFormatException,
@@ -110,10 +104,7 @@ void main() {
       logicalClock: 1,
     );
     points.clear();
-    expect(
-      (envelope.toJson()['payload'] as Map)['value']['points'],
-      [1, 2],
-    );
+    expect((envelope.toJson()['payload'] as Map)['value']['points'], [1, 2]);
     expect(
       () => (envelope.payload['value'] as Map)['points'] = <int>[],
       throwsUnsupportedError,

@@ -48,9 +48,7 @@ class _FakeGateway implements OperationGateway {
 
   @override
   Future<OperationFeedPage> readAfter(int cursor) async {
-    final unread = accepted
-        .where((entry) => entry.cursor > cursor)
-        .toList();
+    final unread = accepted.where((entry) => entry.cursor > cursor).toList();
     return OperationFeedPage(
       cursor: unread.isEmpty ? cursor : unread.last.cursor,
       hasMore: false,
@@ -187,9 +185,11 @@ void main() {
 
   test('optimistic projection is durable before an HTTP send', () async {
     final operation = await local('local-1');
-    final rows = await database.customSelect(
-      'SELECT value FROM projection_probe WHERE id = \'local-1\'',
-    ).get();
+    final rows = await database
+        .customSelect(
+          'SELECT value FROM projection_probe WHERE id = \'local-1\'',
+        )
+        .get();
     expect(rows.single.read<String>('value'), 'local');
     expect(await store.isPending(operation.operationId), isTrue);
     expect(gateway.batches, isEmpty);
@@ -205,12 +205,14 @@ void main() {
     await engine.start();
     expect(await store.pending(), isEmpty);
     expect(gateway.accepted, hasLength(1));
-    expect(gateway.accepted.single.operation.operationId,
-        operation.operationId);
+    expect(
+      gateway.accepted.single.operation.operationId,
+      operation.operationId,
+    );
     expect(rebaseObserved, isEmpty);
-    final rows = await database.customSelect(
-      'SELECT id FROM projection_probe',
-    ).get();
+    final rows = await database
+        .customSelect('SELECT id FROM projection_probe')
+        .get();
     expect(rows, hasLength(1));
     expect(await store.checkpoint('user-A-v2'), 1);
   });
@@ -221,54 +223,56 @@ void main() {
 
     await engine.start();
     expect(rebaseObserved.single, [localEdit.operationId]);
-    final rows = await database.customSelect(
-      'SELECT id FROM projection_probe ORDER BY id',
-    ).get();
-    expect(
-      rows.map((row) => row.read<String>('id')).toList(),
-      ['local-pending', 'remote-added'],
-    );
+    final rows = await database
+        .customSelect('SELECT id FROM projection_probe ORDER BY id')
+        .get();
+    expect(rows.map((row) => row.read<String>('id')).toList(), [
+      'local-pending',
+      'remote-added',
+    ]);
     expect(await store.pending(), isEmpty);
   });
 
-  test('failed projection leaves cursor in place but not other documents',
-      () async {
-    gateway.seed(_remote('actor-broken', 'bad'));
-    gateway.seed(
-      _remote('actor-good', 'good', documentId: 'document-other'),
-    );
-    await engine.stop();
-    var fail = true;
-    engine.dispose();
-    engine = SyncEngine(
-      store: store,
-      gateway: gateway,
-      actorId: 'actor-local',
-      checkpointScope: 'user-A-v2',
-      enableRealtime: false,
-      applyRemote: (remote, pending) async {
-        if (fail && remote.objectId == 'bad') {
-          throw StateError('Projection is temporarily unavailable.');
-        }
-        await database.customStatement(
-          'INSERT INTO projection_probe VALUES (?, ?)',
-          [remote.objectId, 'remote'],
-        );
-      },
-    );
-    await engine.start();
-    expect(await store.checkpoint('user-A-v2'), 0);
-    expect(await store.operation(gateway.accepted.last.operation.operationId),
-        isNotNull);
+  test(
+    'failed projection leaves cursor in place but not other documents',
+    () async {
+      gateway.seed(_remote('actor-broken', 'bad'));
+      gateway.seed(_remote('actor-good', 'good', documentId: 'document-other'));
+      await engine.stop();
+      var fail = true;
+      engine.dispose();
+      engine = SyncEngine(
+        store: store,
+        gateway: gateway,
+        actorId: 'actor-local',
+        checkpointScope: 'user-A-v2',
+        enableRealtime: false,
+        applyRemote: (remote, pending) async {
+          if (fail && remote.objectId == 'bad') {
+            throw StateError('Projection is temporarily unavailable.');
+          }
+          await database.customStatement(
+            'INSERT INTO projection_probe VALUES (?, ?)',
+            [remote.objectId, 'remote'],
+          );
+        },
+      );
+      await engine.start();
+      expect(await store.checkpoint('user-A-v2'), 0);
+      expect(
+        await store.operation(gateway.accepted.last.operation.operationId),
+        isNotNull,
+      );
 
-    fail = false;
-    await engine.syncNow();
-    expect(await store.checkpoint('user-A-v2'), 2);
-    final rows = await database.customSelect(
-      'SELECT id FROM projection_probe',
-    ).get();
-    expect(rows, hasLength(2));
-  });
+      fail = false;
+      await engine.syncNow();
+      expect(await store.checkpoint('user-A-v2'), 2);
+      final rows = await database
+          .customSelect('SELECT id FROM projection_probe')
+          .get();
+      expect(rows, hasLength(2));
+    },
+  );
 
   test('independent documents use distinct actor sequences', () async {
     final first = await local('first-document');
@@ -291,8 +295,7 @@ void main() {
     expect(second.dependencies, isNot(contains(first.operationId)));
   });
 
-  test('a bad later operation cannot block a valid batch prefix',
-      () async {
+  test('a bad later operation cannot block a valid batch prefix', () async {
     await engine.stop();
     engine.dispose();
     final poisoned = _PoisonBatchGateway();
@@ -331,8 +334,7 @@ void main() {
     expect(poisoned.accepted.single.operation.operationId, valid.operationId);
   });
 
-  test('a broken pull does not block the outbox of another document',
-      () async {
+  test('a broken pull does not block the outbox of another document', () async {
     gateway.seed(_remote('actor-bad', 'bad'));
     await engine.stop();
     engine.dispose();
@@ -367,8 +369,7 @@ void main() {
     expect(await store.checkpoint('user-A-v2'), 0);
   });
 
-  test('an earlier actor retry is not hidden by a five-minute retry',
-      () async {
+  test('an earlier actor retry is not hidden by a five-minute retry', () async {
     await engine.stop();
     engine.dispose();
     engine = SyncEngine(
@@ -391,6 +392,7 @@ void main() {
         apply: (_) async {},
       );
     }
+
     await addFor('document-one');
     await addFor('document-two');
     await engine.start();
@@ -408,8 +410,9 @@ void main() {
     );
     expect(await store.pending(), isEmpty);
     expect(
-      (await store.pending(includeDeferred: true))
-          .map((operation) => operation.operationId),
+      (await store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
       [first.operationId, second.operationId],
     );
   });
