@@ -344,10 +344,11 @@ class OperationStore {
   Future<List<OperationEnvelope>> pending({
     String? documentId,
     int limit = 128,
+    int offset = 0,
     bool includeDeferred = false,
   }) async {
-    if (limit < 1 || limit > 1000) {
-      throw ArgumentError.value(limit, 'limit');
+    if (limit < 1 || limit > 1000 || offset < 0) {
+      throw ArgumentError('Invalid outbox pagination.');
     }
     final filter = documentId == null ? '' : 'AND o.document_id = ? ';
     // Never transmit a later actor sequence while its predecessor is
@@ -366,11 +367,12 @@ class OperationStore {
       'SELECT o.envelope_json FROM operation_outbox x '
       'JOIN operations o ON o.operation_id = x.operation_id '
       'WHERE 1 = 1 $ready$filter'
-      'ORDER BY o.actor_id, o.actor_seq LIMIT ?',
+      'ORDER BY o.actor_id, o.actor_seq LIMIT ? OFFSET ?',
       variables: [
         if (!includeDeferred) ...[Variable<int>(now), Variable<int>(now)],
         if (documentId != null) Variable<String>(documentId),
         Variable<int>(limit),
+        Variable<int>(offset),
       ],
     ).get();
     return [
