@@ -246,6 +246,7 @@ class EditorController extends ChangeNotifier {
     TextBlock? text,
     ImageBlock? image,
     bool deleted = false,
+    int? sortIndex,
   }) {
     if (objectId.isEmpty || pageId.isEmpty) {
       throw ArgumentError('Share object IDs must be nonempty.');
@@ -260,6 +261,9 @@ class EditorController extends ChangeNotifier {
         (image != null && image.id != objectId)) {
       throw ArgumentError('Expected exactly one matching object or deletion.');
     }
+    if (sortIndex != null && (sortIndex < 0 || stroke == null)) {
+      throw ArgumentError('Ink order requires a nonnegative stroke index.');
+    }
     if (!canApplyConfirmedRemoteNotebook ||
         activeImageBlockId == objectId ||
         (lassoSelection?.strokeIds.contains(objectId) ?? false) ||
@@ -272,14 +276,23 @@ class EditorController extends ChangeNotifier {
       return false;
     }
     final current = pages[index];
-    final hasInk = stroke != null ||
-        current.inkStrokes.any((entry) => entry.id == objectId);
+    final previousInkIndex = current.inkStrokes.indexWhere(
+      (entry) => entry.id == objectId,
+    );
+    final hasInk = stroke != null || previousInkIndex >= 0;
+    final inkStrokes = [
+      for (final entry in current.inkStrokes)
+        if (entry.id != objectId) entry,
+    ];
+    if (stroke != null) {
+      // A color/geometry update must not silently bring the stroke to front.
+      // Only an explicit layer operation is allowed to move it.
+      final index = sortIndex ??
+          (previousInkIndex < 0 ? inkStrokes.length : previousInkIndex);
+      inkStrokes.insert(index.clamp(0, inkStrokes.length), stroke);
+    }
     final next = current.copyWith(
-      inkStrokes: [
-        for (final entry in current.inkStrokes)
-          if (entry.id != objectId) entry,
-        if (stroke != null) stroke,
-      ],
+      inkStrokes: inkStrokes,
       textBlocks: [
         for (final entry in current.textBlocks)
           if (entry.id != objectId) entry,
