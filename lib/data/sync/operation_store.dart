@@ -323,18 +323,31 @@ class OperationStore {
   Future<List<OperationEnvelope>> pending({
     String? documentId,
     int limit = 128,
+    bool includeDeferred = false,
   }) async {
     if (limit < 1 || limit > 1000) {
       throw ArgumentError.value(limit, 'limit');
     }
     final filter = documentId == null ? '' : 'AND o.document_id = ? ';
+    // Never transmit a later actor sequence while its predecessor is
+    // delayed. A rebase needs *all* unacknowledged edits, including retries.
+    final ready = includeDeferred
+        ? ''
+        : 'AND x.retry_after <= ? AND NOT EXISTS ('
+              'SELECT 1 FROM operation_outbox earlier '
+              'JOIN operations predecessor '
+              'ON predecessor.operation_id = earlier.operation_id '
+              'WHERE predecessor.actor_id = o.actor_id '
+              'AND predecessor.actor_seq < o.actor_seq '
+              'AND earlier.retry_after > ?) ';
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
     final rows = await database.customSelect(
       'SELECT o.envelope_json FROM operation_outbox x '
       'JOIN operations o ON o.operation_id = x.operation_id '
-      'WHERE x.retry_after <= ? $filter'
-      'ORDER BY x.queued_at, o.actor_id, o.actor_seq LIMIT ?',
+      'WHERE 1 = 1 $ready$filter'
+      'ORDER BY o.actor_id, o.actor_seq LIMIT ?',
       variables: [
-        Variable<int>(DateTime.now().toUtc().millisecondsSinceEpoch),
+        if (!includeDeferred) ...[Variable<int>(now), Variable<int>(now)],
         if (documentId != null) Variable<String>(documentId),
         Variable<int>(limit),
       ],
@@ -409,6 +422,13 @@ class OperationStore {
       [scope],
     );
     return row?['server_sequence'] as int? ?? 0;
+  }
+
+  /// Persist a contiguous feed cursor. Replayed rows are idempotent.
+  ///
+  /// The caller must only advance through operations committed locally.
+  Future<void> advanceCheckpoint(String scope, int sequence) {
+    return database.transaction(() => _advanceCheckpoint(scope, sequence));
   }
 
   Future<void> _advanceCheckpoint(String scope, int sequence) async {
