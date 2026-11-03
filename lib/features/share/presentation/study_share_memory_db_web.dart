@@ -20,14 +20,24 @@ Future<NotesDatabase> openSharedGuestDatabase() async {
 /// Unlike the v1 preview database, this stores unacknowledged v2 intents
 /// across browser reloads. It must not be cleared before explicit ACK or
 /// recoverable session closure. Stage 7 may move this into a namespace manager.
-Future<NotesDatabase> openSharedGuestOperationDatabase(String shareId) async {
+Future<NotesDatabase> openSharedGuestOperationDatabase(
+  String shareId, {
+  required String guestActorId,
+}) async {
   if (!RegExp(
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
     r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   ).hasMatch(shareId)) {
     throw const FormatException('Invalid shared session ID.');
   }
-  final key = sha256.convert(utf8.encode(shareId.toLowerCase())).toString();
+  if (guestActorId.isEmpty ||
+      guestActorId.length > 128 ||
+      RegExp(r'[\\x00-\\x1f\\x7f]').hasMatch(guestActorId)) {
+    throw const FormatException('Invalid guest actor namespace.');
+  }
+  final key = sha256.convert(
+    utf8.encode(jsonEncode([shareId.toLowerCase(), guestActorId])),
+  ).toString();
   final sqlite = await WasmSqlite3.loadFromUrl(sharedGuestWasmUri(Uri.base));
   final fileSystem = await IndexedDbFileSystem.open(
     dbName: 'nanotateczki_share_ops_v2_$key',
