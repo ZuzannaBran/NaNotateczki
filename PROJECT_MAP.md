@@ -376,8 +376,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 ### Nowa synchronizacja serwerowa
 
-- `lib/data/sync/api_client.dart` (190): klient REST z wymuszeniem HTTPS,
+- `lib/data/sync/api_client.dart`: klient REST z wymuszeniem HTTPS,
   timeoutem, limitem odpowiedzi, Bearer tokenem i request ID.
+  HTTP 5xx oraz błędy transportu wpisuje automatycznie do `Errors`
+  (`AppErrorLog`), bez treści odpowiedzi i tokenów; wyklucza health
+  oraz sam endpoint diagnostyczny, aby nie powstała pętla raportowania.
+  HTTP 4xx, w tym zwykły konflikt 409, nie tworzy wpisu.
   7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
   Domyślny adres dla wszystkich platform to `https://api.nanotateczki.pl`;
   `BACKEND_URL` może go nadpisać w buildach lokalnych/testowych.
@@ -388,7 +392,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   nie używa timera, nie blokuje UI; błędy sieci są ignorowane.
 - `test/app_activity_wake_service_test.dart`: throttling, inactive/localOnly
   oraz żądanie bez tokenu.
-- `lib/data/sync/diagnostics_upload_service.dart`: podczas zalogowanej sesji nasłuchuje trzech lokalnych logów i przesyła aktualny snapshot po 12 s bezczynności; błędy ponawia po 5 min, nie blokuje aplikacji; jeden trwały UUID urządzenia.
+- `lib/data/sync/diagnostics_upload_service.dart`: podczas zalogowanej sesji
+  nasłuchuje trzech lokalnych logów i przesyła aktualny snapshot po
+  12 s bezczynności do `PUT /v1/reports/diagnostics`; błędy ponawia
+  po 5 min, nie blokuje aplikacji; jeden trwały UUID urządzenia.
+  Backend utrwala `errors` w
+  `data/diagnostics/<account UUID>/<device UUID>.json` i nadpisuje
+  poprzedni snapshot danego urządzenia.
 - `lib/data/sync/account_credential_store.dart`: `AccountCredentialStore`
   pozwala w testach używać pamięci; implementacja
   `SecureAccountCredentialStore` korzysta z `flutter_secure_storage`
@@ -1647,6 +1657,10 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   SQLite ścieżek obrazów po przeniesieniu katalogu danych.
 - `test/api_client_test.dart`: odrzucenie HTTP/sekretów w URL, Bearer/request
   ID i zachowanie struktury odpowiedzi 409.
+- `test/diagnostics_upload_service_test.dart`: błędy HTTP 5xx i transportu
+  trafiają do lokalnych `Errors` oraz do prywatnego snapshotu diagnostycznego
+  na serwerze; duplikaty 5xx są grupowane, konflikt 409 ignorowany,
+  a nieudana wysyłka diagnostyki nie generuje kolejnego raportu.
 - `test/remote_backup_scheduler_test.dart`: odstęp bezczynności 15/30 s,
   nieblokujący upload podczas oczekiwania na serwer, weryfikacja przed exit
   i backup po imporcie ze zdalnego urządzenia bez lokalnych kliknięć;

@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../../core/error/app_error_log.dart';
+
 class ApiResponse {
   const ApiResponse({required this.statusCode, required this.bodyBytes});
 
@@ -154,17 +156,30 @@ class ApiClient {
       request.bodyBytes = body;
     }
 
-    final streamed = await _httpClient.send(request).timeout(effectiveTimeout);
+    late final http.StreamedResponse streamed;
+    try {
+      streamed = await _httpClient.send(request).timeout(effectiveTimeout);
+    } catch (error) {
+      _recordTransportFailure(method, path, error);
+      rethrow;
+    }
     final contentLength = streamed.contentLength;
     if (contentLength != null && contentLength > maxResponseBytes) {
       throw const ApiException(413, 'API response is too large.');
     }
     final builder = BytesBuilder(copy: false);
-    await for (final chunk in streamed.stream.timeout(effectiveTimeout)) {
-      builder.add(chunk);
-      if (builder.length > maxResponseBytes) {
-        throw const ApiException(413, 'API response is too large.');
+    try {
+      await for (final chunk in streamed.stream.timeout(effectiveTimeout)) {
+        builder.add(chunk);
+        if (builder.length > maxResponseBytes) {
+          throw const ApiException(413, 'API response is too large.');
+        }
       }
+    } catch (error) {
+      if (error is! ApiException) {
+        _recordTransportFailure(method, path, error);
+      }
+      rethrow;
     }
     final response = ApiResponse(
       statusCode: streamed.statusCode,
@@ -181,9 +196,38 @@ class ApiClient {
       } catch (_) {
         message = 'The server returned an invalid error response.';
       }
+      if (response.statusCode >= 500) {
+        _recordServerFailure(method, path, response.statusCode);
+      }
       throw ApiException(response.statusCode, message, payload: payload);
     }
     return response;
+  }
+
+  // Diagnostic uploads must never report their own failures recursively.
+  bool _shouldRecordFailure(String path) =>
+      path != '/v1/reports/diagnostics' && path != '/health';
+
+  void _recordServerFailure(String method, String path, int statusCode) {
+    if (!_shouldRecordFailure(path)) {
+      return;
+    }
+    AppErrorLog.instance.record(
+      StateError('HTTP $statusCode: $method $path'),
+      null,
+      source: 'Server API',
+    );
+  }
+
+  void _recordTransportFailure(String method, String path, Object error) {
+    if (!_shouldRecordFailure(path)) {
+      return;
+    }
+    AppErrorLog.instance.record(
+      StateError('Connection failure: $method $path (${error.runtimeType})'),
+      null,
+      source: 'Server API',
+    );
   }
 
   void close() {
