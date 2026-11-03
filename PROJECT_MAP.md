@@ -2227,9 +2227,12 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
 - `lib/features/planner/state/study_planner_controller.dart`:
   `StudySession.modifiedAt`, `syncRecords`, `applyRemoteRecords`,
-  trwałe `tombstones` i zapis v2.
+  trwałe `tombstones` i zapis v2; potwierdzone zdalne usunięcie
+  zastępuje lokalną edycję mimo różnic zegarów i nie dopuszcza odtworzenia UID.
 - `lib/data/sync/planner_sync_service.dart`: stronicowane pobieranie,
-  scalanie per ID według UTC i zapis nowszych lokalnych zmian.
+  scalanie per ID według UTC i wysyłanie usunięć mimo późniejszej daty
+  edycji ze starszego urządzenia. Nie wysyła lokalnych wpisów, jeśli
+  serwer zwrócił tombstone.
 - `lib/app/app_scope.dart`: inicjalizacja, listener zapisu, wznowienie
   i okresowe uzgadnianie; `live_web_sync_service.dart`: `planner_changed`.
 - `test/planner_sync_controller_test.dart`: przypadki offline,
@@ -2239,7 +2242,8 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   właściciel konta, trwałe usunięcia, powiadomienia WebSocket.
 
 - `test/planner_sync_service_test.dart`: dwie instalacje i wspólny backend,
-  dodanie, edycja, usunięcie oraz rozstrzygnięcie zmian offline.
+  dodanie, edycja, usunięcie, konflikt offline oraz usunięcie przy zegarze
+  drugiego urządzenia przesuniętym o kilka godzin.
 
 ### Weryfikacja wyjścia i błędów (2026-11-02)
 
