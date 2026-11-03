@@ -12,7 +12,10 @@ void main() {
       () async {
     final firstShare = const Uuid().v4();
     final secondShare = const Uuid().v4();
-    final first = await guest_db.openSharedGuestOperationDatabase(firstShare);
+    final first = await guest_db.openSharedGuestOperationDatabase(
+      firstShare,
+      guestActorId: 'guest-A',
+    );
     String? operationId;
     try {
       final store = OperationStore(first);
@@ -40,7 +43,20 @@ void main() {
       await restored.close();
     }
 
-    final isolated = await guest_db.openSharedGuestOperationDatabase(secondShare);
+    final anotherGuest = await guest_db.openSharedGuestOperationDatabase(
+      firstShare,
+      guestActorId: 'guest-B',
+    );
+    try {
+      expect(await OperationStore(anotherGuest).pending(), isEmpty);
+    } finally {
+      await anotherGuest.close();
+    }
+
+    final isolated = await guest_db.openSharedGuestOperationDatabase(
+      secondShare,
+      guestActorId: 'guest-A',
+    );
     try {
       expect(await OperationStore(isolated).pending(), isEmpty);
     } finally {
