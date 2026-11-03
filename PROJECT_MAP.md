@@ -377,6 +377,16 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - 10: `CloudSyncResult`; 22: `CloudSyncService`; 30: `getCloudPath`;
   48: `setCloudPath`; 56: `sync`; 100: `mergeNotebooks`.
 
+### Protokół operacji v1 (etap 1)
+
+- `lib/data/sync/operation_protocol.dart`: `OperationEnvelope` i
+  `OperationKind` definiują wersjonowany format operacji. Stabilne ID,
+  aktor, sekwencja, zależności i licznik logiczny. Bez mieszania stanu
+  widoku z treścią. Test: `test/operation_protocol_test.dart`.
+- Kanoniczny opis i reguły payloadu:
+  `NaNotateczki-serwer/docs/OPERATION_PROTOCOL_V1.md`.
+  Ten kontrakt jeszcze nie zastępuje istniejącego snapshotowego sync.
+
 ### Nowa synchronizacja serwerowa
 
 - `lib/data/sync/api_client.dart`: klient REST z wymuszeniem HTTPS,

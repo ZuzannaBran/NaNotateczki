@@ -541,3 +541,13 @@ fizycznych ruchów na urządzeniach. Pełna gwarancja pracy lokalnej i
 równoczesnej wymaga operacji per obiekt, identyfikatorów aktorów i zegarów
 logicznych/CRDT oraz inkrementalnego renderingu, bez globalnego
 podmieniania snapshotów. To wymaga osobnej migracji protokołu.
+
+## Protokół operacji v1 — etap 1 (przygotowany, nieaktywny)
+
+`lib/data/sync/operation_protocol.dart` opisuje zamiar użytkownika oddzielnie
+od aktualnego snapshotu i backupu. Operacja ma stabilny `operationId`,
+`actorId`, rosnący `actorSeq`, `logicalClock`, zależności, typ i payload.
+`documentId`, `pageId` i `objectId` odwołują się do trwałych ID, nie do
+pozycji na ekranie. Nowy model nie jest jeszcze podłączony do Drift ani
+API v1. Nie interpretować go jako ukończonej migracji lub naprawy share.
+Specyfikacja: `NaNotateczki-serwer/docs/OPERATION_PROTOCOL_V1.md`.
