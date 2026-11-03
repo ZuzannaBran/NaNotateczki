@@ -51,6 +51,11 @@ void main() {
       throwsStateError,
     );
     expect(manager.current, StorageNamespace.local());
+    expect(manager.isActive, isFalse);
     expect(manager.accepts(StorageNamespace.local(), old), isFalse);
+    await manager.switchTo(StorageNamespace.local(),
+        stopAndFlush: () async {},
+        open: (_) async {});
+    expect(manager.isActive, isTrue);
   });
 }
