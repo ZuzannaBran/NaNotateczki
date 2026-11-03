@@ -434,11 +434,14 @@ RemoteBackupService _service(
   const deviceId = '123e4567-e89b-12d3-a456-426614174000';
   const backupId = '123e4567-e89b-12d3-a456-426614174001';
   final hash = checksum ?? sha256.convert(utf8.encode(payload)).toString();
+  final metadata = checkpoint == null
+      ? ''
+      : '"accountId":"account-1","schemaVersion":5,'
+            '"operationCheckpoint":${jsonEncode(checkpoint)},';
   final bytes = utf8.encode(
     '{"format":"nanotateczki-server-backup","version":2,'
     '"checksumAlgorithm":"sha256","deviceId":"$deviceId",'
-    '${checkpoint == null ? '' : '"accountId":"account-1",'
-        '"schemaVersion":5,"operationCheckpoint":${jsonEncode(checkpoint)},'}'
+    '$metadata'
     '"checksum":"$hash","payload":$payload}',
   );
   final client = ApiClient(
