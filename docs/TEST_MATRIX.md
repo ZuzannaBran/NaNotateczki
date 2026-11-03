@@ -1049,3 +1049,9 @@ domain-specific reducers are implemented and these checks pass.
 8. Restart po commit PostgreSQL, ale przed odebraniem ACK.
 
 Nie są to potwierdzone wyniki automatycznych testów E2E.
+
+9. Odrzucić HTTP 422 dla operacji w środku paczki i upewnić się, że
+   zablokowany element pozostaje trwale w SQLite `status=blocked`,
+   bez ponawiania co 5 minut, a inne dokumenty nadal synchronizują.
+10. Przeprowadzić migrację istniejącego outboxu SQLite v4 → v5, bez
+   utraty operacji oraz bez zerowania prób/terminów retry.

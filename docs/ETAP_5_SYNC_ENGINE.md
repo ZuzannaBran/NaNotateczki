@@ -90,3 +90,14 @@ zgodność pól z API v2 serwera i brak zmian w produkcyjnej ścieżce v1.
 
 **Niedokończone:** domenowe reduktory, migracja namespace, przełączenie
 produkcji i testy prawdziwego Flutter/PostgreSQL/WebSocket.
+
+## Status odrzuconych operacji — SQLite v5
+
+Odrzucone permanentnie operacje HTTP 403/410/413/422 i nieprzyczynowe
+409 nie są już bez końca retransmitowane. `operation_outbox` przechowuje
+status `blocked` i `last_error`. Późniejsze operacje tego samego aktora
+nie wyprzedzają zablokowanej; nadal można je odczytać przez
+`pending(includeDeferred: true)` w celu ręcznej naprawy.
+
+Przed produkcyjnym przełączeniem wymagana jest obsługa odzyskiwania
+zablokowanego łańcucha w UI i test migracji v4 → v5 na istniejącej bazie.

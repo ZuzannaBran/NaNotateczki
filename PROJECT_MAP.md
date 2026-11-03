@@ -411,8 +411,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   atomowy ACK, tombstones, checkpointy i checksummed snapshots. Projekcja
   wywołującego musi używać tej samej bazy Drift. Nie jest jeszcze wpięty
   we wszystkie legacy ścieżki `saveNotebook` (etap 5).
-- `lib/data/drift/operation_schema.dart`: SQLite v4 z migracją v3 → v4
-  zachowującą tombstones oraz pageId usuniętego obiektu.
+- `lib/data/drift/operation_schema.dart`: SQLite v5 z migracją v3 → v4
+  zachowującą tombstones oraz pageId usuniętego obiektu; v5 zapisuje
+  trwały status `blocked` dla nieodwracalnych błędów wysyłki.
   Tabele są tworzone przez `customStatement` bez nowych mapowań `.g.dart`.
 - `notes_database_connection_io.dart`: WAL + `synchronous=FULL`.
 - `notebook_repository.dart`: `_upsertNotebookPages` i `_upsertPage`
