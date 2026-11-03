@@ -38,9 +38,9 @@ Można dodatkowo wymagać dokładnego przypisanego konta przez
 --account-id UUID. Nie stosować tej opcji do nieskojarzonych danych Local.
 
 Regresje: python3 -m unittest discover -s tool -p 'test_stage11_migrate.py'.
-Siedem scenariuszy uruchomiono lokalnie z CPython 3: poprawne kopiowanie,
+Osiem scenariuszy uruchomiono lokalnie z CPython 3: poprawne kopiowanie,
 izolacja właściciela, brak assetu, restart, odmowa obcego katalogu,
-zmodyfikowany manifest/dane oraz symlink. Nie uruchomiono Flutter/Dart,
+zmodyfikowane dane oraz symlink w assetach lub celu. Nie uruchomiono Flutter/Dart,
 PostgreSQL ani GitHub Actions. Testy używają uproszczonych schematów
 SQLite; historyczne zrzuty rzeczywistych instalacji wciąż są konieczne.
 

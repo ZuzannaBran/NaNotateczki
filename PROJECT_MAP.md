@@ -2502,7 +2502,7 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - tool/stage11_migrate.py: offline, tylko natywne instalacje; SHA-256
   kopii SQLite/WAL/assetów, kontrola SQLite, kont i idempotentny
   manifest staged-not-activated. Nie zmienia aktywnej bazy AppScope.
-- tool/test_stage11_migrate.py: siedem regresji migracji, brakujące assety,
+- tool/test_stage11_migrate.py: osiem regresji migracji, brakujące assety,
   wznowienie staging, account binding, symlinki i integralność celu.
 - docs/ETAP_11_MIGRATION.md: status nieukończonego przełączenia v1→v2,
   wymagania Web, backendu i testów, komendy dla komputera, nie serwera.

@@ -196,7 +196,9 @@ def stage_migration(data: Path, account_id: str | None = None) -> dict:
         raise MigrationError('Invalid app data directory')
     namespace, suffix = _profile_identity(data, account_id)
     target = data / namespace
-    if target.exists() or target.is_symlink():
+    if target.is_symlink() or target.parent.is_symlink():
+        raise MigrationError('Symlinked namespace is forbidden')
+    if target.exists():
         return _verify_existing(target, namespace)
     database = data / 'notes.sqlite'
     if not _regular_file(database):

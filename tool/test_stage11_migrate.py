@@ -85,6 +85,11 @@ class Stage11MigrationTests(unittest.TestCase):
         with self.assertRaises(MigrationError):
             stage_migration(self.data)
 
+    def test_symlinked_target_is_never_accepted(self):
+        (self.data / 'local').symlink_to(self.data / 'images')
+        with self.assertRaises(MigrationError):
+            stage_migration(self.data)
+
     def test_symlinked_assets_are_refused(self):
         (self.data / 'images' / 'link').symlink_to(self.data / 'notes.sqlite')
         with self.assertRaises(MigrationError):
