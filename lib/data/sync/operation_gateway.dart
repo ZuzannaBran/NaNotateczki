@@ -61,7 +61,11 @@ class HttpOperationGateway implements OperationGateway {
     );
     final body = _object(response.decodeJson());
     final entries = body['acknowledgements'];
-    if (entries is! List || entries.length != operations.length) {
+    final batchCursor = body['cursor'];
+    if (batchCursor is! int ||
+        batchCursor <= 0 ||
+        entries is! List ||
+        entries.length != operations.length) {
       throw const FormatException('Incomplete operation ACK batch.');
     }
     final expected = operations.map((op) => op.operationId).toSet();
@@ -81,6 +85,12 @@ class HttpOperationGateway implements OperationGateway {
         throw const FormatException('Invalid operation acknowledgement.');
       }
       result.add(OperationReceipt(id, cursor));
+    }
+    if (result.map((receipt) => receipt.cursor).reduce(
+          (current, next) => current > next ? current : next,
+        ) !=
+        batchCursor) {
+      throw const FormatException('Inconsistent operation batch cursor.');
     }
     return result;
   }
