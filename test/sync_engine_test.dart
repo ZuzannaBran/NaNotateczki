@@ -139,8 +139,7 @@ void main() {
   test('optimistic projection is durable before an HTTP send', () async {
     final operation = await local('local-1');
     final rows = await database.customSelect(
-      'SELECT value FROM projection_probe WHERE id = ?',
-      variables: [],
+      'SELECT value FROM projection_probe WHERE id = \'local-1\'',
     ).get();
     expect(rows.single.read<String>('value'), 'local');
     expect(await store.isPending(operation.operationId), isTrue);
