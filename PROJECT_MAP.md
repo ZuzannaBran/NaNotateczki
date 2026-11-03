@@ -1989,7 +1989,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   Weryfikuje również trwałość ustawienia czułości nawigacji i skali UI,
   domyślne palety, ich utrwalanie, migrację fabrycznych kolorów
   (także zestawów z poprzedniej wersji) i
-  zachowanie ustawionych ręcznie próbek.
+  zachowanie ustawionych ręcznie próbek. Test migracji czeka na zapis
+  preferencji przed przejściem do następnej palety.
 - `test/production/export_render_test.dart` (305): produkcyjne PNG/PDF
   w pamięci, liczba stron i rozmiar obrazu, treść oraz legacy gumka.
   Renderer działa w `tester.runAsync`, poza `FakeAsync` testu widgetowego.

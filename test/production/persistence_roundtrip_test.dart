@@ -295,7 +295,18 @@ void main() {
       expect(controller.inkColor, InkColorPreset.pink.colors[1]);
       controller.setTool(DrawingTool.highlighter);
       expect(controller.inkColor, InkColorPreset.pink.colors[1]);
+      await controller.flushPendingSaves();
       controller.dispose();
+
+      final saved =
+          jsonDecode((await readStoredText('editor_prefs.json'))!)
+              as Map<String, dynamic>;
+      expect(saved['quickColors'], [
+        '#823c44',
+        '#d8798a',
+        '#eaa6ae',
+      ]);
+      expect(saved['penColor'], '#d8798a');
     },
   );
 
