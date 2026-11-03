@@ -869,7 +869,12 @@ class StudyPlannerController extends ChangeNotifier {
       final oldTime = existing == null
           ? null
           : DateTime.tryParse(existing['modifiedAt'] as String)?.toUtc();
-      if (oldTime != null && time.isBefore(oldTime)) {
+      // A deletion confirmed by the account server is authoritative, even
+      // if another device's clock is ahead. Never revive a local deletion
+      // from a stale active record either.
+      if (!deleted &&
+          (existing?['deleted'] == true ||
+              (oldTime != null && time.isBefore(oldTime)))) {
         continue;
       }
       final content = record['entry'];
