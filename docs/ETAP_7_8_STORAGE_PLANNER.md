@@ -38,6 +38,9 @@ otwierania istniejących bibliotek ani zdejmować blokady drugiego konta.
   danej przestrzeni. Nie służy ono do ponownego utworzenia starego UID.
 - Serwerowa projekcja operacji folderów v2 odrzuca osieroconych rodziców,
   cykle przenoszenia i usunięcie rodzica, który nadal ma dzieci.
+- `task.create/set/move/delete` mają odrębne UID i tombstones, a migracja
+  `0012_task_tombstones.sql` rozszerza dozwolone typy. Nadal nie są
+  podłączone do produkcyjnej listy zadań.
 - Dotychczasowa synchronizacja ustawień oparta na CAS pozostaje bez zmian.
 
 **Zależne od etapu 11:** przełączenie istniejących planerów na v2 po
