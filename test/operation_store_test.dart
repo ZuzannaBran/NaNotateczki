@@ -759,7 +759,7 @@ void main() {
     String? parent;
     for (var i = 0; i < 260; i++) {
       final id =
-          '\${(i + 1000).toRadixString(16).padLeft(8, '0')}'
+          '${(i + 1000).toRadixString(16).padLeft(8, '0')}'
           '-1111-4111-8111-111111111111';
       final remote = OperationEnvelope(
         operationId: id,
@@ -784,5 +784,4 @@ void main() {
     expect(next.dependencies, [parent]);
     expect(next.logicalClock, 261);
   });
-
 }
