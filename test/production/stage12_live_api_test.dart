@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -42,11 +40,13 @@ void main() {
               'INSERT OR IGNORE INTO stage12_objects VALUES (?, ?)',
               [objectId, 'committed'],
             );
+            break;
           case OperationKind.objectDelete:
             await db.customStatement(
               'DELETE FROM stage12_objects WHERE id = ?',
               [objectId],
             );
+            break;
           default:
             break;
         }
@@ -71,7 +71,7 @@ void main() {
 
         final registration = await apiA.postJson(
           '/v1/auth/register',
-          {'username': 's12_$id', 'password': 'stage12-test-only'},
+          {'username': 's12_${id.substring(0, 20)}', 'password': 'stage12-test-only'},
           authenticated: false,
         );
         final account = Map<String, dynamic>.from(
