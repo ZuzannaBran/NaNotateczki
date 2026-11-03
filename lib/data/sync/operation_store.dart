@@ -109,10 +109,22 @@ class OperationStore {
           [actorId],
         );
         final previousId = state?['last_operation_id'] as String?;
+        // A new local intent observes the durable remote actor frontier.
+        // This must be read inside the same transaction as actorSeq.
+        final observed = await database.customSelect(
+          'SELECT last_operation_id FROM operation_actor_state '
+          'WHERE actor_id != ? ORDER BY actor_id',
+          variables: [Variable<String>(actorId)],
+        ).get();
         final causalIds = <String>{
           ...dependencies,
+          for (final row in observed)
+            row.read<String>('last_operation_id'),
           if (previousId != null) previousId,
         }.toList()..sort();
+        if (causalIds.length > 256) {
+          throw StateError('Too many causal actor frontiers.');
+        }
         var nextClock = state?['last_clock'] as int? ?? 0;
         for (final id in causalIds) {
           final dependency = await operation(id);
@@ -217,8 +229,15 @@ class OperationStore {
         throw StateError('Invalid causal dependency: $id');
       }
     }
-    await _rejectDeletedTarget(entry);
-    await apply();
+    final deleted = await _isDeletedTarget(entry);
+    if (deleted && source == 'local') {
+      throw StateError('Deleted identity cannot be reused.');
+    }
+    // The server may accept an old concurrent edit as an ignored no-op.
+    // Record its actor sequence and cursor without resurrecting the target.
+    if (!deleted) {
+      await apply();
+    }
 
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
     await database.customStatement(
@@ -261,18 +280,20 @@ class OperationStore {
         [entry.operationId, now],
       );
     }
-    await _writeTombstone(entry);
+    if (!deleted) {
+      await _writeTombstone(entry);
+    }
     return true;
   }
 
-  Future<void> _rejectDeletedTarget(OperationEnvelope entry) async {
+  Future<bool> _isDeletedTarget(OperationEnvelope entry) async {
     final document = entry.documentId;
     if (await isTombstoned(document, 'document', document)) {
-      throw StateError('Document has been deleted.');
+      return true;
     }
     if (entry.kind.target == OperationTarget.object &&
         await isTombstoned(document, 'page', entry.pageId!)) {
-      throw StateError('Page has been deleted.');
+      return true;
     }
     final target = switch (entry.kind.target) {
       OperationTarget.document => (kind: 'document', id: document),
@@ -280,9 +301,7 @@ class OperationStore {
       OperationTarget.object => (kind: 'object', id: entry.objectId!),
       OperationTarget.folder => (kind: 'folder', id: entry.objectId!),
     };
-    if (await isTombstoned(document, target.kind, target.id)) {
-      throw StateError('Deleted identity cannot be reused.');
-    }
+    return isTombstoned(document, target.kind, target.id);
   }
 
   Future<bool> isTombstoned(
