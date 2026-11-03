@@ -231,6 +231,9 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
    Nowy envelope v2 zawiera `accountId`, `schemaVersion` i
    `operationCheckpoint`. Serwer waliduje zgodność z właścicielem;
    starsze poprawne archiwa v2 nadal można odzyskać.
+   Podczas recovery do istniejącej bazy archiwum nie może cofnąć
+   trwale zapisanego checkpointu lokalnego. Reset bazy zezwala
+   na odzyskiwanie bez starego lokalnego kursora.
 2. Snapshot zawiera notatniki z bajtami obrazów, foldery/zadania,
    `study_planner.json`, `app_prefs.json`, `editor_prefs.json`,
    `shared_recent_colors.json` i preferencję bezczynności backupu konta.

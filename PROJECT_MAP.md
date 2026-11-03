@@ -1838,6 +1838,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   i `deviceId` między osobnymi sesjami kont. Regresje etapu 9:
   envelope/checkpoint konta, odmowa przy niepotwierdzonym outboxie,
   wykrywanie zmiany preferencji w czasie capture i marker utraty bazy.
+- `test/account_backup_recovery_regression_test.dart`: odrzucenie
+  archiwalnego backupu starszego od zachowanego checkpointu operacji.
 - `test/live_web_sync_service_test.dart`: pobranie wszystkich stron feedu po
   500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany,
   zachowanie zapisów pojawiających się w czasie bootstrapu konta,

@@ -20,6 +20,9 @@
 - Serwerowy verified backup jest niezmienny; recovery waliduje
   rozmiar, SHA-256 całego pliku i oryginalnego payloadu.
   Obecne tombstones oraz lokalne usunięcia mają pierwszeństwo.
+  Backup ze starszym checkpointem nie jest odtwarzany do nowszej
+  istniejącej bazy; potwierdzony reset pomija porównanie ze starym
+  kursorem, bo poprzedni magazyn został utracony.
 - Zachowano 15/30/60/120/300/900/1800 sekund; 30 sekund domyślnie.
 
 ## Niezakończone zależności

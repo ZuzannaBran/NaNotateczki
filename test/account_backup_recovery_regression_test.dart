@@ -78,6 +78,30 @@ void main() {
     },
   );
 
+  test('an older checkpoint cannot roll back an existing database',
+      () async {
+    final repo = _repository();
+    await repo.database.customStatement(
+      'INSERT INTO sync_checkpoints '
+      '(scope, server_sequence, updated_at) VALUES (?, ?, ?)',
+      ['account', 15, 0],
+    );
+    final service = _service(
+      repo,
+      '{"notebooks":[],"libraryState":{},'
+      '"studyPlannerState":{"sessions":[{"id":"older-event",'
+      '"kind":"event","title":"Outdated",'
+      '"scheduledAt":"2026-11-04T10:00:00Z"}]}}',
+      checkpoint: {'account': 10},
+    );
+    expect(await service.hydrateFromLatestAccountBackup(), isFalse);
+    expect(stored.containsKey('study_planner.json'), isFalse);
+    final cursor = await repo.database.customSelect(
+      "SELECT server_sequence FROM sync_checkpoints WHERE scope = 'account'",
+    ).getSingle();
+    expect(cursor.read<int>('server_sequence'), 15);
+  });
+
   test('payload checksum mismatch still refuses all writes', () async {
     final repo = _repository();
     final service = _service(
@@ -401,6 +425,7 @@ RemoteBackupService _service(
   NotebookRepository repo,
   String payload, {
   String? checksum,
+  Map<String, int>? checkpoint,
   List<Map<String, dynamic>> records = const [],
   int? bootstrapPageSize,
   List<Map<String, dynamic>> plannerEntries = const [],
@@ -412,6 +437,8 @@ RemoteBackupService _service(
   final bytes = utf8.encode(
     '{"format":"nanotateczki-server-backup","version":2,'
     '"checksumAlgorithm":"sha256","deviceId":"$deviceId",'
+    '${checkpoint == null ? '' : '"accountId":"account-1",'
+        '"schemaVersion":5,"operationCheckpoint":${jsonEncode(checkpoint)},'}'
     '"checksum":"$hash","payload":$payload}',
   );
   final client = ApiClient(

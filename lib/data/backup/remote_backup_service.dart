@@ -28,11 +28,17 @@ class RemoteBackupReceipt {
 }
 
 class _VerifiedRecoverySnapshot {
-  const _VerifiedRecoverySnapshot(this.id, this.payload, this.notebooks);
+  const _VerifiedRecoverySnapshot(
+    this.id,
+    this.payload,
+    this.notebooks,
+    this.operationCheckpoint,
+  );
 
   final String id;
   final Map<String, dynamic> payload;
   final List<Notebook> notebooks;
+  final Map<String, int> operationCheckpoint;
 }
 
 class RemoteBackupService {
@@ -255,9 +261,26 @@ class RemoteBackupService {
     final backupId = verified.id;
     final payload = verified.payload;
     final recoveredNotebooks = verified.notebooks;
-    // Check the newest verified snapshot at every sign-in, including when
-    // this device already restored an older one. Reprocessing the same
-    // snapshot would create duplicate numbered conflict copies.
+    // A recovery into an existing database may not replace a more recent
+    // durable feed cursor with an older device backup. A confirmed database
+    // reset has no surviving cursor to protect.
+    if (!databaseWasReset && verified.operationCheckpoint.isNotEmpty) {
+      final rows = await repository.database
+          .customSelect(
+            'SELECT scope, server_sequence FROM sync_checkpoints',
+          )
+          .get();
+      for (final row in rows) {
+        final scope = row.read<String>('scope');
+        final snapshotCursor = verified.operationCheckpoint[scope];
+        if (snapshotCursor != null &&
+            row.read<int>('server_sequence') > snapshotCursor) {
+          return false;
+        }
+      }
+    }
+    // Reprocessing the same verified snapshot would create duplicate
+    // conflict copies; recovery is only invoked for explicit data loss.
     final previousHydration = await readStoredText(hydrationKey);
     String? previousBackupId;
     if (previousHydration != null) {
@@ -494,20 +517,25 @@ class RemoteBackupService {
         final hasMetadata = envelope.containsKey('accountId') ||
             envelope.containsKey('schemaVersion') ||
             envelope.containsKey('operationCheckpoint');
+        var operationCheckpoint = <String, int>{};
         if (hasMetadata) {
           final checkpoint = envelope['operationCheckpoint'];
           if (envelope['accountId'] != expectedUserId ||
               envelope['schemaVersion'] is! int ||
               (envelope['schemaVersion'] as int) <= 0 ||
               checkpoint is! Map<String, dynamic> ||
+              checkpoint.length > 256 ||
               checkpoint.entries.any(
                 (entry) =>
                     entry.key.isEmpty ||
+                    entry.key.length > 128 ||
                     entry.value is! int ||
-                    (entry.value as int) < 0,
+                    (entry.value as int) < 0 ||
+                    (entry.value as int) > 9007199254740991,
               )) {
             throw const FormatException('Invalid backup operation checkpoint.');
           }
+          operationCheckpoint = checkpoint.cast<String, int>();
         }
         final payload = _jsonObject(envelope['payload']);
         final checksum = sha256.convert(backupPayloadBytes(bytes)).toString();
@@ -526,6 +554,7 @@ class RemoteBackupService {
           id,
           payload,
           repository.decodeBackupStrict(rawNotes),
+          operationCheckpoint,
         );
       } on ApiException catch (error, stackTrace) {
         if (error.statusCode != 404 && error.statusCode != 503) {
