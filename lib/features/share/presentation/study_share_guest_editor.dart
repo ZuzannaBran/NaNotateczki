@@ -324,7 +324,11 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       if (!_dirty &&
           jsonEncode(answer.notebook['pages']) !=
               jsonEncode(visibleAtSend['pages'])) {
-        await _installRemote(answer, expectedLocal: visibleAtSend);
+        await _installRemote(
+          answer,
+          expectedLocal: visibleAtSend,
+          fromOwnPush: true,
+        );
       } else if (_dirty) {
         // Keep the accepted revision available for a later visual update,
         // while the next outgoing delta uses _localMergeBase.
@@ -470,6 +474,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
   Future<void> _installRemote(
     SharedStudyDocument snapshot, {
     Map<String, dynamic>? expectedLocal,
+    bool fromOwnPush = false,
   }) async {
     if (_repository == null || !mounted || _closed) {
       return;
@@ -483,7 +488,10 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     if (editor == null || expected == null) {
       return;
     }
-    if (_dirty || _installingRemote || !editor.canApplyConfirmedRemoteNotebook) {
+    if (_dirty ||
+        (_sending && !fromOwnPush) ||
+        _installingRemote ||
+        !editor.canApplyConfirmedRemoteNotebook) {
       _deferRemote(snapshot, expectedLocal: expectedLocal);
       return;
     }
@@ -512,7 +520,10 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     // No remote database transaction may start until earlier local writes
     // have completed. Do not suppress their change notifications while waiting.
     await _repository!.waitForPendingSaves();
-    if (!mounted || _closed || _dirty ||
+    if (!mounted ||
+        _closed ||
+        _dirty ||
+        (_sending && !fromOwnPush) ||
         snapshot.revision < _revision ||
         !editor.canApplyConfirmedRemoteNotebook) {
       _deferRemote(snapshot, expectedLocal: expectedLocal);
