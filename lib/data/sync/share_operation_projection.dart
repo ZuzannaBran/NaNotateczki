@@ -17,8 +17,9 @@ class ShareOperationProjection {
   final Map<String, dynamic>? document;
   final Set<String> tombstones;
 
+  /// Copy only the modified branch; untouched page/object maps are shared.
   static Map<String, dynamic> _copy(Map<String, dynamic> value) =>
-      Map<String, dynamic>.from(jsonDecode(jsonEncode(value)) as Map);
+      Map<String, dynamic>.from(value);
 
   static String _pageKey(String id) => 'page:$id';
   static String _objectKey(String pageId, String objectId) =>
@@ -71,8 +72,10 @@ class ShareOperationProjection {
       return ShareOperationProjection._(next, deleted);
     }
 
-    final pages = next.putIfAbsent('pages', () => <String, dynamic>{})
-        as Map<String, dynamic>;
+    final pages = Map<String, dynamic>.from(
+      next['pages'] as Map? ?? const <String, dynamic>{},
+    );
+    next['pages'] = pages;
     final pageId = kind.target == OperationTarget.page
         ? op.objectId!
         : op.pageId!;
@@ -108,8 +111,10 @@ class ShareOperationProjection {
       throw StateError('Parent page does not exist.');
     }
     if (kind == OperationKind.pageSet) {
+      final mutablePage = Map<String, dynamic>.from(page as Map);
+      pages[pageId] = mutablePage;
       _merge(
-        page as Map<String, dynamic>,
+        mutablePage,
         _fields(op, create: false),
         op,
         force: optimistic,
@@ -117,9 +122,12 @@ class ShareOperationProjection {
       return ShareOperationProjection._(next, deleted);
     }
 
-    final objects = (page as Map<String, dynamic>)
-        .putIfAbsent('objects', () => <String, dynamic>{})
-        as Map<String, dynamic>;
+    final mutablePage = Map<String, dynamic>.from(page as Map);
+    pages[pageId] = mutablePage;
+    final objects = Map<String, dynamic>.from(
+      mutablePage['objects'] as Map? ?? const <String, dynamic>{},
+    );
+    mutablePage['objects'] = objects;
     final objectId = op.objectId!;
     final objectKey = _objectKey(pageId, objectId);
     if (kind == OperationKind.objectDelete) {
@@ -148,31 +156,37 @@ class ShareOperationProjection {
     if (object is! Map<String, dynamic>) {
       throw StateError('Object is not initialized.');
     }
+    final mutableObject = Map<String, dynamic>.from(object);
+    objects[objectId] = mutableObject;
     if (kind == OperationKind.textInsert ||
         kind == OperationKind.textDelete) {
-      final properties = object['properties'] as Map<String, dynamic>;
-      if (object['type'] != OperationKind.objectCreate.wireName ||
+      final properties = Map<String, dynamic>.from(
+        mutableObject['properties'] as Map,
+      );
+      if (mutableObject['type'] != OperationKind.objectCreate.wireName ||
           properties['objectType'] != 'text') {
         throw StateError('Text operation needs a typed text object.');
       }
-      if (!object.containsKey('textAtoms') &&
+      if (!mutableObject.containsKey('textAtoms') &&
           properties['text'] != null &&
           properties['text'] != '') {
         throw StateError('Existing text requires explicit CRDT migration.');
       }
-      final atoms = object['textAtoms'] is Map<String, dynamic>
-          ? object['textAtoms'] as Map<String, dynamic>
+      final atoms = mutableObject['textAtoms'] is Map<String, dynamic>
+          ? mutableObject['textAtoms'] as Map<String, dynamic>
           : <String, dynamic>{};
       final changed = OperationTextSequence.apply(atoms, op);
-      object['textAtoms'] = changed;
+      mutableObject['textAtoms'] = changed;
+      mutableObject['properties'] = properties;
       properties['text'] = OperationTextSequence.render(changed);
       return ShareOperationProjection._(next, deleted);
     }
     final fields = _fields(op, create: false);
-    if (object.containsKey('textAtoms') && fields.containsKey('text')) {
+    if (mutableObject.containsKey('textAtoms') &&
+        fields.containsKey('text')) {
       throw StateError('CRDT text cannot be replaced with object.set.');
     }
-    _merge(object, fields, op, force: optimistic);
+    _merge(mutableObject, fields, op, force: optimistic);
     return ShareOperationProjection._(next, deleted);
   }
 
@@ -195,8 +209,10 @@ class ShareOperationProjection {
     OperationEnvelope op, {
     bool force = false,
   }) {
-    final versions = node['versions'] as Map<String, dynamic>;
-    final properties = node['properties'] as Map<String, dynamic>;
+    final versions = Map<String, dynamic>.from(node['versions'] as Map);
+    final properties = Map<String, dynamic>.from(node['properties'] as Map);
+    node['versions'] = versions;
+    node['properties'] = properties;
     final rank = <Object>[
       op.logicalClock,
       op.actorId,
