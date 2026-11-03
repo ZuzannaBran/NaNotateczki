@@ -139,10 +139,10 @@ class OperationTextSequence {
               ? (x as num).compareTo(y as num)
               : (x as String).compareTo(y as String);
           if (comparison != 0) {
-            return comparison;
+            return -comparison;
           }
         }
-        return a.compareTo(b);
+        return b.compareTo(a);
       });
     }
     final stack = <String>[...?children[null]?.reversed];
