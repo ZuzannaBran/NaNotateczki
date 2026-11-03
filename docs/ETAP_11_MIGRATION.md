@@ -16,17 +16,20 @@ serwer i NIE zmienia aktywnej ścieżki SQLite aplikacji.
 - Sprawdza SQLite quick_check, foreign_key_check, user_version 1–5
   i liczby notatników, stron, elementów, outboxu i tombstones.
 - Kopiuje istniejące SQLite, WAL/SHM/journal, ustawienia i dane planera,
-  identyfikator urządzenia, checkpoint sync (tylko dla właściwego konta),
-  assety, backupy lokalne, archiwa usunięć i incydenty. Wszystkie bajty
-  wejściowe są sumowane SHA-256 i weryfikowane po kopiowaniu.
+  account_profile.json, storage_layout.json, identyfikator urządzenia,
+  stan synchronizacji, kursor ustawień i preimport (tylko dla właściwego
+  konta), assety, backupy lokalne, archiwa usunięć i incydenty. Oryginalne
+  bajty SQLite i sidecarów są dodatkowo zachowane w legacy_sqlite/.
+  Wszystkie pliki źródłowe mają SHA-256 sprawdzany po kopiowaniu.
 - Aktualizuje ścieżki obrazów w **kopii** SQLite; odmawia migrowania
   osieroconego assetu bez inline bytes lub ścieżki poza images/.
 - Kontroluje niezmienność źródła, porównuje liczbę rekordów po zmianie
   ścieżek, publikuje kompletny katalog przez rename. Przy błędzie
   usuwa wyłącznie własny katalog tymczasowy, źródło pozostaje nietknięte.
-- Ponowne uruchomienie weryfikuje manifest i wszystkie SHA-256
-  kopii **oraz aktualnego źródła**; zmiana legacy po stagingu blokuje
-  ponowne użycie nieaktualnej kopii.
+- Ponowne uruchomienie weryfikuje manifest, pełną listę plików docelowych
+  i ich SHA-256 **oraz aktualnego źródła**; zmiana legacy po stagingu
+  blokuje ponowne użycie nieaktualnej kopii. Weryfikacja obejmuje także
+  account_profile.json i nowo utworzone pliki źródłowe.
   Nie nadpisuje istniejącego, niezweryfikowanego katalogu docelowego.
 - Kopia jest oznaczona **staged-not-activated**: nie wolno jej uznać za
   zakończoną migrację protokołu, ani skasować starej biblioteki.
@@ -40,10 +43,12 @@ Można dodatkowo wymagać dokładnego przypisanego konta przez
 --account-id UUID. Nie stosować tej opcji do nieskojarzonych danych Local.
 
 Regresje: python3 -m unittest discover -s tool -p 'test_stage11_migrate.py'.
-Dwanaście scenariuszy dodano; testy wymagają wykonania na checkoutcie: poprawne kopiowanie,
+Siedemnaście scenariuszy dodano; testy wymagają wykonania na checkoutcie: poprawne kopiowanie,
 izolacja właściciela, brak assetu, restart, odmowa obcego katalogu,
 zmodyfikowane dane oraz symlink w assetach lub celu. Nowe testy:
-stale źródło, pliki `.previous`, ścieżka z `..` i zewnętrzny obraz. Nie uruchomiono Flutter/Dart,
+stale źródło, pliki `.previous`, ścieżka z `..`, zewnętrzny obraz,
+prawidłowy staging konta, metadane konta, zmodyfikowany profil,
+nowy plik źródłowy i nieoczekiwany plik w stagingu. Nie uruchomiono Flutter/Dart,
 PostgreSQL ani GitHub Actions. Testy używają uproszczonych schematów
 SQLite; historyczne zrzuty rzeczywistych instalacji wciąż są konieczne.
 
@@ -82,3 +87,13 @@ najpierw zweryfikowanego pełnego backupu PostgreSQL i assetów.
 
 Dotychczasowa aplikacja nadal używa legacy storage i sync; ten etap
 zmniejsza ryzyko przygotowania kopii, ale nie zamyka migracji v2.
+
+## Zasady zgodności po korekcie
+
+Wcześniejszy katalog stagingu ze starszym manifestem może zostać
+odrzucony po rozszerzeniu listy zabezpieczanych plików lub kontroli
+liczników. **Nie usuwać go automatycznie**. Należy zachować kopię i
+po ręcznej weryfikacji przenieść nieaktualny katalog w bezpieczne
+miejsce poza przestrzenią aktywnych danych, a następnie powtórzyć
+staging przy wyłączonej aplikacji. Samo przygotowanie kopii nie
+włącza żadnego writer'a v2 i nie wymaga komend na serwerze.

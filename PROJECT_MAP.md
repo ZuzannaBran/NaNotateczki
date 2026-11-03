@@ -2497,38 +2497,31 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   migracji etapu 11; testy E2E to etap 12.
 
 
-## Etap 11 — staging legacy namespace bez aktywacji
+## Etap 10 — koordynacja wyjścia i wylogowania (2026-11-03)
 
-- tool/stage11_migrate.py: offline, tylko natywne instalacje; SHA-256
-  kopii SQLite/WAL/assetów, kontrola SQLite, kont i idempotentny
-  manifest staged-not-activated. Nie zmienia aktywnej bazy AppScope.
-- tool/test_stage11_migrate.py: osiem regresji migracji, brakujące assety,
-  wznowienie staging, account binding, symlinki i integralność celu.
-- docs/ETAP_11_MIGRATION.md: status nieukończonego przełączenia v1→v2,
-  wymagania Web, backendu i testów, komendy dla komputera, nie serwera.
+- `lib/core/storage/shutdown_coordinator.dart`: 30 s na lokalny flush,
+  sync, verified backup, stop usług i koniec sesji; awarie lokalnego
+  zapisu blokują także offline logout.
+- `lib/app/app_scope.dart`: osłona exit Retry / Cancel / Exit offline,
+  niezwolniony gest lub zapis blokuje zamknięcie do czasu utrwalenia.
+- `lib/features/library/presentation/library_account_slot.dart`:
+  blokada zmiany konta przed stop() writerów; brak fałszywego retry po
+  skutecznie wykonanym lokalnym logout bez łączności z serwerem.
+- `lib/data/sync/account_session_controller.dart`: usunięcie refresh
+  tokenu musi się zakończyć sukcesem przed zmianą sesji.
+- `test/shutdown_coordinator_test.dart`,
+  `test/account_session_controller_test.dart`: regresje timeout,
+  kolejność stop, awaria keyringu i offline revoke.
+- `docs/ETAP_10_SHUTDOWN.md`: ograniczenia platformowe i weryfikacja.
 
+## Etap 11 — weryfikowany staging danych legacy (bez cutover)
 
-## Etap 10 — koordynacja shutdown (2026-11-03)
-
-- lib/core/storage/shutdown_coordinator.dart: wspólny pipeline 30 s:
-  flush lokalny → sync → verified backup → stop usług → koniec sesji;
-  wyjście offline możliwe tylko po lokalnym utrwaleniu.
-- lib/app/app_scope.dart: exit guard Retry / Cancel / Exit offline
-  bez pomijania niezapisanych gestów; błąd oznacza konkretny etap.
-- lib/features/library/presentation/library_account_slot.dart:
-  logout z wyborem pozostania zalogowanym / retry / offline; przed
-  wyczyszczeniem poświadczeń zatrzymuje sieciowych writerów.
-- test/shutdown_coordinator_test.dart: testy faz, timeoutów i
-  blokady wylogowania przy niedokończonym stop().
-- docs/ETAP_10_SHUTDOWN.md: ograniczenia z powodu nieaktywnego
-  namespace etapu 11 i scenariusze środowiskowe.
-
-## Etap 11 — weryfikacja świeżości migracji
-
-- tool/stage11_migrate.py: staging odmawia ponownego użycia kopii,
-  jeśli źródło zmieniło się po SHA-256; zachowuje poprzednie wersje
-  oraz odrzuca ścieżki obrazów opuszczające katalog images/.
-- tool/test_stage11_migrate.py: regresje stale staging, recovery
-  sidecars, traversal path oraz external inline asset.
-- docs/ETAP_11_MIGRATION.md: migracja nadal staged-not-activated,
-  bez automatycznego cutover i bez uruchomienia produkcyjnego v2.
+- `tool/stage11_migrate.py`: offline, Linux/native; SHA-256,
+  zgodność powiązania konta, zachowanie oryginalnej SQLite i WAL
+  w `legacy_sqlite/`, staging do `local/` lub `accounts/<hash>/`,
+  pełne sprawdzenie listy plików, manifest staged-not-activated.
+- `tool/test_stage11_migrate.py`: 17 regresji m.in. staging konta,
+  profile, nowe źródła, osierocone assety, symlinki, resume i WAL.
+- `docs/ETAP_11_MIGRATION.md`: **produkcja v1→v2 nadal nieaktywna**.
+  AppScope i Web nie wykonują cutover; wymagane etapy 7/12/13 i migracja
+  serwerowego protokołu z trwałą blokadą starszych writerów.

@@ -17,16 +17,28 @@ from urllib.parse import quote
 
 MANIFEST = '.stage11_manifest.json'
 INCOMPLETE = '.stage11_incomplete'
-BASE_FILES = ('notes.sqlite', 'notes.sqlite-wal', 'notes.sqlite-shm',
-              'notes.sqlite-journal', 'notes.sqlite.recovery_pending',
-    'app_prefs.json', 'editor_prefs.json',
-              'shared_recent_colors.json', 'library_folders.json',
-              'study_planner.json', 'cloud_sync.json')
+SQLITE_FILES = ('notes.sqlite', 'notes.sqlite-wal', 'notes.sqlite-shm',
+                'notes.sqlite-journal')
+BASE_FILES = SQLITE_FILES + (
+    'notes.sqlite.recovery_pending',
+    'account_profile.json',
+    'storage_layout.json',
+    'app_prefs.json',
+    'editor_prefs.json',
+    'shared_recent_colors.json',
+    'library_folders.json',
+    'study_planner.json',
+    'cloud_sync.json',
+)
+ACCOUNT_FILES = (
+    'server_device',
+    'server_sync_state',
+    'server_backup_preferences',
+    'account_settings_cursor',
+    'account_preimport',
+)
 BASE_DIRS = ('images', 'local_backup', 'deleted_notebooks',
              'data_integrity_incidents')
-TABLES = ('notebook_rows', 'page_rows', 'text_block_rows',
-          'image_block_rows', 'ink_stroke_rows', 'operations',
-          'operation_outbox', 'object_tombstones', 'sync_checkpoints')
 
 
 class MigrationError(RuntimeError):
@@ -49,14 +61,14 @@ def _regular_file(path: Path) -> bool:
 
 def source_files(root: Path, suffix: str | None) -> list[Path]:
     names = list(BASE_FILES)
-    names += [f'{stem}_{suffix}.json' for stem in
-              ('server_device', 'server_sync_state',
-               'server_backup_preferences') if suffix]
+    names += [f'{stem}_{suffix}.json' for stem in ACCOUNT_FILES if suffix]
     names += [f'{name}.{ext}' for name in list(names)
               if name.endswith('.json') for ext in ('previous', 'tmp')]
     paths = []
     for name in names:
         entry = root / name
+        if entry.exists() and not _regular_file(entry):
+            raise MigrationError(f'Expected a regular file: {entry}')
         if _regular_file(entry):
             paths.append(entry)
     for folder in BASE_DIRS:
@@ -82,6 +94,8 @@ def source_files(root: Path, suffix: str | None) -> list[Path]:
 def _profile_identity(root: Path, account_id: str | None) -> tuple[str, str | None]:
     profile = root / 'account_profile.json'
     bound = None
+    if profile.exists() and not _regular_file(profile):
+        raise MigrationError('Invalid account profile entry')
     if _regular_file(profile):
         try:
             data = json.loads(profile.read_text(encoding='utf-8'))
@@ -119,8 +133,14 @@ def _inspect_database(path: Path) -> tuple[int, dict[str, int]]:
             required = {'notebook_rows', 'page_rows', 'image_block_rows'}
             if not required.issubset(existing):
                 raise MigrationError('Missing required document tables')
-            counts = {table: db.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
-                      for table in TABLES if table in existing}
+            counts = {}
+            for table in sorted(existing):
+                if table.startswith('sqlite_'):
+                    continue
+                escaped = table.replace('"', '""')
+                counts[table] = db.execute(
+                    f'SELECT COUNT(*) FROM "{escaped}"'
+                ).fetchone()[0]
             return version, counts
         finally:
             db.close()
@@ -176,9 +196,19 @@ def _verify_existing(target: Path, namespace: str) -> dict:
         raise MigrationError('Existing namespace has no verified migration marker')
     try:
         manifest = json.loads(marker.read_text(encoding='utf-8'))
-        if manifest.get('version') != 1 or manifest.get('namespace') != namespace:
+        if (manifest.get('version') != 1 or
+                manifest.get('namespace') != namespace or
+                manifest.get('status') != 'staged-not-activated'):
             raise MigrationError('Namespace marker mismatch')
-        for relative, sha in manifest['targetFiles'].items():
+        target_files = manifest['targetFiles']
+        if not isinstance(target_files, dict):
+            raise MigrationError('Invalid target file inventory')
+        actual = {str(file.relative_to(target)) for file in target.rglob('*')
+                  if file.is_file() or file.is_symlink()}
+        actual.discard(MANIFEST)
+        if actual != set(target_files):
+            raise MigrationError('Staged file inventory changed')
+        for relative, sha in target_files.items():
             parts = Path(relative).parts
             if Path(relative).is_absolute() or '..' in parts:
                 raise MigrationError('Unsafe path in migration manifest')
@@ -186,7 +216,11 @@ def _verify_existing(target: Path, namespace: str) -> dict:
             if not _regular_file(entry) or digest(entry) != sha:
                 raise MigrationError(f'Migrated file changed: {relative}')
         version, counts = _inspect_database(target / 'notes.sqlite')
-        if version != manifest['schemaVersion'] or counts != manifest['rowCounts']:
+        recorded = manifest['rowCounts']
+        if (version != manifest['schemaVersion'] or
+                not isinstance(recorded, dict) or
+                any(counts.get(name) != count for name, count in
+                    recorded.items())):
             raise MigrationError('Migrated database metadata changed')
         return manifest
     except (ValueError, KeyError, TypeError, UnicodeError) as exc:
@@ -229,22 +263,31 @@ def stage_migration(data: Path, account_id: str | None = None) -> dict:
     version, counts = _inspect_database(database)
     files = source_files(data, suffix)
     original = {str(path.relative_to(data)): digest(path) for path in files}
+    # Preserve the original SQLite bytes in addition to the rewritten copy.
     needed = sum(path.stat().st_size for path in files)
+    needed += sum(path.stat().st_size for path in files
+                  if path.name in SQLITE_FILES)
     if shutil.disk_usage(data).free < int(needed * 1.2) + 1024 * 1024:
         raise MigrationError('Insufficient free space to stage a verified copy')
     staging = target.with_name(target.name + '.stage11-incomplete')
     if staging.is_symlink():
         raise MigrationError('Staging path is a symlink')
     if staging.exists():
-        if not (staging / INCOMPLETE).is_file():
+        incomplete = staging / INCOMPLETE
+        if (not _regular_file(incomplete) or
+                incomplete.read_text(encoding='ascii') != 'stage11\n'):
             raise MigrationError('Unrecognized staging directory; refuse deletion')
         shutil.rmtree(staging)
-    staging.mkdir(parents=True)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging.mkdir(parents=False)
     (staging / INCOMPLETE).write_text('stage11\n', encoding='ascii')
     try:
         for path in files:
             rel = path.relative_to(data)
             _copy_verified(path, staging / rel, original[str(rel)])
+            if path.name in SQLITE_FILES:
+                _copy_verified(path, staging / 'legacy_sqlite' / path.name,
+                               original[str(rel)])
         if source_files(data, suffix) != files or any(
             digest(data / rel) != sha for rel, sha in original.items()
         ):
@@ -254,7 +297,9 @@ def stage_migration(data: Path, account_id: str | None = None) -> dict:
         staged_version, staged_counts = _inspect_database(staging / 'notes.sqlite')
         if staged_version != version or staged_counts != counts:
             raise MigrationError('Document/object counts changed during migration')
-        if any(digest(data / rel) != sha for rel, sha in original.items()):
+        if (source_files(data, suffix) != files or
+                any(digest(data / rel) != sha
+                    for rel, sha in original.items())):
             raise MigrationError('Legacy source changed during validation')
         targets = {str(path.relative_to(staging)): digest(path)
                    for path in staging.rglob('*')
@@ -269,7 +314,10 @@ def stage_migration(data: Path, account_id: str | None = None) -> dict:
         with marker.open('rb') as stream:
             os.fsync(stream.fileno())
         (staging / INCOMPLETE).unlink()
-        target.parent.mkdir(parents=True, exist_ok=True)
+        if (source_files(data, suffix) != files or
+                any(digest(data / rel) != sha
+                    for rel, sha in original.items())):
+            raise MigrationError('Legacy source changed before publication')
         staging.rename(target)
         return _verify_existing(target, namespace)
     except BaseException:

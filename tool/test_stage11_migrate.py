@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
@@ -53,6 +54,51 @@ class Stage11MigrationTests(unittest.TestCase):
         self.assertFalse((self.data / 'local').exists())
         result = stage_migration(self.data, 'account-a')
         self.assertTrue(result['namespace'].startswith('accounts/'))
+        self.assertFalse((self.data / 'local').exists())
+
+    def test_bound_namespace_stages_and_reuses_verified_copy(self):
+        (self.data / 'account_profile.json').write_text(json.dumps({
+            'version': 1, 'boundUserId': 'account-a'}), encoding='utf8')
+        suffix = hashlib.sha256(b'account-a').hexdigest()[:16]
+        account_settings = self.data / f'account_settings_cursor_{suffix}.json'
+        account_settings.write_text('{"version":1}', encoding='utf8')
+        report = stage_migration(self.data, 'account-a')
+        target = self.data / report['namespace']
+        self.assertTrue(target.is_dir())
+        self.assertEqual(digest(account_settings),
+                         digest(target / account_settings.name))
+        self.assertEqual(report, stage_migration(self.data, 'account-a'))
+        self.assertEqual(digest(self.data / 'notes.sqlite'),
+                         digest(target / 'legacy_sqlite' / 'notes.sqlite'))
+
+    def test_modified_profile_invalidates_staging(self):
+        profile = self.data / 'account_profile.json'
+        profile.write_text(json.dumps({'version': 1,
+                                       'boundUserId': 'account-a'}))
+        stage_migration(self.data, 'account-a')
+        profile.write_text(json.dumps({'version': 1,
+                                       'boundUserId': 'account-a',
+                                       'onboardingComplete': True}))
+        with self.assertRaisesRegex(MigrationError, 'source changed'):
+            stage_migration(self.data, 'account-a')
+
+    def test_adding_legacy_file_invalidates_staging(self):
+        stage_migration(self.data)
+        (self.data / 'storage_layout.json').write_text('{}')
+        with self.assertRaisesRegex(MigrationError, 'source changed'):
+            stage_migration(self.data)
+
+    def test_staged_extra_file_invalidates_manifest(self):
+        report = stage_migration(self.data)
+        target = self.data / report['namespace']
+        (target / 'unexpected').write_text('unsafe')
+        with self.assertRaisesRegex(MigrationError, 'inventory changed'):
+            stage_migration(self.data)
+
+    def test_directory_in_place_of_profile_is_refused(self):
+        (self.data / 'account_profile.json').mkdir()
+        with self.assertRaises(MigrationError):
+            stage_migration(self.data)
         self.assertFalse((self.data / 'local').exists())
 
     def test_missing_asset_aborts_without_committing(self):
