@@ -15,7 +15,10 @@ class OperationActorClock {
     this.logicalClock = 0,
     this.previousOperationId,
   }) {
-    if (actorId.isEmpty || actorSeq < 0 || logicalClock < 0) {
+    if (actorId.isEmpty || actorId.length > 128 || actorSeq < 0 ||
+        actorSeq > OperationEnvelope.maxSafeInteger || logicalClock < 0 ||
+        logicalClock > OperationEnvelope.maxSafeInteger ||
+        (actorSeq > 0 && previousOperationId == null)) {
       throw ArgumentError('Invalid actor checkpoint.');
     }
   }
