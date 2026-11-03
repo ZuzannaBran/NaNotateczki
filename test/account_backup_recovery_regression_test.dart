@@ -231,6 +231,99 @@ void main() {
     expect(stored.containsKey('study_planner.json'), isFalse);
   });
 
+  test('backup recovers unrelated entries without resurrecting deletions',
+      () async {
+    final backup = jsonEncode({
+      'notebooks': <dynamic>[],
+      'libraryState': <String, dynamic>{},
+      'studyPlannerState': {
+        'version': 2,
+        'sessions': [
+          {
+            'id': 'deleted-event',
+            'kind': 'event',
+            'title': 'Removed elsewhere',
+            'scheduledAt': '2026-11-04T10:00:00Z',
+          },
+          {
+            'id': 'unsynced-event',
+            'kind': 'event',
+            'title': 'Recover me',
+            'scheduledAt': '2026-11-04T11:00:00Z',
+          },
+        ],
+      },
+    });
+    final service = _service(
+      _repository(),
+      backup,
+      plannerEntries: [
+        {
+          'id': 'deleted-event',
+          'modifiedAt': '2026-11-03T01:00:00Z',
+          'deleted': true,
+          'entry': null,
+        },
+      ],
+    );
+    expect(await service.hydrateFromLatestAccountBackup(), isTrue);
+    final recovered = jsonDecode(stored['study_planner.json']!);
+    expect(recovered['sessions'], hasLength(1));
+    expect(recovered['sessions'].single['id'], 'unsynced-event');
+  });
+
+  test('backup preserves local entries while recovering unknown IDs',
+      () async {
+    stored['study_planner.json'] = jsonEncode({
+      'version': 2,
+      'sessions': [
+        {
+          'id': 'same-id',
+          'kind': 'event',
+          'title': 'Newer local edit',
+          'scheduledAt': '2026-11-04T10:00:00Z',
+        },
+      ],
+      'tombstones': {'deleted-id': '2026-11-03T00:00:00Z'},
+    });
+    final backup = jsonEncode({
+      'notebooks': <dynamic>[],
+      'libraryState': <String, dynamic>{},
+      'studyPlannerState': {
+        'version': 2,
+        'sessions': [
+          {
+            'id': 'same-id',
+            'kind': 'event',
+            'title': 'Old edit',
+            'scheduledAt': '2026-11-04T10:00:00Z',
+          },
+          {
+            'id': 'deleted-id',
+            'kind': 'event',
+            'title': 'Old deleted event',
+            'scheduledAt': '2026-11-04T10:00:00Z',
+          },
+          {
+            'id': 'new-id',
+            'kind': 'event',
+            'title': 'Unique recovery',
+            'scheduledAt': '2026-11-04T10:00:00Z',
+          },
+        ],
+      },
+    });
+    expect(
+      await _service(_repository(), backup).hydrateFromLatestAccountBackup(),
+      isTrue,
+    );
+    final recovered = jsonDecode(stored['study_planner.json']!);
+    expect(recovered['sessions'], hasLength(2));
+    expect(recovered['sessions'][0]['title'], 'Newer local edit');
+    expect(recovered['sessions'][1]['title'], 'Unique recovery');
+    expect(recovered['tombstones'], contains('deleted-id'));
+  });
+
   test('legacy planner backup can seed an empty account', () async {
     final backup = jsonEncode({
       'notebooks': <dynamic>[],
@@ -311,6 +404,7 @@ RemoteBackupService _service(
   List<Map<String, dynamic>> records = const [],
   int? bootstrapPageSize,
   List<Map<String, dynamic>> plannerEntries = const [],
+  int? plannerPageSize,
 }) {
   const deviceId = '123e4567-e89b-12d3-a456-426614174000';
   const backupId = '123e4567-e89b-12d3-a456-426614174001';
@@ -342,7 +436,21 @@ RemoteBackupService _service(
         return http.Response.bytes(bytes, 200);
       }
       if (request.url.path == '/v1/planner/entries') {
-        return http.Response(jsonEncode({'entries': plannerEntries, 'next': null}), 200);
+        final after = request.url.queryParameters['after'];
+        final start = after == null
+            ? 0
+            : plannerEntries.indexWhere((entry) => entry['id'] == after) + 1;
+        final entries = plannerPageSize == null
+            ? plannerEntries.skip(start).toList()
+            : plannerEntries.skip(start).take(plannerPageSize).toList();
+        final next = plannerPageSize != null &&
+                start + entries.length < plannerEntries.length
+            ? entries.last['id'] as String
+            : null;
+        return http.Response(
+          jsonEncode({'entries': entries, 'next': next}),
+          200,
+        );
       }
       if (request.url.path == '/v1/sync/bootstrap') {
         final after = request.url.queryParameters['after'];
