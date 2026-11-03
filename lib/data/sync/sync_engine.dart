@@ -1,0 +1,431 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+import 'api_client.dart';
+import 'operation_gateway.dart';
+import 'operation_protocol.dart';
+import 'operation_store.dart';
+
+/// Applies one remote intent inside the OperationStore SQLite transaction.
+///
+/// [pendingLocal] includes deferred retries. A reducer must merge remote
+/// fields into the current projection and rebase those intents, rather than
+/// installing a complete server snapshot over optimistic local edits.
+typedef RemoteOperationReducer = Future<void> Function(
+  OperationEnvelope remote,
+  List<OperationEnvelope> pendingLocal,
+);
+
+/// The opt-in v2 journal driver. A migrated namespace must own one instance.
+///
+/// Legacy v1 snapshot writers must not run for documents driven by this
+/// engine. Enabling the engine for existing v1 accounts requires stage 11.
+class SyncEngine extends ChangeNotifier {
+  SyncEngine({
+    required this.store,
+    required this.gateway,
+    required this.actorId,
+    required this.checkpointScope,
+    required this.applyRemote,
+    this.apiClient,
+    this.enableRealtime = true,
+    this.pollInterval = const Duration(seconds: 45),
+  }) {
+    if (actorId.isEmpty || checkpointScope.isEmpty) {
+      throw ArgumentError('An actor and isolated checkpoint are required.');
+    }
+  }
+
+  static const maxBatchSize = 50;
+  static const maxConcurrentActors = 3;
+  static const maxPagesPerPass = 100;
+
+  final OperationStore store;
+  final OperationGateway gateway;
+  final String actorId;
+  final String checkpointScope;
+  final RemoteOperationReducer applyRemote;
+  final ApiClient? apiClient;
+  final bool enableRealtime;
+  final Duration pollInterval;
+
+  bool _started = false;
+  bool _disposed = false;
+  bool _requested = false;
+  int _generation = 0;
+  int _failures = 0;
+  final Map<String, int> _actorFailures = {};
+  Future<void>? _active;
+  Timer? _poll;
+  Timer? _debounce;
+  Timer? _retry;
+  Timer? _socketRetry;
+  WebSocketChannel? _socket;
+  StreamSubscription<dynamic>? _socketSubscription;
+
+  String? lastError;
+  DateTime? lastSuccessfulSync;
+
+  bool get isStarted => _started;
+
+  /// Writes the projection and outbox in one transaction before scheduling IO.
+  Future<OperationEnvelope> writeLocal({
+    required String documentId,
+    required OperationKind kind,
+    required Map<String, dynamic> payload,
+    required Future<void> Function(OperationEnvelope) apply,
+    String? pageId,
+    String? objectId,
+    String? revertsOperationId,
+    List<String> dependencies = const [],
+  }) async {
+    final operation = await store.writeLocal(
+      actorId: actorId,
+      documentId: documentId,
+      kind: kind,
+      payload: payload,
+      apply: apply,
+      pageId: pageId,
+      objectId: objectId,
+      revertsOperationId: revertsOperationId,
+      dependencies: dependencies,
+    );
+    requestSync();
+    return operation;
+  }
+
+  Future<void> start() async {
+    if (_disposed) {
+      throw StateError('A disposed sync engine cannot restart.');
+    }
+    if (_started) {
+      return syncNow();
+    }
+    _started = true;
+    final generation = ++_generation;
+    _poll = Timer.periodic(pollInterval, (_) => requestSync());
+    if (enableRealtime && apiClient != null) {
+      unawaited(_connectSocket(generation));
+    }
+    await syncNow();
+  }
+
+  Future<void> stop() async {
+    _started = false;
+    ++_generation;
+    _requested = false;
+    _poll?.cancel();
+    _debounce?.cancel();
+    _retry?.cancel();
+    _socketRetry?.cancel();
+    _poll = null;
+    _debounce = null;
+    _retry = null;
+    _socketRetry = null;
+    final subscription = _socketSubscription;
+    _socketSubscription = null;
+    await subscription?.cancel();
+    final socket = _socket;
+    _socket = null;
+    await socket?.sink.close();
+    await _active;
+  }
+
+  void requestSync() {
+    if (!_started || _disposed) {
+      return;
+    }
+    _requested = true;
+    if (_active != null || _debounce?.isActive == true) {
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 40), () {
+      _debounce = null;
+      unawaited(syncNow());
+    });
+  }
+
+  /// Concurrent callers share one bounded, serial synchronization pass.
+  Future<void> syncNow() {
+    if (!_started || _disposed) {
+      return Future<void>.value();
+    }
+    _requested = true;
+    final current = _active;
+    if (current != null) {
+      return current;
+    }
+    final future = _drain(_generation);
+    _active = future;
+    return future.whenComplete(() {
+      if (identical(_active, future)) {
+        _active = null;
+      }
+      if (_requested && _started) {
+        requestSync();
+      }
+    });
+  }
+
+  bool _isActive(int generation) =>
+      _started && !_disposed && _generation == generation;
+
+  Future<void> _drain(int generation) async {
+    while (_isActive(generation) && _requested) {
+      _requested = false;
+      try {
+        await _pull(generation);
+        if (!_isActive(generation)) {
+          return;
+        }
+        await _push(generation);
+        if (!_isActive(generation)) {
+          return;
+        }
+        await _pull(generation);
+        if (!_isActive(generation)) {
+          return;
+        }
+        _failures = 0;
+        lastSuccessfulSync = DateTime.now().toUtc();
+        notifyListeners();
+      } catch (error) {
+        if (!_isActive(generation)) {
+          return;
+        }
+        lastError = error.toString();
+        notifyListeners();
+        _failures++;
+        _scheduleRetry(_backoff(_failures));
+        break;
+      }
+    }
+  }
+
+  /// Do not advance the durable global cursor past an unapplied operation.
+  /// Other independent operations in the same page can still be committed:
+  /// replay after a crash or gap is idempotent.
+  Future<void> _pull(int generation) async {
+    var cursor = await store.checkpoint(checkpointScope);
+    for (var pageNumber = 0; pageNumber < maxPagesPerPass; pageNumber++) {
+      final page = await gateway.readAfter(cursor);
+      if (!_isActive(generation)) {
+        return;
+      }
+      var contiguous = cursor;
+      Object? blocked;
+      var gap = false;
+      for (final item in page.operations) {
+        try {
+          final queuedEcho = await store.isPending(item.operation.operationId);
+          await store.applyRemote(
+            item.operation,
+            serverSequence: item.cursor,
+            apply: () async {
+              // No replacement of the whole document or optimistic edits.
+              final pending = await store.pending(
+                documentId: item.operation.documentId,
+                limit: 1000,
+                includeDeferred: true,
+              );
+              await applyRemote(item.operation, pending);
+            },
+          );
+          if (!_isActive(generation)) {
+            return;
+          }
+          if (queuedEcho) {
+            await store.acknowledge(
+              item.operation.operationId,
+              serverSequence: item.cursor,
+            );
+          }
+          if (!gap) {
+            contiguous = item.cursor;
+          }
+        } catch (error) {
+          blocked ??= error;
+          gap = true;
+        }
+      }
+      if (!_isActive(generation)) {
+        return;
+      }
+      if (contiguous > cursor) {
+        await store.advanceCheckpoint(checkpointScope, contiguous);
+        cursor = contiguous;
+      }
+      if (blocked != null) {
+        throw StateError('Operation feed has an unresolved gap: $blocked');
+      }
+      if (!page.hasMore) {
+        return;
+      }
+    }
+    // Keep processing long feeds without monopolizing the UI event loop.
+    _requested = true;
+  }
+
+  Future<void> _push(int generation) async {
+    final ready = await store.pending(limit: 1000);
+    if (!_isActive(generation) || ready.isEmpty) {
+      return;
+    }
+    final groups = <String, List<OperationEnvelope>>{};
+    for (final operation in ready) {
+      final group = groups.putIfAbsent(operation.actorId, () => []);
+      if (group.length < maxBatchSize) {
+        group.add(operation);
+      }
+    }
+    final selected = groups.entries.take(maxConcurrentActors).toList();
+    await Future.wait([
+      for (final group in selected)
+        _sendActor(generation, group.key, group.value),
+    ]);
+    if (groups.length > selected.length ||
+        ready.length >= maxBatchSize * selected.length) {
+      // Another pass can flush the remaining batches once the first ACKs
+      // are durable; deferred actors are filtered in OperationStore.
+      _requested = true;
+    }
+  }
+
+  Future<void> _sendActor(
+    int generation,
+    String actor,
+    List<OperationEnvelope> batch,
+  ) async {
+    try {
+      final receipts = await gateway.send(batch);
+      if (!_isActive(generation)) {
+        return;
+      }
+      final expected = batch.map((operation) => operation.operationId).toSet();
+      final received = receipts.map((receipt) => receipt.operationId).toSet();
+      if (received.length != receipts.length ||
+          !setEquals(expected, received) ||
+          receipts.any((receipt) => receipt.cursor <= 0)) {
+        throw const FormatException('Incomplete or invalid server ACK.');
+      }
+      for (final receipt in receipts) {
+        if (!_isActive(generation)) {
+          return;
+        }
+        await store.acknowledge(
+          receipt.operationId,
+          serverSequence: receipt.cursor,
+        );
+      }
+      _actorFailures.remove(actor);
+    } catch (error) {
+      if (!_isActive(generation)) {
+        return;
+      }
+      lastError = error.toString();
+      notifyListeners();
+      final failures = (_actorFailures[actor] ?? 0) + 1;
+      _actorFailures[actor] = failures;
+      final permanent = error is ApiException &&
+          (error.statusCode == 403 || error.statusCode == 422);
+      final delay = permanent
+          ? const Duration(minutes: 5)
+          : _backoff(failures);
+      // Delaying the first unacknowledged sequence also blocks later
+      // sequences of that actor, not unrelated actors.
+      await store.scheduleRetry(batch.first.operationId, delay: delay);
+      _scheduleRetry(delay);
+    }
+  }
+
+  Duration _backoff(int failures) {
+    final seconds = min(60, 1 << min(failures - 1, 6));
+    return Duration(milliseconds: seconds * 1000 + Random().nextInt(350));
+  }
+
+  void _scheduleRetry(Duration delay) {
+    if (!_started || _retry?.isActive == true) {
+      return;
+    }
+    _retry = Timer(delay, () {
+      _retry = null;
+      requestSync();
+    });
+  }
+
+  Future<void> _connectSocket(int generation) async {
+    if (!_isActive(generation) || _socket != null) {
+      return;
+    }
+    final api = apiClient;
+    final token = api?.accessToken;
+    if (api == null || token == null || token.isEmpty) {
+      return;
+    }
+    final uri = api.resolve('/v2/realtime').replace(
+      scheme: api.baseUri.scheme == 'https' ? 'wss' : 'ws',
+    );
+    final socket = WebSocketChannel.connect(uri);
+    _socket = socket;
+    _socketSubscription = socket.stream.listen(
+      (event) {
+        try {
+          final message = jsonDecode(event as String);
+          if (message is Map && message['type'] == 'operations_changed') {
+            requestSync();
+          }
+        } catch (_) {
+          // A malformed hint cannot advance a cursor or mutate a document.
+        }
+      },
+      onError: (_) => _socketDisconnected(generation, socket),
+      onDone: () => _socketDisconnected(generation, socket),
+      cancelOnError: true,
+    );
+    try {
+      await socket.ready.timeout(const Duration(seconds: 10));
+      if (_isActive(generation) && identical(_socket, socket)) {
+        socket.sink.add(jsonEncode({
+          'type': 'authenticate',
+          'token': token,
+        }));
+        // A missed hint while disconnected is recovered by REST.
+        requestSync();
+      }
+    } catch (_) {
+      _socketDisconnected(generation, socket);
+    }
+  }
+
+  void _socketDisconnected(int generation, WebSocketChannel socket) {
+    if (!identical(_socket, socket)) {
+      return;
+    }
+    _socket = null;
+    _socketSubscription = null;
+    unawaited(socket.sink.close());
+    if (!_isActive(generation)) {
+      return;
+    }
+    requestSync();
+    _socketRetry?.cancel();
+    _socketRetry = Timer(const Duration(seconds: 5), () {
+      _socketRetry = null;
+      unawaited(_connectSocket(generation));
+    });
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) {
+      return;
+    }
+    unawaited(stop());
+    _disposed = true;
+    super.dispose();
+  }
+}
