@@ -445,9 +445,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   WebSocket hints, najwcześniejszy retry, generation token na stop,
   odświeżenie sesji i rebase przez callback. Błąd pull nie blokuje push.
   Pakiet 409/413/422 próbuje bezpiecznego prefiksu, bez pomijania actorSeq.
+  `onRemoteCommitted` powiadamia UI dopiero po commit SQLite i przed
+  przesunięciem kursora; błędny patch jest ponawiany, a ACK własnego
+  aktora nie odmalowuje widoku. `lastError` znika po sukcesie.
   Nie podłączać do UID v1 przed etapem 11.
 - `lib/data/sync/operation_store.dart`: `pending(includeDeferred)`,
-  `isPending`, `advanceCheckpoint`; strzeże actorSeq także przy
+  `isPending`, `isLocalOperation`, `advanceCheckpoint`; strzeże actorSeq także przy
   retry, lokalne operacje zależą od trwałych zdalnych frontierów,
   a zaakceptowane przez serwer opóźnione edycje usuniętego UID
   pozostają w dzienniku jako no-op.
@@ -483,12 +486,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   (odrębny od bazy v1, konta i pozostałych gości).
 - `lib/features/editor/state/editor_controller.dart`:
   `applyConfirmedShareObjectPatch` aplikuje jeden już utrwalony obiekt
-  bez podmiany kontrolera, historii widoku lub innych stron.
+  bez podmiany kontrolera, historii widoku lub innych stron; aktualizacja
+  koloru/geometrii ink nie zmienia z-order, jawny `sortIndex` go zmienia.
 - Regresje: `test/operation_text_sequence_test.dart`,
   `test/share_operation_projection_test.dart`,
   `test/share_operation_guest_database_test.dart` (Chrome),
   `test/share_editor_object_patch_test.dart`; serwer:
-  `api/tests/test_text_sequence.py`.
+  `api/tests/test_text_sequence.py`,
+  `api/tests/test_operations_share_auth.py` (wygaśnięcie v2 Share).
 - `docs/ETAP_6_SHARE_OPERATIONS.md`: stan wdrożenia i scenariusze E2E.
   **Nie podłączono jeszcze do legacy hosta/gościa.** `StudyShareGuestEditor`
   i `LiveWebSyncService` pozostają w v1 do migracji UID (etap 11);
