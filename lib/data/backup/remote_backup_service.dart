@@ -326,13 +326,33 @@ class RemoteBackupService {
     }
     changed =
         await _mergeLibraryState(recoveredLibrary, recoveredUids) || changed;
-    changed =
-        await _restoreAccountFile(
-          'study_planner.json',
-          payload['studyPlannerState'],
-          allowEmptyPlanner: true,
-        ) ||
-        changed;
+    // A verified backup is historical recovery data, not a live account
+    // revision. Even a backup verified later may contain an older planner.
+    // Consult the authoritative per-entry feed (including tombstones) before
+    // attempting to seed a genuinely empty planner from a legacy snapshot.
+    final recoveredPlanner = payload['studyPlannerState'];
+    if (recoveredPlanner is Map<String, dynamic> &&
+        ((recoveredPlanner['sessions'] is List &&
+                (recoveredPlanner['sessions'] as List).isNotEmpty) ||
+            (recoveredPlanner['tombstones'] is Map &&
+                (recoveredPlanner['tombstones'] as Map).isNotEmpty))) {
+      final remotePlanner = _jsonObject(
+        (await apiClient.get('/v1/planner/entries')).decodeJson(),
+      );
+      final remoteEntries = remotePlanner['entries'];
+      if (remoteEntries is! List) {
+        throw const FormatException('Invalid account planner recovery feed.');
+      }
+      if (remoteEntries.isEmpty) {
+        changed =
+            await _restoreAccountFile(
+              'study_planner.json',
+              recoveredPlanner,
+              allowEmptyPlanner: true,
+            ) ||
+            changed;
+      }
+    }
     changed =
         await _restoreAccountFile(
           'app_prefs.json',
@@ -568,7 +588,9 @@ class RemoteBackupService {
         if (allowEmptyPlanner &&
             (previous is! Map ||
                 previous['sessions'] is! List ||
-                (previous['sessions'] as List).isNotEmpty)) {
+                (previous['sessions'] as List).isNotEmpty ||
+                (previous['tombstones'] is Map &&
+                    (previous['tombstones'] as Map).isNotEmpty))) {
           return false;
         }
       } catch (_) {
