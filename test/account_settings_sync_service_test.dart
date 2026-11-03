@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -108,12 +109,30 @@ void main() {
   test(
     'an edit during library upload remains local and syncs next pass',
     () async {
+      final suffix = sha256
+          .convert(utf8.encode('account-a'))
+          .toString()
+          .substring(0, 16);
       final files = <String, String>{
         'library_folders.json': jsonEncode({
           'folders': ['Local'],
           'covers': {},
           'plannerTasks': {},
           'recentCoverColors': [],
+        }),
+        'account_settings_cursor_$suffix.json': jsonEncode({
+          'version': 1,
+          'settings': {
+            'libraryState': {
+              'revision': 0,
+              'value': {
+                'folders': <String>[],
+                'covers': {},
+                'plannerTasks': {},
+                'recentCoverColors': <int>[],
+              },
+            },
+          },
         }),
       };
       textStorageReadOverride = (key) async => files[key];
@@ -186,6 +205,63 @@ void main() {
       expect(remoteValue['folders'], ['During upload', 'Local', 'Remote']);
     },
   );
+
+  test('existing account deletion beats an unbound local folder', () async {
+    final files = <String, String>{
+      'library_folders.json': jsonEncode({
+        'folders': ['Already deleted'],
+        'covers': {'Already deleted': {'color': 7}},
+        'plannerTasks': {},
+        'recentCoverColors': <int>[],
+      }),
+    };
+    textStorageReadOverride = (key) async => files[key];
+    textStorageWriteOverride = (key, value) async => files[key] = value;
+    var uploads = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.method == 'PUT') {
+          uploads++;
+          fail('An old local folder must not be uploaded.');
+        }
+        return http.Response(
+          jsonEncode({
+            'settings': {
+              'libraryState': {
+                'revision': 7,
+                'value': {
+                  'folders': <String>[],
+                  'covers': {},
+                  'plannerTasks': {},
+                  'recentCoverColors': <int>[],
+                },
+              },
+            },
+          }),
+          200,
+        );
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-a';
+    addTearDown(session.dispose);
+    final sync = AccountSettingsSyncService(
+      apiClient: client,
+      session: session,
+    );
+
+    await sync.syncNow();
+    expect(uploads, 0);
+    expect(
+      (jsonDecode(files['library_folders.json']!) as Map)['folders'],
+      isEmpty,
+    );
+    expect(files.keys.any((key) => key.startsWith('account_preimport_')),
+        isTrue);
+  });
 
   test('expired access token is refreshed without signing out', () async {
     textStorageReadOverride = (_) async => null;

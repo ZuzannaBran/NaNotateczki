@@ -186,7 +186,7 @@ Map<String, dynamic> _mergeTaskGroups(
   return merged;
 }
 
- 
+
 /// Restores only metadata belonging to documents actually recovered.
 ///
 /// A verified device backup is historical, not an authority to resurrect

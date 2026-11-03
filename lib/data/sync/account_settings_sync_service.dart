@@ -208,11 +208,19 @@ class AccountSettingsSyncService {
       }
       final revision = currentRemote?['revision'] as int? ?? 0;
       final remoteValue = currentRemote?['value'];
-      final desired = mergeAccountLibraryState(
-        base: known?['value'],
-        local: local,
-        remote: remoteValue,
-      );
+      // An account with an existing server revision must be authoritative
+      // on the first synchronization of this device. In particular, a
+      // historical local folder must not recreate a server-side deletion.
+      // Explicit Local -> Account import is handled separately.
+      final desired = known == null &&
+              currentRemote != null &&
+              remoteValue is Map<String, dynamic>
+          ? Map<String, dynamic>.from(remoteValue)
+          : mergeAccountLibraryState(
+              base: known?['value'],
+              local: local,
+              remote: remoteValue,
+            );
       final shouldUpload =
           local != null &&
           (currentRemote == null || !_equivalent(desired, remoteValue));
