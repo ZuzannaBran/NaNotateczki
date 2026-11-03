@@ -224,6 +224,34 @@ void main() {
     expect(projection.fieldsFor(first)?['color'], 'red');
   });
 
+  test('causal cycle is rejected before either operation can apply', () {
+    final queue = CausalOperationBuffer();
+    expect(
+      queue.ingest(op(
+        id: a1, actor: 'A', sequence: 1, clock: 2,
+        dependencies: [b1],
+      )),
+      isEmpty,
+    );
+    expect(
+      () => queue.ingest(op(
+        id: b1, actor: 'B', sequence: 1, clock: 2,
+        dependencies: [a1],
+      )),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(queue.pendingCount, 1);
+  });
+
+  test('actor cannot omit its immediately previous operation dependency', () {
+    final queue = CausalOperationBuffer();
+    queue.ingest(op(id: a1, actor: 'A', sequence: 1, clock: 1));
+    expect(
+      () => queue.ingest(op(id: a2, actor: 'A', sequence: 2, clock: 2)),
+      throwsA(isA<OperationOrderException>()),
+    );
+  });
+
   test('queue capacity and checkpoint reject invalid replays', () {
     final queue = CausalOperationBuffer(
       initialActorSequences: {'A': 2},
