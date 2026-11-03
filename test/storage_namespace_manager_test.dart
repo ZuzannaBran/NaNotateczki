@@ -16,7 +16,7 @@ void main() {
     expect(a.nativeDatabaseName, isNot(local.nativeDatabaseName));
     expect(a.webDatabaseName, isNot(b.webDatabaseName));
     expect(a.imageDirectory, isNot(b.imageDirectory));
-    expect(a.fileKey('../account_profile.json'), throwsArgumentError);
+    expect(() => a.fileKey('../account_profile.json'), throwsArgumentError);
     expect(() => StorageNamespace.account(''), throwsArgumentError);
   });
 
