@@ -49,7 +49,8 @@ void main() {
     for (final kind in OperationKind.values) {
       final op = operation(
         kind: kind,
-        documentId: kind.target == OperationTarget.folder
+        documentId: kind.target == OperationTarget.folder ||
+                kind.target == OperationTarget.task
             ? OperationEnvelope.libraryDocumentId
             : 'document-1',
         pageId: kind.target == OperationTarget.object ? 'page-1' : null,
