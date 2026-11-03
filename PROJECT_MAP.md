@@ -474,7 +474,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `api/app/operation_projection.py` repo NaNotateczki-serwer.
 - `lib/features/share/presentation/study_share_memory_db_web.dart`:
   `openSharedGuestOperationDatabase(shareId)` otwiera trwały, izolowany
-  per zaproszenie SQLite WASM w IndexedDB (odrębny od bazy v1 i konta).
+  per parę shareId + guestActorId SQLite WASM w IndexedDB
+  (odrębny od bazy v1, konta i pozostałych gości).
 - `lib/features/editor/state/editor_controller.dart`:
   `applyConfirmedShareObjectPatch` aplikuje jeden już utrwalony obiekt
   bez podmiany kontrolera, historii widoku lub innych stron.
