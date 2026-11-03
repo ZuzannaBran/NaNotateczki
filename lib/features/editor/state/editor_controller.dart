@@ -200,6 +200,9 @@ class EditorController extends ChangeNotifier {
   bool get canApplyConfirmedRemoteNotebook =>
       !_isDisposed &&
       !_hasPendingSaveWork &&
+      !repository.hasPendingSaves &&
+      activeTextBlockId == null &&
+      !_isObjectTransformActive &&
       !InkActivityTracker.instance.hasActiveContacts;
 
   /// Updates confirmed document content without changing local navigation.
