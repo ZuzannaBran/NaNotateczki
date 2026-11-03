@@ -206,7 +206,9 @@ class ApiClient {
 
   // Diagnostic uploads must never report their own failures recursively.
   bool _shouldRecordFailure(String path) =>
-      path != '/v1/reports/diagnostics' && path != '/health';
+      path != '/v1/reports/diagnostics' &&
+      path != '/v1/time' &&
+      path != '/health';
 
   void _recordServerFailure(String method, String path, int statusCode) {
     if (!_shouldRecordFailure(path)) {
