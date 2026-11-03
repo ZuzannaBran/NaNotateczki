@@ -53,6 +53,8 @@ cd NaNotateczki-serwer
 bash scripts/run-stage12-real.sh
 # Krótsza weryfikacja bez 2000 operacji:
 bash scripts/run-stage12-real.sh --quick
+# Pełny test dwóch klientów Flutter przez rzeczywiste API/WS/SQL:
+NN_STAGE12_FLUTTER_ROOT=../NaNotateczki bash scripts/run-stage12-real.sh
 ```
 
 Wymagane: Docker Compose v2, Python 3 z `venv`, dostęp do pakietów
