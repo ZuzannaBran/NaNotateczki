@@ -243,9 +243,9 @@ Po migracji katalogu aktualizuje w SQLite prefiks trwałych ścieżek obrazów.
   110: `DatabaseOpenException`; 143: `NotesDatabase`.
 - 152: `NotesDatabase.open` (opcjonalna publiczna nazwa osobnej bazy);
   304: relokacja ścieżek obrazów; 318: kontrola integralności;
-  346: `_createOperationSchema`; 353: `schemaVersion` (`3`);
+  346: `_createOperationSchema`; 353: `schemaVersion` (`5`);
   356: `migration` — zachowuje migrację v1→v2 i dodaje tabele operacji
-  w migracji v2→v3, bez kasowania notatników.
+  w migracji v2→v3, zachowuje tombstones v4 i status blocked v5.
 
 - `lib/data/drift/operation_schema.dart`: addytywne tabele surowego SQL
   dla operacji, outboxu, ACK, tombstones, checkpointów, snapshotów,

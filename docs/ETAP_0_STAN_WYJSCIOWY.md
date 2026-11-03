@@ -70,3 +70,12 @@ miganiem i utratą niezależnych edycji za potwierdzoną.
 4. Dane kont i Local nie mają jeszcze osobnych baz (opis w `data.md`).
 5. Przenoszenia zmian podczas gestu, offline, crashu i reconnect
    wymagają testów rzeczywistych urządzeń, nie tylko mocków.
+
+
+
+## Audyt spójności granicy 0–4 (3 listopada 2026)
+
+Kontrakt starych snapshotów v1 nie dopuszcza automatycznego wskrzeszania
+usuniętych UID: legacy `restoreDeleted` jest ignorowane. Wcześniejszy
+opis odzyskiwania w `data.md` był sprzeczny z tym wymaganiem i został
+uzgodniony bez zmiany kodu produkcyjnej synchronizacji.

@@ -536,14 +536,14 @@ miejscem na końcowe HTTP; przy detached i Web hidden jest tylko
 best-effort flush, potem retry przy następnym uruchomieniu.
 
 Tombstone pozostaje autorytatywny wobec starego backupu i urządzenia bez
-niepotwierdzonych edycji. Jeśli drugie urządzenie posiada oczekującą
-rzeczywistą zmianę, po otrzymaniu tombstone wykonuje jawny retry
-`restoreDeleted` z aktualną rewizją CAS. Po zaakceptowaniu przez serwer
-przywrócony zostaje oryginalny UID i folder dla wszystkich urządzeń,
-bez kopii `(1)`. Zwykłe odtworzenie backupu nie wysyła tego znacznika.
-Kolejność przyjęcia na serwerze, nie arbitralny czas backupu, rozstrzyga
-konkurujące operacje. Wspólna sesja udostępniania zakończona przez
-usunięcie nie jest automatycznie przywracana wraz z dokumentem.
+potwierdzonej nowszej tożsamości. Historyczna flaga `restoreDeleted` jest
+ignorowana przez serwer i nie upoważnia do przywrócenia skasowanego UID.
+Rzeczywista, niepotwierdzona edycja drugiego urządzenia musi pozostać
+zachowana lokalnie do jawnego rozstrzygnięcia; nie wolno jej bezgłośnie
+skasować ani użyć starego backupu do odtworzenia oryginalnego UID.
+Dopiero świadome utworzenie nowej tożsamości może prowadzić do nowego
+dokumentu. Wspólna sesja udostępniania zakończona przez usunięcie
+nie jest automatycznie przywracana.
 
 ### Ochrona usunięć przed archiwalnym backupem
 
