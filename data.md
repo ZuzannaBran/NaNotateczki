@@ -460,9 +460,11 @@ Ważna jest chwila lokalnej edycji i przyczynowa rewizja danych, nie czas
 zweryfikowania ani wysłania snapshotu backupu. Backup jest archiwum
 awaryjnym, a nie operacją edycji wpisów konta. Po restarcie urządzenia
 live-sync na serwerze wraz z tombstones jest autorytatywny. Podczas
-odzyskiwania starego `study_planner.json` backup może wypełnić wyłącznie
-pusty lokalny planer, jeśli na serwerze nie istnieje żaden wpis (również
-usunięty) i lokalnie nie zapisano żadnego tombstone.
+odzyskiwania starego `study_planner.json` backup może dołączyć jedynie
+wpisy o identyfikatorach nieobecnych zarówno w bieżącym planie lokalnym,
+jak i w pełnym stronicowanym feedzie planera na serwerze (w tym tombstones).
+Nie zastępuje lokalnych edycji ani usunięć i zachowuje niezależne wpisy
+z backupu.
 W żadnym razie nie wolno ustalać pierwszeństwa poprzez `verifiedAt`.
 Dla dwóch niepowiązanych edycji offline same zegary UTC nadal nie
 gwarantują deterministycznej kolejności; wymagany jest protokół CAS
