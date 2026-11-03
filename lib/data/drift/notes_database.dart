@@ -351,7 +351,7 @@ class NotesDatabase extends _$NotesDatabase {
   }
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -366,6 +366,10 @@ class NotesDatabase extends _$NotesDatabase {
       }
       if (from < 3 && to >= 3) {
         await _createOperationSchema();
+      } else if (from == 3 && to >= 4) {
+        for (final statement in operationTombstoneV4Migration) {
+          await customStatement(statement);
+        }
       }
     },
     beforeOpen: (details) async {

@@ -308,18 +308,33 @@ class OperationStore {
       OperationTarget.object => (kind: 'object', id: entry.objectId!),
       OperationTarget.folder => (kind: 'folder', id: entry.objectId!),
     };
-    return isTombstoned(document, target.kind, target.id);
+    return isTombstoned(
+      document,
+      target.kind,
+      target.id,
+      pageId: target.kind == 'object' ? entry.pageId : null,
+    );
   }
 
   Future<bool> isTombstoned(
     String documentId,
     String targetKind,
-    String objectId,
-  ) async {
+    String objectId, {
+    String? pageId,
+  }) async {
+    if (targetKind == 'object' && (pageId == null || pageId.isEmpty)) {
+      throw ArgumentError('Object tombstones require a page ID.');
+    }
     return await _row(
       'SELECT operation_id FROM object_tombstones '
-      'WHERE document_id = ? AND target_kind = ? AND object_id = ?',
-      [documentId, targetKind, objectId],
+      'WHERE document_id = ? AND target_kind = ? '
+      'AND page_id = ? AND object_id = ?',
+      [
+        documentId,
+        targetKind,
+        targetKind == 'object' ? pageId! : '',
+        objectId,
+      ],
     ) != null;
   }
 
@@ -336,11 +351,12 @@ class OperationStore {
     }
     await database.customStatement(
       'INSERT INTO object_tombstones '
-      '(document_id, target_kind, object_id, operation_id) '
-      'VALUES (?, ?, ?, ?)',
+      '(document_id, target_kind, page_id, object_id, operation_id) '
+      'VALUES (?, ?, ?, ?, ?)',
       [
         entry.documentId,
         targetKind,
+        targetKind == 'object' ? entry.pageId! : '',
         targetKind == 'document' ? entry.documentId : entry.objectId!,
         entry.operationId,
       ],

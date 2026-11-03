@@ -252,11 +252,50 @@ void main() {
         'document-one',
         'object',
         'deleted-object',
+        pageId: 'page-one',
       ),
       isTrue,
     );
     await expectLater(add('deleted-object'), throwsStateError);
     expect((await add('new-identity')).actorSeq, 3);
+  });
+
+  test('a tombstone on page one does not delete the same ID on page two',
+      () async {
+    final first = await add('same-id');
+    await store.writeLocal(
+      actorId: 'device-one',
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'same-id',
+      kind: OperationKind.objectDelete,
+      payload: const {},
+      apply: (_) async {},
+    );
+    expect(
+      await store.isTombstoned(
+        'document-one', 'object', 'same-id', pageId: 'page-one',
+      ),
+      isTrue,
+    );
+    expect(
+      await store.isTombstoned(
+        'document-one', 'object', 'same-id', pageId: 'page-two',
+      ),
+      isFalse,
+    );
+    final anotherPage = await store.writeLocal(
+      actorId: 'device-one',
+      documentId: 'document-one',
+      pageId: 'page-two',
+      objectId: 'same-id',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'name': 'on another page'},
+      },
+      apply: (_) async {},
+    );
+    expect(anotherPage.dependencies, contains(first.operationId));
   });
 
   test('outbox pagination returns every pending intent in actor order',
@@ -373,7 +412,64 @@ void main() {
     expect(await store.pending(), hasLength(20));
   });
 
-  test('v2 upgrades to v3 preserving legacy notebooks', () async {
+  test('v3 upgrades tombstones without losing the deleted page ID',
+      () async {
+    final directory = await Directory.systemTemp.createTemp('notes-v3-v4-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/notes.sqlite');
+    final initial = NotesDatabase(NativeDatabase(file));
+    final initialStore = OperationStore(initial);
+    await initialStore.writeLocal(
+      actorId: 'legacy-actor',
+      documentId: 'legacy-document',
+      pageId: 'original-page',
+      objectId: 'old-object',
+      kind: OperationKind.objectDelete,
+      payload: const {},
+      apply: (_) async {},
+    );
+    await initial.close();
+
+    final raw = sqlite.sqlite3.open(file.path);
+    try {
+      raw.execute('DROP TABLE object_tombstones');
+      raw.execute('CREATE TABLE object_tombstones ('
+          'document_id TEXT NOT NULL, target_kind TEXT NOT NULL, '
+          'object_id TEXT NOT NULL, operation_id TEXT NOT NULL, '
+          'PRIMARY KEY(document_id, target_kind, object_id))');
+      raw.execute("INSERT INTO object_tombstones "
+          "(document_id, target_kind, object_id, operation_id) "
+          "SELECT document_id, 'object', object_id, operation_id "
+          "FROM operations WHERE kind = 'object.delete'");
+      raw.execute('PRAGMA user_version = 3');
+    } finally {
+      raw.dispose();
+    }
+
+    final upgraded = NotesDatabase(NativeDatabase(file));
+    try {
+      final updatedStore = OperationStore(upgraded);
+      expect(
+        await updatedStore.isTombstoned(
+          'legacy-document', 'object', 'old-object',
+          pageId: 'original-page',
+        ),
+        isTrue,
+      );
+      expect(
+        await updatedStore.isTombstoned(
+          'legacy-document', 'object', 'old-object',
+          pageId: 'other-page',
+        ),
+        isFalse,
+      );
+      expect(upgraded.schemaVersion, 4);
+    } finally {
+      await upgraded.close();
+    }
+  });
+
+  test('v2 upgrades to v4 preserving legacy notebooks', () async {
     final folder = await Directory.systemTemp.createTemp('notes-drift-v3-');
     addTearDown(() => folder.delete(recursive: true));
     final file = File('${folder.path}/notes.sqlite');
@@ -419,7 +515,7 @@ void main() {
         "WHERE type = 'table' AND name = 'operations'",
       ).getSingle();
       expect(operations.read<String>('name'), 'operations');
-      expect(upgraded.schemaVersion, 3);
+      expect(upgraded.schemaVersion, 4);
     } finally {
       await upgraded.close();
     }

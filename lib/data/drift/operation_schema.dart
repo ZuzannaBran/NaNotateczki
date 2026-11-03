@@ -51,10 +51,11 @@ const operationSchemaStatements = <String>[
     document_id TEXT NOT NULL,
     target_kind TEXT NOT NULL
       CHECK(target_kind IN ('document', 'page', 'object', 'folder')),
+    page_id TEXT NOT NULL DEFAULT '',
     object_id TEXT NOT NULL,
     operation_id TEXT NOT NULL
       REFERENCES operations(operation_id) ON DELETE RESTRICT,
-    PRIMARY KEY(document_id, target_kind, object_id)
+    PRIMARY KEY(document_id, target_kind, page_id, object_id)
   )
   ''',
   '''
@@ -97,4 +98,33 @@ const operationSchemaStatements = <String>[
     last_operation_id TEXT
   )
   ''',
+];
+
+/// SQLite v3 used only objectId. Rebuild from the durable delete operation to
+/// recover its pageId without discarding a single existing tombstone.
+const operationTombstoneV4Migration = <String>[
+  '''
+  CREATE TABLE object_tombstones_v4 (
+    document_id TEXT NOT NULL,
+    target_kind TEXT NOT NULL
+      CHECK(target_kind IN ('document', 'page', 'object', 'folder')),
+    page_id TEXT NOT NULL DEFAULT '',
+    object_id TEXT NOT NULL,
+    operation_id TEXT NOT NULL
+      REFERENCES operations(operation_id) ON DELETE RESTRICT,
+    PRIMARY KEY(document_id, target_kind, page_id, object_id)
+  )
+  ''',
+  '''
+  INSERT INTO object_tombstones_v4
+    (document_id, target_kind, page_id, object_id, operation_id)
+  SELECT old.document_id, old.target_kind,
+    CASE WHEN old.target_kind = 'object'
+      THEN COALESCE(op.page_id, '') ELSE '' END,
+    old.object_id, old.operation_id
+  FROM object_tombstones old
+  JOIN operations op ON op.operation_id = old.operation_id
+  ''',
+  'DROP TABLE object_tombstones',
+  'ALTER TABLE object_tombstones_v4 RENAME TO object_tombstones',
 ];
