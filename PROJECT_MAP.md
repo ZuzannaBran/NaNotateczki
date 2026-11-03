@@ -390,12 +390,15 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 ### Porządkowanie operacji v1 (etap 2)
 
 - `lib/data/sync/operation_ordering.dart`: `OperationActorClock`
-  (licznik Lamporta, sequence i checkpoint), `CausalOperationBuffer`
-  (kolejka opóźnionych zależności, duplikaty i rozgałęzienia aktora),
-  `OperationPropertyRegister` (deterministyczne reguły pól i tombstones).
-  `test/operation_ordering_test.dart`: różna kolejność dostarczenia,
-  usunięcia, brakujące operacje i konflikt rewizji.
-  Kod nie jest jeszcze wpięty w produkcyjną bazę ani API v1.
+  (Lamport, granice zależności, zapamiętywany frontier zdalnych aktorów),
+  `CausalOperationBuffer` (atomowe zatwierdzanie gotowych operacji,
+  kwarantanna wadliwych zaległych pakietów, duplikaty i rozgałęzienia),
+  `OperationCheckpoint` (pełna historia i odrzucone ID, bez kompaktowania)
+  oraz `OperationPropertyRegister` (reguły pól i tombstones).
+  `test/operation_ordering_test.dart`: kolejność, błędne zależności,
+  wycofanie po błędzie, restart, odrzucone ID, limit zależności.
+  Kod nie jest jeszcze wpięty w produkcyjną bazę Drift; serwerowe API v2
+  jest dostępne od etapu 4, lecz stare klienty nadal używają v1.
 
 ### Nowa synchronizacja serwerowa
 
