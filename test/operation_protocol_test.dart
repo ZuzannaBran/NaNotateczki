@@ -186,9 +186,18 @@ void main() {
   });
 
   test('wire identifier rules reject control characters and long IDs', () {
-    expect(() => operation(objectId: 'bad\\n'.replaceAll('\\n', '\n')), throwsFormatException);
-    expect(() => operation(pageId: 'x' * 129), throwsFormatException);
-    expect(() => operation(documentId: 'bad\\u0000'.replaceAll('\\u0000', '\u0000')), throwsFormatException);
+    expect(
+      () => operation(objectId: 'bad\n'),
+      throwsFormatException,
+    );
+    expect(
+      () => operation(pageId: List.filled(129, 'x').join()),
+      throwsFormatException,
+    );
+    expect(
+      () => operation(documentId: 'bad\u0000'),
+      throwsFormatException,
+    );
   });
 
   test('inverse reference requires its causal dependency', () {
@@ -209,5 +218,4 @@ void main() {
       throwsFormatException,
     );
   });
-
 }

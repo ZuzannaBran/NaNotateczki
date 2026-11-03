@@ -72,9 +72,7 @@ class OperationEnvelope {
     r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   );
 
-  static final RegExp _invalidIdentifierChar = RegExp(
-    r'[\x00-\x1f\x7f]',
-  );
+  static final RegExp _invalidIdentifierChar = RegExp(r'[\x00-\x1f\x7f]');
 
   final String operationId;
   final String actorId;
@@ -146,8 +144,7 @@ class OperationEnvelope {
         (!creating && value.isEmpty)) {
       throw FormatException('Expected exactly one $fieldName object.');
     }
-    if (!creating &&
-        (value.containsKey('id') || value.containsKey('uid'))) {
+    if (!creating && (value.containsKey('id') || value.containsKey('uid'))) {
       throw const FormatException(
         'Stable IDs cannot be changed by property edits.',
       );
