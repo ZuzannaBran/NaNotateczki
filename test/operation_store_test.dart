@@ -124,6 +124,49 @@ void main() {
     expect(local.logicalClock, greaterThan(remote.logicalClock));
   });
 
+  test('undo automatically depends on the reverted operation', () async {
+    final created = await add('undo-object');
+    final undo = await store.writeLocal(
+      actorId: 'device-one',
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'undo-object',
+      kind: OperationKind.objectDelete,
+      payload: const {},
+      revertsOperationId: created.operationId,
+      apply: (_) => database.customStatement(
+        'DELETE FROM projection_probe WHERE id = ?',
+        ['undo-object'],
+      ),
+    );
+    expect(undo.dependencies, contains(created.operationId));
+  });
+
+  test('unrelated remote actor frontiers never leak into dependencies',
+      () async {
+    final remote = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'unrelated-actor',
+      actorSeq: 1,
+      documentId: 'another-document',
+      pageId: 'other-page',
+      objectId: 'other-object',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'name': 'remote'},
+      },
+      dependencies: const [],
+      logicalClock: 4,
+    );
+    await store.applyRemote(
+      remote,
+      serverSequence: 1,
+      apply: () async {},
+    );
+    final local = await add('local-in-this-document');
+    expect(local.dependencies, isNot(contains(remote.operationId)));
+  });
+
   test('stale remote edit after tombstone is logged but not projected',
       () async {
     await add('deleted-earlier');

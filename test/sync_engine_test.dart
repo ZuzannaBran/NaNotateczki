@@ -245,6 +245,27 @@ void main() {
     expect(rows, hasLength(2));
   });
 
+  test('independent documents use distinct actor sequences', () async {
+    final first = await local('first-document');
+    final second = await engine.writeLocal(
+      documentId: 'document-two',
+      pageId: 'page-two',
+      objectId: 'second-document',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'name': 'second-document'},
+      },
+      apply: (_) => database.customStatement(
+        'INSERT INTO projection_probe VALUES (?, ?)',
+        ['second-document', 'local'],
+      ),
+    );
+    expect(first.actorSeq, 1);
+    expect(second.actorSeq, 1);
+    expect(first.actorId, isNot(second.actorId));
+    expect(second.dependencies, isNot(contains(first.operationId)));
+  });
+
   test('deferred predecessor blocks a later actor sequence', () async {
     final first = await local('first');
     final second = await local('second');

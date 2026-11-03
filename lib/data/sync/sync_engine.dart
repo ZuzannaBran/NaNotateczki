@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -100,8 +101,14 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       objectId: objectId,
     );
     envelope.validateForV2Projection();
+    // Actor sequences and causal frontiers are document-scoped. An account
+    // may edit unrelated documents concurrently, and guests cannot fetch
+    // dependencies on private documents belonging to the owner.
+    final scopedActorId = sha256
+        .convert(utf8.encode(jsonEncode([actorId, checkpointScope, documentId])))
+        .toString();
     final operation = await store.writeLocal(
-      actorId: actorId,
+      actorId: scopedActorId,
       documentId: documentId,
       kind: kind,
       payload: payload,

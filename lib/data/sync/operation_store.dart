@@ -112,12 +112,19 @@ class OperationStore {
         // A new local intent observes the durable remote actor frontier.
         // This must be read inside the same transaction as actorSeq.
         final observed = await database.customSelect(
-          'SELECT last_operation_id FROM operation_actor_state '
-          'WHERE actor_id != ? ORDER BY actor_id',
-          variables: [Variable<String>(actorId)],
+          'SELECT actor.last_operation_id FROM operation_actor_state actor '
+          'JOIN operations latest '
+          'ON latest.operation_id = actor.last_operation_id '
+          'WHERE actor.actor_id != ? AND latest.document_id = ? '
+          'ORDER BY actor.actor_id',
+          variables: [
+            Variable<String>(actorId),
+            Variable<String>(documentId),
+          ],
         ).get();
         final causalIds = <String>{
           ...dependencies,
+          if (revertsOperationId != null) revertsOperationId,
           for (final row in observed)
             row.read<String>('last_operation_id'),
           if (previousId != null) previousId,

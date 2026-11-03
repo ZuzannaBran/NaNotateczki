@@ -59,7 +59,10 @@ class OperationActorClock {
   }) {
     final causalIds = <String>{
       ...dependencies,
-      ..._observed.values.map((op) => op.operationId),
+      if (revertsOperationId != null) revertsOperationId,
+      ..._observed.values
+          .where((op) => op.documentId == documentId)
+          .map((op) => op.operationId),
       if (previousOperationId != null) previousOperationId!,
     }.toList()..sort();
     if (causalIds.length > 256 ||
