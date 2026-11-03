@@ -16,7 +16,8 @@ void main() {
     textStorageWriteOverride = null;
   });
 
-  test('v2 planner uses revisions despite clock skew and stores ACKs', () async {
+  test('v2 planner uses revisions despite clock skew and stores ACKs',
+      () async {
     final storage = <String, String>{};
     textStorageReadOverride = (key) async => storage[key];
     textStorageWriteOverride = (key, text) async => storage[key] = text;
