@@ -307,10 +307,10 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         _localMergeBase = null;
       }
       if (rejected) {
-        // The rejected delta still belongs to the visible local document.
-        // Do not mark those strokes/text changes as already acknowledged:
-        // the next edit must not silently discard them during a rebase.
-        _localMergeBase = null;
+        // Keep the last visible baseline. Clearing it would cause the next
+        // upload to interpret unseen accepted guest objects as deletions.
+        // The losing local edit remains in the recovery outbox until the
+        // conflict is resolved.
         _dirty = true;
         if (mounted) {
           setState(() {

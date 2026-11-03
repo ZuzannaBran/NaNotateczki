@@ -115,6 +115,42 @@ void main() {
     expect(ids, hasLength(4));
   });
 
+  test('rejected guest text cannot remove unseen accepted host objects', () {
+    final visibleRejected = note();
+    final nextLocal = note();
+    final accepted = note();
+    (visibleRejected['pages'] as List).single['textBlocks'] = [
+      {'id': 'same-text', 'text': 'losing value'},
+    ];
+    (nextLocal['pages'] as List).single['textBlocks'] = [
+      {'id': 'same-text', 'text': 'losing value'},
+    ];
+    (nextLocal['pages'] as List).single['inkStrokes'].add({
+      'id': 'guest-new',
+      'points': [2],
+    });
+    (accepted['pages'] as List).single['textBlocks'] = [
+      {'id': 'same-text', 'text': 'winning value'},
+    ];
+    (accepted['pages'] as List).single['inkStrokes'].add({
+      'id': 'host-new',
+      'points': [3],
+    });
+
+    final rebased = mergeNotebookChanges(
+      visibleRejected,
+      nextLocal,
+      accepted,
+    )!;
+    final page = (rebased['pages'] as List).single;
+    expect((page['textBlocks'] as List).single['text'], 'winning value');
+    final inkIds = (page['inkStrokes'] as List)
+        .map((stroke) => stroke['id'])
+        .toList();
+    expect(inkIds, containsAll(['old', 'guest-new', 'host-new']));
+    expect(inkIds, hasLength(3));
+  });
+
   test('rebase preserves a deliberate deletion after an acknowledged send', () {
     final sent = note();
     final current = note();
