@@ -12,6 +12,7 @@ Nie uruchamiać jednocześnie `LiveWebSyncService` i `SyncEngine` dla jednego UI
 ## Przygotowane elementy
 
 1. `ShareOperationProjection`: czysty reducer per dokument/strona/obiekt,
+   kopiowanie tylko zmienianej gałęzi (bez pełnej serializacji JSON),
    trwałe tombstones i wersjonowanie osobnych właściwości operacji
    `document.*`, `page.*`, `stroke.create`, `object.*`.
    Nie przesyła pełnego JSON notebooka i nie dotyka stanu widoku.
