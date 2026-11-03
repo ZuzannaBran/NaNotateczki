@@ -515,3 +515,7 @@ bez kopii `(1)`. Zwykłe odtworzenie backupu nie wysyła tego znacznika.
 Kolejność przyjęcia na serwerze, nie arbitralny czas backupu, rozstrzyga
 konkurujące operacje. Wspólna sesja udostępniania zakończona przez
 usunięcie nie jest automatycznie przywracana wraz z dokumentem.
+
+### Ochrona usunięć przed archiwalnym backupem
+
+Przy odzyskiwaniu verified snapshotu nie wolno dołączać całej historycznej listy folderów ani okładek. Dopisywane są tylko ścieżki (z przodkami) dokumentów faktycznie odzyskanych po sprawdzeniu aktualnych tombstones; zadania można przenieść wyłącznie dla ich zmapowanych UID. Wylogowanie i przejście konta do Local wymagają najpierw opróżnienia zapisów, synchronizacji oraz potwierdzenia końcowego backupu, a w razie błędu pozostawiają aktywną sesję i jej kolejkę.

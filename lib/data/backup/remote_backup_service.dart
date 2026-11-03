@@ -11,6 +11,7 @@ import '../../features/notebook/domain/notebook.dart';
 import '../../features/notebook/domain/notebook_kind.dart';
 import '../sync/account_session_controller.dart';
 import '../sync/api_client.dart';
+import '../sync/library_state_merge.dart';
 import '../sync/notebook_conflicts.dart';
 import 'backup_payload_bytes.dart';
 
@@ -325,7 +326,14 @@ class RemoteBackupService {
       }
     }
     changed =
-        await _mergeLibraryState(recoveredLibrary, recoveredUids) || changed;
+        await _mergeLibraryState(
+          recoveredLibrary,
+          recoveredUids,
+          restoredFolderPaths: recoveredNotebooks
+              .where((item) => recoveredUids.containsKey(item.uid))
+              .map((item) => item.folder),
+        ) ||
+        changed;
     // Snapshot verification time is not an edit revision. Only entries
     // unknown to both the live account and this device can be recovered.
     changed =
@@ -461,41 +469,21 @@ class RemoteBackupService {
 
   static Future<bool> _mergeLibraryState(
     Map<String, dynamic> recovered,
-    Map<String, String> recoveredUids,
-  ) async {
-    if (recovered.isEmpty) {
+    Map<String, String> recoveredUids, {
+    required Iterable<String> restoredFolderPaths,
+  }) async {
+    if (recoveredUids.isEmpty) {
       return false;
     }
     final current = _jsonObject(
       _decodeOptionalObject(await readStoredText('library_folders.json')),
     );
-    final merged = <String, dynamic>{...recovered, ...current};
-    for (final field in ['folders', 'recentCoverColors']) {
-      if (recovered[field] is List) {
-        merged[field] = {
-          if (current[field] is List) ...current[field] as List,
-          ...recovered[field] as List,
-        }.toList();
-      }
-    }
-    if (recovered['covers'] is Map) {
-      merged['covers'] = {
-        ...recovered['covers'] as Map,
-        if (current['covers'] is Map) ...current['covers'] as Map,
-      };
-    }
-    final tasks = <String, dynamic>{
-      if (current['plannerTasks'] is Map)
-        ...Map<String, dynamic>.from(current['plannerTasks'] as Map),
-    };
-    for (final entry in recoveredUids.entries) {
-      if (!tasks.containsKey(entry.value)) {
-        tasks[entry.value] = _plannerTasks(recovered, entry.key);
-      }
-    }
-    if (current['plannerTasks'] is Map || recovered['plannerTasks'] is Map) {
-      merged['plannerTasks'] = tasks;
-    }
+    final merged = mergeRecoveredLibraryMetadata(
+      current: current,
+      recovered: recovered,
+      recoveredUids: recoveredUids,
+      restoredFolderPaths: restoredFolderPaths,
+    );
     if (jsonEncode(merged) == jsonEncode(current)) {
       return false;
     }

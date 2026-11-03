@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/error/one_shot_error_notice.dart';
+import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
@@ -891,20 +892,52 @@ class _AccountDialogState extends State<_AccountDialog> {
     }
   }
 
+  /// Keep the account and its local outbox intact until a verified backup.
+  ///
+  /// Never stop live sync before it has published the final editor writes.
+  Future<void> _finishSignedInSession() async {
+    final session = context.read<AccountSessionController>();
+    if (!session.isSignedIn) {
+      return;
+    }
+    final sync = context.read<LiveWebSyncService>();
+    final backup = context.read<RemoteBackupScheduler>();
+    await AppSaveCoordinator.instance.flushPending();
+    if (!sync.isStarted) {
+      await sync.start(InitialSyncPolicy.mergeSafely).timeout(
+        const Duration(seconds: 45),
+      );
+    }
+    await sync.syncNow().timeout(const Duration(seconds: 45));
+    if (sync.hasPendingChanges || sync.lastError != null) {
+      throw StateError(
+        'Changes are still waiting to sync. Stay signed in and retry.',
+      );
+    }
+    if (!backup.isEnabled) {
+      backup.enableForSignedInAccount();
+    }
+    await backup.ensureVerifiedForExit().timeout(
+      const Duration(seconds: 60),
+    );
+    if (backup.hasPendingBackup || backup.lastError != null) {
+      throw StateError(
+        'The final backup is not verified. Stay signed in and retry.',
+      );
+    }
+    await sync.stop();
+    await backup.stop();
+    await session.logout();
+  }
+
   Future<void> _useLocal() async {
     if (_localFormKey.currentState?.validate() != true) {
       return;
     }
     final session = context.read<AccountSessionController>();
-    final sync = context.read<LiveWebSyncService>();
-    final backup = context.read<RemoteBackupScheduler>();
     _startWorking();
     try {
-      if (session.isSignedIn) {
-        await sync.stop();
-        await backup.stop();
-        await session.logout();
-      }
+      await _finishSignedInSession();
       await session.useLocalProfile(_localNameController.text);
       if (!mounted) {
         return;
@@ -924,24 +957,16 @@ class _AccountDialogState extends State<_AccountDialog> {
   Future<void> _logout() async {
     _startWorking();
     final session = context.read<AccountSessionController>();
-    final sync = context.read<LiveWebSyncService>();
-    final backup = context.read<RemoteBackupScheduler>();
     try {
-      await sync.stop();
-      await backup.stop();
-      await session.logout();
-    } catch (failure) {
-      // The server may be offline; local logout must still reach the
-      // welcome screen and must never retain a usable local session.
-      if (session.isSignedIn) {
-        _showFailure(failure);
-        return;
-      }
-      _showFailure(failure);
-    } finally {
-      if (!session.isSignedIn && mounted) {
+      await _finishSignedInSession();
+      if (mounted) {
         _show(_AccountView.landing);
       }
+    } catch (failure) {
+      // A failed backup is a recoverable state, never permission to discard
+      // the active session or its unsent edits.
+      _showFailure(failure);
+    } finally {
       _stopWorking();
     }
   }

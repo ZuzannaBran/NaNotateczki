@@ -295,6 +295,8 @@ Web nadal zapisuje pełny snapshot w `localStorage`.
 - 2407: `BackupSnapshotReport`.
 
 ### `lib/data/backup/remote_backup_service.dart` (aktualizowany)
+Odzyskiwanie archiwalnych metadanych biblioteki nie przywraca pustych usuniętych folderów; tylko faktycznie odzyskane dokumenty mogą przywrócić swoje ścieżki nadrzędne, okładki i zadania. Test `test/recovered_library_metadata_test.dart`.
+
 
 Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
 zadania, planer, ustawienia, Recent i preferencję backupu; liczy SHA-256,

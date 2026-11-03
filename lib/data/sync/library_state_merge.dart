@@ -185,3 +185,66 @@ Map<String, dynamic> _mergeTaskGroups(
   }
   return merged;
 }
+
+ 
+/// Restores only metadata belonging to documents actually recovered.
+///
+/// A verified device backup is historical, not an authority to resurrect
+/// folders or tasks explicitly deleted from the live account.
+Map<String, dynamic> mergeRecoveredLibraryMetadata({
+  required Map<String, dynamic> current,
+  required Map<String, dynamic> recovered,
+  required Map<String, String> recoveredUids,
+  required Iterable<String> restoredFolderPaths,
+}) {
+  if (recoveredUids.isEmpty) {
+    return current;
+  }
+  final result = <String, dynamic>{...current};
+  final folderNames = <String>{
+    if (current['folders'] is List)
+      ...(current['folders'] as List).whereType<String>(),
+  };
+  final addedFolders = <String>{};
+  for (final folder in restoredFolderPaths) {
+    final parts = folder.split('/').where((part) => part.isNotEmpty).toList();
+    for (var length = 1; length <= parts.length; length++) {
+      final path = parts.take(length).join('/');
+      if (folderNames.add(path)) {
+        addedFolders.add(path);
+      }
+    }
+  }
+  if (addedFolders.isNotEmpty) {
+    result['folders'] = folderNames.toList()..sort();
+  }
+  final oldCovers = recovered['covers'];
+  if (oldCovers is Map && addedFolders.isNotEmpty) {
+    final covers = <String, dynamic>{
+      if (current['covers'] is Map)
+        ...Map<String, dynamic>.from(current['covers'] as Map),
+    };
+    for (final path in addedFolders) {
+      if (!covers.containsKey(path) && oldCovers.containsKey(path)) {
+        covers[path] = oldCovers[path];
+      }
+    }
+    result['covers'] = covers;
+  }
+  final archivedTasks = recovered['plannerTasks'];
+  if (archivedTasks is Map) {
+    final tasks = <String, dynamic>{
+      if (current['plannerTasks'] is Map)
+        ...Map<String, dynamic>.from(current['plannerTasks'] as Map),
+    };
+    for (final entry in recoveredUids.entries) {
+      if (!tasks.containsKey(entry.value) &&
+          archivedTasks[entry.key] is List) {
+        tasks[entry.value] = archivedTasks[entry.key];
+      }
+    }
+    result['plannerTasks'] = tasks;
+  }
+  // Account preferences and recent colors remain authoritative elsewhere.
+  return result;
+}
