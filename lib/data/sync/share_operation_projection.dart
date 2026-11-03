@@ -150,10 +150,11 @@ class ShareOperationProjection {
     }
     if (kind == OperationKind.textInsert ||
         kind == OperationKind.textDelete) {
-      if (object['type'] != OperationKind.objectCreate.wireName) {
-        throw StateError('Text operation needs an object.');
-      }
       final properties = object['properties'] as Map<String, dynamic>;
+      if (object['type'] != OperationKind.objectCreate.wireName ||
+          properties['objectType'] != 'text') {
+        throw StateError('Text operation needs a typed text object.');
+      }
       if (!object.containsKey('textAtoms') &&
           properties['text'] != null &&
           properties['text'] != '') {
