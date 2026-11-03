@@ -351,7 +351,7 @@ class NotesDatabase extends _$NotesDatabase {
   }
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -387,6 +387,11 @@ class NotesDatabase extends _$NotesDatabase {
           await customStatement(
             'ALTER TABLE operation_outbox ADD COLUMN last_error TEXT',
           );
+        }
+      }
+      if (from >= 3 && from < 6 && to >= 6) {
+        for (final statement in operationTombstoneV6Migration) {
+          await customStatement(statement);
         }
       }
     },
