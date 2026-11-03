@@ -221,7 +221,10 @@ class NotebookRepository {
     return recovered;
   }
 
-  Future<int> restoreNotebooksAtomically(List<Notebook> notebooks) async {
+  Future<int> restoreNotebooksAtomically(
+    List<Notebook> notebooks, {
+    bool notifyChanges = true,
+  }) async {
     if (notebooks.isEmpty) {
       return 0;
     }
