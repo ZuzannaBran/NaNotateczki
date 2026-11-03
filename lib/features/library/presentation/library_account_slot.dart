@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/error/one_shot_error_notice.dart';
+import '../../../core/input/ink_activity_tracker.dart';
 import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/shutdown_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
@@ -13,6 +14,7 @@ import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
 import '../../../core/widgets/app_labeled_field.dart';
 import '../../../data/backup/remote_backup_scheduler.dart';
+import '../../notebook/data/notebook_repository.dart';
 import '../../../data/sync/account_session_controller.dart';
 import '../../../data/sync/api_client.dart';
 import '../../../data/sync/live_web_sync_service.dart';
@@ -30,6 +32,7 @@ Future<void> showLibraryAccountDialog(
   final session = context.read<AccountSessionController?>();
   final backup = context.read<RemoteBackupScheduler?>();
   final sync = context.read<LiveWebSyncService?>();
+  final repository = context.read<NotebookRepository?>();
   if (session == null || backup == null || sync == null) {
     return Future<void>.value();
   }
@@ -42,6 +45,8 @@ Future<void> showLibraryAccountDialog(
         ChangeNotifierProvider<AccountSessionController>.value(value: session),
         ChangeNotifierProvider<RemoteBackupScheduler>.value(value: backup),
         ChangeNotifierProvider<LiveWebSyncService>.value(value: sync),
+        if (repository != null)
+          Provider<NotebookRepository>.value(value: repository),
       ],
       child: _AccountDialog(
         liveSyncAvailable: liveSyncAvailable,
@@ -908,10 +913,14 @@ class _AccountDialogState extends State<_AccountDialog> {
     final backup = context.read<RemoteBackupScheduler>();
     final coordinator = ShutdownCoordinator(
       flushLocal: () async {
+        await InkActivityTracker.instance.waitForNoActiveContacts();
         await AppSaveCoordinator.instance.flushPending();
+        final repository = context.read<NotebookRepository?>();
+        await repository?.waitForPendingSaves();
         await waitForPendingTextStorageOperations();
         await sync.flushPersistedOutbox();
-        if (AppSaveCoordinator.instance.hasPendingWork) {
+        if (AppSaveCoordinator.instance.hasPendingWork ||
+            (repository?.hasPendingSaves ?? false)) {
           throw StateError('Local editor writes are still pending.');
         }
       },
