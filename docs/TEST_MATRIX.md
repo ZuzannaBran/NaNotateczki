@@ -27,6 +27,22 @@ a platform as tested until its actual Actions job succeeds.
 - The desktop matrix also runs merged catalog/planner UI, typography and
   planner lifecycle regressions directly on Linux, Windows and macOS.
 
+## Stage 12 — operation-based persistence acceptance (November 2026)
+
+Added `test/production/stage12_operation_stress_test.dart` for 1000
+create + 1000 delete operations through real Drift/SQLite, restart,
+outbox, tombstones, ACK replay and transaction rollback. On the canonical
+`NaNotateczki-serwer/main` repository, the opt-in
+`scripts/run-stage12-real.sh` brings up disposable PostgreSQL 17 with
+real FastAPI/WS test requests. Its tests include 2000 operations, CAS-like
+idempotency, account separation, concurrent text, revoked Share and REST
+catch-up after a disconnected WebSocket.
+
+These tests have **not** been executed in the current coding environment
+(no Flutter/Dart SDK or Docker). They do not certify the full cross-device
+matrix or stage-11 protocol cutover. See `docs/ETAP_12_TESTS.md` for exact
+commands, safety guards, remaining crash/fault scenarios and manual checks.
+
 ## Account and study timer typography (November 2026)
 
 Automated regression: `test/library_account_slot_test.dart` checks that
