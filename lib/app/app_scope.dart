@@ -394,6 +394,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           ),
         );
       });
+      WidgetsBinding.instance.scheduleFrame();
     } catch (_) {
       // Old API versions, offline mode and unreliable measurements must not
       // interrupt signing in or synchronization.
