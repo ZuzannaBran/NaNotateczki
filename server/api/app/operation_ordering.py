@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from uuid import uuid4
 from typing import Any
 
@@ -26,7 +27,7 @@ def precedence(operation: OperationEnvelope) -> tuple[int, str, int, str]:
 
 @dataclass
 class OperationActorClock:
-    """Generate immutable local intents and remember observed actor frontiers."""
+    """Generate local intents with observed actor frontiers."""
 
     actor_id: str
     actor_seq: int = 0
@@ -67,7 +68,10 @@ class OperationActorClock:
         causal_ids = sorted({
             *dependencies,
             *(item.operation_id for item in self.observed.values()),
-            *([self.previous_operation_id] if self.previous_operation_id else []),
+            *(
+                [self.previous_operation_id]
+                if self.previous_operation_id else []
+            ),
         })
         if (
             len(causal_ids) > 256
@@ -132,11 +136,20 @@ class OperationCheckpoint:
 
     operations: tuple[OperationEnvelope, ...]
     schema_version: int = 1
+    rejected: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "rejected", MappingProxyType(dict(self.rejected))
+        )
 
     def to_dict(self) -> dict:
         return {
             "schemaVersion": self.schema_version,
-            "operations": [operation.to_dict() for operation in self.operations],
+            "operations": [
+                operation.to_dict() for operation in self.operations
+            ],
+            "rejectedOperations": dict(self.rejected),
         }
 
     @classmethod
@@ -156,7 +169,16 @@ class OperationCheckpoint:
             )
         except (InvalidOperation, TypeError) as exc:
             raise ValueError("Invalid checkpoint operation.") from exc
-        return cls(operations)
+        rejected = raw.get("rejectedOperations", {})
+        if (
+            not isinstance(rejected, dict)
+            or any(
+                not isinstance(key, str) or not isinstance(reason, str)
+                or not reason for key, reason in rejected.items()
+            )
+        ):
+            raise ValueError("Invalid rejected operation records.")
+        return cls(operations, rejected=dict(rejected))
 
 
 @dataclass
@@ -189,9 +211,12 @@ class CausalOperationBuffer:
     def export_checkpoint(self) -> OperationCheckpoint:
         if self.pending:
             # Pending changes must live in the durable outbox, not a snapshot.
-            raise OperationOrderError("Pending operations cannot be checkpointed.")
+            raise OperationOrderError(
+                "Pending operations cannot be checkpointed."
+            )
         return OperationCheckpoint(
-            tuple(sorted(self.accepted.values(), key=precedence))
+            tuple(sorted(self.accepted.values(), key=precedence)),
+            rejected=dict(self.rejected),
         )
 
     @classmethod
@@ -205,11 +230,15 @@ class CausalOperationBuffer:
             queue.ingest(operation)
         if queue.pending or len(queue.accepted) != len(checkpoint.operations):
             raise ValueError("Incomplete or inconsistent causal checkpoint.")
+        if any(key in queue.accepted for key in checkpoint.rejected):
+            raise ValueError("Accepted and rejected operation IDs overlap.")
+        queue.rejected.update(checkpoint.rejected)
         return queue
 
     def missing_dependencies(self, operation: OperationEnvelope) -> list[str]:
         return [
-            item for item in operation.dependencies if item not in self.known_ids
+            item for item in operation.dependencies
+            if item not in self.known_ids
         ]
 
     @staticmethod
@@ -234,8 +263,9 @@ class CausalOperationBuffer:
         return False
 
     def ingest(self, operation: OperationEnvelope) -> list[OperationEnvelope]:
-        existing = self.pending.get(operation.operation_id) or self.accepted.get(
-            operation.operation_id
+        existing = (
+            self.pending.get(operation.operation_id)
+            or self.accepted.get(operation.operation_id)
         )
         if existing is not None:
             if existing.to_dict() != operation.to_dict():
@@ -246,7 +276,9 @@ class CausalOperationBuffer:
         if operation.operation_id in self.known_ids:
             # This should be unreachable for a complete checkpoint.
             raise OperationOrderError("Missing known operation payload.")
-        if operation.actor_seq <= self.actor_sequences.get(operation.actor_id, 0):
+        if operation.actor_seq <= self.actor_sequences.get(
+            operation.actor_id, 0
+        ):
             raise OperationOrderError("Sequence precedes checkpoint.")
         used = self.sequence_ids.get(operation.actor_id, {}).get(
             operation.actor_seq
