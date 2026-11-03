@@ -162,7 +162,7 @@ class OperationStore {
   /// Incoming projection and server feed position commit or roll back together.
   Future<bool> applyRemote(
     OperationEnvelope operation, {
-    required String checkpointScope,
+    String? checkpointScope,
     required int serverSequence,
     required Future<void> Function() apply,
   }) {
@@ -173,7 +173,9 @@ class OperationStore {
           source: 'remote',
           apply: apply,
         );
-        await _advanceCheckpoint(checkpointScope, serverSequence);
+        if (checkpointScope != null) {
+          await _advanceCheckpoint(checkpointScope, serverSequence);
+        }
         return changed;
       });
     });
@@ -360,6 +362,15 @@ class OperationStore {
           ),
         ),
     ];
+  }
+
+  /// Distinguishes a locally queued echo from an ordinary remote replay.
+  Future<bool> isPending(String operationId) async {
+    return await _row(
+          'SELECT operation_id FROM operation_outbox WHERE operation_id = ?',
+          [operationId],
+        ) !=
+        null;
   }
 
   Future<void> scheduleRetry(
