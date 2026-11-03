@@ -387,6 +387,16 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `NaNotateczki-serwer/docs/OPERATION_PROTOCOL_V1.md`.
   Ten kontrakt jeszcze nie zastępuje istniejącego snapshotowego sync.
 
+### Porządkowanie operacji v1 (etap 2)
+
+- `lib/data/sync/operation_ordering.dart`: `OperationActorClock`
+  (licznik Lamporta, sequence i checkpoint), `CausalOperationBuffer`
+  (kolejka opóźnionych zależności, duplikaty i rozgałęzienia aktora),
+  `OperationPropertyRegister` (deterministyczne reguły pól i tombstones).
+  `test/operation_ordering_test.dart`: różna kolejność dostarczenia,
+  usunięcia, brakujące operacje i konflikt rewizji.
+  Kod nie jest jeszcze wpięty w produkcyjną bazę ani API v1.
+
 ### Nowa synchronizacja serwerowa
 
 - `lib/data/sync/api_client.dart`: klient REST z wymuszeniem HTTPS,

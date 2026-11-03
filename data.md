@@ -551,3 +551,14 @@ od aktualnego snapshotu i backupu. Operacja ma stabilny `operationId`,
 pozycji na ekranie. Nowy model nie jest jeszcze podłączony do Drift ani
 API v1. Nie interpretować go jako ukończonej migracji lub naprawy share.
 Specyfikacja: `NaNotateczki-serwer/docs/OPERATION_PROTOCOL_V1.md`.
+
+## Porządkowanie operacji v1 — etap 2 (nieaktywne)
+
+`OperationActorClock` używa licznika logicznego Lamporta bez wall-clock.
+`CausalOperationBuffer` nie wykonuje operacji z brakującym poprzednikiem
+aktora ani z brakującymi zależnościami. Identyczne retransmisje są
+idempotentne, ale powtórne wykorzystanie ID/actorSeq z innym payloadem jest
+błędem protokołu. Dla tego samego pola wygrywa para logicClock/actorId/
+actorSeq/operationId; tombstone nie pozwala wskrzeszać usuniętego UID.
+Nie ma jeszcze atomowej transakcji Drift/outbox ani obsługi endpointów v2;
+przekazywanie tej kolejki do produkcyjnego zapisu byłoby przedwczesne.
