@@ -1035,3 +1035,17 @@ Never modify a real user's production notebook for these checks.
 These scenarios have **not been executed** in this session. The v2 client
 and backend cannot be declared end-to-end ready until the migration and
 domain-specific reducers are implemented and these checks pass.
+
+## V2 — testy do wykonania przed przełączeniem (3 listopada 2026)
+
+1. Poprawna kolejność `document.create` → `page.create` →
+   `object.create` i zgodny payload `value`.
+2. Usunięcie identycznego objectId na dwóch różnych stronach.
+3. Migracja SQLite v3 → v4 z zachowaniem tombstones.
+4. Undo/Redo po synchronizacji i restarcie.
+5. Błędna projekcja A nie blokuje wysyłki dokumentu B.
+6. Błędna późna operacja paczki nie blokuje poprawnego prefiksu.
+7. Niezależne retry i aktorzy dla dwóch dokumentów oraz Share.
+8. Restart po commit PostgreSQL, ale przed odebraniem ACK.
+
+Nie są to potwierdzone wyniki automatycznych testów E2E.

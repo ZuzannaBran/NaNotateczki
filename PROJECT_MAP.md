@@ -411,8 +411,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   atomowy ACK, tombstones, checkpointy i checksummed snapshots. Projekcja
   wywołującego musi używać tej samej bazy Drift. Nie jest jeszcze wpięty
   we wszystkie legacy ścieżki `saveNotebook` (etap 5).
-- `lib/data/drift/operation_schema.dart`: schemat v3 utworzony przez
-  `customStatement`, nie wymaga teraz zmian pliku `.g.dart`.
+- `lib/data/drift/operation_schema.dart`: SQLite v4 z migracją v3 → v4
+  zachowującą tombstones oraz pageId usuniętego obiektu.
+  Tabele są tworzone przez `customStatement` bez nowych mapowań `.g.dart`.
 - `notes_database_connection_io.dart`: WAL + `synchronous=FULL`.
 - `notebook_repository.dart`: `_upsertNotebookPages` i `_upsertPage`
   aktualizują rekordy zamiast pełnego kasowania i reinstalacji.
@@ -426,13 +427,15 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - `lib/data/sync/operation_gateway.dart`: `OperationGateway`,
   `HttpOperationGateway`, `OperationReceipt`, `OperationFeedPage`.
-  Waliduje pełne ACK, identyfikatory, kursory i limit 1 MiB API v2.
+  Waliduje payload, ACK, kursory i limit 1 MiB API v2;
+  przekazuje nagłówek Share `X-Share-Id`.
 - `lib/data/sync/sync_engine.dart`: `SyncEngine` i
   `RemoteOperationReducer`. Trwały lokalny outbox, max 50/800 KiB
-  w paczce, niezależne aktory, ACK bez replay, REST catch-up,
-  WebSocket hints, backoff, wznowienie, token generation na stop,
-  odświeżenie sesji i jawny rebase przez callback.
-  Nie podłączać do legacy UID przed etapem 11.
+  w paczce, aktorzy per dokument, ACK bez replay, REST catch-up,
+  WebSocket hints, najwcześniejszy retry, generation token na stop,
+  odświeżenie sesji i rebase przez callback. Błąd pull nie blokuje push.
+  Pakiet 409/413/422 próbuje bezpiecznego prefiksu, bez pomijania actorSeq.
+  Nie podłączać do UID v1 przed etapem 11.
 - `lib/data/sync/operation_store.dart`: `pending(includeDeferred)`,
   `isPending`, `advanceCheckpoint`; strzeże actorSeq także przy
   retry, lokalne operacje zależą od trwałych zdalnych frontierów,

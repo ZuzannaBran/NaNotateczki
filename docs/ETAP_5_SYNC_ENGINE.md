@@ -74,3 +74,19 @@ PostgreSQL użytkownika. Nie uruchomiono `dart analyze`, `flutter test`
 ani testów E2E; nie traktować samych nowych testów jako zaliczonych.
 Nie uruchomiono ręcznie GitHub Actions. Weryfikacja w kodzie obejmuje
 zgodność pól z API v2 serwera i brak zmian w produkcyjnej ścieżce v1.
+
+## Poprawki infrastruktury — 3 listopada 2026
+
+- Walidacja `*.create` wymaga `value`, a `*.set` wymaga `properties`.
+  Nieobsługiwane teksty i assety są odrzucane przed trwałym zapisem.
+- ActorId w `SyncEngine` jest izolowany per namespace i dokument; obce
+  dokumenty nie pojawiają się w zależnościach.
+- Undo/Redo automatycznie zawiera `revertsOperationId` w zależnościach.
+- SQLite v4 zachowuje tombstones i rozróżnia pageId.
+- Nieudany pull nie blokuje push. Przy 409/413/422 w dużej paczce klient
+  próbuje pierwszą operację, nie pomijając złej sekwencji.
+- Retry wybiera najwcześniejszy termin, Share v2 przenosi nagłówek
+  `X-Share-Id` i pole `shareId` w WebSocket.
+
+**Niedokończone:** domenowe reduktory, migracja namespace, przełączenie
+produkcji i testy prawdziwego Flutter/PostgreSQL/WebSocket.

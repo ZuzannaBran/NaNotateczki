@@ -376,9 +376,11 @@ narzędziem `age`. Skrypt nie wdraża retencji i nie zastępuje testu odtworzeni
   migracji nie edytuje się, tylko dodaje następną.
 
 
-## SQLite v3 — dziennik operacji (etap 3)
+## SQLite v4 — dziennik operacji (etap 3)
 
-Lokalna baza Drift jest migrowana addytywnie z v2 do v3. `OperationStore`
+Lokalna baza Drift jest migrowana addytywnie z v2 do v4. Migracja v3 → v4
+odtwarza pageId z operacji usuwającej obiekt i zachowuje tombstones.
+`OperationStore`
 zapisuje projekcję i operację z outboxem w jednej transakcji, a odbiór
 zdalny zapisuje operację, projekcję i checkpoint w jednej transakcji.
 ID oraz potwierdzenia muszą przetrwać ponowną wysyłkę i restart.
@@ -588,8 +590,9 @@ poprawnego potwierdzenia. Checkpoint etapu 2 przechowuje komplet zaakceptowanych
 operacji i identyfikatory odrzuconych; nie wolno zastępować go samym licznikiem
 aktora ani kompaktować bez trwałego indeksu ID. Zegar aktora zachowuje
 zaobserwowane zależności również po odtworzeniu.
-Backend posiada opt-in API v2 po etapie 4, ale klient nie ma jeszcze
-atomowej transakcji Drift/outbox z etapu 3. Dotychczasowa synchronizacja
+Backend posiada opt-in API v2 po etapie 4 i trwały outbox etapu 5.
+Klient nadal nie ma domenowych reducerów ani migracji produkcyjnej.
+Dotychczasowa synchronizacja
 API v1 i share nadal działają na snapshotach. Nie przełączać użytkowników
 na protokół operacji przed migracją i testami end-to-end.
 
