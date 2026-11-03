@@ -253,18 +253,143 @@ void main() {
   });
 
   test('queue capacity and checkpoint reject invalid replays', () {
-    final queue = CausalOperationBuffer(
-      initialActorSequences: {'A': 2},
-      maximumPending: 1,
+    final original = CausalOperationBuffer();
+    original.ingest(op(id: a1, actor: 'A', sequence: 1, clock: 1));
+    original.ingest(op(
+      id: a2, actor: 'A', sequence: 2, clock: 2,
+      dependencies: [a1],
+    ));
+    final checkpoint = OperationCheckpoint.fromJson(
+      original.exportCheckpoint().toJson(),
+    );
+    final queue = CausalOperationBuffer.fromCheckpoint(
+      checkpoint, maximumPending: 1,
     );
     expect(
-      () => queue.ingest(op(id: a1, actor: 'A', sequence: 1, clock: 1)),
+      () => queue.ingest(op(id: b2, actor: 'A', sequence: 1, clock: 1)),
       throwsA(isA<OperationOrderException>()),
     );
-    queue.ingest(op(id: a2, actor: 'A', sequence: 4, clock: 4));
+    queue.ingest(op(id: b1, actor: 'A', sequence: 4, clock: 4));
     expect(
       () => queue.ingest(op(id: b2, actor: 'B', sequence: 2, clock: 4)),
       throwsA(isA<OperationOrderException>()),
     );
+  });
+
+  test('invalid buffered child does not swallow accepted parent', () {
+    final queue = CausalOperationBuffer();
+    final bad = op(
+      id: b1, actor: 'B', sequence: 1, clock: 1, dependencies: [a1],
+    );
+    expect(queue.ingest(bad), isEmpty);
+    final parent = op(id: a1, actor: 'A', sequence: 1, clock: 2);
+    expect(queue.ingest(parent), [parent]);
+    expect(queue.rejectedOperations, contains(b1));
+    expect(queue.pendingCount, 0);
+    final corrected = op(
+      id: b2, actor: 'B', sequence: 1, clock: 3, dependencies: [a1],
+    );
+    expect(queue.ingest(corrected), [corrected]);
+    expect(
+      () => queue.ingest(bad),
+      throwsA(isA<OperationOrderException>()),
+    );
+  });
+
+  test('invalid incoming operation leaves checkpoint unchanged', () {
+    final queue = CausalOperationBuffer();
+    queue.ingest(op(id: a1, actor: 'A', sequence: 1, clock: 7));
+    final before = queue.exportCheckpoint().toJson();
+    expect(
+      () => queue.ingest(op(
+        id: a2, actor: 'A', sequence: 2, clock: 7,
+        dependencies: [a1],
+      )),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(queue.exportCheckpoint().toJson(), before);
+    expect(queue.pendingCount, 0);
+    expect(queue.rejectedOperations, isEmpty);
+    expect(queue.ingest(op(
+      id: a2, actor: 'A', sequence: 2, clock: 8,
+      dependencies: [a1],
+    )), hasLength(1));
+  });
+
+  test('checkpoint restores predecessor, clocks and exact deduplication', () {
+    final queue = CausalOperationBuffer();
+    final parent = op(id: a1, actor: 'A', sequence: 1, clock: 15);
+    queue.ingest(parent);
+    final restored = CausalOperationBuffer.fromCheckpoint(
+      OperationCheckpoint.fromJson(queue.exportCheckpoint().toJson()),
+    );
+    expect(restored.ingest(parent), isEmpty);
+    expect(
+      () => restored.ingest(op(id: a2, actor: 'A',
+        sequence: 2, clock: 16)),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(
+      () => restored.ingest(op(id: a2, actor: 'A',
+        sequence: 2, clock: 15, dependencies: [a1])),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(
+      () => restored.ingest(op(id: b1, actor: 'B',
+        sequence: 1, clock: 14, dependencies: [a1])),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(
+      () => restored.ingest(op(
+        id: a1, actor: 'A', sequence: 1, clock: 15,
+        payload: {'properties': {'color': 'forged'}},
+      )),
+      throwsA(isA<OperationOrderException>()),
+    );
+    expect(restored.ingest(op(
+      id: b1, actor: 'B', sequence: 1, clock: 16,
+      dependencies: [a1],
+    )), hasLength(1));
+  });
+
+  test('pending gap cannot be checkpointed as committed history', () {
+    final queue = CausalOperationBuffer();
+    queue.ingest(op(
+      id: a2, actor: 'A', sequence: 2, clock: 2,
+      dependencies: [a1],
+    ));
+    expect(() => queue.exportCheckpoint(),
+        throwsA(isA<OperationOrderException>()));
+    expect(
+      () => CausalOperationBuffer.fromCheckpoint(OperationCheckpoint(
+        operations: [op(
+          id: a2, actor: 'A', sequence: 2, clock: 2,
+          dependencies: [a1],
+        )],
+      )),
+      throwsFormatException,
+    );
+  });
+
+  test('actor includes observed remote frontier in future edits', () {
+    final actor = OperationActorClock(actorId: 'local');
+    final remote = op(id: b1, actor: 'remote', sequence: 1, clock: 20);
+    actor.observe(remote);
+    final first = actor.next(
+      documentId: 'notebook', pageId: 'page', objectId: 'stroke',
+      kind: OperationKind.objectSet,
+      payload: {'properties': {'x': 1}},
+    );
+    expect(first.dependencies, contains(remote.operationId));
+    expect(first.logicalClock, 21);
+    final restored = OperationActorClock.fromCheckpoint(actor.toCheckpoint());
+    final second = restored.next(
+      documentId: 'notebook', pageId: 'page', objectId: 'stroke',
+      kind: OperationKind.objectSet,
+      payload: {'properties': {'x': 2}},
+    );
+    expect(second.dependencies, containsAll([
+      remote.operationId, first.operationId,
+    ]));
   });
 }
