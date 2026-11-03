@@ -158,7 +158,8 @@ void main() {
           pageId: 'page', objectId: 'stroke'),
     );
     expect(pending.pending, hasLength(1));
-    expect((strokeObjectCount(pending.visible)), 0);
+    expect(strokeObjectCount(pending.visible), 0);
+    expect(pending.unresolved, contains(id(11)));
   });
 
   test('remote edits preserve original untouched page map', () {
