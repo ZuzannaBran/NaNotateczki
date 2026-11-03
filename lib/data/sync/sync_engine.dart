@@ -251,6 +251,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
           return;
         }
         _failures = 0;
+        lastError = null;
         lastSuccessfulSync = DateTime.now().toUtc();
         notifyListeners();
       } catch (error) {
