@@ -709,3 +709,25 @@ staged-not-activated. Aplikacja wciąż używa wspólnego notes.sqlite.
 Przełączenie AppScope, Web/IndexedDB, import Local→konto i migracja serwera
 v1→v2 NIE są jeszcze ukończone; nie uruchamiać dwóch writerów ani nie
 usuwać danych źródłowych. Szczegóły: docs/ETAP_11_MIGRATION.md.
+
+
+### Etap 10 — shutdown, sesje i trwały outbox
+
+ShutdownCoordinator ogranicza cały proces zamknięcia i wylogowania do
+30 sekund. Kolejność: lokalny zapis, synchronizacja, verified backup,
+zatrzymanie live writerów, wylogowanie. Wyjście offline nie wysyła
+snapshotu, ale jest dozwolone wyłącznie po bezpiecznym utrwaleniu
+lokalnych danych; outbox i checkpointy pozostają na dysku.
+Po błędzie zatrzymania aktywnego writera nie wolno czyścić sesji.
+Zdalne odwołanie tokenu podczas wylogowania ma timeout 5 s; bez sieci
+nie jest gwarantowane zdalne unieważnienie poświadczenia.
+Testy i granice: docs/ETAP_10_SHUTDOWN.md.
+
+### Etap 11 — stale staging
+
+Kopia przygotowana przez tool/stage11_migrate.py jest tylko stagingiem.
+Przed jej ponownym użyciem trzeba ponownie sprawdzić SHA-256 każdego
+pliku źródła; zmianę źródła traktować jako blokadę cutover, a nie
+zezwolenie na zastąpienie nowszego SQLite starszym stagingiem.
+Nie aktywować staged namespace ani v2 API bez kontrolowanej migracji
+serwera, modelu operacyjnego, tokenów oraz testów E2E.

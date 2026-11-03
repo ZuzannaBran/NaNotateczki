@@ -90,6 +90,36 @@ class Stage11MigrationTests(unittest.TestCase):
         with self.assertRaises(MigrationError):
             stage_migration(self.data)
 
+    def test_migration_refuses_to_reuse_stale_source(self):
+        stage_migration(self.data)
+        (self.data / 'study_planner.json').write_text('{"sessions":[1]}')
+        with self.assertRaisesRegex(MigrationError, 'source changed'):
+            stage_migration(self.data)
+
+    def test_recovery_sidecar_is_preserved(self):
+        original = self.data / 'study_planner.json.previous'
+        original.write_text('{"sessions":["recovered"]}')
+        report = stage_migration(self.data)
+        copy = self.data / 'local' / 'study_planner.json.previous'
+        self.assertEqual(digest(original), digest(copy))
+        self.assertIn('study_planner.json.previous', report['targetFiles'])
+
+    def test_image_path_traversal_is_rejected(self):
+        with sqlite3.connect(self.data / 'notes.sqlite') as db:
+            db.execute('UPDATE image_block_rows SET path=?',
+                       (str(self.data / 'images' / '..' / 'notes.sqlite'),))
+        with self.assertRaisesRegex(MigrationError, 'Unsafe image path'):
+            stage_migration(self.data)
+        self.assertTrue((self.data / 'notes.sqlite').exists())
+        self.assertFalse((self.data / 'local').exists())
+
+    def test_external_image_path_with_inline_bytes_still_refused(self):
+        with sqlite3.connect(self.data / 'notes.sqlite') as db:
+            db.execute('UPDATE image_block_rows SET path=?, bytes=?',
+                       ('/private/elsewhere/image.png', b'inline'))
+        with self.assertRaisesRegex(MigrationError, 'External image path'):
+            stage_migration(self.data)
+
     def test_symlinked_assets_are_refused(self):
         (self.data / 'images' / 'link').symlink_to(self.data / 'notes.sqlite')
         with self.assertRaises(MigrationError):

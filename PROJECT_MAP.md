@@ -2506,3 +2506,29 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   wznowienie staging, account binding, symlinki i integralność celu.
 - docs/ETAP_11_MIGRATION.md: status nieukończonego przełączenia v1→v2,
   wymagania Web, backendu i testów, komendy dla komputera, nie serwera.
+
+
+## Etap 10 — koordynacja shutdown (2026-11-03)
+
+- lib/core/storage/shutdown_coordinator.dart: wspólny pipeline 30 s:
+  flush lokalny → sync → verified backup → stop usług → koniec sesji;
+  wyjście offline możliwe tylko po lokalnym utrwaleniu.
+- lib/app/app_scope.dart: exit guard Retry / Cancel / Exit offline
+  bez pomijania niezapisanych gestów; błąd oznacza konkretny etap.
+- lib/features/library/presentation/library_account_slot.dart:
+  logout z wyborem pozostania zalogowanym / retry / offline; przed
+  wyczyszczeniem poświadczeń zatrzymuje sieciowych writerów.
+- test/shutdown_coordinator_test.dart: testy faz, timeoutów i
+  blokady wylogowania przy niedokończonym stop().
+- docs/ETAP_10_SHUTDOWN.md: ograniczenia z powodu nieaktywnego
+  namespace etapu 11 i scenariusze środowiskowe.
+
+## Etap 11 — weryfikacja świeżości migracji
+
+- tool/stage11_migrate.py: staging odmawia ponownego użycia kopii,
+  jeśli źródło zmieniło się po SHA-256; zachowuje poprzednie wersje
+  oraz odrzuca ścieżki obrazów opuszczające katalog images/.
+- tool/test_stage11_migrate.py: regresje stale staging, recovery
+  sidecars, traversal path oraz external inline asset.
+- docs/ETAP_11_MIGRATION.md: migracja nadal staged-not-activated,
+  bez automatycznego cutover i bez uruchomienia produkcyjnego v2.

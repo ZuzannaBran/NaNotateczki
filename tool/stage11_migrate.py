@@ -18,7 +18,8 @@ from urllib.parse import quote
 MANIFEST = '.stage11_manifest.json'
 INCOMPLETE = '.stage11_incomplete'
 BASE_FILES = ('notes.sqlite', 'notes.sqlite-wal', 'notes.sqlite-shm',
-              'notes.sqlite-journal', 'app_prefs.json', 'editor_prefs.json',
+              'notes.sqlite-journal', 'notes.sqlite.recovery_pending',
+    'app_prefs.json', 'editor_prefs.json',
               'shared_recent_colors.json', 'library_folders.json',
               'study_planner.json', 'cloud_sync.json')
 BASE_DIRS = ('images', 'local_backup', 'deleted_notebooks',
@@ -51,6 +52,8 @@ def source_files(root: Path, suffix: str | None) -> list[Path]:
     names += [f'{stem}_{suffix}.json' for stem in
               ('server_device', 'server_sync_state',
                'server_backup_preferences') if suffix]
+    names += [f'{name}.{ext}' for name in list(names)
+              if name.endswith('.json') for ext in ('previous', 'tmp')]
     paths = []
     for name in names:
         entry = root / name
@@ -142,12 +145,15 @@ def _rewrite_and_check_images(database: Path, old_images: Path,
                 old_prefix = str(old_images.resolve()) + os.sep
                 if path.startswith(old_prefix):
                     relative = path[len(old_prefix):]
+                    parts = Path(relative).parts
+                    if not parts or any(part in ('', '.', '..') for part in parts):
+                        raise MigrationError(f'Unsafe image path: {uid}')
                     destination = new_images / relative
                     if not (staged_images / relative).is_file() and bytes_ is None:
                         raise MigrationError(f'Missing image asset: {uid}')
                     db.execute('UPDATE image_block_rows SET path=? WHERE uid=?',
                                (str(destination), uid))
-                elif bytes_ is None:
+                else:
                     raise MigrationError(f'External image path requires manual '
                                          f'import: {uid}')
     finally:
@@ -187,6 +193,21 @@ def _verify_existing(target: Path, namespace: str) -> dict:
         raise MigrationError(f'Invalid migration manifest: {exc}') from exc
 
 
+def _verify_source_unchanged(root: Path, suffix: str | None,
+                             manifest: dict) -> None:
+    """Reject an old verified copy if the live legacy database has advanced."""
+    original = manifest.get('sourceFiles')
+    if not isinstance(original, dict):
+        raise MigrationError('Migration manifest lacks source checksums')
+    files = source_files(root, suffix)
+    current = {str(file.relative_to(root)): digest(file) for file in files}
+    if current != original:
+        raise MigrationError(
+            'Legacy source changed after staging; the candidate is stale. '
+            'Preserve both copies and repeat migration after a safe review.'
+        )
+
+
 def stage_migration(data: Path, account_id: str | None = None) -> dict:
     """Prepare a verified candidate; never mutate or delete the legacy source."""
     if data.is_symlink():
@@ -199,7 +220,9 @@ def stage_migration(data: Path, account_id: str | None = None) -> dict:
     if target.is_symlink() or target.parent.is_symlink():
         raise MigrationError('Symlinked namespace is forbidden')
     if target.exists():
-        return _verify_existing(target, namespace)
+        verified = _verify_existing(target, namespace)
+        _verify_source_unchanged(data, suffix, verified)
+        return verified
     database = data / 'notes.sqlite'
     if not _regular_file(database):
         raise MigrationError('Legacy notes.sqlite not found')

@@ -24,7 +24,9 @@ serwer i NIE zmienia aktywnej ścieżki SQLite aplikacji.
 - Kontroluje niezmienność źródła, porównuje liczbę rekordów po zmianie
   ścieżek, publikuje kompletny katalog przez rename. Przy błędzie
   usuwa wyłącznie własny katalog tymczasowy, źródło pozostaje nietknięte.
-- Ponowne uruchomienie weryfikuje manifest i wszystkie SHA-256.
+- Ponowne uruchomienie weryfikuje manifest i wszystkie SHA-256
+  kopii **oraz aktualnego źródła**; zmiana legacy po stagingu blokuje
+  ponowne użycie nieaktualnej kopii.
   Nie nadpisuje istniejącego, niezweryfikowanego katalogu docelowego.
 - Kopia jest oznaczona **staged-not-activated**: nie wolno jej uznać za
   zakończoną migrację protokołu, ani skasować starej biblioteki.
@@ -38,9 +40,10 @@ Można dodatkowo wymagać dokładnego przypisanego konta przez
 --account-id UUID. Nie stosować tej opcji do nieskojarzonych danych Local.
 
 Regresje: python3 -m unittest discover -s tool -p 'test_stage11_migrate.py'.
-Osiem scenariuszy uruchomiono lokalnie z CPython 3: poprawne kopiowanie,
+Dwanaście scenariuszy dodano; testy wymagają wykonania na checkoutcie: poprawne kopiowanie,
 izolacja właściciela, brak assetu, restart, odmowa obcego katalogu,
-zmodyfikowane dane oraz symlink w assetach lub celu. Nie uruchomiono Flutter/Dart,
+zmodyfikowane dane oraz symlink w assetach lub celu. Nowe testy:
+stale źródło, pliki `.previous`, ścieżka z `..` i zewnętrzny obraz. Nie uruchomiono Flutter/Dart,
 PostgreSQL ani GitHub Actions. Testy używają uproszczonych schematów
 SQLite; historyczne zrzuty rzeczywistych instalacji wciąż są konieczne.
 
