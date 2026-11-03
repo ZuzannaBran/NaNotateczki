@@ -391,12 +391,22 @@ void main() {
         findsNothing,
       );
 
+      final uploadsBeforeLogout = remoteBackupService.calls;
+      remoteBackupService.failNextUpload = true;
+      await tester.tap(find.byKey(const ValueKey('account-logout')));
+      await tester.pumpAndSettle();
+      expect(session.isSignedIn, isTrue);
+      expect(remoteBackupService.calls, uploadsBeforeLogout + 1);
+      expect(sync.isStarted, isTrue);
+      expect(find.byKey(const ValueKey('account-logout')), findsOneWidget);
+
       await tester.tap(find.byKey(const ValueKey('account-logout')));
       for (var i = 0; i < 100 && session.isSignedIn; i++) {
         await tester.pump(const Duration(milliseconds: 10));
       }
       await tester.pumpAndSettle();
       expect(session.isSignedIn, isFalse);
+      expect(remoteBackupService.calls, uploadsBeforeLogout + 2);
       expect(sync.isStarted, isFalse);
       expect(backup.isEnabled, isFalse);
       expect(
@@ -774,12 +784,17 @@ class _FakeRemoteBackupService extends RemoteBackupService {
   });
 
   int calls = 0;
+  bool failNextUpload = false;
 
   @override
   Future<RemoteBackupReceipt> uploadVerifiedSnapshot({
     required String deviceId,
   }) async {
     calls++;
+    if (failNextUpload) {
+      failNextUpload = false;
+      throw StateError('Simulated backup failure');
+    }
     return RemoteBackupReceipt(
       backupId: 'backup-$calls',
       checksum: 'checksum-$calls',
