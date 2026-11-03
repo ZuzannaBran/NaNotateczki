@@ -118,7 +118,9 @@ class PlannerSyncService {
       }
       final onServer = remote[item.key];
       if (onServer != null &&
-          !_modified(item.value).isAfter(_modified(onServer))) {
+          (onServer['deleted'] == true ||
+              (item.value['deleted'] != true &&
+                  !_modified(item.value).isAfter(_modified(onServer))))) {
         continue;
       }
       final response = await apiClient
