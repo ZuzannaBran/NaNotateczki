@@ -229,7 +229,7 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 
 ### Drift
 
-### `lib/data/drift/notes_database.dart` (361 linii)
+### `lib/data/drift/notes_database.dart` (376 linii)
 
 Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami. Start sprawdza
 `PRAGMA quick_check` i `PRAGMA foreign_key_check`; po potwierdzonej korupcji lub naruszeniu integralności natywna baza jest
@@ -243,9 +243,13 @@ Po migracji katalogu aktualizuje w SQLite prefiks trwałych ścieżek obrazów.
   110: `DatabaseOpenException`; 143: `NotesDatabase`.
 - 152: `NotesDatabase.open` (opcjonalna publiczna nazwa osobnej bazy);
   304: relokacja ścieżek obrazów; 318: kontrola integralności;
-  346: `schemaVersion` (`2`); 349: `migration` — usuwa dane starego
-  mechanizmu Index tab podczas przejścia z v1.
+  346: `_createOperationSchema`; 353: `schemaVersion` (`3`);
+  356: `migration` — zachowuje migrację v1→v2 i dodaje tabele operacji
+  w migracji v2→v3, bez kasowania notatników.
 
+- `lib/data/drift/operation_schema.dart`: addytywne tabele surowego SQL
+  dla operacji, outboxu, ACK, tombstones, checkpointów, snapshotów,
+  assetów oraz stanów aktorów; bez zmiany wygenerowanego DAO.
 - `lib/data/drift/notes_database_connection.dart` (2): conditional export
   natywnego lub webowego połączenia.
 - `lib/data/drift/notes_database_connection_io.dart` (210): przed otwarciem
@@ -397,8 +401,26 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   oraz `OperationPropertyRegister` (reguły pól i tombstones).
   `test/operation_ordering_test.dart`: kolejność, błędne zależności,
   wycofanie po błędzie, restart, odrzucone ID, limit zależności.
-  Kod nie jest jeszcze wpięty w produkcyjną bazę Drift; serwerowe API v2
-  jest dostępne od etapu 4, lecz stare klienty nadal używają v1.
+  Nowy `OperationStore` zapisuje operacje w Drift od etapu 3;
+  legacy klienci nadal używają snapshotów v1 do czasu migracji.
+
+### Trwały lokalny dziennik (etap 3)
+
+- `lib/data/sync/operation_store.dart`: transakcyjny zapis projekcji i
+  `OperationEnvelope`, rosnący `actorSeq`, idempotencja, lokalny outbox,
+  atomowy ACK, tombstones, checkpointy i checksummed snapshots. Projekcja
+  wywołującego musi używać tej samej bazy Drift. Nie jest jeszcze wpięty
+  we wszystkie legacy ścieżki `saveNotebook` (etap 5).
+- `lib/data/drift/operation_schema.dart`: schemat v3 utworzony przez
+  `customStatement`, nie wymaga teraz zmian pliku `.g.dart`.
+- `notes_database_connection_io.dart`: WAL + `synchronous=FULL`.
+- `notebook_repository.dart`: `_upsertNotebookPages` i `_upsertPage`
+  aktualizują rekordy zamiast pełnego kasowania i reinstalacji.
+- `test/operation_store_test.dart`: rollback, ponawianie, ACK, usunięcia,
+  migracja z v2, snapshoty i checkpointy.
+- `test/notebook_incremental_update_test.dart`: wyzwalacze SQL wykrywają
+  niepotrzebne usuwanie stron i tekstów przy zwykłej edycji.
+- `docs/ETAP_3_SQLITE.md`: wymagania wdrożeniowe i testy crash-recovery.
 
 ### Nowa synchronizacja serwerowa
 

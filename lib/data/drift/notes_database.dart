@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/error/app_error_log.dart';
 import 'notes_database_connection.dart';
+import 'operation_schema.dart';
 
 part 'notes_database.g.dart';
 
@@ -342,16 +343,29 @@ class NotesDatabase extends _$NotesDatabase {
     }
   }
 
+  /// Additive v3 journal schema. Existing notebook rows remain unchanged.
+  Future<void> _createOperationSchema() async {
+    for (final statement in operationSchemaStatements) {
+      await customStatement(statement);
+    }
+  }
+
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (m) => m.createAll(),
+    onCreate: (m) async {
+      await m.createAll();
+      await _createOperationSchema();
+    },
     onUpgrade: (m, from, to) async {
       if (from < 2 && to >= 2) {
         await m.deleteTable('index_tab_rows');
         await m.alterTable(TableMigration(pageRows));
+      }
+      if (from < 3 && to >= 3) {
+        await _createOperationSchema();
       }
     },
     beforeOpen: (details) async {

@@ -711,8 +711,7 @@ class NotebookRepository {
             ..where((row) => row.uid.equals(notebook.uid)))
           .write(NotebookRowsCompanion(updatedAt: Value(updatedAt)));
       for (final entry in pagesById.values) {
-        await _deletePageChildren(entry.value.id);
-        await _insertPage(notebook.uid, entry.value, entry.key);
+        await _upsertPage(notebook.uid, entry.value, entry.key);
       }
       return true;
     });
@@ -816,10 +815,7 @@ class NotebookRepository {
               updatedAt: updatedAt,
             ),
           );
-      await _deleteNotebookChildren(notebookToSave.uid);
-      for (final entry in notebookToSave.pages.asMap().entries) {
-        await _insertPage(notebookToSave.uid, entry.value, entry.key);
-      }
+      await _upsertNotebookPages(notebookToSave);
       return true;
     });
     if (saved) {
@@ -1922,6 +1918,111 @@ class NotebookRepository {
           .insert(
             _strokeToCompanion(normalizedPage.id, entry.value, entry.key),
           );
+    }
+  }
+
+  /// Preserve stable row IDs: update changed pages and delete only missing
+  /// pages and objects instead of replacing every child after each save.
+  Future<void> _upsertNotebookPages(Notebook notebook) async {
+    final present = notebook.pages.map((page) => page.id).toSet();
+    final previous = await (database.select(
+      database.pageRows,
+    )..where((row) => row.notebookUid.equals(notebook.uid))).get();
+    for (final entry in notebook.pages.asMap().entries) {
+      await _upsertPage(notebook.uid, entry.value, entry.key);
+    }
+    for (final page in previous) {
+      if (present.contains(page.uid)) {
+        continue;
+      }
+      await _deletePageChildren(page.uid);
+      await (database.delete(
+        database.pageRows,
+      )..where((row) => row.uid.equals(page.uid))).go();
+    }
+  }
+
+  Future<void> _upsertPage(
+    String notebookUid,
+    NotePage page,
+    int pageIndex,
+  ) async {
+    final normalized = InkEraserEngine.normalizePage(page);
+    final existing = await (database.select(
+      database.pageRows,
+    )..where((row) => row.uid.equals(normalized.id))).getSingleOrNull();
+    if (existing != null && existing.notebookUid != notebookUid) {
+      throw StateError('Page ID belongs to another notebook: '
+          '${normalized.id}');
+    }
+
+    await database.into(database.pageRows).insertOnConflictUpdate(
+      PageRowsCompanion.insert(
+        uid: normalized.id,
+        notebookUid: notebookUid,
+        pageIndex: pageIndex,
+        title: normalized.title,
+        isBookmarked: normalized.isBookmarked,
+      ),
+    );
+    await _deleteMissingPageRows(
+      'text_block_rows',
+      normalized.id,
+      normalized.textBlocks.map((item) => item.id).toSet(),
+    );
+    await _deleteMissingPageRows(
+      'image_block_rows',
+      normalized.id,
+      normalized.imageBlocks.map((item) => item.id).toSet(),
+    );
+    await _deleteMissingPageRows(
+      'ink_stroke_rows',
+      normalized.id,
+      normalized.inkStrokes.map((item) => item.id).toSet(),
+    );
+
+    for (final entry in normalized.textBlocks.asMap().entries) {
+      await database.into(database.textBlockRows).insertOnConflictUpdate(
+        _textToCompanion(normalized.id, entry.value, entry.key),
+      );
+    }
+    for (final entry in normalized.imageBlocks.asMap().entries) {
+      await database.into(database.imageBlockRows).insertOnConflictUpdate(
+        _imageToCompanion(normalized.id, entry.value, entry.key),
+      );
+    }
+    for (final entry in normalized.inkStrokes.asMap().entries) {
+      await database.into(database.inkStrokeRows).insertOnConflictUpdate(
+        _strokeToCompanion(normalized.id, entry.value, entry.key),
+      );
+    }
+  }
+
+  Future<void> _deleteMissingPageRows(
+    String table,
+    String pageUid,
+    Set<String> retained,
+  ) async {
+    const allowed = {
+      'text_block_rows',
+      'image_block_rows',
+      'ink_stroke_rows',
+    };
+    if (!allowed.contains(table)) {
+      throw ArgumentError.value(table, 'table');
+    }
+    final previous = await database.customSelect(
+      'SELECT uid FROM $table WHERE page_uid = ?',
+      variables: [Variable<String>(pageUid)],
+    ).get();
+    for (final row in previous) {
+      final uid = row.read<String>('uid');
+      if (!retained.contains(uid)) {
+        await database.customStatement(
+          'DELETE FROM $table WHERE uid = ? AND page_uid = ?',
+          [uid, pageUid],
+        );
+      }
     }
   }
 

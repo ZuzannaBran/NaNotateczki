@@ -55,7 +55,14 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
   }
 
   return NotesDatabaseConnection(
-    executor: NativeDatabase.createInBackground(file),
+    executor: NativeDatabase.createInBackground(
+      file,
+      setup: (database) {
+        database.execute('PRAGMA journal_mode = WAL');
+        database.execute('PRAGMA synchronous = FULL');
+        database.execute('PRAGMA foreign_keys = ON');
+      },
+    ),
     freshFile: freshFile,
     recoveryPending: recoveryPending,
     recoveryReason: recoveryReason,

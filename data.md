@@ -376,6 +376,28 @@ narzędziem `age`. Skrypt nie wdraża retencji i nie zastępuje testu odtworzeni
   migracji nie edytuje się, tylko dodaje następną.
 
 
+## SQLite v3 — dziennik operacji (etap 3)
+
+Lokalna baza Drift jest migrowana addytywnie z v2 do v3. `OperationStore`
+zapisuje projekcję i operację z outboxem w jednej transakcji, a odbiór
+zdalny zapisuje operację, projekcję i checkpoint w jednej transakcji.
+ID oraz potwierdzenia muszą przetrwać ponowną wysyłkę i restart.
+Tombstones blokują ponowne użycie usuniętego UID w nowym protokole.
+
+Natywne SQLite pracuje z WAL i `synchronous=FULL`. Przy backupie bazy
+nie wolno pomijać niezatwierdzonych stron WAL. Asset jest najpierw
+utrwalany na dysku z checksumą, a następnie referencjonowany w transakcji;
+nie wolno go fizycznie kasować przed potwierdzonym checkpointem GC.
+
+**Granica kompatybilności:** istniejące zapisy snapshotowe nie zostały
+jeszcze przepięte do `OperationStore`. W etapie 5 należy wymagać jego
+transakcyjnego użycia przez wszystkie mutacje lokalne oraz uniemożliwić
+równoczesny zapis starym i nowym protokołem tego samego dokumentu.
+`operations` nie wolno automatycznie czyścić na podstawie samego ACK;
+potrzebne są potwierdzone snapshoty i bezpieczna retencja zależności.
+
+Szczegóły i scenariusze: `docs/ETAP_3_SQLITE.md`.
+
 ## Wspólna edycja sesji Web
 
 Właściciel udostępnia istniejący notebook lub board na 4 godziny.
