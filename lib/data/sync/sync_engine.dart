@@ -449,9 +449,12 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
                   failure.statusCode == 413 ||
                   failure.statusCode == 422 ||
                   (failure.statusCode == 409 && !causalGap)));
-      final delay = permanent
-          ? const Duration(minutes: 5)
-          : _backoff(failures);
+      if (permanent) {
+        // No endless retry loop and no loss of the immutable outbox entry.
+        await store.markBlocked(batch.first.operationId, failure.toString());
+        return;
+      }
+      final delay = _backoff(failures);
       // Retry only the first unacknowledged actor sequence. Other actors
       // remain eligible while this one is deferred.
       await store.scheduleRetry(batch.first.operationId, delay: delay);

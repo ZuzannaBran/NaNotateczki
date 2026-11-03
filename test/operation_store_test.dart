@@ -321,6 +321,25 @@ void main() {
     expect(anotherPage.dependencies, contains(first.operationId));
   });
 
+  test('permanent failure survives and blocks only its own actor',
+      () async {
+    final first = await add('blocked');
+    final next = await add('same-actor-after-blocked');
+    final other = await add('other-actor', actorId: 'device-two');
+    await store.markBlocked(first.operationId, 'Server rejected 422');
+    expect(await store.blockedReason(first.operationId), 'Server rejected 422');
+    expect(
+      (await store.pending()).map((op) => op.operationId),
+      [other.operationId],
+    );
+    expect(
+      (await store.pending(includeDeferred: true))
+          .map((op) => op.operationId),
+      [first.operationId, next.operationId, other.operationId],
+    );
+    expect(await store.isPending(first.operationId), isTrue);
+  });
+
   test('outbox pagination returns every pending intent in actor order',
       () async {
     for (var i = 0; i < 5; i++) {
@@ -486,7 +505,7 @@ void main() {
         ),
         isFalse,
       );
-      expect(upgraded.schemaVersion, 4);
+      expect(upgraded.schemaVersion, 5);
     } finally {
       await upgraded.close();
     }
@@ -538,7 +557,7 @@ void main() {
         "WHERE type = 'table' AND name = 'operations'",
       ).getSingle();
       expect(operations.read<String>('name'), 'operations');
-      expect(upgraded.schemaVersion, 4);
+      expect(upgraded.schemaVersion, 5);
     } finally {
       await upgraded.close();
     }

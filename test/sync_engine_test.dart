@@ -327,6 +327,7 @@ void main() {
     await engine.start();
     expect(await store.isPending(valid.operationId), isFalse);
     expect(await store.isPending(invalid.operationId), isTrue);
+    expect(await store.blockedReason(invalid.operationId), contains('422'));
     expect(poisoned.accepted.single.operation.operationId, valid.operationId);
   });
 

@@ -31,7 +31,10 @@ const operationSchemaStatements = <String>[
       REFERENCES operations(operation_id) ON DELETE RESTRICT,
     queued_at INTEGER NOT NULL,
     attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts >= 0),
-    retry_after INTEGER NOT NULL DEFAULT 0
+    retry_after INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'queued'
+      CHECK(status IN ('queued', 'blocked')),
+    last_error TEXT
   )
   ''',
   '''

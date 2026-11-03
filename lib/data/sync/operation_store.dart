@@ -381,13 +381,15 @@ class OperationStore {
     // delayed. A rebase needs *all* unacknowledged edits, including retries.
     final ready = includeDeferred
         ? ''
-        : 'AND x.retry_after <= ? AND NOT EXISTS ('
+        : "AND x.status = 'queued' "
+              'AND x.retry_after <= ? AND NOT EXISTS ('
               'SELECT 1 FROM operation_outbox earlier '
               'JOIN operations predecessor '
               'ON predecessor.operation_id = earlier.operation_id '
               'WHERE predecessor.actor_id = o.actor_id '
               'AND predecessor.actor_seq < o.actor_seq '
-              'AND earlier.retry_after > ?) ';
+              "AND (earlier.status = 'blocked' "
+              'OR earlier.retry_after > ?)) ';
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
     final rows = await database.customSelect(
       'SELECT o.envelope_json FROM operation_outbox x '
@@ -430,9 +432,36 @@ class OperationStore {
     final at = DateTime.now().toUtc().add(delay).millisecondsSinceEpoch;
     await database.customStatement(
       'UPDATE operation_outbox SET attempts = attempts + 1, '
-      'retry_after = ? WHERE operation_id = ?',
+      "retry_after = ? WHERE operation_id = ? AND status = 'queued'",
       [at, operationId],
     );
+  }
+
+  /// Retains an operation the server has permanently rejected.
+  /// Later actor sequences remain blocked, but other actors can progress.
+  Future<void> markBlocked(String operationId, String reason) async {
+    if (reason.isEmpty) {
+      throw ArgumentError('A blocked operation needs a reason.');
+    }
+    await database.transaction(() async {
+      if (!await isPending(operationId)) {
+        throw StateError('Cannot block an unknown operation.');
+      }
+      await database.customStatement(
+        "UPDATE operation_outbox SET status = 'blocked', last_error = ? "
+        'WHERE operation_id = ?',
+        [reason, operationId],
+      );
+    });
+  }
+
+  Future<String?> blockedReason(String operationId) async {
+    final row = await _row(
+      "SELECT last_error FROM operation_outbox WHERE operation_id = ? "
+      "AND status = 'blocked'",
+      [operationId],
+    );
+    return row?['last_error'] as String?;
   }
 
   /// ACK and outbox deletion are atomic and idempotent.

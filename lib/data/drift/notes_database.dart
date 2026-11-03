@@ -351,7 +351,7 @@ class NotesDatabase extends _$NotesDatabase {
   }
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -369,6 +369,24 @@ class NotesDatabase extends _$NotesDatabase {
       } else if (from == 3 && to >= 4) {
         for (final statement in operationTombstoneV4Migration) {
           await customStatement(statement);
+        }
+      }
+      if (from >= 3 && from < 5 && to >= 5) {
+        final columns = await customSelect(
+          'PRAGMA table_info(operation_outbox)',
+        ).get();
+        final names = columns.map((row) => row.read<String>('name')).toSet();
+        if (!names.contains('status')) {
+          await customStatement(
+            "ALTER TABLE operation_outbox ADD COLUMN status TEXT "
+            "NOT NULL DEFAULT 'queued' "
+            "CHECK(status IN ('queued', 'blocked'))",
+          );
+        }
+        if (!names.contains('last_error')) {
+          await customStatement(
+            'ALTER TABLE operation_outbox ADD COLUMN last_error TEXT',
+          );
         }
       }
     },
