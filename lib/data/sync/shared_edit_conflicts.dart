@@ -48,6 +48,17 @@ bool hasRejectedSharedEdits(
   return false;
 }
 
+/// A delayed network snapshot must never replace a newer confirmation or
+/// editor content that has changed before its local save notification.
+bool canInstallSharedGuestRevision({
+  required int incomingRevision,
+  required int confirmedRevision,
+  required Map<String, dynamic> expectedLocal,
+  required Map<String, dynamic> visibleLocal,
+}) =>
+    incomingRevision >= confirmedRevision &&
+    _sameValue(expectedLocal['pages'], visibleLocal['pages']);
+
 Map<String, Map<String, dynamic>> _byId(Object? items) {
   final indexed = <String, Map<String, dynamic>>{};
   if (items is! List) {
