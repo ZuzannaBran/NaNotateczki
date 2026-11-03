@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -490,7 +491,9 @@ void main() {
       checkpointScope: 'user-A-v2',
       enableRealtime: false,
       applyRemote: (_, _) async {},
-      onRemoteCommitted: (_) async => notifications++,
+      onRemoteCommitted: (_) async {
+        notifications++;
+      },
     );
     final created = await local('own-stroke');
     await engine.start();
