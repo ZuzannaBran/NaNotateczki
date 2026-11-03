@@ -149,21 +149,32 @@ int compareOperationPrecedence(OperationEnvelope a, OperationEnvelope b) {
 
 /// A lossless stage-2 checkpoint. Compaction needs a durable ID lookup.
 class OperationCheckpoint {
-  OperationCheckpoint({required List<OperationEnvelope> operations})
-    : operations = List.unmodifiable(operations);
+  OperationCheckpoint({
+    required List<OperationEnvelope> operations,
+    Map<String, String> rejectedOperations = const {},
+  }) : operations = List.unmodifiable(operations),
+       rejectedOperations = Map.unmodifiable(rejectedOperations);
 
   static const schemaVersion = 1;
   final List<OperationEnvelope> operations;
+  final Map<String, String> rejectedOperations;
 
   Map<String, dynamic> toJson() => {
     'schemaVersion': schemaVersion,
     'operations': [for (final op in operations) op.toJson()],
+    'rejectedOperations': Map<String, String>.of(rejectedOperations),
   };
 
   factory OperationCheckpoint.fromJson(Map<String, dynamic> json) {
     if (json['schemaVersion'] != schemaVersion ||
         json['operations'] is! List) {
       throw const FormatException('Invalid operation checkpoint.');
+    }
+    final rejected = Map<String, String>.from(
+      json['rejectedOperations'] as Map? ?? const {},
+    );
+    if (rejected.values.any((reason) => reason.isEmpty)) {
+      throw const FormatException('Invalid rejected operations.');
     }
     return OperationCheckpoint(
       operations: [
@@ -172,6 +183,7 @@ class OperationCheckpoint {
             Map<String, dynamic>.from(value as Map),
           ),
       ],
+      rejectedOperations: rejected,
     );
   }
 }
@@ -198,9 +210,11 @@ class CausalOperationBuffer {
       queue.ingest(operation);
     }
     if (queue.pendingCount != 0 ||
-        queue._accepted.length != operations.length) {
+        queue._accepted.length != operations.length ||
+        checkpoint.rejectedOperations.keys.any(queue._accepted.containsKey)) {
       throw const FormatException('Inconsistent causal checkpoint.');
     }
+    queue._rejected.addAll(checkpoint.rejectedOperations);
     return queue;
   }
 
@@ -226,6 +240,7 @@ class CausalOperationBuffer {
     return OperationCheckpoint(
       operations: _accepted.values.toList()
         ..sort(compareOperationPrecedence),
+      rejectedOperations: _rejected,
     );
   }
 
