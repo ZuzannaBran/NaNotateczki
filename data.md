@@ -192,7 +192,9 @@ katalogu głównego ani całego katalogu domowego jako celu.
   platformach natywnych; trwałe dane są pobierane przez REST.
 ## Serwer
 
-Kod wdrożeniowy znajduje się w `server/`. PostgreSQL i API są dostępne tylko
+Kanoniczny kod wdrożeniowy znajduje się w repozytorium
+`NaNotateczki-serwer/main`. Katalog `server/` aplikacji jest lustrem
+zgodności używanym przez istniejące testy, a nie niezależnym backendem. PostgreSQL i API są dostępne tylko
 w prywatnej sieci Compose. Caddy wiąże port `8080` wyłącznie do
 `127.0.0.1`; publiczne HTTPS ma kończyć Cloudflare Tunnel.
 

@@ -539,7 +539,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   OCR, crop, rotacja oraz legacy inline bytes.
   4: `ImageBlock`.
 
-### `lib/features/notebook/data/notebook_repository.dart` (2494 linie)
+### `lib/features/notebook/data/notebook_repository.dart` (aktualizowany)
 
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. Po zapisaniu dowodów podejrzany zapis
@@ -556,7 +556,9 @@ ponownie, a niskopoziomowa serializacja odrzuca próbę utrwalenia eraser-stroke
 `NotebookRepositoryChange` rozróżnia pełną zmianę, zmianę konkretnych page IDs
 i zmianę samych metadanych, dzięki czemu scheduler może uruchomić backup v6
 tylko dla właściwych stron. Repozytorium udostępnia też oczekiwanie na
-wszystkie trwające zapisy per UID. Ręczny eksport pozostaje samowystarczalny
+wszystkie trwające zapisy per UID. Atomowe przywracanie i import respektują
+parametr `notifyChanges`, zgłaszając zmianę dopiero po zatwierdzeniu.
+Ręczny eksport pozostaje samowystarczalny
 i zachowuje obrazy inline.
 
 - 23: `DataIntegrityIncidentHandler`; 30: `NotebookRepositoryChange`;
@@ -1586,7 +1588,9 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
 
 - `data.md`: źródło prawdy dla lokalnego układu plików, trybów konta,
   backupu serwerowego, synchronizacji i znanych granic szyfrowania.
-- `server/`: lekki stos PostgreSQL 17 + FastAPI + Caddy + opcjonalny
+- `server/`: lustro kanonicznego backendu `NaNotateczki-serwer/main`;
+  różnice sprawdza `tool/check_server_mirror.py`. Lekki stos
+  PostgreSQL 17 + FastAPI + Caddy + opcjonalny
   Cloudflare Tunnel. API zawiera Argon2id/JWT/rotowane refresh tokeny,
   owner isolation, CAS/idempotencję, tombstones, change events, WebSocket
   oraz pending/upload/finalize dla zweryfikowanych snapshotów. Migracja SQL
@@ -1659,7 +1663,8 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
 Testy pokrywają repozytorium i ochronę danych, backup, sync, flattening gumki,
 indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 
-- `test/notebook_repository_test.dart`: zapis, migracja legacy gumek, kontrola
+- `test/notebook_repository_test.dart`: regresje powiadomień po atomowym
+  restore/import, zapis, migracja legacy gumek, kontrola
   uprawnionych usunięć i nieoczekiwanej utraty danych,
   migracja v1→v2 usuwająca dane Index tab bez utraty stron.
 - `test/local_backup_service_test.dart`:
@@ -2291,3 +2296,5 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `lib/core/error/one_shot_error_notice.dart`: śledzi nowe incydenty
   usług per instancja; `library_account_slot.dart` nie odtwarza
   zastanych wcześniej komunikatów po otwarciu dialogu.
+
+- `docs/ETAP_0_STAN_WYJSCIOWY.md`: stan wyjściowy zapisu, usuwania, backupu i share oraz granice weryfikacji.
