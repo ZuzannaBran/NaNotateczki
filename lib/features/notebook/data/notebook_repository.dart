@@ -280,18 +280,44 @@ class NotebookRepository {
     _lastFetchSkippedCorruptRows = false;
     _lastCorruptNotebookIds.clear();
     _isNotebookCacheComplete = true;
-    onChanged?.call([
-      for (final item in persisted) NotebookRepositoryChange.full(item.uid),
-    ]);
+    if (notifyChanges) {
+      onChanged?.call([
+        for (final item in persisted) NotebookRepositoryChange.full(item.uid),
+      ]);
+    }
     return persisted.length;
   }
 
   Future<int> importNotebooksAtomically(
     List<Notebook> notebooks, {
     bool verifiedRemoteSync = false,
+    bool notifyChanges = true,
+    bool serializeWithLocalSaves = false,
   }) async {
     if (notebooks.isEmpty) {
       return 0;
+    }
+    if (serializeWithLocalSaves) {
+      if (notebooks.length != 1) {
+        throw ArgumentError('Serialized import requires one notebook.');
+      }
+      final uid = notebooks.single.uid;
+      final previous = _saveTails[uid] ?? Future<void>.value();
+      final completion = Completer<void>();
+      _saveTails[uid] = completion.future;
+      try {
+        await previous;
+        return await importNotebooksAtomically(
+          notebooks,
+          verifiedRemoteSync: verifiedRemoteSync,
+          notifyChanges: notifyChanges,
+        );
+      } finally {
+        completion.complete();
+        if (identical(_saveTails[uid], completion.future)) {
+          _saveTails.remove(uid);
+        }
+      }
     }
     final normalizedNotebooks = [
       for (final notebook in notebooks)
