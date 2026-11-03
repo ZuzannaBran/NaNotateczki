@@ -146,10 +146,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       _applyAppearance(document);
       setState(() {});
       if (recovered) {
-        _pushTimer = Timer(
-          sharedGuestPushDebounce,
-          () => unawaited(_push()),
-        );
+        _pushTimer = Timer(sharedGuestPushDebounce, () => unawaited(_push()));
       } else {
         // Close the gap between the first read and WebSocket auth.
         unawaited(_refresh());
@@ -178,10 +175,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     _dirty = true;
     unawaited(_persistPending());
     _pushTimer?.cancel();
-    _pushTimer = Timer(
-      sharedGuestPushDebounce,
-      () => unawaited(_push()),
-    );
+    _pushTimer = Timer(sharedGuestPushDebounce, () => unawaited(_push()));
   }
 
   Future<void> _persistPending() {
@@ -373,10 +367,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       _sending = false;
       if (_dirty && _error == null && mounted) {
         _pushTimer?.cancel();
-        _pushTimer = Timer(
-          sharedGuestPushDebounce,
-          () => unawaited(_push()),
-        );
+        _pushTimer = Timer(sharedGuestPushDebounce, () => unawaited(_push()));
       }
     }
   }
@@ -475,10 +466,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     // asynchronous onChanged callback runs. It must win over a remote import.
     _dirty = true;
     _pushTimer?.cancel();
-    _pushTimer = Timer(
-      sharedGuestPushDebounce,
-      () => unawaited(_push()),
-    );
+    _pushTimer = Timer(sharedGuestPushDebounce, () => unawaited(_push()));
   }
 
   Future<void> _installRemote(
@@ -494,7 +482,8 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       return;
     }
     final editor = _editor;
-    final expected = expectedLocal ??
+    final expected =
+        expectedLocal ??
         (_base == null
             ? null
             : sharedGuestVisibleBaseline(
@@ -523,7 +512,8 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       return;
     }
     _applyAppearance(snapshot);
-    if (jsonEncode(visible['pages']) == jsonEncode(snapshot.notebook['pages'])) {
+    if (jsonEncode(visible['pages']) ==
+        jsonEncode(snapshot.notebook['pages'])) {
       _deferredRemote = null;
       _deferredExpectedLocal = null;
       _remoteRetryTimer?.cancel();
@@ -585,10 +575,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       _installingRemote = false;
       if (_dirty && !_sending && mounted && !_closed) {
         _pushTimer?.cancel();
-        _pushTimer = Timer(
-          sharedGuestPushDebounce,
-          () => unawaited(_push()),
-        );
+        _pushTimer = Timer(sharedGuestPushDebounce, () => unawaited(_push()));
       }
     }
   }
@@ -611,10 +598,9 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     _remoteRetryTimer = Timer(const Duration(milliseconds: 150), () {
       final latest = _deferredRemote;
       if (latest != null && mounted && !_closed) {
-        unawaited(_installRemote(
-          latest,
-          expectedLocal: _deferredExpectedLocal,
-        ));
+        unawaited(
+          _installRemote(latest, expectedLocal: _deferredExpectedLocal),
+        );
       }
     });
   }

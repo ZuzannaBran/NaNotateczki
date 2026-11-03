@@ -904,9 +904,9 @@ class _AccountDialogState extends State<_AccountDialog> {
     final backup = context.read<RemoteBackupScheduler>();
     await AppSaveCoordinator.instance.flushPending();
     if (!sync.isStarted) {
-      await sync.start(InitialSyncPolicy.mergeSafely).timeout(
-        const Duration(seconds: 45),
-      );
+      await sync
+          .start(InitialSyncPolicy.mergeSafely)
+          .timeout(const Duration(seconds: 45));
     }
     await sync.syncNow().timeout(const Duration(seconds: 45));
     if (sync.hasPendingChanges || sync.lastError != null) {
@@ -917,9 +917,7 @@ class _AccountDialogState extends State<_AccountDialog> {
     if (!backup.isEnabled) {
       backup.enableForSignedInAccount();
     }
-    await backup.ensureVerifiedForExit().timeout(
-      const Duration(seconds: 60),
-    );
+    await backup.ensureVerifiedForExit().timeout(const Duration(seconds: 60));
     if (backup.hasPendingBackup || backup.lastError != null) {
       throw StateError(
         'The final backup is not verified. Stay signed in and retry.',

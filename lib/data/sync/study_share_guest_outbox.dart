@@ -15,6 +15,7 @@ class PendingStudyShareEdit {
   final int baseRevision;
   final Map<String, dynamic> baseNotebook;
   final Map<String, dynamic> notebook;
+
   /// Visible state at the last accepted upload, needed to rebase new edits.
   final Map<String, dynamic>? localMergeBase;
 }

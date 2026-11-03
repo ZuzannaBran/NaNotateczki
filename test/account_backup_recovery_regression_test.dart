@@ -198,8 +198,7 @@ void main() {
     expect(stored['study_planner.json'], tombstone);
   });
 
-  test('account planner tombstone blocks stale backup on new device',
-      () async {
+  test('account planner tombstone blocks stale backup on new device', () async {
     final backup = jsonEncode({
       'notebooks': <dynamic>[],
       'libraryState': <String, dynamic>{},
@@ -231,49 +230,50 @@ void main() {
     expect(stored.containsKey('study_planner.json'), isFalse);
   });
 
-  test('backup recovers unrelated entries without resurrecting deletions',
-      () async {
-    final backup = jsonEncode({
-      'notebooks': <dynamic>[],
-      'libraryState': <String, dynamic>{},
-      'studyPlannerState': {
-        'version': 2,
-        'sessions': [
+  test(
+    'backup recovers unrelated entries without resurrecting deletions',
+    () async {
+      final backup = jsonEncode({
+        'notebooks': <dynamic>[],
+        'libraryState': <String, dynamic>{},
+        'studyPlannerState': {
+          'version': 2,
+          'sessions': [
+            {
+              'id': 'deleted-event',
+              'kind': 'event',
+              'title': 'Removed elsewhere',
+              'scheduledAt': '2026-11-04T10:00:00Z',
+            },
+            {
+              'id': 'unsynced-event',
+              'kind': 'event',
+              'title': 'Recover me',
+              'scheduledAt': '2026-11-04T11:00:00Z',
+            },
+          ],
+        },
+      });
+      final service = _service(
+        _repository(),
+        backup,
+        plannerEntries: [
           {
             'id': 'deleted-event',
-            'kind': 'event',
-            'title': 'Removed elsewhere',
-            'scheduledAt': '2026-11-04T10:00:00Z',
-          },
-          {
-            'id': 'unsynced-event',
-            'kind': 'event',
-            'title': 'Recover me',
-            'scheduledAt': '2026-11-04T11:00:00Z',
+            'modifiedAt': '2026-11-03T01:00:00Z',
+            'deleted': true,
+            'entry': null,
           },
         ],
-      },
-    });
-    final service = _service(
-      _repository(),
-      backup,
-      plannerEntries: [
-        {
-          'id': 'deleted-event',
-          'modifiedAt': '2026-11-03T01:00:00Z',
-          'deleted': true,
-          'entry': null,
-        },
-      ],
-    );
-    expect(await service.hydrateFromLatestAccountBackup(), isTrue);
-    final recovered = jsonDecode(stored['study_planner.json']!);
-    expect(recovered['sessions'], hasLength(1));
-    expect(recovered['sessions'].single['id'], 'unsynced-event');
-  });
+      );
+      expect(await service.hydrateFromLatestAccountBackup(), isTrue);
+      final recovered = jsonDecode(stored['study_planner.json']!);
+      expect(recovered['sessions'], hasLength(1));
+      expect(recovered['sessions'].single['id'], 'unsynced-event');
+    },
+  );
 
-  test('backup preserves local entries while recovering unknown IDs',
-      () async {
+  test('backup preserves local entries while recovering unknown IDs', () async {
     stored['study_planner.json'] = jsonEncode({
       'version': 2,
       'sessions': [
@@ -443,7 +443,8 @@ RemoteBackupService _service(
         final entries = plannerPageSize == null
             ? plannerEntries.skip(start).toList()
             : plannerEntries.skip(start).take(plannerPageSize).toList();
-        final next = plannerPageSize != null &&
+        final next =
+            plannerPageSize != null &&
                 start + entries.length < plannerEntries.length
             ? entries.last['id'] as String
             : null;

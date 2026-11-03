@@ -210,7 +210,9 @@ void main() {
     final files = <String, String>{
       'library_folders.json': jsonEncode({
         'folders': ['Already deleted'],
-        'covers': {'Already deleted': {'color': 7}},
+        'covers': {
+          'Already deleted': {'color': 7},
+        },
         'plannerTasks': {},
         'recentCoverColors': <int>[],
       }),
@@ -259,8 +261,10 @@ void main() {
       (jsonDecode(files['library_folders.json']!) as Map)['folders'],
       isEmpty,
     );
-    expect(files.keys.any((key) => key.startsWith('account_preimport_')),
-        isTrue);
+    expect(
+      files.keys.any((key) => key.startsWith('account_preimport_')),
+      isTrue,
+    );
   });
 
   test('expired access token is refreshed without signing out', () async {

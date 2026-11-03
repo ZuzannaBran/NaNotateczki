@@ -17,9 +17,7 @@ void main() {
         expect(request.url.path, '/v1/time');
         expect(request.headers.containsKey('Authorization'), isFalse);
         return http.Response(
-          jsonEncode({
-            'serverTimeMs': serverTime.millisecondsSinceEpoch,
-          }),
+          jsonEncode({'serverTimeMs': serverTime.millisecondsSinceEpoch}),
           200,
         );
       }),
