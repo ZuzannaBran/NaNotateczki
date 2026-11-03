@@ -15,7 +15,7 @@ Future<NotesDatabase> openSharedGuestDatabase() async {
   return NotesDatabase(WasmDatabase.inMemory(sqlite));
 }
 
-/// A durable per-invitation operation journal, never the account database.
+/// A durable per-invitation and per-guest journal, never the account DB.
 ///
 /// Unlike the v1 preview database, this stores unacknowledged v2 intents
 /// across browser reloads. It must not be cleared before explicit ACK or
@@ -32,7 +32,7 @@ Future<NotesDatabase> openSharedGuestOperationDatabase(
   }
   if (guestActorId.isEmpty ||
       guestActorId.length > 128 ||
-      RegExp(r'[\\x00-\\x1f\\x7f]').hasMatch(guestActorId)) {
+      RegExp(r'[\x00-\x1f\x7f]').hasMatch(guestActorId)) {
     throw const FormatException('Invalid guest actor namespace.');
   }
   final key = sha256.convert(
