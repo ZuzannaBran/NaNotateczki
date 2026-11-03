@@ -151,7 +151,9 @@ class OperationEnvelope {
         throw const FormatException('Create payload ID does not match target.');
       }
       if (value.containsKey('uid') && value['uid'] != documentId) {
-        throw const FormatException('Create payload UID does not match target.');
+        throw const FormatException(
+          'Create payload UID does not match target.',
+        );
       }
     }
   }

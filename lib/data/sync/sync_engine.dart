@@ -107,9 +107,8 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     // Actor sequences and causal frontiers are document-scoped. An account
     // may edit unrelated documents concurrently, and guests cannot fetch
     // dependencies on private documents belonging to the owner.
-    final scopedActorId = sha256
-        .convert(utf8.encode(jsonEncode([actorId, checkpointScope, documentId])))
-        .toString();
+    final actorData = jsonEncode([actorId, checkpointScope, documentId]);
+    final scopedActorId = sha256.convert(utf8.encode(actorData)).toString();
     final operation = await store.writeLocal(
       actorId: scopedActorId,
       documentId: documentId,
