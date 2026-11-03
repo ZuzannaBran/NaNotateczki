@@ -291,6 +291,21 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
   odpowiedzią. Odtwarzanie backupu pobiera komplet stron, w tym tombstones,
   przed rozstrzygnięciem o importowaniu starego dokumentu.
 
+## Kontrola czasu urządzenia przy starcie konta
+
+Po zalogowaniu i wznowieniu zapisanej sesji aplikacja odczytuje
+`GET /v1/time` z własnego serwera. Endpoint zwraca milisekundy epoki
+UTC bez cache; klient liczy różnicę od środka czasu żądania, mierząc
+RTT monotonicznym `Stopwatch`. Przy różnicy większej niż 60 sekund
++ połowa RTT pokazuje 15-sekundowy SnackBar i zapisuje zdarzenie w
+`AppErrorLog` (wysyłanym przez diagnostics). Pomiary o RTT ponad
+10 sekund oraz skoki zegara podczas żądania są odrzucane.
+Niedostępność sieci nie blokuje startu ani lokalnej pracy.
+Porównanie działa jednak tylko przy poprawnym czasie serwera
+(zalecana synchronizacja NTP). `DateTime.now().toUtc()` eliminuje
+różnice stref, ale nie koryguje zegara urządzenia. Ostrzeżenie nie
+zmienia reguł CAS/tombstones ani samo nie ustawia zegara.
+
 ## Synchronizacja preferencji konta
 
 Na Linuxie, Web, iOS i Androidzie ustawienia `app_prefs.json`,
