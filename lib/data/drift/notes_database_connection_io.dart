@@ -31,11 +31,13 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
   );
   final dir = Directory(migration.dataPath);
   final file = File('${dir.path}/$name');
+  await file.parent.create(recursive: true);
   final marker = _recoveryMarker(file);
   await _recoverRecoveryMarker(marker);
   final freshFile = !file.existsSync();
 
   if (freshFile &&
+      name == 'notes.sqlite' &&
       !await marker.exists() &&
       await _hasLocalRecoveryCandidate(dir)) {
     await _writeRecoveryMarker(
@@ -67,10 +69,11 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
     recoveryPending: recoveryPending,
     recoveryReason: recoveryReason,
     legacyImageDirectory:
+        name != 'notes.sqlite' ||
         migration.conflictingPaths.any((path) => path.startsWith('images/'))
         ? null
         : '${documents.path}/images',
-    imageDirectory: '${dir.path}/images',
+    imageDirectory: '${file.parent.path}/images',
   );
 }
 
