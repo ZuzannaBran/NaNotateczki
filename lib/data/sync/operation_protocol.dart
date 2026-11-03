@@ -123,11 +123,48 @@ class OperationEnvelope {
     required String documentId,
     String? objectId,
   }) {
-    if (kind == OperationKind.textInsert ||
-        kind == OperationKind.textDelete ||
-        kind == OperationKind.assetAttach ||
+    if (kind == OperationKind.assetAttach ||
         kind == OperationKind.assetDetach) {
-      throw UnsupportedError('This operation has no v2 reducer yet.');
+      throw UnsupportedError('Asset operations need verified transport.');
+    }
+    if (kind == OperationKind.textInsert) {
+      final anchor = payload['afterAtomId'];
+      final atoms = payload['atoms'];
+      if (payload.length != 2 ||
+          !payload.containsKey('afterAtomId') ||
+          (anchor != null &&
+              (anchor is! String || !_uuidPattern.hasMatch(anchor))) ||
+          atoms is! List ||
+          atoms.isEmpty ||
+          atoms.length > 256) {
+        throw const FormatException('Invalid text.insert payload.');
+      }
+      final seen = <String>{};
+      for (final atom in atoms) {
+        if (atom is! Map ||
+            atom.length != 2 ||
+            atom['id'] is! String ||
+            atom['text'] is! String ||
+            !_uuidPattern.hasMatch(atom['id'] as String) ||
+            !seen.add(atom['id'] as String) ||
+            (atom['text'] as String).isEmpty ||
+            (atom['text'] as String).runes.length > 1024) {
+          throw const FormatException('Invalid text atom.');
+        }
+      }
+      return;
+    }
+    if (kind == OperationKind.textDelete) {
+      final ids = payload['atomIds'];
+      if (payload.length != 1 ||
+          ids is! List ||
+          ids.isEmpty ||
+          ids.length > 256 ||
+          ids.any((id) => id is! String || !_uuidPattern.hasMatch(id)) ||
+          ids.toSet().length != ids.length) {
+        throw const FormatException('Invalid text.delete payload.');
+      }
+      return;
     }
     if (kind.wireName.endsWith('.delete')) {
       if (payload.isNotEmpty) {
