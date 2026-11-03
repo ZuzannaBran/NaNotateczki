@@ -42,6 +42,62 @@ void main() {
     },
   );
 
+  test('atomic recovery emits one change after a successful restore', () async {
+    final notifications = <List<NotebookRepositoryChange>>[];
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(
+      database,
+      onChanged: (changes) => notifications.add(changes.toList()),
+    );
+    final createdAt = DateTime.utc(2026, 1, 1);
+    final notebook = Notebook(
+      uid: 'restored-notebook',
+      title: 'Recovered',
+      kind: NotebookKind.notebook,
+      folder: 'Notes',
+      createdAt: createdAt,
+      updatedAt: createdAt,
+      pages: [
+        NotePage(
+          id: 'restored-page',
+          title: 'Page',
+          textBlocks: const [],
+          imageBlocks: const [],
+          inkStrokes: const [],
+          isBookmarked: false,
+        ),
+      ],
+    );
+
+    expect(await repository.restoreNotebooksAtomically([notebook]), 1);
+    expect(notifications, hasLength(1));
+    expect(notifications.single, hasLength(1));
+    expect(notifications.single.single.uid, notebook.uid);
+    expect(notifications.single.single.isFull, isTrue);
+
+    await expectLater(
+      repository.restoreNotebooksAtomically([notebook]),
+      throwsA(isA<StateError>()),
+    );
+    expect(notifications, hasLength(1));
+
+    final quietDatabase = NotesDatabase(NativeDatabase.memory());
+    addTearDown(quietDatabase.close);
+    final quietRepository = NotebookRepository(
+      quietDatabase,
+      onChanged: (changes) => notifications.add(changes.toList()),
+    );
+    expect(
+      await quietRepository.restoreNotebooksAtomically(
+        [notebook],
+        notifyChanges: false,
+      ),
+      1,
+    );
+    expect(notifications, hasLength(1));
+  });
+
   test(
     'saveRecoveredCopy remaps nested ids to avoid SQLite conflicts',
     () async {
