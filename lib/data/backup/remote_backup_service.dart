@@ -550,17 +550,6 @@ class RemoteBackupService {
       throw const FormatException('Invalid planner backup tombstones.');
     }
 
-    final rawLocal = await readStoredText('study_planner.json');
-    final local = _jsonObject(_decodeOptionalObject(rawLocal));
-    final existingSessions = local['sessions'];
-    final existingTombstones = local['tombstones'];
-    if (existingSessions != null && existingSessions is! List) {
-      throw const FormatException('Invalid local planner entries.');
-    }
-    if (existingTombstones != null && existingTombstones is! Map) {
-      throw const FormatException('Invalid local planner tombstones.');
-    }
-
     // Read all pages: a tombstone can appear beyond the first 200 records.
     final protectedIds = <String>{};
     String? after;
@@ -591,6 +580,19 @@ class RemoteBackupService {
       }
       after = next as String?;
     } while (after != null);
+
+    // Inspect local state after network I/O so edits made during recovery
+    // are not overwritten by a stale pre-request snapshot.
+    final rawLocal = await readStoredText('study_planner.json');
+    final local = _jsonObject(_decodeOptionalObject(rawLocal));
+    final existingSessions = local['sessions'];
+    final existingTombstones = local['tombstones'];
+    if (existingSessions != null && existingSessions is! List) {
+      throw const FormatException('Invalid local planner entries.');
+    }
+    if (existingTombstones != null && existingTombstones is! Map) {
+      throw const FormatException('Invalid local planner tombstones.');
+    }
 
     final keptSessions = existingSessions is List
         ? List<dynamic>.from(existingSessions)
@@ -630,6 +632,9 @@ class RemoteBackupService {
       return false;
     }
     // Never replace locally edited records or deletions with an old backup.
+    if (!session.isSignedIn || session.userId != userId) {
+      return false;
+    }
     await writeStoredText('study_planner.json', jsonEncode({
       ...local,
       'version': 2,
