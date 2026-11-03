@@ -143,6 +143,8 @@ class OperationEnvelope {
       for (final atom in atoms) {
         if (atom is! Map ||
             atom.length != 2 ||
+            !atom.containsKey('id') ||
+            !atom.containsKey('text') ||
             atom['id'] is! String ||
             atom['text'] is! String ||
             !_uuidPattern.hasMatch(atom['id'] as String) ||
@@ -181,9 +183,14 @@ class OperationEnvelope {
         (!creating && value.isEmpty)) {
       throw FormatException('Expected exactly one $fieldName object.');
     }
-    if (!creating && (value.containsKey('id') || value.containsKey('uid'))) {
+    if (!creating &&
+        (value.containsKey('id') ||
+            value.containsKey('uid') ||
+            (kind.target == OperationTarget.object &&
+                (value.containsKey('objectType') ||
+                    value.containsKey('textAtoms'))))) {
       throw const FormatException(
-        'Stable IDs cannot be changed by property edits.',
+        'Identity and CRDT internals cannot be changed by property edits.',
       );
     }
     for (final key in value.keys) {
