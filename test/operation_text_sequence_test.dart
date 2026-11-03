@@ -63,6 +63,39 @@ void main() {
     expect(OperationTextSequence.render(ab), 'BA');
   });
 
+  test('insertion at caret precedes the existing successor', () {
+    final original = textOperation(
+      operationId: firstId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      logicalClock: 4,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'A'},
+          {'id': secondId, 'text': 'B'},
+        ],
+      },
+    );
+    final atCaret = textOperation(
+      operationId: thirdId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      logicalClock: 5,
+      payload: {
+        'afterAtomId': firstId,
+        'atoms': [
+          {'id': thirdId, 'text': 'X'},
+        ],
+      },
+    );
+    final state = OperationTextSequence.apply(
+      OperationTextSequence.apply({}, original),
+      atCaret,
+    );
+    expect(OperationTextSequence.render(state), 'AXB');
+  });
+
   test('deleted atoms stay as anchors for delayed insertions', () {
     final insert = textOperation(
       operationId: firstId,
