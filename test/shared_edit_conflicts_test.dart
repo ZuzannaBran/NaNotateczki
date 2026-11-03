@@ -96,7 +96,10 @@ void main() {
       final acknowledged = _doc(
         text: 'mine',
         strokes: [
-          {'id': 'remote-ink', 'points': [1, 2]},
+          {
+            'id': 'remote-ink',
+            'points': [1, 2],
+          },
         ],
       );
       final expected = sharedGuestVisibleBaseline(
@@ -142,7 +145,10 @@ void main() {
     final visible = _doc(
       text: 'saved',
       strokes: [
-        {'id': 'new-ink', 'points': [1, 2]},
+        {
+          'id': 'new-ink',
+          'points': [1, 2],
+        },
       ],
     );
     expect(
@@ -164,5 +170,4 @@ void main() {
       isTrue,
     );
   });
-
 }

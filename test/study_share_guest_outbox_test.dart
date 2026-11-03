@@ -99,27 +99,36 @@ void main() {
     const mergeBase = <String, dynamic>{
       'uid': 'original',
       'pages': [
-        {'id': 'page', 'inkStrokes': [{'id': 'guest-a'}]},
+        {
+          'id': 'page',
+          'inkStrokes': [
+            {'id': 'guest-a'},
+          ],
+        },
       ],
     };
     const changed = <String, dynamic>{
       'uid': 'original',
       'pages': [
-        {'id': 'page', 'inkStrokes': [
-          {'id': 'guest-a'},
-          {'id': 'guest-c'},
-        ]},
+        {
+          'id': 'page',
+          'inkStrokes': [
+            {'id': 'guest-a'},
+            {'id': 'guest-c'},
+          ],
+        },
       ],
     };
-    await outbox.write(const PendingStudyShareEdit(
-      baseRevision: 12,
-      baseNotebook: base,
-      notebook: changed,
-      localMergeBase: mergeBase,
-    ));
+    await outbox.write(
+      const PendingStudyShareEdit(
+        baseRevision: 12,
+        baseNotebook: base,
+        notebook: changed,
+        localMergeBase: mergeBase,
+      ),
+    );
     final recovered = await StudyShareGuestOutbox('session-rebase').read();
     expect(recovered!.localMergeBase, mergeBase);
     expect(recovered.notebook, changed);
   });
-
 }

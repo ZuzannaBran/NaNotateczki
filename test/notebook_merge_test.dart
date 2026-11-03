@@ -94,23 +94,39 @@ void main() {
     final accepted = note();
     final submittedStrokes =
         (submitted['pages'] as List).first['inkStrokes'] as List;
-    submittedStrokes.add({'id': 'guest-a', 'points': [2]});
+    submittedStrokes.add({
+      'id': 'guest-a',
+      'points': [2],
+    });
     final localStrokes =
         (visibleAfterSend['pages'] as List).first['inkStrokes'] as List;
-    localStrokes.add({'id': 'guest-a', 'points': [2]});
-    localStrokes.add({'id': 'guest-c', 'points': [4]});
+    localStrokes.add({
+      'id': 'guest-a',
+      'points': [2],
+    });
+    localStrokes.add({
+      'id': 'guest-c',
+      'points': [4],
+    });
     final acceptedStrokes =
         (accepted['pages'] as List).first['inkStrokes'] as List;
-    acceptedStrokes.add({'id': 'guest-a', 'points': [2]});
-    acceptedStrokes.add({'id': 'host-b', 'points': [3]});
+    acceptedStrokes.add({
+      'id': 'guest-a',
+      'points': [2],
+    });
+    acceptedStrokes.add({
+      'id': 'host-b',
+      'points': [3],
+    });
 
     final rebased = mergeNotebookChanges(
       submitted,
       visibleAfterSend,
       accepted,
     )!;
-    final ids = ((rebased['pages'] as List).single['inkStrokes'] as List)
-        .map((stroke) => stroke['id']);
+    final ids = ((rebased['pages'] as List).single['inkStrokes'] as List).map(
+      (stroke) => stroke['id'],
+    );
     expect(ids, containsAll(['old', 'guest-a', 'guest-c', 'host-b']));
     expect(ids, hasLength(4));
   });
@@ -137,11 +153,7 @@ void main() {
       'points': [3],
     });
 
-    final rebased = mergeNotebookChanges(
-      visibleRejected,
-      nextLocal,
-      accepted,
-    )!;
+    final rebased = mergeNotebookChanges(visibleRejected, nextLocal, accepted)!;
     final page = (rebased['pages'] as List).single;
     expect((page['textBlocks'] as List).single['text'], 'winning value');
     final inkIds = (page['inkStrokes'] as List)
@@ -164,15 +176,21 @@ void main() {
       'points': [4],
     });
     (accepted['pages'] as List).first['inkStrokes'].addAll([
-      {'id': 'guest-a', 'points': [2]},
-      {'id': 'host-b', 'points': [3]},
+      {
+        'id': 'guest-a',
+        'points': [2],
+      },
+      {
+        'id': 'host-b',
+        'points': [3],
+      },
     ]);
 
     final rebased = mergeNotebookChanges(sent, current, accepted)!;
-    final ids = ((rebased['pages'] as List).single['inkStrokes'] as List)
-        .map((stroke) => stroke['id']);
+    final ids = ((rebased['pages'] as List).single['inkStrokes'] as List).map(
+      (stroke) => stroke['id'],
+    );
     expect(ids, containsAll(['old', 'guest-c', 'host-b']));
     expect(ids, isNot(contains('guest-a')));
   });
-
 }

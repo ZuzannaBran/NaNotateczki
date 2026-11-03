@@ -11,7 +11,9 @@ void main() {
     };
     final archived = <String, dynamic>{
       'folders': ['Deleted'],
-      'covers': {'Deleted': {'color': 7}},
+      'covers': {
+        'Deleted': {'color': 7},
+      },
       'plannerTasks': <String, dynamic>{},
       'recentCoverColors': [2],
     };
@@ -28,7 +30,9 @@ void main() {
   test('only recovered notebook restores its folder and ancestors', () {
     final current = <String, dynamic>{
       'folders': ['Current'],
-      'covers': {'Current': {'color': 3}},
+      'covers': {
+        'Current': {'color': 3},
+      },
       'plannerTasks': {
         'new-planner': [
           {'id': 'account-task', 'title': 'Keep'},
@@ -60,24 +64,20 @@ void main() {
       },
       restoredFolderPaths: const ['Class/Math/Topic'],
     );
-    expect(
-      merged['folders'],
-      ['Class', 'Class/Math', 'Class/Math/Topic', 'Current'],
-    );
+    expect(merged['folders'], [
+      'Class',
+      'Class/Math',
+      'Class/Math/Topic',
+      'Current',
+    ]);
     expect((merged['covers'] as Map).containsKey('Old'), isFalse);
     expect((merged['covers'] as Map)['Current'], {'color': 3});
     expect((merged['covers'] as Map)['Class/Math'], {'color': 4});
-    expect(
-      (merged['plannerTasks'] as Map)['new-planner'],
-      [
-        {'id': 'account-task', 'title': 'Keep'},
-      ],
-    );
-    expect(
-      (merged['plannerTasks'] as Map)['new-note'],
-      [
-        {'id': 'new-task', 'title': 'Recover'},
-      ],
-    );
+    expect((merged['plannerTasks'] as Map)['new-planner'], [
+      {'id': 'account-task', 'title': 'Keep'},
+    ]);
+    expect((merged['plannerTasks'] as Map)['new-note'], [
+      {'id': 'new-task', 'title': 'Recover'},
+    ]);
   });
 }
