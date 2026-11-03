@@ -2525,3 +2525,18 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `docs/ETAP_11_MIGRATION.md`: **produkcja v1→v2 nadal nieaktywna**.
   AppScope i Web nie wykonują cutover; wymagane etapy 7/12/13 i migracja
   serwerowego protokołu z trwałą blokadą starszych writerów.
+
+## Etap 12 — nowe testy, akceptacja nadal otwarta (2026-11-03)
+
+- `test/production/stage12_operation_stress_test.dart`: 1000 dopisków,
+  1000 usunięć, odtworzenie SQLite po restarcie, outbox i tombstones,
+  retransmisja ACK oraz rollback i ciągłość aktora.
+- Kanoniczny backend `NaNotateczki-serwer/main`:
+  `api/tests/test_stage12_real_stack.py`,
+  `compose.stage12.yaml` i `scripts/run-stage12-real.sh`.
+  Izolowany PostgreSQL 17, prawdziwe routery FastAPI/WebSocket,
+  operacje i feed, share/revoke, delete/transform, tekst CRDT,
+  Undo/Redo, rollback batcha i izolacja kont.
+- `docs/ETAP_12_TESTS.md`: uruchomienie i otwarte kryteria. Testy
+  backendowe nie zastępują Flutter↔API v2 testów dwóch urządzeń ani
+  nieaktywnego cutover etapu 11; brak SDK/Dockera nie oznacza zaliczenia.
