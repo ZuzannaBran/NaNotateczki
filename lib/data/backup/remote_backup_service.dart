@@ -49,6 +49,38 @@ class RemoteBackupService {
   final ApiClient apiClient;
   final AccountSessionController session;
 
+  static String _databasePresenceKey(String userId) {
+    final suffix = sha256
+        .convert(utf8.encode(userId))
+        .toString()
+        .substring(0, 16);
+    return 'account_database_present_$suffix.json';
+  }
+
+  /// A missing SQLite file is data loss only if the account used it before.
+  /// An empty but existing database is never interpreted as lost data.
+  Future<bool> wasDatabaseInitialized(String userId) async {
+    final raw = await readStoredText(_databasePresenceKey(userId));
+    if (raw == null) {
+      return false;
+    }
+    final marker = jsonDecode(raw);
+    if (marker is! Map<String, dynamic> || marker['version'] != 1) {
+      throw const FormatException('Invalid account database presence marker.');
+    }
+    return true;
+  }
+
+  Future<void> markDatabaseInitialized(String userId) async {
+    if (!session.isSignedIn || session.userId != userId) {
+      throw StateError('Account changed before database marker write.');
+    }
+    await writeStoredText(
+      _databasePresenceKey(userId),
+      jsonEncode({'version': 1}),
+    );
+  }
+
   Future<RemoteBackupReceipt> uploadVerifiedSnapshot({
     required String deviceId,
   }) async {

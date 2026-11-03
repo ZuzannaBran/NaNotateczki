@@ -207,6 +207,36 @@ void main() {
     expect(reads, 2);
   });
 
+  test('presence marker distinguishes new database from data loss',
+      () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        fail('Database presence tracking must be offline.');
+      }),
+    );
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-a';
+    addTearDown(session.dispose);
+    final service = RemoteBackupService(
+      repository: NotebookRepository(database),
+      apiClient: client,
+      session: session,
+    );
+    expect(await service.wasDatabaseInitialized('account-a'), isFalse);
+    await service.markDatabaseInitialized('account-a');
+    expect(await service.wasDatabaseInitialized('account-a'), isTrue);
+    expect(await service.wasDatabaseInitialized('account-b'), isFalse);
+    expect(stored, hasLength(1));
+  });
+
   test('keeps a backup dirty when data changes during upload', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);

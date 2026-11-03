@@ -72,6 +72,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldMessengerState> _notificationMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
   bool _databaseWasReset = false;
+  bool _databaseFreshFile = false;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
   final ValueNotifier<String?> _exitFailure = ValueNotifier<String?>(null);
   Future<void>? _exitDrain;
@@ -439,9 +440,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         await _plannerReady;
         var restored = false;
         Object? recoveryFailure;
-        // Archived backups are disaster recovery, never normal conflict
-        // resolution on every account sign-in.
-        if (_databaseWasReset) {
+        // A new installation has no presence marker. If IndexedDB/SQLite
+        // vanished after an earlier successful account start, recover it.
+        final needsRecovery = _databaseWasReset ||
+            (_databaseFreshFile &&
+                await backup.wasDatabaseInitialized(userId));
+        if (needsRecovery) {
           try {
             restored = await backup.hydrateFromLatestAccountBackup(
               databaseWasReset: true,
@@ -485,7 +489,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           sync.reportStartupFailure(recoveryFailure);
           return;
         }
+        await backup.markDatabaseInitialized(userId);
         _databaseWasReset = false;
+        _databaseFreshFile = false;
         _bootstrappedAccount = userId;
         scheduler.enableForSignedInAccount();
         _observedIdleSeconds = scheduler.idleSeconds;
@@ -544,6 +550,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         final result = snapshot.data!;
         if (_repository == null) {
           _databaseWasReset = result.wasReset;
+          _databaseFreshFile = result.freshFile;
         }
         final repository =
             _repository ??
