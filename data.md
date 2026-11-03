@@ -696,3 +696,16 @@ wymaga nadania istniejącym danym stabilnych identyfikatorów i atomowej
 migracji w etapie 11. Dotychczasowe `library_folders.json` i
 `study_planner.json` nie są zastępowane automatycznie.
 Opis granic: `docs/ETAP_7_8_STORAGE_PLANNER.md`.
+
+
+### Etap 11: przygotowanie odizolowanych magazynów (bez przełączenia)
+
+Natywny skrypt offline tool/stage11_migrate.py kopiuje i weryfikuje SHA-256
+starej SQLite, WAL, istniejących assetów, preferencji, danych planera,
+tombstones i outboxu do izolowanego katalogu Local lub przypisanego konta.
+Odrzuca błędny identyfikator konta, uszkodzoną bazę i brakujące assety.
+Pozostawia nietknięte wszystkie źródła i zapisuje manifest
+staged-not-activated. Aplikacja wciąż używa wspólnego notes.sqlite.
+Przełączenie AppScope, Web/IndexedDB, import Local→konto i migracja serwera
+v1→v2 NIE są jeszcze ukończone; nie uruchamiać dwóch writerów ani nie
+usuwać danych źródłowych. Szczegóły: docs/ETAP_11_MIGRATION.md.
