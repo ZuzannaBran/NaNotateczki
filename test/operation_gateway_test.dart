@@ -87,6 +87,38 @@ void main() {
     expect(requested, isFalse);
   });
 
+  test('Share transport attaches the same scope to POST and GET', () async {
+    const shareId = '11111111-1111-4111-8111-111111111111';
+    final operation = _operation();
+    final client = clientFor((request) async {
+      expect(request.headers['X-Share-Id'], shareId);
+      if (request.method == 'POST') {
+        return http.Response(
+          jsonEncode({
+            'cursor': 2,
+            'acknowledgements': [
+              {
+                'operationId': operation.operationId,
+                'cursor': 2,
+                'status': 'applied',
+              },
+            ],
+          }),
+          200,
+        );
+      }
+      expect(request.method, 'GET');
+      expect(request.url.queryParameters['after'], '2');
+      return http.Response(
+        jsonEncode({'cursor': 2, 'hasMore': false, 'operations': []}),
+        200,
+      );
+    });
+    final gateway = HttpOperationGateway(client, shareId: shareId);
+    expect((await gateway.send([operation])).single.cursor, 2);
+    expect((await gateway.readAfter(2)).cursor, 2);
+  });
+
   test('a partial ACK batch cannot be accepted', () async {
     final operation = _operation();
     final client = clientFor((_) async {

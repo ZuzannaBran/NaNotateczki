@@ -38,9 +38,13 @@ abstract class OperationGateway {
 
 /// REST v2 is authoritative. WebSocket only signals that REST should run.
 class HttpOperationGateway implements OperationGateway {
-  const HttpOperationGateway(this.apiClient);
+  const HttpOperationGateway(this.apiClient, {this.shareId});
 
   final ApiClient apiClient;
+  final String? shareId;
+
+  Map<String, String>? get _shareHeaders =>
+      shareId == null ? null : {'X-Share-Id': shareId!};
 
   @override
   Future<List<OperationReceipt>> send(
@@ -61,6 +65,7 @@ class HttpOperationGateway implements OperationGateway {
     final response = await apiClient.postJson(
       '/v2/operations/batch',
       request,
+      headers: _shareHeaders,
     );
     final body = _object(response.decodeJson());
     final entries = body['acknowledgements'];
@@ -103,9 +108,11 @@ class HttpOperationGateway implements OperationGateway {
     if (cursor < 0) {
       throw ArgumentError.value(cursor, 'cursor');
     }
-    final response = await apiClient.get(
+    final response = await apiClient.request(
+      'GET',
       '/v2/operations',
       query: {'after': '$cursor'},
+      headers: _shareHeaders,
     );
     final body = _object(response.decodeJson());
     final pageCursor = body['cursor'];

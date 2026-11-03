@@ -34,12 +34,17 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     required this.checkpointScope,
     required this.applyRemote,
     this.apiClient,
+    this.shareId,
     this.refreshAuthentication,
     this.enableRealtime = true,
     this.pollInterval = const Duration(seconds: 45),
   }) {
     if (actorId.isEmpty || checkpointScope.isEmpty) {
       throw ArgumentError('An actor and isolated checkpoint are required.');
+    }
+    if (gateway is HttpOperationGateway &&
+        (gateway as HttpOperationGateway).shareId != shareId) {
+      throw ArgumentError('Share IDs must match REST and WebSocket.');
     }
   }
 
@@ -54,6 +59,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   final String checkpointScope;
   final RemoteOperationReducer applyRemote;
   final ApiClient? apiClient;
+  final String? shareId;
   final Future<void> Function()? refreshAuthentication;
   final bool enableRealtime;
   final Duration pollInterval;
@@ -500,6 +506,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
         socket.sink.add(jsonEncode({
           'type': 'authenticate',
           'token': token,
+          if (shareId != null) 'shareId': shareId,
         }));
         // A missed hint while disconnected is recovered by REST.
         requestSync();
