@@ -10,17 +10,18 @@ offline również po zalogowaniu.
   albo tryb lokalny. `localOnly` wymaga wyłącznie lokalnej nazwy użytkownika
   i nie wykonuje żadnego połączenia z API.
 - Konto powstaje dopiero po jawnym logowaniu. Na Linuxie, Web, Androidzie
-  i iOS aplikacja automatycznie uruchamia bezpieczne scalanie `mergeSafely`,
-  zawsze sprawdzając najnowszy zweryfikowany backup przy logowaniu i starcie
-  zapamiętanej sesji, a następnie odtwarzając brakujące dane.
+  i iOS zwykły start uruchamia synchronizację konta, ale nie importuje
+  archiwalnego backupu. Recovery verified backup jest osobną ścieżką
+  uruchamianą tylko po wykrytej utracie bazy. Samo istnienie pustej
+  biblioteki ani pierwsze otwarcie nowego magazynu nie oznacza utraty.
 - Odtwarzanie backupu dołącza brakujące notatniki, pomija identyczne,
   a odmienną wersję zachowuje w tym samym folderze z pierwszym wolnym
   numerem `(1)`, `(2)` itd. Kopia ma nowe UID i ID wszystkich obiektów.
   Nie zastępuje istniejącego notatnika; pierwszeństwo nad backupem mają
   zdarzenia synchronizacji i tombstones. Foldery są łączone, a zadania
   konfliktowego planera trafiają pod UID jego kopii. Backup jest pobierany
-  i weryfikowany przy każdym starcie konta; ponowny import już przetworzonego
-  identyfikatora jest pomijany, chyba że system stwierdzi utratę lokalnej
+  i weryfikowany tylko przy awaryjnym odzyskiwaniu; ponowny import już
+  przetworzonego identyfikatora jest pomijany, chyba że system stwierdzi utratę lokalnej
   bazy SQLite. Puste konto po świadomym usunięciu nie oznacza utraty bazy.
   Błąd odzyskiwania jest logowany, nie blokuje live sync i blokuje wysyłkę
   potencjalnie niekompletnego snapshotu do czasu poprawnego odzyskania.
@@ -223,7 +224,13 @@ Instrukcje migracji i sprawdzenia komunikacji są w `server/README.md`.
 ### Backup urządzenia
 
 1. Klient opróżnia aktywne zapisy, odrzuca backup przy uszkodzonych rekordach
-   i buduje format `nanotateczki-server-backup` v2.
+   i buduje format `nanotateczki-server-backup` v2. SQLite i checkpoint
+   odczytuje w jednej transakcji; sprawdza, czy pliki ustawień/planera nie
+   zmieniły się podczas tego odczytu. Nie wysyła archiwum z lokalnym outboxem
+   zawierającym niepotwierdzone operacje; outbox pozostaje nietknięty.
+   Nowy envelope v2 zawiera `accountId`, `schemaVersion` i
+   `operationCheckpoint`. Serwer waliduje zgodność z właścicielem;
+   starsze poprawne archiwa v2 nadal można odzyskać.
 2. Snapshot zawiera notatniki z bajtami obrazów, foldery/zadania,
    `study_planner.json`, `app_prefs.json`, `editor_prefs.json`,
    `shared_recent_colors.json` i preferencję bezczynności backupu konta.
@@ -499,6 +506,22 @@ i są ponawiane.
 Wymagana migracja PostgreSQL: `0008_planner_entries.sql`.
 
 ## Pierwszeństwo live sync nad asynchronicznym backupem
+
+Nowa ścieżka startu sprawdza trwały marker otwarcia bazy per konto:
+nowy magazyn bez markera uruchamia normalną synchronizację, natomiast
+brak wcześniej otwieranej SQLite/IndexedDB z markerem albo potwierdzona
+kwarantanna uruchamia awaryjne odzyskiwanie. Marker jest zapisywany
+dopiero po inicjalizacji konta. Recovery następnie uruchamia synchronizację;
+nie promuje automatycznie checkpointu historycznego backupu ponad aktualny
+kursor serwera. Zwykłe logowanie nie skanuje archiwów.
+
+**Ograniczenie etapu 9:** produkcyjny edytor nadal używa starego
+protokołu snapshotowego, dopóki etap 11 nie przeprowadzi migracji operacji.
+Pełny replay operacji v2 ponad snapshotem i oddzielne content-addressed
+assety backupu wymagają tej migracji; nie wolno przedstawiać ich jako
+wdrożonych. Szczegóły w `docs/ETAP_9_BACKUP_RECOVERY.md`.
+
+
 
 Ważna jest chwila lokalnej edycji i przyczynowa rewizja danych, nie czas
 zweryfikowania ani wysłania snapshotu backupu. Backup jest archiwum

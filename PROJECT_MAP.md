@@ -306,6 +306,11 @@ Kompletny snapshot serwerowy v2: opróżnia zapisy, dołącza obrazy, foldery,
 zadania, planer, ustawienia, Recent i preferencję backupu; liczy SHA-256,
 wykonuje pending → upload → finalize i uznaje
 wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
+Etap 9: kopia z `accountId`, `schemaVersion`, `operationCheckpoint`.
+Notatki i checkpoint są czytane transakcyjnie; zmiana plików planera i
+preferencji przerywa snapshot, a obecny outbox blokuje wysyłkę do ACK.
+Zwykły start nie importuje backupu. Marker per konto odróżnia utraconą
+SQLite/IndexedDB od nowej lub celowo pustej biblioteki.
 
 - 12: `RemoteBackupReceipt`; 24: `RemoteBackupService`;
   42: `uploadVerifiedSnapshot`; 145: `hydrateFromLatestAccountBackup` pobiera
@@ -315,9 +320,9 @@ wyłącznie odpowiedź `verified`. Limit klienta wynosi 64 MiB.
   Odmienny szkic z backupu zachowuje jako kopię obok rewizji konta;
   nie wskrzesza dokumentów oznaczonych jako usunięte.
   Łączy foldery i zachowuje zadania przy właściwej kopii planera.
-  Nie nadpisuje istniejących preferencji ani historii planera. Każdy start
-  konta sprawdza najnowszy verified backup; po potwierdzonej utracie SQLite
-  może przywrócić identyczny backupId mimo wcześniejszego checkpointu.
+  Nie nadpisuje istniejących preferencji ani historii planera. Tylko
+  potwierdzona utrata lokalnej bazy wyzwala automatyczne recovery;
+  można wtedy przywrócić identyczny backupId mimo markera odzyskiwania.
   Błąd odzyskania nie zatrzymuje inicjalizacji live sync. Znacznik backupId zapobiega dublowaniu kopii konfliktowych
   podczas ponownego przetwarzania tego samego snapshotu. Oczekujące offline
   usunięcia z outboxu mają pierwszeństwo nad snapshotem.
@@ -1830,7 +1835,9 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
 - `test/remote_backup_service_test.dart`: kompletny snapshot v2 z biblioteką
   i planerem, wymaganie potwierdzonego `verified` oraz zachowanie flagi dirty,
   gdy dane zmienią się podczas ręcznego `backupNow`, a także izolacja stanu
-  i `deviceId` między osobnymi sesjami kont.
+  i `deviceId` między osobnymi sesjami kont. Regresje etapu 9:
+  envelope/checkpoint konta, odmowa przy niepotwierdzonym outboxie,
+  wykrywanie zmiany preferencji w czasie capture i marker utraty bazy.
 - `test/live_web_sync_service_test.dart`: pobranie wszystkich stron feedu po
   500 zdarzeń, ochrona kursora przed pominięciem równoległej zmiany,
   zachowanie zapisów pojawiających się w czasie bootstrapu konta,
@@ -2476,3 +2483,13 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   bezstratną migracją etapu 11.** Stage 7 import/kopiowanie i aktywny
   sync folderów/zadań zależą od tej migracji. Testy nieuruchomione
   w środowisku bez SDK.
+
+## Etap 9 — backup i odtwarzanie (częściowo wdrożony)
+
+- `docs/ETAP_9_BACKUP_RECOVERY.md`: zasady snapshotów z checkpointem,
+  zidentyfikowane granice starego protokołu, scenariusze weryfikacji.
+- Serwer kanoniczny: `api/app/routers/backups.py` w
+  `NaNotateczki-serwer/main`, z testem
+  `api/tests/test_backup_validation.py` (weryfikacja właściciela i kursora).
+- Replay operacji v2 i snapshoty per dokument pozostają zablokowane do
+  migracji etapu 11; testy E2E to etap 12.
