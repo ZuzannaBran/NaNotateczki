@@ -215,6 +215,7 @@ class PlannerSyncService {
             ledger.acknowledge(server);
             await writeStoredText(ledgerKey, ledger.encode());
           }
+          break;
         case PlannerSyncDecision.adoptRemote:
           if (server == null) {
             throw StateError('Missing authoritative planner record: $id');
@@ -238,6 +239,7 @@ class PlannerSyncService {
           await planner.flush();
           ledger.acknowledge(server);
           await writeStoredText(ledgerKey, ledger.encode());
+          break;
         case PlannerSyncDecision.sendLocal:
           if (source == null) {
             throw StateError('Missing local planner record: $id');
@@ -277,6 +279,7 @@ class PlannerSyncService {
             );
             await planner.flush();
           }
+          break;
         case PlannerSyncDecision.conflict:
           throw StateError(
             'Concurrent planner edit for $id. Local changes were preserved.',
