@@ -65,6 +65,68 @@ void main() {
     expect(editor.viewScale, 1.5);
   });
 
+  test('remote style patches preserve ink order until explicit reorder',
+      () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final editor = EditorController(
+      repository: repository,
+      notebook: notebook,
+    );
+    addTearDown(editor.dispose);
+    final pageId = notebook.pages.single.id;
+    InkStroke stroke(String id, int color) => InkStroke(
+      id: id,
+      color: Color(color),
+      width: 2,
+      tool: DrawingTool.pen,
+      points: [const InkPoint(dx: 1, dy: 2, pressure: 1)],
+    );
+    final back = stroke('back', 0xFF000000);
+    final front = stroke('front', 0xFFFFFFFF);
+    expect(editor.applyConfirmedShareObjectPatch(
+      pageId: pageId,
+      objectId: back.id,
+      stroke: back,
+    ), isTrue);
+    expect(editor.applyConfirmedShareObjectPatch(
+      pageId: pageId,
+      objectId: front.id,
+      stroke: front,
+    ), isTrue);
+    expect(editor.currentPage.inkStrokes.map((item) => item.id),
+        ['back', 'front']);
+
+    expect(editor.applyConfirmedShareObjectPatch(
+      pageId: pageId,
+      objectId: back.id,
+      stroke: back.copyWith(color: const Color(0xFFAA1122)),
+    ), isTrue);
+    expect(editor.currentPage.inkStrokes.map((item) => item.id),
+        ['back', 'front']);
+    expect(editor.currentPage.inkStrokes.first.color.toARGB32(),
+        0xFFAA1122);
+
+    expect(editor.applyConfirmedShareObjectPatch(
+      pageId: pageId,
+      objectId: front.id,
+      stroke: front,
+      sortIndex: 0,
+    ), isTrue);
+    expect(editor.currentPage.inkStrokes.map((item) => item.id),
+        ['front', 'back']);
+    expect(() => editor.applyConfirmedShareObjectPatch(
+      pageId: pageId,
+      objectId: front.id,
+      stroke: front,
+      sortIndex: -1,
+    ), throwsArgumentError);
+    expect(editor.currentPage.inkStrokes.map((item) => item.id),
+        ['front', 'back']);
+  });
+
   test('share patch never overwrites an active local edit', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
