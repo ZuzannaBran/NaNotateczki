@@ -169,7 +169,7 @@ void main() {
     expect(await store.checkpoint('user-A-v2'), 30);
     final rows = await database.customSelect(
       'SELECT * FROM projection_probe WHERE id = ?',
-      variables: [const Variable<String>('deleted-earlier')],
+      variables: [Variable<String>('deleted-earlier')],
     ).get();
     expect(rows, isEmpty);
   });
