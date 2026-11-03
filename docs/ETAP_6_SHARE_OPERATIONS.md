@@ -119,3 +119,12 @@ Serwer blokuje współistnienie dwóch writerów (v1/v2) dla tego samego UID.
   Bilet nie trafia do outboxu, projekcji ani checkpointów SQLite.
 - Testy regresyjne obejmują brak tokenu konta, odrębny token konta i
   niewłaściwy zakres Share. Nie dokonano produkcyjnego przełączenia v1/v2.
+
+## Revocation / wygaśnięcie Share v2
+
+`SyncEngine` obsługuje zdarzenie WebSocket `ended` i odpowiedź HTTP 410.
+Gość zatrzymuje REST/polling/WebSocket, dostaje pojedynczy
+`onShareEnded`, a niepotwierdzone operacje pozostają w SQLite dla
+jawnego odzyskania. Regresja w `test/sync_engine_test.dart` zabezpiecza
+zachowanie outboxu po 410. Błąd 401 nadal oznacza konieczność uzyskania
+nowego biletu; nie usuwa danych.

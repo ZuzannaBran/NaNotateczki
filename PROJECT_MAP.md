@@ -2434,3 +2434,7 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   REST/WebSocket operacji v2, parowany z `shareId`; nigdy nie używa
   JWT konta gościa zamiast biletu. Regresje w
   `test/operation_gateway_test.dart`.
+
+- `SyncEngine.onShareEnded`: powiadomienie po WebSocket `ended` lub
+  HTTP 410 zatrzymuje wznawianie sesji i zachowuje outbox.
+  Regresja: `test/sync_engine_test.dart`.

@@ -37,6 +37,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     this.apiClient,
     this.shareId,
     this.guestTicket,
+    this.onShareEnded,
     this.refreshAuthentication,
     this.enableRealtime = true,
     this.pollInterval = const Duration(seconds: 45),
@@ -73,6 +74,9 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Guest ticket stays in memory; it is never part of an operation envelope.
   final String? guestTicket;
+
+  /// Called once when a v2 guest session is revoked or expires.
+  final void Function()? onShareEnded;
   final Future<void> Function()? refreshAuthentication;
   final bool enableRealtime;
   final Duration pollInterval;
@@ -468,10 +472,24 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  void _endShare() {
+    if (shareId == null || !_started) {
+      return;
+    }
+    // stop() invalidates the connection generation immediately. The outbox
+    // remains durable, available for explicit recovery after rejoining.
+    unawaited(stop());
+    onShareEnded?.call();
+  }
+
   Future<T> _authorized<T>(Future<T> Function() action) async {
     try {
       return await action();
     } on ApiException catch (error) {
+      if (shareId != null && error.statusCode == 410) {
+        _endShare();
+        rethrow;
+      }
       if (error.statusCode != 401 || refreshAuthentication == null) {
         rethrow;
       }
@@ -537,6 +555,10 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
           final message = jsonDecode(event as String);
           if (message is Map && message['type'] == 'operations_changed') {
             requestSync();
+          } else if (shareId != null &&
+              message is Map &&
+              message['type'] == 'ended') {
+            _endShare();
           }
         } catch (_) {
           // A malformed hint cannot advance a cursor or mutate a document.

@@ -81,6 +81,17 @@ class _RetryGateway extends _FakeGateway {
   }
 }
 
+class _RevokedShareGateway implements OperationGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async => throw const ApiException(410, 'Shared session expired.');
+
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async =>
+      throw const ApiException(410, 'Shared session expired.');
+}
+
 OperationEnvelope _remote(
   String actor,
   String objectId, {
@@ -427,4 +438,35 @@ void main() {
     expect(gateway.cursors.keys.single, first.operationId);
     expect((await store.operation(first.operationId))?.actorSeq, 1);
   });
+  test('HTTP 410 stops Share and preserves offline outbox', () async {
+    await engine.stop();
+    engine.dispose();
+    var ended = 0;
+    const ticket = '01234567890123456789012345678901234567890123456789';
+    engine = SyncEngine(
+      store: store,
+      gateway: _RevokedShareGateway(),
+      actorId: 'guest-instance',
+      checkpointScope: 'share-guest-1',
+      shareId: '11111111-1111-4111-8111-111111111111',
+      guestTicket: ticket,
+      onShareEnded: () => ended++,
+      enableRealtime: false,
+      applyRemote: (_, __) async {},
+    );
+    final pending = await engine.writeLocal(
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'offline-stroke',
+      kind: OperationKind.strokeCreate,
+      payload: const {'value': {'colorValue': 1}},
+      apply: (_) async {},
+    );
+    expect(await store.isPending(pending.operationId), isTrue);
+    await engine.start();
+    expect(ended, 1);
+    expect(engine.isStarted, isFalse);
+    expect(await store.isPending(pending.operationId), isTrue);
+  });
+
 }
