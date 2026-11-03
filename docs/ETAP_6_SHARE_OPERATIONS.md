@@ -20,12 +20,13 @@ Nie uruchamiać jednocześnie `LiveWebSyncService` i `SyncEngine` dla jednego UI
    tombstone. Odrzucone rebase pozostaje widoczne w `unresolved`.
    Ten obiekt jest stanem prezentacji, nie zastępuje trwałego outboxu.
 3. `OperationTextSequence` (Dart) i `text_sequence.py` (FastAPI):
-   deterministyczna sekwencja atomów z trwałymi ID, kotwicami, porządkiem
+   deterministyczna sekwencja atomów dla obiektów oznaczonych `objectType: text`, z trwałymi ID,
+   kotwicami, porządkiem
    Lamport + actor i trwałymi znacznikami usunięcia. `text.insert` oraz
    `text.delete` są walidowane i odtwarzane na serwerze; zwykłe `object.set`
    nie może nadpisać istniejącego tekstu CRDT.
 4. `openSharedGuestOperationDatabase(shareId)` tworzy osobny, trwały
-   SQLite WASM/IndexedDB dla każdego zaproszenia. Nie wykorzystuje bazy
+   SQLite WASM/IndexedDB dla pary `shareId` + `guestActorId`. Nie wykorzystuje bazy
    konta, natomiast stary edytor v1 nadal korzysta z pamięciowej SQLite
    i osobnego outboxu v1.
 5. `EditorController.applyConfirmedShareObjectPatch` pozwala zaaplikować
