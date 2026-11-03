@@ -88,4 +88,38 @@ void main() {
     storage['study_share_guest_outbox_v1_session-a'] = 'not-json';
     await expectLater(outbox.read(), throwsFormatException);
   });
+  test('recovered guest delta retains the last visible merge base', () async {
+    final outbox = StudyShareGuestOutbox('session-rebase');
+    const base = <String, dynamic>{
+      'uid': 'original',
+      'pages': [
+        {'id': 'page', 'inkStrokes': []},
+      ],
+    };
+    const mergeBase = <String, dynamic>{
+      'uid': 'original',
+      'pages': [
+        {'id': 'page', 'inkStrokes': [{'id': 'guest-a'}]},
+      ],
+    };
+    const changed = <String, dynamic>{
+      'uid': 'original',
+      'pages': [
+        {'id': 'page', 'inkStrokes': [
+          {'id': 'guest-a'},
+          {'id': 'guest-c'},
+        ]},
+      ],
+    };
+    await outbox.write(const PendingStudyShareEdit(
+      baseRevision: 12,
+      baseNotebook: base,
+      notebook: changed,
+      localMergeBase: mergeBase,
+    ));
+    final recovered = await StudyShareGuestOutbox('session-rebase').read();
+    expect(recovered!.localMergeBase, mergeBase);
+    expect(recovered.notebook, changed);
+  });
+
 }
