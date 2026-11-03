@@ -162,14 +162,34 @@ void main() {
     expect(pending.unresolved, contains(id(11)));
   });
 
-  test('remote edits preserve original untouched page map', () {
-    final state = initial();
+  test('remote edits copy only the touched page and object', () {
+    var state = initial();
+    state = state.apply(
+      op(14, OperationKind.pageCreate, {
+        'value': {'title': 'Unrelated page'},
+      }, objectId: 'other-page'),
+    );
+    state = state.apply(
+      op(15, OperationKind.strokeCreate, {
+        'value': {'color': 7},
+      }, pageId: 'page', objectId: 'untouched-stroke'),
+    );
+    final beforePages = state.document!['pages'] as Map;
+    final beforeObjects = (beforePages['page'] as Map)['objects'] as Map;
     final updated = state.apply(
       op(13, OperationKind.objectSet, {
         'properties': {'color': 3},
       }, pageId: 'page', objectId: 'stroke'),
     );
-    expect((state.document!['pages'] as Map).length, 1);
+    final afterPages = updated.document!['pages'] as Map;
+    final afterObjects = (afterPages['page'] as Map)['objects'] as Map;
+    expect(identical(state.document, updated.document), isFalse);
+    expect(identical(beforePages['other-page'], afterPages['other-page']),
+        isTrue);
+    expect(identical(beforePages['page'], afterPages['page']), isFalse);
+    expect(identical(beforeObjects['untouched-stroke'],
+        afterObjects['untouched-stroke']), isTrue);
+    expect(identical(beforeObjects['stroke'], afterObjects['stroke']), isFalse);
     expect((stroke(state)['properties'] as Map)['color'], 1);
     expect((stroke(updated)['properties'] as Map)['color'], 3);
   });
