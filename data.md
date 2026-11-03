@@ -592,3 +592,21 @@ Backend posiada opt-in API v2 po etapie 4, ale klient nie ma jeszcze
 atomowej transakcji Drift/outbox z etapu 3. Dotychczasowa synchronizacja
 API v1 i share nadal działają na snapshotach. Nie przełączać użytkowników
 na protokół operacji przed migracją i testami end-to-end.
+
+
+## Operacyjny silnik v2 — etap 5, bez przełączenia produkcyjnego
+
+`SyncEngine` i `HttpOperationGateway` obsługują trwały dziennik SQLite,
+kolejkę operacji, stronicowany odbiór po kursorze, ACK bez ponownej projekcji,
+REST po reconnect oraz powiadomienia WebSocket. Nowy lokalny ruch jest
+zapisywany atomowo z projekcją, zależnościami przyczynowymi i actorSeq.
+Odrzucony lub utracony ACK nie usuwa niepotwierdzonych danych. Opóźnione
+zdalne operacje dotyczące trwałych tombstones są rejestrowane bez
+wskrzeszania obiektów.
+
+**Ta warstwa nie zastępuje jeszcze produkcyjnego `LiveWebSyncService`.**
+Backend v2 odrzuca UID zapisane dotychczasowym API v1; do czasu etapu 11
+nie wolno uruchamiać dwóch writerów dla jednego dokumentu. Etap 6 musi
+dostarczyć domenowe projektory obiektów i CRDT/OT dla tekstu, a etap 7
+osobne przestrzenie aktora/outboxu dla kont, Local i gościa. Szczegóły
+implementacyjne i niewykonane testy E2E: `docs/ETAP_5_SYNC_ENGINE.md`.
