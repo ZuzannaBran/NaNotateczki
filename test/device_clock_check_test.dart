@@ -68,6 +68,19 @@ void main() {
     expect((await check.measure())!.isSignificant, isFalse);
   });
 
+  test('half the network round-trip extends warning tolerance', () {
+    const difference = DeviceClockDifference(
+      offset: Duration(seconds: 61),
+      roundTrip: Duration(seconds: 4),
+    );
+    expect(difference.isSignificant, isFalse);
+    const realMismatch = DeviceClockDifference(
+      offset: Duration(seconds: 65),
+      roundTrip: Duration(seconds: 4),
+    );
+    expect(realMismatch.isSignificant, isTrue);
+  });
+
   test('malformed clock response is rejected', () async {
     final api = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
