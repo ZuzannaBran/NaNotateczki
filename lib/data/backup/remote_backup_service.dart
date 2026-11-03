@@ -583,6 +583,7 @@ class RemoteBackupService {
 
     // Inspect local state after network I/O so edits made during recovery
     // are not overwritten by a stale pre-request snapshot.
+    await AppSaveCoordinator.instance.flushPending();
     final rawLocal = await readStoredText('study_planner.json');
     final local = _jsonObject(_decodeOptionalObject(rawLocal));
     final existingSessions = local['sessions'];
@@ -634,6 +635,11 @@ class RemoteBackupService {
     // Never replace locally edited records or deletions with an old backup.
     if (!session.isSignedIn || session.userId != userId) {
       return false;
+    }
+    // Recovery must never replace a change saved while it was preparing
+    // the merge. Leave the checkpoint pending and retry after reloading.
+    if (await readStoredText('study_planner.json') != rawLocal) {
+      throw StateError('Planner changed during backup recovery; retry safely.');
     }
     await writeStoredText('study_planner.json', jsonEncode({
       ...local,
