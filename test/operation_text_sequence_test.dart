@@ -1,0 +1,167 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:program/data/sync/operation_protocol.dart';
+import 'package:program/data/sync/operation_text_sequence.dart';
+
+const firstId = '00000000-0000-4000-8000-000000000001';
+const secondId = '00000000-0000-4000-8000-000000000002';
+const thirdId = '00000000-0000-4000-8000-000000000003';
+
+OperationEnvelope textOperation({
+  required String operationId,
+  required String actorId,
+  required OperationKind kind,
+  required Map<String, dynamic> payload,
+  int logicalClock = 10,
+}) {
+  return OperationEnvelope(
+    operationId: operationId,
+    actorId: actorId,
+    actorSeq: 1,
+    documentId: 'document',
+    pageId: 'page',
+    objectId: 'text',
+    kind: kind,
+    payload: payload,
+    dependencies: const [],
+    logicalClock: logicalClock,
+  );
+}
+
+void main() {
+  test('concurrent inserts converge in both delivery orders', () {
+    final alice = textOperation(
+      operationId: firstId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'A'},
+        ],
+      },
+    );
+    final bob = textOperation(
+      operationId: secondId,
+      actorId: 'bob',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': secondId, 'text': 'B'},
+        ],
+      },
+    );
+    final ab = OperationTextSequence.apply(
+      OperationTextSequence.apply({}, alice),
+      bob,
+    );
+    final ba = OperationTextSequence.apply(
+      OperationTextSequence.apply({}, bob),
+      alice,
+    );
+    expect(ab, ba);
+    expect(OperationTextSequence.render(ab), 'AB');
+  });
+
+  test('deleted atoms stay as anchors for delayed insertions', () {
+    final insert = textOperation(
+      operationId: firstId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'a'},
+        ],
+      },
+    );
+    final delete = textOperation(
+      operationId: secondId,
+      actorId: 'alice',
+      kind: OperationKind.textDelete,
+      payload: {
+        'atomIds': [firstId],
+      },
+    );
+    final follow = textOperation(
+      operationId: thirdId,
+      actorId: 'bob',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': firstId,
+        'atoms': [
+          {'id': thirdId, 'text': 'b'},
+        ],
+      },
+    );
+    final state = OperationTextSequence.apply(
+      OperationTextSequence.apply(
+        OperationTextSequence.apply({}, insert),
+        delete,
+      ),
+      follow,
+    );
+    expect(OperationTextSequence.render(state), 'b');
+    expect(OperationTextSequence.anchorBefore(state, 1), thirdId);
+    expect((state[firstId] as Map)['deleted'], isTrue);
+  });
+
+  test('invalid atom never mutates prior projection', () {
+    final insert = textOperation(
+      operationId: firstId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'ok'},
+        ],
+      },
+    );
+    final before = OperationTextSequence.apply({}, insert);
+    final duplicate = textOperation(
+      operationId: secondId,
+      actorId: 'bob',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'bad'},
+        ],
+      },
+    );
+    expect(
+      () => OperationTextSequence.apply(before, duplicate),
+      throwsFormatException,
+    );
+    expect(OperationTextSequence.render(before), 'ok');
+  });
+
+  test('validates text operations before they reach the outbox', () {
+    final insert = textOperation(
+      operationId: firstId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'a'},
+        ],
+      },
+    );
+    expect(insert.validateForV2Projection, returnsNormally);
+    final invalid = textOperation(
+      operationId: secondId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'x'},
+          {'id': firstId, 'text': 'y'},
+        ],
+      },
+    );
+    expect(invalid.validateForV2Projection, throwsFormatException);
+  });
+}
