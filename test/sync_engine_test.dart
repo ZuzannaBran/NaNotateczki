@@ -59,6 +59,18 @@ class _FakeGateway implements OperationGateway {
   }
 }
 
+class _PoisonBatchGateway extends _FakeGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async {
+    if (operations.any((operation) => operation.objectId == 'bad')) {
+      throw const ApiException(422, 'Bad object projection');
+    }
+    return super.send(operations);
+  }
+}
+
 class _RetryGateway extends _FakeGateway {
   @override
   Future<List<OperationReceipt>> send(
@@ -277,6 +289,45 @@ void main() {
     expect(second.actorSeq, 1);
     expect(first.actorId, isNot(second.actorId));
     expect(second.dependencies, isNot(contains(first.operationId)));
+  });
+
+  test('a bad later operation cannot block a valid batch prefix',
+      () async {
+    await engine.stop();
+    engine.dispose();
+    final poisoned = _PoisonBatchGateway();
+    engine = SyncEngine(
+      store: store,
+      gateway: poisoned,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (_, __) async {},
+    );
+    final valid = await engine.writeLocal(
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'good',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'name': 'good'},
+      },
+      apply: (_) async {},
+    );
+    final invalid = await engine.writeLocal(
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'bad',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'name': 'bad'},
+      },
+      apply: (_) async {},
+    );
+    await engine.start();
+    expect(await store.isPending(valid.operationId), isFalse);
+    expect(await store.isPending(invalid.operationId), isTrue);
+    expect(poisoned.accepted.single.operation.operationId, valid.operationId);
   });
 
   test('a broken pull does not block the outbox of another document',

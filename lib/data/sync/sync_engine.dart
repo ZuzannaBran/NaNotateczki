@@ -365,6 +365,29 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _acceptReceipts(
+    int generation,
+    List<OperationEnvelope> batch,
+    List<OperationReceipt> receipts,
+  ) async {
+    final expected = batch.map((operation) => operation.operationId).toSet();
+    final received = receipts.map((receipt) => receipt.operationId).toSet();
+    if (received.length != receipts.length ||
+        !setEquals(expected, received) ||
+        receipts.any((receipt) => receipt.cursor <= 0)) {
+      throw const FormatException('Incomplete or invalid server ACK.');
+    }
+    for (final receipt in receipts) {
+      if (!_isActive(generation)) {
+        return;
+      }
+      await store.acknowledge(
+        receipt.operationId,
+        serverSequence: receipt.cursor,
+      );
+    }
+  }
+
   Future<void> _sendActor(
     int generation,
     String actor,
@@ -375,48 +398,62 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       if (!_isActive(generation)) {
         return;
       }
-      final expected = batch.map((operation) => operation.operationId).toSet();
-      final received = receipts.map((receipt) => receipt.operationId).toSet();
-      if (received.length != receipts.length ||
-          !setEquals(expected, received) ||
-          receipts.any((receipt) => receipt.cursor <= 0)) {
-        throw const FormatException('Incomplete or invalid server ACK.');
-      }
-      for (final receipt in receipts) {
-        if (!_isActive(generation)) {
-          return;
-        }
-        await store.acknowledge(
-          receipt.operationId,
-          serverSequence: receipt.cursor,
-        );
-      }
+      await _acceptReceipts(generation, batch, receipts);
       _actorFailures.remove(actor);
     } catch (error) {
       if (!_isActive(generation)) {
         return;
       }
-      lastError = error.toString();
+      Object failure = error;
+      // The server commits an entire batch or none of it. If one later
+      // intent fails, commit the safe prefix instead of penalizing its first
+      // operation. Never jump over an invalid actor sequence.
+      if (error is ApiException &&
+          batch.length > 1 &&
+          (error.statusCode == 409 ||
+              error.statusCode == 413 ||
+              error.statusCode == 422)) {
+        try {
+          final first = [batch.first];
+          final receipts = await _authorized(() => gateway.send(first));
+          if (!_isActive(generation)) {
+            return;
+          }
+          await _acceptReceipts(generation, first, receipts);
+          _actorFailures.remove(actor);
+          _requested = true;
+          return;
+        } catch (firstError) {
+          failure = firstError;
+        }
+      }
+      if (!_isActive(generation)) {
+        return;
+      }
+      lastError = failure.toString();
       notifyListeners();
       final failures = (_actorFailures[actor] ?? 0) + 1;
       _actorFailures[actor] = failures;
-      final causalGap = error is ApiException &&
-          error.statusCode == 409 &&
-          error.payload is Map &&
-          (error.payload as Map)['detail'] is Map &&
-          ((error.payload as Map)['detail'] as Map)['code'] ==
+      final causalGap = failure is ApiException &&
+          failure.statusCode == 409 &&
+          failure.payload is Map &&
+          (failure.payload as Map)['detail'] is Map &&
+          ((failure.payload as Map)['detail'] as Map)['code'] ==
               'CAUSAL_GAP';
-      final permanent = error is ArgumentError ||
-          (error is ApiException &&
-              (error.statusCode == 403 ||
-                  error.statusCode == 413 ||
-                  error.statusCode == 422 ||
-                  (error.statusCode == 409 && !causalGap)));
+      final permanent = failure is ArgumentError ||
+          failure is UnsupportedError ||
+          failure is FormatException ||
+          (failure is ApiException &&
+              (failure.statusCode == 403 ||
+                  failure.statusCode == 410 ||
+                  failure.statusCode == 413 ||
+                  failure.statusCode == 422 ||
+                  (failure.statusCode == 409 && !causalGap)));
       final delay = permanent
           ? const Duration(minutes: 5)
           : _backoff(failures);
-      // Delaying the first unacknowledged sequence also blocks later
-      // sequences of that actor, not unrelated actors.
+      // Retry only the first unacknowledged actor sequence. Other actors
+      // remain eligible while this one is deferred.
       await store.scheduleRetry(batch.first.operationId, delay: delay);
       _scheduleRetry(delay);
     }
