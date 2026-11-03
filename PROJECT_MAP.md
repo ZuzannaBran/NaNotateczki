@@ -1214,6 +1214,8 @@ Powiększony dokument zachowuje rzeczywistą wysokość scrolla; ręczny pionowy
 pan uwzględnia bieżący offset przewinięcia, dzięki czemu można wrócić
 do pierwszej i ostatniej strony bez zmiany zoomu. Kółko/trackpad obsługuje
 albo natywny scroll, albo pan canvasa, nigdy obydwa jednocześnie.
+Ctrl/Cmd+scroll (pinch touchpada na desktopie) powiększa dokument,
+rezerwując sygnał przed natywnym Scrollable; zwykły scroll nie zoomuje.
 Gesty pan palcem oraz przewijanie stron i minimapy respektują czułość
 nawigacji; zoom i gesty narzędzi pozostają bez zmian.
 W Move jeden palec przesuwa zaznaczony obraz/PDF niezależnie od preferencji
@@ -1514,7 +1516,8 @@ Pan dotykowy boarda ma regulowaną czułość i próg gestu; pierwszy
 palec po przekroczeniu progu trafia do aktywnych kontaktów nawigacji,
 więc dołożony drugi palec zawsze przejmuje gest zamiast pozostawić
 board bez przesuwania. Rysik, zoom i transformacje obiektów są
-niezależne od tego ustawienia.
+niezależne od tego ustawienia. Ctrl/Cmd+scroll na desktopie powiększa
+tablicę, a zwykłe przewijanie nadal ją przesuwa.
 Board ma stały boczny odstęp 16 px, ale nie ma marginesu u góry,
 więc zawartość można swobodnie przesuwać za toolbar. Obszar roboczy
 ma proste górne rogi i zaokrąglone dolne rogi (12 px) zarówno w dekoracji,
@@ -1648,6 +1651,11 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   nieblokujący upload podczas oczekiwania na serwer, weryfikacja przed exit
   i backup po imporcie ze zdalnego urządzenia bez lokalnych kliknięć;
   nieudane uzgodnienie blokuje przestarzały snapshot.
+- `test/editor_screen_responsive_layout_test.dart` i
+  `test/board_scene_bounds_test.dart`: regresja Ctrl+scroll pinch touchpada,
+  rozdzielona od zwykłego przewijania.
+- `test/account_tombstone_bootstrap_test.dart`: po usunięciu na serwerze
+  znany wcześniej dokument nie zostaje wskrzeszony po compact tombstone.
 - `test/shared_editor_viewport_test.dart`: zachowanie lokalnej strony, zoomu
   i pan podczas odbioru obcych zmian.
 - `test/one_shot_error_notice_test.dart`: błąd wyświetlany jednokrotnie

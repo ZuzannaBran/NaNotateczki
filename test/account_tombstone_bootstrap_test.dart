@@ -28,6 +28,61 @@ void main() {
     textStorageWriteOverride = null;
   });
 
+  test('compacted remote deletion never reuploads a known UID', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final original = await repository.createNotebook(title: 'Deleted elsewhere');
+    final suffix = sha256
+        .convert(utf8.encode('account-1'))
+        .toString()
+        .substring(0, 16);
+    final stored = <String, String>{
+      'server_sync_state_$suffix.json': jsonEncode({
+        'version': 1,
+        'cursor': 2,
+        'revisions': {original.uid: 2},
+        'bases': {
+          original.uid: NotebookRepository.encodeNotebook(original),
+        },
+        'pending': <String>[],
+      }),
+    };
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response('{"cursor":4,"notebooks":[]}', 200);
+        }
+        if (request.url.path == '/v1/sync/changes') {
+          return http.Response('{"cursor":4,"changes":[]}', 200);
+        }
+        fail('A deleted document must not be reuploaded.');
+      }),
+    )..setAccessToken('token');
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-1';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+
+    await sync.start(InitialSyncPolicy.mergeSafely);
+
+    expect(await repository.getNotebook(original.uid), isNull);
+    expect(await repository.fetchNotebooks(), isEmpty);
+    expect(sync.hasPendingChanges, isFalse);
+    await sync.stop();
+  });
+
   test('bootstrap tombstone never retains stale original document', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);

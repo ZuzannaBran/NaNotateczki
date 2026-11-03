@@ -11,8 +11,10 @@ import 'package:flutter/gestures.dart'
         PointerPanZoomStartEvent,
         PointerPanZoomUpdateEvent,
         PointerScrollEvent,
-        PointerSignalEvent;
+        PointerSignalEvent,
+        GestureBinding;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HardwareKeyboard;
 import 'package:provider/provider.dart';
 
 import '../../../core/input/app_preferences_controller.dart';
@@ -593,8 +595,33 @@ class _EditorScreenState extends State<EditorScreen> {
     if (!_isNavigationPointerKind(event.kind)) {
       return;
     }
-    if (event.scrollDelta == Offset.zero ||
-        _usesNativePageScroll(context.read<EditorController>())) {
+    if (event.scrollDelta == Offset.zero) {
+      return;
+    }
+    // On some desktops a touchpad pinch is delivered as Ctrl+scroll.
+    // Reserve that signal before the parent Scrollable receives it.
+    if ((HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed) &&
+        event.scrollDelta.dy != 0) {
+      final scaleDelta = math.exp(-event.scrollDelta.dy / 200)
+          .clamp(0.25, 4.0)
+          .toDouble();
+      GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+        if (!mounted ||
+            context.read<EditorController>().isCanvasNavigationLocked) {
+          return;
+        }
+        _applyPageTransform(
+          scaleDelta: scaleDelta,
+          panDelta: Offset.zero,
+          focalPoint: event.localPosition,
+          docWorldSize: docWorldSize,
+          viewportSize: viewportSize,
+        );
+      });
+      return;
+    }
+    if (_usesNativePageScroll(context.read<EditorController>())) {
       return;
     }
     // Linux trackpads often emit scroll signals for two-finger panning.

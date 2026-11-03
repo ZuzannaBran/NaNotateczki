@@ -1577,13 +1577,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byTooltip('Study history'), findsNothing);
     expect(find.byTooltip('Settings'), findsNothing);
-    await tester.tap(find.byKey(ValueKey('planner-session-tile:${rated.id}')));
+    await tester.tap(
+      find.byKey(ValueKey('planner-session-tile:${rated.id}')).first,
+    );
     await tester.pumpAndSettle();
     expect(find.text('Productivity: ★★★☆☆'), findsOneWidget);
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(ValueKey('planner-session-tile:${unrated.id}')),
+      find.byKey(ValueKey('planner-session-tile:${unrated.id}')).first,
     );
     await tester.pumpAndSettle();
     expect(find.textContaining('Productivity:'), findsNothing);
@@ -1624,10 +1626,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final done = find.byKey(ValueKey('planner-session-tile:${finished.id}'));
+      final done = find.byKey(
+        ValueKey('planner-session-tile:${finished.id}'),
+      ).first;
       final upcoming = find.byKey(
         ValueKey('planner-session-tile:${planned.id}'),
-      );
+      ).first;
       final scheme = Theme.of(tester.element(done)).colorScheme;
       final doneColor = tester.widget<Material>(done).color!;
       final upcomingColor = tester.widget<Material>(upcoming).color!;

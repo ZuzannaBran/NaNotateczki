@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -24,6 +25,67 @@ import 'support/native_test_documents.dart';
 void main() {
   useIsolatedNativeTestDocuments();
   useInMemoryTestTextStorage();
+
+  testWidgets('Ctrl-scroll pinch zooms the notebook', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 850));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final database = NotesDatabase(NativeDatabase.memory());
+    final preferences = AppPreferencesController();
+    final controller = EditorController(
+      repository: NotebookRepository(database),
+      notebook: _notebook(),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AppPreferencesController>.value(
+              value: preferences,
+            ),
+            ChangeNotifierProvider<EditorController>.value(value: controller),
+          ],
+          child: const EditorScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final point = tester.getCenter(
+      find.byKey(const ValueKey('notebook-page-viewport')),
+    );
+    final originalScale = _documentScale(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    tester.binding.handlePointerEvent(
+      const PointerScrollEvent(
+        position: Offset(550, 350),
+        scrollDelta: Offset(0, -80),
+        kind: PointerDeviceKind.mouse,
+      ),
+    );
+    await tester.pump();
+    final enlargedScale = _documentScale(tester);
+    expect(enlargedScale, greaterThan(originalScale));
+
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    tester.binding.handlePointerEvent(
+      PointerScrollEvent(
+        position: point,
+        scrollDelta: const Offset(0, -50),
+        kind: PointerDeviceKind.mouse,
+      ),
+    );
+    await tester.pump();
+    expect(_documentScale(tester), closeTo(enlargedScale, 0.001));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    preferences.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await database.close();
+  });
 
   testWidgets(
     'background switches repaint without notifying the whole editor',

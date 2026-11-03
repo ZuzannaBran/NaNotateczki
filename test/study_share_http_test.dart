@@ -434,10 +434,7 @@ void main() {
     late http.Request captured;
     final harness = await _makeOwner((request) async {
       captured = request;
-      return http.Response(
-        '{"appearance":{"darkMode":true}}',
-        200,
-      );
+      return http.Response('{"appearance":{"darkMode":true}}', 200);
     });
     await harness.service.updateAppearance(
       _activeShare(),

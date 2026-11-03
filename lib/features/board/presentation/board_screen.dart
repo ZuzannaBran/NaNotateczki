@@ -9,6 +9,7 @@ import 'package:flutter/gestures.dart'
         PointerScrollEvent,
         PointerSignalEvent;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HardwareKeyboard;
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
@@ -355,6 +356,16 @@ class _BoardScreenState extends State<BoardScreen> {
       return;
     }
     if (event.scrollDelta == Offset.zero) {
+      return;
+    }
+    // On some desktops a touchpad pinch arrives as Ctrl+scroll.
+    if ((HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed) &&
+        event.scrollDelta.dy != 0) {
+      final factor = math.exp(-event.scrollDelta.dy / 200)
+          .clamp(0.25, 4.0)
+          .toDouble();
+      controller.zoomBy(factor, focalPoint: event.localPosition);
       return;
     }
     // Trackpad two-finger drag can arrive as scroll signal on Linux.

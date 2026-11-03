@@ -217,5 +217,7 @@ try {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
   }
-  await rm(profile, { recursive: true, force: true });
+  await rm(profile, {
+    recursive: true, force: true, maxRetries: 10, retryDelay: 250,
+  });
 }

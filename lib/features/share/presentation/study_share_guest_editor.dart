@@ -172,7 +172,6 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       const Duration(milliseconds: 35),
       () => unawaited(_push()),
     );
-
   }
 
   Future<void> _persistPending() {
@@ -391,10 +390,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     final spacing = appearance['backgroundSpacing'];
     if (style is int && spacing is num) {
       _editor?.applySharedBackgroundSettings(
-        PageBackgroundSettings.fromJson({
-          'style': style,
-          'spacing': spacing,
-        }),
+        PageBackgroundSettings.fromJson({'style': style, 'spacing': spacing}),
       );
     }
   }
@@ -410,8 +406,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
     }
     _applyAppearance(snapshot);
     final local = NotebookRepository.encodeNotebook(editor.notebook);
-    if (jsonEncode(local['pages']) ==
-        jsonEncode(snapshot.notebook['pages'])) {
+    if (jsonEncode(local['pages']) == jsonEncode(snapshot.notebook['pages'])) {
       _deferredRemote = null;
       _remoteRetryTimer?.cancel();
       _base = snapshot.notebook;
@@ -426,10 +421,9 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         return;
       }
       final updated = _decode(snapshot.notebook);
-      await _repository!.importNotebooksAtomically(
-        [updated],
-        verifiedRemoteSync: true,
-      );
+      await _repository!.importNotebooksAtomically([
+        updated,
+      ], verifiedRemoteSync: true);
       if (!mounted || _dirty || !editor.canApplyConfirmedRemoteNotebook) {
         _deferRemote(snapshot);
         return;

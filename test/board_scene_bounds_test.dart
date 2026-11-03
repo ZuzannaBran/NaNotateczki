@@ -1,5 +1,7 @@
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -167,6 +169,31 @@ void main() {
     final fastPan = await panByTouch(2.0, 41);
     expect(slowPan, greaterThan(0));
     expect(fastPan, greaterThan(slowPan));
+
+    controller.setViewTransform(scale: 1, pan: Offset.zero);
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    tester.binding.handlePointerEvent(
+      const PointerScrollEvent(
+        position: Offset(500, 350),
+        scrollDelta: Offset(0, -80),
+        kind: PointerDeviceKind.mouse,
+      ),
+    );
+    await tester.pump();
+    final zoomedScale = controller.viewScale;
+    expect(zoomedScale, greaterThan(1));
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    tester.binding.handlePointerEvent(
+      const PointerScrollEvent(
+        position: Offset(500, 350),
+        scrollDelta: Offset(0, -50),
+        kind: PointerDeviceKind.mouse,
+      ),
+    );
+    await tester.pump();
+    expect(controller.viewScale, zoomedScale);
+
 
     await tester.pumpWidget(app(showToolbar: false));
     await tester.pump();

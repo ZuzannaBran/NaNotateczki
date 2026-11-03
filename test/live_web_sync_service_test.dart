@@ -33,85 +33,88 @@ void main() {
     textStorageWriteOverride = null;
   });
 
-  test('shared incoming revision waits for the host to finish writing', () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    final note = await repository.createNotebook(title: 'Host note');
-    final base = (await repository.getNotebook(note.uid))!;
-    final remote = base.copyWith(
-      pages: [base.pages.single.copyWith(title: 'Guest update')],
-    );
-    var remoteChanged = false;
-    var canApply = false;
-    final client = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((request) async {
-        if (request.url.path == '/v1/sync/bootstrap') {
-          return http.Response(
-            jsonEncode({
-              'cursor': 1,
-              'notebooks': [
-                {
-                  'uid': base.uid,
-                  'revision': 1,
-                  'deleted': false,
-                  'notebook': NotebookRepository.encodeNotebook(base),
-                },
-              ],
-            }),
-            200,
-          );
-        }
-        if (request.url.path == '/v1/sync/changes') {
-          return http.Response(
-            jsonEncode({
-              'cursor': remoteChanged ? 2 : 1,
-              'changes': remoteChanged
-                  ? [
-                      {
-                        'uid': base.uid,
-                        'revision': 2,
-                        'deleted': false,
-                        'notebook': NotebookRepository.encodeNotebook(remote),
-                      },
-                    ]
-                  : [],
-              'hasMore': false,
-            }),
-            200,
-          );
-        }
-        fail('An unchanged host must not upload a new notebook.');
-      }),
-    )..setAccessToken('token');
-    addTearDown(client.close);
-    final session = AccountSessionController(client)
-      ..mode = AccountDataMode.account
-      ..userId = 'share-guard-owner';
-    addTearDown(session.dispose);
-    final sync = LiveWebSyncService(
-      repository: repository,
-      apiClient: client,
-      session: session,
-      enableRealtime: false,
-    );
-    addTearDown(sync.dispose);
-    await sync.start(InitialSyncPolicy.mergeSafely);
-    sync.setSharedDocumentUid(base.uid);
-    sync.setSharedRemoteApplyGuard(base.uid, () => canApply);
+  test(
+    'shared incoming revision waits for the host to finish writing',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final note = await repository.createNotebook(title: 'Host note');
+      final base = (await repository.getNotebook(note.uid))!;
+      final remote = base.copyWith(
+        pages: [base.pages.single.copyWith(title: 'Guest update')],
+      );
+      var remoteChanged = false;
+      var canApply = false;
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/v1/sync/bootstrap') {
+            return http.Response(
+              jsonEncode({
+                'cursor': 1,
+                'notebooks': [
+                  {
+                    'uid': base.uid,
+                    'revision': 1,
+                    'deleted': false,
+                    'notebook': NotebookRepository.encodeNotebook(base),
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/v1/sync/changes') {
+            return http.Response(
+              jsonEncode({
+                'cursor': remoteChanged ? 2 : 1,
+                'changes': remoteChanged
+                    ? [
+                        {
+                          'uid': base.uid,
+                          'revision': 2,
+                          'deleted': false,
+                          'notebook': NotebookRepository.encodeNotebook(remote),
+                        },
+                      ]
+                    : [],
+                'hasMore': false,
+              }),
+              200,
+            );
+          }
+          fail('An unchanged host must not upload a new notebook.');
+        }),
+      )..setAccessToken('token');
+      addTearDown(client.close);
+      final session = AccountSessionController(client)
+        ..mode = AccountDataMode.account
+        ..userId = 'share-guard-owner';
+      addTearDown(session.dispose);
+      final sync = LiveWebSyncService(
+        repository: repository,
+        apiClient: client,
+        session: session,
+        enableRealtime: false,
+      );
+      addTearDown(sync.dispose);
+      await sync.start(InitialSyncPolicy.mergeSafely);
+      sync.setSharedDocumentUid(base.uid);
+      sync.setSharedRemoteApplyGuard(base.uid, () => canApply);
 
-    remoteChanged = true;
-    await sync.syncNow();
-    final before = (await repository.getNotebook(base.uid))!;
-    expect(before.pages.single.title, isNot('Guest update'));
-    canApply = true;
-    await sync.syncNow();
-    final after = (await repository.getNotebook(base.uid))!;
-    expect(after.pages.single.title, 'Guest update');
-    sync.clearSharedRemoteApplyGuard(base.uid);
-    await sync.stop();
-  });
+      remoteChanged = true;
+      await sync.syncNow();
+      final before = (await repository.getNotebook(base.uid))!;
+      expect(before.pages.single.title, isNot('Guest update'));
+      canApply = true;
+      await sync.syncNow();
+      final after = (await repository.getNotebook(base.uid))!;
+      expect(after.pages.single.title, 'Guest update');
+      sync.clearSharedRemoteApplyGuard(base.uid);
+      await sync.stop();
+    },
+  );
 
   test('local and UTC timestamps do not create a sync conflict', () async {
     final database = NotesDatabase(NativeDatabase.memory());

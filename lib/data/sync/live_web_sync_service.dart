@@ -173,7 +173,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       remote.addAll(records.map(_decodeRemoteRecord));
       after = next as String?;
     } while (after != null);
-    await _applyInitialPolicy(policy, remote);
+    await _applyInitialPolicy(policy, remote, initialCursor ?? 0);
     _cursor = initialCursor;
     _started = true;
     await _offlineQueueTail;
@@ -371,6 +371,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _applyInitialPolicy(
     InitialSyncPolicy policy,
     List<_RemoteNotebookRecord> remote,
+    int remoteCursor,
   ) async {
     final local = await repository.fetchNotebooks();
     if (policy == InitialSyncPolicy.uploadLocal && remote.isNotEmpty) {
@@ -446,6 +447,34 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       _pending.remove(record.uid);
       _idempotencyKeys.remove(record.uid);
     }
+    if (policy != InitialSyncPolicy.downloadRemote) {
+      final knownRemoteUids = remote.map((record) => record.uid).toSet();
+      for (final notebook in local) {
+        if (knownRemoteUids.contains(notebook.uid)) {
+          continue;
+        }
+        // A full bootstrap can omit a document after its tombstone has
+        // been compacted. Do not resurrect a previously synced UID.
+        if (remoteCursor > 0 && _revisions.containsKey(notebook.uid)) {
+          if (_hasUnsentEdit(
+            notebook.uid,
+            notebook,
+            _bases[notebook.uid],
+          )) {
+            final copy = await _conflictCopy(notebook, reserved: imports);
+            imports.add(copy);
+            _queueConflictCopy(copy.uid);
+          }
+          remoteDeletes.add(notebook.uid);
+          _pending.remove(notebook.uid);
+          _idempotencyKeys.remove(notebook.uid);
+          _bases.remove(notebook.uid);
+          continue;
+        }
+        _pending.add(notebook.uid);
+        _idempotencyKeys[notebook.uid] = const Uuid().v4();
+      }
+    }
     if (imports.isNotEmpty) {
       await _applyRemoteImports(imports);
     }
@@ -460,14 +489,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       }
       remoteApplyEpoch++;
       await onRemoteApplied?.call();
-    }
-    if (policy != InitialSyncPolicy.downloadRemote) {
-      for (final notebook in local) {
-        if (!remote.any((record) => record.uid == notebook.uid)) {
-          _pending.add(notebook.uid);
-          _idempotencyKeys[notebook.uid] = const Uuid().v4();
-        }
-      }
     }
   }
 

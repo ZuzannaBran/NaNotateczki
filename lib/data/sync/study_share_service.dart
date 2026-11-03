@@ -141,14 +141,11 @@ class StudyShareService {
     required PageBackgroundSettings background,
   }) async {
     await _refreshIfNeeded();
-    await session.apiClient.putJson(
-      '/v1/study-shares/${share.id}/appearance',
-      {
-        'darkMode': darkMode,
-        'backgroundStyle': background.style.index,
-        'backgroundSpacing': background.spacing,
-      },
-    );
+    await session.apiClient.putJson('/v1/study-shares/${share.id}/appearance', {
+      'darkMode': darkMode,
+      'backgroundStyle': background.style.index,
+      'backgroundSpacing': background.spacing,
+    });
   }
 
   Future<ActiveStudyShare> extend(ActiveStudyShare share) async {
