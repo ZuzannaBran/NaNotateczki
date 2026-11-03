@@ -121,13 +121,17 @@ void main() {
 
   test('513 code points split into three insert and delete batches', () {
     final adapter = ShareTextEditAdapter();
-    var state = applyPlan({}, adapter.plan(atoms: {}, newText: List.filled(513, 'x').join()));
-    final changes = adapter.plan(atoms: state, newText: List.filled(513, 'y').join());
+    final initial = List.filled(513, 'x').join();
+    final replacement = List.filled(513, 'y').join();
+    var state = applyPlan(
+      {}, adapter.plan(atoms: {}, newText: initial),
+    );
+    final changes = adapter.plan(atoms: state, newText: replacement);
     expect(changes.where((it) => it.kind == OperationKind.textDelete),
         hasLength(3));
     expect(changes.where((it) => it.kind == OperationKind.textInsert),
         hasLength(3));
     state = applyPlan(state, changes);
-    expect(OperationTextSequence.render(state), 'y' * 513);
+    expect(OperationTextSequence.render(state), replacement);
   });
 }

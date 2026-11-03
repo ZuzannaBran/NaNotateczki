@@ -3,7 +3,8 @@ import 'package:uuid/uuid.dart';
 import 'operation_protocol.dart';
 import 'operation_text_sequence.dart';
 
-/// One client-side intent. SyncEngine assigns actorSeq, Lamport and operationId.
+/// One client-side intent. SyncEngine assigns actorSeq, Lamport
+/// and operationId.
 class ShareTextIntent {
   const ShareTextIntent(this.kind, this.payload);
 
@@ -93,7 +94,9 @@ class ShareTextEditAdapter {
       for (final character in inserted.sublist(offset, end)) {
         final atomId = _createAtomId();
         if (!_uuidPattern.hasMatch(atomId) || !used.add(atomId)) {
-          throw StateError('Atom generator produced a duplicate or invalid ID.');
+          throw StateError(
+            'Atom generator produced a duplicate or invalid ID.',
+          );
         }
         batch.add({'id': atomId, 'text': character});
       }
