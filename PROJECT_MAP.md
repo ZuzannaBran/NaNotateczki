@@ -465,6 +465,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   redukuje dokument/strony/obiekty i tombstones według stabilnych ID,
   bez pełnych snapshotów; `PendingShareProjection` nakłada oczekujące
   lokalne operacje na potwierdzony stan i ujawnia nierozwiązane usunięcia.
+- `lib/data/sync/share_text_edit_adapter.dart`:
+  `ShareTextEditAdapter` mapuje zmianę plain text na atomowe intenty,
+  wstawia/usuwania z kotwicami i dzieli wsady po 256; formatowanie
+  Quill jest jawnie blokowane do czasu migracji atrybutów.
+  Regresja: `test/share_text_edit_adapter_test.dart`.
 - `lib/data/sync/operation_text_sequence.dart`:
   `OperationTextSequence` — RGA/CRDT atomów z deterministycznym
   porządkiem, kotwicami i usunięciami zachowanymi do replay;
