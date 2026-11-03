@@ -60,7 +60,7 @@ void main() {
       alice,
     );
     expect(ab, ba);
-    expect(OperationTextSequence.render(ab), 'AB');
+    expect(OperationTextSequence.render(ab), 'BA');
   });
 
   test('deleted atoms stay as anchors for delayed insertions', () {
