@@ -80,6 +80,21 @@ Testy starszych modułów (backup, migracja 11, planner, shutdown, share,
 operacje) pozostają wymagane. Nie zostały automatycznie uruchomione samym
 zapisaniem nowych testów.
 
+## Naprawiony brak z wcześniejszych etapów
+
+Zidentyfikowano niespójność: serwer migracją 0012 akceptował
+`task.delete`, ale lokalna SQLite v5 dopuszczała tombstones tylko
+dla document/page/object/folder. `OperationStore` nie uwzględniał
+`OperationTarget.task`. Wdrożono SQLite v6: nowa kategoria
+`task` w tabeli, migracja zachowująca stare rekordy, obsługa
+usuwania i ochrony przed ponownym użyciem UID, regresje
+`test/task_tombstone_migration_test.dart` dla nowej bazy i
+aktualizacji v5 → v6. Etap 11 rozpoznaje teraz pliki z `user_version=6`.
+
+Zmiana dotyczy tylko lokalnego schematu SQLite aplikacji.
+Nie dodawano nowej migracji SQL backendu, bo
+`0012_task_tombstones.sql` już to obsługuje.
+
 ## Blokery do pełnego zaliczenia
 
 1. Etap 11 pozostawia dane w stanie `staged-not-activated`; publiczny
