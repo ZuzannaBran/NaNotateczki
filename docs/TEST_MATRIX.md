@@ -29,7 +29,7 @@ a platform as tested until its actual Actions job succeeds.
 
 ## Stage 12 — operation-based persistence acceptance (November 2026)
 
-Added `test/production/stage12_operation_stress_test.dart` for 1000
+Added `test/task_tombstone_migration_test.dart` for local task delete protection and SQLite v5→v6 preservation, and `integration_test/stage12_live_api_test.dart` for a networked two-client runner (not yet executed). Added `test/production/stage12_operation_stress_test.dart` for 1000
 create + 1000 delete operations through real Drift/SQLite, restart,
 outbox, tombstones, ACK replay and transaction rollback. On the canonical
 `NaNotateczki-serwer/main` repository, the opt-in
