@@ -607,7 +607,10 @@ na protokół operacji przed migracją i testami end-to-end.
 
 Istnieją reduktory zmian konkretnych obiektów, nakładka lokalnych
 niepotwierdzonych operacji, CRDT tekstu z tymi samymi zasadami w Dart i
-FastAPI oraz trwały SQLite WASM gościa izolowany per `shareId`.
+FastAPI oraz trwały SQLite WASM gościa izolowany przez parę
+`shareId` + trwałe `guestActorId`. Identyfikator aktora musi przetrwać
+reload w ramach tego samego uprawnienia; zmiana grant/ticket wymaga
+jawnego wznowienia lub migracji kolejki, nie cichego przejęcia.
 `EditorController` ma metodę nałożenia pojedynczej zatwierdzonej zmiany
 bez resetowania widoku. To **nie jest jeszcze produkcyjny kanał Share**:
 legacy `StudyShareGuestEditor` i `LiveWebSyncService` nadal korzystają
