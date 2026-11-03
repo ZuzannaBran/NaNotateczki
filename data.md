@@ -386,13 +386,16 @@ narzędziem `age`. Skrypt nie wdraża retencji i nie zastępuje testu odtworzeni
   migracji nie edytuje się, tylko dodaje następną.
 
 
-## SQLite v5 — dziennik operacji (etapy 3–5)
+## SQLite v6 — dziennik operacji (etapy 3–5 i poprawka etapu 12)
 
-Lokalna baza Drift jest migrowana addytywnie z v2 do v5. Migracja v3 → v4
+Lokalna baza Drift jest migrowana addytywnie z v2 do v6. Migracja v3 → v4
 odtwarza pageId z operacji usuwającej obiekt i zachowuje tombstones.
 Migracja v4 → v5 dodaje trwały status `blocked` i opis błędu do outboxu,
 bez usuwania operacji. Dalsza sekwencja tego samego aktora pozostaje
 zatrzymana do świadomej naprawy; inni aktorzy nie są blokowani.
+Migracja v5 → v6 przebudowuje jedynie tabelę `object_tombstones`, dodaje
+kategorię `task`, zachowuje wszystkie wcześniejsze usunięcia i dziennik
+operacji. `OperationStore` blokuje ponowne użycie skasowanego UID zadania.
 `OperationStore`
 zapisuje projekcję i operację z outboxem w jednej transakcji, a odbiór
 zdalny zapisuje operację, projekcję i checkpoint w jednej transakcji.
