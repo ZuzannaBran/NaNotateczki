@@ -407,7 +407,7 @@ class AccountSessionController extends ChangeNotifier {
       if (refreshToken != null && apiClient.accessToken != null) {
         await apiClient.postJson('/v1/auth/logout', {
           'refreshToken': refreshToken,
-        });
+        }).timeout(const Duration(seconds: 5));
       }
     } finally {
       useLocalOnly();

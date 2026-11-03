@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/error/one_shot_error_notice.dart';
 import '../../../core/storage/app_save_coordinator.dart';
+import '../../../core/storage/shutdown_coordinator.dart';
+import '../../../core/storage/text_storage.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
@@ -185,6 +187,8 @@ class _AccountAvatar extends StatelessWidget {
 }
 
 enum _AccountView { landing, signIn, register, local, settings, password }
+
+enum _LogoutRecovery { retry, cancel, offline }
 
 class _AccountDialog extends StatefulWidget {
   const _AccountDialog({
@@ -892,40 +896,112 @@ class _AccountDialogState extends State<_AccountDialog> {
     }
   }
 
-  /// Keep the account and its local outbox intact until a verified backup.
-  ///
-  /// Never stop live sync before it has published the final editor writes.
-  Future<void> _finishSignedInSession() async {
+  /// Flush all local writes before any network operation or credential change.
+  Future<void> _finishSignedInSession({
+    bool preserveOffline = false,
+  }) async {
     final session = context.read<AccountSessionController>();
     if (!session.isSignedIn) {
       return;
     }
     final sync = context.read<LiveWebSyncService>();
     final backup = context.read<RemoteBackupScheduler>();
-    await AppSaveCoordinator.instance.flushPending();
-    if (!sync.isStarted) {
-      await sync
-          .start(InitialSyncPolicy.mergeSafely)
-          .timeout(const Duration(seconds: 45));
+    final coordinator = ShutdownCoordinator(
+      flushLocal: () async {
+        await AppSaveCoordinator.instance.flushPending();
+        await waitForPendingTextStorageOperations();
+        await sync.flushPersistedOutbox();
+        if (AppSaveCoordinator.instance.hasPendingWork) {
+          throw StateError('Local editor writes are still pending.');
+        }
+      },
+      syncRemote: () async {
+        if (!sync.isStarted) {
+          await sync.start(InitialSyncPolicy.mergeSafely);
+        }
+        await sync.syncNow();
+        if (sync.hasPendingChanges || sync.lastError != null) {
+          throw StateError('Unsent account changes remain in the outbox.');
+        }
+      },
+      verifyBackup: () async {
+        if (!backup.isEnabled) {
+          backup.enableForSignedInAccount();
+        }
+        await backup.ensureVerifiedForExit();
+        if (backup.hasPendingBackup || backup.lastError != null) {
+          throw StateError('The final account backup is not verified.');
+        }
+      },
+      stopServices: () async {
+        // Timeouts from the preceding network steps do not cancel I/O.
+        // Join all writers before clearing or changing account identity.
+        await sync.stop();
+        await backup.stop();
+        await waitForPendingTextStorageOperations();
+      },
+      endSession: () async {
+        try {
+          await session.logout();
+        } catch (_) {
+          // The server may be offline, but local credentials are erased
+          // in logout's finally block. Never mask local persistence errors.
+          if (!preserveOffline || session.isSignedIn) {
+            rethrow;
+          }
+        }
+      },
+    );
+    await coordinator.run(preserveOffline: preserveOffline);
+  }
+
+  Future<bool> _finishSessionWithChoice() async {
+    while (true) {
+      try {
+        await _finishSignedInSession();
+        return true;
+      } on ShutdownInterrupted catch (failure) {
+        if (!failure.localSafe || !mounted) {
+          rethrow;
+        }
+        final choice = await showDialog<_LogoutRecovery>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Account sync not complete'),
+            content: Text(
+              'Local changes are saved. Remote sync or backup stopped '
+              'at ' + failure.phase.name + '. Your unsent changes will remain '
+              'on this device.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext)
+                    .pop(_LogoutRecovery.cancel),
+                child: const Text('Stay signed in'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext)
+                    .pop(_LogoutRecovery.retry),
+                child: const Text('Retry'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext)
+                    .pop(_LogoutRecovery.offline),
+                child: const Text('Log out offline'),
+              ),
+            ],
+          ),
+        );
+        if (choice == _LogoutRecovery.cancel || choice == null) {
+          return false;
+        }
+        if (choice == _LogoutRecovery.offline) {
+          await _finishSignedInSession(preserveOffline: true);
+          return true;
+        }
+      }
     }
-    await sync.syncNow().timeout(const Duration(seconds: 45));
-    if (sync.hasPendingChanges || sync.lastError != null) {
-      throw StateError(
-        'Changes are still waiting to sync. Stay signed in and retry.',
-      );
-    }
-    if (!backup.isEnabled) {
-      backup.enableForSignedInAccount();
-    }
-    await backup.ensureVerifiedForExit().timeout(const Duration(seconds: 60));
-    if (backup.hasPendingBackup || backup.lastError != null) {
-      throw StateError(
-        'The final backup is not verified. Stay signed in and retry.',
-      );
-    }
-    await sync.stop();
-    await backup.stop();
-    await session.logout();
   }
 
   Future<void> _useLocal() async {
@@ -935,7 +1011,9 @@ class _AccountDialogState extends State<_AccountDialog> {
     final session = context.read<AccountSessionController>();
     _startWorking();
     try {
-      await _finishSignedInSession();
+      if (!await _finishSessionWithChoice()) {
+        return;
+      }
       await session.useLocalProfile(_localNameController.text);
       if (!mounted) {
         return;
@@ -956,7 +1034,9 @@ class _AccountDialogState extends State<_AccountDialog> {
     _startWorking();
     final session = context.read<AccountSessionController>();
     try {
-      await _finishSignedInSession();
+      if (!await _finishSessionWithChoice()) {
+        return;
+      }
       if (mounted) {
         _show(_AccountView.landing);
       }

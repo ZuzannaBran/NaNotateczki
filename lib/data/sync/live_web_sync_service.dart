@@ -48,6 +48,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   final Set<String> _pending = <String>{};
 
   Future<void> _offlineQueueTail = Future<void>.value();
+  Future<void>? _lastOutboxWrite;
   final Map<String, String> _idempotencyKeys = <String, String>{};
   Timer? _drainTimer;
   Timer? _reconnectTimer;
@@ -269,6 +270,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         }),
       );
     });
+    _lastOutboxWrite = operation;
     _offlineQueueTail = operation.catchError((
       Object error,
       StackTrace stackTrace,
@@ -1200,6 +1202,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         }),
       );
     });
+    _lastOutboxWrite = write;
     _offlineQueueTail = write.catchError((Object error, StackTrace stackTrace) {
       AppErrorLog.instance.record(
         error,
@@ -1208,6 +1211,16 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
       );
     });
     return write;
+  }
+
+  /// Refuse logout if the latest outbox write failed, even when a background
+  /// error handler logged and consumed the failure for the running UI.
+  Future<void> flushPersistedOutbox() async {
+    await _offlineQueueTail;
+    await _lastOutboxWrite;
+    if (_activeUserId != null) {
+      await _saveState();
+    }
   }
 
   static Map<String, dynamic> _requireJsonObject(Object? raw) {

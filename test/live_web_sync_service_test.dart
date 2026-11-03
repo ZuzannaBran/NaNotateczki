@@ -1440,6 +1440,33 @@ void main() {
       hasLength(2),
     );
   });
+  test('shutdown refuses a failed durable outbox write', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) async => http.Response('', 500)),
+    );
+    addTearDown(client.close);
+    final session = AccountSessionController(client)
+      ..mode = AccountDataMode.account
+      ..userId = 'pending-owner';
+    addTearDown(session.dispose);
+    final sync = LiveWebSyncService(
+      repository: repository,
+      apiClient: client,
+      session: session,
+      enableRealtime: false,
+    );
+    addTearDown(sync.dispose);
+    textStorageWriteOverride = (_, _) async {
+      throw StateError('Disk full before outbox fsync.');
+    };
+    sync.enqueue([const NotebookRepositoryChange.full('offline-document')]);
+    await expectLater(sync.flushPersistedOutbox(), throwsStateError);
+  });
+
 }
 
 class _MemoryAccountCredentialStore implements AccountCredentialStore {

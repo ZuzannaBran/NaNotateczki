@@ -13,6 +13,8 @@ import '../core/input/app_preferences_controller.dart';
 import '../core/input/app_scroll_behavior.dart';
 import '../core/input/ink_activity_tracker.dart';
 import '../core/storage/app_save_coordinator.dart';
+import '../core/storage/shutdown_coordinator.dart';
+import '../core/storage/text_storage.dart';
 import '../core/theme/app_theme.dart';
 import '../data/backup/local_backup_service.dart';
 import '../data/backup/remote_backup_service.dart';
@@ -75,6 +77,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   bool _databaseFreshFile = false;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
   final ValueNotifier<String?> _exitFailure = ValueNotifier<String?>(null);
+  final ValueNotifier<bool> _allowOfflineExit = ValueNotifier<bool>(false);
   Future<void>? _exitDrain;
   bool _allowExit = false;
   bool _openErrorRecorded = false;
@@ -131,6 +134,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
     _finishingExit.dispose();
     _exitFailure.dispose();
+    _allowOfflineExit.dispose();
     super.dispose();
   }
 
@@ -159,7 +163,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     return ui.AppExitResponse.cancel;
   }
 
-  Future<void> _finishPendingWorkAndExit() async {
+  Future<void> _finishPendingWorkAndExit({
+    bool preserveOffline = false,
+  }) async {
     final repository = _repository;
     final backupService = _backupService;
     final scheduler = _backupScheduler;
@@ -170,26 +176,47 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
 
     _exitFailure.value = null;
+    _allowOfflineExit.value = false;
     _finishingExit.value = true;
-    try {
-      await InkActivityTracker.instance.waitForNoActiveContacts();
-      for (var attempt = 0; attempt < 3; attempt++) {
-        await AppSaveCoordinator.instance.flushPending();
-        await repository.waitForPendingSaves();
-        if (!AppSaveCoordinator.instance.hasPendingWork &&
-            !repository.hasPendingSaves) {
-          break;
+    final coordinator = ShutdownCoordinator(
+      flushLocal: () async {
+        await InkActivityTracker.instance.waitForNoActiveContacts();
+        for (var attempt = 0; attempt < 3; attempt++) {
+          await AppSaveCoordinator.instance.flushPending();
+          await repository.waitForPendingSaves();
+          await waitForPendingTextStorageOperations();
+          if (!AppSaveCoordinator.instance.hasPendingWork &&
+              !repository.hasPendingSaves) {
+            break;
+          }
         }
-      }
-      if (AppSaveCoordinator.instance.hasPendingWork ||
-          repository.hasPendingSaves) {
-        throw StateError('Pending editor saves did not settle.');
-      }
-
-      await scheduler.flushForExit();
-      await backupService.waitUntilIdle();
-
-      if (_accountSession?.isSignedIn == true) {
+        if (AppSaveCoordinator.instance.hasPendingWork ||
+            repository.hasPendingSaves) {
+          throw StateError('Pending editor saves did not settle.');
+        }
+        await scheduler.flushForExit();
+        await backupService.waitUntilIdle();
+        await waitForPendingTextStorageOperations();
+        if (_accountSession?.isSignedIn == true) {
+          await _liveSync?.flushPersistedOutbox();
+        }
+      },
+      syncRemote: () async {
+        if (_accountSession?.isSignedIn != true) {
+          return;
+        }
+        if (_liveSync == null) {
+          throw StateError('Account synchronization is unavailable.');
+        }
+        await _liveSync!.syncNow();
+        if (_liveSync!.hasPendingChanges || _liveSync!.lastError != null) {
+          throw StateError('Pending account changes remain in the outbox.');
+        }
+      },
+      verifyBackup: () async {
+        if (_accountSession?.isSignedIn != true) {
+          return;
+        }
         final remote = _remoteBackupScheduler;
         if (remote == null) {
           throw StateError('Remote backup is not available.');
@@ -197,14 +224,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (!remote.isEnabled) {
           remote.enableForSignedInAccount();
         }
-        // First publish local changes; then snapshot the final state.
-        await _liveSync?.syncNow();
-        if (_liveSync?.hasPendingChanges == true) {
-          throw StateError('Account changes are still awaiting sync.');
-        }
         await remote.ensureVerifiedForExit();
-      }
-
+      },
+    );
+    try {
+      await coordinator.run(preserveOffline: preserveOffline);
       _allowExit = true;
       _exitFailure.value = null;
       final response = await ServicesBinding.instance.exitApplication(
@@ -224,7 +248,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         source: 'AppScope.finishPendingWorkAndExit',
       );
       if (mounted) {
-        _exitFailure.value = 'Backup could not finish: $error';
+        _allowOfflineExit.value =
+            error is ShutdownInterrupted && error.localSafe;
+        _exitFailure.value = 'Exit stopped: $error';
         _finishingExit.value = false;
       }
     } finally {
@@ -232,6 +258,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _exitDrain = null;
       }
     }
+  }
+
+  void _cancelPendingExit() {
+    _exitFailure.value = null;
+    _allowOfflineExit.value = false;
+    _backupScheduler?.resumeAfterExitCancellation();
   }
 
   bool _handleGlobalKeyEvent(KeyEvent event) {
@@ -760,6 +792,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                         child: _ExitGuardOverlay(
                           finishingExit: _finishingExit,
                           exitFailure: _exitFailure,
+                          allowOfflineExit: _allowOfflineExit,
+                          onCancel: _cancelPendingExit,
+                          onExitOffline: () {
+                            _exitDrain ??= _finishPendingWorkAndExit(
+                              preserveOffline: true,
+                            );
+                          },
                           onRetry: () {
                             _exitDrain ??= _finishPendingWorkAndExit();
                           },
@@ -831,13 +870,19 @@ class _ExitGuardOverlay extends StatelessWidget {
   const _ExitGuardOverlay({
     required this.finishingExit,
     required this.exitFailure,
+    required this.allowOfflineExit,
     required this.onRetry,
+    required this.onCancel,
+    required this.onExitOffline,
     required this.child,
   });
 
   final ValueListenable<bool> finishingExit;
   final ValueListenable<String?> exitFailure;
+  final ValueListenable<bool> allowOfflineExit;
   final VoidCallback onRetry;
+  final VoidCallback onCancel;
+  final VoidCallback onExitOffline;
   final Widget child;
 
   @override
@@ -867,9 +912,27 @@ class _ExitGuardOverlay extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(failure, textAlign: TextAlign.center),
-                              TextButton(
-                                onPressed: onRetry,
-                                child: const Text('Retry backup'),
+                              ValueListenableBuilder<bool>(
+                                valueListenable: allowOfflineExit,
+                                builder: (context, canExitOffline, _) => Column(
+                                  children: [
+                                    TextButton(
+                                      onPressed: onRetry,
+                                      child: const Text('Retry'),
+                                    ),
+                                    if (canExitOffline)
+                                      TextButton(
+                                        onPressed: onExitOffline,
+                                        child: const Text(
+                                          'Exit with saved local changes',
+                                        ),
+                                      ),
+                                    TextButton(
+                                      onPressed: onCancel,
+                                      child: const Text('Cancel exit'),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
