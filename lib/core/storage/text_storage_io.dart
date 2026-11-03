@@ -107,9 +107,14 @@ Future<void> _recoverAtomicWrite(File file) async {
 
 Future<File> _fileForKey(String key, {String? directoryPath}) async {
   final path = directoryPath ?? await getAppDataPath();
-  final directory = Directory(path);
-  if (!await directory.exists()) {
-    await directory.create(recursive: true);
+  if (key.startsWith('/') ||
+      key.contains('\\') ||
+      key.split('/').any(
+        (part) => part.isEmpty || part == '.' || part == '..',
+      )) {
+    throw ArgumentError.value(key, 'key', 'Invalid relative storage key');
   }
-  return File('$path/$key');
+  final file = File('$path/$key');
+  await file.parent.create(recursive: true);
+  return file;
 }
