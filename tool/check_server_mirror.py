@@ -18,6 +18,7 @@ SHARED = (
     "SECURITY_DEPLOY.md",
     "SERVER.md",
     "TESTING.md",
+    "docs/OPERATION_PROTOCOL_V1.md",
     "compose.yaml",
     "compose.local.yaml",
     "compose.public.yaml",
