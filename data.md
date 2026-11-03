@@ -603,6 +603,20 @@ API v1 i share nadal działają na snapshotach. Nie przełączać użytkowników
 na protokół operacji przed migracją i testami end-to-end.
 
 
+## Share v2 — etap 6 (warstwa przygotowana, migracja nieaktywna)
+
+Istnieją reduktory zmian konkretnych obiektów, nakładka lokalnych
+niepotwierdzonych operacji, CRDT tekstu z tymi samymi zasadami w Dart i
+FastAPI oraz trwały SQLite WASM gościa izolowany per `shareId`.
+`EditorController` ma metodę nałożenia pojedynczej zatwierdzonej zmiany
+bez resetowania widoku. To **nie jest jeszcze produkcyjny kanał Share**:
+legacy `StudyShareGuestEditor` i `LiveWebSyncService` nadal korzystają
+z JSON snapshotów. Serwer prawidłowo blokuje v2 dla tych UID do czasu
+bezpiecznej migracji z etapu 11. Nie uruchamiać dwóch writerów naraz.
+Nowy kanał nie synchronizuje jeszcze Quill delta formatting ani assetów
+PDF/obrazów; podgląd nietrwałych fragmentów kreski wymaga integracji.
+Szczegóły: `docs/ETAP_6_SHARE_OPERATIONS.md`.
+
 ## Operacyjny silnik v2 — etap 5, bez przełączenia produkcyjnego
 
 `SyncEngine` i `HttpOperationGateway` obsługują trwały dziennik SQLite,
