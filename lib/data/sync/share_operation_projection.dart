@@ -25,7 +25,10 @@ class ShareOperationProjection {
       'object:$pageId:$objectId';
 
   /// The returned value can be discarded on failure without any side effect.
-  ShareOperationProjection apply(OperationEnvelope op) {
+  ShareOperationProjection apply(
+    OperationEnvelope op, {
+    bool optimistic = false,
+  }) {
     op.validateForV2Projection();
     if (op.kind.target == OperationTarget.folder) {
       throw UnsupportedError('Folder operations are handled in stage 8.');
@@ -64,7 +67,7 @@ class ShareOperationProjection {
       throw StateError('Document is not initialized.');
     }
     if (kind == OperationKind.documentSet) {
-      _merge(next, _fields(op, create: false), op);
+      _merge(next, _fields(op, create: false), op, force: optimistic);
       return ShareOperationProjection._(next, deleted);
     }
 
@@ -105,7 +108,12 @@ class ShareOperationProjection {
       throw StateError('Parent page does not exist.');
     }
     if (kind == OperationKind.pageSet) {
-      _merge(page as Map<String, dynamic>, _fields(op, create: false), op);
+      _merge(
+        page as Map<String, dynamic>,
+        _fields(op, create: false),
+        op,
+        force: optimistic,
+      );
       return ShareOperationProjection._(next, deleted);
     }
 
@@ -163,7 +171,7 @@ class ShareOperationProjection {
     if (object.containsKey('textAtoms') && fields.containsKey('text')) {
       throw StateError('CRDT text cannot be replaced with object.set.');
     }
-    _merge(object, fields, op);
+    _merge(object, fields, op, force: optimistic);
     return ShareOperationProjection._(next, deleted);
   }
 
@@ -183,8 +191,9 @@ class ShareOperationProjection {
   static void _merge(
     Map<String, dynamic> node,
     Map<String, dynamic> fields,
-    OperationEnvelope op,
-  ) {
+    OperationEnvelope op, {
+    bool force = false,
+  }) {
     final versions = node['versions'] as Map<String, dynamic>;
     final properties = node['properties'] as Map<String, dynamic>;
     final rank = <Object>[
@@ -195,7 +204,8 @@ class ShareOperationProjection {
     ];
     for (final entry in fields.entries) {
       final previous = versions[entry.key];
-      if (previous == null ||
+      if (force ||
+          previous == null ||
           _compareRanks(rank, List<Object>.from(previous as List)) > 0) {
         versions[entry.key] = rank;
         properties[entry.key] = entry.value;
@@ -233,7 +243,7 @@ class PendingShareProjection {
     unresolved.clear();
     for (final op in pending.values) {
       try {
-        result = result.apply(op);
+        result = result.apply(op, optimistic: true);
       } catch (error) {
         unresolved[op.operationId] = error.toString();
       }
@@ -253,7 +263,7 @@ class PendingShareProjection {
       ..[op.operationId] = op;
     var result = confirmed;
     for (final local in proposed.values) {
-      result = result.apply(local);
+      result = result.apply(local, optimistic: true);
     }
     pending[op.operationId] = op;
   }
