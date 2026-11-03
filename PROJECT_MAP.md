@@ -2528,6 +2528,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
 ## Etap 12 — nowe testy, akceptacja nadal otwarta (2026-11-03)
 
+- `test/task_tombstone_migration_test.dart`: regresje SQLite v6,
+  trwałe task.delete i migracja v5 → v6, także kompatybilność
+  stagingu etapu 11.
 - `test/production/stage12_operation_stress_test.dart`: 1000 dopisków,
   1000 usunięć, odtworzenie SQLite po restarcie, outbox i tombstones,
   retransmisja ACK oraz rollback i ciągłość aktora.
