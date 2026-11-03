@@ -115,3 +115,24 @@ zablokowanego łańcucha w UI i test migracji v4 → v5 na istniejącej bazie.
 - Zmiany są objęte testami regresyjnymi kontraktu i transakcji.
   Nie wykonano w tej sesji lokalnego Flutter/Dart ani E2E PostgreSQL.
   Przełączenie v1 na v2 nadal wymaga migracji namespace i reducerów.
+
+## Uzupełnienie: odświeżanie widoku po zatwierdzeniu operacji
+
+- `SyncEngine.onRemoteCommitted` jest wywoływane **po** zatwierdzeniu
+  transakcji `OperationStore.applyRemote` i **przed** przesunięciem
+  checkpointu odbioru. Wcześniejszy callback `applyRemote` służy wyłącznie
+  do trwałych zmian w SQLite; nie może modyfikować kontrolera Flutter.
+- Jeśli UI chwilowo nie może bezpiecznie nałożyć patcha (np. aktywny gest),
+  callback powinien zgłosić błąd. Kursor zostanie zachowany, operacja
+  odtworzona, a callback ponowiony. Powtórzenie musi być idempotentne.
+- Echo własnej operacji, także po wcześniejszym ACK i ponownym odczycie
+  starego kursora, jest rozpoznawane przez trwałą kolumnę
+  `operations.source = local` i nie uruchamia odświeżenia UI.
+- Po udanym pełnym przebiegu `lastError` zostaje wyczyszczony.
+- Regresje: `test/sync_engine_test.dart` sprawdza odczyt zatwierdzonej
+  projekcji w callbacku, ponowienie po odmowie UI oraz własne echo po ACK.
+
+**Wciąż zablokowane:** produkcyjny `LiveWebSyncService` nie może zostać
+zastąpiony dla UID v1 przed migracją z etapu 11. Potrzebne jest również
+kontrolowane przełączenie writerów, separacja z etapu 7 oraz testy E2E
+(etapy 12–13). Nowy callback nie jest sam w sobie przełączeniem produkcji.
