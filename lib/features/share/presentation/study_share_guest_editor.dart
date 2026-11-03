@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../data/drift/notes_database.dart';
 import '../../../data/sync/api_client.dart';
+import '../../../data/sync/notebook_merge.dart';
 import '../../../data/sync/shared_edit_conflicts.dart';
 import '../../../data/sync/study_share_guest_outbox.dart';
 import '../../../data/sync/study_share_service.dart';
@@ -53,6 +54,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
   NotebookRepository? _repository;
   EditorController? _editor;
   Map<String, dynamic>? _base;
+  Map<String, dynamic>? _localMergeBase;
   int _revision = 0;
   Timer? _pollTimer;
   Timer? _pushTimer;
@@ -116,6 +118,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
             notebook,
           ], verifiedRemoteSync: true);
           _base = pending.baseNotebook;
+          _localMergeBase = pending.localMergeBase;
           _revision = pending.baseRevision;
           _dirty = true;
           recovered = true;
@@ -191,6 +194,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
           baseRevision: _revision,
           baseNotebook: _base!,
           notebook: NotebookRepository.encodeNotebook(notebook),
+          localMergeBase: _localMergeBase,
         ),
       );
       _outboxFailed = false;
@@ -250,7 +254,25 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       if (notebook == null) {
         throw StateError('Shared notebook is unavailable.');
       }
-      final submitted = NotebookRepository.encodeNotebook(notebook);
+      final visibleAtSend = NotebookRepository.encodeNotebook(notebook);
+      // The visible editor may not yet include elements merged by the server
+      // during the previous request. Rebase only new local edits against the
+      // accepted snapshot; never interpret unseen remote ink as deletions.
+      final mergeBase = _localMergeBase;
+      final submitted = mergeBase == null
+          ? visibleAtSend
+          : mergeNotebookChanges(mergeBase, visibleAtSend, original);
+      if (submitted == null) {
+        _dirty = true;
+        if (mounted) {
+          setState(() {
+            _error =
+                'A concurrent edit conflicts with your local changes. '
+                'They remain in this tab; review them before continuing.';
+          });
+        }
+        return;
+      }
       if (jsonEncode(submitted['pages']) == jsonEncode(original['pages'])) {
         await _clearPending();
         return;
@@ -267,11 +289,23 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
         submitted,
         answer.notebook,
       );
-      // Even if more input arrived during the request, the next diff must
-      // use the authoritative server snapshot, not the submitted one.
       _base = answer.notebook;
       _revision = answer.revision;
       _discardObsoleteRemote();
+      final editor = _editor;
+      if (editor != null &&
+          jsonEncode(_visibleDocument(editor)['pages']) !=
+              jsonEncode(visibleAtSend['pages'])) {
+        // A gesture can start before its database save/onChanged completes.
+        _dirty = true;
+      }
+      if (_dirty ||
+          jsonEncode(answer.notebook['pages']) !=
+              jsonEncode(visibleAtSend['pages'])) {
+        _localMergeBase = visibleAtSend;
+      } else {
+        _localMergeBase = null;
+      }
       if (rejected) {
         _dirty = true;
         if (mounted) {
@@ -287,11 +321,15 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       if (_error != null && mounted) {
         setState(() => _error = null);
       }
-      // The server can merge changes from several participants.
       if (!_dirty &&
           jsonEncode(answer.notebook['pages']) !=
-              jsonEncode(submitted['pages'])) {
-        await _installRemote(answer, expectedLocal: submitted);
+              jsonEncode(visibleAtSend['pages'])) {
+        await _installRemote(answer, expectedLocal: visibleAtSend);
+      } else if (_dirty) {
+        // Keep the accepted revision available for a later visual update,
+        // while the next outgoing delta uses _localMergeBase.
+        _deferRemote(answer, expectedLocal: visibleAtSend);
+        unawaited(_persistPending());
       }
       await _clearPending();
     } on ApiException catch (error) {
@@ -467,6 +505,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       _remoteRetryTimer?.cancel();
       _base = snapshot.notebook;
       _revision = snapshot.revision;
+      _localMergeBase = null;
       return;
     }
 
@@ -511,6 +550,7 @@ class _StudyShareGuestEditorState extends State<StudyShareGuestEditor> {
       _remoteRetryTimer?.cancel();
       _base = snapshot.notebook;
       _revision = snapshot.revision;
+      _localMergeBase = null;
       if (_error != null && mounted) {
         setState(() => _error = null);
       }
