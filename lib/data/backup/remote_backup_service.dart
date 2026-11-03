@@ -326,33 +326,11 @@ class RemoteBackupService {
     }
     changed =
         await _mergeLibraryState(recoveredLibrary, recoveredUids) || changed;
-    // A verified backup is historical recovery data, not a live account
-    // revision. Even a backup verified later may contain an older planner.
-    // Consult the authoritative per-entry feed (including tombstones) before
-    // attempting to seed a genuinely empty planner from a legacy snapshot.
-    final recoveredPlanner = payload['studyPlannerState'];
-    if (recoveredPlanner is Map<String, dynamic> &&
-        ((recoveredPlanner['sessions'] is List &&
-                (recoveredPlanner['sessions'] as List).isNotEmpty) ||
-            (recoveredPlanner['tombstones'] is Map &&
-                (recoveredPlanner['tombstones'] as Map).isNotEmpty))) {
-      final remotePlanner = _jsonObject(
-        (await apiClient.get('/v1/planner/entries')).decodeJson(),
-      );
-      final remoteEntries = remotePlanner['entries'];
-      if (remoteEntries is! List) {
-        throw const FormatException('Invalid account planner recovery feed.');
-      }
-      if (remoteEntries.isEmpty) {
-        changed =
-            await _restoreAccountFile(
-              'study_planner.json',
-              recoveredPlanner,
-              allowEmptyPlanner: true,
-            ) ||
-            changed;
-      }
-    }
+    // Snapshot verification time is not an edit revision. Only entries
+    // unknown to both the live account and this device can be recovered.
+    changed =
+        await _mergeRecoveredPlanner(payload['studyPlannerState'], userId) ||
+        changed;
     changed =
         await _restoreAccountFile(
           'app_prefs.json',
@@ -550,6 +528,115 @@ class RemoteBackupService {
       throw const FormatException('Invalid recent color history.');
     }
     return decoded.cast<int>().take(12).toList();
+  }
+
+  Future<bool> _mergeRecoveredPlanner(
+    Object? source,
+    String userId,
+  ) async {
+    if (source is! Map<String, dynamic>) {
+      return false;
+    }
+    final recoveredSessions = source['sessions'];
+    final recoveredTombstones = source['tombstones'];
+    if (recoveredSessions is! List &&
+        (recoveredTombstones is! Map || recoveredTombstones.isEmpty)) {
+      return false;
+    }
+    if (recoveredSessions != null && recoveredSessions is! List) {
+      throw const FormatException('Invalid planner backup entries.');
+    }
+    if (recoveredTombstones != null && recoveredTombstones is! Map) {
+      throw const FormatException('Invalid planner backup tombstones.');
+    }
+
+    final rawLocal = await readStoredText('study_planner.json');
+    final local = _jsonObject(_decodeOptionalObject(rawLocal));
+    final existingSessions = local['sessions'];
+    final existingTombstones = local['tombstones'];
+    if (existingSessions != null && existingSessions is! List) {
+      throw const FormatException('Invalid local planner entries.');
+    }
+    if (existingTombstones != null && existingTombstones is! Map) {
+      throw const FormatException('Invalid local planner tombstones.');
+    }
+
+    // Read all pages: a tombstone can appear beyond the first 200 records.
+    final protectedIds = <String>{};
+    String? after;
+    do {
+      final response = _jsonObject(
+        (await apiClient.get(
+          '/v1/planner/entries',
+          query: after == null ? null : {'after': after},
+        )).decodeJson(),
+      );
+      if (!session.isSignedIn || session.userId != userId) {
+        return false;
+      }
+      final remote = response['entries'];
+      if (remote is! List) {
+        throw const FormatException('Invalid account planner recovery feed.');
+      }
+      for (final item in remote) {
+        if (item is! Map || item['id'] is! String) {
+          throw const FormatException('Invalid account planner entry.');
+        }
+        protectedIds.add(item['id'] as String);
+      }
+      final next = response['next'];
+      if (next != null &&
+          (next is! String || next.isEmpty || next == after)) {
+        throw const FormatException('Invalid planner recovery cursor.');
+      }
+      after = next as String?;
+    } while (after != null);
+
+    final keptSessions = existingSessions is List
+        ? List<dynamic>.from(existingSessions)
+        : <dynamic>[];
+    final keptTombstones = existingTombstones is Map
+        ? Map<String, dynamic>.from(existingTombstones)
+        : <String, dynamic>{};
+    protectedIds.addAll(keptTombstones.keys);
+    for (final entry in keptSessions) {
+      if (entry is! Map || entry['id'] is! String) {
+        throw const FormatException('Invalid local planner entry.');
+      }
+      protectedIds.add(entry['id'] as String);
+    }
+
+    final novelSessions = <dynamic>[];
+    for (final entry in recoveredSessions ?? const <dynamic>[]) {
+      if (entry is! Map || entry['id'] is! String) {
+        throw const FormatException('Invalid backed up planner entry.');
+      }
+      if (protectedIds.add(entry['id'] as String)) {
+        novelSessions.add(entry);
+      }
+    }
+    final novelTombstones = <String, dynamic>{};
+    if (recoveredTombstones is Map) {
+      for (final item in recoveredTombstones.entries) {
+        if (item.key is! String || item.value is! String) {
+          throw const FormatException('Invalid backed up planner tombstone.');
+        }
+        if (protectedIds.add(item.key as String)) {
+          novelTombstones[item.key as String] = item.value;
+        }
+      }
+    }
+    if (novelSessions.isEmpty && novelTombstones.isEmpty) {
+      return false;
+    }
+    // Never replace locally edited records or deletions with an old backup.
+    await writeStoredText('study_planner.json', jsonEncode({
+      ...local,
+      'version': 2,
+      'sessions': [...keptSessions, ...novelSessions],
+      'tombstones': {...keptTombstones, ...novelTombstones},
+    }));
+    return true;
   }
 
   static Future<bool> _restoreAccountFile(
