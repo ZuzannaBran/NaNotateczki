@@ -197,4 +197,42 @@ void main() {
     );
     expect(invalid.validateForV2Projection, throwsFormatException);
   });
+  test('delete is copy-on-write and rejects corrupt singleton rank', () {
+    final insert = textOperation(
+      operationId: firstId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'A'},
+          {'id': secondId, 'text': 'B'},
+        ],
+      },
+    );
+    final initial = OperationTextSequence.apply({}, insert);
+    final removal = textOperation(
+      operationId: thirdId,
+      actorId: 'alice',
+      kind: OperationKind.textDelete,
+      payload: {'atomIds': [firstId]},
+    );
+    final updated = OperationTextSequence.apply(initial, removal);
+    expect(OperationTextSequence.render(initial), 'AB');
+    expect(OperationTextSequence.render(updated), 'B');
+    expect(identical(initial[firstId], updated[firstId]), isFalse);
+    expect(identical(initial[secondId], updated[secondId]), isTrue);
+    final corrupt = {
+      firstId: {
+        'after': null,
+        'text': 'A',
+        'deleted': false,
+        'order': [1, 'alice', 1, 'operation', 'broken'],
+      },
+    };
+    expect(
+      () => OperationTextSequence.visibleIds(corrupt),
+      throwsFormatException,
+    );
+  });
 }

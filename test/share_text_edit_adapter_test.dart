@@ -111,4 +111,23 @@ void main() {
       throwsStateError,
     );
   });
+  test('Unicode supplementary characters remain intact after replacement', () {
+    final adapter = ShareTextEditAdapter();
+    var state = applyPlan({}, adapter.plan(atoms: {}, newText: 'A😀B'));
+    final changes = adapter.plan(atoms: state, newText: 'A🦊B');
+    state = applyPlan(state, changes);
+    expect(OperationTextSequence.render(state), 'A🦊B');
+  });
+
+  test('513 code points split into three insert and delete batches', () {
+    final adapter = ShareTextEditAdapter();
+    var state = applyPlan({}, adapter.plan(atoms: {}, newText: 'x' * 513));
+    final changes = adapter.plan(atoms: state, newText: 'y' * 513);
+    expect(changes.where((it) => it.kind == OperationKind.textDelete),
+        hasLength(3));
+    expect(changes.where((it) => it.kind == OperationKind.textInsert),
+        hasLength(3));
+    state = applyPlan(state, changes);
+    expect(OperationTextSequence.render(state), 'y' * 513);
+  });
 }

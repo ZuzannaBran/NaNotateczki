@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'operation_protocol.dart';
 
 /// A deterministic sequence CRDT shared by account and guest editors.
@@ -19,9 +17,7 @@ class OperationTextSequence {
     Map<String, dynamic> current,
     OperationEnvelope operation,
   ) {
-    final atoms = Map<String, dynamic>.from(
-      jsonDecode(jsonEncode(current)) as Map,
-    );
+    final atoms = Map<String, dynamic>.from(current);
     final payload = operation.payload;
     if (operation.kind == OperationKind.textInsert) {
       if (payload.length != 2 ||
@@ -88,7 +84,10 @@ class OperationTextSequence {
         throw const FormatException('Invalid or missing text atom.');
       }
       for (final id in ids) {
-        (atoms[id] as Map<String, dynamic>)['deleted'] = true;
+        atoms[id] = <String, dynamic>{
+          ...Map<String, dynamic>.from(atoms[id] as Map),
+          'deleted': true,
+        };
       }
     } else {
       throw UnsupportedError('Not a text operation.');
@@ -116,6 +115,11 @@ class OperationTextSequence {
           after == entry.key ||
           rank is! List ||
           rank.length != 5 ||
+          rank[0] is! int ||
+          rank[1] is! String ||
+          rank[2] is! int ||
+          rank[3] is! String ||
+          rank[4] is! int ||
           value['deleted'] is! bool ||
           value['text'] is! String) {
         throw const FormatException('Malformed text atom graph.');
