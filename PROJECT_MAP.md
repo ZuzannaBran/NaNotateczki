@@ -389,6 +389,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   widoku z treścią. Test: `test/operation_protocol_test.dart`.
 - Kanoniczny opis i reguły payloadu:
   `NaNotateczki-serwer/docs/OPERATION_PROTOCOL_V1.md`.
+  Walidacja v2 dopuszcza puste `value`, odrzuca nadmiarowe pola payloadu,
+  zmianę `id`/`uid` i niedozwolone znaki w identyfikatorach.
   Ten kontrakt jeszcze nie zastępuje istniejącego snapshotowego sync.
 
 ### Porządkowanie operacji v1 (etap 2)
@@ -408,7 +410,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - `lib/data/sync/operation_store.dart`: transakcyjny zapis projekcji i
   `OperationEnvelope`, rosnący `actorSeq`, idempotencja, lokalny outbox,
-  atomowy ACK, tombstones, checkpointy i checksummed snapshots. Projekcja
+  atomowy ACK, tombstones, checkpointy i checksummed snapshots.
+  Zależności są weryfikowane jako należące do tego samego dokumentu. Projekcja
   wywołującego musi używać tej samej bazy Drift. Nie jest jeszcze wpięty
   we wszystkie legacy ścieżki `saveNotebook` (etap 5).
 - `lib/data/drift/operation_schema.dart`: SQLite v5 z migracją v3 → v4

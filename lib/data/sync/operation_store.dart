@@ -237,6 +237,9 @@ class OperationStore {
       if (dependency == null || dependency.logicalClock >= entry.logicalClock) {
         throw StateError('Invalid causal dependency: $id');
       }
+      if (dependency.documentId != entry.documentId) {
+        throw StateError('Cross-document causal dependency: $id');
+      }
     }
     final deleted = await _isDeletedTarget(entry);
     if (deleted && source == 'local') {

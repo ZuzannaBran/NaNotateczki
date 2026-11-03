@@ -144,4 +144,70 @@ void main() {
     expect(undo.toJson()['revertsOperationId'], firstId);
     expect(undo.operationId, isNot(firstId));
   });
+
+  test('v2 accepts empty create values but requires an exact payload key', () {
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.pageCreate,
+        documentId: 'doc',
+        objectId: 'page',
+        payload: const {'value': <String, Object?>{}},
+      ),
+      returnsNormally,
+    );
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.pageSet,
+        documentId: 'doc',
+        objectId: 'page',
+        payload: const {
+          'properties': {'x': 4},
+          'unexpected': true,
+        },
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('v2 property edits cannot change stable identity', () {
+    for (final field in ['id', 'uid']) {
+      expect(
+        () => OperationEnvelope.validateV2Payload(
+          kind: OperationKind.pageSet,
+          documentId: 'doc',
+          objectId: 'page',
+          payload: {
+            'properties': {field: 'forged'},
+          },
+        ),
+        throwsFormatException,
+      );
+    }
+  });
+
+  test('wire identifier rules reject control characters and long IDs', () {
+    expect(() => operation(objectId: 'bad\\n'.replaceAll('\\n', '\n')), throwsFormatException);
+    expect(() => operation(pageId: 'x' * 129), throwsFormatException);
+    expect(() => operation(documentId: 'bad\\u0000'.replaceAll('\\u0000', '\u0000')), throwsFormatException);
+  });
+
+  test('inverse reference requires its causal dependency', () {
+    expect(
+      () => OperationEnvelope(
+        operationId: secondId,
+        actorId: 'device-a',
+        actorSeq: 2,
+        documentId: 'document-1',
+        pageId: 'page-1',
+        objectId: 'stroke-1',
+        kind: OperationKind.objectDelete,
+        payload: const {},
+        dependencies: const [],
+        logicalClock: 2,
+        revertsOperationId: firstId,
+      ),
+      throwsFormatException,
+    );
+  });
+
 }

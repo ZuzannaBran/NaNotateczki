@@ -657,4 +657,50 @@ void main() {
       await upgraded.close();
     }
   });
+
+  test('cross-document causal dependencies roll back without an outbox', () async {
+    final foreign = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-foreign',
+      actorSeq: 1,
+      documentId: 'foreign-document',
+      kind: OperationKind.documentCreate,
+      payload: const {
+        'value': {'title': 'Other'},
+      },
+      dependencies: const [],
+      logicalClock: 1,
+    );
+    await store.applyRemote(
+      foreign,
+      serverSequence: 1,
+      apply: () async {},
+    );
+    await expectLater(
+      store.writeLocal(
+        actorId: 'local-document',
+        documentId: 'document-one',
+        pageId: 'page-one',
+        objectId: 'isolated',
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'value': {'label': 'isolated'},
+        },
+        dependencies: [foreign.operationId],
+        apply: (_) async {
+          await database.customStatement(
+            'INSERT INTO projection_probe VALUES (?, ?)',
+            ['isolated', 'wrong'],
+          );
+        },
+      ),
+      throwsStateError,
+    );
+    expect(await store.pending(), isEmpty);
+    expect(
+      await database.customSelect('SELECT * FROM projection_probe').get(),
+      isEmpty,
+    );
+  });
+
 }

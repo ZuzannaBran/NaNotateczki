@@ -72,6 +72,10 @@ class OperationEnvelope {
     r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   );
 
+  static final RegExp _invalidIdentifierChar = RegExp(
+    r'[\x00-\x1f\x7f]',
+  );
+
   final String operationId;
   final String actorId;
   final int actorSeq;
@@ -137,8 +141,16 @@ class OperationEnvelope {
         kind == OperationKind.strokeCreate || kind.wireName.endsWith('.create');
     final fieldName = creating ? 'value' : 'properties';
     final value = payload[fieldName];
-    if (value is! Map || value.isEmpty || payload.length != 1) {
-      throw FormatException('Expected a nonempty $fieldName object.');
+    if (value is! Map ||
+        payload.length != 1 ||
+        (!creating && value.isEmpty)) {
+      throw FormatException('Expected exactly one $fieldName object.');
+    }
+    if (!creating &&
+        (value.containsKey('id') || value.containsKey('uid'))) {
+      throw const FormatException(
+        'Stable IDs cannot be changed by property edits.',
+      );
     }
     for (final key in value.keys) {
       if (key is! String || key.isEmpty || key.length > 128) {
@@ -222,8 +234,20 @@ class OperationEnvelope {
     if (dependencies.length > 256 ||
         dependencies.toSet().length != dependencies.length ||
         dependencies.contains(operationId) ||
-        dependencies.any((id) => !_uuidPattern.hasMatch(id))) {
+        dependencies.any((id) => !_uuidPattern.hasMatch(id)) ||
+        (revertsOperationId != null &&
+            !dependencies.contains(revertsOperationId))) {
       throw const FormatException('Invalid causal dependencies.');
+    }
+    if (_invalidIdentifierChar.hasMatch(actorId) ||
+        _invalidIdentifierChar.hasMatch(documentId) ||
+        (pageId != null &&
+            (pageId!.length > 128 ||
+                _invalidIdentifierChar.hasMatch(pageId!))) ||
+        (objectId != null &&
+            (objectId!.length > 128 ||
+                _invalidIdentifierChar.hasMatch(objectId!)))) {
+      throw const FormatException('Invalid target identifier.');
     }
     if (kind.target == OperationTarget.document &&
         (objectId != null || pageId != null)) {

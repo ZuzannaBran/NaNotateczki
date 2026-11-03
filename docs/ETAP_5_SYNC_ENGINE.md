@@ -101,3 +101,17 @@ nie wyprzedzają zablokowanej; nadal można je odczytać przez
 
 Przed produkcyjnym przełączeniem wymagana jest obsługa odzyskiwania
 zablokowanego łańcucha w UI i test migracji v4 → v5 na istniejącej bazie.
+
+
+## Audyt kontraktu v2 — 3 listopada 2026
+
+- Serwer i Dart dopuszczają puste `value` dla nowego, pustego obiektu,
+  lecz `properties` przy aktualizacji nie może być puste.
+- Odrzucane są nieznane klucze payloadu oraz próby zmiany `id` lub
+  `uid` przez operacje właściwości.
+- Walidacja identyfikatorów klienta odrzuca znaki sterujące i zbyt długie
+  ID przed trwałym zapisem; lokalny dziennik nie przyjmuje zależności
+  wskazujących operację innego dokumentu.
+- Zmiany są objęte testami regresyjnymi kontraktu i transakcji.
+  Nie wykonano w tej sesji lokalnego Flutter/Dart ani E2E PostgreSQL.
+  Przełączenie v1 na v2 nadal wymaga migracji namespace i reducerów.
