@@ -95,6 +95,85 @@ void main() {
     expect((await add('safe-object')).actorSeq, 1);
   });
 
+  test('local intent depends on every committed remote actor frontier',
+      () async {
+    final remote = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'actor-remote',
+      actorSeq: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'remote-observed',
+      kind: OperationKind.objectCreate,
+      payload: const {'properties': {}},
+      dependencies: const [],
+      logicalClock: 7,
+    );
+    await store.applyRemote(
+      remote,
+      checkpointScope: 'user-A-v2',
+      serverSequence: 12,
+      apply: () => database.customStatement(
+        'INSERT INTO projection_probe VALUES (?, ?)',
+        ['remote-observed', 'remote'],
+      ),
+    );
+
+    final local = await add('local-after-remote');
+    expect(local.dependencies, contains(remote.operationId));
+    expect(local.logicalClock, greaterThan(remote.logicalClock));
+  });
+
+  test('stale remote edit after tombstone is logged but not projected',
+      () async {
+    await add('deleted-earlier');
+    await store.writeLocal(
+      actorId: 'device-one',
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'deleted-earlier',
+      kind: OperationKind.objectDelete,
+      payload: const {},
+      apply: (_) => database.customStatement(
+        'DELETE FROM projection_probe WHERE id = ?',
+        ['deleted-earlier'],
+      ),
+    );
+    final stale = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'actor-stale',
+      actorSeq: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'deleted-earlier',
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'label': 'must-not-appear'},
+      },
+      dependencies: const [],
+      logicalClock: 1,
+    );
+    var projected = false;
+    expect(
+      await store.applyRemote(
+        stale,
+        checkpointScope: 'user-A-v2',
+        serverSequence: 30,
+        apply: () async {
+          projected = true;
+        },
+      ),
+      isTrue,
+    );
+    expect(projected, isFalse);
+    expect(await store.checkpoint('user-A-v2'), 30);
+    final rows = await database.customSelect(
+      'SELECT * FROM projection_probe WHERE id = ?',
+      variables: [const Variable<String>('deleted-earlier')],
+    ).get();
+    expect(rows, isEmpty);
+  });
+
   test('ACK cannot erase unknown or mismatching operations', () async {
     final op = await add('object-ack');
     await expectLater(
