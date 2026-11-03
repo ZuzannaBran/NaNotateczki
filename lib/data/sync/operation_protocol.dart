@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 /// The v1 wire-format namespace shared by account sync and study shares.
-enum OperationTarget { document, page, object, folder }
+enum OperationTarget { document, page, object, folder, task }
 
 enum OperationKind {
   documentCreate('document.create', OperationTarget.document),
@@ -23,7 +23,11 @@ enum OperationKind {
   folderCreate('folder.create', OperationTarget.folder),
   folderSet('folder.set', OperationTarget.folder),
   folderMove('folder.move', OperationTarget.folder),
-  folderDelete('folder.delete', OperationTarget.folder);
+  folderDelete('folder.delete', OperationTarget.folder),
+  taskCreate('task.create', OperationTarget.task),
+  taskSet('task.set', OperationTarget.task),
+  taskMove('task.move', OperationTarget.task),
+  taskDelete('task.delete', OperationTarget.task);
 
   const OperationKind(this.wireName, this.target);
 
@@ -309,16 +313,18 @@ class OperationEnvelope {
         'Object operations require page and object IDs.',
       );
     }
-    if (kind.target == OperationTarget.folder &&
+    if ((kind.target == OperationTarget.folder ||
+            kind.target == OperationTarget.task) &&
         (documentId != libraryDocumentId ||
             objectId == null ||
             objectId!.isEmpty ||
             pageId != null)) {
-      throw const FormatException('Folder operations require a folder ID.');
+      throw const FormatException('Library operations require an object ID.');
     }
     if (kind.target != OperationTarget.folder &&
+        kind.target != OperationTarget.task &&
         documentId == libraryDocumentId) {
-      throw const FormatException('Library namespace is reserved for folders.');
+      throw const FormatException('Library namespace is reserved.');
     }
   }
 }
