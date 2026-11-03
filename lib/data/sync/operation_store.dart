@@ -429,6 +429,16 @@ class OperationStore {
     ];
   }
 
+  /// Local journal entries remain local after the server ACK removes outbox.
+  /// This prevents a replayed echo from repainting the editor on reconnect.
+  Future<bool> isLocalOperation(String operationId) async {
+    final row = await _row(
+      'SELECT source FROM operations WHERE operation_id = ?',
+      [operationId],
+    );
+    return row?['source'] == 'local';
+  }
+
   /// Distinguishes a locally queued echo from an ordinary remote replay.
   Future<bool> isPending(String operationId) async {
     return await _row(
