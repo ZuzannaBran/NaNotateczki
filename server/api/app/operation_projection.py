@@ -1,7 +1,7 @@
 """Deterministic, JSON-safe v2 projection with permanent entity tombstones.
 
-Text atom and asset reducers are intentionally NOT accepted until their
-independent validation/storage contracts are implemented (stages 6 and 9).
+Text atoms use deterministic RGA ordering. Assets still require a separate
+verified transport before they can be enabled.
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from typing import Any
 
 from .operation_ordering import precedence
 from .operation_protocol import LIBRARY_DOCUMENT_ID, OperationEnvelope
+from .text_sequence import TextSequenceError, apply_text_operation
 
 
 class ProjectionError(ValueError):
@@ -24,8 +25,14 @@ def _properties(operation: OperationEnvelope, *, create: bool) -> dict:
         not create and not fields
     ):
         raise ProjectionError(f"Expected exactly one {name} object.")
-    if not create and ("id" in fields or "uid" in fields):
-        raise ProjectionError("Stable IDs cannot be changed by property edits.")
+    if not create and (
+        "id" in fields or "uid" in fields or (
+            operation.kind.startswith("object.") and (
+                "objectType" in fields or "textAtoms" in fields
+            )
+        )
+    ):
+        raise ProjectionError("Identity and CRDT internals cannot be changed.")
     if any(not isinstance(key, str) or not 1 <= len(key) <= 128 for key in fields):
         raise ProjectionError("Invalid property name.")
     if create and "id" in fields:
@@ -52,6 +59,29 @@ def _merge(node: dict, fields: Mapping, op: OperationEnvelope) -> None:
             properties[key] = value
 
 
+def _validate_folder_graph(folders: dict) -> None:
+    """Reject orphan parents and cycles after deterministic property merges."""
+    checked: set[str] = set()
+    for folder_id in folders:
+        current = folder_id
+        visiting: set[str] = set()
+        while current is not None and current not in checked:
+            if current in visiting:
+                raise ProjectionError("Folder move creates a cycle.")
+            visiting.add(current)
+            node = folders.get(current)
+            if node is None:
+                raise ProjectionError("Folder parent does not exist.")
+            properties = node.get("properties", {})
+            parent = properties.get("parentId")
+            if parent is not None and (
+                not isinstance(parent, str) or not parent
+            ):
+                raise ProjectionError("Invalid folder parent ID.")
+            current = parent
+        checked.update(visiting)
+
+
 def apply_operation(
     current: dict | None,
     op: OperationEnvelope,
@@ -63,14 +93,16 @@ def apply_operation(
     and appends the operation in ONE PostgreSQL transaction.
     """
     kind = op.kind
-    if kind.startswith("text.") or kind.startswith("asset."):
-        raise ProjectionError("Text and asset reducers are not enabled in v2 yet.")
+    if kind.startswith("asset."):
+        raise ProjectionError("Asset reducers are not enabled in v2 yet.")
     if kind == "stroke.create":
         is_create = True
     else:
         is_create = kind.endswith(".create")
-    is_delete = kind.endswith(".delete")
-    if is_delete:
+    is_delete = kind.endswith(".delete") and not kind.startswith("text.")
+    if kind.startswith("text."):
+        fields = None
+    elif is_delete:
         if op.to_dict()["payload"]:
             raise ProjectionError("Delete operations require empty payload.")
     elif is_create:
@@ -112,6 +144,13 @@ def apply_operation(
             current = {"folders": {}}
         folders = current.setdefault("folders", {})
         if kind == "folder.delete":
+            for folder_id, child in folders.items():
+                if (folder_id != op.object_id and
+                        child.get("properties", {}).get("parentId")
+                        == op.object_id):
+                    raise ProjectionError(
+                        "Folder has children; delete or move them first."
+                    )
             folders.pop(op.object_id, None)
             return current, folder_key if folder_key not in tombstones else None
         if folder_key in tombstones:
@@ -127,6 +166,7 @@ def apply_operation(
         if node is None:
             raise ProjectionError("Folder has not been created.")
         _merge(node, fields, op)
+        _validate_folder_graph(folders)
         return current, None
 
     if current is None:
@@ -183,5 +223,16 @@ def apply_operation(
         objects[op.object_id] = node
     if node is None:
         raise ProjectionError("Object has not been created.")
+    if kind.startswith("text."):
+        if (node.get("type") != "object.create" or
+                node.get("properties", {}).get("objectType") != "text"):
+            raise ProjectionError("Text operations require a text object.")
+        try:
+            apply_text_operation(node, op)
+        except TextSequenceError as exc:
+            raise ProjectionError(str(exc)) from exc
+        return current, None
+    if "textAtoms" in node and "text" in fields:
+        raise ProjectionError("CRDT text cannot be replaced by object.set.")
     _merge(node, fields, op)
     return current, None
