@@ -2443,3 +2443,36 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `SyncEngine.onShareEnded`: powiadomienie po WebSocket `ended` lub
   HTTP 410 zatrzymuje wznawianie sesji i zachowuje outbox.
   Regresja: `test/sync_engine_test.dart`.
+
+
+## Etapy 7–8 (2026-11-03, infrastruktura opt-in)
+
+- `lib/core/storage/storage_namespace_manager.dart`:
+  `StorageNamespace` tworzy osobne przestrzenie Local, konto i gość
+  Share (SQLite, IndexedDB, pliki, assety); `StorageNamespaceManager`
+  serializuje przejścia i unieważnia opóźnione żądania. Test:
+  `test/storage_namespace_manager_test.dart`.
+- `lib/core/storage/text_storage_io.dart` i
+  `lib/data/drift/notes_database_connection_io.dart`: obsługują bezpieczne
+  zagnieżdżone katalogi baz/plików. Stare dane `notes.sqlite` nadal
+  pozostają domyślną przestrzenią uruchomienia.
+- `lib/data/sync/planner_revision_ledger.dart`:
+  per wpis CAS, podpis treści bez `modifiedAt`, reguły tombstones
+  i wykrywanie konfliktów. `PlannerSyncService(useRevisions: true)`
+  używa opt-in `/v2/planner/entries`, potwierdza trwałe rewizje
+  i chroni niedostarczone edycje. Testy:
+  `test/planner_revision_ledger_test.dart`,
+  `test/planner_revision_sync_service_test.dart`.
+- `study_planner_controller.dart`: `revisionAuthoritative` dla
+  zatwierdzonych rekordów v2, dotychczasowa ścieżka v1 bez zmiany.
+- `lib/data/sync/operation_protocol.dart`: nowe `task.create/set/move/delete`
+  w domenie `@library`; test `test/operation_protocol_test.dart`.
+- Backend kanoniczny `NaNotateczki-serwer/main`: migracje
+  `0011_planner_revisions.sql`, `0012_task_tombstones.sql`,
+  `planner_v2.py` (CAS + idempotencja), projekcja `folder.*`
+  z walidacją drzewa i `task.*` per UID. W `server/` jest lustro.
+- `docs/ETAP_7_8_STORAGE_PLANNER.md`: granica bezpieczeństwa.
+  **Nie włączać namespaców przy loginie ani sync planera v2 przed
+  bezstratną migracją etapu 11.** Stage 7 import/kopiowanie i aktywny
+  sync folderów/zadań zależą od tej migracji. Testy nieuruchomione
+  w środowisku bez SDK.
