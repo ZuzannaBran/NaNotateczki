@@ -437,6 +437,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/operation_gateway.dart`: `OperationGateway`,
   `HttpOperationGateway`, `OperationReceipt`, `OperationFeedPage`.
   Waliduje payload, ACK, kursory i limit 1 MiB API v2;
+  backend sprawdza też limit rozmiaru materializowanej projekcji;
   przekazuje nagłówek Share `X-Share-Id`.
 - `lib/data/sync/sync_engine.dart`: `SyncEngine` i
   `RemoteOperationReducer`. Trwały lokalny outbox, max 50/800 KiB
