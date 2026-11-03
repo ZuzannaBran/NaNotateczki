@@ -219,4 +219,45 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('task operations require library scope and stable IDs', () {
+    final task = OperationEnvelope(
+      operationId: firstId,
+      actorId: 'device-a',
+      actorSeq: 1,
+      documentId: OperationEnvelope.libraryDocumentId,
+      objectId: 'task-1',
+      kind: OperationKind.taskCreate,
+      payload: {
+        'value': {'plannerUid': 'planner-1', 'title': 'Read chapter'},
+      },
+      dependencies: [],
+      logicalClock: 1,
+    );
+    task.validateForV2Projection();
+    expect(
+      OperationEnvelope.fromJson(task.toJson()).kind,
+      OperationKind.taskCreate,
+    );
+    expect(
+      () => operation(
+        kind: OperationKind.taskDelete,
+        documentId: 'regular-document',
+        pageId: null,
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.taskCreate,
+        documentId: OperationEnvelope.libraryDocumentId,
+        objectId: 'task-2',
+        payload: {
+          'value': {'title': 'Missing planner'},
+        },
+      ),
+      throwsFormatException,
+    );
+  });
+
 }
