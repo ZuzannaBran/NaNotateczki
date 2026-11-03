@@ -411,6 +411,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/operation_store.dart`: transakcyjny zapis projekcji i
   `OperationEnvelope`, rosnący `actorSeq`, idempotencja, lokalny outbox,
   atomowy ACK, tombstones, checkpointy i checksummed snapshots.
+  Snapshot jest blokowany, jeśli cofa potwierdzony kursor ACK albo
+  istniejący checkpoint snapshotu.
   Zależności są weryfikowane jako należące do tego samego dokumentu. Projekcja
   wywołującego musi używać tej samej bazy Drift. Nie jest jeszcze wpięty
   we wszystkie legacy ścieżki `saveNotebook` (etap 5).

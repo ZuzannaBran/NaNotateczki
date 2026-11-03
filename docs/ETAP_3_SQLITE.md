@@ -2,7 +2,9 @@
 
 ## Zakres
 
-Migracja Drift `schemaVersion: 2 → 3` jest addytywna. Zachowuje
+Migracja Drift `schemaVersion: 2 → 5` jest addytywna. Obejmuje
+kolejne migracje v2→v3, v3→v4 (tombstones z pageId) oraz v4→v5
+(trwały status blocked w outboxie). Zachowuje
 `notebook_rows`, `page_rows`, `text_block_rows`,
 `image_block_rows` i `ink_stroke_rows`.
 
@@ -18,7 +20,10 @@ wywołującego: projekcja musi pisać przez tę samą instancję
 
 Przy odbiorze z serwera operacja, projekcja i checkpoint są zatwierdzane
 razem. ACK usuwa z outboxu wyłącznie potwierdzony identyfikator. Duplikat
-tego samego envelope nie wykonuje ponownie projekcji. Tombstone blokuje
+tego samego envelope nie wykonuje ponownie projekcji. Snapshot nie może
+mieć kursora starszego niż ACK tego dokumentu ani cofać najnowszego
+zapisanego checkpointu snapshotu. Nadal wymaga to kompletnego dowodu
+spójności projekcji i zdalnego checkpointu przed aktywacją produkcyjną. Tombstone blokuje
 ponowne użycie ID usuniętego dokumentu, strony lub obiektu.
 
 Natywne połączenie SQLite używa WAL i `synchronous=FULL`. Backup bazy
@@ -65,7 +70,7 @@ flutter test test/notebook_repository_test.dart
 ```
 
 Testy zawierają rollback po błędzie projekcji, idempotentne ponowienie,
-ACK, tombstones, checkpoint, immutable snapshot, restartową migrację v2→v3
+ACK, tombstones, checkpoint, immutable snapshot, restartowe migracje v2→v5
 oraz wykrywanie niepotrzebnych DELETE podczas zapisu stron.
 
 Dodatkowa ręczna próba crash-recovery: zapisać lokalne operacje offline,

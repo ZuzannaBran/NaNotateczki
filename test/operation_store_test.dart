@@ -702,4 +702,31 @@ void main() {
       isEmpty,
     );
   });
+
+  test('snapshot cannot predate an ACK or a later snapshot', () async {
+    final operation = await add('ack-before-snapshot');
+    await store.acknowledge(operation.operationId, serverSequence: 7);
+    await expectLater(
+      store.saveSnapshot(
+        documentId: 'document-one',
+        serverSequence: 6,
+        snapshotJson: '{"objects":0}',
+      ),
+      throwsStateError,
+    );
+    await store.saveSnapshot(
+      documentId: 'document-one',
+      serverSequence: 10,
+      snapshotJson: '{"objects":1}',
+    );
+    await expectLater(
+      store.saveSnapshot(
+        documentId: 'document-one',
+        serverSequence: 9,
+        snapshotJson: '{"objects":0}',
+      ),
+      throwsStateError,
+    );
+    expect((await store.latestSnapshot('document-one'))?.serverSequence, 10);
+  });
 }

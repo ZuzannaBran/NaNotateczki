@@ -556,6 +556,23 @@ class OperationStore {
       if (pending != null) {
         throw StateError('Cannot snapshot unacknowledged edits.');
       }
+      final acknowledged = await _row(
+        'SELECT MAX(a.server_sequence) AS latest FROM operation_ack a '
+        'JOIN operations o ON o.operation_id = a.operation_id '
+        'WHERE o.document_id = ?',
+        [documentId],
+      );
+      if (serverSequence < (acknowledged?['latest'] as int? ?? 0)) {
+        throw StateError('Snapshot predates an acknowledged operation.');
+      }
+      final mostRecent = await _row(
+        'SELECT MAX(server_sequence) AS latest FROM document_snapshots '
+        'WHERE document_id = ?',
+        [documentId],
+      );
+      if (serverSequence < (mostRecent?['latest'] as int? ?? 0)) {
+        throw StateError('Snapshot checkpoint cannot move backwards.');
+      }
       final known = await _row(
         'SELECT checksum_sha256 FROM document_snapshots '
         'WHERE document_id = ? AND server_sequence = ?',
