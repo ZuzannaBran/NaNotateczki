@@ -9,11 +9,14 @@ class PendingStudyShareEdit {
     required this.baseRevision,
     required this.baseNotebook,
     required this.notebook,
+    this.localMergeBase,
   });
 
   final int baseRevision;
   final Map<String, dynamic> baseNotebook;
   final Map<String, dynamic> notebook;
+  /// Visible state at the last accepted upload, needed to rebase new edits.
+  final Map<String, dynamic>? localMergeBase;
 }
 
 /// Keeps one pending snapshot per invitation in the browser's local storage.
@@ -46,10 +49,18 @@ class StudyShareGuestOutbox {
         notebook['pages'] is! List) {
       throw const FormatException('Guest recovery document mismatch.');
     }
+    final localMergeBase = decoded['localMergeBase'];
+    if (localMergeBase != null &&
+        (localMergeBase is! Map<String, dynamic> ||
+            localMergeBase['uid'] != notebook['uid'] ||
+            localMergeBase['pages'] is! List)) {
+      throw const FormatException('Invalid guest recovery merge base.');
+    }
     return PendingStudyShareEdit(
       baseRevision: decoded['baseRevision'] as int,
       baseNotebook: base,
       notebook: notebook,
+      localMergeBase: localMergeBase as Map<String, dynamic>?,
     );
   }
 
@@ -61,6 +72,8 @@ class StudyShareGuestOutbox {
         'baseRevision': pending.baseRevision,
         'baseNotebook': pending.baseNotebook,
         'notebook': pending.notebook,
+        if (pending.localMergeBase != null)
+          'localMergeBase': pending.localMergeBase,
       }),
     );
   }
