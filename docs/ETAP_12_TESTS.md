@@ -11,7 +11,7 @@ obiektów. Kontrola operacji, outboxu i tombstone po zamknięciu i ponownym
 otwarciu SQLite, idempotentny ACK, atomowy rollback lokalnej projekcji i
 brak zużycia `actorSeq` przy niepowodzeniu.
 
-W katalogu aplikacji, na hoście z zainstalowanym Flutter SDK:
+Na komputerze testowym z Flutter SDK:
 
 ```bash
 flutter pub get
@@ -84,9 +84,10 @@ zapisaniem nowych testów.
 
 1. Etap 11 pozostawia dane w stanie `staged-not-activated`; publiczny
    cykl migracji i cutover dla istniejących kont nadal nie jest aktywny.
-2. Repozytoria nie mają jeszcze produkcyjnego scenariusza Flutter ↔ API v2 ↔
-   PostgreSQL dla dwóch prawdziwych klientów z kontrolą artefaktów ekranu.
-   Testy samego backendu tego nie zastępują.
+2. Dodano `integration_test/stage12_live_api_test.dart` (dwa rzeczywiste
+   silniki Flutter + REST v2 + PostgreSQL + WebSocket), uruchamiane przez
+   `NN_STAGE12_FLUTTER_ROOT`; wyniku jeszcze nie zweryfikowano. Nadal brak
+   kontrolowanego scenariusza dwóch urządzeń z obserwacją migania i gestów.
 3. Wymagane są kontrolowane testy uszkodzenia assetu, braku miejsca,
    restartu serwera w trakcie COMMIT, starego backupu po usunięciu UID i
    przerwanej migracji. Wykonywać je wyłącznie na danych testowych.
