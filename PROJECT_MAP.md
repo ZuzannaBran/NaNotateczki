@@ -2537,6 +2537,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   Izolowany PostgreSQL 17, prawdziwe routery FastAPI/WebSocket,
   operacje i feed, share/revoke, delete/transform, tekst CRDT,
   Undo/Redo, rollback batcha i izolacja kont.
+- `integration_test/stage12_live_api_test.dart`: opt-in dwa silniki
+  Flutter synchronizujące dopiski i usunięcia z prawdziwym API v2 przez
+  lokalny serwer HTTP i PostgreSQL, bez testu rzeczywistych gestów.
 - `docs/ETAP_12_TESTS.md`: uruchomienie i otwarte kryteria. Testy
   backendowe nie zastępują Flutter↔API v2 testów dwóch urządzeń ani
   nieaktywnego cutover etapu 11; brak SDK/Dockera nie oznacza zaliczenia.
