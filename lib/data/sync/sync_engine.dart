@@ -98,19 +98,12 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     String? revertsOperationId,
     List<String> dependencies = const [],
   }) async {
-    final envelope = OperationEnvelope(
-      operationId: '00000000-0000-4000-8000-000000000000',
-      actorId: actorId,
-      actorSeq: 1,
-      documentId: documentId,
+    OperationEnvelope.validateV2Payload(
       kind: kind,
       payload: payload,
-      dependencies: const [],
-      logicalClock: 1,
-      pageId: pageId,
+      documentId: documentId,
       objectId: objectId,
     );
-    envelope.validateForV2Projection();
     // Actor sequences and causal frontiers are document-scoped. An account
     // may edit unrelated documents concurrently, and guests cannot fetch
     // dependencies on private documents belonging to the owner.

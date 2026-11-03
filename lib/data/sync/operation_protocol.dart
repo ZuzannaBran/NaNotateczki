@@ -107,6 +107,20 @@ class OperationEnvelope {
   /// The envelope itself also supports future text and asset operation kinds.
   /// Those kinds must not enter a durable outbox until their reducers exist.
   void validateForV2Projection() {
+    validateV2Payload(
+      kind: kind,
+      payload: payload,
+      documentId: documentId,
+      objectId: objectId,
+    );
+  }
+
+  static void validateV2Payload({
+    required OperationKind kind,
+    required Map<String, dynamic> payload,
+    required String documentId,
+    String? objectId,
+  }) {
     if (kind == OperationKind.textInsert ||
         kind == OperationKind.textDelete ||
         kind == OperationKind.assetAttach ||
