@@ -205,6 +205,9 @@ class OperationStore {
     required String source,
     required Future<void> Function() apply,
   }) async {
+    if (source == 'local') {
+      entry.validateForV2Projection();
+    }
     final existing = await operation(entry.operationId);
     if (existing != null) {
       if (!const DeepCollectionEquality().equals(

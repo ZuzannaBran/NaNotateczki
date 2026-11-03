@@ -39,7 +39,7 @@ void main() {
       objectId: objectId,
       kind: OperationKind.objectCreate,
       payload: {
-        'properties': {'label': objectId},
+        'value': {'label': objectId},
       },
       apply: (_) => database.customStatement(
         'INSERT INTO projection_probe (id, value) VALUES (?, ?)',
@@ -47,6 +47,27 @@ void main() {
       ),
     );
   }
+
+  test('direct store writes reject malformed create payloads', () async {
+    await expectLater(
+      store.writeLocal(
+        actorId: 'device-one',
+        documentId: 'document-one',
+        pageId: 'page-one',
+        objectId: 'invalid',
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'properties': {'label': 'invalid'},
+        },
+        apply: (_) async {
+          throw StateError('Projection must not be invoked.');
+        },
+      ),
+      throwsFormatException,
+    );
+    expect(await store.pending(), isEmpty);
+    expect(await store.operation(const Uuid().v4()), isNull);
+  });
 
   test('projection and outbox share a transaction', () async {
     final first = await add('object-one');
@@ -76,7 +97,9 @@ void main() {
         pageId: 'page-one',
         objectId: 'lost-object',
         kind: OperationKind.objectCreate,
-        payload: const {'properties': {}},
+        payload: const {
+          'value': {'label': 'valid data before disk failure'},
+        },
         apply: (_) async {
           await database.customStatement(
             'INSERT INTO projection_probe (id, value) VALUES (?, ?)',
