@@ -392,4 +392,33 @@ void main() {
       remote.operationId, first.operationId,
     ]));
   });
+  test('actor dependency cap cannot advance its sequence', () {
+    final clock = OperationActorClock(actorId: 'local');
+    for (var i = 0; i < 257; i++) {
+      final id = '${i.toRadixString(16).padLeft(8, '0')}'
+          '-1111-4111-8111-111111111111';
+      clock.observe(op(
+        id: id, actor: 'remote-$i',
+        sequence: 1, clock: 2,
+      ));
+    }
+    final before = clock.toCheckpoint();
+    expect(() => clock.next(
+      documentId: 'notebook', pageId: 'page', objectId: 'stroke',
+      kind: OperationKind.objectSet,
+      payload: {'properties': {'x': 1}},
+    ), throwsFormatException);
+    expect(clock.toCheckpoint(), before);
+  });
+
+  test('actor rejects checkpoint with a newer observed clock', () {
+    final actor = OperationActorClock(actorId: 'local');
+    actor.observe(op(id: b1, actor: 'remote', sequence: 1, clock: 8));
+    final invalid = actor.toCheckpoint()..['logicalClock'] = 7;
+    expect(
+      () => OperationActorClock.fromCheckpoint(invalid),
+      throwsFormatException,
+    );
+  });
+
 }
