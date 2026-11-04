@@ -1,5 +1,18 @@
 # Dane NaNotateczki
 
+## Aktualny stan cutover (2026-11-04)
+
+Źródło prawdy o statusie finalizacji: docs/ETAP_14_FINALIZACJA.md.
+Etapy 11–13 nie zakończyły jeszcze migracji produkcyjnej. Native i Web
+nadal uruchamiają aktywny zapis v1; SyncEngine v2 jest opt-in, a
+server/ pozostaje zgodnościowym lustrem backendu dla testów. Usuwanie
+tych ścieżek przed bezstratnym cutover grozi utratą danych.
+Historyczne opisy poniżej dokumentują także stare ścieżki v1 i ich
+kontrakt — nie oznaczają aktywacji v2 ani zgody na restoreDeleted.
+Kanoniczny serwer NaNotateczki-serwer/main ma tylko odczytowy
+scripts/stage14-retirement-audit.sh; kod 0 nie zastępuje akceptacji
+E2E i weryfikacji zaległych kolejek na urządzeniach.
+
 Ten dokument jest źródłem prawdy dla lokalnego zapisu, migracji, backupu
 serwerowego i synchronizacji. Lokalny Drift/SQLite pozostaje podstawą pracy
 offline również po zalogowaniu.
