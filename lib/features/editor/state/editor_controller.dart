@@ -99,6 +99,9 @@ class EditorController extends ChangeNotifier {
     if (notebook.kind == NotebookKind.planner) {
       throw UnsupportedError('Planner items do not use the drawing editor.');
     }
+    if (operationWriter != null) {
+      repository.registerOperationWriter(notebook.uid);
+    }
     pages = notebook.pages;
     _v2PersistedNotebook = notebook;
     currentPageIndex = 0;
@@ -452,6 +455,16 @@ class EditorController extends ChangeNotifier {
         _fullSavePending ||
         _dirtyPageIds.isNotEmpty) {
       unawaited(_save());
+    }
+    if (operationWriter != null) {
+      final lastCommit = _v2SaveTail;
+      if (lastCommit == null) {
+        repository.unregisterOperationWriter(notebook.uid);
+      } else {
+        unawaited(lastCommit.whenComplete(
+          () => repository.unregisterOperationWriter(notebook.uid),
+        ));
+      }
     }
     _isDisposed = true;
     imageTransformPreview.dispose();
