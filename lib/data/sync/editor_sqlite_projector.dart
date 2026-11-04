@@ -142,6 +142,13 @@ class EditorSqliteProjector {
   Future<void> _deletePage(OperationEnvelope op) async {
     final pageId = op.objectId!;
     await _pageExists(op, pageId);
+    final count = await _row(
+      'SELECT COUNT(*) AS total FROM page_rows WHERE notebook_uid = ?',
+      [Variable<String>(op.documentId)],
+    );
+    if ((count?['total'] as int? ?? 0) <= 1) {
+      throw StateError('The last notebook page cannot be deleted.');
+    }
     for (final table in [
       'ink_stroke_rows',
       'text_block_rows',
