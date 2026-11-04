@@ -37,6 +37,7 @@ void main() {
 
       final restored = await guest_db.openSharedGuestOperationDatabase(
         firstShare,
+        guestActorId: 'guest-A',
       );
       try {
         final entries = await OperationStore(restored).pending();

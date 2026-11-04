@@ -419,7 +419,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `CausalOperationBuffer` (atomowe zatwierdzanie gotowych operacji,
   kwarantanna wadliwych zaległych pakietów, duplikaty i rozgałęzienia),
   `OperationCheckpoint` (pełna historia i odrzucone ID, bez kompaktowania)
-  oraz `OperationPropertyRegister` (reguły pól i tombstones).
+  oraz `OperationPropertyRegister` (reguły pól i tombstones, osobne
+  namespace folderów i zadań).
   `test/operation_ordering_test.dart`: kolejność, błędne zależności,
   wycofanie po błędzie, restart, odrzucone ID, limit zależności.
   Nowy `OperationStore` zapisuje operacje w Drift od etapu 3;

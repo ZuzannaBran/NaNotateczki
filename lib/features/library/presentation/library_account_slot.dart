@@ -1041,7 +1041,6 @@ class _AccountDialogState extends State<_AccountDialog> {
 
   Future<void> _logout() async {
     _startWorking();
-    final session = context.read<AccountSessionController>();
     try {
       if (!await _finishSessionWithChoice()) {
         return;

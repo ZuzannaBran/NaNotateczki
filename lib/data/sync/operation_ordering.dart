@@ -436,6 +436,7 @@ class OperationPropertyRegister {
       case OperationKind.pageDelete:
       case OperationKind.objectDelete:
       case OperationKind.folderDelete:
+      case OperationKind.taskDelete:
         _tombstones.add(_key(operation));
         return;
       case OperationKind.documentCreate:
@@ -450,6 +451,9 @@ class OperationPropertyRegister {
       case OperationKind.folderCreate:
       case OperationKind.folderSet:
       case OperationKind.folderMove:
+      case OperationKind.taskCreate:
+      case OperationKind.taskSet:
+      case OperationKind.taskMove:
         break;
       case OperationKind.textInsert:
       case OperationKind.textDelete:
@@ -520,6 +524,8 @@ class OperationPropertyRegister {
         ]);
       case OperationTarget.folder:
         return jsonEncode(['@library', 'folder', operation.objectId]);
+      case OperationTarget.task:
+        return jsonEncode(['@library', 'task', operation.objectId]);
     }
   }
 

@@ -613,7 +613,7 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
           locallyVisible != null &&
           jsonEncode(acceptedShared['pages']) !=
               jsonEncode(locallyVisible['pages'])) {
-        _sharedVisibleBases[uid] = locallyVisible!;
+        _sharedVisibleBases[uid] = locallyVisible;
       } else {
         _sharedVisibleBases.remove(uid);
       }

@@ -34,6 +34,44 @@ OperationEnvelope op({
 );
 
 void main() {
+  test('task register separates task fields and preserves deletes', () {
+    final register = OperationPropertyRegister();
+    OperationEnvelope task(
+      String id,
+      int sequence,
+      OperationKind kind,
+      Map<String, dynamic> payload,
+    ) => OperationEnvelope(
+      operationId: id,
+      actorId: 'task-device',
+      actorSeq: sequence,
+      documentId: OperationEnvelope.libraryDocumentId,
+      objectId: 'task-1',
+      kind: kind,
+      payload: payload,
+      dependencies: const [],
+      logicalClock: sequence,
+    );
+
+    final created = task(a1, 1, OperationKind.taskCreate, {
+      'value': {'plannerUid': 'planner-1', 'title': 'Initial'},
+    });
+    register.apply(created);
+    register.apply(task(a2, 2, OperationKind.taskSet, {
+      'properties': {'title': 'Revised'},
+    }));
+    register.apply(task(b1, 3, OperationKind.taskMove, {
+      'properties': {'plannerUid': 'planner-2'},
+    }));
+    expect(register.fieldsFor(created), {
+      'plannerUid': 'planner-2',
+      'title': 'Revised',
+    });
+
+    register.apply(task(b2, 4, OperationKind.taskDelete, const {}));
+    expect(register.fieldsFor(created), isNull);
+  });
+
   test('actor advances logical time and includes own predecessor', () {
     final actor = OperationActorClock(actorId: 'device-a');
     final first = actor.next(
