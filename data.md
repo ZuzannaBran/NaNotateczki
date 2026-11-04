@@ -807,6 +807,9 @@ Nowe reduktory protokołu, ale **nie produkcyjny cutover**:
   Po pobraniu klient ponownie sprawdza checksum oraz rozmiar.
 - Serwer wymaga dodatkowej **migracji 0014_verified_assets.sql** przed
   wdrożeniem API. Zastosowanie jej nie aktywuje konta v2.
+- Przy konwersji edycji Quill terminalny znak nowej linii pozostaje
+  w atomach CRDT, nawet jeśli `TextBlock.text` jest zapisany z trimRight.
+  Rozbieżna treść Delta jest odrzucana.
 - `EditorOperationBridge` może planować osadzane obiekty Quill z
   kanoniczną referencją `asset:<id>` i ukończonym, zweryfikowanym
   uploadem. Bez tego przerywa planowanie. Wymiana obrazu/PDF wymaga
