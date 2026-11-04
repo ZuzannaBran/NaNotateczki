@@ -70,16 +70,13 @@ void main() {
           '(id TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)',
         );
 
-        final registration = await apiA.postJson(
-          '/v1/auth/register',
-          {'username': 's12_${id.substring(0, 20)}', 'password': 'stage12-test-only'},
-          authenticated: false,
+        // Provisioned by the Stage-12 runner in disposable PostgreSQL.
+        const token = String.fromEnvironment('NN_STAGE12_ACCESS_TOKEN');
+        expect(
+          token,
+          isNotEmpty,
+          reason: 'Run this test using scripts/run-stage12-real.sh',
         );
-        final account = Map<String, dynamic>.from(
-          registration.decodeJson() as Map,
-        );
-        final token = account['accessToken'] as String;
-        expect(token, isNotEmpty);
         apiA.setAccessToken(token);
         apiB.setAccessToken(token);
 
