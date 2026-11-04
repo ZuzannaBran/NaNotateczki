@@ -115,6 +115,13 @@ void main() {
     expect(saved.pages, hasLength(2));
     expect(saved.pages.first.inkStrokes, hasLength(1));
     expect((await store.pending()).last.kind, OperationKind.pageCreate);
+    controller.deleteLastPage();
+    await controller.flushPendingSaves();
+    expect(
+      (await repository.getNotebook(notebook.uid))?.pages,
+      hasLength(1),
+    );
+    expect((await store.pending()).last.kind, OperationKind.pageDelete);
     expect(repositoryWrites, 0);
   });
 
