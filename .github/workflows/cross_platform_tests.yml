@@ -16,9 +16,11 @@ concurrency:
   group: cross-platform-v3-${{ github.workflow }}-${{ github.ref }}-${{ contains(github.event.head_commit.message, '[ci:failed-only]') && 'failed-only' || 'full' }}
   cancel-in-progress: true
 
-# A [ci:failed-only] push rechecks only the two previously failing CI jobs.
+# [ci:android-only] runs only the Android emulator job after a CI-specific fix.
+# [ci:failed-only] retains the existing reduced verification mode.
 jobs:
   analyze-and-unit:
+    if: ${{ !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: Dart analysis, regressions and coverage
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -77,7 +79,7 @@ jobs:
           if-no-files-found: ignore
 
   backend-unit:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: Python API and deployment contract
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -97,7 +99,7 @@ jobs:
           python -m pytest -q api/tests
 
   postgres-http-e2e:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: PostgreSQL HTTP smoke (account, sync, sharing, backup)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -144,7 +146,7 @@ jobs:
         run: docker compose -f compose.yaml -f compose.local.yaml down -v
 
   stylus-input:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: Stylus and palm input regression (isolated)
     runs-on: ubuntu-24.04
     timeout-minutes: 18
@@ -177,7 +179,7 @@ jobs:
           --reporter expanded --timeout 90s
 
   adaptive-layout:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: Phone, tablet and desktop layout regressions
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -200,7 +202,7 @@ jobs:
             --reporter expanded --timeout 3m --concurrency 2
 
   export-render:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: PNG/PDF production renderer
     runs-on: ubuntu-24.04
     timeout-minutes: 12
@@ -216,7 +218,7 @@ jobs:
         run: flutter test test/production/export_render_test.dart --reporter expanded --timeout 2m
 
   web:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: Chrome, JavaScript/IndexedDB and web bootstrap
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -275,7 +277,7 @@ jobs:
             --chrome-binary="${{ steps.chrome.outputs.chrome-path }}"
 
   wasm-audit:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: WebAssembly compatibility audit (non-blocking)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -303,7 +305,7 @@ jobs:
           fi
 
   desktop:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: ${{ matrix.platform }} - desktop bootstrap and release
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
@@ -389,7 +391,7 @@ jobs:
         run: flutter build ${{ matrix.platform }} --release
 
   android-build:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: Android APK compilation
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -411,7 +413,7 @@ jobs:
         run: flutter build apk --release
 
   ios-build:
-    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: iOS simulator compilation (no signing)
     runs-on: macos-15
     timeout-minutes: 50
@@ -454,6 +456,8 @@ jobs:
     timeout-minutes: 65
     steps:
       - uses: actions/checkout@v5
+      - name: Verify emulator disk preflight decisions
+        run: bash .github/scripts/test_android_emulator_preflight.sh
       - name: Free space for Android emulator userdata
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/share/powershell /opt/hostedtoolcache/CodeQL
@@ -487,7 +491,7 @@ jobs:
 
   ios-simulator:
     name: iOS - ${{ matrix.device }} simulator end-to-end
-    if: ${{ github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[ci:failed-only]') }}
+    if: ${{ github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     runs-on: macos-15
     timeout-minutes: 70
     strategy:

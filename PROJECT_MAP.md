@@ -2194,6 +2194,8 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   Release wymaga prywatnego `android/key.properties` poza CI i jawnym trybem
   debug-signing; konfiguracja odrzuca niepełne klucze i brak keystore.
   Release uruchamia R8; nie wyłączaj shrinkingu dla całej aplikacji.
+- `.github/scripts/test_android_emulator_preflight.sh`: regresja progu
+  wolnego miejsca dla AVD i selektywnego czyszczenia cache Docker.
 - `.github/scripts/android_emulator_preflight.sh`: sprawdza dostępne miejsce
   po instalacji AVD; emulator używa partycji 1536M, aby uniknąć
   wyczerpania miejsca runnera.
@@ -2202,6 +2204,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   `sys.boot_completed`, następnie uruchamia obydwa testy integracyjne.
   Runner emulatora wywołuje pojedynczą komendę Bash, zamiast interpretować
   instrukcje pętli oddzielnie przez `/bin/sh`.
+- `.github/workflows/cross_platform_tests.yml`: znacznik
+  `[ci:android-only]` uruchamia wyłącznie emulator Android na `dev`;
+  `[ci:failed-only]` zachowuje dawny tryb zredukowanej weryfikacji.
 - `.github/workflows/cross_platform_tests.yml`: CI na Linux, Windows, macOS,
   Chrome, Android oraz symulatorach iPhone i iPad, na push `dev`.
   Eksport PNG/PDF jest osobnym jobem z własnym timeoutem; pozostałe testy
