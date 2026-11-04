@@ -10,40 +10,38 @@ void main() {
       '"boundUserId":"00112233-4455-6677-8899-aabbccddeeff"}',
     );
     expect(local, StorageNamespace.local());
-    expect(account, StorageNamespace.account(
-      '00112233-4455-6677-8899-aabbccddeeff',
-    ));
+    expect(
+      account,
+      StorageNamespace.account('00112233-4455-6677-8899-aabbccddeeff'),
+    );
     expect(account.webDatabaseName, isNot(local.webDatabaseName));
     expect(account.nativeDatabaseName, isNot(local.nativeDatabaseName));
   });
 
   test('two account identities cannot share local storage keys', () {
-    final a = StorageNamespace.account(
-      '00112233-4455-6677-8899-aabbccddeeff',
-    );
-    final b = StorageNamespace.account(
-      '00112233-4455-6677-8899-aabbccddeaaa',
-    );
+    final a = StorageNamespace.account('00112233-4455-6677-8899-aabbccddeeff');
+    final b = StorageNamespace.account('00112233-4455-6677-8899-aabbccddeaaa');
     expect(a.webDatabaseName, isNot(b.webDatabaseName));
-    expect(a.fileKey('study_planner.json'),
-        isNot(b.fileKey('study_planner.json')));
+    expect(
+      a.fileKey('study_planner.json'),
+      isNot(b.fileKey('study_planner.json')),
+    );
   });
 
   test('account switch never exposes the previous namespace', () {
-    final a = StorageNamespace.account(
-      '00112233-4455-6677-8899-aabbccddeeff',
+    final a = StorageNamespace.account('00112233-4455-6677-8899-aabbccddeeff');
+    final b = StorageNamespace.account('00112233-4455-6677-8899-aabbccddeaaa');
+    bool visible(
+      StorageNamespace? active,
+      StorageNamespace? target, {
+      bool switching = false,
+      bool failed = false,
+    }) => ActiveStorageNamespace.canDisplay(
+      opened: active,
+      expected: target,
+      switching: switching,
+      failed: failed,
     );
-    final b = StorageNamespace.account(
-      '00112233-4455-6677-8899-aabbccddeaaa',
-    );
-    bool visible(StorageNamespace? active, StorageNamespace? target,
-        {bool switching = false, bool failed = false}) =>
-        ActiveStorageNamespace.canDisplay(
-          opened: active,
-          expected: target,
-          switching: switching,
-          failed: failed,
-        );
     expect(visible(a, a), isTrue);
     expect(visible(a, b), isFalse);
     expect(visible(a, a, switching: true), isFalse);

@@ -112,8 +112,7 @@ void main() {
     },
   );
 
-  test('unacknowledged operations cannot enter a checkpoint backup',
-      () async {
+  test('unacknowledged operations cannot enter a checkpoint backup', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -162,53 +161,54 @@ void main() {
       ),
       throwsA(isA<StateError>()),
     );
-    final pending = await database.customSelect(
-      'SELECT operation_id FROM operation_outbox',
-    ).get();
+    final pending = await database
+        .customSelect('SELECT operation_id FROM operation_outbox')
+        .get();
     expect(pending, hasLength(1));
   });
 
-  test('concurrent settings write aborts inconsistent backup capture',
-      () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    await repository.createNotebook();
-    var reads = 0;
-    textStorageReadOverride = (key) async {
-      if (key != 'app_prefs.json') {
-        return null;
-      }
-      reads++;
-      return reads == 1 ? '{"darkMode":false}' : '{"darkMode":true}';
-    };
-    final client = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((request) async {
-        fail('Mixed-state backup must not reach the server.');
-      }),
-    )..setAccessToken('token');
-    addTearDown(client.close);
-    final session = AccountSessionController(client)
-      ..mode = AccountDataMode.account
-      ..userId = 'user-1';
-    addTearDown(session.dispose);
-    final service = RemoteBackupService(
-      repository: repository,
-      apiClient: client,
-      session: session,
-    );
-    await expectLater(
-      service.uploadVerifiedSnapshot(
-        deviceId: '123e4567-e89b-12d3-a456-426614174000',
-      ),
-      throwsA(isA<StateError>()),
-    );
-    expect(reads, 2);
-  });
+  test(
+    'concurrent settings write aborts inconsistent backup capture',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      await repository.createNotebook();
+      var reads = 0;
+      textStorageReadOverride = (key) async {
+        if (key != 'app_prefs.json') {
+          return null;
+        }
+        reads++;
+        return reads == 1 ? '{"darkMode":false}' : '{"darkMode":true}';
+      };
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          fail('Mixed-state backup must not reach the server.');
+        }),
+      )..setAccessToken('token');
+      addTearDown(client.close);
+      final session = AccountSessionController(client)
+        ..mode = AccountDataMode.account
+        ..userId = 'user-1';
+      addTearDown(session.dispose);
+      final service = RemoteBackupService(
+        repository: repository,
+        apiClient: client,
+        session: session,
+      );
+      await expectLater(
+        service.uploadVerifiedSnapshot(
+          deviceId: '123e4567-e89b-12d3-a456-426614174000',
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(reads, 2);
+    },
+  );
 
-  test('presence marker distinguishes new database from data loss',
-      () async {
+  test('presence marker distinguishes new database from data loss', () async {
     final stored = <String, String>{};
     textStorageReadOverride = (key) async => stored[key];
     textStorageWriteOverride = (key, value) async => stored[key] = value;

@@ -1466,7 +1466,6 @@ void main() {
     sync.enqueue([const NotebookRepositoryChange.full('offline-document')]);
     await expectLater(sync.flushPersistedOutbox(), throwsStateError);
   });
-
 }
 
 class _MemoryAccountCredentialStore implements AccountCredentialStore {

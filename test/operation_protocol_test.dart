@@ -49,7 +49,8 @@ void main() {
     for (final kind in OperationKind.values) {
       final op = operation(
         kind: kind,
-        documentId: kind.target == OperationTarget.folder ||
+        documentId:
+            kind.target == OperationTarget.folder ||
                 kind.target == OperationTarget.task
             ? OperationEnvelope.libraryDocumentId
             : 'document-1',
@@ -187,18 +188,12 @@ void main() {
   });
 
   test('wire identifier rules reject control characters and long IDs', () {
-    expect(
-      () => operation(objectId: 'bad\n'),
-      throwsFormatException,
-    );
+    expect(() => operation(objectId: 'bad\n'), throwsFormatException);
     expect(
       () => operation(pageId: List.filled(129, 'x').join()),
       throwsFormatException,
     );
-    expect(
-      () => operation(documentId: 'bad\u0000'),
-      throwsFormatException,
-    );
+    expect(() => operation(documentId: 'bad\u0000'), throwsFormatException);
   });
 
   test('inverse reference requires its causal dependency', () {
@@ -259,5 +254,4 @@ void main() {
       throwsFormatException,
     );
   });
-
 }

@@ -87,8 +87,7 @@ void main() {
     expect(requested, isFalse);
   });
 
-  test('Share REST uses a scoped guest ticket, not the account JWT',
-      () async {
+  test('Share REST uses a scoped guest ticket, not the account JWT', () async {
     const shareId = '11111111-1111-4111-8111-111111111111';
     const ticket = '01234567890123456789012345678901234567890123456789';
     final operation = _operation();
@@ -118,7 +117,9 @@ void main() {
       );
     });
     final gateway = HttpOperationGateway(
-      client, shareId: shareId, guestTicket: ticket,
+      client,
+      shareId: shareId,
+      guestTicket: ticket,
     );
     expect((await gateway.send([operation])).single.cursor, 2);
     expect((await gateway.readAfter(2)).cursor, 2);
@@ -205,7 +206,9 @@ void main() {
     );
     addTearDown(client.close);
     final guest = HttpOperationGateway(
-      client, shareId: shareId, guestTicket: ticket,
+      client,
+      shareId: shareId,
+      guestTicket: ticket,
     );
     expect((await guest.send([operation])).single.cursor, 1);
   });
@@ -224,7 +227,9 @@ void main() {
     );
     expect(
       () => HttpOperationGateway(
-        client, shareId: shareId, guestTicket: 'bad\nheader',
+        client,
+        shareId: shareId,
+        guestTicket: 'bad\nheader',
       ),
       throwsArgumentError,
     );

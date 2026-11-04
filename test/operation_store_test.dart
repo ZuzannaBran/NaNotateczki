@@ -658,50 +658,49 @@ void main() {
     }
   });
 
-  test('cross-document causal dependencies roll back without an outbox', () async {
-    final foreign = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'remote-foreign',
-      actorSeq: 1,
-      documentId: 'foreign-document',
-      kind: OperationKind.documentCreate,
-      payload: const {
-        'value': {'title': 'Other'},
-      },
-      dependencies: const [],
-      logicalClock: 1,
-    );
-    await store.applyRemote(
-      foreign,
-      serverSequence: 1,
-      apply: () async {},
-    );
-    await expectLater(
-      store.writeLocal(
-        actorId: 'local-document',
-        documentId: 'document-one',
-        pageId: 'page-one',
-        objectId: 'isolated',
-        kind: OperationKind.objectCreate,
+  test(
+    'cross-document causal dependencies roll back without an outbox',
+    () async {
+      final foreign = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'remote-foreign',
+        actorSeq: 1,
+        documentId: 'foreign-document',
+        kind: OperationKind.documentCreate,
         payload: const {
-          'value': {'label': 'isolated'},
+          'value': {'title': 'Other'},
         },
-        dependencies: [foreign.operationId],
-        apply: (_) async {
-          await database.customStatement(
-            'INSERT INTO projection_probe VALUES (?, ?)',
-            ['isolated', 'wrong'],
-          );
-        },
-      ),
-      throwsStateError,
-    );
-    expect(await store.pending(), isEmpty);
-    expect(
-      await database.customSelect('SELECT * FROM projection_probe').get(),
-      isEmpty,
-    );
-  });
+        dependencies: const [],
+        logicalClock: 1,
+      );
+      await store.applyRemote(foreign, serverSequence: 1, apply: () async {});
+      await expectLater(
+        store.writeLocal(
+          actorId: 'local-document',
+          documentId: 'document-one',
+          pageId: 'page-one',
+          objectId: 'isolated',
+          kind: OperationKind.objectCreate,
+          payload: const {
+            'value': {'label': 'isolated'},
+          },
+          dependencies: [foreign.operationId],
+          apply: (_) async {
+            await database.customStatement(
+              'INSERT INTO projection_probe VALUES (?, ?)',
+              ['isolated', 'wrong'],
+            );
+          },
+        ),
+        throwsStateError,
+      );
+      expect(await store.pending(), isEmpty);
+      expect(
+        await database.customSelect('SELECT * FROM projection_probe').get(),
+        isEmpty,
+      );
+    },
+  );
 
   test('snapshot cannot predate an ACK or a later snapshot', () async {
     final operation = await add('ack-before-snapshot');
@@ -730,58 +729,68 @@ void main() {
     expect((await store.latestSnapshot('document-one'))?.serverSequence, 10);
   });
 
-  test('asset references preserve same object ID across different pages', () async {
-    for (final page in ['first-page', 'second-page']) {
-      await store.attachAssetReference(
-        documentId: 'document-one',
-        pageId: page,
-        objectId: 'shared-object',
-        assetId: 'asset-one',
-        storagePath: 'images/asset-one',
-        checksumSha256: List.filled(64, 'a').join(),
-        byteLength: 5,
+  test(
+    'asset references preserve same object ID across different pages',
+    () async {
+      for (final page in ['first-page', 'second-page']) {
+        await store.attachAssetReference(
+          documentId: 'document-one',
+          pageId: page,
+          objectId: 'shared-object',
+          assetId: 'asset-one',
+          storagePath: 'images/asset-one',
+          checksumSha256: List.filled(64, 'a').join(),
+          byteLength: 5,
+        );
+      }
+      final rows = await database
+          .customSelect(
+            'SELECT object_id FROM asset_references ORDER BY object_id',
+          )
+          .get();
+      expect(rows, hasLength(2));
+      expect(
+        rows.map((row) => row.read<String>('object_id')),
+        containsAll([
+          'page:["first-page","shared-object"]',
+          'page:["second-page","shared-object"]',
+        ]),
       );
-    }
-    final rows = await database.customSelect(
-      'SELECT object_id FROM asset_references ORDER BY object_id',
-    ).get();
-    expect(rows, hasLength(2));
-    expect(
-      rows.map((row) => row.read<String>('object_id')),
-      containsAll([
-        'page:["first-page","shared-object"]',
-        'page:["second-page","shared-object"]',
-      ]),
-    );
-  });
+    },
+  );
 
-  test('local journal prunes implied frontiers but keeps causal order', () async {
-    String? parent;
-    for (var i = 0; i < 260; i++) {
-      final id =
-          '${(i + 1000).toRadixString(16).padLeft(8, '0')}'
-          '-1111-4111-8111-111111111111';
-      final remote = OperationEnvelope(
-        operationId: id,
-        actorId: 'remote-$i',
-        actorSeq: 1,
-        logicalClock: i + 1,
-        documentId: 'document-one',
-        pageId: 'page-one',
-        objectId: 'remote-$i',
-        kind: OperationKind.objectCreate,
-        payload: const {'value': {'x': 1}},
-        dependencies: [if (parent != null) parent],
-      );
-      await store.applyRemote(
-        remote,
-        serverSequence: i + 1,
-        apply: () async {},
-      );
-      parent = id;
-    }
-    final next = await add('local-after-frontier');
-    expect(next.dependencies, [parent]);
-    expect(next.logicalClock, 261);
-  });
+  test(
+    'local journal prunes implied frontiers but keeps causal order',
+    () async {
+      String? parent;
+      for (var i = 0; i < 260; i++) {
+        final id =
+            '${(i + 1000).toRadixString(16).padLeft(8, '0')}'
+            '-1111-4111-8111-111111111111';
+        final remote = OperationEnvelope(
+          operationId: id,
+          actorId: 'remote-$i',
+          actorSeq: 1,
+          logicalClock: i + 1,
+          documentId: 'document-one',
+          pageId: 'page-one',
+          objectId: 'remote-$i',
+          kind: OperationKind.objectCreate,
+          payload: const {
+            'value': {'x': 1},
+          },
+          dependencies: [if (parent != null) parent],
+        );
+        await store.applyRemote(
+          remote,
+          serverSequence: i + 1,
+          apply: () async {},
+        );
+        parent = id;
+      }
+      final next = await add('local-after-frontier');
+      expect(next.dependencies, [parent]);
+      expect(next.logicalClock, 261);
+    },
+  );
 }

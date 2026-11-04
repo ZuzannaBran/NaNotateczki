@@ -541,7 +541,9 @@ void main() {
       kind: OperationKind.objectSet,
       pageId: 'page',
       objectId: 'stroke',
-      payload: const {'properties': {'x': 1}},
+      payload: const {
+        'properties': {'x': 1},
+      },
     );
     final restored = OperationActorClock.fromCheckpoint(actor.toCheckpoint());
     expect(restored.documentId, 'notebook');
@@ -551,7 +553,9 @@ void main() {
         kind: OperationKind.objectSet,
         pageId: 'page',
         objectId: 'stroke',
-        payload: const {'properties': {'x': 2}},
+        payload: const {
+          'properties': {'x': 2},
+        },
       ),
       throwsFormatException,
     );
@@ -565,7 +569,9 @@ void main() {
         pageId: 'page',
         objectId: 'stroke',
         kind: OperationKind.objectSet,
-        payload: const {'properties': {'x': 3}},
+        payload: const {
+          'properties': {'x': 3},
+        },
         dependencies: const [],
       ),
     );
@@ -574,7 +580,9 @@ void main() {
       kind: OperationKind.objectSet,
       pageId: 'page',
       objectId: 'stroke',
-      payload: const {'properties': {'x': 4}},
+      payload: const {
+        'properties': {'x': 4},
+      },
     );
     expect(next.dependencies, [first.operationId]);
   });
@@ -586,13 +594,12 @@ void main() {
       kind: OperationKind.objectSet,
       pageId: 'page',
       objectId: 'stroke',
-      payload: const {'properties': {'x': 1}},
+      payload: const {
+        'properties': {'x': 1},
+      },
     );
     final old = actor.toCheckpoint()..remove('documentId');
-    expect(
-      () => OperationActorClock.fromCheckpoint(old),
-      throwsArgumentError,
-    );
+    expect(() => OperationActorClock.fromCheckpoint(old), throwsArgumentError);
   });
 
   test('causal buffer rejects cross-document actors and parents', () {
@@ -608,11 +615,14 @@ void main() {
         pageId: 'page',
         objectId: 'stroke',
         kind: OperationKind.objectSet,
-        payload: const {'properties': {'x': 2}},
+        payload: const {
+          'properties': {'x': 2},
+        },
         dependencies: const [a1],
         logicalClock: 2,
       );
     }
+
     expect(
       () => queue.ingest(different(b1, 'B', 1)),
       throwsA(isA<OperationOrderException>()),
@@ -641,7 +651,9 @@ void main() {
           pageId: 'page',
           objectId: 'item',
           kind: OperationKind.objectSet,
-          payload: const {'properties': {'x': 1}},
+          payload: const {
+            'properties': {'x': 1},
+          },
           dependencies: [if (parent != null) parent],
           logicalClock: i + 1,
         ),
@@ -653,7 +665,9 @@ void main() {
       pageId: 'page',
       objectId: 'item',
       kind: OperationKind.objectSet,
-      payload: const {'properties': {'x': 2}},
+      payload: const {
+        'properties': {'x': 2},
+      },
     );
     expect(next.dependencies, [parent]);
     expect(next.logicalClock, 261);

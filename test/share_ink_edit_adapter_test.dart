@@ -43,7 +43,9 @@ void main() {
     expect(changes.single.pageId, 'page-1');
     expect(changes.single.objectId, 'stroke');
     final fields = changes.single.payload['value'] as Map<String, dynamic>;
-    expect(fields['points'], [[4.0, 8.0, 0.7]]);
+    expect(fields['points'], [
+      [4.0, 8.0, 0.7],
+    ]);
     final decoded = adapter.decode('stroke', {
       'type': 'stroke.create',
       'properties': fields,
@@ -65,14 +67,11 @@ void main() {
       OperationKind.objectSet,
     ]);
     expect((changes.first.payload['properties'] as Map).keys, ['points']);
+    expect((changes.last.payload['properties'] as Map).keys, ['colorValue']);
     expect(
-      (changes.last.payload['properties'] as Map).keys,
-      ['colorValue'],
+      adapter.plan(before: page([old]), after: page([ink('stroke')])),
+      isEmpty,
     );
-    expect(adapter.plan(
-      before: page([old]),
-      after: page([ink('stroke')]),
-    ), isEmpty);
   });
 
   test('eraser records tombstone and updates remaining z-order', () {
@@ -99,22 +98,22 @@ void main() {
 
   test('duplicates, malformed strokes and other pages fail closed', () {
     expect(
-      () => adapter.plan(
-        before: page([]),
-        after: page([ink('dup'), ink('dup')]),
-      ),
+      () =>
+          adapter.plan(before: page([]), after: page([ink('dup'), ink('dup')])),
       throwsStateError,
     );
     expect(
       () => adapter.plan(
         before: page([]),
-        after: page([InkStroke(
-          id: 'bad',
-          points: [],
-          color: const Color(0xFF000000),
-          width: 2,
-          tool: DrawingTool.pen,
-        )]),
+        after: page([
+          InkStroke(
+            id: 'bad',
+            points: [],
+            color: const Color(0xFF000000),
+            width: 2,
+            tool: DrawingTool.pen,
+          ),
+        ]),
       ),
       throwsStateError,
     );
@@ -132,7 +131,9 @@ void main() {
           'colorValue': 0xFF000000,
           'width': 1,
           'toolIndex': DrawingTool.pen.index,
-          'points': [[double.nan, 4, 1]],
+          'points': [
+            [double.nan, 4, 1],
+          ],
         },
       }),
       throwsFormatException,
@@ -140,8 +141,8 @@ void main() {
   });
 
   test('concurrent color and movement converge through the v2 reducer', () {
-    String uuid(int number) => '00000000-0000-4000-8000-' +
-        number.toString().padLeft(12, '0');
+    String uuid(int number) =>
+        '00000000-0000-4000-8000-' + number.toString().padLeft(12, '0');
     OperationEnvelope op(
       int number,
       OperationKind kind,
@@ -163,53 +164,81 @@ void main() {
     );
 
     var initial = ShareOperationProjection.empty();
+    initial = initial.apply(op(1, OperationKind.documentCreate, {'value': {}}));
     initial = initial.apply(
-      op(1, OperationKind.documentCreate, {'value': {}}),
+      op(2, OperationKind.pageCreate, {'value': {}}, objectId: 'page-1'),
     );
+    final create = adapter
+        .plan(before: page([]), after: page([ink('stroke')]))
+        .single;
     initial = initial.apply(
-      op(2, OperationKind.pageCreate, {'value': {}},
-          objectId: 'page-1'),
+      op(
+        3,
+        create.kind,
+        create.payload,
+        pageId: create.pageId,
+        objectId: create.objectId,
+      ),
     );
-    final create = adapter.plan(
-      before: page([]),
-      after: page([ink('stroke')]),
-    ).single;
-    initial = initial.apply(
-      op(3, create.kind, create.payload,
-          pageId: create.pageId, objectId: create.objectId),
+    final style = adapter
+        .plan(
+          before: page([ink('stroke')]),
+          after: page([ink('stroke', color: 0xFFAA7788)]),
+        )
+        .single;
+    final movement = adapter
+        .plan(
+          before: page([ink('stroke')]),
+          after: page([ink('stroke', dx: 25)]),
+        )
+        .single;
+    final styleOp = op(
+      4,
+      style.kind,
+      style.payload,
+      pageId: style.pageId,
+      objectId: style.objectId,
+      actor: 'alice',
     );
-    final style = adapter.plan(
-      before: page([ink('stroke')]),
-      after: page([ink('stroke', color: 0xFFAA7788)]),
-    ).single;
-    final movement = adapter.plan(
-      before: page([ink('stroke')]),
-      after: page([ink('stroke', dx: 25)]),
-    ).single;
-    final styleOp = op(4, style.kind, style.payload,
-        pageId: style.pageId, objectId: style.objectId, actor: 'alice');
-    final movementOp = op(5, movement.kind, movement.payload,
-        pageId: movement.pageId, objectId: movement.objectId, actor: 'bob');
+    final movementOp = op(
+      5,
+      movement.kind,
+      movement.payload,
+      pageId: movement.pageId,
+      objectId: movement.objectId,
+      actor: 'bob',
+    );
     final left = initial.apply(styleOp).apply(movementOp);
     final right = initial.apply(movementOp).apply(styleOp);
     expect(left.document, right.document);
 
-    final objects = ((left.document!['pages'] as Map)['page-1']
-        as Map)['objects'] as Map;
+    final objects =
+        ((left.document!['pages'] as Map)['page-1'] as Map)['objects'] as Map;
     final merged = adapter.decode(
-      'stroke', objects['stroke'] as Map<String, dynamic>,
+      'stroke',
+      objects['stroke'] as Map<String, dynamic>,
     );
     expect(merged.points.single.dx, 25);
     expect(merged.color.toARGB32(), 0xFFAA7788);
 
     final deleted = left.apply(
-      op(6, OperationKind.objectDelete, {},
-          pageId: 'page-1', objectId: 'stroke'),
+      op(
+        6,
+        OperationKind.objectDelete,
+        {},
+        pageId: 'page-1',
+        objectId: 'stroke',
+      ),
     );
     expect(
       () => deleted.apply(
-        op(7, create.kind, create.payload,
-            pageId: create.pageId, objectId: create.objectId),
+        op(
+          7,
+          create.kind,
+          create.payload,
+          pageId: create.pageId,
+          objectId: create.objectId,
+        ),
       ),
       throwsStateError,
     );

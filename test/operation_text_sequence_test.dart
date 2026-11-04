@@ -215,7 +215,9 @@ void main() {
       operationId: thirdId,
       actorId: 'alice',
       kind: OperationKind.textDelete,
-      payload: {'atomIds': [firstId]},
+      payload: {
+        'atomIds': [firstId],
+      },
     );
     final updated = OperationTextSequence.apply(initial, removal);
     expect(OperationTextSequence.render(initial), 'AB');
