@@ -1364,6 +1364,10 @@ aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
   korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
   oraz pojedyncze undo/redo.
   682: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
+- Historia Undo/Redo pamięta UID strony, na której wykonano akcję;
+  cofanie po nawigacji nie może zmieniać obiektów innej strony.
+  Usunięcie strony usuwa powiązane wpisy historii. Regresje w
+  `test/editor_controller_layering_test.dart`.
 - 1407: łączenie zapisanych domyślnych teł; 1490: `undo`; 1516: `redo`;
   1591: `toggleBookmark`; 1667: `updateActiveTextStyle` — blokowe
   formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
