@@ -30,6 +30,7 @@ import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/domain/text_block.dart';
 import 'editor_actions.dart';
+import 'editor_v2_operation_writer.dart';
 import 'input_mode.dart';
 import 'ink_color_presets.dart';
 import 'page_background.dart';
@@ -89,11 +90,17 @@ class EditorController extends ChangeNotifier {
     required this.repository,
     required this.notebook,
     this.saveDebounce = defaultSaveDebounce,
+    this.operationWriter,
   }) {
+    if (operationWriter != null &&
+        !identical(repository.database, operationWriter!.projector.database)) {
+      throw ArgumentError('Editor and v2 journal must share one SQLite DB.');
+    }
     if (notebook.kind == NotebookKind.planner) {
       throw UnsupportedError('Planner items do not use the drawing editor.');
     }
     pages = notebook.pages;
+    _v2PersistedNotebook = notebook;
     currentPageIndex = 0;
     AppSaveCoordinator.instance.register(
       this,
@@ -104,7 +111,10 @@ class EditorController extends ChangeNotifier {
   }
 
   final NotebookRepository repository;
+  final EditorV2OperationWriter? operationWriter;
   Notebook notebook;
+  late Notebook _v2PersistedNotebook;
+  Future<void>? _v2SaveTail;
   Duration saveDebounce;
   final Uuid _uuid = const Uuid();
   final ImagePicker _imagePicker = ImagePicker();
@@ -177,8 +187,10 @@ class EditorController extends ChangeNotifier {
 
   NotePage get currentPage => pages[currentPageIndex];
 
-  bool get canUndo => _undoActions.isNotEmpty;
-  bool get canRedo => _redoActions.isNotEmpty;
+  // Inverse intents and new IDs for tombstoned objects are not yet wired.
+  // An optimistic legacy Undo must not resurrect a deleted v2 object.
+  bool get canUndo => operationWriter == null && _undoActions.isNotEmpty;
+  bool get canRedo => operationWriter == null && _redoActions.isNotEmpty;
   bool get allowsFingerDrawing => pointerInputMode.allowsFingerDrawing;
   bool get isObjectTransformActive => _isObjectTransformActive;
   bool get isActiveImageEdit =>
@@ -221,7 +233,7 @@ class EditorController extends ChangeNotifier {
     if (incoming.uid != notebook.uid) {
       throw ArgumentError('Remote notebook UID does not match the editor.');
     }
-    if (!canApplyConfirmedRemoteNotebook) {
+    if (operationWriter != null || !canApplyConfirmedRemoteNotebook) {
       return false;
     }
     final selectedPageId = currentPage.id;
@@ -318,6 +330,11 @@ class EditorController extends ChangeNotifier {
         if (i == index) next else pages[i],
     ];
     notebook = notebook.copyWith(pages: pages);
+    if (operationWriter != null) {
+      // Remote projection is already durable. Do not re-emit its patch as
+      // a new local operation during the next editor save.
+      _v2PersistedNotebook = notebook;
+    }
     // v2 undo/redo must ultimately emit inverse operations. Until stage 11
     // binds them, do not allow a stale legacy action to undo remote changes.
     _undoActions.clear();
@@ -355,6 +372,7 @@ class EditorController extends ChangeNotifier {
       _prefsSaveDebounce != null ||
       _activePrefsSave != null ||
       _notebookSaveDebounce != null ||
+      _v2SaveTail != null ||
       _fullSavePending ||
       _dirtyPageIds.isNotEmpty ||
       _activeTextEditBefore != null;
@@ -380,6 +398,23 @@ class EditorController extends ChangeNotifier {
     }
 
     await repository.waitForPendingSaves();
+    if (operationWriter != null) {
+      // The v2 journal and its projection commit together; no legacy writer
+      // is allowed to run on the same document during flush or shutdown.
+      await _v2SaveTail;
+      if (_fullSavePending || _dirtyPageIds.isNotEmpty) {
+        await _saveV2();
+      }
+      await _v2SaveTail;
+      if (_integritySaveBlocked ||
+          _fullSavePending ||
+          _dirtyPageIds.isNotEmpty) {
+        throw const DataIntegrityProtectionException(
+          'Editor v2 changes were not durably committed.',
+        );
+      }
+      return;
+    }
     if (_integritySaveBlocked) {
       throw const DataIntegrityProtectionException(
         'Notebook save is blocked by data integrity protection.',
@@ -1639,6 +1674,9 @@ class EditorController extends ChangeNotifier {
   }
 
   void undo() {
+    if (operationWriter != null) {
+      return;
+    }
     _commitActiveTextEdit();
     if (_undoActions.isEmpty) {
       return;
@@ -1675,6 +1713,9 @@ class EditorController extends ChangeNotifier {
   }
 
   void redo() {
+    if (operationWriter != null) {
+      return;
+    }
     _commitActiveTextEdit();
     if (_redoActions.isEmpty) {
       return;
@@ -3291,7 +3332,57 @@ class EditorController extends ChangeNotifier {
     });
   }
 
+  /// Serializes v2 writes without ever invoking snapshot repository saves.
+  ///
+  /// The committed baseline advances only after the SQLite transaction.
+  /// Another gesture during an active transaction queues a fresh comparison
+  /// against that baseline, so it cannot overwrite a newer page revision.
+  Future<void> _saveV2() {
+    _notebookSaveDebounce?.cancel();
+    _notebookSaveDebounce = null;
+    _fullSavePending = true;
+    final previous = _v2SaveTail ?? Future<void>.value();
+    late final Future<void> next;
+    next = previous.then((_) async {
+      final savedPages = pages;
+      final proposed = notebook.copyWith(
+        pages: savedPages,
+        updatedAt: DateTime.now(),
+      );
+      try {
+        await operationWriter!.writeNotebookChange(
+          before: _v2PersistedNotebook,
+          after: proposed,
+        );
+        _v2PersistedNotebook = proposed;
+        _integritySaveBlocked = false;
+        if (identical(pages, savedPages)) {
+          _fullSavePending = false;
+          _dirtyPageIds.clear();
+          _expectedRemovedIdsByPage.clear();
+          _expectedRemovedPageIds.clear();
+        }
+      } catch (error, stackTrace) {
+        // Never fall back to saveNotebook after a failed v2 batch. Leave
+        // optimistic state dirty and block shutdown until it can be saved.
+        _integritySaveBlocked = true;
+        _fullSavePending = true;
+        debugPrint('EditorController._saveV2 blocked: $error\n$stackTrace');
+      }
+    }).whenComplete(() {
+      if (identical(_v2SaveTail, next)) {
+        _v2SaveTail = null;
+      }
+    });
+    _v2SaveTail = next;
+    return next;
+  }
+
   Future<void> _saveDirtyPages() async {
+    if (operationWriter != null) {
+      await _saveV2();
+      return;
+    }
     if (_dirtyPageIds.isEmpty) {
       return;
     }
@@ -3330,6 +3421,10 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> _save() async {
+    if (operationWriter != null) {
+      await _saveV2();
+      return;
+    }
     _integritySaveBlocked = false;
     _notebookSaveDebounce?.cancel();
     _notebookSaveDebounce = null;
