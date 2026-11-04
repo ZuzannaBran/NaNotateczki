@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -9,7 +10,7 @@ import 'package:program/data/sync/operation_store.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:uuid/uuid.dart';
 
-Map<String, dynamic> _stroke(String id) => {
+Map<String, dynamic> _stroke() => {
   'objectType': 'stroke',
   'colorValue': 0xFF123456,
   'width': 2.0,
@@ -69,7 +70,7 @@ void main() {
         kind: OperationKind.strokeCreate,
         pageId: pageId,
         objectId: 'stroke-one',
-        payload: {'value': _stroke('stroke-one')},
+        payload: {'value': _stroke()},
       ),
     ]);
     expect(added, hasLength(1));
@@ -130,7 +131,7 @@ void main() {
           kind: OperationKind.strokeCreate,
           pageId: pageId,
           objectId: 'stroke-one',
-          payload: {'value': _stroke('stroke-one')},
+          payload: {'value': _stroke()},
         ),
       ]),
       throwsStateError,
@@ -145,7 +146,7 @@ void main() {
           kind: OperationKind.strokeCreate,
           pageId: pageId,
           objectId: 'stroke-one',
-          payload: {'value': _stroke('stroke-one')},
+          payload: {'value': _stroke()},
         ),
         const LocalOperationDraft(
           kind: OperationKind.objectSet,
@@ -165,7 +166,7 @@ void main() {
         kind: OperationKind.strokeCreate,
         pageId: pageId,
         objectId: 'stroke-one',
-        payload: {'value': _stroke('stroke-one')},
+        payload: {'value': _stroke()},
       ),
     ]);
     expect(committed.single.actorSeq, 1);
@@ -177,7 +178,7 @@ void main() {
         kind: OperationKind.strokeCreate,
         pageId: pageId,
         objectId: 'stroke-one',
-        payload: {'value': _stroke('stroke-one')},
+        payload: {'value': _stroke()},
       ),
     ])).single;
     final remote = OperationEnvelope(
@@ -234,7 +235,7 @@ void main() {
       pageId: notebook.pages.single.id,
       objectId: 'restart-ink',
       kind: OperationKind.strokeCreate,
-      payload: {'value': _stroke('restart-ink')},
+      payload: {'value': _stroke()},
       apply: EditorSqliteProjector(first).apply,
     );
     await first.close();
