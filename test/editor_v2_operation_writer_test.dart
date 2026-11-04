@@ -120,6 +120,80 @@ void main() {
     );
   });
 
+  test('multiple page edits commit as one causally ordered batch',
+      () async {
+    final notebook = await repository.createNotebook();
+    final first = notebook.pages.single;
+    final newPage = first.copyWith(
+      id: 'second-page',
+      title: 'Second page',
+      inkStrokes: const [],
+    );
+    final stroke = InkStroke(
+      id: 'v2-ink-two',
+      color: const Color(0xFF112233),
+      width: 2,
+      tool: DrawingTool.pen,
+      points: [const InkPoint(dx: 5, dy: 6, pressure: 0.5)],
+    );
+    final after = notebook.copyWith(
+      pages: [
+        first.copyWith(inkStrokes: [stroke]),
+        newPage,
+      ],
+    );
+    final ops = await writer.writeNotebookChange(
+      before: notebook,
+      after: after,
+    );
+    expect(ops.map((operation) => operation.kind), [
+      OperationKind.strokeCreate,
+      OperationKind.pageCreate,
+    ]);
+    expect(ops[1].dependencies, contains(ops[0].operationId));
+    final saved = (await repository.getNotebook(notebook.uid))!;
+    expect(saved.pages, hasLength(2));
+    expect(saved.pages.first.inkStrokes.single.id, stroke.id);
+    expect(saved.pages.last.id, newPage.id);
+    expect(await store.pending(), hasLength(2));
+  });
+
+  test('multi-page transaction rolls back earlier edits on identity error',
+      () async {
+    final notebook = await repository.createNotebook();
+    final other = await repository.createNotebook();
+    final old = notebook.pages.single;
+    final changed = notebook.copyWith(
+      pages: [
+        old.copyWith(
+          inkStrokes: [
+            InkStroke(
+              id: 'rollback-stroke',
+              color: const Color(0xFF223344),
+              width: 2,
+              tool: DrawingTool.pen,
+              points: [
+                const InkPoint(dx: 2, dy: 4, pressure: 0.6),
+              ],
+            ),
+          ],
+        ),
+        other.pages.single,
+      ],
+    );
+    await expectLater(
+      writer.writeNotebookChange(
+        before: notebook,
+        after: changed,
+      ),
+      throwsStateError,
+    );
+    final current = await repository.getNotebook(notebook.uid);
+    expect(current?.pages, hasLength(1));
+    expect(current?.pages.single.inkStrokes, isEmpty);
+    expect(await store.pending(), isEmpty);
+  });
+
   test('Quill update reuses SQLite atom identity after each commit',
       () async {
     final notebook = await repository.createNotebook();
