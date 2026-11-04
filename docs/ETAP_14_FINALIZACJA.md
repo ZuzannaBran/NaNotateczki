@@ -70,6 +70,18 @@ Test bez Dockera w checkoutcie serwera:
 
 Nie trzeba wykonywać teraz żadnych komend na produkcyjnym serwerze.
 
+## Wynik lokalnej weryfikacji (2026-11-04)
+
+Uruchomiono `python -m unittest discover -s scripts/tests -p
+'test_stage14*.py' -q` na lokalnej kopii **dokładnie tych samych**
+skryptów i testów (potwierdzono zgodność Git blob SHA z GitHub).
+Wynik: **13/13 PASS**. `bash -n` skryptów także zaliczone.
+Były to testy z atrapą Dockera/odpowiedzi bazy, nie wykonano
+destrukcyjnego SQL na PostgreSQL i nie uruchomiono scenariuszy
+API/Flutter E2E. Testy routerów API pozostają do uruchomienia
+na kompletnym checkoutcie backendu z zależnościami. Nie wykonywano
+ręcznie GitHub Actions.
+
 ## Kroki pozostałe do pełnego zamknięcia
 
 1. Zamknąć etap 11: aktywacja namespaces Local/Account/Web, bezstratny
