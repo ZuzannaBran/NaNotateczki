@@ -622,6 +622,14 @@ void main() {
     await engine.syncNow();
     expect(await store.checkpoint('user-A-v2'), 1);
     expect(notifications, 1);
+    await engine.stop();
+    await database.customStatement(
+      'UPDATE sync_checkpoints SET server_sequence = 0 WHERE scope = ?',
+      ['user-A-v2'],
+    );
+    await engine.start();
+    // A new editor session can rebuild the view from its durable projection.
+    expect(notifications, 2);
     final rows = await database.customSelect(
       'SELECT id FROM projection_probe',
     ).get();
