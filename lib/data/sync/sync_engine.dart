@@ -226,6 +226,9 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     _socket = null;
     await socket?.sink.close();
     await _active;
+    // A callback finishing during stop must not leave stale UI deliveries
+    // after the engine is restarted with a different editor instance.
+    _notifiedRemoteOperations.clear();
   }
 
   void requestSync() {
