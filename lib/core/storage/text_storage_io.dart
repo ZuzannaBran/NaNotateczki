@@ -106,7 +106,11 @@ Future<void> _recoverAtomicWrite(File file) async {
 }
 
 Future<File> _fileForKey(String key, {String? directoryPath}) async {
-  final path = directoryPath ?? await getAppDataPath();
+  // The identity profile is global so a restart can choose its namespace.
+  final path = directoryPath ??
+      (key.startsWith('account_profile.json')
+          ? await getRootAppDataPath()
+          : await getAppDataPath());
   if (key.startsWith('/') ||
       key.contains('\\') ||
       key.split('/').any(

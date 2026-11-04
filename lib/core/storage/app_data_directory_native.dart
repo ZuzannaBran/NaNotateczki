@@ -2,11 +2,15 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app_data_directory_io.dart';
 import 'app_data_migration_report.dart';
+import 'active_storage_namespace.dart';
 
-Future<String> getAppDataPath() async {
+Future<String> getRootAppDataPath() async {
   final support = await getApplicationSupportDirectory();
   return '${support.path}/data';
 }
+
+Future<String> getAppDataPath() async =>
+    '${await getRootAppDataPath()}/${ActiveStorageNamespace.current.relativePath}';
 
 Future<AppDataMigrationReport> prepareAppDataDirectory({
   String? supportPath,

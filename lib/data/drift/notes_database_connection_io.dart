@@ -78,7 +78,7 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
 }
 
 Future<String?> quarantineNotesDatabase(String name) async {
-  final dir = Directory(await getAppDataPath());
+  final dir = Directory(await getRootAppDataPath());
   final file = File('${dir.path}/$name');
   if (!await file.exists()) {
     return null;
@@ -128,7 +128,7 @@ Future<String?> quarantineNotesDatabase(String name) async {
 }
 
 Future<void> clearNotesDatabaseRecoveryMarker(String name) async {
-  final dir = Directory(await getAppDataPath());
+  final dir = Directory(await getRootAppDataPath());
   final marker = _recoveryMarker(File('${dir.path}/$name'));
   await _recoverRecoveryMarker(marker);
   if (await marker.exists()) {
