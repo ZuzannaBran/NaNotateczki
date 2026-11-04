@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../core/storage/storage_namespace_manager.dart';
 import '../../core/storage/text_storage.dart';
 
 /// A guest edit that has not yet been acknowledged by the server.
@@ -24,7 +25,8 @@ class PendingStudyShareEdit {
 /// Do not clear it until the server accepts the submitted changes.
 class StudyShareGuestOutbox {
   StudyShareGuestOutbox(String shareId)
-    : _key = 'study_share_guest_outbox_v1_$shareId';
+    : _key = StorageNamespace.share(shareId, 'legacy-web-guest')
+          .fileKey('outbox.json');
 
   final String _key;
 
