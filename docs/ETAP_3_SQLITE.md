@@ -144,7 +144,12 @@ snapshotów/checkpointów CRDT.
 `EditorV2OperationWriter` wiąże most z `SyncEngine.writeLocalBatch`
 i tą samą instancją `NotesDatabase`; odczytuje trwałe atomy przed
 przygotowaniem edycji, nie tworzy pustych wsadów i nie wywołuje
-`NotebookRepository.saveNotebook`. Nowe testy:
+`NotebookRepository.saveNotebook`. `writeNotebookChange` scala zmiany
+wielu stron w jedną transakcję. Zmiana przypisania ID obiektu do innej
+strony lub zmiana kolejności stron bez obsługi `object.move` jest
+odrzucana. Rozbieżny początkowy Delta Quill nie może nadpisać atomów
+z trwałej projekcji. Projektor odmawia też kasowania ID, jeśli ten sam
+identyfikator istnieje w kilku warstwach. Nowe testy:
 `test/editor_sqlite_projector_test.dart` i
 `test/editor_v2_operation_writer_test.dart`, obejmujące rollback,
 offline outbox, ink, formatowanie, restart i idempotentny remote replay.
@@ -164,6 +169,13 @@ akcji `EditorController`, bezpieczny Undo/Redo, synchronizację remote z
 rebase, migrację dokumentów/outboxu, wsparcie platform i testy E2E.
 Nie wolno włączać jednocześnie writerów v1 i v2 ani usuwać snapshotowego
 zapisu przed zakończeniem tych prac.
+
+Powtórzony odczyt już dostarczonej obcej operacji nie wywołuje
+ponownego callbacku UI w tej samej sesji `SyncEngine` (maksymalnie
+4096 zapamiętanych ID). Po nieudanym callbacku powiadomienie można
+ponowić; po restarcie silnika pamięć powiadomień jest czyszczona.
+Regresja: `test/sync_engine_test.dart`. Nie zastępuje to trwałego
+stanu odtworzenia warstwy UI ani rebase konfliktów.
 
 ### Ręczna weryfikacja, gdy dostępne będzie środowisko Flutter
 
