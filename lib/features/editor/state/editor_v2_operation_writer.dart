@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:collection/collection.dart';
 
 import '../../../data/sync/editor_sqlite_projector.dart';
 import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/operation_store.dart';
+import '../../../data/sync/operation_text_sequence.dart';
 import '../../../data/sync/sync_engine.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/notebook.dart';
@@ -200,11 +203,19 @@ class EditorV2OperationWriter {
           (changed.text == old.text && changed.deltaJson == old.deltaJson)) {
         continue;
       }
-      result[old.id] = await syncEngine.store.textAtoms(
+      final atoms = await syncEngine.store.textAtoms(
         documentId: documentId,
         pageId: before.id,
         objectId: old.id,
       );
+      if (old.deltaJson != null &&
+          !const DeepCollectionEquality().equals(
+            jsonDecode(old.deltaJson!),
+            OperationTextSequence.renderDelta(atoms),
+          )) {
+        throw StateError('The text edit started from stale Quill formatting.');
+      }
+      result[old.id] = atoms;
     }
     return result;
   }
