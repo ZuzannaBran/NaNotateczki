@@ -78,6 +78,9 @@ class OperationEnvelope {
 
   static final RegExp _invalidIdentifierChar = RegExp(r'[\x00-\x1f\x7f]');
 
+  static bool _isValidUuid(String value) =>
+      value.length == 36 && _uuidPattern.hasMatch(value);
+
   final String operationId;
   final String actorId;
   final int actorSeq;
@@ -137,7 +140,7 @@ class OperationEnvelope {
       if (payload.length != 2 ||
           !payload.containsKey('afterAtomId') ||
           (anchor != null &&
-              (anchor is! String || !_uuidPattern.hasMatch(anchor))) ||
+              (anchor is! String || !_isValidUuid(anchor))) ||
           atoms is! List ||
           atoms.isEmpty ||
           atoms.length > 256) {
@@ -151,7 +154,7 @@ class OperationEnvelope {
             !atom.containsKey('text') ||
             atom['id'] is! String ||
             atom['text'] is! String ||
-            !_uuidPattern.hasMatch(atom['id'] as String) ||
+            !_isValidUuid(atom['id'] as String) ||
             !seen.add(atom['id'] as String) ||
             (atom['text'] as String).isEmpty ||
             (atom['text'] as String).runes.length > 1024) {
@@ -166,7 +169,7 @@ class OperationEnvelope {
           ids is! List ||
           ids.isEmpty ||
           ids.length > 256 ||
-          ids.any((id) => id is! String || !_uuidPattern.hasMatch(id)) ||
+          ids.any((id) => id is! String || !_isValidUuid(id)) ||
           ids.toSet().length != ids.length) {
         throw const FormatException('Invalid text.delete payload.');
       }
@@ -270,9 +273,9 @@ class OperationEnvelope {
     if (schemaVersion != currentSchemaVersion) {
       throw FormatException('Unsupported operation schema: $schemaVersion');
     }
-    if (!_uuidPattern.hasMatch(operationId) ||
+    if (!_isValidUuid(operationId) ||
         (revertsOperationId != null &&
-            !_uuidPattern.hasMatch(revertsOperationId!))) {
+            !_isValidUuid(revertsOperationId!))) {
       throw const FormatException('Invalid operation UUID.');
     }
     if (actorId.isEmpty ||
@@ -288,7 +291,7 @@ class OperationEnvelope {
     if (dependencies.length > 256 ||
         dependencies.toSet().length != dependencies.length ||
         dependencies.contains(operationId) ||
-        dependencies.any((id) => !_uuidPattern.hasMatch(id)) ||
+        dependencies.any((id) => !_isValidUuid(id)) ||
         (revertsOperationId != null &&
             !dependencies.contains(revertsOperationId))) {
       throw const FormatException('Invalid causal dependencies.');
