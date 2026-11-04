@@ -2491,7 +2491,10 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   create/delete/transform/set/reorder, a `decode` waliduje remote ink.
   Adapter jest opt-in i nie zastępuje jeszcze starego zapisu Share.
 - `lib/data/sync/share_text_edit_adapter.dart`:
-  plain-text CRDT; formatowane delty Quill wymagają osobnego protokołu.
+  plain-text i Quill CRDT. Edytor przechowuje przycięty plainText,
+  ale Delta może zawierać obowiązkowy końcowy znak nowej linii;
+  adapter zachowuje atom `\\n` i odrzuca rozbieżną treść.
+  Regresja: `test/share_text_edit_adapter_test.dart`.
 - `lib/data/sync/operation_text_sequence.dart`:
   copy-on-write atomów i rygorystyczna walidacja rankingu.
 - `test/share_ink_edit_adapter_test.dart` oraz testy sekwencji tekstu:
