@@ -2547,7 +2547,10 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `server/api/app/account_protocol.py`, `server/scripts/stage13-activate-empty-canary.sh`
   — trwałe, domyślnie v1, nieodwracalne przełączenie WYŁĄCZNIE pustego
   konta testowego; blokada HTTP 409 zapisu v1 na koncie v2 i odwrotnie.
-  Regresje: `server/api/tests/test_account_protocol_fence.py`,
+  Również `server/api/app/routers/study_shares.py` odrzuca stary PUT
+  gościa po przełączeniu właściciela. Regresje:
+  `server/api/tests/test_account_protocol_fence.py`,
+  `server/api/tests/test_share_protocol_fence.py`,
   `server/scripts/tests/test_stage13_canary_activation.py`.
   Runner Flutter E2E zakłada testowego właściciela v2 w disposable PostgreSQL.
 - `docs/ETAP_12_TESTS.md`: uruchomienie i otwarte kryteria. Testy
