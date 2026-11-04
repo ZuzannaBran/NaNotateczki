@@ -146,6 +146,158 @@ void main() {
     );
   });
 
+  test('verified Quill image is attached before its text atom', () {
+    final block = _text('\uFFFC').copyWith(
+      deltaJson: '[{"insert":{"image":"asset:embed-one"}}]',
+    );
+    final drafts = bridge.planPageChange(
+      before: _page(),
+      after: _page(texts: [block]),
+      verifiedAssets: {
+        'embed-one': const VerifiedEditorAsset(
+          assetId: 'embed-one',
+          sha256:
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          sizeBytes: 128,
+          mediaType: 'image/png',
+        ),
+      },
+    );
+    expect(drafts.map((draft) => draft.kind), [
+      OperationKind.objectCreate,
+      OperationKind.assetAttach,
+      OperationKind.textInsert,
+    ]);
+    final atoms = drafts.last.payload['atoms'] as List;
+    expect((atoms.single as Map)['embed'], {'image': 'asset:embed-one'});
+  });
+
+  test('repeated Quill asset references attach only once', () {
+    final block = _text('\uFFFC\uFFFC').copyWith(
+      deltaJson: '[{"insert":{"pdf":"asset:pdf-one"}},'
+          '{"insert":{"pdf":"asset:pdf-one"}}]',
+    );
+    final drafts = bridge.planPageChange(
+      before: _page(),
+      after: _page(texts: [block]),
+      verifiedAssets: {
+        'pdf-one': const VerifiedEditorAsset(
+          assetId: 'pdf-one',
+          sha256:
+              'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          sizeBytes: 256,
+          mediaType: 'application/pdf',
+        ),
+      },
+    );
+    expect(
+      drafts.where((draft) => draft.kind == OperationKind.assetAttach),
+      hasLength(1),
+    );
+    final atoms = drafts.last.payload['atoms'] as List;
+    expect(atoms, hasLength(2));
+  });
+
+  test('unverified or external Quill embeds fail closed', () {
+    final block = _text('\uFFFC').copyWith(
+      deltaJson: '[{"insert":{"image":"asset:missing"}}]',
+    );
+    expect(
+      () => bridge.planPageChange(
+        before: _page(),
+        after: _page(texts: [block]),
+      ),
+      throwsStateError,
+    );
+    expect(
+      () => bridge.planPageChange(
+        before: _page(),
+        after: _page(texts: [
+          block.copyWith(
+            deltaJson: '[{"insert":{"image":"https://example.org/x.png"}}]',
+          ),
+        ]),
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('Quill embed MIME cannot differ from verified file', () {
+    final block = _text('\uFFFC').copyWith(
+      deltaJson: '[{"insert":{"pdf":"asset:one"}}]',
+    );
+    expect(
+      () => bridge.planPageChange(
+        before: _page(),
+        after: _page(texts: [block]),
+        verifiedAssets: {
+          'one': const VerifiedEditorAsset(
+            assetId: 'one',
+            sha256:
+                'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            sizeBytes: 20,
+            mediaType: 'image/png',
+          ),
+        },
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('image replacement attaches, updates and detaches in order', () {
+    final original = _image();
+    final replacement = original.copyWith(
+      path: '/private/replaced.jpg',
+      imageMime: 'image/jpeg',
+    );
+    final drafts = bridge.planPageChange(
+      before: _page(images: [original]),
+      after: _page(images: [replacement]),
+      existingAssetIds: {'image-one': 'old-asset'},
+      verifiedAssets: {
+        'image-one': const VerifiedEditorAsset(
+          assetId: 'new-asset',
+          sha256:
+              'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+          sizeBytes: 200,
+          mediaType: 'image/jpeg',
+        ),
+      },
+    );
+    expect(drafts.map((draft) => draft.kind), [
+      OperationKind.assetAttach,
+      OperationKind.objectSet,
+      OperationKind.assetDetach,
+    ]);
+    expect(
+      (drafts[1].payload['properties'] as Map)['assetId'],
+      'new-asset',
+    );
+    expect(drafts.last.payload, {'assetId': 'old-asset'});
+  });
+
+  test('image replacement without prior asset identity is rejected', () {
+    final original = _image();
+    expect(
+      () => bridge.planPageChange(
+        before: _page(images: [original]),
+        after: _page(images: [
+          original.copyWith(path: '/private/replaced.jpg'),
+        ]),
+        verifiedAssets: {
+          'image-one': const VerifiedEditorAsset(
+            assetId: 'new-asset',
+            sha256:
+                'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+            sizeBytes: 200,
+            mediaType: 'image/jpeg',
+          ),
+        },
+      ),
+      throwsStateError,
+    );
+  });
+
   test('moving an image between pages preserves original identity', () {
     final image = _image();
     final action = MoveImageBetweenPagesAction(
