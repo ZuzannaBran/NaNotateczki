@@ -4,6 +4,8 @@ import 'package:drift/drift.dart';
 
 import '../drift/notes_database.dart';
 import 'operation_protocol.dart';
+import 'operation_store.dart';
+import 'operation_text_sequence.dart';
 import 'share_ink_edit_adapter.dart';
 
 /// Applies v2 page and ink operations to the production Drift tables.
@@ -12,13 +14,15 @@ import 'share_ink_edit_adapter.dart';
 /// [database] identical to the store's database. No legacy saveNotebook
 /// writer may mutate the same document while this projector is active.
 ///
-/// Text, media, cross-page moves, and document creation deliberately fail
-/// closed until their durable projection is implemented. This is not a
-/// production cutover switch.
+/// Media, cross-page moves and document creation deliberately fail closed
+/// until their durable projection is implemented. Quill embeds require a
+/// verified asset store and are refused here. This is not a cutover switch.
 class EditorSqliteProjector {
-  EditorSqliteProjector(this.database);
+  EditorSqliteProjector(this.database)
+      : _store = OperationStore(database);
 
   final NotesDatabase database;
+  final OperationStore _store;
   final ShareInkEditAdapter _ink = ShareInkEditAdapter();
 
   Future<void> apply(OperationEnvelope operation) async {
@@ -39,12 +43,23 @@ class EditorSqliteProjector {
         await _deletePage(operation);
       case OperationKind.strokeCreate:
         await _createStroke(operation);
+      case OperationKind.objectCreate:
+        await _createText(operation);
       case OperationKind.objectSet:
+        if (await _textRow(operation) != null) {
+          await _setText(operation);
+        } else {
+          await _updateStroke(operation);
+        }
       case OperationKind.objectTransform:
       case OperationKind.objectReorder:
         await _updateStroke(operation);
+      case OperationKind.textInsert:
+      case OperationKind.textDelete:
+      case OperationKind.textFormat:
+        await _applyText(operation);
       case OperationKind.objectDelete:
-        await _deleteStroke(operation);
+        await _deleteObject(operation);
       default:
         throw UnsupportedError(
           'No verified SQLite editor reducer for ${operation.kind.wireName}.',
@@ -294,12 +309,180 @@ class EditorSqliteProjector {
     );
   }
 
-  Future<void> _deleteStroke(OperationEnvelope op) async {
-    await _storedStroke(op);
-    await database.customStatement(
-      'DELETE FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
-      [op.objectId, op.pageId],
+  Future<void> _deleteObject(OperationEnvelope op) async {
+    await _pageExists(op, op.pageId!);
+    final ink = await _row(
+      'SELECT uid FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
+      [Variable<String>(op.objectId!), Variable<String>(op.pageId!)],
     );
+    if (ink != null) {
+      await database.customStatement(
+        'DELETE FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
+        [op.objectId, op.pageId],
+      );
+      return;
+    }
+    if (await _textRow(op) != null) {
+      await database.customStatement(
+        'DELETE FROM text_block_rows WHERE uid = ? AND page_uid = ?',
+        [op.objectId, op.pageId],
+      );
+      return;
+    }
+    throw StateError('Unsupported or missing object deletion target.');
+  }
+
+  Future<Map<String, dynamic>?> _textRow(OperationEnvelope op) => _row(
+    'SELECT text, delta_json, font_size, color_value, width, rotation, '
+    'dx, dy, sort_index FROM text_block_rows '
+    'WHERE uid = ? AND page_uid = ?',
+    [Variable<String>(op.objectId!), Variable<String>(op.pageId!)],
+  );
+
+  Future<void> _createText(OperationEnvelope op) async {
+    final pageId = op.pageId!;
+    await _pageExists(op, pageId);
+    await _objectIdUnused(op.objectId!);
+    final value = Map<String, dynamic>.from(op.payload['value'] as Map);
+    if (value['objectType'] != 'text') {
+      throw UnsupportedError('Only text object.create is supported.');
+    }
+    final fields = Map<String, dynamic>.from(value)..remove('objectType');
+    _validateTextGeometry(fields);
+    await database.customStatement(
+      'INSERT INTO text_block_rows '
+      '(uid, page_uid, text, delta_json, font_size, color_value, '
+      'width, rotation, dx, dy, sort_index) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        op.objectId,
+        pageId,
+        '',
+        null,
+        (fields['fontSize'] as num).toDouble(),
+        fields['colorValue'],
+        (fields['width'] as num).toDouble(),
+        (fields['rotation'] as num).toDouble(),
+        (fields['dx'] as num).toDouble(),
+        (fields['dy'] as num).toDouble(),
+        fields['sortIndex'],
+      ],
+    );
+  }
+
+  Future<void> _setText(OperationEnvelope op) async {
+    await _pageExists(op, op.pageId!);
+    final row = await _textRow(op);
+    if (row == null) {
+      throw StateError('Missing text object.');
+    }
+    final changes = Map<String, dynamic>.from(
+      op.payload['properties'] as Map,
+    );
+    if (changes.keys.any(
+      (key) => !const {
+        'fontSize',
+        'colorValue',
+        'width',
+        'rotation',
+        'dx',
+        'dy',
+        'sortIndex',
+      }.contains(key),
+    )) {
+      throw const FormatException('Unsupported text property update.');
+    }
+    final merged = <String, dynamic>{
+      'fontSize': row['font_size'],
+      'colorValue': row['color_value'],
+      'width': row['width'],
+      'rotation': row['rotation'],
+      'dx': row['dx'],
+      'dy': row['dy'],
+      'sortIndex': row['sort_index'],
+      ...changes,
+    };
+    _validateTextGeometry(merged);
+    await database.customStatement(
+      'UPDATE text_block_rows SET font_size = ?, color_value = ?, '
+      'width = ?, rotation = ?, dx = ?, dy = ?, sort_index = ? '
+      'WHERE uid = ? AND page_uid = ?',
+      [
+        (merged['fontSize'] as num).toDouble(),
+        merged['colorValue'],
+        (merged['width'] as num).toDouble(),
+        (merged['rotation'] as num).toDouble(),
+        (merged['dx'] as num).toDouble(),
+        (merged['dy'] as num).toDouble(),
+        merged['sortIndex'],
+        op.objectId,
+        op.pageId,
+      ],
+    );
+  }
+
+  Future<void> _applyText(OperationEnvelope op) async {
+    await _pageExists(op, op.pageId!);
+    final row = await _textRow(op);
+    if (row == null) {
+      throw StateError('Text CRDT operation requires a text object.');
+    }
+    if (op.kind == OperationKind.textInsert) {
+      for (final atom in op.payload['atoms'] as List) {
+        if ((atom as Map).containsKey('embed')) {
+          throw UnsupportedError('Quill embeds require an asset projector.');
+        }
+      }
+    }
+    final durable = await _store.textAtoms(
+      documentId: op.documentId,
+      pageId: op.pageId!,
+      objectId: op.objectId!,
+    );
+    final previousText = OperationTextSequence.render(durable).trimRight();
+    if (row['text'] != previousText) {
+      throw StateError('The text projection is not at its durable frontier.');
+    }
+    final updated = OperationTextSequence.apply(durable, op);
+    final text = OperationTextSequence.render(updated).trimRight();
+    await database.customStatement(
+      'UPDATE text_block_rows SET text = ?, delta_json = ? '
+      'WHERE uid = ? AND page_uid = ?',
+      [
+        text,
+        jsonEncode(OperationTextSequence.renderDelta(updated)),
+        op.objectId,
+        op.pageId,
+      ],
+    );
+  }
+
+  static void _validateTextGeometry(Map<String, dynamic> fields) {
+    if (fields.keys.length != 7 ||
+        fields.keys.any(
+          (key) => !const {
+            'fontSize',
+            'colorValue',
+            'width',
+            'rotation',
+            'dx',
+            'dy',
+            'sortIndex',
+          }.contains(key),
+        ) ||
+        fields['colorValue'] is! int ||
+        (fields['colorValue'] as int) < 0 ||
+        (fields['colorValue'] as int) > 0xFFFFFFFF) {
+      throw const FormatException('Invalid text geometry.');
+    }
+    for (final key in ['fontSize', 'width', 'rotation', 'dx', 'dy']) {
+      final value = fields[key];
+      if (value is! num || !value.toDouble().isFinite ||
+          (const {'fontSize', 'width'}.contains(key) && value <= 0)) {
+        throw const FormatException('Invalid text geometry.');
+      }
+    }
+    _index(fields['sortIndex']);
   }
 
   static int _index(Object? value) {
