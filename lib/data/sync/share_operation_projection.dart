@@ -160,12 +160,7 @@ class ShareOperationProjection {
         throw StateError('Destination identity is occupied.');
       }
       final nextObject = Map<String, dynamic>.from(moved);
-      _merge(
-        nextObject,
-        {'sortIndex': sortIndex},
-        op,
-        force: optimistic,
-      );
+      _merge(nextObject, {'sortIndex': sortIndex}, op, force: optimistic);
       objects.remove(objectId);
       destinationObjects[objectId] = nextObject;
       nextDestination['objects'] = destinationObjects;
@@ -352,10 +347,8 @@ class ShareOperationProjection {
 /// Invalid concurrent local edits remain in the outbox as unresolved intents.
 /// A server response is never allowed to silently delete an unacknowledged op.
 class PendingShareProjection {
-  PendingShareProjection(
-    this.confirmed, {
-    Set<String>? verifiedAssetDigests,
-  }) : verifiedAssets = verifiedAssetDigests ?? <String>{};
+  PendingShareProjection(this.confirmed, {Set<String>? verifiedAssetDigests})
+    : verifiedAssets = verifiedAssetDigests ?? <String>{};
 
   ShareOperationProjection confirmed;
 
@@ -368,6 +361,7 @@ class PendingShareProjection {
     }
     verifiedAssets.add(digest);
   }
+
   final LinkedHashMap<String, OperationEnvelope> pending =
       LinkedHashMap<String, OperationEnvelope>();
   final Map<String, String> unresolved = <String, String>{};
