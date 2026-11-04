@@ -483,6 +483,19 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   nieuruchomione scenariusze E2E. Etap 6 dodaje konkretne reduktory
   edytora/Share, etap 11 przełącza istniejące dokumenty.
 
+### Dokończenie kontraktu v2 (2026-11-04, etap 2 w toku)
+
+- `operation_protocol.dart`: `text.format` i `object.move`; walidacja
+  atrybutów Quill oraz tożsamości strony docelowej.
+- `operation_text_sequence.dart`: deterministyczny CRDT atrybutów per atom,
+  `renderDelta`, obsługa usuwania stylu przez `null`.
+- `share_text_edit_adapter.dart`: konwersja pełnych snapshotów Delta na
+  `text.insert/delete/format` (embedy wymagają jeszcze transportu assetów).
+- Testy: `test/operation_protocol_test.dart`,
+  `test/operation_text_sequence_test.dart`,
+  `test/share_text_edit_adapter_test.dart`.
+- v1 pozostaje aktywny; ten kod nie oznacza cutover edytora.
+
 ### Share v2 — przyrostowe operacje (etap 6, opt-in)
 
 - `lib/data/sync/share_operation_projection.dart`: `ShareOperationProjection`

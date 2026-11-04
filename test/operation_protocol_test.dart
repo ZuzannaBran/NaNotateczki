@@ -292,4 +292,77 @@ void main() {
       throwsFormatException,
     );
   });
+  test('v2 cross-page moves validate exact destination and order', () {
+    final valid = OperationEnvelope(
+      operationId: firstId,
+      actorId: 'device-a',
+      actorSeq: 1,
+      documentId: 'document',
+      pageId: 'source',
+      objectId: 'ink',
+      kind: OperationKind.objectMove,
+      payload: {'toPageId': 'destination', 'sortIndex': 1},
+      dependencies: const [],
+      logicalClock: 1,
+    );
+    expect(valid.validateForV2Projection, returnsNormally);
+    for (final payload in [
+      {'toPageId': 'source', 'sortIndex': 1},
+      {'toPageId': 'destination', 'sortIndex': -1},
+      {'toPageId': 'destination', 'sortIndex': 1, 'extra': 'unsafe'},
+    ]) {
+      expect(
+        () => OperationEnvelope.validateV2Payload(
+          kind: OperationKind.objectMove,
+          documentId: 'document',
+          pageId: 'source',
+          objectId: 'ink',
+          payload: payload,
+        ),
+        throwsFormatException,
+      );
+    }
+  });
+
+  test('v2 validates rich text atom attributes and format edits', () {
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.textInsert,
+        documentId: 'document',
+        objectId: 'text',
+        payload: {
+          'afterAtomId': null,
+          'atoms': [
+            {'id': firstId, 'text': 'A', 'attributes': {'bold': true}},
+          ],
+        },
+      ),
+      returnsNormally,
+    );
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.textFormat,
+        documentId: 'document',
+        objectId: 'text',
+        payload: {
+          'atomIds': [firstId],
+          'attributes': {'bold': null},
+        },
+      ),
+      returnsNormally,
+    );
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.textFormat,
+        documentId: 'document',
+        objectId: 'text',
+        payload: {
+          'atomIds': [firstId],
+          'attributes': {'invalid': <int>[1]},
+        },
+      ),
+      throwsFormatException,
+    );
+  });
+
 }

@@ -237,4 +237,55 @@ void main() {
       throwsFormatException,
     );
   });
+  test('concurrent Quill formatting converges and keeps unrelated keys', () {
+    final original = textOperation(
+      operationId: firstId,
+      actorId: 'origin',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'X'},
+        ],
+      },
+    );
+    final initial = OperationTextSequence.apply({}, original);
+    final bold = textOperation(
+      operationId: secondId,
+      actorId: 'alice',
+      kind: OperationKind.textFormat,
+      logicalClock: 15,
+      payload: {
+        'atomIds': [firstId],
+        'attributes': {'bold': true, 'color': 'red'},
+      },
+    );
+    final color = textOperation(
+      operationId: thirdId,
+      actorId: 'zed',
+      kind: OperationKind.textFormat,
+      logicalClock: 15,
+      payload: {
+        'atomIds': [firstId],
+        'attributes': {'color': 'blue'},
+      },
+    );
+    final forward = OperationTextSequence.apply(
+      OperationTextSequence.apply(initial, bold),
+      color,
+    );
+    final reverse = OperationTextSequence.apply(
+      OperationTextSequence.apply(initial, color),
+      bold,
+    );
+    expect(forward, reverse);
+    expect(OperationTextSequence.renderDelta(forward), [
+      {
+        'insert': 'X',
+        'attributes': {'bold': true, 'color': 'blue'},
+      },
+    ]);
+    expect(OperationTextSequence.render(initial), 'X');
+  });
+
 }

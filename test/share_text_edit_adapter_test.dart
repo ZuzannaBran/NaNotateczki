@@ -65,13 +65,22 @@ void main() {
     expect(adapter.plan(atoms: current, newText: 'unchanged'), isEmpty);
   });
 
-  test('rich formatting and legacy text chunks fail closed', () {
+  test('Quill deltas and legacy text chunks are handled safely', () {
     final adapter = ShareTextEditAdapter();
+    final formatted = adapter.plan(
+      atoms: {},
+      newText: 'rich',
+      changedDeltaJson: '[{"insert":"rich","attributes":{"bold":true}}]',
+    );
+    final formattedAtoms = applyPlan({}, formatted);
+    expect(OperationTextSequence.renderDelta(formattedAtoms), [
+      {'insert': 'rich', 'attributes': {'bold': true}},
+    ]);
     expect(
       () => adapter.plan(
         atoms: {},
-        newText: 'rich',
-        changedDeltaJson: '[{"insert":"rich"}]',
+        newText: 'a',
+        changedDeltaJson: '[{"insert":{"image":"unverified"}}]',
       ),
       throwsUnsupportedError,
     );
@@ -128,4 +137,57 @@ void main() {
     state = applyPlan(state, changes);
     expect(OperationTextSequence.render(state), replacement);
   });
+  test('Quill format changes preserve atom IDs and can be undone', () {
+    final adapter = ShareTextEditAdapter();
+    final plain = applyPlan({}, adapter.plan(atoms: {}, newText: 'Hello'));
+    final initialIds = OperationTextSequence.visibleIds(plain);
+    final bold = adapter.plan(
+      atoms: plain,
+      newText: 'Hello',
+      changedDeltaJson:
+          '[{"insert":"He","attributes":{"bold":true}},'
+          '{"insert":"llo"}]',
+    );
+    expect(bold.map((item) => item.kind).toSet(),
+        {OperationKind.textFormat});
+    final styled = applyPlan(plain, bold);
+    expect(OperationTextSequence.visibleIds(styled), initialIds);
+    expect(OperationTextSequence.renderDelta(styled), [
+      {'insert': 'He', 'attributes': {'bold': true}},
+      {'insert': 'llo'},
+    ]);
+    final undo = adapter.plan(
+      atoms: styled,
+      newText: 'Hello',
+      changedDeltaJson: '[{"insert":"Hello"}]',
+    );
+    expect(undo, isNotEmpty);
+    expect(OperationTextSequence.renderDelta(applyPlan(styled, undo)), [
+      {'insert': 'Hello'},
+    ]);
+  });
+
+  test('Quill formatting preserves emoji and rejects mismatched text', () {
+    final adapter = ShareTextEditAdapter();
+    final plan = adapter.plan(
+      atoms: {},
+      newText: 'A😀',
+      changedDeltaJson:
+          '[{"insert":"A"},{"insert":"😀","attributes":{"italic":true}}]',
+    );
+    final state = applyPlan({}, plan);
+    expect(OperationTextSequence.renderDelta(state), [
+      {'insert': 'A'},
+      {'insert': '😀', 'attributes': {'italic': true}},
+    ]);
+    expect(
+      () => adapter.plan(
+        atoms: state,
+        newText: 'A🦊',
+        changedDeltaJson: '[{"insert":"A😀"}]',
+      ),
+      throwsFormatException,
+    );
+  });
+
 }
