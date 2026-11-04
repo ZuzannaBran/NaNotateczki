@@ -52,6 +52,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       _openScopedDatabase();
   StorageNamespace? _namespace;
   bool _switchingNamespace = false;
+  Object? _namespaceSwitchFailure;
   NotebookRepository? _repository;
   LocalBackupService? _backupService;
   CloudSyncService? _cloudSync;
@@ -133,7 +134,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (next == null || _namespace == next) {
       return;
     }
-    _switchingNamespace = true;
+    setState(() {
+      _switchingNamespace = true;
+      _namespaceSwitchFailure = null;
+    });
     try {
       await _quiesceAccountWriters();
       if (mounted) {
@@ -143,8 +147,34 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       AppErrorLog.instance.record(
         error, stackTrace, source: 'AppScope.namespaceSwitch',
       );
-      _switchingNamespace = false;
+      if (mounted) {
+        setState(() {
+          _switchingNamespace = false;
+          _namespaceSwitchFailure = error;
+        });
+      }
     }
+  }
+
+  Widget _namespaceGuardedLibrary() {
+    return Consumer<AccountSessionController>(
+      builder: (context, session, _) {
+        final expected = session.isSignedIn
+            ? StorageNamespace.account(session.userId!)
+            : session.preferredMode == AccountDataMode.localOnly
+                ? StorageNamespace.local()
+                : _namespace;
+        if (_namespaceSwitchFailure != null) {
+          return _StartupErrorScreen(error: _namespaceSwitchFailure!);
+        }
+        if (_switchingNamespace || expected != _namespace) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return const LibraryScreen();
+      },
+    );
   }
 
   @override
@@ -871,7 +901,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             scrollBehavior: const AppScrollBehavior(),
             title: 'NaNotateczki',
             theme: AppTheme.light(),
-            home: const LibraryScreen(),
+            home: _namespaceGuardedLibrary(),
             builder: (context, child) {
               return Consumer<AppPreferencesController>(
                 builder: (context, preferences, _) {
