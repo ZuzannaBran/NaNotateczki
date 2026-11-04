@@ -145,6 +145,7 @@ class EditorController extends ChangeNotifier {
   Timer? _notebookSaveDebounce;
   final Set<String> _dirtyPageIds = <String>{};
   final Map<String, Set<String>> _expectedRemovedIdsByPage = {};
+  final Set<String> _expectedRemovedPageIds = {};
   bool _fullSavePending = false;
   bool _integritySaveBlocked = false;
   bool _isDisposed = false;
@@ -1739,6 +1740,7 @@ class EditorController extends ChangeNotifier {
     _undoActions.removeWhere(referencesRemovedPage);
     _redoActions.removeWhere(referencesRemovedPage);
     _notifyHistoryChanged();
+    _expectedRemovedPageIds.add(removedPageId);
     pages = pages.take(pages.length - 1).toList();
     currentPageIndex = currentPageIndex.clamp(0, pages.length - 1).toInt();
     activeTextBlockId = null;
@@ -3336,6 +3338,7 @@ class EditorController extends ChangeNotifier {
     final expectedRemoved = _pendingExpectedRemovals({
       for (final page in savedPages) page.id,
     });
+    final expectedRemovedPages = Set<String>.of(_expectedRemovedPageIds);
     final updated = notebook.copyWith(
       pages: savedPages,
       updatedAt: DateTime.now(),
@@ -3345,9 +3348,11 @@ class EditorController extends ChangeNotifier {
         updated,
         preserveMetadata: true,
         expectedRemovedIdsByPage: expectedRemoved,
+        expectedRemovedPageIds: expectedRemovedPages,
       );
       if (saved) {
         _clearSavedExpectedRemovals(expectedRemoved);
+        _expectedRemovedPageIds.removeAll(expectedRemovedPages);
       }
       if (saved && identical(pages, savedPages)) {
         _fullSavePending = false;
