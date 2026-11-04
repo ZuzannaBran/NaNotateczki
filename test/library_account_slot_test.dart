@@ -394,9 +394,11 @@ void main() {
       final uploadsBeforeLogout = remoteBackupService.calls;
       remoteBackupService.failNextUpload = true;
       await tester.tap(find.byKey(const ValueKey('account-logout')));
-      for (var i = 0;
-          i < 100 && find.text('Account sync not complete').evaluate().isEmpty;
-          i++) {
+      for (
+        var i = 0;
+        i < 100 && find.text('Account sync not complete').evaluate().isEmpty;
+        i++
+      ) {
         await tester.pump(const Duration(milliseconds: 10));
       }
       expect(find.text('Account sync not complete'), findsOneWidget);
