@@ -22,19 +22,26 @@ void main() {
   }
 
   test('upload verifies digest, length and MIME before attach', () async {
-    final gateway = OperationAssetGateway(clientFor((request) async {
-      expect(request.method, 'PUT');
-      expect(request.url.path, '/v2/assets/$digest');
-      expect(request.bodyBytes, png);
-      expect(request.headers['authorization'], 'Bearer owner-token');
-      return http.Response(jsonEncode({
-        'sha256': digest,
-        'sizeBytes': png.length,
-        'mediaType': 'image/png',
-      }), 200);
-    }));
+    final gateway = OperationAssetGateway(
+      clientFor((request) async {
+        expect(request.method, 'PUT');
+        expect(request.url.path, '/v2/assets/$digest');
+        expect(request.bodyBytes, png);
+        expect(request.headers['authorization'], 'Bearer owner-token');
+        return http.Response(
+          jsonEncode({
+            'sha256': digest,
+            'sizeBytes': png.length,
+            'mediaType': 'image/png',
+          }),
+          200,
+        );
+      }),
+    );
     final payload = await gateway.upload(
-      assetId: 'image-1', bytes: png, mediaType: 'image/png',
+      assetId: 'image-1',
+      bytes: png,
+      mediaType: 'image/png',
     );
     expect(payload, {
       'assetId': 'image-1',
@@ -45,30 +52,37 @@ void main() {
   });
 
   test('wrong server checksum prevents an asset attach', () async {
-    final gateway = OperationAssetGateway(clientFor((_) async {
-      return http.Response(jsonEncode({
-        'sha256': List.filled(64, '0').join(),
-        'sizeBytes': png.length,
-        'mediaType': 'image/png',
-      }), 200);
-    }));
-    await expectLater(gateway.upload(
-      assetId: 'image-1', bytes: png, mediaType: 'image/png',
-    ), throwsFormatException);
+    final gateway = OperationAssetGateway(
+      clientFor((_) async {
+        return http.Response(
+          jsonEncode({
+            'sha256': List.filled(64, '0').join(),
+            'sizeBytes': png.length,
+            'mediaType': 'image/png',
+          }),
+          200,
+        );
+      }),
+    );
+    await expectLater(
+      gateway.upload(assetId: 'image-1', bytes: png, mediaType: 'image/png'),
+      throwsFormatException,
+    );
   });
 
   test('download verifies the bytes and rejects corruption', () async {
     var corrupt = false;
-    final gateway = OperationAssetGateway(clientFor((_) async {
-      return http.Response.bytes(corrupt ? <int>[1, 2] : png, 200);
-    }));
-    expect(await gateway.download(
-      sha256: digest, sizeBytes: png.length,
-    ), png);
+    final gateway = OperationAssetGateway(
+      clientFor((_) async {
+        return http.Response.bytes(corrupt ? <int>[1, 2] : png, 200);
+      }),
+    );
+    expect(await gateway.download(sha256: digest, sizeBytes: png.length), png);
     corrupt = true;
-    await expectLater(gateway.download(
-      sha256: digest, sizeBytes: png.length,
-    ), throwsFormatException);
+    await expectLater(
+      gateway.download(sha256: digest, sizeBytes: png.length),
+      throwsFormatException,
+    );
   });
 
   test('guest assets use share ticket and scoped header', () async {
@@ -79,20 +93,30 @@ void main() {
       httpClient: MockClient((request) async {
         expect(request.headers['authorization'], 'Bearer $ticket');
         expect(request.headers['x-share-id'], shareId);
-        return http.Response(jsonEncode({
-          'sha256': digest,
-          'sizeBytes': png.length,
-          'mediaType': 'image/png',
-        }), 200);
+        return http.Response(
+          jsonEncode({
+            'sha256': digest,
+            'sizeBytes': png.length,
+            'mediaType': 'image/png',
+          }),
+          200,
+        );
       }),
     );
     addTearDown(api.close);
     final gateway = OperationAssetGateway(
-      api, shareId: shareId, guestTicket: ticket,
+      api,
+      shareId: shareId,
+      guestTicket: ticket,
     );
-    expect((await gateway.upload(
-      assetId: 'image-1', bytes: png, mediaType: 'image/png',
-    ))['sha256'], digest);
+    expect(
+      (await gateway.upload(
+        assetId: 'image-1',
+        bytes: png,
+        mediaType: 'image/png',
+      ))['sha256'],
+      digest,
+    );
   });
 
   test('invalid size, MIME and ticket fail before request', () async {
@@ -102,15 +126,18 @@ void main() {
       return http.Response('{}', 200);
     });
     final gateway = OperationAssetGateway(client);
-    await expectLater(gateway.upload(
-      assetId: 'bad', bytes: [], mediaType: 'image/png',
-    ), throwsArgumentError);
-    await expectLater(gateway.upload(
-      assetId: 'bad', bytes: png, mediaType: 'text/html',
-    ), throwsArgumentError);
+    await expectLater(
+      gateway.upload(assetId: 'bad', bytes: [], mediaType: 'image/png'),
+      throwsArgumentError,
+    );
+    await expectLater(
+      gateway.upload(assetId: 'bad', bytes: png, mediaType: 'text/html'),
+      throwsArgumentError,
+    );
     expect(called, isFalse);
-    expect(() => OperationAssetGateway(
-      client, shareId: 'one',
-    ), throwsArgumentError);
+    expect(
+      () => OperationAssetGateway(client, shareId: 'one'),
+      throwsArgumentError,
+    );
   });
 }
