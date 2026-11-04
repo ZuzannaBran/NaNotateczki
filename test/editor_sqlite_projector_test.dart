@@ -414,6 +414,29 @@ void main() {
         },
       ),
     ]);
+    final pendingBefore = await store.pending();
+    await database.customStatement(
+      'UPDATE text_block_rows SET delta_json = ? WHERE uid = ?',
+      ['[{"insert":"A","attributes":{"bold":true}}]', 'text-one'],
+    );
+    await expectLater(
+      write([
+        LocalOperationDraft(
+          kind: OperationKind.textFormat,
+          pageId: pageId,
+          objectId: 'text-one',
+          payload: const {
+            'atomIds': [atom],
+            'attributes': {'italic': true},
+          },
+        ),
+      ]),
+      throwsStateError,
+    );
+    expect(await store.pending(), hasLength(pendingBefore.length));
+    final result = (await notebooks.getNotebook(documentId))!;
+    expect(result.pages.single.textBlocks.single.text, 'A');
+    expect(result.pages.single.textBlocks.single.deltaJson, contains('bold'));
   });
 
   test('the last page cannot be removed through v2', () async {
