@@ -2574,3 +2574,13 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   SyncEngine, ShareOperationProjection i importery legacy muszą zostać
   zachowane. Nie usuwać v1, timera, debounce ani lustra backendu
   przed pełną migracją namespace + E2E + odcięciem starych klientów.
+
+- Kanoniczny serwer: `scripts/stage14-reset-test-account-v2.sh` —
+  atomowy destrukcyjny reset wyłącznie wskazanego konta testowego,
+  bez zmiany jego loginu i hasła. Guardy API na v2 blokują stare
+  mutacje settings/planner/share/backup. Lustro czterech zmienionych
+  routerów jest zgodne z repo kanonicznym. Regresje serwerowe:
+  `scripts/tests/test_stage14_reset_test_account.py`,
+  `api/tests/test_stage14_reset_legacy_write_fences.py`.
+  Bez pełnego przełączenia edytora Flutter na SyncEngine
+  reset pozwala jedynie na próby API v2, nie na użytkowanie aplikacji.
