@@ -53,7 +53,7 @@ void main() {
         },
         OperationKind.assetAttach => <String, dynamic>{
           'assetId': 'image',
-          'sha256': 'a' * 64,
+          'sha256': List.filled(64, 'a').join(),
           'sizeBytes': 10,
           'mediaType': 'image/png',
         },

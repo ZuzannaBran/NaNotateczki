@@ -85,7 +85,7 @@ void main() {
         newText: 'a',
         changedDeltaJson: '[{"insert":{"image":"unverified"}}]',
       ),
-      throwsUnsupportedError,
+      throwsFormatException,
     );
     final initial = OperationTextSequence.apply(
       {},

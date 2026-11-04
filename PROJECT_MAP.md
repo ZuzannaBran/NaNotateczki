@@ -2637,12 +2637,20 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `lib/data/sync/operation_text_sequence.dart`: CRDT Quill,
   formatowanie per atom i `renderDelta`.
 - `lib/data/sync/share_text_edit_adapter.dart`: planowanie intentów
-  tekstowych ze snapshotów Delta Quill. Osadzone embedy fail-closed.
+  tekstowych ze snapshotów Delta Quill. Osadzone obrazy i PDF reprezentowane
+  jako atomy `U+FFFC` z kanonicznym `asset:<assetId>`. Wstawienie wymaga
+  wcześniejszego `asset.attach` i zgodnego MIME; zewnętrzne URL są odrzucane.
+  `asset.detach` nie usuwa assetu, dopóki widoczny embed go używa.
 - `lib/data/sync/operation_asset_gateway.dart`: osobny upload i download
   plików z kontrolą SHA-256, rozmiaru i zakresu uprawnień Share.
 - `test/operation_asset_gateway_test.dart`: kontrola uploadu, pobrania,
-  błędów integralności i uprawnień; `test/operation_protocol_test.dart`:
-  walidacja metadanych assetu.
+  błędów integralności i uprawnień; `test/operation_protocol_test.dart`,
+  `test/operation_text_sequence_test.dart`,
+  `test/share_text_edit_adapter_test.dart`,
+  `test/share_operation_projection_test.dart`: walidacja embedów,
+  odtwarzanie Delta, zmiana obrazu/PDF, odmowa niepowiązanego assetu;
+  `test/operation_ordering_test.dart`: operacje specjalizowane nie
+  przechodzą przez rejestr prostych właściwości.
 - Backend kanoniczny: `NaNotateczki-serwer/api/app/asset_store.py`,
   `routers/assets.py`, `operation_projection.py` oraz
   `migrations/0014_verified_assets.sql`. Katalog `server/` to lustro.
