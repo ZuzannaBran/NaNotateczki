@@ -736,7 +736,11 @@ ponownie, a niskopoziomowa serializacja odrzuca próbę utrwalenia eraser-stroke
 `NotebookRepositoryChange` rozróżnia pełną zmianę, zmianę konkretnych page IDs
 i zmianę samych metadanych, dzięki czemu scheduler może uruchomić backup v6
 tylko dla właściwych stron. Repozytorium udostępnia też oczekiwanie na
-wszystkie trwające zapisy per UID. Atomowe przywracanie i import respektują
+wszystkie trwające zapisy per UID. `registerOperationWriter` i
+`unregisterOperationWriter` rezerwują UID dla edytora v2; stare
+saveNotebook/saveNotebookPages, import/restore, metadane i delete
+odmawiają modyfikacji zajętego dokumentu. Nie zastępuje to
+serwerowej blokady protokołu. Atomowe przywracanie i import respektują
 parametr `notifyChanges`, zgłaszając zmianę dopiero po zatwierdzeniu.
 Ręczny eksport pozostaje samowystarczalny
 i zachowuje obrazy inline.
@@ -1330,9 +1334,10 @@ tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 oraz `writeNotebookChange` — atomowy wsad wielostronicowy.
 Odrzuca przenoszenie obiektu między stronami bez `object.move`,
 zmianę kolejności stron oraz edycję z nieaktualnym Delta Quill.
-Adapter pozostaje opt-in, nadal nieprzekazany do
-produkcyjnego `EditorController`; brak bezpiecznej obsługi Undo/Redo v2,
-assetów i zdalnego rebase. Nie przełączać `AppScope` na ten writer.
+Adapter jest podłączony jako opt-in do `EditorController`, ale
+nie jest aktywowany przez produkcyjny `AppScope`. W trybie v2
+Undo/Redo jest celowo wyłączone do czasu inverse intents i remint ID.
+Nie wspiera pełnego transferu assetów ani zdalnego rebase.
 Test: `test/editor_v2_operation_writer_test.dart`.
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
@@ -1361,7 +1366,12 @@ W aktywnej wspólnej sesji zapis skończonego gestu nie czeka dodatkowych
 Rejestruje się w `AppSaveCoordinator`;
 `flushPendingSaves` commit'uje aktywną edycję tekstu, anuluje debounce,
 czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
-zgodą na zamknięcie aplikacji. Nowo wstawiony lub wklejony tekst i obraz
+zgodą na zamknięcie aplikacji. Opcjonalny `operationWriter` kieruje
+zapis wyłącznie do v2 z serializacją zmian i utrwaloną bazą stanu;
+`NotebookRepository` blokuje wtedy legacy snapshot writery na tym UID.
+Undo/Redo w trybie v2 pozostaje zablokowane, aby nie odtworzyć tombstone.
+Regresja: `test/editor_controller_v2_test.dart`.
+Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
 tuszem i tekstem; aktywny obraz można wskazać i transformować wyłącznie w
