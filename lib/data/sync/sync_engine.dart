@@ -94,6 +94,10 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   int _generation = 0;
   int _failures = 0;
   final Map<String, int> _actorFailures = {};
+  // A cursor may replay a committed remote operation after a later gap.
+  // Keep successful UI deliveries within this engine session idempotent.
+  final Set<String> _notifiedRemoteOperations = <String>{};
+  static const _maxRememberedUiOperations = 4096;
   Future<void>? _active;
   Timer? _poll;
   Timer? _debounce;
@@ -214,6 +218,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     _retry = null;
     _retryDueAt = null;
     _socketRetry = null;
+    _notifiedRemoteOperations.clear();
     final subscription = _socketSubscription;
     _socketSubscription = null;
     await subscription?.cancel();
@@ -346,8 +351,18 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
           // replay; the UI must never be mutated inside a rollbackable write.
           // ACKed local operations are also echoes and must not repaint.
           if (!queuedEcho &&
-              !await store.isLocalOperation(item.operation.operationId)) {
+              !await store.isLocalOperation(item.operation.operationId) &&
+              !_notifiedRemoteOperations.contains(item.operation.operationId)) {
             await onRemoteCommitted?.call(item.operation);
+            if (onRemoteCommitted != null) {
+              _notifiedRemoteOperations.add(item.operation.operationId);
+              if (_notifiedRemoteOperations.length >
+                  _maxRememberedUiOperations) {
+                _notifiedRemoteOperations.remove(
+                  _notifiedRemoteOperations.first,
+                );
+              }
+            }
           }
           if (!_isActive(generation)) {
             return;
