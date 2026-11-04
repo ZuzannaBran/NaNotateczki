@@ -439,6 +439,98 @@ void main() {
     expect(result.pages.single.textBlocks.single.deltaJson, contains('bold'));
   });
 
+  test('v2 page deletion cannot orphan a stored image asset', () async {
+    const target = 'asset-page';
+    await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageCreate,
+        objectId: target,
+        payload: {
+          'value': {'title': 'Assets', 'isBookmarked': false},
+        },
+      ),
+    ]);
+    await database.customStatement(
+      'INSERT INTO image_block_rows '
+      '(uid, page_uid, path, ocr_text, width, height, rotation, dx, dy, '
+      'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        'media-one', target, '/private/asset.pdf', '',
+        100.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0,
+      ],
+    );
+    final queued = await store.pending();
+    await expectLater(
+      write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageDelete,
+          objectId: target,
+          payload: {},
+        ),
+      ]),
+      throwsUnsupportedError,
+    );
+    expect(await store.pending(), hasLength(queued.length));
+    expect(
+      await database.customSelect(
+        'SELECT uid FROM page_rows WHERE uid = ?',
+        variables: [const Variable<String>(target)],
+      ).get(),
+      hasLength(1),
+    );
+    expect(
+      await database.customSelect(
+        'SELECT uid FROM image_block_rows WHERE uid = ?',
+        variables: [const Variable<String>('media-one')],
+      ).get(),
+      hasLength(1),
+    );
+  });
+
+  test('v2 page deletion cannot orphan a Quill embed', () async {
+    const target = 'embed-page';
+    await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageCreate,
+        objectId: target,
+        payload: {
+          'value': {'title': 'Embeds', 'isBookmarked': false},
+        },
+      ),
+    ]);
+    await database.customStatement(
+      'INSERT INTO text_block_rows '
+      '(uid, page_uid, text, delta_json, font_size, color_value, '
+      'width, rotation, dx, dy, sort_index) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        'quill-one', target, '\uFFFC',
+        '[{"insert":{"image":"asset:asset-one"}}]',
+        18.0, 0xFF000000, 120.0, 0.0, 0.0, 0.0, 0,
+      ],
+    );
+    final queued = await store.pending();
+    await expectLater(
+      write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageDelete,
+          objectId: target,
+          payload: {},
+        ),
+      ]),
+      throwsUnsupportedError,
+    );
+    expect(await store.pending(), hasLength(queued.length));
+    expect(
+      await database.customSelect(
+        'SELECT uid FROM text_block_rows WHERE uid = ?',
+        variables: [const Variable<String>('quill-one')],
+      ).get(),
+      hasLength(1),
+    );
+  });
+
   test('the last page cannot be removed through v2', () async {
     await expectLater(
       write([
