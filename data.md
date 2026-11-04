@@ -459,9 +459,15 @@ bezpośrednio w istniejących tabelach Drift w transakcji `OperationStore`.
 z `operations` (zależności i atomowe tombstones nie są kompaktowane).
 `EditorV2OperationWriter` spina `EditorOperationBridge` z
 `SyncEngine.writeLocalBatch`, wymagając tej samej instancji bazy.
+`EditorController(operationWriter: ...)` wybiera go opcjonalnie
+zamiast wywołań legacy saveNotebook/saveNotebookPages. Kontroler
+utrzymuje potwierdzony baseline i serializuje zapisy; repozytorium
+rezerwuje UID za pomocą `registerOperationWriter` i blokuje stare
+snapshoty, import, restore, metadata i delete na zajętym UID.
+W opt-in v2 Undo/Redo jest wyłączone (brak inverse intents).
 Nie obsługuje jeszcze zweryfikowanych assetów, Quill embedów,
-cross-page moves, zakładania dokumentów v2 ani rebase konfliktów
-na obiektach i dlatego nie jest używany przez `EditorController`.
+cross-page moves, zakładania dokumentów v2 ani rebase konfliktów.
+Produkcja nadal nie przekazuje do `EditorController` tego writera.
 Wielokrotne odczytywanie atomów z pełnego dziennika ma ograniczenie
 wydajnościowe; wymagane będą sprawdzone checkpointy tekstu.
 Ta implementacja nie daje zgody na uruchomienie v2 dla kont produkcyjnych.
