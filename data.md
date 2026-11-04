@@ -103,11 +103,10 @@ testów na Linux/Web/Android/iOS; to nie jest jeszcze gwarancja działania.
 
 ## Docelowe zasady migracji Local → konto (jeszcze NIE wdrożone)
 
-Obecna implementacja nadal wykorzystuje wspólne `notes.sqlite` i klucze
-plików `localOnly`/konta, automatycznie wywołuje `mergeSafely` po loginie.
-Nie wolno uznawać tej implementacji za bezpieczną separację. Przed nowym
-flow logowania konieczna jest osobna przestrzeń danych dla Local i każdego
-konta oraz atomowa migracja poprzedniego magazynu.
+Dla wyczyszczonych instalacji Local i każde konto mają odrębne SQLite
+oraz pliki/klucze Web. Na logowaniu nie jest już automatycznie mieszany
+lokalny notatnik z kontem; stara migracja dla instalacji z danymi nadal
+wymaga jawnej, atomowej decyzji i konwersji (jeszcze niedostępna).
 
 Przy pierwszym logowaniu użytkownik wybiera, czy zachować całość Local
 w izolacji, czy **skopiować** dane do konta. Izolacja pozostawia Local
@@ -702,11 +701,10 @@ IndexedDB dla każdej przestrzeni. `StorageNamespaceManager` unieważnia
 opóźnione odpowiedzi sieciowe i po nieudanym przełączeniu pozostaje
 nieaktywny, zamiast ujawniać niepełne dane jako prawidłową bibliotekę.
 
-**Uwaga:** `AppScope` nadal otwiera jedną, dotychczasową bazę `notes.sqlite`,
-a `AccountSessionController` ogranicza logowanie do pierwotnie przypisanego
-konta. Bez bezpiecznej migracji z etapu 11 **nie wolno aktywować** oddzielnych
-magazynów w ścieżce logowania, automatycznie kopiować danych Local ani
-wyłączać istniejącego ograniczenia.
+**Uwaga:** `AppScope` dla czystych instalacji otwiera odrębne namespace
+Local i każdego konta. Starsze dane z katalogu głównego nie są importowane.
+Automatyczne kopiowanie Local do konta pozostaje zabronione do czasu
+wdrożenia jawnego importu i weryfikacji danych.
 
 Serwer `NaNotateczki-serwer/main` udostępnia opt-in
 `/v2/planner/entries` (migracja `0011_planner_revisions.sql`):
@@ -771,8 +769,8 @@ Narzędzie `scripts/stage13-activate-empty-canary.sh` działa jedynie dla
 zupełnie pustego konta testowego przy wyłączonym API.
 
 Nie istnieje jeszcze produkcyjna migracja istniejących dokumentów v1,
-assetów, checkpointów oraz lokalnego outboxu do v2. `AppScope` nadal
-otwiera wspólną bazę i używa `LiveWebSyncService`, więc pełna izolacja
-Local/A/B i przełączenie silnika pozostają otwartymi blokadami.
+assetów, checkpointów oraz lokalnego outboxu do v2. `AppScope` otwiera już odrębne magazyny dla czystych instalacji, ale
+wciąż używa `LiveWebSyncService` v1. Przełączenie silnika operacyjnego,
+Share v2 i aktywny import Local do konta pozostają otwartymi blokadami.
 NIE uruchamiać tego narzędzia na realnych danych i nie używać starej
 wersji API po aktywacji konta v2.

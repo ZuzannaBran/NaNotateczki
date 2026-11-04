@@ -5,8 +5,8 @@ Nie jest to potwierdzenie produkcyjnej migracji.
 
 ## Powód blokady
 
-- docs/ETAP_11_MIGRATION.md: dane są staged-not-activated;
-  AppScope i Web nadal korzystają z legacy storage.
+- docs/ETAP_11_MIGRATION.md: czyste instalacje są odizolowane Local/konto,
+  ale historyczne stagingi nie są aktywowane i nie mają bezstratnego importu.
 - docs/ETAP_12_TESTS.md: pełne E2E, gesty Share i testy platformowe
   wciąż wymagają rzeczywistego wykonania.
 - Kanoniczny backend NaNotateczki-serwer/main i jego
@@ -17,6 +17,19 @@ Nie jest to potwierdzenie produkcyjnej migracji.
   Legacy nie jest więc martwym kodem.
 
 ## Dodatkowa decyzja: dane testowe można usunąć
+
+Pełny reset PostgreSQL oraz serwerowego `data/` został potwierdzony
+w logu użytkownika (2026-11-04). `scripts/reset-all-test-data.sh`
+ponownie nałożył migracje 0001–0013 i uruchomił API, DB oraz Caddy.
+Reset nie wyczyścił automatycznie danych lokalnych urządzeń.
+
+Dla wyczyszczonych instalacji w `NaNotateczki/dev` wdrożono izolowany
+bootstrap `local/`, `accounts/<hash>/` i prefiksy Web IndexedDB/localStorage.
+Zmiana konta zatrzymuje legacy writery, fluszuje i odtwarza provider tree.
+Guest Share ma własny klucz outbox per link. Regresje dodano, nieuruchomione.
+To **nie kończy przełączenia operacji v2**: Quill, assety/PDF oraz pełna
+projekcja notebooka nadal nie mają produkcyjnego writera v2.
+
 
 Zamiast pełnego replay danych v1 przygotowano na kanonicznym backendzie
 skrypt `scripts/stage14-reset-test-account-v2.sh`, kasujący atomowo dane

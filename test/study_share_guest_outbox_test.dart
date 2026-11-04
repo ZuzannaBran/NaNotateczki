@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:program/core/storage/storage_namespace_manager.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/sync/study_share_guest_outbox.dart';
 
 void main() {
   final storage = <String, String>{};
+  final guestKey = StorageNamespace.share('session-a', 'legacy-web-guest')
+      .fileKey('outbox.json');
 
   setUp(() {
     storage.clear();
@@ -43,6 +46,8 @@ void main() {
     expect(reopened.baseNotebook, base);
     expect(reopened.notebook, changed);
     expect(await StudyShareGuestOutbox('session-b').read(), isNull);
+    expect(storage.keys.single, startsWith('shares/'));
+    expect(storage.keys.single, endsWith('/outbox.json'));
     await first.clear();
     expect(await first.read(), isNull);
   });
@@ -63,7 +68,7 @@ void main() {
     'storage write failures propagate without deleting earlier data',
     () async {
       final outbox = StudyShareGuestOutbox('session-a');
-      storage['study_share_guest_outbox_v1_session-a'] = 'previous';
+      storage[guestKey] = 'previous';
       textStorageWriteOverride = (_, _) async {
         throw StateError('storage quota exceeded');
       };
@@ -77,15 +82,15 @@ void main() {
         ),
         throwsStateError,
       );
-      expect(storage['study_share_guest_outbox_v1_session-a'], 'previous');
+      expect(storage[guestKey], 'previous');
     },
   );
 
   test('malformed snapshots are never silently accepted', () async {
     final outbox = StudyShareGuestOutbox('session-a');
-    storage['study_share_guest_outbox_v1_session-a'] = '{"version":1}';
+    storage[guestKey] = '{"version":1}';
     await expectLater(outbox.read(), throwsFormatException);
-    storage['study_share_guest_outbox_v1_session-a'] = 'not-json';
+    storage[guestKey] = 'not-json';
     await expectLater(outbox.read(), throwsFormatException);
   });
   test('recovered guest delta retains the last visible merge base', () async {

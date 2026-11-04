@@ -159,6 +159,8 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   pliki Local/konta i klucze Web przed bootstrapem AppScope.
 - `lib/app/notes_app.dart`: odbudowuje AppScope po bezpiecznym
   przełączeniu tożsamości; osobna baza per konto.
+- `lib/data/sync/study_share_guest_outbox.dart`: odizolowany per share
+  klucz na guest draft, nadal legacy v1; nie aktywuje Share v2.
 - `test/active_storage_namespace_test.dart`: izolacja i fail-closed profilu.
 
 
