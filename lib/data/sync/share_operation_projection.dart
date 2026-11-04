@@ -261,6 +261,39 @@ class ShareOperationProjection {
     return ShareOperationProjection._(next, deleted);
   }
 
+  /// Stable canvas z-order regardless of JSON or SQLite map key ordering.
+  List<String> orderedObjectIds(String pageId) {
+    final pages = document?['pages'];
+    if (pages is! Map) {
+      return const <String>[];
+    }
+    final page = pages[pageId];
+    if (page == null) {
+      return const <String>[];
+    }
+    if (page is! Map || page['objects'] is! Map) {
+      throw const FormatException('Invalid page object collection.');
+    }
+    final objects = page['objects'] as Map;
+    int rank(String id) {
+      final node = objects[id];
+      if (node is! Map || node['properties'] is! Map) {
+        throw const FormatException('Invalid projected object.');
+      }
+      final order = (node['properties'] as Map)['sortIndex'] ?? 0;
+      if (order is! int || order < 0 || order >= 1000000) {
+        throw const FormatException('Invalid object z-order.');
+      }
+      return order;
+    }
+    final ids = objects.keys.cast<String>().toList();
+    ids.sort((a, b) {
+      final comparison = rank(a).compareTo(rank(b));
+      return comparison != 0 ? comparison : a.compareTo(b);
+    });
+    return ids;
+  }
+
   static Map<String, dynamic> _newNode() => {
     'properties': <String, dynamic>{},
     'versions': <String, dynamic>{},
