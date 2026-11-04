@@ -12,7 +12,9 @@ import '../core/error/app_error_log.dart';
 import '../core/input/app_preferences_controller.dart';
 import '../core/input/app_scroll_behavior.dart';
 import '../core/input/ink_activity_tracker.dart';
+import '../core/storage/active_storage_namespace.dart';
 import '../core/storage/app_save_coordinator.dart';
+import '../core/storage/storage_namespace_manager.dart';
 import '../core/storage/shutdown_coordinator.dart';
 import '../core/storage/text_storage.dart';
 import '../core/theme/app_theme.dart';
@@ -37,14 +39,19 @@ import '../features/notebook/domain/notebook.dart';
 import '../features/planner/state/study_planner_controller.dart';
 
 class AppScope extends StatefulWidget {
-  const AppScope({super.key});
+  const AppScope({super.key, required this.onNamespaceSwitch});
+
+  final VoidCallback onNamespaceSwitch;
 
   @override
   State<AppScope> createState() => _AppScopeState();
 }
 
 class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
-  late final Future<DatabaseOpenResult> _openFuture = NotesDatabase.open();
+  late final Future<DatabaseOpenResult> _openFuture =
+      _openScopedDatabase();
+  StorageNamespace? _namespace;
+  bool _switchingNamespace = false;
   NotebookRepository? _repository;
   LocalBackupService? _backupService;
   CloudSyncService? _cloudSync;
@@ -82,6 +89,56 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   Future<void>? _exitDrain;
   bool _allowExit = false;
   bool _openErrorRecorded = false;
+
+  Future<DatabaseOpenResult> _openScopedDatabase() async {
+    final profile = await readStoredText(
+      AccountSessionController.profileStorageKey,
+    );
+    final namespace = ActiveStorageNamespace.fromProfile(profile);
+    _namespace = namespace;
+    ActiveStorageNamespace.activate(namespace);
+    return NotesDatabase.open(
+      databaseName: kIsWeb
+          ? namespace.webDatabaseName
+          : namespace.nativeDatabaseName,
+    );
+  }
+
+  Future<void> _switchNamespaceIfNeeded() async {
+    final session = _accountSession;
+    if (session == null || !session.profileLoaded || session.isBusy ||
+        _switchingNamespace) {
+      return;
+    }
+    final next = session.isSignedIn
+        ? StorageNamespace.account(session.userId!)
+        : session.preferredMode == AccountDataMode.localOnly
+            ? StorageNamespace.local()
+            : _namespace;
+    if (next == null || _namespace == next) {
+      return;
+    }
+    _switchingNamespace = true;
+    try {
+      await AppSaveCoordinator.instance.flushPending();
+      await _repository?.waitForPendingSaves();
+      await _backupScheduler?.flushForExit();
+      await _backupService?.waitUntilIdle();
+      await waitForPendingTextStorageOperations();
+      await _liveSync?.stop();
+      _plannerSync?.stop();
+      _accountSettingsSync?.stop();
+      await _remoteBackupScheduler?.stop();
+      if (mounted) {
+        widget.onNamespaceSwitch();
+      }
+    } catch (error, stackTrace) {
+      AppErrorLog.instance.record(
+        error, stackTrace, source: 'AppScope.namespaceSwitch',
+      );
+      _switchingNamespace = false;
+    }
+  }
 
   @override
   void initState() {
@@ -129,6 +186,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     _diagnosticsUpload?.dispose();
     _accountSession?.dispose();
     _apiClient?.close();
+    unawaited(_openFuture.then((opened) => opened.database.close()));
     final backupService = _backupService;
     if (backupService != null) {
       unawaited(backupService.dispose());
@@ -454,6 +512,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         session == null ||
         !session.isSignedIn ||
         session.isBusy ||
+        _switchingNamespace ||
+        _namespace != StorageNamespace.account(session.userId!) ||
         backup == null ||
         scheduler == null ||
         sync == null ||
@@ -605,7 +665,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               onChanged: (changes) {
                 _backupScheduler?.schedule(changes: changes);
                 _remoteBackupScheduler?.markDirty();
-                _liveSync?.enqueue(changes);
+                final signedInUser = _accountSession?.userId;
+                if (signedInUser != null &&
+                    _legacyProtocolReadyUser == signedInUser &&
+                    _namespace == StorageNamespace.account(signedInUser)) {
+                  _liveSync?.enqueue(changes);
+                }
                 if (changes.isEmpty) {
                   // Folder, cover and task metadata live in library_folders.
                   _scheduleAccountSettingsSync();
@@ -731,9 +796,19 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           );
           accountSession.addListener(() {
             _updateActivityWakePermission(accountSession);
-            if (accountSession.isSignedIn && !accountSession.isBusy) {
-              unawaited(_startAccountSync());
-            } else if (!accountSession.isSignedIn) {
+            if (accountSession.profileLoaded && !accountSession.isBusy) {
+              final target = accountSession.isSignedIn
+                  ? StorageNamespace.account(accountSession.userId!)
+                  : accountSession.preferredMode == AccountDataMode.localOnly
+                      ? StorageNamespace.local()
+                      : _namespace;
+              if (target != _namespace) {
+                unawaited(_switchNamespaceIfNeeded());
+              } else if (accountSession.isSignedIn) {
+                unawaited(_startAccountSync());
+              }
+            }
+            if (!accountSession.isSignedIn) {
               _bootstrappedAccount = null;
               _legacyProtocolReadyUser = null;
               _clockCheckedForUser = null;

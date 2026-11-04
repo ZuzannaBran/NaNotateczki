@@ -155,13 +155,6 @@ class AccountSessionController extends ChangeNotifier {
         'The password must contain 8 to 128 characters.',
       );
     }
-    if (lastAccountUsername != null &&
-        lastAccountUsername != normalizedUsername) {
-      throw StateError(
-        'This device already contains another account library. '
-        'Use a separate browser profile or app installation.',
-      );
-    }
     _sessionGeneration++;
     isBusy = true;
     error = null;
@@ -178,14 +171,9 @@ class AccountSessionController extends ChangeNotifier {
         throw const FormatException('Malformed account identity response.');
       }
       final incomingUserId = incoming['userId'] as String;
-      if (_boundUserId != null && _boundUserId != incomingUserId) {
-        throw StateError(
-          'This device already contains another account library. '
-          'Use a separate browser profile or app installation.',
-        );
-      }
       _applySession(incoming);
-      _boundUserId ??= incomingUserId;
+      // Account namespaces are isolated; an explicit new login selects its own.
+      _boundUserId = incomingUserId;
       preferredMode = AccountDataMode.account;
       onboardingComplete = true;
       lastAccountUsername = normalizedUsername;
