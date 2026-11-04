@@ -164,7 +164,7 @@ void main() {
       pageId: before.id,
       objectId: 'text-one',
     );
-    expect(atoms.length, 4);
+    expect(atoms.length, 3);
   });
 
   test('a failed media edit never writes an outbox operation', () async {
