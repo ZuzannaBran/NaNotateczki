@@ -46,6 +46,65 @@ void main() {
     expect(incidents, isEmpty);
   });
 
+  test('undo and redo keep the original page across navigation', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final source = await repository.createNotebook();
+    final editor = EditorController(repository: repository, notebook: source);
+    addTearDown(editor.dispose);
+
+    final firstId = editor.currentPage.id;
+    editor.addPage();
+    final secondId = editor.currentPage.id;
+    await editor.flushPendingSaves();
+    editor.addInkStroke(const [
+      InkPoint(dx: 20, dy: 30, pressure: 0.5),
+    ]);
+    await editor.flushPendingSaves();
+
+    editor.setCurrentPage(0);
+    editor.undo();
+    expect(editor.currentPage.id, secondId);
+    expect(editor.pages.first.inkStrokes, isEmpty);
+    expect(editor.pages.last.inkStrokes, isEmpty);
+
+    editor.setCurrentPage(0);
+    editor.redo();
+    expect(editor.currentPage.id, secondId);
+    expect(editor.pages.first.id, firstId);
+    expect(editor.pages.first.inkStrokes, isEmpty);
+    expect(editor.pages.last.inkStrokes, hasLength(1));
+    await editor.flushPendingSaves();
+
+    final saved = await repository.getNotebook(source.uid);
+    expect(saved?.pages.first.inkStrokes, isEmpty);
+    expect(saved?.pages.last.inkStrokes, hasLength(1));
+  });
+
+  test('deleting a page invalidates its undo history', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final source = await repository.createNotebook();
+    final editor = EditorController(repository: repository, notebook: source);
+    addTearDown(editor.dispose);
+
+    editor.addPage();
+    editor.addInkStroke(const [
+      InkPoint(dx: 6, dy: 7, pressure: 0.5),
+    ]);
+    expect(editor.canUndo, isTrue);
+    editor.deleteLastPage();
+    expect(editor.canUndo, isFalse);
+    expect(editor.canRedo, isFalse);
+    expect(editor.pages, hasLength(1));
+    await editor.flushPendingSaves();
+
+    final saved = await repository.getNotebook(source.uid);
+    expect(saved?.pages, hasLength(1));
+  });
+
   test('image deletion does not produce a false data-loss incident', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
