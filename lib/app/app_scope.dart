@@ -104,6 +104,21 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _quiesceAccountWriters() async {
+    await AppSaveCoordinator.instance.flushPending();
+    await _repository?.waitForPendingSaves();
+    await _backupScheduler?.flushForExit();
+    await _backupService?.waitUntilIdle();
+    await SharedRecentColors.load();
+    await waitForPendingTextStorageOperations();
+    await _liveSync?.stop();
+    _plannerSync?.stop();
+    _accountSettingsSync?.stop();
+    await _remoteBackupScheduler?.stop();
+    _bootstrappedAccount = null;
+    _legacyProtocolReadyUser = null;
+  }
+
   Future<void> _switchNamespaceIfNeeded() async {
     final session = _accountSession;
     if (session == null || !session.profileLoaded || session.isBusy ||
@@ -120,16 +135,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
     _switchingNamespace = true;
     try {
-      await AppSaveCoordinator.instance.flushPending();
-      await _repository?.waitForPendingSaves();
-      await _backupScheduler?.flushForExit();
-      await _backupService?.waitUntilIdle();
-      await SharedRecentColors.load();
-      await waitForPendingTextStorageOperations();
-      await _liveSync?.stop();
-      _plannerSync?.stop();
-      _accountSettingsSync?.stop();
-      await _remoteBackupScheduler?.stop();
+      await _quiesceAccountWriters();
       if (mounted) {
         widget.onNamespaceSwitch?.call();
       }
@@ -695,6 +701,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               onBeforeAccountRestore: () {
                 _activityWake?.setEnabled(true);
               },
+              onBeforeAccountChange: _quiesceAccountWriters,
             );
         _accountSession = accountSession;
         _diagnosticsUpload ??= DiagnosticsUploadService(
@@ -805,6 +812,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                       ? StorageNamespace.local()
                       : _namespace;
               if (target != _namespace) {
+                _remoteBackupScheduler?.disable();
+                _settingsPoll?.cancel();
+                _settingsDebounce?.cancel();
+                _plannerDebounce?.cancel();
                 unawaited(_switchNamespaceIfNeeded());
               } else if (accountSession.isSignedIn) {
                 unawaited(_startAccountSync());

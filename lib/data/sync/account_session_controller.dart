@@ -14,6 +14,7 @@ class AccountSessionController extends ChangeNotifier {
     this.apiClient, {
     AccountCredentialStore? credentialStore,
     this.onBeforeAccountRestore,
+    this.onBeforeAccountChange,
   }) : _credentialStore =
            credentialStore ?? const SecureAccountCredentialStore();
 
@@ -21,6 +22,7 @@ class AccountSessionController extends ChangeNotifier {
 
   final ApiClient apiClient;
   final VoidCallback? onBeforeAccountRestore;
+  final Future<void> Function()? onBeforeAccountChange;
   final AccountCredentialStore _credentialStore;
   Future<void> _credentialQueue = Future<void>.value();
   int _sessionGeneration = 0;
@@ -160,6 +162,8 @@ class AccountSessionController extends ChangeNotifier {
     error = null;
     _notifyIfActive();
     try {
+      // The old account must stop all writers before the API identity changes.
+      await onBeforeAccountChange?.call();
       final response = await apiClient.postJson(path, {
         'username': normalizedUsername,
         'password': password,
