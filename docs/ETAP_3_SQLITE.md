@@ -158,15 +158,25 @@ Nie były wykonane w środowisku bez SDK Flutter/Dart.
 **Granice:** projektor odrzuca `image/pdf`, embedy Quill,
 `asset.attach/detach`, `document.create`, `object.move` i inne
 niewspierane mutacje. Nie zapewnia jeszcze uzgodnień LWW per pole ani
-rebase przy jednoczesnych edycjach. `EditorV2OperationWriter` nie
-jest wpięty do produkcyjnego `EditorController`. Undo/Redo v2 wymaga
-osobnego odwzorowania inverse intents oraz nowych identyfikatorów przy
-tombstone; nie można po prostu odtworzyć usuniętego UID.
+rebase przy jednoczesnych edycjach. `EditorController` ma teraz
+opcjonalny parametr `operationWriter`; jeśli został podany, `_save`,
+`_saveDirtyPages` i flush używają wyłącznie kolejki operacyjnej v2
+z utrwalonym baseline, bez wywołania `saveNotebook` ani
+`saveNotebookPages`. `NotebookRepository.registerOperationWriter`
+rezerwuje UID na czas pracy kontrolera i blokuje legacy writery,
+import, restore, metadata i delete na zajętym dokumencie. Zwolnienie
+własności następuje dopiero po opróżnieniu kolejki przy dispose.
+Regresja: `test/editor_controller_v2_test.dart`.
+W trybie opt-in Undo/Redo jest celowo wyłączone; wymaga osobnego
+odwzorowania inverse intents oraz nowych identyfikatorów przy
+tombstone. Nie wolno po prostu odtworzyć usuniętego UID.
 
 To NIE jest produkcyjny cutover. Aktywne konto nadal zapisuje v1.
-Przed przełączeniem należy zakończyć obsługę assetów, przekazanie wszystkich
-akcji `EditorController`, bezpieczny Undo/Redo, synchronizację remote z
-rebase, migrację dokumentów/outboxu, wsparcie platform i testy E2E.
+Przed przełączeniem należy zakończyć obsługę assetów, pokrycie
+wszystkich działań `EditorController`, bezpieczny Undo/Redo,
+remote sync z rebase/LWW, aktualizację metadanych dokumentów oraz
+powiadamianie UI/backupu po v2 commit, migrację dokumentów/outboxu,
+wsparcie platform i testy E2E.
 Nie wolno włączać jednocześnie writerów v1 i v2 ani usuwać snapshotowego
 zapisu przed zakończeniem tych prac.
 
