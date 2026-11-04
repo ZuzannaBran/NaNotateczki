@@ -400,7 +400,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - `lib/data/sync/operation_protocol.dart`: `OperationEnvelope` i
   `OperationKind` definiują wersjonowany format operacji. Stabilne ID,
-  aktor, sekwencja, zależności i licznik logiczny. Bez mieszania stanu
+  aktor, sekwencja, zależności i licznik logiczny. UUID wymagają
+  dokładnie 36 znaków (także przy zależnościach, Undo i atomach tekstu),
+  bez akceptowania końcowego znaku nowej linii. Bez mieszania stanu
   widoku z treścią. Test: `test/operation_protocol_test.dart`.
 - `server/api/tests/test_dart_python_operation_contract.py`: uruchamiany w
   CI aplikacji test zgodności nazw, targetów i ograniczeń protokołu
