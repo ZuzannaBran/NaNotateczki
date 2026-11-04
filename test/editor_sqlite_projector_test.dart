@@ -219,6 +219,136 @@ void main() {
     expect((await store.pending()), hasLength(1));
   });
 
+  test('Quill text remains recoverable from journal atoms', () async {
+    const atomA = '11111111-1111-4111-8111-111111111111';
+    const atomB = '22222222-2222-4222-8222-222222222222';
+    const atomNewline = '33333333-3333-4333-8333-333333333333';
+    final committed = await write([
+      LocalOperationDraft(
+        kind: OperationKind.objectCreate,
+        pageId: pageId,
+        objectId: 'text-one',
+        payload: const {
+          'value': {
+            'objectType': 'text',
+            'dx': 12.0,
+            'dy': 14.0,
+            'width': 200.0,
+            'fontSize': 18.0,
+            'rotation': 0.0,
+            'colorValue': 0xFF222222,
+            'sortIndex': 0,
+          },
+        },
+      ),
+      LocalOperationDraft(
+        kind: OperationKind.textInsert,
+        pageId: pageId,
+        objectId: 'text-one',
+        payload: const {
+          'afterAtomId': null,
+          'atoms': [
+            {'id': atomA, 'text': 'H', 'attributes': {'bold': true}},
+            {'id': atomB, 'text': 'i', 'attributes': {'bold': true}},
+            {'id': atomNewline, 'text': '\n'},
+          ],
+        },
+      ),
+    ]);
+    expect(committed, hasLength(2));
+    final saved = await notebooks.getNotebook(documentId);
+    expect(saved?.pages.single.textBlocks.single.text, 'Hi');
+    expect(saved?.pages.single.textBlocks.single.deltaJson, contains('bold'));
+
+    final durable = await store.textAtoms(
+      documentId: documentId,
+      pageId: pageId,
+      objectId: 'text-one',
+    );
+    expect(durable, hasLength(3));
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.textFormat,
+        pageId: pageId,
+        objectId: 'text-one',
+        payload: const {
+          'atomIds': [atomA, atomB],
+          'attributes': {'bold': null, 'italic': true},
+        },
+      ),
+      LocalOperationDraft(
+        kind: OperationKind.textDelete,
+        pageId: pageId,
+        objectId: 'text-one',
+        payload: const {
+          'atomIds': [atomA],
+        },
+      ),
+    ]);
+    final changed = (await notebooks.getNotebook(documentId))!
+        .pages.single.textBlocks.single;
+    expect(changed.text, 'i');
+    expect(changed.deltaJson, contains('italic'));
+    expect(changed.deltaJson, isNot(contains('"bold":true')));
+    expect(
+      await store.textAtoms(
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'text-one',
+      ),
+      hasLength(3),
+    );
+  });
+
+  test('invalid text gesture rolls back atom history and SQLite', () async {
+    await expectLater(
+      write([
+        const LocalOperationDraft(
+          kind: OperationKind.objectCreate,
+          pageId: 'wrong-page',
+          objectId: 'text-one',
+          payload: {
+            'value': {
+              'objectType': 'text',
+              'dx': 1.0,
+              'dy': 1.0,
+              'width': 100.0,
+              'fontSize': 18.0,
+              'rotation': 0.0,
+              'colorValue': 0xFF000000,
+              'sortIndex': 0,
+            },
+          },
+        ),
+      ]),
+      throwsStateError,
+    );
+    expect(await store.pending(), isEmpty);
+    expect(
+      await store.textAtoms(
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'text-one',
+      ),
+      isEmpty,
+    );
+  });
+
+  test('the last page cannot be removed through v2', () async {
+    await expectLater(
+      write([
+        LocalOperationDraft(
+          kind: OperationKind.pageDelete,
+          objectId: pageId,
+          payload: const {},
+        ),
+      ]),
+      throwsStateError,
+    );
+    expect((await notebooks.getNotebook(documentId))?.pages, hasLength(1));
+    expect(await store.pending(), isEmpty);
+  });
+
   test('committed ink and outbox survive restarting SQLite', () async {
     final directory = await Directory.systemTemp.createTemp(
       'nanotateczki-v2-projector-',
