@@ -16,6 +16,26 @@ Nie jest to potwierdzenie produkcyjnej migracji.
   i rewizje v1. SyncEngine v2 i ShareOperationProjection są opt-in.
   Legacy nie jest więc martwym kodem.
 
+## Dodatkowa decyzja: dane testowe można usunąć
+
+Zamiast pełnego replay danych v1 przygotowano na kanonicznym backendzie
+skrypt `scripts/stage14-reset-test-account-v2.sh`, kasujący atomowo dane
+wyłącznie wskazanego konta testowego po potwierdzeniu UUID, loginu,
+wyłączeniu API i wykonaniu backupu. Zachowuje login i hasło, usuwa
+serwerowe kolejki i dodaje marker v2. Odmawia resetu konta już na v2.
+Dodatkowo wszystkie stare mutacje ustawień, planera, Share i backupu
+zostały zablokowane dla kont v2 i odzwierciedlone w lustrze `server/`.
+Testy: `scripts/tests/test_stage14_reset_test_account.py` oraz
+`api/tests/test_stage14_reset_legacy_write_fences.py`.
+
+Nie wykonano skryptu na produkcji; brak identyfikatora konta i dostępu
+do terminala serwera. Reset eliminuje koszt konwersji starych notatek,
+ale **nie** zastępuje integracji SyncEngine v2 z Flutterem,
+assetami, formatowaniem Quill i Share. Przed nią konto po resecie
+może służyć do testów API v2, nie do normalnej pracy w aplikacji.
+Instrukcja administratora: kanoniczny serwer
+`docs/STAGE14_TEST_RESET_PL.md`.
+
 ## Wykonane bezpieczne porządki
 
 1. Naprawiono błędny delimiter SQL w kanonicznym
