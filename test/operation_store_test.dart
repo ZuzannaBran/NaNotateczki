@@ -291,7 +291,7 @@ void main() {
     'a tombstone on page one does not delete the same ID on page two',
     () async {
       final first = await add('same-id');
-      await store.writeLocal(
+      final deleted = await store.writeLocal(
         actorId: 'device-one',
         documentId: 'document-one',
         pageId: 'page-one',
@@ -329,7 +329,8 @@ void main() {
         },
         apply: (_) async {},
       );
-      expect(anotherPage.dependencies, contains(first.operationId));
+      expect(anotherPage.dependencies, contains(deleted.operationId));
+      expect(anotherPage.dependencies, isNot(contains(first.operationId)));
     },
   );
 
@@ -513,7 +514,7 @@ void main() {
 
     final upgraded = NotesDatabase(NativeDatabase(file));
     final upgradedStore = OperationStore(upgraded);
-    expect(upgraded.schemaVersion, 5);
+    expect(upgraded.schemaVersion, 6);
     expect(
       (await upgradedStore.pending()).single.operationId,
       original.operationId,
@@ -596,7 +597,7 @@ void main() {
         ),
         isFalse,
       );
-      expect(upgraded.schemaVersion, 5);
+      expect(upgraded.schemaVersion, 6);
     } finally {
       await upgraded.close();
     }
@@ -652,7 +653,7 @@ void main() {
           )
           .getSingle();
       expect(operations.read<String>('name'), 'operations');
-      expect(upgraded.schemaVersion, 5);
+      expect(upgraded.schemaVersion, 6);
     } finally {
       await upgraded.close();
     }

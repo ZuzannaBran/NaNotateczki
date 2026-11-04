@@ -406,10 +406,8 @@ void main() {
       expect(docs, hasLength(2));
       final copy = docs.singleWhere((note) => note.title == 'Tasks (1)');
       final library = jsonDecode(stored['library_folders.json']!);
-      expect(
-        library['folders'],
-        containsAll(['Local folder', 'Backup folder']),
-      );
+      expect(library['folders'], contains('Local folder'));
+      expect(library['folders'], isNot(contains('Backup folder')));
       expect(library['plannerTasks'][planner.uid].single['title'], 'Local');
       expect(library['plannerTasks'][copy.uid].single['title'], 'Backup');
     },

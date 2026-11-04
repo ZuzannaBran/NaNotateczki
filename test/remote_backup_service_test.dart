@@ -113,6 +113,7 @@ void main() {
   );
 
   test('unacknowledged operations cannot enter a checkpoint backup', () async {
+    textStorageReadOverride = (_) async => null;
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);

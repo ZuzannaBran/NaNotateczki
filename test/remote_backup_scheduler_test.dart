@@ -201,9 +201,12 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
 
-    final exit = scheduler.ensureVerifiedForExit();
+    final exitExpectation = expectLater(
+      scheduler.ensureVerifiedForExit(),
+      throwsStateError,
+    );
     await tester.pump(const Duration(milliseconds: 2));
-    await expectLater(exit, throwsStateError);
+    await exitExpectation;
     expect(scheduler.hasPendingBackup, isTrue);
     expect(scheduler.lastVerifiedBackup, isNull);
 

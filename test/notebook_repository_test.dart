@@ -487,7 +487,7 @@ void main() {
     },
   );
 
-  test('saveNotebookPages rolls back when replacing a page fails', () async {
+  test('saveNotebookPages rolls back when a stroke insert fails', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -506,6 +506,10 @@ void main() {
     final broken = notebook.copyWith(
       pages: [brokenPage],
       updatedAt: notebook.updatedAt.add(const Duration(seconds: 1)),
+    );
+    await database.customStatement(
+      'CREATE TRIGGER refuse_stroke_insert BEFORE INSERT ON ink_stroke_rows '
+      "BEGIN SELECT RAISE(ABORT, 'forced stroke write failure'); END",
     );
 
     await expectLater(

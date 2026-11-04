@@ -197,10 +197,12 @@ void main() {
       sync.setSharedDocumentUid(initial.uid);
       sync.setSharedRemoteApplyGuard(initial.uid, () => canApply);
 
-      final hostOne = initial.copyWith(
-        pages: [initial.pages.single.copyWith(title: 'Host 1')],
+      final currentHost = (await repository.getNotebook(initial.uid))!;
+      final hostOne = currentHost.copyWith(
+        updatedAt: currentHost.updatedAt.add(const Duration(seconds: 1)),
+        pages: [currentHost.pages.single.copyWith(title: 'Host 1')],
       );
-      await repository.saveNotebook(hostOne);
+      expect(await repository.saveNotebook(hostOne), isTrue);
       sync.enqueue([NotebookRepositoryChange.full(initial.uid)]);
       await sync.syncNow();
       expect(sync.lastError, isNull);
@@ -209,9 +211,10 @@ void main() {
       expect(visible.pages.single.isBookmarked, isFalse);
 
       final hostTwo = visible.copyWith(
+        updatedAt: visible.updatedAt.add(const Duration(seconds: 1)),
         pages: [visible.pages.single.copyWith(title: 'Host 2')],
       );
-      await repository.saveNotebook(hostTwo);
+      expect(await repository.saveNotebook(hostTwo), isTrue);
       sync.enqueue([NotebookRepositoryChange.full(initial.uid)]);
       await sync.syncNow();
       expect(sync.lastError, isNull);

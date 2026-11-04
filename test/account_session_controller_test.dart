@@ -759,6 +759,7 @@ void main() {
   });
 
   test('legacy account name is not a barrier with isolated storage', () async {
+    textStorageWriteOverride = (_, _) async {};
     textStorageReadOverride = (key) async {
       if (key != AccountSessionController.profileStorageKey) {
         return null;

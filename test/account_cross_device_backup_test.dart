@@ -118,6 +118,9 @@ void main() {
             downloads++;
             return http.Response.bytes(bytes!, 200);
           }
+          if (request.url.path == '/v1/planner/entries') {
+            return http.Response('{"entries":[]}', 200);
+          }
           if (request.url.path == '/v1/sync/bootstrap') {
             return http.Response(
               jsonEncode({'cursor': bootstrapCursor, 'notebooks': []}),
@@ -257,6 +260,12 @@ void main() {
             }),
             200,
           );
+        }
+        if (request.url.path == '/v1/planner/entries') {
+          return http.Response('{"entries":[]}', 200);
+        }
+        if (request.url.path == '/v1/sync/bootstrap') {
+          return http.Response('{"cursor":0,"notebooks":[]}', 200);
         }
         if (request.url.path.endsWith('/download')) {
           final id = request.url.pathSegments[2];
