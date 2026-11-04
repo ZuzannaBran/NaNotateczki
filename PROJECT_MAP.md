@@ -402,6 +402,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `OperationKind` definiują wersjonowany format operacji. Stabilne ID,
   aktor, sekwencja, zależności i licznik logiczny. Bez mieszania stanu
   widoku z treścią. Test: `test/operation_protocol_test.dart`.
+- `server/api/tests/test_dart_python_operation_contract.py`: uruchamiany w
+  CI aplikacji test zgodności nazw, targetów i ograniczeń protokołu
+  Flutter/Python, sprawdza rzeczywisty model Python bez atrap.
 - Kanoniczny opis i reguły payloadu:
   `NaNotateczki-serwer/docs/OPERATION_PROTOCOL_V1.md`.
   Walidacja v2 dopuszcza puste `value`, odrzuca nadmiarowe pola payloadu,
