@@ -439,8 +439,23 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Snapshot jest blokowany, jeśli cofa potwierdzony kursor ACK albo
   istniejący checkpoint snapshotu.
   Zależności są weryfikowane jako należące do tego samego dokumentu. Projekcja
-  wywołującego musi używać tej samej bazy Drift. Nie jest jeszcze wpięty
-  we wszystkie legacy ścieżki `saveNotebook` (etap 5).
+  wywołującego musi używać tej samej bazy Drift. `textAtoms`
+  rekonstruuje trwały stan Quill CRDT z zaakceptowanych operacji w SQLite,
+  w kolejności ich zatwierdzenia; przed checkpoints obowiązuje limit
+  50000 operacji na obiekt tekstowy (fail-closed). Nadal nie obejmuje
+  legacy ścieżek `saveNotebook` (etap 5).
+- `lib/data/sync/editor_sqlite_projector.dart`:
+  `EditorSqliteProjector.apply` mutuje w tej samej transakcji istniejące
+  tabele Drift. Obsługuje create/set/delete stron (z ochroną ostatniej)
+  i ink (create/style/transform/reorder/delete), tekstowe object.create,
+  geometrię, plain-text Quill CRDT insert/delete/format oraz usunięcia
+  bloków tekstowych. Rzutowanie atomów korzysta z `OperationStore.textAtoms`.
+  Nie wspiera jeszcze obrazów/PDF, embedów, document.create, object.move,
+  conflict rebase; takie operacje są odrzucane zamiast zapisywać częściowy
+  niepoprawny stan. Ten projektor jest wyłącznie opt-in i nigdy nie należy
+  używać go równolegle z legacy writerem tego dokumentu.
+- `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
+  Quill CRDT, tombstones, ACK, restart i ochrona usunięć.
 - `lib/data/drift/operation_schema.dart`: SQLite v5 z migracją v3 → v4
   zachowującą tombstones oraz pageId usuniętego obiektu; v5 zapisuje
   trwały status `blocked` dla nieodwracalnych błędów wysyłki.
@@ -1299,7 +1314,19 @@ generuje attach → object.set → detach, nigdy ścieżkę lokalną.
 Aktualizacja tekstu nadal wymaga trwałych atomów CRDT i rebase.
 Most nie jest podłączony do produkcyjnego `EditorController`.
 Regresje: `test/editor_operation_bridge_test.dart` oraz batch/rollback
-w `test/sync_engine_test.dart`. 
+w `test/sync_engine_test.dart`.
+
+### `lib/features/editor/state/editor_v2_operation_writer.dart`
+
+`EditorV2OperationWriter` spina `EditorOperationBridge` z
+`SyncEngine.writeLocalBatch` i `EditorSqliteProjector.apply`; sprawdza
+tożsamość instancji bazy dziennika i projekcji, pobiera trwałe atomy
+tekstowe z `OperationStore` i pomija puste zmiany. Metody:
+`writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`.
+To jest adapter integracyjny opt-in, nadal nieprzekazany do
+produkcyjnego `EditorController`; brak bezpiecznej obsługi Undo/Redo v2,
+assetów i zdalnego rebase. Nie przełączać `AppScope` na ten writer.
+Test: `test/editor_v2_operation_writer_test.dart`.
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
 
