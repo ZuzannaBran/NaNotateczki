@@ -37,9 +37,8 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
   final freshFile = !file.existsSync();
 
   if (freshFile &&
-      name == 'notes.sqlite' &&
       !await marker.exists() &&
-      await _hasLocalRecoveryCandidate(dir)) {
+      await _hasLocalRecoveryCandidate(file.parent)) {
     await _writeRecoveryMarker(
       marker,
       'A fresh SQLite database was opened while a local backup exists.',
