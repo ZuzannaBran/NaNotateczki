@@ -149,7 +149,11 @@ class EditorOperationBridge {
         if (atoms == null) {
           throw StateError('A text change needs the durable CRDT atom state.');
         }
-        if (OperationTextSequence.render(atoms) != old.text) {
+        final atomText = OperationTextSequence.render(atoms);
+        if (atomText != old.text &&
+            (old.deltaJson == null ||
+                !atomText.endsWith('\n') ||
+                atomText.trimRight() != old.text)) {
           throw StateError('Stale text atom projection cannot be edited.');
         }
         result.addAll(_attachQuillEmbeds(
