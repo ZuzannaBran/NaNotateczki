@@ -86,6 +86,33 @@ class ApiClient {
     return baseUri.replace(path: '$basePath$path', queryParameters: query);
   }
 
+  /// Fail closed before legacy sync writes to an account activated for v2.
+  /// A 404 is compatible with backend versions predating the protocol probe.
+  Future<void> ensureLegacyAccountProtocol() async {
+    late final ApiResponse response;
+    try {
+      response = await get('/v1/auth/protocol');
+    } on ApiException catch (error) {
+      if (error.statusCode == 404) {
+        return;
+      }
+      rethrow;
+    }
+    final payload = response.decodeJson();
+    if (payload is! Map<String, dynamic>) {
+      throw const FormatException('Invalid account sync protocol response.');
+    }
+    final protocol = payload['protocol'];
+    if (protocol == 'v2') {
+      throw StateError(
+        'This account uses sync v2. Update the app before editing it.',
+      );
+    }
+    if (protocol != 'v1') {
+      throw const FormatException('Unsupported account sync protocol.');
+    }
+  }
+
   Uri realtimeUri() {
     final uri = resolve('/v1/realtime');
     return uri.replace(scheme: uri.scheme == 'https' ? 'wss' : 'ws');

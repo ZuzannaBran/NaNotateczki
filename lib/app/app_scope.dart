@@ -470,6 +470,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final future = () async {
       try {
         await _plannerReady;
+        // Never restore an older snapshot or start v1 writers for a v2
+        // account. Keep local data and the outbox untouched on failure.
+        await _apiClient!.ensureLegacyAccountProtocol();
+        if (!mounted || session.userId != userId || !session.isSignedIn) {
+          return;
+        }
         var restored = false;
         Object? recoveryFailure;
         // A new installation has no presence marker. If IndexedDB/SQLite

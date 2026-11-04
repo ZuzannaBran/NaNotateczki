@@ -102,4 +102,74 @@ void main() {
       ),
     );
   });
+  test('legacy account protocol is accepted before bootstrapping v1', () async {
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        expect(request.url.path, '/v1/auth/protocol');
+        expect(request.headers['authorization'], 'Bearer access');
+        return http.Response(jsonEncode({'protocol': 'v1'}), 200);
+      }),
+    );
+    addTearDown(client.close);
+    client.setAccessToken('access');
+    await client.ensureLegacyAccountProtocol();
+  });
+
+  test('v2 account cannot be bootstrapped through legacy writers', () async {
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient(
+        (_) async => http.Response(jsonEncode({'protocol': 'v2'}), 200),
+      ),
+    );
+    addTearDown(client.close);
+    client.setAccessToken('access');
+    await expectLater(
+      client.ensureLegacyAccountProtocol(),
+      throwsA(isA<StateError>()),
+    );
+  });
+
+  test('missing and unknown protocols fail closed', () async {
+    for (final body in <String>['{}', '{"protocol":"v3"}', '[]']) {
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((_) async => http.Response(body, 200)),
+      );
+      addTearDown(client.close);
+      client.setAccessToken('access');
+      await expectLater(
+        client.ensureLegacyAccountProtocol(),
+        throwsA(isA<FormatException>()),
+      );
+    }
+  });
+
+  test('only 404 from a pre-v2 server permits the legacy fallback', () async {
+    for (final status in <int>[404, 403, 500]) {
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient(
+          (_) async => http.Response('{"detail":"Unavailable"}', status),
+        ),
+      );
+      addTearDown(client.close);
+      client.setAccessToken('access');
+      if (status == 404) {
+        await client.ensureLegacyAccountProtocol();
+      } else {
+        await expectLater(
+          client.ensureLegacyAccountProtocol(),
+          throwsA(
+            isA<ApiException>().having(
+              (error) => error.statusCode,
+              'statusCode',
+              status,
+            ),
+          ),
+        );
+      }
+    }
+  });
 }

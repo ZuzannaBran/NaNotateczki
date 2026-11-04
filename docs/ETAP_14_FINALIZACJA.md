@@ -36,6 +36,20 @@ może służyć do testów API v2, nie do normalnej pracy w aplikacji.
 Instrukcja administratora: kanoniczny serwer
 `docs/STAGE14_TEST_RESET_PL.md`.
 
+## Dodatkowa blokada niezgodnego klienta (2026-11-04)
+
+Kanoniczne API wystawia uwierzytelnione `GET /v1/auth/protocol`.
+`AppScope` odpytuje je przed recovery, `LiveWebSyncService.start`
+i uruchomieniem schedulerów backupu v1. Odpowiedź `v2` zatrzymuje
+rozruch starszego synchronizatora i pozostawia lokalne dane/outbox.
+Jedynie HTTP 404 ze starszego backendu pozwala użyć kontraktu v1;
+inne błędy blokują bootstrap bez utraty lokalnych danych. Serwerowe
+transakcyjne bariery v1/v2 pozostają konieczne również po sondzie.
+Regresje: `test/api_client_test.dart`,
+`api/tests/test_account_protocol_fence.py` (kanoniczny serwer i lustro).
+Brak Flutter SDK w tym środowisku — nie ogłoszono PASS aplikacji.
+To zabezpieczenie **nie uruchamia** edycji v2 i nie zamyka etapów 11–13.
+
 ## Wykonane bezpieczne porządki
 
 1. Naprawiono błędny delimiter SQL w kanonicznym

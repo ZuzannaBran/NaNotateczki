@@ -13,6 +13,11 @@ Kanoniczny serwer NaNotateczki-serwer/main ma tylko odczytowy
 scripts/stage14-retirement-audit.sh; kod 0 nie zastępuje akceptacji
 E2E i weryfikacji zaległych kolejek na urządzeniach.
 
+Nowy klient wykonuje uwierzytelnioną sondę `GET /v1/auth/protocol`
+przed legacy recovery i sync. Konto z markerem v2 nie uruchamia
+writerów v1; stan lokalny pozostaje zachowany. Samo wykrycie v2
+nie oznacza jeszcze włączenia nowego edytora operacyjnego.
+
 Ten dokument jest źródłem prawdy dla lokalnego zapisu, migracji, backupu
 serwerowego i synchronizacji. Lokalny Drift/SQLite pozostaje podstawą pracy
 offline również po zalogowaniu.

@@ -2584,3 +2584,10 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `api/tests/test_stage14_reset_legacy_write_fences.py`.
   Bez pełnego przełączenia edytora Flutter na SyncEngine
   reset pozwala jedynie na próby API v2, nie na użytkowanie aplikacji.
+
+- `ApiClient.ensureLegacyAccountProtocol` i `AppScope._startAccountSync`:
+  przed recovery i legacy sync sprawdza `GET /v1/auth/protocol`;
+  konto v2 nie może uruchomić klienta v1. Jedynie 404 starego API
+  zachowuje kompatybilność, inne błędy nie przełączają writera.
+  Regresje: `test/api_client_test.dart`; backend: auth.py
+  kanoniczny i mirror, `test_account_protocol_fence.py`.
