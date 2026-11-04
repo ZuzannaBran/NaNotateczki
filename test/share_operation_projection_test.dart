@@ -238,6 +238,146 @@ void main() {
     expect((stroke(state)['properties'] as Map)['color'], 1);
     expect((stroke(updated)['properties'] as Map)['color'], 3);
   });
+  test('v2 moves an image between pages without copying other objects', () {
+    var state = initial();
+    state = state.apply(op(
+      40,
+      OperationKind.pageCreate,
+      {'value': {'title': 'Destination'}},
+      objectId: 'target',
+    ));
+    final untouched = (state.document!['pages'] as Map)['target'];
+    final moved = state.apply(op(
+      41,
+      OperationKind.objectMove,
+      {'toPageId': 'target', 'sortIndex': 2},
+      pageId: 'page',
+      objectId: 'stroke',
+    ));
+    expect(strokeObjectCount(moved), 0);
+    final movedNode = ((moved.document!['pages'] as Map)['target'] as Map)[
+        'objects'] as Map;
+    expect((movedNode['stroke'] as Map)['properties'], {
+      'color': 1,
+      'dx': 0,
+      'sortIndex': 2,
+    });
+    expect(identical(untouched, (moved.document!['pages'] as Map)['target']),
+        isFalse);
+    expect(strokeObjectCount(state), 1);
+    expect(
+      () => moved.apply(op(
+        42,
+        OperationKind.objectMove,
+        {'toPageId': 'missing', 'sortIndex': 0},
+        pageId: 'target',
+        objectId: 'stroke',
+      )),
+      throwsStateError,
+    );
+  });
+
+  test('v2 applies Quill attributes without replacing existing text IDs', () {
+    var state = initial().apply(op(
+      50,
+      OperationKind.objectCreate,
+      {'value': {'objectType': 'text', 'text': ''}},
+      pageId: 'page',
+      objectId: 'text',
+    ));
+    state = state.apply(op(
+      51,
+      OperationKind.textInsert,
+      {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': id(71), 'text': 'X', 'attributes': {'bold': true}},
+        ],
+      },
+      pageId: 'page',
+      objectId: 'text',
+    ));
+    state = state.apply(op(
+      52,
+      OperationKind.textFormat,
+      {
+        'atomIds': [id(71)],
+        'attributes': {'bold': null, 'color': 'red'},
+      },
+      pageId: 'page',
+      objectId: 'text',
+      clock: 4,
+    ));
+    final node = (((state.document!['pages'] as Map)['page'] as Map)[
+        'objects'] as Map)['text'] as Map;
+    expect((node['properties'] as Map)['text'], 'X');
+    expect((node['properties'] as Map)['delta'], [
+      {'insert': 'X', 'attributes': {'color': 'red'}},
+    ]);
+    expect((node['textAtoms'] as Map).keys, contains(id(71)));
+    expect(
+      () => state.apply(op(
+        53,
+        OperationKind.objectSet,
+        {'properties': {'delta': []}},
+        pageId: 'page',
+        objectId: 'text',
+      )),
+      throwsStateError,
+    );
+  });
+
+  test('optimistic asset attach requires a verified upload receipt', () {
+    const digest = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    var state = initial().apply(op(
+      60,
+      OperationKind.objectCreate,
+      {'value': {'objectType': 'image'}},
+      pageId: 'page',
+      objectId: 'photo',
+    ));
+    final attach = op(
+      61,
+      OperationKind.assetAttach,
+      {
+        'assetId': 'photo-asset',
+        'sha256': digest,
+        'sizeBytes': 15,
+        'mediaType': 'image/png',
+      },
+      pageId: 'page',
+      objectId: 'photo',
+      clock: 5,
+    );
+    final pending = PendingShareProjection(state);
+    expect(() => pending.enqueue(attach), throwsStateError);
+    pending.markAssetVerified(digest);
+    pending.enqueue(attach);
+    final projected = pending.visible;
+    final node = ((((projected.document!['pages'] as Map)['page'] as Map)[
+        'objects'] as Map)['photo']) as Map;
+    expect((node['assets'] as Map)['photo-asset'], {
+      'sha256': digest,
+      'sizeBytes': 15,
+      'mediaType': 'image/png',
+    });
+    pending.accept(attach);
+    expect(pending.pending, isEmpty);
+    final detached = pending.confirmed.apply(op(
+      62,
+      OperationKind.assetDetach,
+      {'assetId': 'photo-asset'},
+      pageId: 'page',
+      objectId: 'photo',
+      clock: 6,
+    ));
+    final detachedNode = ((((detached.document!['pages'] as Map)['page'] as Map)[
+        'objects'] as Map)['photo']) as Map;
+    expect(detachedNode['assets'], isEmpty);
+    expect((node['assets'] as Map).length, 1);
+  });
+
 }
 
 int strokeObjectCount(ShareOperationProjection state) {
