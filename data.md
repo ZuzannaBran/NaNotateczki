@@ -452,6 +452,20 @@ nie wolno pomijać niezatwierdzonych stron WAL. Asset jest najpierw
 utrwalany na dysku z checksumą, a następnie referencjonowany w transakcji;
 nie wolno go fizycznie kasować przed potwierdzonym checkpointem GC.
 
+**Przygotowanie lokalnej projekcji edytora v2 (opt-in, 2026-11-05):**
+`EditorSqliteProjector` aktualizuje strony, ink i plain-text Quill
+bezpośrednio w istniejących tabelach Drift w transakcji `OperationStore`.
+`OperationStore.textAtoms` odtwarza trwałą sekwencję CRDT tekstu
+z `operations` (zależności i atomowe tombstones nie są kompaktowane).
+`EditorV2OperationWriter` spina `EditorOperationBridge` z
+`SyncEngine.writeLocalBatch`, wymagając tej samej instancji bazy.
+Nie obsługuje jeszcze zweryfikowanych assetów, Quill embedów,
+cross-page moves, zakładania dokumentów v2 ani rebase konfliktów
+na obiektach i dlatego nie jest używany przez `EditorController`.
+Wielokrotne odczytywanie atomów z pełnego dziennika ma ograniczenie
+wydajnościowe; wymagane będą sprawdzone checkpointy tekstu.
+Ta implementacja nie daje zgody na uruchomienie v2 dla kont produkcyjnych.
+
 **Granica kompatybilności:** istniejące zapisy snapshotowe nie zostały
 jeszcze przepięte do `OperationStore`. W etapie 5 należy wymagać jego
 transakcyjnego użycia przez wszystkie mutacje lokalne oraz uniemożliwić
