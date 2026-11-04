@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Prevents editing when this client cannot save the account protocol.
 class UnsupportedAccountProtocolScreen extends StatefulWidget {
-  const UnsupportedAccountProtocolScreen({
-    required this.onLogOut,
-    super.key,
-  });
+  const UnsupportedAccountProtocolScreen({required this.onLogOut, super.key});
 
   final Future<void> Function() onLogOut;
 

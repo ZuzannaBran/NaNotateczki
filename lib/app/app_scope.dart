@@ -183,11 +183,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (session.isSignedIn &&
-            _incompatibleProtocolUser == session.userId) {
-          return UnsupportedAccountProtocolScreen(
-            onLogOut: session.logout,
-          );
+        if (session.isSignedIn && _incompatibleProtocolUser == session.userId) {
+          return UnsupportedAccountProtocolScreen(onLogOut: session.logout);
         }
         return const LibraryScreen();
       },
