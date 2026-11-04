@@ -74,7 +74,10 @@ void main() {
     );
     final formattedAtoms = applyPlan({}, formatted);
     expect(OperationTextSequence.renderDelta(formattedAtoms), [
-      {'insert': 'rich', 'attributes': {'bold': true}},
+      {
+        'insert': 'rich',
+        'attributes': {'bold': true},
+      },
     ]);
     expect(
       () => adapter.plan(
@@ -148,12 +151,14 @@ void main() {
           '[{"insert":"He","attributes":{"bold":true}},'
           '{"insert":"llo"}]',
     );
-    expect(bold.map((item) => item.kind).toSet(),
-        {OperationKind.textFormat});
+    expect(bold.map((item) => item.kind).toSet(), {OperationKind.textFormat});
     final styled = applyPlan(plain, bold);
     expect(OperationTextSequence.visibleIds(styled), initialIds);
     expect(OperationTextSequence.renderDelta(styled), [
-      {'insert': 'He', 'attributes': {'bold': true}},
+      {
+        'insert': 'He',
+        'attributes': {'bold': true},
+      },
       {'insert': 'llo'},
     ]);
     final undo = adapter.plan(
@@ -178,7 +183,10 @@ void main() {
     final state = applyPlan({}, plan);
     expect(OperationTextSequence.renderDelta(state), [
       {'insert': 'A'},
-      {'insert': '😀', 'attributes': {'italic': true}},
+      {
+        'insert': '😀',
+        'attributes': {'italic': true},
+      },
     ]);
     expect(
       () => adapter.plan(
@@ -189,5 +197,4 @@ void main() {
       throwsFormatException,
     );
   });
-
 }

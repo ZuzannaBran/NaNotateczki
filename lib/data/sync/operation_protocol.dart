@@ -177,8 +177,9 @@ class OperationEnvelope {
       for (final atom in atoms) {
         if (atom is! Map ||
             (atom.length != 2 && atom.length != 3) ||
-            atom.keys.any((key) =>
-                key != 'id' && key != 'text' && key != 'attributes') ||
+            atom.keys.any(
+              (key) => key != 'id' && key != 'text' && key != 'attributes',
+            ) ||
             !atom.containsKey('id') ||
             !atom.containsKey('text') ||
             atom['id'] is! String ||

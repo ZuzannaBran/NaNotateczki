@@ -37,13 +37,13 @@ class ShareTextEditAdapter {
     final desired = changedDeltaJson == null
         ? [
             for (final rune in newText.runes)
-              (character: String.fromCharCode(rune),
-               attributes: <String, dynamic>{}),
+              (
+                character: String.fromCharCode(rune),
+                attributes: <String, dynamic>{},
+              ),
           ]
         : _parseQuillDelta(changedDeltaJson);
-    final nextCharacters = [
-      for (final item in desired) item.character,
-    ];
+    final nextCharacters = [for (final item in desired) item.character];
     if (nextCharacters.join() != newText) {
       throw const FormatException('Quill delta differs from edited text.');
     }
@@ -87,9 +87,11 @@ class ShareTextEditAdapter {
     ) {
       final requested = offset + OperationTextSequence.maxAtomsPerOperation;
       final end = requested < deletedIds.length ? requested : deletedIds.length;
-      result.add(ShareTextIntent(OperationKind.textDelete, {
-        'atomIds': deletedIds.sublist(offset, end),
-      }));
+      result.add(
+        ShareTextIntent(OperationKind.textDelete, {
+          'atomIds': deletedIds.sublist(offset, end),
+        }),
+      );
     }
 
     var anchor = prefix == 0 ? null : oldIds[prefix - 1];
@@ -115,10 +117,12 @@ class ShareTextEditAdapter {
           if (item.attributes.isNotEmpty) 'attributes': item.attributes,
         });
       }
-      result.add(ShareTextIntent(OperationKind.textInsert, {
-        'afterAtomId': anchor,
-        'atoms': batch,
-      }));
+      result.add(
+        ShareTextIntent(OperationKind.textInsert, {
+          'afterAtomId': anchor,
+          'atoms': batch,
+        }),
+      );
       anchor = batch.last['id'] as String;
     }
 
@@ -135,10 +139,12 @@ class ShareTextEditAdapter {
         if (groupedIds.isEmpty) {
           return;
         }
-        result.add(ShareTextIntent(OperationKind.textFormat, {
-          'atomIds': List<String>.of(groupedIds),
-          'attributes': Map<String, dynamic>.of(groupedChanges!),
-        }));
+        result.add(
+          ShareTextIntent(OperationKind.textFormat, {
+            'atomIds': List<String>.of(groupedIds),
+            'attributes': Map<String, dynamic>.of(groupedChanges!),
+          }),
+        );
         groupedIds.clear();
       }
 
@@ -176,12 +182,11 @@ class ShareTextEditAdapter {
     return result;
   }
 
-  static bool _sameAttributes(
-    Map<String, dynamic> a,
-    Map<String, dynamic> b,
-  ) => a.length == b.length &&
-      a.entries.every((entry) =>
-          b.containsKey(entry.key) && b[entry.key] == entry.value);
+  static bool _sameAttributes(Map<String, dynamic> a, Map<String, dynamic> b) =>
+      a.length == b.length &&
+      a.entries.every(
+        (entry) => b.containsKey(entry.key) && b[entry.key] == entry.value,
+      );
 
   static List<({String character, Map<String, dynamic> attributes})>
   _parseQuillDelta(String value) {

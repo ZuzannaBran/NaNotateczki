@@ -333,7 +333,11 @@ void main() {
         payload: {
           'afterAtomId': null,
           'atoms': [
-            {'id': firstId, 'text': 'A', 'attributes': {'bold': true}},
+            {
+              'id': firstId,
+              'text': 'A',
+              'attributes': {'bold': true},
+            },
           ],
         },
       ),
@@ -358,11 +362,12 @@ void main() {
         objectId: 'text',
         payload: {
           'atomIds': [firstId],
-          'attributes': {'invalid': <int>[1]},
+          'attributes': {
+            'invalid': <int>[1],
+          },
         },
       ),
       throwsFormatException,
     );
   });
-
 }

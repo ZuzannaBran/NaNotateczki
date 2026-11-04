@@ -287,5 +287,4 @@ void main() {
     ]);
     expect(OperationTextSequence.render(initial), 'X');
   });
-
 }

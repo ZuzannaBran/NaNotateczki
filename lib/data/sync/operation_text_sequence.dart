@@ -39,8 +39,9 @@ class OperationTextSequence {
       for (final value in values) {
         if (value is! Map ||
             (value.length != 2 && value.length != 3) ||
-            value.keys.any((key) =>
-                key != 'id' && key != 'text' && key != 'attributes') ||
+            value.keys.any(
+              (key) => key != 'id' && key != 'text' && key != 'attributes',
+            ) ||
             !value.containsKey('id') ||
             !value.containsKey('text') ||
             !_validId(value['id']) ||
@@ -69,9 +70,7 @@ class OperationTextSequence {
           'text': value['text'],
           'deleted': false,
           'attributes': attributes,
-          'attributeVersions': {
-            for (final name in attributes.keys) name: rank,
-          },
+          'attributeVersions': {for (final name in attributes.keys) name: rank},
           'order': <Object>[
             operation.logicalClock,
             operation.actorId,
@@ -102,9 +101,7 @@ class OperationTextSequence {
       }
     } else if (operation.kind == OperationKind.textFormat) {
       final ids = (payload['atomIds'] as List).cast<String>();
-      final changes = Map<String, dynamic>.from(
-        payload['attributes'] as Map,
-      );
+      final changes = Map<String, dynamic>.from(payload['attributes'] as Map);
       final rank = _operationRank(operation);
       if (ids.any((id) => !atoms.containsKey(id))) {
         throw const FormatException('Unknown formatted text atom.');
@@ -169,9 +166,7 @@ class OperationTextSequence {
   }
 
   /// Converts projected atoms into a Quill snapshot without losing styles.
-  static List<Map<String, dynamic>> renderDelta(
-    Map<String, dynamic> atoms,
-  ) {
+  static List<Map<String, dynamic>> renderDelta(Map<String, dynamic> atoms) {
     final result = <Map<String, dynamic>>[];
     for (final id in visibleIds(atoms)) {
       final node = atoms[id] as Map;
@@ -192,10 +187,7 @@ class OperationTextSequence {
     return result;
   }
 
-  static bool _equalAttributes(
-    Map? previous,
-    Map<String, dynamic> current,
-  ) {
+  static bool _equalAttributes(Map? previous, Map<String, dynamic> current) {
     if ((previous?.length ?? 0) != current.length) {
       return false;
     }
