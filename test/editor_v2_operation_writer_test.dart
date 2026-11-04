@@ -241,6 +241,51 @@ void main() {
     expect(atoms.length, 3);
   });
 
+  test('stale Quill formatting cannot overwrite the durable text',
+      () async {
+    final notebook = await repository.createNotebook();
+    final page = notebook.pages.single;
+    TextBlock block(String text, String delta) => TextBlock(
+      id: 'rich-text',
+      text: text,
+      deltaJson: delta,
+      position: Offset.zero,
+      fontSize: 18,
+      color: const Color(0xFF111111),
+      width: 200,
+    );
+    final saved = page.copyWith(textBlocks: [
+      block('A', r'[{"insert":"A\n"}]'),
+    ]);
+    await writer.writePageChange(
+      documentId: notebook.uid,
+      before: page,
+      after: saved,
+    );
+    final existing = await store.pending();
+    final stale = page.copyWith(textBlocks: [
+      block('A', r'[{"insert":"A","attributes":{"bold":true}},'
+          r'{"insert":"\n"}]'),
+    ]);
+    final edited = page.copyWith(textBlocks: [
+      block('B', r'[{"insert":"B\n"}]'),
+    ]);
+    await expectLater(
+      writer.writePageChange(
+        documentId: notebook.uid,
+        before: stale,
+        after: edited,
+      ),
+      throwsStateError,
+    );
+    expect(await store.pending(), hasLength(existing.length));
+    expect(
+      (await repository.getNotebook(notebook.uid))
+          ?.pages.single.textBlocks.single.text,
+      'A',
+    );
+  });
+
   test('a failed media edit never writes an outbox operation', () async {
     final notebook = await repository.createNotebook();
     final page = notebook.pages.single;
