@@ -39,9 +39,9 @@ import '../features/notebook/domain/notebook.dart';
 import '../features/planner/state/study_planner_controller.dart';
 
 class AppScope extends StatefulWidget {
-  const AppScope({super.key, required this.onNamespaceSwitch});
+  const AppScope({super.key, this.onNamespaceSwitch});
 
-  final VoidCallback onNamespaceSwitch;
+  final VoidCallback? onNamespaceSwitch;
 
   @override
   State<AppScope> createState() => _AppScopeState();
@@ -124,13 +124,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       await _repository?.waitForPendingSaves();
       await _backupScheduler?.flushForExit();
       await _backupService?.waitUntilIdle();
+      await SharedRecentColors.load();
       await waitForPendingTextStorageOperations();
       await _liveSync?.stop();
       _plannerSync?.stop();
       _accountSettingsSync?.stop();
       await _remoteBackupScheduler?.stop();
       if (mounted) {
-        widget.onNamespaceSwitch();
+        widget.onNamespaceSwitch?.call();
       }
     } catch (error, stackTrace) {
       AppErrorLog.instance.record(
@@ -186,10 +187,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     _diagnosticsUpload?.dispose();
     _accountSession?.dispose();
     _apiClient?.close();
-    unawaited(_openFuture.then((opened) => opened.database.close()));
+    unawaited(_openFuture.then((opened) => opened.database.close())
+        .catchError((Object _, StackTrace __) {}));
     final backupService = _backupService;
     if (backupService != null) {
-      unawaited(backupService.dispose());
+      backupService.dispose();
     }
     _finishingExit.dispose();
     _exitFailure.dispose();

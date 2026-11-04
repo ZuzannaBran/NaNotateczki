@@ -2,6 +2,13 @@
 
 ## Aktualny stan cutover (2026-11-04)
 
+Od czystej instalacji tryby Local i każde konto mają oddzielne SQLite
+oraz magazyny plikowe; Web ma odrębne IndexedDB i prefiksy localStorage.
+`account_profile.json` pozostaje globalnym selektorem. Login/logout zmienia
+aktywny magazyn po flush i zatrzymaniu writerów, bez automatycznego importu.
+Nie aktywuje to jeszcze SyncEngine v2 ani Share v2: stare API v1 wciąż działa.
+Dane sprzed resetu nie są automatycznie kopiowane do nowej struktury.
+
 Źródło prawdy o statusie finalizacji: docs/ETAP_14_FINALIZACJA.md.
 Etapy 11–13 nie zakończyły jeszcze migracji produkcyjnej. Native i Web
 nadal uruchamiają aktywny zapis v1; SyncEngine v2 jest opt-in, a

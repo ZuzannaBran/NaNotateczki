@@ -155,6 +155,13 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 
 ### Storage i diagnostyka
 
+- `lib/core/storage/active_storage_namespace.dart`: wybiera nazwę SQLite,
+  pliki Local/konta i klucze Web przed bootstrapem AppScope.
+- `lib/app/notes_app.dart`: odbudowuje AppScope po bezpiecznym
+  przełączeniu tożsamości; osobna baza per konto.
+- `test/active_storage_namespace_test.dart`: izolacja i fail-closed profilu.
+
+
 - `lib/core/storage/app_data_directory.dart`: conditional export natywnego
   układu danych i webowego no-op.
 - `lib/core/storage/app_data_directory_native.dart` (23): rozwiązuje ścieżki

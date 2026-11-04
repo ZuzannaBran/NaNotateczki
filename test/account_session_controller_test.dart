@@ -594,7 +594,7 @@ void main() {
     },
   );
 
-  test('refuses a second account on the same local notebook storage', () async {
+  test('switches account identity without mixing isolated storage', () async {
     final stored = <String, String>{};
     textStorageReadOverride = (key) async => stored[key];
     textStorageWriteOverride = (key, value) async => stored[key] = value;
@@ -636,21 +636,21 @@ void main() {
       credentialStore: credentials,
     );
     await restarted.loadProfile();
-    await expectLater(
-      restarted.login('account_b', 'password'),
-      throwsA(isA<StateError>()),
-    );
-    expect(loginCalls, 1);
-    expect(restarted.isSignedIn, isFalse);
-    await restarted.login('account_a', 'password');
-    expect(restarted.isSignedIn, isTrue);
+    await restarted.login('account_b', 'password');
     expect(loginCalls, 2);
+    expect(restarted.isSignedIn, isTrue);
+    expect(restarted.userId, 'user-b');
+    expect(
+      jsonDecode(stored[AccountSessionController.profileStorageKey]!)
+          ['boundUserId'],
+      'user-b',
+    );
     first.dispose();
     restarted.dispose();
     client.close();
   });
 
-  test('legacy account profile blocks a different username', () async {
+  test('legacy account name is not a barrier with isolated storage', () async {
     textStorageReadOverride = (key) async {
       if (key != AccountSessionController.profileStorageKey) {
         return null;
@@ -659,19 +659,24 @@ void main() {
     };
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((_) async {
-        fail('No request should be made for a different user.');
-      }),
+      httpClient: MockClient((_) async => http.Response(
+        jsonEncode({
+          'accessToken': 'access',
+          'refreshToken': 'refresh',
+          'expiresIn': 600,
+          'userId': 'user-other',
+          'username': 'other_user',
+        }), 200,
+      )),
     );
     final session = AccountSessionController(
       client,
       credentialStore: credentials,
     );
     await session.loadProfile();
-    await expectLater(
-      session.login('other_user', 'password'),
-      throwsA(isA<StateError>()),
-    );
+    await session.login('other_user', 'password');
+    expect(session.isSignedIn, isTrue);
+    expect(session.userId, 'user-other');
     session.dispose();
     client.close();
   });

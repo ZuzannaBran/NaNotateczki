@@ -1,7 +1,8 @@
 # Etap 11 — bezpieczna migracja dotychczasowych danych
 
-Status: **przygotowanie danych natywnych wdrożone; produkcyjne przełączenie
-NIE jest wykonane**. Nie uruchamiać obu protokołów zapisujących do jednego UID.
+Status: **dla pustych, wyczyszczonych instalacji podłączono oddzielne
+magazyny Local/Account na Native/Web**. Migracja istniejących danych oraz
+protokół SyncEngine v2/Share nie zostały jeszcze uruchomione. Nie uruchamiać obu protokołów zapisujących do jednego UID.
 
 ## Zweryfikowany proces przygotowawczy na Linux / native
 
