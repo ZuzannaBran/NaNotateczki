@@ -1664,7 +1664,8 @@ class EditorController extends ChangeNotifier {
     _recordExpectedRemovals(action, before, updated, undo: true);
     _redoActions.add(entry);
     _notifyHistoryChanged();
-    currentPageIndex = index;
+    // Reuse normal navigation cleanup for active overlays and selections.
+    setCurrentPage(index);
     _updatePage(updated);
     if (action is UpdateInkStrokeAction) {
       _touchInkPageRevision(updated.id);
@@ -1699,7 +1700,8 @@ class EditorController extends ChangeNotifier {
     _recordExpectedRemovals(action, before, updated);
     _undoActions.add(entry);
     _notifyHistoryChanged();
-    currentPageIndex = index;
+    // Reuse normal navigation cleanup for active overlays and selections.
+    setCurrentPage(index);
     _updatePage(updated);
     if (action is UpdateInkStrokeAction) {
       _touchInkPageRevision(updated.id);
