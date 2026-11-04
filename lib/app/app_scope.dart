@@ -167,7 +167,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (_namespaceSwitchFailure != null) {
           return _StartupErrorScreen(error: _namespaceSwitchFailure!);
         }
-        if (_switchingNamespace || expected != _namespace) {
+        if (!ActiveStorageNamespace.canDisplay(
+          opened: _namespace,
+          expected: expected,
+          switching: _switchingNamespace,
+          failed: _namespaceSwitchFailure != null,
+        )) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );

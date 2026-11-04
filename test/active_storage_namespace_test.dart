@@ -29,6 +29,28 @@ void main() {
         isNot(b.fileKey('study_planner.json')));
   });
 
+  test('account switch never exposes the previous namespace', () {
+    final a = StorageNamespace.account(
+      '00112233-4455-6677-8899-aabbccddeeff',
+    );
+    final b = StorageNamespace.account(
+      '00112233-4455-6677-8899-aabbccddeaaa',
+    );
+    bool visible(StorageNamespace? active, StorageNamespace? target,
+        {bool switching = false, bool failed = false}) =>
+        ActiveStorageNamespace.canDisplay(
+          opened: active,
+          expected: target,
+          switching: switching,
+          failed: failed,
+        );
+    expect(visible(a, a), isTrue);
+    expect(visible(a, b), isFalse);
+    expect(visible(a, a, switching: true), isFalse);
+    expect(visible(a, a, failed: true), isFalse);
+    expect(visible(null, a), isFalse);
+  });
+
   test('invalid profile account identity is rejected', () {
     expect(
       () => ActiveStorageNamespace.fromProfile(

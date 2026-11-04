@@ -161,7 +161,8 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   przełączeniu tożsamości; osobna baza per konto.
 - `lib/data/sync/study_share_guest_outbox.dart`: odizolowany per share
   klucz na guest draft, nadal legacy v1; nie aktywuje Share v2.
-- `test/active_storage_namespace_test.dart`: izolacja i fail-closed profilu.
+- `test/active_storage_namespace_test.dart`: izolacja, fail-closed profilu
+  oraz brak dostępu do starej biblioteki podczas zmiany konta.
 
 
 - `lib/core/storage/app_data_directory.dart`: conditional export natywnego

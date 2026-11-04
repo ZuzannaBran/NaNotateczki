@@ -9,6 +9,15 @@ class ActiveStorageNamespace {
 
   static StorageNamespace get current => _current;
 
+  /// Never expose account A while account B is being opened or failed.
+  static bool canDisplay({
+    required StorageNamespace? opened,
+    required StorageNamespace? expected,
+    required bool switching,
+    required bool failed,
+  }) =>
+      opened != null && expected == opened && !switching && !failed;
+
   static void activate(StorageNamespace namespace) {
     _current = namespace;
   }
