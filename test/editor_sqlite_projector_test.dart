@@ -334,6 +334,88 @@ void main() {
     );
   });
 
+  test('ambiguous cross-layer identity cannot delete either object',
+      () async {
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.strokeCreate,
+        pageId: pageId,
+        objectId: 'duplicate',
+        payload: {'value': _stroke()},
+      ),
+    ]);
+    await database.customStatement(
+      'INSERT INTO text_block_rows '
+      '(uid, page_uid, text, delta_json, font_size, color_value, '
+      'width, rotation, dx, dy, sort_index) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ['duplicate', pageId, '', null, 18.0, 0xFF000000,
+        100.0, 0.0, 0.0, 0.0, 0],
+    );
+    await expectLater(
+      write([
+        LocalOperationDraft(
+          kind: OperationKind.objectDelete,
+          pageId: pageId,
+          objectId: 'duplicate',
+          payload: const {},
+        ),
+      ]),
+      throwsStateError,
+    );
+    expect(await inkRows(), hasLength(1));
+    expect(
+      (await database.customSelect(
+        'SELECT uid FROM text_block_rows WHERE uid = ?',
+        variables: [const Variable<String>('duplicate')],
+      ).get()),
+      hasLength(1),
+    );
+    expect(
+      await store.isTombstoned(
+        documentId,
+        'object',
+        'duplicate',
+        pageId: pageId,
+      ),
+      isFalse,
+    );
+  });
+
+  test('stale Quill formatting blocks a new text operation', () async {
+    const atom = '11111111-1111-4111-8111-111111111111';
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.objectCreate,
+        pageId: pageId,
+        objectId: 'text-one',
+        payload: const {
+          'value': {
+            'objectType': 'text',
+            'dx': 0.0,
+            'dy': 0.0,
+            'width': 100.0,
+            'fontSize': 18.0,
+            'rotation': 0.0,
+            'colorValue': 0xFF000000,
+            'sortIndex': 0,
+          },
+        },
+      ),
+      LocalOperationDraft(
+        kind: OperationKind.textInsert,
+        pageId: pageId,
+        objectId: 'text-one',
+        payload: {
+          'afterAtomId': null,
+          'atoms': [
+            {'id': atom, 'text': 'A'},
+          ],
+        },
+      ),
+    ]);
+  });
+
   test('the last page cannot be removed through v2', () async {
     await expectLater(
       write([
