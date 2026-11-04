@@ -2556,3 +2556,21 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `docs/ETAP_12_TESTS.md`: uruchomienie i otwarte kryteria. Testy
   backendowe nie zastępują Flutter↔API v2 testów dwóch urządzeń ani
   nieaktywnego cutover etapu 11; brak SDK/Dockera nie oznacza zaliczenia.
+
+
+## Etap 14 — finalizacja warunkowa (2026-11-04)
+
+- docs/ETAP_14_FINALIZACJA.md: inwentarz active v1 i opt-in v2,
+  reguły bezpiecznego usuwania legacy oraz nierozwiązane bramki
+  etapów 11–13. Etap 14 jest częściowy, bez produkcyjnego cutover.
+- server/scripts/stage13-status.sh: poprawiono delimiter DO $$ / END $$;
+  kanoniczna wersja w NaNotateczki-serwer/main.
+- NaNotateczki-serwer/main: scripts/stage14-retirement-audit.sh wykonuje
+  wyłącznie odczytowy raport PostgreSQL, zwraca 75 przy blokadzie;
+  scripts/tests/test_stage14_retirement_audit.py obejmuje regresję
+  poprawnego SQL i fail-closed audytu. Nowe pliki nie są kopiowane
+  do lustra server/, ponieważ canonical backend jest źródłem prawdy.
+- LiveWebSyncService i StudyShareGuestEditor wciąż obsługują realny v1.
+  SyncEngine, ShareOperationProjection i importery legacy muszą zostać
+  zachowane. Nie usuwać v1, timera, debounce ani lustra backendu
+  przed pełną migracją namespace + E2E + odcięciem starych klientów.
