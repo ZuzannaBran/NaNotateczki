@@ -120,7 +120,9 @@ warstwa wywołująca musi osobno sprawdzić potwierdzenie z asset gateway.
 
 Poprawiono istniejącą historię `EditorController`: Undo/Redo zachowuje
 ID strony po zmianie aktualnej strony, a usunięcie strony unieważnia jej
-stare wpisy historii. Jest to naprawa bezpieczeństwa w aktywnym edytorze
+stare wpisy historii. Jawne usunięcie całej strony z zawartością przekazuje
+do zabezpieczenia `NotebookRepository` jej ID; nieoznaczony ubytek
+pozostaje blokowany. Regresje: `editor_controller_layering_test.dart`. Jest to naprawa bezpieczeństwa w aktywnym edytorze
 v1, **nie** obsługa operacyjnego Undo/Redo v2 z tombstones.
 
 To NIE jest produkcyjny cutover. Brakuje integracji z `EditorController`,
