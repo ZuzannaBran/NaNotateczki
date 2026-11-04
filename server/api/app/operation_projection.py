@@ -6,6 +6,7 @@ verified transport before they can be enabled.
 from __future__ import annotations
 
 from collections.abc import Mapping
+import re
 from typing import Any
 
 from .operation_ordering import precedence
@@ -86,6 +87,8 @@ def apply_operation(
     current: dict | None,
     op: OperationEnvelope,
     tombstones: set[tuple[str, str, str]],
+    *,
+    verified_assets: frozenset[str] = frozenset(),
 ) -> tuple[dict | None, tuple[str, str, str] | None]:
     """Return updated projection and optional newly permanent tombstone.
 
@@ -93,14 +96,37 @@ def apply_operation(
     and appends the operation in ONE PostgreSQL transaction.
     """
     kind = op.kind
-    if kind.startswith("asset."):
-        raise ProjectionError("Asset reducers are not enabled in v2 yet.")
+    if kind == "asset.attach":
+        payload = op.to_dict()["payload"]
+        if (
+            set(payload) != {"assetId", "sha256", "sizeBytes", "mediaType"}
+            or not isinstance(payload["assetId"], str)
+            or not 1 <= len(payload["assetId"]) <= 128
+            or not isinstance(payload["sha256"], str)
+            or not re.fullmatch(r"[0-9a-f]{64}", payload["sha256"])
+            or type(payload["sizeBytes"]) is not int
+            or not 1 <= payload["sizeBytes"] <= 64 * 1024 * 1024
+            or payload["mediaType"] not in {
+                "image/png", "image/jpeg", "image/webp", "application/pdf"
+            }
+        ):
+            raise ProjectionError("Invalid asset.attach payload.")
+        if payload["sha256"] not in verified_assets:
+            raise ProjectionError("Asset is not verified.")
+    elif kind == "asset.detach":
+        payload = op.to_dict()["payload"]
+        if (
+            set(payload) != {"assetId"}
+            or not isinstance(payload["assetId"], str)
+            or not 1 <= len(payload["assetId"]) <= 128
+        ):
+            raise ProjectionError("Invalid asset.detach payload.")
     if kind == "stroke.create":
         is_create = True
     else:
         is_create = kind.endswith(".create")
     is_delete = kind.endswith(".delete") and not kind.startswith("text.")
-    if kind.startswith("text."):
+    if kind.startswith(("text.", "asset.")) or kind == "object.move":
         fields = None
     elif is_delete:
         if op.to_dict()["payload"]:
@@ -244,6 +270,35 @@ def apply_operation(
             return current, object_key if object_key not in tombstones else None
         raise ProjectionError("Parent page has not been created.")
     objects = page.setdefault("objects", {})
+    if kind == "object.move":
+        payload = op.to_dict()["payload"]
+        if set(payload) != {"toPageId", "sortIndex"}:
+            raise ProjectionError("Invalid object.move payload.")
+        destination_id, sort_index = payload["toPageId"], payload["sortIndex"]
+        if (
+            not isinstance(destination_id, str)
+            or not 1 <= len(destination_id) <= 128
+            or type(sort_index) is not int
+            or not 0 <= sort_index < 1000000
+            or destination_id == op.page_id
+        ):
+            raise ProjectionError("Invalid object.move destination.")
+        destination_page = pages.get(destination_id)
+        if destination_page is None or (
+            "page", "", destination_id
+        ) in tombstones:
+            raise ProjectionError("Destination page does not exist.")
+        if op.object_id not in objects:
+            raise ProjectionError("Source object does not exist.")
+        destination_objects = destination_page.setdefault("objects", {})
+        if op.object_id in destination_objects or (
+            "object", destination_id, op.object_id or ""
+        ) in tombstones:
+            raise ProjectionError("Destination identity is occupied.")
+        moved = objects.pop(op.object_id)
+        _merge(moved, {"sortIndex": sort_index}, op)
+        destination_objects[op.object_id] = moved
+        return current, None
     if kind == "object.delete":
         objects.pop(op.object_id, None)
         return current, object_key if object_key not in tombstones else None
@@ -260,6 +315,22 @@ def apply_operation(
         objects[op.object_id] = node
     if node is None:
         raise ProjectionError("Object has not been created.")
+    if kind.startswith("asset."):
+        asset_id = payload["assetId"]
+        rank = list(precedence(op))
+        versions = node.setdefault("assetVersions", {})
+        if asset_id not in versions or rank > versions[asset_id]:
+            assets = node.setdefault("assets", {})
+            if kind == "asset.attach":
+                assets[asset_id] = {
+                    "sha256": payload["sha256"],
+                    "sizeBytes": payload["sizeBytes"],
+                    "mediaType": payload["mediaType"],
+                }
+            else:
+                assets.pop(asset_id, None)
+            versions[asset_id] = rank
+        return current, None
     if kind.startswith("text."):
         if (node.get("type") != "object.create" or
                 node.get("properties", {}).get("objectType") != "text"):
@@ -269,7 +340,21 @@ def apply_operation(
         except TextSequenceError as exc:
             raise ProjectionError(str(exc)) from exc
         return current, None
-    if "textAtoms" in node and "text" in fields:
+    if "textAtoms" in node and ({"text", "delta"} & fields.keys()):
         raise ProjectionError("CRDT text cannot be replaced by object.set.")
     _merge(node, fields, op)
     return current, None
+
+
+def ordered_objects(page: dict) -> list[tuple[str, dict]]:
+    """Return the z-order independently of JSONB object-key order."""
+    objects = page.get("objects", {})
+    if not isinstance(objects, dict):
+        raise ProjectionError("Invalid object collection.")
+    def order(entry: tuple[str, dict]) -> tuple[int, str]:
+        object_id, node = entry
+        index = node.get("properties", {}).get("sortIndex", 0)
+        if type(index) is not int or not 0 <= index < 1000000:
+            raise ProjectionError("Invalid object z-order.")
+        return index, object_id
+    return sorted(objects.items(), key=order)
