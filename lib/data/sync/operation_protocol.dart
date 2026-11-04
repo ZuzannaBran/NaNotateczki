@@ -14,10 +14,12 @@ enum OperationKind {
   objectCreate('object.create', OperationTarget.object),
   objectSet('object.set', OperationTarget.object),
   objectTransform('object.transform', OperationTarget.object),
+  objectMove('object.move', OperationTarget.object),
   objectReorder('object.reorder', OperationTarget.object),
   objectDelete('object.delete', OperationTarget.object),
   textInsert('text.insert', OperationTarget.object),
   textDelete('text.delete', OperationTarget.object),
+  textFormat('text.format', OperationTarget.object),
   assetAttach('asset.attach', OperationTarget.object),
   assetDetach('asset.detach', OperationTarget.object),
   folderCreate('folder.create', OperationTarget.folder),
@@ -121,6 +123,7 @@ class OperationEnvelope {
       payload: payload,
       documentId: documentId,
       objectId: objectId,
+      pageId: pageId,
     );
   }
 
@@ -129,7 +132,24 @@ class OperationEnvelope {
     required Map<String, dynamic> payload,
     required String documentId,
     String? objectId,
+    String? pageId,
   }) {
+    if (kind == OperationKind.objectMove) {
+      final destination = payload['toPageId'];
+      final order = payload['sortIndex'];
+      if (payload.length != 2 ||
+          destination is! String ||
+          destination.isEmpty ||
+          destination.length > 128 ||
+          _invalidIdentifierChar.hasMatch(destination) ||
+          destination == pageId ||
+          order is! int ||
+          order < 0 ||
+          order >= 1000000) {
+        throw const FormatException('Invalid object.move payload.');
+      }
+      return;
+    }
     if (kind == OperationKind.assetAttach ||
         kind == OperationKind.assetDetach) {
       throw UnsupportedError('Asset operations need verified transport.');
@@ -148,7 +168,9 @@ class OperationEnvelope {
       final seen = <String>{};
       for (final atom in atoms) {
         if (atom is! Map ||
-            atom.length != 2 ||
+            (atom.length != 2 && atom.length != 3) ||
+            atom.keys.any((key) =>
+                key != 'id' && key != 'text' && key != 'attributes') ||
             !atom.containsKey('id') ||
             !atom.containsKey('text') ||
             atom['id'] is! String ||
@@ -158,6 +180,9 @@ class OperationEnvelope {
             (atom['text'] as String).isEmpty ||
             (atom['text'] as String).runes.length > 1024) {
           throw const FormatException('Invalid text atom.');
+        }
+        if (atom.containsKey('attributes')) {
+          _validateTextAttributes(atom['attributes']);
         }
       }
       return;
@@ -172,6 +197,24 @@ class OperationEnvelope {
           ids.toSet().length != ids.length) {
         throw const FormatException('Invalid text.delete payload.');
       }
+      return;
+    }
+    if (kind == OperationKind.textFormat) {
+      final ids = payload['atomIds'];
+      final changes = payload['attributes'];
+      if (payload.length != 2 ||
+          !payload.containsKey('atomIds') ||
+          !payload.containsKey('attributes') ||
+          ids is! List ||
+          ids.isEmpty ||
+          ids.length > 256 ||
+          ids.any((id) => id is! String || !_isValidUuid(id)) ||
+          ids.toSet().length != ids.length ||
+          changes is! Map ||
+          changes.isEmpty) {
+        throw const FormatException('Invalid text.format payload.');
+      }
+      _validateTextAttributes(changes, allowNull: true);
       return;
     }
     if (kind.wireName.endsWith('.delete')) {
@@ -222,6 +265,32 @@ class OperationEnvelope {
         throw const FormatException(
           'Create payload UID does not match target.',
         );
+      }
+    }
+  }
+
+  static void _validateTextAttributes(
+    Object? candidate, {
+    bool allowNull = false,
+  }) {
+    if (candidate is! Map || candidate.length > 32) {
+      throw const FormatException('Invalid Quill attributes.');
+    }
+    for (final entry in candidate.entries) {
+      final name = entry.key;
+      final value = entry.value;
+      if (name is! String || name.isEmpty || name.length > 64) {
+        throw const FormatException('Invalid Quill attribute name.');
+      }
+      if (value == null && allowNull) {
+        continue;
+      }
+      if (value is! String && value is! bool && value is! num) {
+        throw const FormatException('Invalid Quill attribute value.');
+      }
+      if ((value is String && value.length > 2048) ||
+          (value is num && !value.isFinite)) {
+        throw const FormatException('Invalid Quill attribute value.');
       }
     }
   }

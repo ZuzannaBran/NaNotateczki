@@ -19,6 +19,7 @@ class OperationTextSequence {
   ) {
     final atoms = Map<String, dynamic>.from(current);
     final payload = operation.payload;
+    operation.validateForV2Projection();
     if (operation.kind == OperationKind.textInsert) {
       if (payload.length != 2 ||
           !payload.containsKey('afterAtomId') ||
@@ -37,7 +38,9 @@ class OperationTextSequence {
       final ids = <String>{};
       for (final value in values) {
         if (value is! Map ||
-            value.length != 2 ||
+            (value.length != 2 && value.length != 3) ||
+            value.keys.any((key) =>
+                key != 'id' && key != 'text' && key != 'attributes') ||
             !value.containsKey('id') ||
             !value.containsKey('text') ||
             !_validId(value['id']) ||
@@ -54,13 +57,21 @@ class OperationTextSequence {
         }
       }
       var anchor = after as String?;
+      final rank = _operationRank(operation);
       for (var index = 0; index < values.length; index++) {
         final value = values[index] as Map;
         final id = value['id'] as String;
+        final attributes = Map<String, dynamic>.from(
+          value['attributes'] as Map? ?? const {},
+        );
         atoms[id] = <String, dynamic>{
           'after': anchor,
           'text': value['text'],
           'deleted': false,
+          'attributes': attributes,
+          'attributeVersions': {
+            for (final name in attributes.keys) name: rank,
+          },
           'order': <Object>[
             operation.logicalClock,
             operation.actorId,
@@ -89,12 +100,112 @@ class OperationTextSequence {
           'deleted': true,
         };
       }
+    } else if (operation.kind == OperationKind.textFormat) {
+      final ids = (payload['atomIds'] as List).cast<String>();
+      final changes = Map<String, dynamic>.from(
+        payload['attributes'] as Map,
+      );
+      final rank = _operationRank(operation);
+      if (ids.any((id) => !atoms.containsKey(id))) {
+        throw const FormatException('Unknown formatted text atom.');
+      }
+      for (final id in ids) {
+        final atom = Map<String, dynamic>.from(atoms[id] as Map);
+        final attributes = Map<String, dynamic>.from(
+          atom['attributes'] as Map? ?? const {},
+        );
+        final versions = Map<String, dynamic>.from(
+          atom['attributeVersions'] as Map? ?? const {},
+        );
+        for (final change in changes.entries) {
+          final previous = versions[change.key];
+          if (previous == null || _rankIsLater(rank, previous as List)) {
+            if (change.value == null) {
+              attributes.remove(change.key);
+            } else {
+              attributes[change.key] = change.value;
+            }
+            versions[change.key] = rank;
+          }
+        }
+        atom['attributes'] = attributes;
+        atom['attributeVersions'] = versions;
+        atoms[id] = atom;
+      }
     } else {
       throw UnsupportedError('Not a text operation.');
     }
     // Validate the full graph, including deleted anchors and cycles.
     visibleIds(atoms);
     return atoms;
+  }
+
+  static List<Object> _operationRank(OperationEnvelope operation) => [
+    operation.logicalClock,
+    operation.actorId,
+    operation.actorSeq,
+    operation.operationId,
+  ];
+
+  static bool _rankIsLater(List<Object> current, List previous) {
+    if (previous.length != 4) {
+      throw const FormatException('Invalid attribute precedence.');
+    }
+    for (var i = 0; i < current.length; i++) {
+      final newer = current[i];
+      final older = previous[i];
+      if ((i.isEven && (newer is! int || older is! int)) ||
+          (i.isOdd && (newer is! String || older is! String))) {
+        throw const FormatException('Invalid attribute precedence.');
+      }
+      final comparison = i.isEven
+          ? (newer as int).compareTo(older as int)
+          : (newer as String).compareTo(older as String);
+      if (comparison != 0) {
+        return comparison > 0;
+      }
+    }
+    return false;
+  }
+
+  /// Converts projected atoms into a Quill snapshot without losing styles.
+  static List<Map<String, dynamic>> renderDelta(
+    Map<String, dynamic> atoms,
+  ) {
+    final result = <Map<String, dynamic>>[];
+    for (final id in visibleIds(atoms)) {
+      final node = atoms[id] as Map;
+      final attributes = Map<String, dynamic>.from(
+        node['attributes'] as Map? ?? const {},
+      );
+      final text = node['text'] as String;
+      if (result.isNotEmpty &&
+          _equalAttributes(result.last['attributes'] as Map?, attributes)) {
+        result.last['insert'] = (result.last['insert'] as String) + text;
+      } else {
+        result.add({
+          'insert': text,
+          if (attributes.isNotEmpty) 'attributes': attributes,
+        });
+      }
+    }
+    return result;
+  }
+
+  static bool _equalAttributes(
+    Map? previous,
+    Map<String, dynamic> current,
+  ) {
+    if ((previous?.length ?? 0) != current.length) {
+      return false;
+    }
+    for (final entry in current.entries) {
+      if (previous?[entry.key] != entry.value ||
+          !(previous?.containsKey(entry.key) ?? false)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   static bool _validId(Object? value) =>
@@ -121,7 +232,10 @@ class OperationTextSequence {
           rank[3] is! String ||
           rank[4] is! int ||
           value['deleted'] is! bool ||
-          value['text'] is! String) {
+          value['text'] is! String ||
+          (value['attributes'] != null && value['attributes'] is! Map) ||
+          (value['attributeVersions'] != null &&
+              value['attributeVersions'] is! Map)) {
         throw const FormatException('Malformed text atom graph.');
       }
       children.putIfAbsent(after as String?, () => []).add(entry.key);
