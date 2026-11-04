@@ -558,8 +558,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   sprawdza `boundUserId`, login i adres API; offline nie wymusza
   logowania, a odrzucony token usuwa. Login i wylogowanie są
   serializowane z operacjami na magazynie sekretów; ponowny login
-  nie traci danych lokalnych. `shouldShowStartupDialog` tylko przy
-  nieukończonym onboardingu.
+  nie traci danych lokalnych. Przy logout kończy zapisy i synchronizację
+  przed odwołaniem serwerowej sesji; błąd flush pozostawia aktywne konto.
+  `shouldShowStartupDialog` tylko przy nieukończonym onboardingu.
   10: `AccountDataMode`; 12: `AccountSessionController`;
   84: `_loadProfile`; 223: `_refreshSession`;
   247: `_restorePersistedSession`; 313: `_persistRefreshCredential`;

@@ -394,6 +394,9 @@ class AccountSessionController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Drain writers while the identity and token are still valid.
+    // A failed flush must not revoke an account with unsaved local edits.
+    await onBeforeAccountChange?.call();
     final refreshToken = _refreshToken;
     Object? remoteFailure;
     StackTrace? remoteStack;

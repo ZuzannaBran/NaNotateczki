@@ -369,6 +369,113 @@ void main() {
     },
   );
 
+  test('logout drains account writers before revoking credentials', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    final drainStarted = Completer<void>();
+    final allowDrain = Completer<void>();
+    var gateLogout = false;
+    var revokeCalled = false;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access-test',
+              'refreshToken': 'refresh-test',
+              'expiresIn': 600,
+              'userId': 'user-1',
+              'username': 'test_user',
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/auth/logout') {
+          revokeCalled = true;
+          expect(request.headers['authorization'], 'Bearer access-test');
+          return http.Response('', 204);
+        }
+        fail('Unexpected request: ${request.url}');
+      }),
+    );
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+      onBeforeAccountChange: () async {
+        if (!gateLogout) {
+          return;
+        }
+        drainStarted.complete();
+        await allowDrain.future;
+      },
+    );
+    await session.loadProfile();
+    await session.login('test_user', 'password');
+    gateLogout = true;
+    final logout = session.logout();
+    await drainStarted.future;
+    expect(revokeCalled, isFalse);
+    expect(session.isSignedIn, isTrue);
+    expect(credentials.value, contains('refresh-test'));
+    allowDrain.complete();
+    await logout;
+    expect(revokeCalled, isTrue);
+    expect(credentials.value, isNull);
+    expect(session.isSignedIn, isFalse);
+    session.dispose();
+    client.close();
+  });
+
+  test('failed writer drain preserves the account session', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    var rejectDrain = false;
+    var revokeCalls = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access-test',
+              'refreshToken': 'refresh-test',
+              'expiresIn': 600,
+              'userId': 'user-1',
+              'username': 'test_user',
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/auth/logout') {
+          revokeCalls++;
+          return http.Response('', 204);
+        }
+        fail('Unexpected request: ${request.url}');
+      }),
+    );
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+      onBeforeAccountChange: () async {
+        if (rejectDrain) {
+          throw StateError('Pending local writes');
+        }
+      },
+    );
+    await session.loadProfile();
+    await session.login('test_user', 'password');
+    rejectDrain = true;
+    await expectLater(session.logout(), throwsStateError);
+    expect(revokeCalls, 0);
+    expect(session.isSignedIn, isTrue);
+    expect(credentials.value, contains('refresh-test'));
+    session.dispose();
+    client.close();
+  });
+
   test('failed credential deletion keeps account active at logout', () async {
     final stored = <String, String>{};
     textStorageReadOverride = (key) async => stored[key];

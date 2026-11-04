@@ -16,6 +16,24 @@ Nie jest to potwierdzenie produkcyjnej migracji.
   i rewizje v1. SyncEngine v2 i ShareOperationProjection są opt-in.
   Legacy nie jest więc martwym kodem.
 
+## Potwierdzenie usunięcia danych lokalnych (2026-11-04)
+
+Użytkownik potwierdził, że usunął również lokalne dane testowe.
+Dla pustych magazynów nie jest wymagany import historycznych SQLite,
+WAL, UID ani kolejki v1 do v2. Nie jest to równoznaczne z przełączeniem
+aplikacji: rejestracja nowych kont i produkcyjny edytor nadal używają v1.
+Nie należy uruchamiać skryptów migracji historycznych danych na pustych
+magazynach ani automatycznie włączać v2 bez obsługi wszystkich akcji.
+Aktualny reset serwera nie gwarantuje usunięcia stanu pozostawionego na
+innych, niezweryfikowanych urządzeniach.
+
+## Dodatkowe zabezpieczenie przy wylogowaniu (2026-11-04)
+
+Przed żądaniem odwołania sesji konto zatrzymuje i opróżnia lokalne writery
+przez onBeforeAccountChange; błąd flush nie unieważnia sesji i nie usuwa
+jej tokenu. Dwa testy regresyjne kontrolują kolejność i przypadek błędu.
+Brak Flutter SDK w środowisku — testów nie ogłoszono jako zaliczonych.
+
 ## Dodatkowa decyzja: dane testowe można usunąć
 
 Pełny reset PostgreSQL oraz serwerowego `data/` został potwierdzony
