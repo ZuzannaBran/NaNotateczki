@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../drift/notes_database.dart';
 import 'operation_protocol.dart';
+import 'operation_text_sequence.dart';
 
 /// Immutable, checksummed projection of an acknowledged document state.
 class StoredDocumentSnapshot {
@@ -105,6 +106,49 @@ class OperationStore {
         jsonDecode(row['envelope_json'] as String) as Map,
       ),
     );
+  }
+
+  /// Rebuilds the text CRDT from immutable, committed operations.
+  ///
+  /// No tentative operation or ACK is required for recovery. Call inside the
+  /// same SQLite transaction as a new text projection; the caller applies the
+  /// new envelope to this result before it is inserted into the journal.
+  Future<Map<String, dynamic>> textAtoms({
+    required String documentId,
+    required String pageId,
+    required String objectId,
+  }) async {
+    if (documentId.isEmpty || pageId.isEmpty || objectId.isEmpty) {
+      throw ArgumentError('Text CRDT lookup needs complete identity.');
+    }
+    final rows = await database.customSelect(
+      'SELECT envelope_json FROM operations '
+      'WHERE document_id = ? AND page_id = ? AND object_id = ? '
+      "AND kind IN ('text.insert', 'text.delete', 'text.format') "
+      'ORDER BY rowid',
+      variables: [
+        Variable<String>(documentId),
+        Variable<String>(pageId),
+        Variable<String>(objectId),
+      ],
+    ).get();
+    // Replay is intentionally bounded until verified text checkpoints exist.
+    // Refuse to truncate history or silently discard causally required atoms.
+    if (rows.length > 50000) {
+      throw StateError('Text operation history requires a checkpoint.');
+    }
+    var atoms = <String, dynamic>{};
+    for (final row in rows) {
+      final json = jsonDecode(row.read<String>('envelope_json'));
+      if (json is! Map) {
+        throw const FormatException('Corrupt text operation envelope.');
+      }
+      final operation = OperationEnvelope.fromJson(
+        Map<String, dynamic>.from(json),
+      );
+      atoms = OperationTextSequence.apply(atoms, operation);
+    }
+    return atoms;
   }
 
   /// Allocates actorSeq atomically. A rolled-back edit consumes no sequence.
