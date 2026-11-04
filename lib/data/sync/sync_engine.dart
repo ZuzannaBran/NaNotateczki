@@ -127,14 +127,13 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       payload: payload,
       documentId: documentId,
       objectId: objectId,
+      pageId: pageId,
     );
     // Actor sequences and causal frontiers are document-scoped. An account
     // may edit unrelated documents concurrently, and guests cannot fetch
     // dependencies on private documents belonging to the owner.
-    final actorData = jsonEncode([actorId, checkpointScope, documentId]);
-    final scopedActorId = sha256.convert(utf8.encode(actorData)).toString();
     final operation = await store.writeLocal(
-      actorId: scopedActorId,
+      actorId: _scopedActorId(documentId),
       documentId: documentId,
       kind: kind,
       payload: payload,
@@ -146,6 +145,42 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     );
     requestSync();
     return operation;
+  }
+
+  String _scopedActorId(String documentId) {
+    final actorData = jsonEncode([actorId, checkpointScope, documentId]);
+    return sha256.convert(utf8.encode(actorData)).toString();
+  }
+
+  /// Persists a whole completed gesture before requesting network delivery.
+  ///
+  /// Every draft is validated before the transaction. The store commits all
+  /// projections, actor sequence numbers and outbox rows or none of them.
+  Future<List<OperationEnvelope>> writeLocalBatch({
+    required String documentId,
+    required List<LocalOperationDraft> operations,
+    required Future<void> Function(OperationEnvelope) apply,
+  }) async {
+    if (operations.isEmpty) {
+      throw ArgumentError.value(operations, 'operations', 'Empty gesture.');
+    }
+    for (final draft in operations) {
+      OperationEnvelope.validateV2Payload(
+        kind: draft.kind,
+        payload: draft.payload,
+        documentId: documentId,
+        pageId: draft.pageId,
+        objectId: draft.objectId,
+      );
+    }
+    final committed = await store.writeLocalBatch(
+      actorId: _scopedActorId(documentId),
+      documentId: documentId,
+      operations: operations,
+      apply: apply,
+    );
+    requestSync();
+    return committed;
   }
 
   Future<void> start() async {

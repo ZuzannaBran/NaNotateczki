@@ -463,7 +463,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   przekazuje nagłówek Share `X-Share-Id`.
 - `lib/data/sync/sync_engine.dart`: `SyncEngine` i
   `RemoteOperationReducer`. Trwały lokalny outbox, max 50/800 KiB
-  w paczce, aktorzy per dokument, ACK bez replay, REST catch-up,
+  w paczce, `writeLocalBatch` gestu z jednym aktorem per dokument, ACK bez replay, REST catch-up,
   WebSocket hints, najwcześniejszy retry, generation token na stop,
   odświeżenie sesji i rebase przez callback. Błąd pull nie blokuje push.
   Pakiet 409/413/422 próbuje bezpiecznego prefiksu, bez pomijania actorSeq.
@@ -1283,6 +1283,17 @@ usunięte stroke'y i ich pierwotne indeksy zamiast pełnej kopii strony.
 - 264: `MoveImageBetweenPagesAction`;
   393: `MoveSelectionAction`; 449: `DeleteSelectionAction`;
   485: `PasteSelectionAction`; 521: `OffsetPosition`.
+
+### `lib/features/editor/state/editor_operation_bridge.dart`
+
+`EditorOperationBridge` planuje v2 z już zatwierdzonych zmian strony,
+korzystając z istniejących adapterów Ink/Quill. Obsługuje stronę,
+rysowanie/gumkę, geometrię, tworzenie tekstu i zweryfikowane assety.
+Wymaga trwałych atomów CRDT przy aktualizacji tekstu; zmiana zawartości
+assetu i embedy Quill są celowo blokowane do obsługi upload/rebase.
+Nie jest jeszcze podłączony do produkcyjnego `EditorController`.
+Regresje: `test/editor_operation_bridge_test.dart` oraz batch/rollback
+w `test/sync_engine_test.dart`.
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
 

@@ -96,3 +96,18 @@ jest osiągalny z późniejszego. Jawne zależności, poprzednik aktora
 i `revertsOperationId` nigdy nie są usuwane. Ponad 256 **niezależnych**
 frontierów nadal wymaga rozszerzenia protokołu i nie jest obcinane:
 operacja lokalna nie przechodzi do dziennika zamiast utraty przyczynowości.
+
+## Przygotowanie przejścia edytora (częściowe)
+
+Dodano `EditorOperationBridge`, który przekłada zatwierdzoną zmianę
+strony na `LocalOperationDraft` używając istniejących adapterów ink/tekst.
+`SyncEngine.writeLocalBatch` zapisuje cały gest w jednej transakcji
+przed planowaniem wysyłki i waliduje wszystkie payloady zawczasu.
+
+To NIE jest produkcyjny cutover. Brakuje integracji z `EditorController`,
+trwałego odwzorowania/rebase atomów CRDT przy każdej edycji Quill,
+bezpiecznego Undo/Redo tożsamości z tombstones, kompletnej obsługi
+replace/detach assetów i projekcji SQLite dla wszystkich typów.
+Nie wolno włączać jednocześnie writerów v1 i v2 ani usuwać snapshotowego
+zapisu przed zakończeniem tych prac. Testy wymagają uruchomienia przez
+Flutter/Dart; samo dodanie regresji nie oznacza ich zaliczenia.

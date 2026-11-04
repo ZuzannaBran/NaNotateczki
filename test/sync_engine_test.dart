@@ -171,6 +171,107 @@ void main() {
     );
   }
 
+  test('batch API commits and ACKs a completed gesture once', () async {
+    final drafts = [
+      for (final id in ['ink-a', 'ink-b', 'ink-c'])
+        LocalOperationDraft(
+          kind: OperationKind.objectCreate,
+          pageId: 'page-one',
+          objectId: id,
+          payload: {'value': {'label': id}},
+        ),
+    ];
+    final committed = await engine.writeLocalBatch(
+      documentId: 'document-one',
+      operations: drafts,
+      apply: (operation) => database.customStatement(
+        'INSERT INTO projection_probe VALUES (?, ?)',
+        [operation.objectId!, 'local'],
+      ),
+    );
+    expect(committed.map((op) => op.actorSeq), [1, 2, 3]);
+    expect(committed[1].dependencies, contains(committed.first.operationId));
+    expect((await store.pending()).length, 3);
+    expect(
+      (await database.customSelect('SELECT * FROM projection_probe').get())
+          .length,
+      3,
+    );
+
+    await engine.start();
+    expect(await store.pending(), isEmpty);
+    expect(gateway.accepted, hasLength(3));
+    expect(rebaseObserved, isEmpty);
+    expect(
+      (await database.customSelect('SELECT * FROM projection_probe').get())
+          .length,
+      3,
+    );
+  });
+
+  test('batch API rolls back all writes and actor sequence on error', () async {
+    await expectLater(
+      engine.writeLocalBatch(
+        documentId: 'document-one',
+        operations: [
+          for (final id in ['good', 'failed', 'never'])
+            LocalOperationDraft(
+              kind: OperationKind.objectCreate,
+              pageId: 'page-one',
+              objectId: id,
+              payload: {'value': {'label': id}},
+            ),
+        ],
+        apply: (operation) async {
+          if (operation.objectId == 'failed') {
+            throw StateError('Projection failed.');
+          }
+          await database.customStatement(
+            'INSERT INTO projection_probe VALUES (?, ?)',
+            [operation.objectId!, 'temporary'],
+          );
+        },
+      ),
+      throwsStateError,
+    );
+    expect(await store.pending(), isEmpty);
+    expect(
+      await database.customSelect('SELECT * FROM projection_probe').get(),
+      isEmpty,
+    );
+    expect((await local('recovered')).actorSeq, 1);
+  });
+
+  test('batch prevalidates every draft before writing the projection',
+      () async {
+    var touched = false;
+    await expectLater(
+      engine.writeLocalBatch(
+        documentId: 'document-one',
+        operations: const [
+          LocalOperationDraft(
+            kind: OperationKind.objectCreate,
+            pageId: 'page-one',
+            objectId: 'valid',
+            payload: {'value': {'label': 'valid'}},
+          ),
+          LocalOperationDraft(
+            kind: OperationKind.objectCreate,
+            pageId: 'page-one',
+            objectId: 'invalid',
+            payload: {'properties': {'label': 'invalid'}},
+          ),
+        ],
+        apply: (_) async {
+          touched = true;
+        },
+      ),
+      throwsFormatException,
+    );
+    expect(touched, isFalse);
+    expect(await store.pending(), isEmpty);
+  });
+
   test('invalid create is refused before any SQLite or outbox write', () async {
     await expectLater(
       engine.writeLocal(
