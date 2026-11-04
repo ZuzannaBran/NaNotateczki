@@ -488,6 +488,50 @@ void main() {
     );
   });
 
+  test('v2 page deletion preserves durable asset reference rows',
+      () async {
+    const target = 'reference-page';
+    await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageCreate,
+        objectId: target,
+        payload: {
+          'value': {'title': 'Attached', 'isBookmarked': false},
+        },
+      ),
+    ]);
+    await store.attachAssetReference(
+      documentId: documentId,
+      pageId: target,
+      objectId: 'owner-object',
+      assetId: 'verified-one',
+      storagePath: '/private/verified-one',
+      checksumSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      byteLength: 12,
+    );
+    final queued = await store.pending();
+    await expectLater(
+      write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageDelete,
+          objectId: target,
+          payload: {},
+        ),
+      ]),
+      throwsUnsupportedError,
+    );
+    expect(await store.pending(), hasLength(queued.length));
+    expect(
+      await database.customSelect(
+        'SELECT asset_id FROM asset_references '
+        'WHERE document_id = ?',
+        variables: [Variable<String>(documentId)],
+      ).get(),
+      hasLength(1),
+    );
+  });
+
   test('v2 page deletion cannot orphan a Quill embed', () async {
     const target = 'embed-page';
     await write([
