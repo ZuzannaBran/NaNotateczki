@@ -39,9 +39,15 @@ ShareOperationProjection initial() {
     }, objectId: 'page'),
   );
   state = state.apply(
-    op(3, OperationKind.strokeCreate, {
-      'value': {'color': 1, 'dx': 0},
-    }, pageId: 'page', objectId: 'stroke'),
+    op(
+      3,
+      OperationKind.strokeCreate,
+      {
+        'value': {'color': 1, 'dx': 0},
+      },
+      pageId: 'page',
+      objectId: 'stroke',
+    ),
   );
   return state;
 }
@@ -85,12 +91,15 @@ void main() {
 
   test('remote deletion never resurrects an object or its old UID', () {
     final delete = op(
-      6, OperationKind.objectDelete, {},
+      6,
+      OperationKind.objectDelete,
+      {},
       pageId: 'page',
       objectId: 'stroke',
     );
     final edit = op(
-      7, OperationKind.objectSet,
+      7,
+      OperationKind.objectSet,
       {
         'properties': {'color': 99},
       },
@@ -98,14 +107,20 @@ void main() {
       objectId: 'stroke',
     );
     final deleted = initial().apply(delete).apply(edit);
-    final objects = ((deleted.document!['pages'] as Map)['page'] as Map)
-        ['objects'] as Map;
+    final objects =
+        ((deleted.document!['pages'] as Map)['page'] as Map)['objects'] as Map;
     expect(objects, isEmpty);
     expect(
       () => deleted.apply(
-        op(8, OperationKind.strokeCreate, {
-          'value': {'color': 99},
-        }, pageId: 'page', objectId: 'stroke'),
+        op(
+          8,
+          OperationKind.strokeCreate,
+          {
+            'value': {'color': 99},
+          },
+          pageId: 'page',
+          objectId: 'stroke',
+        ),
       ),
       throwsStateError,
     );
@@ -149,13 +164,24 @@ void main() {
   test('remote deletion leaves unacknowledged local edit for recovery', () {
     final pending = PendingShareProjection(initial());
     pending.enqueue(
-      op(11, OperationKind.objectSet, {
-        'properties': {'color': 12},
-      }, pageId: 'page', objectId: 'stroke'),
+      op(
+        11,
+        OperationKind.objectSet,
+        {
+          'properties': {'color': 12},
+        },
+        pageId: 'page',
+        objectId: 'stroke',
+      ),
     );
     pending.accept(
-      op(12, OperationKind.objectDelete, {},
-          pageId: 'page', objectId: 'stroke'),
+      op(
+        12,
+        OperationKind.objectDelete,
+        {},
+        pageId: 'page',
+        objectId: 'stroke',
+      ),
     );
     expect(pending.pending, hasLength(1));
     expect(strokeObjectCount(pending.visible), 0);
@@ -170,25 +196,44 @@ void main() {
       }, objectId: 'other-page'),
     );
     state = state.apply(
-      op(15, OperationKind.strokeCreate, {
-        'value': {'color': 7},
-      }, pageId: 'page', objectId: 'untouched-stroke'),
+      op(
+        15,
+        OperationKind.strokeCreate,
+        {
+          'value': {'color': 7},
+        },
+        pageId: 'page',
+        objectId: 'untouched-stroke',
+      ),
     );
     final beforePages = state.document!['pages'] as Map;
     final beforeObjects = (beforePages['page'] as Map)['objects'] as Map;
     final updated = state.apply(
-      op(13, OperationKind.objectSet, {
-        'properties': {'color': 3},
-      }, pageId: 'page', objectId: 'stroke'),
+      op(
+        13,
+        OperationKind.objectSet,
+        {
+          'properties': {'color': 3},
+        },
+        pageId: 'page',
+        objectId: 'stroke',
+      ),
     );
     final afterPages = updated.document!['pages'] as Map;
     final afterObjects = (afterPages['page'] as Map)['objects'] as Map;
     expect(identical(state.document, updated.document), isFalse);
-    expect(identical(beforePages['other-page'], afterPages['other-page']),
-        isTrue);
+    expect(
+      identical(beforePages['other-page'], afterPages['other-page']),
+      isTrue,
+    );
     expect(identical(beforePages['page'], afterPages['page']), isFalse);
-    expect(identical(beforeObjects['untouched-stroke'],
-        afterObjects['untouched-stroke']), isTrue);
+    expect(
+      identical(
+        beforeObjects['untouched-stroke'],
+        afterObjects['untouched-stroke'],
+      ),
+      isTrue,
+    );
     expect(identical(beforeObjects['stroke'], afterObjects['stroke']), isFalse);
     expect((stroke(state)['properties'] as Map)['color'], 1);
     expect((stroke(updated)['properties'] as Map)['color'], 3);

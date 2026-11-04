@@ -8,59 +8,66 @@ import 'package:program/features/share/presentation/study_share_memory_db_stub.d
     as guest_db;
 
 void main() {
-  test('guest operation outbox survives reload without leaking to other share',
-      () async {
-    final firstShare = const Uuid().v4();
-    final secondShare = const Uuid().v4();
-    final first = await guest_db.openSharedGuestOperationDatabase(
-      firstShare,
-      guestActorId: 'guest-A',
-    );
-    String? operationId;
-    try {
-      final store = OperationStore(first);
-      final operation = await store.writeLocal(
-        actorId: 'guest',
-        documentId: 'shared-doc',
-        kind: OperationKind.documentCreate,
-        payload: {
-          'value': {'title': 'Only in guest A'},
-        },
-        apply: (_) async {},
+  test(
+    'guest operation outbox survives reload without leaking to other share',
+    () async {
+      final firstShare = const Uuid().v4();
+      final secondShare = const Uuid().v4();
+      final first = await guest_db.openSharedGuestOperationDatabase(
+        firstShare,
+        guestActorId: 'guest-A',
       );
-      operationId = operation.operationId;
-      expect(await store.pending(), hasLength(1));
-    } finally {
-      await first.close();
-    }
+      String? operationId;
+      try {
+        final store = OperationStore(first);
+        final operation = await store.writeLocal(
+          actorId: 'guest',
+          documentId: 'shared-doc',
+          kind: OperationKind.documentCreate,
+          payload: {
+            'value': {'title': 'Only in guest A'},
+          },
+          apply: (_) async {},
+        );
+        operationId = operation.operationId;
+        expect(await store.pending(), hasLength(1));
+      } finally {
+        await first.close();
+      }
 
-    final restored = await guest_db.openSharedGuestOperationDatabase(firstShare);
-    try {
-      final entries = await OperationStore(restored).pending();
-      expect(entries.map((entry) => entry.operationId),
-          contains(operationId));
-    } finally {
-      await restored.close();
-    }
+      final restored = await guest_db.openSharedGuestOperationDatabase(
+        firstShare,
+      );
+      try {
+        final entries = await OperationStore(restored).pending();
+        expect(
+          entries.map((entry) => entry.operationId),
+          contains(operationId),
+        );
+      } finally {
+        await restored.close();
+      }
 
-    final anotherGuest = await guest_db.openSharedGuestOperationDatabase(
-      firstShare,
-      guestActorId: 'guest-B',
-    );
-    try {
-      expect(await OperationStore(anotherGuest).pending(), isEmpty);
-    } finally {
-      await anotherGuest.close();
-    }
+      final anotherGuest = await guest_db.openSharedGuestOperationDatabase(
+        firstShare,
+        guestActorId: 'guest-B',
+      );
+      try {
+        expect(await OperationStore(anotherGuest).pending(), isEmpty);
+      } finally {
+        await anotherGuest.close();
+      }
 
-    final isolated = await guest_db.openSharedGuestOperationDatabase(
-      secondShare,
-      guestActorId: 'guest-A',
-    );
-    try {
-      expect(await OperationStore(isolated).pending(), isEmpty);
-    } finally {
-      await isolated.close();
-    }
-  }, skip: !kIsWeb);
+      final isolated = await guest_db.openSharedGuestOperationDatabase(
+        secondShare,
+        guestActorId: 'guest-A',
+      );
+      try {
+        expect(await OperationStore(isolated).pending(), isEmpty);
+      } finally {
+        await isolated.close();
+      }
+    },
+    skip: !kIsWeb,
+  );
 }

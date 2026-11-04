@@ -11,8 +11,10 @@ void main() {
 
     expect(a, StorageNamespace.account('user-a'));
     expect({local, a, b, guest, other}, hasLength(5));
-    expect(a.fileKey('study_planner.json'),
-        isNot(b.fileKey('study_planner.json')));
+    expect(
+      a.fileKey('study_planner.json'),
+      isNot(b.fileKey('study_planner.json')),
+    );
     expect(a.nativeDatabaseName, isNot(local.nativeDatabaseName));
     expect(a.webDatabaseName, isNot(b.webDatabaseName));
     expect(a.imageDirectory, isNot(b.imageDirectory));
@@ -28,14 +30,18 @@ void main() {
     final calls = <String>[];
     final oldGeneration = manager.generation;
 
-    await manager.switchTo(a,
-        stopAndFlush: () async => calls.add('close-local'),
-        open: (target) async => calls.add(target.relativePath));
+    await manager.switchTo(
+      a,
+      stopAndFlush: () async => calls.add('close-local'),
+      open: (target) async => calls.add(target.relativePath),
+    );
     final accountGeneration = manager.generation;
     expect(manager.accepts(local, oldGeneration), isFalse);
-    await manager.switchTo(b,
-        stopAndFlush: () async => calls.add('close-a'),
-        open: (target) async => calls.add(target.relativePath));
+    await manager.switchTo(
+      b,
+      stopAndFlush: () async => calls.add('close-a'),
+      open: (target) async => calls.add(target.relativePath),
+    );
     expect(manager.accepts(a, accountGeneration), isFalse);
     expect(manager.current, b);
     expect(calls, hasLength(4));
@@ -45,17 +51,21 @@ void main() {
     final manager = StorageNamespaceManager();
     final old = manager.generation;
     await expectLater(
-      manager.switchTo(StorageNamespace.account('user-a'),
-          stopAndFlush: () async {},
-          open: (_) async => throw StateError('disk full')),
+      manager.switchTo(
+        StorageNamespace.account('user-a'),
+        stopAndFlush: () async {},
+        open: (_) async => throw StateError('disk full'),
+      ),
       throwsStateError,
     );
     expect(manager.current, StorageNamespace.local());
     expect(manager.isActive, isFalse);
     expect(manager.accepts(StorageNamespace.local(), old), isFalse);
-    await manager.switchTo(StorageNamespace.local(),
-        stopAndFlush: () async {},
-        open: (_) async {});
+    await manager.switchTo(
+      StorageNamespace.local(),
+      stopAndFlush: () async {},
+      open: (_) async {},
+    );
     expect(manager.isActive, isTrue);
   });
 }

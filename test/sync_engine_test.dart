@@ -439,49 +439,55 @@ void main() {
     expect(gateway.cursors.keys.single, first.operationId);
     expect((await store.operation(first.operationId))?.actorSeq, 1);
   });
-  test('remote UI patches run after SQLite commit and retry on failure',
-      () async {
-    gateway.seed(_remote('other-actor', 'remote-patch'));
-    engine.dispose();
-    var attempts = 0;
-    var allowDisplay = false;
-    engine = SyncEngine(
-      store: store,
-      gateway: gateway,
-      actorId: 'actor-local',
-      checkpointScope: 'user-A-v2',
-      enableRealtime: false,
-      applyRemote: (remote, _) => database.customStatement(
-        'INSERT INTO projection_probe VALUES (?, ?)',
-        [remote.objectId, 'committed'],
-      ),
-      onRemoteCommitted: (remote) async {
-        attempts++;
-        final rows = await database.customSelect(
-          'SELECT value FROM projection_probe WHERE id = ?',
-          variables: [Variable<String>(remote.objectId!)],
-        ).get();
-        expect(rows.single.read<String>('value'), 'committed');
-        if (!allowDisplay) {
-          throw StateError('Editor is busy with a local gesture.');
-        }
-      },
-    );
-    await engine.start();
-    expect(await store.checkpoint('user-A-v2'), 0);
-    expect(attempts, greaterThanOrEqualTo(1));
-    expect(engine.lastError, isNotNull);
-    allowDisplay = true;
-    await engine.syncNow();
-    expect(await store.checkpoint('user-A-v2'), 1);
-    expect(engine.lastError, isNull);
-    expect(attempts, greaterThanOrEqualTo(2));
-    final rows = await database.customSelect(
-      'SELECT value FROM projection_probe WHERE id = ?',
-      variables: [const Variable<String>('remote-patch')],
-    ).get();
-    expect(rows, hasLength(1));
-  });
+  test(
+    'remote UI patches run after SQLite commit and retry on failure',
+    () async {
+      gateway.seed(_remote('other-actor', 'remote-patch'));
+      engine.dispose();
+      var attempts = 0;
+      var allowDisplay = false;
+      engine = SyncEngine(
+        store: store,
+        gateway: gateway,
+        actorId: 'actor-local',
+        checkpointScope: 'user-A-v2',
+        enableRealtime: false,
+        applyRemote: (remote, _) => database.customStatement(
+          'INSERT INTO projection_probe VALUES (?, ?)',
+          [remote.objectId, 'committed'],
+        ),
+        onRemoteCommitted: (remote) async {
+          attempts++;
+          final rows = await database
+              .customSelect(
+                'SELECT value FROM projection_probe WHERE id = ?',
+                variables: [Variable<String>(remote.objectId!)],
+              )
+              .get();
+          expect(rows.single.read<String>('value'), 'committed');
+          if (!allowDisplay) {
+            throw StateError('Editor is busy with a local gesture.');
+          }
+        },
+      );
+      await engine.start();
+      expect(await store.checkpoint('user-A-v2'), 0);
+      expect(attempts, greaterThanOrEqualTo(1));
+      expect(engine.lastError, isNotNull);
+      allowDisplay = true;
+      await engine.syncNow();
+      expect(await store.checkpoint('user-A-v2'), 1);
+      expect(engine.lastError, isNull);
+      expect(attempts, greaterThanOrEqualTo(2));
+      final rows = await database
+          .customSelect(
+            'SELECT value FROM projection_probe WHERE id = ?',
+            variables: [const Variable<String>('remote-patch')],
+          )
+          .get();
+      expect(rows, hasLength(1));
+    },
+  );
 
   test('an ACKed local echo cannot repaint after cursor replay', () async {
     engine.dispose();
@@ -534,7 +540,9 @@ void main() {
       pageId: 'page-one',
       objectId: 'offline-stroke',
       kind: OperationKind.strokeCreate,
-      payload: const {'value': {'colorValue': 1}},
+      payload: const {
+        'value': {'colorValue': 1},
+      },
       apply: (_) async {},
     );
     expect(await store.isPending(pending.operationId), isTrue);
@@ -543,5 +551,4 @@ void main() {
     expect(engine.isStarted, isFalse);
     expect(await store.isPending(pending.operationId), isTrue);
   });
-
 }

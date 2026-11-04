@@ -41,9 +41,7 @@ void main() {
     ]);
     atoms = applyPlan(atoms, replacement);
     expect(OperationTextSequence.render(atoms), 'AXC');
-    atoms = applyPlan(
-      atoms, adapter.plan(atoms: atoms, newText: 'AC'),
-    );
+    atoms = applyPlan(atoms, adapter.plan(atoms: atoms, newText: 'AC'));
     expect(OperationTextSequence.render(atoms), 'AC');
   });
 
@@ -54,15 +52,15 @@ void main() {
     expect(plan, hasLength(2));
     expect(plan.every((item) => item.kind == OperationKind.textInsert), isTrue);
     final firstBatch = plan.first.payload['atoms'] as List;
-    expect(plan.last.payload['afterAtomId'],
-        (firstBatch.last as Map)['id']);
+    expect(plan.last.payload['afterAtomId'], (firstBatch.last as Map)['id']);
     expect(OperationTextSequence.render(applyPlan({}, plan)), text);
   });
 
   test('same text creates no duplicate operations', () {
     final adapter = ShareTextEditAdapter();
     final current = applyPlan(
-      {}, adapter.plan(atoms: {}, newText: 'unchanged'),
+      {},
+      adapter.plan(atoms: {}, newText: 'unchanged'),
     );
     expect(adapter.plan(atoms: current, newText: 'unchanged'), isEmpty);
   });
@@ -97,19 +95,13 @@ void main() {
         logicalClock: 1,
       ),
     );
-    expect(
-      () => adapter.plan(atoms: initial, newText: 'AX'),
-      throwsStateError,
-    );
+    expect(() => adapter.plan(atoms: initial, newText: 'AX'), throwsStateError);
   });
 
   test('duplicate atom IDs are rejected before emitting an intent', () {
     const reusedId = '00000000-0000-4000-8000-000000000001';
     final adapter = ShareTextEditAdapter(createAtomId: () => reusedId);
-    expect(
-      () => adapter.plan(atoms: {}, newText: 'AB'),
-      throwsStateError,
-    );
+    expect(() => adapter.plan(atoms: {}, newText: 'AB'), throwsStateError);
   });
   test('Unicode supplementary characters remain intact after replacement', () {
     final adapter = ShareTextEditAdapter();
@@ -123,14 +115,16 @@ void main() {
     final adapter = ShareTextEditAdapter();
     final initial = List.filled(513, 'x').join();
     final replacement = List.filled(513, 'y').join();
-    var state = applyPlan(
-      {}, adapter.plan(atoms: {}, newText: initial),
-    );
+    var state = applyPlan({}, adapter.plan(atoms: {}, newText: initial));
     final changes = adapter.plan(atoms: state, newText: replacement);
-    expect(changes.where((it) => it.kind == OperationKind.textDelete),
-        hasLength(3));
-    expect(changes.where((it) => it.kind == OperationKind.textInsert),
-        hasLength(3));
+    expect(
+      changes.where((it) => it.kind == OperationKind.textDelete),
+      hasLength(3),
+    );
+    expect(
+      changes.where((it) => it.kind == OperationKind.textInsert),
+      hasLength(3),
+    );
     state = applyPlan(state, changes);
     expect(OperationTextSequence.render(state), replacement);
   });

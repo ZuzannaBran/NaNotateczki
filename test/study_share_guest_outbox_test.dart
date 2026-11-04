@@ -5,8 +5,10 @@ import 'package:program/data/sync/study_share_guest_outbox.dart';
 
 void main() {
   final storage = <String, String>{};
-  final guestKey = StorageNamespace.share('session-a', 'legacy-web-guest')
-      .fileKey('outbox.json');
+  final guestKey = StorageNamespace.share(
+    'session-a',
+    'legacy-web-guest',
+  ).fileKey('outbox.json');
 
   setUp(() {
     storage.clear();
