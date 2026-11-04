@@ -427,6 +427,12 @@ narzędziem `age`. Skrypt nie wdraża retencji i nie zastępuje testu odtworzeni
 
 ## SQLite v6 — dziennik operacji (etapy 3–5 i poprawka etapu 12)
 
+Legacy `EditorController.deleteLastPage` przekazuje jawnie usunięty page ID
+do `NotebookRepository.saveNotebook`. Zabezpieczenie integralności może
+dopuścić ubytek całej wskazanej strony bez mylenia go z uszkodzeniem
+snapshotu. Każde nieoznaczone usunięcie pozostaje blokowane i logowane.
+Nie zmienia to produkcyjnego protokołu sync v1 ani nie aktywuje v2.
+
 Lokalna baza Drift jest migrowana addytywnie z v2 do v6. Migracja v3 → v4
 odtwarza pageId z operacji usuwającej obiekt i zachowuje tombstones.
 Migracja v4 → v5 dodaje trwały status `blocked` i opis błędu do outboxu,
