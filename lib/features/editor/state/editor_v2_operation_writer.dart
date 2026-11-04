@@ -1,8 +1,11 @@
+import 'package:collection/collection.dart';
+
 import '../../../data/sync/editor_sqlite_projector.dart';
 import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/operation_store.dart';
 import '../../../data/sync/sync_engine.dart';
 import '../../notebook/domain/note_page.dart';
+import '../../notebook/domain/notebook.dart';
 import 'editor_actions.dart';
 import 'editor_operation_bridge.dart';
 
@@ -26,6 +29,98 @@ class EditorV2OperationWriter {
   final SyncEngine syncEngine;
   final EditorSqliteProjector projector;
   final EditorOperationBridge _bridge;
+
+  /// Commits the complete effect of a multi-page gesture atomically.
+  ///
+  /// Moves that retain an object ID on a different page require object.move
+  /// and must never be emulated as delete/create with a partial commit.
+  Future<List<OperationEnvelope>> writeNotebookChange({
+    required Notebook before,
+    required Notebook after,
+  }) async {
+    if (before.uid != after.uid ||
+        before.kind != after.kind ||
+        before.title != after.title ||
+        before.folder != after.folder ||
+        after.pages.isEmpty) {
+      throw ArgumentError('Unsupported notebook identity or metadata edit.');
+    }
+    Map<String, NotePage> uniquePages(Notebook notebook) {
+      final result = <String, NotePage>{};
+      for (final page in notebook.pages) {
+        if (page.id.isEmpty || result.containsKey(page.id)) {
+          throw StateError('Duplicate or missing notebook page identity.');
+        }
+        result[page.id] = page;
+      }
+      return result;
+    }
+
+    Map<String, String> objectPages(Notebook notebook) {
+      final result = <String, String>{};
+      for (final page in notebook.pages) {
+        final ids = [
+          ...page.inkStrokes.map((stroke) => stroke.id),
+          ...page.textBlocks.map((block) => block.id),
+          ...page.imageBlocks.map((block) => block.id),
+        ];
+        for (final id in ids) {
+          if (id.isEmpty || result.containsKey(id)) {
+            throw StateError('Duplicate or missing object identity.');
+          }
+          result[id] = page.id;
+        }
+      }
+      return result;
+    }
+
+    final oldPages = uniquePages(before);
+    final newPages = uniquePages(after);
+    final oldObjects = objectPages(before);
+    final newObjects = objectPages(after);
+    for (final entry in newObjects.entries) {
+      final origin = oldObjects[entry.key];
+      if (origin != null && origin != entry.value) {
+        throw UnsupportedError('Cross-page objects require object.move.');
+      }
+    }
+    final originalOrder = [
+      for (final page in before.pages)
+        if (newPages.containsKey(page.id)) page.id,
+    ];
+    final nextOrder = [
+      for (final page in after.pages)
+        if (oldPages.containsKey(page.id)) page.id,
+    ];
+    if (!const ListEquality<String>().equals(originalOrder, nextOrder)) {
+      throw UnsupportedError('Page reordering is not yet in v2.');
+    }
+
+    final drafts = <LocalOperationDraft>[];
+    for (final page in after.pages) {
+      final old = oldPages[page.id];
+      if (old == null) {
+        drafts.addAll(_bridge.planCreatePage(page));
+      } else {
+        final atoms = await _textAtoms(
+          documentId: after.uid,
+          before: old,
+          after: page,
+        );
+        drafts.addAll(_bridge.planPageChange(
+          before: old,
+          after: page,
+          textAtomsById: atoms,
+        ));
+      }
+    }
+    for (final page in before.pages) {
+      if (!newPages.containsKey(page.id)) {
+        drafts.add(_bridge.planDeletePage(page.id));
+      }
+    }
+    return _commit(after.uid, drafts);
+  }
 
   Future<List<OperationEnvelope>> writeAction({
     required String documentId,
