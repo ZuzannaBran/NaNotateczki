@@ -498,9 +498,10 @@ void main() {
         clock: 5,
       ),
     );
-    final rich = (((detached.document!['pages'] as Map)['page'] as Map)[
-            'objects']
-        as Map)['rich'] as Map;
+    final rich =
+        (((detached.document!['pages'] as Map)['page'] as Map)['objects']
+                as Map)['rich']
+            as Map;
     expect(rich['assets'], isEmpty);
     expect((rich['properties'] as Map)['delta'], isEmpty);
   });

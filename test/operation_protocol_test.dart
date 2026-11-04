@@ -392,7 +392,10 @@ void main() {
       returnsNormally,
     );
     for (final value in [
-      {'text': 'X', 'embed': {'image': 'asset:photo-1'}},
+      {
+        'text': 'X',
+        'embed': {'image': 'asset:photo-1'},
+      },
       {
         'text': '\uFFFC',
         'embed': {'image': 'https://example.com/x.png'},

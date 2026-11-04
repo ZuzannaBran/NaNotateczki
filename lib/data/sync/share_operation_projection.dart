@@ -208,7 +208,8 @@ class ShareOperationProjection {
       if (previous == null ||
           _compareRanks(rank, List<Object>.from(previous as List)) > 0) {
         final old = assets[assetId];
-        final replacing = kind == OperationKind.assetAttach &&
+        final replacing =
+            kind == OperationKind.assetAttach &&
             old is Map &&
             (old['sha256'] != digest ||
                 old['sizeBytes'] != op.payload['sizeBytes'] ||
@@ -262,8 +263,8 @@ class ShareOperationProjection {
             final validMime = embed.containsKey('pdf')
                 ? mime == 'application/pdf'
                 : mime == 'image/png' ||
-                    mime == 'image/jpeg' ||
-                    mime == 'image/webp';
+                      mime == 'image/jpeg' ||
+                      mime == 'image/webp';
             if (!validMime) {
               throw StateError(
                 'Quill embed requires a matching attached asset.',

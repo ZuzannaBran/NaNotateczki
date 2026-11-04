@@ -142,9 +142,7 @@ class OperationEnvelope {
       throw const FormatException('Quill embed must reference an asset.');
     }
     final id = reference.substring(6);
-    if (id.isEmpty ||
-        id.length > 128 ||
-        _invalidIdentifierChar.hasMatch(id)) {
+    if (id.isEmpty || id.length > 128 || _invalidIdentifierChar.hasMatch(id)) {
       throw const FormatException('Invalid Quill embed asset ID.');
     }
     return id;
