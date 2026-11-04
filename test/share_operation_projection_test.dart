@@ -410,57 +410,51 @@ void main() {
     final detachedNode =
         ((((detached.document!['pages'] as Map)['page'] as Map)['objects']
                 as Map)['photo'])
-            as Map;    expect(detachedNode['assets'], isEmpty);
+            as Map;
+    expect(detachedNode['assets'], isEmpty);
     expect((node['assets'] as Map).length, 1);
   });
 
   test('canvas ordering is stable across different insertion histories', () {
-    final base = initial().apply(op(
-      80,
-      OperationKind.objectCreate,
-      {
-        'value': {'objectType': 'image', 'sortIndex': 1},
-      },
-      pageId: 'page',
-      objectId: 'image-z',
-    ));
-    final next = base.apply(op(
-      81,
-      OperationKind.objectCreate,
-      {
-        'value': {'objectType': 'image', 'sortIndex': 0},
-      },
-      pageId: 'page',
-      objectId: 'image-a',
-    ));
-    expect(next.orderedObjectIds('page'), [
-      'image-a',
-      'stroke',
-      'image-z',
-    ]);
+    final base = initial().apply(
+      op(
+        80,
+        OperationKind.objectCreate,
+        {
+          'value': {'objectType': 'image', 'sortIndex': 1},
+        },
+        pageId: 'page',
+        objectId: 'image-z',
+      ),
+    );
+    final next = base.apply(
+      op(
+        81,
+        OperationKind.objectCreate,
+        {
+          'value': {'objectType': 'image', 'sortIndex': 0},
+        },
+        pageId: 'page',
+        objectId: 'image-a',
+      ),
+    );
+    expect(next.orderedObjectIds('page'), ['image-a', 'stroke', 'image-z']);
     expect(next.orderedObjectIds('nonexistent-page'), isEmpty);
-    final updated = next.apply(op(
-      82,
-      OperationKind.objectReorder,
-      {
-        'properties': {'sortIndex': 3},
-      },
-      pageId: 'page',
-      objectId: 'image-a',
-      clock: 9,
-    ));
-    expect(updated.orderedObjectIds('page'), [
-      'stroke',
-      'image-z',
-      'image-a',
-    ]);
-    expect(next.orderedObjectIds('page'), [
-      'image-a',
-      'stroke',
-      'image-z',
-    ]);
+    final updated = next.apply(
+      op(
+        82,
+        OperationKind.objectReorder,
+        {
+          'properties': {'sortIndex': 3},
+        },
+        pageId: 'page',
+        objectId: 'image-a',
+        clock: 9,
+      ),
+    );
+    expect(updated.orderedObjectIds('page'), ['stroke', 'image-z', 'image-a']);
+    expect(next.orderedObjectIds('page'), ['image-a', 'stroke', 'image-z']);
   });
-
 }
 
 int strokeObjectCount(ShareOperationProjection state) {

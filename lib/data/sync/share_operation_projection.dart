@@ -281,6 +281,7 @@ class ShareOperationProjection {
       }
       return order;
     }
+
     final ids = objects.keys.cast<String>().toList();
     ids.sort((a, b) {
       final comparison = rank(a).compareTo(rank(b));
