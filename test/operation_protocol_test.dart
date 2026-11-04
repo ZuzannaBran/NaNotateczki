@@ -196,6 +196,47 @@ void main() {
     expect(() => operation(documentId: 'bad\u0000'), throwsFormatException);
   });
 
+  test('wire UUIDs must not accept a trailing newline', () {
+    expect(
+      () => operation(operationId: '$firstId\n'),
+      throwsFormatException,
+    );
+    expect(
+      () => operation(dependencies: ['$secondId\n']),
+      throwsFormatException,
+    );
+    expect(
+      () => OperationEnvelope(
+        operationId: secondId,
+        actorId: 'device-a',
+        actorSeq: 2,
+        documentId: 'document-1',
+        pageId: 'page-1',
+        objectId: 'stroke-1',
+        kind: OperationKind.objectDelete,
+        payload: const {},
+        dependencies: const [firstId],
+        logicalClock: 2,
+        revertsOperationId: '$firstId\n',
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.textInsert,
+        documentId: 'document-1',
+        objectId: 'text-1',
+        payload: {
+          'afterAtomId': '$firstId\n',
+          'atoms': [
+            {'id': secondId, 'text': 'a'},
+          ],
+        },
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('inverse reference requires its causal dependency', () {
     expect(
       () => OperationEnvelope(
