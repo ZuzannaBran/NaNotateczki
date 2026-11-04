@@ -415,6 +415,96 @@ void main() {
     expect((node['assets'] as Map).length, 1);
   });
 
+  test('Quill embeds need attached assets and block dangling detach', () {
+    const digest =
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    var state = initial().apply(
+      op(
+        90,
+        OperationKind.objectCreate,
+        {
+          'value': {'objectType': 'text', 'text': ''},
+        },
+        pageId: 'page',
+        objectId: 'rich',
+      ),
+    );
+    final insert = op(
+      91,
+      OperationKind.textInsert,
+      {
+        'afterAtomId': null,
+        'atoms': [
+          {
+            'id': id(150),
+            'text': '\uFFFC',
+            'embed': {'image': 'asset:photo'},
+          },
+        ],
+      },
+      pageId: 'page',
+      objectId: 'rich',
+    );
+    expect(() => state.apply(insert), throwsStateError);
+    state = state.apply(
+      op(
+        92,
+        OperationKind.assetAttach,
+        {
+          'assetId': 'photo',
+          'sha256': digest,
+          'sizeBytes': 12,
+          'mediaType': 'image/png',
+        },
+        pageId: 'page',
+        objectId: 'rich',
+        clock: 2,
+      ),
+    );
+    state = state.apply(insert);
+    expect(
+      () => state.apply(
+        op(
+          93,
+          OperationKind.assetDetach,
+          {'assetId': 'photo'},
+          pageId: 'page',
+          objectId: 'rich',
+          clock: 3,
+        ),
+      ),
+      throwsStateError,
+    );
+    state = state.apply(
+      op(
+        94,
+        OperationKind.textDelete,
+        {
+          'atomIds': [id(150)],
+        },
+        pageId: 'page',
+        objectId: 'rich',
+        clock: 4,
+      ),
+    );
+    final detached = state.apply(
+      op(
+        95,
+        OperationKind.assetDetach,
+        {'assetId': 'photo'},
+        pageId: 'page',
+        objectId: 'rich',
+        clock: 5,
+      ),
+    );
+    final rich = (((detached.document!['pages'] as Map)['page'] as Map)[
+            'objects']
+        as Map)['rich'] as Map;
+    expect(rich['assets'], isEmpty);
+    expect((rich['properties'] as Map)['delta'], isEmpty);
+  });
+
   test('canvas ordering is stable across different insertion histories', () {
     final base = initial().apply(
       op(

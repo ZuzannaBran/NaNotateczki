@@ -140,6 +140,64 @@ void main() {
     state = applyPlan(state, changes);
     expect(OperationTextSequence.render(state), replacement);
   });
+  test('Quill images and PDFs emit atomic embedded assets', () {
+    final adapter = ShareTextEditAdapter();
+    const image = '[{"insert":"A"},'
+        '{"insert":{"image":"asset:photo-1"}},'
+        '{"insert":"B"}]';
+    const pdf = '[{"insert":"A"},'
+        '{"insert":{"pdf":"asset:document-1"}},'
+        '{"insert":"B"}]';
+    final created = adapter.plan(
+      atoms: {},
+      newText: 'A\uFFFCB',
+      changedDeltaJson: image,
+    );
+    final initial = applyPlan({}, created);
+    expect(OperationTextSequence.renderDelta(initial), [
+      {'insert': 'A'},
+      {
+        'insert': {'image': 'asset:photo-1'},
+      },
+      {'insert': 'B'},
+    ]);
+    expect(
+      adapter.plan(
+        atoms: initial,
+        newText: 'A\uFFFCB',
+        changedDeltaJson: image,
+      ),
+      isEmpty,
+    );
+    final replaced = adapter.plan(
+      atoms: initial,
+      newText: 'A\uFFFCB',
+      changedDeltaJson: pdf,
+    );
+    expect(replaced.map((item) => item.kind), [
+      OperationKind.textDelete,
+      OperationKind.textInsert,
+    ]);
+    final updated = applyPlan(initial, replaced);
+    expect(OperationTextSequence.renderDelta(updated), [
+      {'insert': 'A'},
+      {
+        'insert': {'pdf': 'asset:document-1'},
+      },
+      {'insert': 'B'},
+    ]);
+    expect(
+      () => adapter.plan(
+        atoms: initial,
+        newText: 'A\uFFFCB',
+        changedDeltaJson:
+            '[{"insert":"A"},{"insert":{"image":"https://evil/x"}},'
+            '{"insert":"B"}]',
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('Quill format changes preserve atom IDs and can be undone', () {
     final adapter = ShareTextEditAdapter();
     final plain = applyPlan({}, adapter.plan(atoms: {}, newText: 'Hello'));

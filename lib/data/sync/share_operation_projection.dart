@@ -207,6 +207,16 @@ class ShareOperationProjection {
       final previous = versions[assetId];
       if (previous == null ||
           _compareRanks(rank, List<Object>.from(previous as List)) > 0) {
+        final old = assets[assetId];
+        final replacing = kind == OperationKind.assetAttach &&
+            old is Map &&
+            (old['sha256'] != digest ||
+                old['sizeBytes'] != op.payload['sizeBytes'] ||
+                old['mediaType'] != op.payload['mediaType']);
+        if ((kind == OperationKind.assetDetach || replacing) &&
+            _referencesAsset(mutableObject, assetId)) {
+          throw StateError('Cannot detach or replace an embedded asset.');
+        }
         if (kind == OperationKind.assetAttach) {
           assets[assetId] = {
             'sha256': digest,
@@ -240,6 +250,28 @@ class ShareOperationProjection {
       final atoms = mutableObject['textAtoms'] is Map<String, dynamic>
           ? mutableObject['textAtoms'] as Map<String, dynamic>
           : <String, dynamic>{};
+      if (kind == OperationKind.textInsert) {
+        final attached = mutableObject['assets'] as Map? ?? const {};
+        for (final raw in op.payload['atoms'] as List) {
+          final atom = raw as Map;
+          if (atom.containsKey('embed')) {
+            final embed = atom['embed'] as Map;
+            final id = OperationEnvelope.embedAssetId(embed);
+            final asset = attached[id];
+            final mime = asset is Map ? asset['mediaType'] : null;
+            final validMime = embed.containsKey('pdf')
+                ? mime == 'application/pdf'
+                : mime == 'image/png' ||
+                    mime == 'image/jpeg' ||
+                    mime == 'image/webp';
+            if (!validMime) {
+              throw StateError(
+                'Quill embed requires a matching attached asset.',
+              );
+            }
+          }
+        }
+      }
       final changed = OperationTextSequence.apply(atoms, op);
       mutableObject['textAtoms'] = changed;
       mutableObject['properties'] = properties;
@@ -254,6 +286,24 @@ class ShareOperationProjection {
     }
     _merge(mutableObject, fields, op, force: optimistic);
     return ShareOperationProjection._(next, deleted);
+  }
+
+  static bool _referencesAsset(Map<String, dynamic> object, String assetId) {
+    final atoms = object['textAtoms'];
+    if (atoms == null) {
+      return false;
+    }
+    if (atoms is! Map<String, dynamic>) {
+      throw const FormatException('Invalid text atom collection.');
+    }
+    for (final id in OperationTextSequence.visibleIds(atoms)) {
+      final atom = atoms[id] as Map;
+      if (atom.containsKey('embed') &&
+          OperationEnvelope.embedAssetId(atom['embed']) == assetId) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Stable canvas z-order regardless of JSON or SQLite map key ordering.

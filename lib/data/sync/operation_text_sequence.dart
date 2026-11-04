@@ -38,9 +38,13 @@ class OperationTextSequence {
       final ids = <String>{};
       for (final value in values) {
         if (value is! Map ||
-            (value.length != 2 && value.length != 3) ||
+            (value.length < 2 || value.length > 4) ||
             value.keys.any(
-              (key) => key != 'id' && key != 'text' && key != 'attributes',
+              (key) =>
+                  key != 'id' &&
+                  key != 'text' &&
+                  key != 'attributes' &&
+                  key != 'embed',
             ) ||
             !value.containsKey('id') ||
             !value.containsKey('text') ||
@@ -56,6 +60,14 @@ class OperationTextSequence {
         if (text.runes.any((rune) => rune >= 0xD800 && rune <= 0xDFFF)) {
           throw const FormatException('Invalid Unicode text atom.');
         }
+        if (value.containsKey('embed')) {
+          if (text != '\uFFFC') {
+            throw const FormatException('Invalid Quill embed atom.');
+          }
+          OperationEnvelope.embedAssetId(value['embed']);
+        } else if (text.contains('\uFFFC')) {
+          throw const FormatException('Unlinked Quill replacement character.');
+        }
       }
       var anchor = after as String?;
       final rank = _operationRank(operation);
@@ -70,6 +82,8 @@ class OperationTextSequence {
           'text': value['text'],
           'deleted': false,
           'attributes': attributes,
+          if (value.containsKey('embed'))
+            'embed': Map<String, dynamic>.from(value['embed'] as Map),
           'attributeVersions': {for (final name in attributes.keys) name: rank},
           'order': <Object>[
             operation.logicalClock,
@@ -173,13 +187,17 @@ class OperationTextSequence {
       final attributes = Map<String, dynamic>.from(
         node['attributes'] as Map? ?? const {},
       );
-      final text = node['text'] as String;
-      if (result.isNotEmpty &&
+      final insert = node.containsKey('embed')
+          ? Map<String, dynamic>.from(node['embed'] as Map)
+          : node['text'] as String;
+      if (insert is String &&
+          result.isNotEmpty &&
+          result.last['insert'] is String &&
           _equalAttributes(result.last['attributes'] as Map?, attributes)) {
-        result.last['insert'] = (result.last['insert'] as String) + text;
+        result.last['insert'] = (result.last['insert'] as String) + insert;
       } else {
         result.add({
-          'insert': text,
+          'insert': insert,
           if (attributes.isNotEmpty) 'attributes': attributes,
         });
       }
@@ -229,6 +247,14 @@ class OperationTextSequence {
           (value['attributeVersions'] != null &&
               value['attributeVersions'] is! Map)) {
         throw const FormatException('Malformed text atom graph.');
+      }
+      if (value.containsKey('embed')) {
+        if (value['text'] != '\uFFFC') {
+          throw const FormatException('Invalid Quill embed atom.');
+        }
+        OperationEnvelope.embedAssetId(value['embed']);
+      } else if ((value['text'] as String).contains('\uFFFC')) {
+        throw const FormatException('Unlinked Quill replacement character.');
       }
       children.putIfAbsent(after as String?, () => []).add(entry.key);
     }

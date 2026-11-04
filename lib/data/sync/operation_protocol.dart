@@ -127,6 +127,29 @@ class OperationEnvelope {
     );
   }
 
+  /// Validates an inline Quill image/PDF reference and returns its asset ID.
+  ///
+  /// Remote URLs and local file paths cannot be used as durable embed IDs.
+  static String embedAssetId(Object? embed) {
+    if (embed is! Map || embed.length != 1) {
+      throw const FormatException('Invalid Quill embed.');
+    }
+    final kind = embed.keys.single;
+    final reference = embed[kind];
+    if ((kind != 'image' && kind != 'pdf') ||
+        reference is! String ||
+        !reference.startsWith('asset:')) {
+      throw const FormatException('Quill embed must reference an asset.');
+    }
+    final id = reference.substring(6);
+    if (id.isEmpty ||
+        id.length > 128 ||
+        _invalidIdentifierChar.hasMatch(id)) {
+      throw const FormatException('Invalid Quill embed asset ID.');
+    }
+    return id;
+  }
+
   static void validateV2Payload({
     required OperationKind kind,
     required Map<String, dynamic> payload,
@@ -201,9 +224,13 @@ class OperationEnvelope {
       final seen = <String>{};
       for (final atom in atoms) {
         if (atom is! Map ||
-            (atom.length != 2 && atom.length != 3) ||
+            (atom.length < 2 || atom.length > 4) ||
             atom.keys.any(
-              (key) => key != 'id' && key != 'text' && key != 'attributes',
+              (key) =>
+                  key != 'id' &&
+                  key != 'text' &&
+                  key != 'attributes' &&
+                  key != 'embed',
             ) ||
             !atom.containsKey('id') ||
             !atom.containsKey('text') ||
@@ -217,6 +244,14 @@ class OperationEnvelope {
         }
         if (atom.containsKey('attributes')) {
           _validateTextAttributes(atom['attributes']);
+        }
+        if (atom.containsKey('embed')) {
+          if (atom['text'] != '\uFFFC') {
+            throw const FormatException('Quill embed needs a single atom.');
+          }
+          embedAssetId(atom['embed']);
+        } else if ((atom['text'] as String).contains('\uFFFC')) {
+          throw const FormatException('Unlinked Quill replacement character.');
         }
       }
       return;

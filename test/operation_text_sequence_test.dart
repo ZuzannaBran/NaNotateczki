@@ -237,6 +237,55 @@ void main() {
       throwsFormatException,
     );
   });
+  test('Quill embeds remain atomic during rendering and formatting', () {
+    final inserted = textOperation(
+      operationId: firstId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'A'},
+          {
+            'id': secondId,
+            'text': '\uFFFC',
+            'embed': {'image': 'asset:photo-1'},
+          },
+          {'id': thirdId, 'text': 'B'},
+        ],
+      },
+    );
+    final state = OperationTextSequence.apply({}, inserted);
+    expect(OperationTextSequence.render(state), 'A\uFFFCB');
+    expect(OperationTextSequence.renderDelta(state), [
+      {'insert': 'A'},
+      {
+        'insert': {'image': 'asset:photo-1'},
+      },
+      {'insert': 'B'},
+    ]);
+    final formatted = OperationTextSequence.apply(
+      state,
+      textOperation(
+        operationId: secondId,
+        actorId: 'bob',
+        kind: OperationKind.textFormat,
+        payload: {
+          'atomIds': [secondId],
+          'attributes': {'width': 120},
+        },
+        logicalClock: 12,
+      ),
+    );
+    expect(OperationTextSequence.renderDelta(formatted)[1], {
+      'insert': {'image': 'asset:photo-1'},
+      'attributes': {'width': 120},
+    });
+    expect(OperationTextSequence.renderDelta(state)[1], {
+      'insert': {'image': 'asset:photo-1'},
+    });
+  });
+
   test('concurrent Quill formatting converges and keeps unrelated keys', () {
     final original = textOperation(
       operationId: firstId,

@@ -371,6 +371,59 @@ void main() {
     );
   });
 
+  test('v2 Quill embeds require canonical asset-backed atoms', () {
+    final valid = {
+      'afterAtomId': null,
+      'atoms': [
+        {
+          'id': firstId,
+          'text': '\uFFFC',
+          'embed': {'image': 'asset:photo-1'},
+        },
+      ],
+    };
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.textInsert,
+        documentId: 'document',
+        objectId: 'text',
+        payload: valid,
+      ),
+      returnsNormally,
+    );
+    for (final value in [
+      {'text': 'X', 'embed': {'image': 'asset:photo-1'}},
+      {
+        'text': '\uFFFC',
+        'embed': {'image': 'https://example.com/x.png'},
+      },
+      {
+        'text': '\uFFFC',
+        'embed': {'video': 'asset:video-1'},
+      },
+      {'text': '\uFFFC'},
+      {
+        'text': '\uFFFC',
+        'embed': {'pdf': 'asset:bad\n'},
+      },
+    ]) {
+      expect(
+        () => OperationEnvelope.validateV2Payload(
+          kind: OperationKind.textInsert,
+          documentId: 'document',
+          objectId: 'text',
+          payload: {
+            'afterAtomId': null,
+            'atoms': [
+              {'id': firstId, ...value},
+            ],
+          },
+        ),
+        throwsFormatException,
+      );
+    }
+  });
+
   test('v2 asset attach/detach enforce verified metadata shape', () {
     final payload = {
       'assetId': 'photo-1',

@@ -5,6 +5,12 @@ import 'package:uuid/uuid.dart';
 import 'operation_protocol.dart';
 import 'operation_text_sequence.dart';
 
+typedef _DesiredAtom = ({
+  String character,
+  Map<String, dynamic> attributes,
+  Map<String, dynamic>? embed,
+});
+
 /// One client-side intent. SyncEngine assigns actorSeq and operationId.
 class ShareTextIntent {
   const ShareTextIntent(this.kind, this.payload);
@@ -15,8 +21,8 @@ class ShareTextIntent {
 
 /// Converts committed plain-text or Quill snapshot changes into CRDT intents.
 ///
-/// Formatting is expressed as per-attribute updates on stable character IDs.
-/// Rich embeds require verified asset transport and are rejected here.
+/// Formatting uses stable atom IDs. Embeds use content-addressed, pre-attached
+/// image/PDF assets; the projector rejects missing or mismatched references.
 class ShareTextEditAdapter {
   ShareTextEditAdapter({String Function()? createAtomId})
     : _createAtomId = createAtomId ?? const Uuid().v4;
@@ -40,6 +46,7 @@ class ShareTextEditAdapter {
               (
                 character: String.fromCharCode(rune),
                 attributes: <String, dynamic>{},
+                embed: null,
               ),
           ]
         : _parseQuillDelta(changedDeltaJson);
@@ -53,6 +60,7 @@ class ShareTextEditAdapter {
 
     final oldIds = OperationTextSequence.visibleIds(atoms);
     final oldCharacters = <String>[];
+    final oldEmbeds = <Map<String, dynamic>?>[];
     for (final id in oldIds) {
       final atom = atoms[id] as Map;
       final text = atom['text'] as String;
@@ -60,19 +68,36 @@ class ShareTextEditAdapter {
         throw StateError('Text must be migrated to one atom per code point.');
       }
       oldCharacters.add(text);
+      oldEmbeds.add(
+        atom['embed'] is Map
+            ? Map<String, dynamic>.from(atom['embed'] as Map)
+            : null,
+      );
+    }
+
+    bool sameAtom(int oldIndex, int newIndex) {
+      final before = oldEmbeds[oldIndex];
+      final after = desired[newIndex].embed;
+      return oldCharacters[oldIndex] == desired[newIndex].character &&
+          (before == null && after == null ||
+              before != null &&
+                  after != null &&
+                  _sameAttributes(before, after));
     }
 
     var prefix = 0;
     while (prefix < oldCharacters.length &&
         prefix < nextCharacters.length &&
-        oldCharacters[prefix] == nextCharacters[prefix]) {
+        sameAtom(prefix, prefix)) {
       prefix++;
     }
     var suffix = 0;
     while (suffix < oldCharacters.length - prefix &&
         suffix < nextCharacters.length - prefix &&
-        oldCharacters[oldCharacters.length - 1 - suffix] ==
-            nextCharacters[nextCharacters.length - 1 - suffix]) {
+        sameAtom(
+          oldCharacters.length - 1 - suffix,
+          nextCharacters.length - 1 - suffix,
+        )) {
       suffix++;
     }
 
@@ -115,6 +140,7 @@ class ShareTextEditAdapter {
           'id': atomId,
           'text': item.character,
           if (item.attributes.isNotEmpty) 'attributes': item.attributes,
+          if (item.embed != null) 'embed': item.embed,
         });
       }
       result.add(
@@ -188,13 +214,12 @@ class ShareTextEditAdapter {
         (entry) => b.containsKey(entry.key) && b[entry.key] == entry.value,
       );
 
-  static List<({String character, Map<String, dynamic> attributes})>
-  _parseQuillDelta(String value) {
+  static List<_DesiredAtom> _parseQuillDelta(String value) {
     final decoded = jsonDecode(value);
     if (decoded is! List) {
       throw const FormatException('Quill snapshot must be a Delta list.');
     }
-    final result = <({String character, Map<String, dynamic> attributes})>[];
+    final result = <_DesiredAtom>[];
     for (final raw in decoded) {
       if (raw is! Map ||
           !raw.containsKey('insert') ||
@@ -202,8 +227,11 @@ class ShareTextEditAdapter {
         throw const FormatException('Quill snapshot needs insert operations.');
       }
       final insert = raw['insert'];
-      if (insert is! String) {
-        throw UnsupportedError('Rich embeds need verified asset transport.');
+      if (insert is! String && insert is! Map) {
+        throw const FormatException('Invalid Quill Delta insertion.');
+      }
+      if (insert is Map) {
+        OperationEnvelope.embedAssetId(insert);
       }
       final attrs = raw['attributes'] ?? const <String, dynamic>{};
       if (attrs is! Map || attrs.length > 32) {
@@ -223,11 +251,20 @@ class ShareTextEditAdapter {
         }
         attributes[key] = item;
       }
-      for (final rune in insert.runes) {
+      if (insert is Map) {
         result.add((
-          character: String.fromCharCode(rune),
+          character: '\uFFFC',
           attributes: attributes,
+          embed: Map<String, dynamic>.from(insert),
         ));
+      } else {
+        for (final rune in (insert as String).runes) {
+          result.add((
+            character: String.fromCharCode(rune),
+            attributes: attributes,
+            embed: null,
+          ));
+        }
       }
     }
     return result;
