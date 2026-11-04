@@ -702,8 +702,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 Most domena ↔ Drift ↔ JSON, z kolejką zapisu per UID i ochroną przed
 podejrzaną utratą danych. Po zapisaniu dowodów podejrzany zapis
 jest blokowany wyjątkiem przed transakcją SQLite. Zapis z edytora
-przekazuje identyfikatory elementów usuniętych jawnie przez użytkownika;
-guard rozpoznaje przeniesienie obrazu po ID i tożsamości pliku/bajtów
+przekazuje identyfikatory elementów i całych stron usuniętych jawnie przez
+użytkownika; jawne `deleteLastPage` może usunąć stronę z zawartością,
+lecz nieoznaczone usunięcie nadal blokuje guard (regresje:
+`test/editor_controller_layering_test.dart`). Guard rozpoznaje też
+przeniesienie obrazu po ID i tożsamości pliku/bajtów
 (bez porównywania geometrii i legacy OCR). Nie pomija niezgłoszonych
 usunięć i skrócenia istniejących danych. Jest też kanoniczną granicą migracji starego modelu
 gumki: odczyt normalizuje legacy maski, a zdrowe strony są fizycznie
