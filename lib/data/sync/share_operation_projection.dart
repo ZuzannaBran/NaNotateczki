@@ -29,6 +29,7 @@ class ShareOperationProjection {
   ShareOperationProjection apply(
     OperationEnvelope op, {
     bool optimistic = false,
+    Set<String> verifiedAssets = const <String>{},
   }) {
     op.validateForV2Projection();
     if (op.kind.target == OperationTarget.folder) {
@@ -137,6 +138,40 @@ class ShareOperationProjection {
       }
       return ShareOperationProjection._(next, deleted);
     }
+    if (kind == OperationKind.objectMove) {
+      final destinationId = op.payload['toPageId'] as String;
+      final sortIndex = op.payload['sortIndex'] as int;
+      final destination = pages[destinationId];
+      if (destination is! Map ||
+          deleted.contains(_pageKey(destinationId)) ||
+          destinationId == pageId) {
+        throw StateError('Destination page is not available.');
+      }
+      final moved = objects[objectId];
+      if (moved is! Map<String, dynamic>) {
+        throw StateError('Source object is not available.');
+      }
+      final nextDestination = Map<String, dynamic>.from(destination);
+      final destinationObjects = Map<String, dynamic>.from(
+        nextDestination['objects'] as Map? ?? const <String, dynamic>{},
+      );
+      if (destinationObjects.containsKey(objectId) ||
+          deleted.contains(_objectKey(destinationId, objectId))) {
+        throw StateError('Destination identity is occupied.');
+      }
+      final nextObject = Map<String, dynamic>.from(moved);
+      _merge(
+        nextObject,
+        {'sortIndex': sortIndex},
+        op,
+        force: optimistic,
+      );
+      objects.remove(objectId);
+      destinationObjects[objectId] = nextObject;
+      nextDestination['objects'] = destinationObjects;
+      pages[destinationId] = nextDestination;
+      return ShareOperationProjection._(next, deleted);
+    }
     if (kind == OperationKind.objectCreate ||
         kind == OperationKind.strokeCreate) {
       if (objects.containsKey(objectId)) {
@@ -153,7 +188,48 @@ class ShareOperationProjection {
     }
     final mutableObject = Map<String, dynamic>.from(object);
     objects[objectId] = mutableObject;
-    if (kind == OperationKind.textInsert || kind == OperationKind.textDelete) {
+    if (kind == OperationKind.assetAttach ||
+        kind == OperationKind.assetDetach) {
+      final assetId = op.payload['assetId'] as String;
+      final digest = op.payload['sha256'];
+      if (kind == OperationKind.assetAttach &&
+          optimistic &&
+          !verifiedAssets.contains(digest)) {
+        throw StateError('Asset upload must be verified before local attach.');
+      }
+      final versions = Map<String, dynamic>.from(
+        mutableObject['assetVersions'] as Map? ?? const <String, dynamic>{},
+      );
+      final assets = Map<String, dynamic>.from(
+        mutableObject['assets'] as Map? ?? const <String, dynamic>{},
+      );
+      final rank = <Object>[
+        op.logicalClock,
+        op.actorId,
+        op.actorSeq,
+        op.operationId,
+      ];
+      final previous = versions[assetId];
+      if (previous == null ||
+          _compareRanks(rank, List<Object>.from(previous as List)) > 0) {
+        if (kind == OperationKind.assetAttach) {
+          assets[assetId] = {
+            'sha256': digest,
+            'sizeBytes': op.payload['sizeBytes'],
+            'mediaType': op.payload['mediaType'],
+          };
+        } else {
+          assets.remove(assetId);
+        }
+        versions[assetId] = rank;
+      }
+      mutableObject['assetVersions'] = versions;
+      mutableObject['assets'] = assets;
+      return ShareOperationProjection._(next, deleted);
+    }
+    if (kind == OperationKind.textInsert ||
+        kind == OperationKind.textDelete ||
+        kind == OperationKind.textFormat) {
       final properties = Map<String, dynamic>.from(
         mutableObject['properties'] as Map,
       );
@@ -173,10 +249,12 @@ class ShareOperationProjection {
       mutableObject['textAtoms'] = changed;
       mutableObject['properties'] = properties;
       properties['text'] = OperationTextSequence.render(changed);
+      properties['delta'] = OperationTextSequence.renderDelta(changed);
       return ShareOperationProjection._(next, deleted);
     }
     final fields = _fields(op, create: false);
-    if (mutableObject.containsKey('textAtoms') && fields.containsKey('text')) {
+    if (mutableObject.containsKey('textAtoms') &&
+        (fields.containsKey('text') || fields.containsKey('delta'))) {
       throw StateError('CRDT text cannot be replaced with object.set.');
     }
     _merge(mutableObject, fields, op, force: optimistic);
@@ -241,9 +319,22 @@ class ShareOperationProjection {
 /// Invalid concurrent local edits remain in the outbox as unresolved intents.
 /// A server response is never allowed to silently delete an unacknowledged op.
 class PendingShareProjection {
-  PendingShareProjection(this.confirmed);
+  PendingShareProjection(
+    this.confirmed, {
+    Set<String>? verifiedAssetDigests,
+  }) : verifiedAssets = verifiedAssetDigests ?? <String>{};
 
   ShareOperationProjection confirmed;
+
+  /// Only digests with confirmed upload and local checksum may be added.
+  final Set<String> verifiedAssets;
+
+  void markAssetVerified(String digest) {
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(digest)) {
+      throw const FormatException('Invalid verified asset digest.');
+    }
+    verifiedAssets.add(digest);
+  }
   final LinkedHashMap<String, OperationEnvelope> pending =
       LinkedHashMap<String, OperationEnvelope>();
   final Map<String, String> unresolved = <String, String>{};
@@ -265,7 +356,11 @@ class PendingShareProjection {
         continue;
       }
       try {
-        result = result.apply(op, optimistic: true);
+        result = result.apply(
+          op,
+          optimistic: true,
+          verifiedAssets: verifiedAssets,
+        );
       } catch (error) {
         unresolved[op.operationId] = error.toString();
       }
@@ -285,7 +380,11 @@ class PendingShareProjection {
       ..[op.operationId] = op;
     var result = confirmed;
     for (final local in proposed.values) {
-      result = result.apply(local, optimistic: true);
+      result = result.apply(
+        local,
+        optimistic: true,
+        verifiedAssets: verifiedAssets,
+      );
     }
     pending[op.operationId] = op;
   }
