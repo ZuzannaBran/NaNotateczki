@@ -807,9 +807,12 @@ Nowe reduktory protokołu, ale **nie produkcyjny cutover**:
   Po pobraniu klient ponownie sprawdza checksum oraz rozmiar.
 - Serwer wymaga dodatkowej **migracji 0014_verified_assets.sql** przed
   wdrożeniem API. Zastosowanie jej nie aktywuje konta v2.
-- Osadzane obiekty `insert: { ... }` w Delta Quill pozostają odrzucane
-  do czasu połączenia ich z referencjami zweryfikowanych assetów.
-  Produkcyjny edytor nadal zapisuje v1, aż zakończy się krok 3.
+- `EditorOperationBridge` może planować osadzane obiekty Quill z
+  kanoniczną referencją `asset:<id>` i ukończonym, zweryfikowanym
+  uploadem. Bez tego przerywa planowanie. Wymiana obrazu/PDF wymaga
+  trwałego ID poprzedniego assetu i oddzielnego nowego assetu.
+  To nadal nie jest aktywna ścieżka produkcyjna; edytor zapisuje v1
+  do zakończenia i weryfikacji pełnego kroku 3.
 
 Nie wolno usuwać aktywnych writerów v1 ani włączać v2 dla kont produkcyjnych
 tylko z powodu dodania tej migracji i reduktorów.
