@@ -452,7 +452,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   bloków tekstowych. Rzutowanie atomów korzysta z `OperationStore.textAtoms`.
   Nie wspiera jeszcze obrazów/PDF, embedów, document.create, object.move,
   conflict rebase; takie operacje są odrzucane zamiast zapisywać częściowy
-  niepoprawny stan. Ten projektor jest wyłącznie opt-in i nigdy nie należy
+  niepoprawny stan. Blokuje też niejednoznaczne ID między warstwami
+  i rozbieżny Delta Quill. Projektor jest wyłącznie opt-in i nigdy nie należy
   używać go równolegle z legacy writerem tego dokumentu.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
   Quill CRDT, tombstones, ACK, restart i ochrona usunięć.
@@ -484,7 +485,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Pakiet 409/413/422 próbuje bezpiecznego prefiksu, bez pomijania actorSeq.
   `onRemoteCommitted` powiadamia UI dopiero po commit SQLite i przed
   przesunięciem kursora; błędny patch jest ponawiany, a ACK własnego
-  aktora nie odmalowuje widoku. `lastError` znika po sukcesie.
+  aktora nie odmalowuje widoku. Powtórny odczyt obcego envelope nie
+  wywołuje drugi raz tej samej udanej notyfikacji w jednej sesji
+  (pamięć 4096 ID); po restarcie może być ponowiona.
+  `lastError` znika po sukcesie.
   Nie podłączać do UID v1 przed etapem 11.
 - `lib/data/sync/operation_store.dart`: `pending(includeDeferred)`,
   `isPending`, `isLocalOperation`, `advanceCheckpoint`; strzeże actorSeq także przy
@@ -1322,8 +1326,11 @@ w `test/sync_engine_test.dart`.
 `SyncEngine.writeLocalBatch` i `EditorSqliteProjector.apply`; sprawdza
 tożsamość instancji bazy dziennika i projekcji, pobiera trwałe atomy
 tekstowe z `OperationStore` i pomija puste zmiany. Metody:
-`writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`.
-To jest adapter integracyjny opt-in, nadal nieprzekazany do
+`writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`
+oraz `writeNotebookChange` — atomowy wsad wielostronicowy.
+Odrzuca przenoszenie obiektu między stronami bez `object.move`,
+zmianę kolejności stron oraz edycję z nieaktualnym Delta Quill.
+Adapter pozostaje opt-in, nadal nieprzekazany do
 produkcyjnego `EditorController`; brak bezpiecznej obsługi Undo/Redo v2,
 assetów i zdalnego rebase. Nie przełączać `AppScope` na ten writer.
 Test: `test/editor_v2_operation_writer_test.dart`.
