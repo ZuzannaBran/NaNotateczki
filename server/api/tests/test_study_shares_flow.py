@@ -867,6 +867,7 @@ def test_owner_change_feed_contains_merged_guest_strokes(monkeypatch):
         pass
 
     monkeypatch.setattr(sync, "lock_owner_events", no_op)
+    monkeypatch.setattr(sync, "require_legacy_protocol", no_op)
     monkeypatch.setattr(sync, "hub", SimpleNamespace(publish=no_op))
     response = asyncio.run(sync.put_notebook(
         NOTE_UID,
@@ -982,6 +983,7 @@ def test_deleting_shared_notebook_revokes_guest_access(monkeypatch):
         notifications.append((key, message))
 
     monkeypatch.setattr(sync, "lock_owner_events", no_lock)
+    monkeypatch.setattr(sync, "require_legacy_protocol", no_lock)
     monkeypatch.setattr(sync, "hub", SimpleNamespace(publish=publish))
     asyncio.run(sync.delete_notebook(
         NOTE_UID,
