@@ -129,7 +129,10 @@ v1, **nie** obsługa operacyjnego Undo/Redo v2 z tombstones.
 
 Dodano `EditorSqliteProjector` bez zmiany schematu Drift. Zatwierdzone
 operacje stron i ink aktualizują ich docelowe rekordy SQLite; usunięcie
-ostatniej strony jest blokowane. Dla tekstu `object.create` i
+ostatniej strony jest blokowane. Usunięcie strony z obrazem/PDF lub
+embedem Quill jest odrzucane do chwili obsługi detach assetów
+(regresje w `test/editor_sqlite_projector_test.dart`).
+Dla tekstu `object.create` i
 `object.set` modyfikują typed rows, natomiast
 `text.insert/delete/format` odtwarzają atomy CRDT z dziennika,
 nakładają operację i zapisują `text` oraz Delta Quill. Replay
