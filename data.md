@@ -734,3 +734,20 @@ pliku źródła; zmianę źródła traktować jako blokadę cutover, a nie
 zezwolenie na zastąpienie nowszego SQLite starszym stagingiem.
 Nie aktywować staged namespace ani v2 API bez kontrolowanej migracji
 serwera, modelu operacyjnego, tokenów oraz testów E2E.
+
+## Bezpieczna bariera v1/v2 — etap 13 (2026-11-04)
+
+Po migracji SQL 0013 `account_sync_protocol` wskazuje konto świadomie
+aktywowane dla nowego protokołu operacji. Brak wiersza oznacza v1.
+Backend sprawdza marker pod transakcyjną blokadą właściciela na v1
+PUT/DELETE i na v2 batch. Sama flaga `OPERATIONS_V2_WRITE_MODE` nie
+przenosi konta, a API v2 ma domyślnie blokadę zapisu.
+Narzędzie `scripts/stage13-activate-empty-canary.sh` działa jedynie dla
+zupełnie pustego konta testowego przy wyłączonym API.
+
+Nie istnieje jeszcze produkcyjna migracja istniejących dokumentów v1,
+assetów, checkpointów oraz lokalnego outboxu do v2. `AppScope` nadal
+otwiera wspólną bazę i używa `LiveWebSyncService`, więc pełna izolacja
+Local/A/B i przełączenie silnika pozostają otwartymi blokadami.
+NIE uruchamiać tego narzędzia na realnych danych i nie używać starej
+wersji API po aktywacji konta v2.
