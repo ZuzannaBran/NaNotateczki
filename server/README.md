@@ -133,6 +133,44 @@ Testy równoległości, odzyskiwania backupu oraz publicznego HTTPS/WSS przez
 Cloudflare nadal wymagają odrębnej weryfikacji. Matryca i instrukcje:
 `TESTING.md`.
 
+## Etap 13 — wdrożenie produkcyjne (jeszcze zablokowane)
+
+Procedura, bezpieczna flaga canary, test odtworzenia PostgreSQL+assetów
+oraz monitoring: [docs/STAGE13_PRODUCTION_ROLLOUT_PL.md](docs/STAGE13_PRODUCTION_ROLLOUT_PL.md).
+Domyślnie `OPERATIONS_V2_WRITE_MODE=disabled`; nie przełączać istniejących
+kont, dopóki etap 11 nie ma aktywnego cutover, a etap 12 zaliczonych E2E.
+Lokalna walidacja archiwum bez Dockera:
+
+```bash
+python3 -m unittest discover -s scripts/tests -p 'test_stage13_backup_check.py'
+```
+
+## Etap 12 — testy prawdziwego PostgreSQL i WebSocket (bez produkcji)
+
+Na komputerze testowym z Docker Compose v2 i Pythonem 3:
+
+```bash
+bash scripts/run-stage12-real.sh
+# Krótka wersja pomija test 1000 dodanych + 1000 skasowanych obiektów:
+bash scripts/run-stage12-real.sh --quick
+# Opcjonalnie z checkoutem aplikacji i Flutter SDK:
+NN_STAGE12_FLUTTER_ROOT=../NaNotateczki bash scripts/run-stage12-real.sh
+```
+
+Runner uruchamia osobny, nietrwały PostgreSQL 17 na dynamicznym porcie
+localhost, stosuje migracje 0001–0012, następnie wykonuje prawdziwe
+zapytania FastAPI i połączenia WebSocket. Nie podmienia bazy ani hubu
+mockami. Po zakończeniu usuwa testowy kontener i jego dane. Dodatkowa
+blokada w pytest odrzuca niejawny start i nieznane adresy bazy.
+Nie uruchamiać przeciwko /srv/nanotateczki ani produkcyjnemu API.
+Nie wymaga żadnej migracji produkcyjnej ani komendy na serwerze.
+
+Ten zestaw bada backend, ale nie jest testem dwóch prawdziwych
+instancji Flutter. Weryfikacja cutover z etapu 11, realnych
+gestów na dwóch platformach, awarii przy zapisie i assetów
+pozostaje obowiązkowa przed etapem 13. Wyniki należy odnotować
+w dokumentacji aplikacji `docs/ETAP_12_TESTS.md`.
+
 ## Utwardzenie zabezpieczeń
 
 Proxy Caddy pobiera adres klienta z nagłówka `CF-Connecting-IP` od
