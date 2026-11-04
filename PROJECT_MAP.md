@@ -2571,6 +2571,13 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
 ## Etap 14 — finalizacja warunkowa (2026-11-04)
 
+- `lib/app/unsupported_account_protocol_screen.dart`: po wykryciu
+  nieobsługiwanego konta v2 blokuje edycję w starszym kliencie, zachowuje
+  lokalne dane i udostępnia wylogowanie. Typowany błąd
+  `AccountProtocolNotSupported` w `api_client.dart` odróżnia to od
+  awarii sieci. Regresje: `test/api_client_test.dart` i
+  `test/unsupported_account_protocol_screen_test.dart`.
+
 - docs/ETAP_14_FINALIZACJA.md: inwentarz active v1 i opt-in v2,
   reguły bezpiecznego usuwania legacy oraz nierozwiązane bramki
   etapów 11–13. Etap 14 jest częściowy, bez produkcyjnego cutover.

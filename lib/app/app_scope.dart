@@ -37,6 +37,7 @@ import '../features/library/presentation/library_screen.dart';
 import '../features/notebook/data/notebook_repository.dart';
 import '../features/notebook/domain/notebook.dart';
 import '../features/planner/state/study_planner_controller.dart';
+import 'unsupported_account_protocol_screen.dart';
 
 class AppScope extends StatefulWidget {
   const AppScope({super.key, this.onNamespaceSwitch});
@@ -79,6 +80,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   bool _appIsForeground = true;
   String? _bootstrappedAccount;
   String? _legacyProtocolReadyUser;
+  String? _incompatibleProtocolUser;
   String? _clockCheckedForUser;
   final GlobalKey<ScaffoldMessengerState> _notificationMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
@@ -118,6 +120,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     await _remoteBackupScheduler?.stop();
     _bootstrappedAccount = null;
     _legacyProtocolReadyUser = null;
+    _incompatibleProtocolUser = null;
   }
 
   Future<void> _switchNamespaceIfNeeded() async {
@@ -175,6 +178,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         )) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (session.isSignedIn &&
+            _incompatibleProtocolUser == session.userId) {
+          return UnsupportedAccountProtocolScreen(
+            onLogOut: session.logout,
           );
         }
         return const LibraryScreen();
@@ -586,6 +595,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (!mounted || session.userId != userId || !session.isSignedIn) {
           return;
         }
+        if (_incompatibleProtocolUser == userId && mounted) {
+          setState(() => _incompatibleProtocolUser = null);
+        }
         _legacyProtocolReadyUser = userId;
         var restored = false;
         Object? recoveryFailure;
@@ -650,6 +662,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           unawaited(_syncPlanner());
         });
       } catch (error, stackTrace) {
+        if (error is AccountProtocolNotSupported &&
+            mounted &&
+            session.isSignedIn &&
+            session.userId == userId) {
+          setState(() => _incompatibleProtocolUser = userId);
+        }
         sync.reportStartupFailure(error);
         AppErrorLog.instance.record(
           error,
@@ -859,6 +877,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             if (!accountSession.isSignedIn) {
               _bootstrappedAccount = null;
               _legacyProtocolReadyUser = null;
+              _incompatibleProtocolUser = null;
               _clockCheckedForUser = null;
               _settingsPoll?.cancel();
               _settingsDebounce?.cancel();

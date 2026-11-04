@@ -28,6 +28,12 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode): $message';
 }
 
+/// Signals that legacy snapshot writers cannot edit a v2 account.
+class AccountProtocolNotSupported extends StateError {
+  AccountProtocolNotSupported()
+      : super('This version cannot edit accounts using sync v2.');
+}
+
 class ApiClient {
   ApiClient({
     Uri? baseUri,
@@ -104,9 +110,7 @@ class ApiClient {
     }
     final protocol = payload['protocol'];
     if (protocol == 'v2') {
-      throw StateError(
-        'This account uses sync v2. Update the app before editing it.',
-      );
+      throw AccountProtocolNotSupported();
     }
     if (protocol != 'v1') {
       throw const FormatException('Unsupported account sync protocol.');

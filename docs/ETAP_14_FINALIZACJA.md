@@ -82,6 +82,18 @@ Regresje: `test/api_client_test.dart`,
 Brak Flutter SDK w tym środowisku — nie ogłoszono PASS aplikacji.
 To zabezpieczenie **nie uruchamia** edycji v2 i nie zamyka etapów 11–13.
 
+## Blokada edycji kont z nieobsługiwanym v2
+
+Po otrzymaniu `protocol=v2` starszy klient pokazuje ekran z
+informacją o nieobsługiwanym protokole i przyciskiem `Log out`
+zamiast zezwalać na edycję, której nie potrafi zsynchronizować.
+Lokalny magazyn, assety i outbox pozostają nietknięte.
+Normalna praca offline kont v1 nie jest blokowana.
+Regresje dodano do `test/api_client_test.dart` i
+`test/unsupported_account_protocol_screen_test.dart`. Bez Flutter SDK
+wynik testów nie został potwierdzony. Nie jest to wdrożenie
+produkcyjnego edytora SyncEngine v2.
+
 ## Wykonane bezpieczne porządki
 
 1. Naprawiono błędny delimiter SQL w kanonicznym

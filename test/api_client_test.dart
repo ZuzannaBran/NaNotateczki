@@ -127,7 +127,7 @@ void main() {
     client.setAccessToken('access');
     await expectLater(
       client.ensureLegacyAccountProtocol(),
-      throwsA(isA<StateError>()),
+      throwsA(isA<AccountProtocolNotSupported>()),
     );
   });
 
