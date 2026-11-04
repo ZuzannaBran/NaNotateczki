@@ -104,10 +104,21 @@ strony na `LocalOperationDraft` używając istniejących adapterów ink/tekst.
 `SyncEngine.writeLocalBatch` zapisuje cały gest w jednej transakcji
 przed planowaniem wysyłki i waliduje wszystkie payloady zawczasu.
 
+Most obsługuje teraz zweryfikowane embedy Quill oraz wymianę
+obrazu/PDF przy znanym starym asset ID. Sekwencja osadzonego zasobu to
+`object.create → asset.attach → text.insert`; usunięcie referencji
+poprzedza `asset.detach`. Wymiana istniejącego obrazu używa
+`asset.attach → object.set(assetId) → asset.detach`. Nieweryfikowany
+zasób, błędny MIME, zewnętrzny URL oraz brak trwałego ID starego assetu
+powodują odmowę planowania całego gestu. `verifiedAssets` jest
+indeksowane po ID bloku obrazu lub po ID assetu dla embedu Quill.
+To wyłącznie planowanie operacji, **nie dowód istnienia uploadu**:
+warstwa wywołująca musi osobno sprawdzić potwierdzenie z asset gateway.
+
 To NIE jest produkcyjny cutover. Brakuje integracji z `EditorController`,
 trwałego odwzorowania/rebase atomów CRDT przy każdej edycji Quill,
-bezpiecznego Undo/Redo tożsamości z tombstones, kompletnej obsługi
-replace/detach assetów i projekcji SQLite dla wszystkich typów.
-Nie wolno włączać jednocześnie writerów v1 i v2 ani usuwać snapshotowego
-zapisu przed zakończeniem tych prac. Testy wymagają uruchomienia przez
-Flutter/Dart; samo dodanie regresji nie oznacza ich zaliczenia.
+bezpiecznego Undo/Redo tożsamości z tombstones, zdalnej projekcji
+SQLite i odtworzenia po restarcie. Nie wolno włączać jednocześnie
+writerów v1 i v2 ani usuwać snapshotowego zapisu przed zakończeniem
+tych prac. Testy wymagają uruchomienia przez Flutter/Dart; samo dodanie
+regresji nie oznacza ich zaliczenia.
