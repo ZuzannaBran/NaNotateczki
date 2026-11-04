@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
 
 import '../drift/notes_database.dart';
@@ -315,21 +316,26 @@ class EditorSqliteProjector {
       'SELECT uid FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
       [Variable<String>(op.objectId!), Variable<String>(op.pageId!)],
     );
-    if (ink != null) {
-      await database.customStatement(
-        'DELETE FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
-        [op.objectId, op.pageId],
-      );
-      return;
+    final text = await _textRow(op);
+    final image = await _row(
+      'SELECT uid FROM image_block_rows WHERE uid = ? AND page_uid = ?',
+      [Variable<String>(op.objectId!), Variable<String>(op.pageId!)],
+    );
+    final matches = (ink == null ? 0 : 1) +
+        (text == null ? 0 : 1) +
+        (image == null ? 0 : 1);
+    if (matches != 1) {
+      throw StateError('Missing or ambiguous editor object identity.');
     }
-    if (await _textRow(op) != null) {
-      await database.customStatement(
-        'DELETE FROM text_block_rows WHERE uid = ? AND page_uid = ?',
-        [op.objectId, op.pageId],
-      );
-      return;
+    if (image != null) {
+      throw UnsupportedError('Image deletion requires asset detachment.');
     }
-    throw StateError('Unsupported or missing object deletion target.');
+    await database.customStatement(
+      ink != null
+          ? 'DELETE FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?'
+          : 'DELETE FROM text_block_rows WHERE uid = ? AND page_uid = ?',
+      [op.objectId, op.pageId],
+    );
   }
 
   Future<Map<String, dynamic>?> _textRow(OperationEnvelope op) => _row(
@@ -442,6 +448,16 @@ class EditorSqliteProjector {
     final previousText = OperationTextSequence.render(durable).trimRight();
     if (row['text'] != previousText) {
       throw StateError('The text projection is not at its durable frontier.');
+    }
+    final storedDelta = row['delta_json'];
+    final durableDelta = OperationTextSequence.renderDelta(durable);
+    if ((storedDelta == null && durable.isNotEmpty) ||
+        (storedDelta != null &&
+            !const DeepCollectionEquality().equals(
+              jsonDecode(storedDelta as String),
+              durableDelta,
+            ))) {
+      throw StateError('The Quill Delta differs from the durable atoms.');
     }
     final updated = OperationTextSequence.apply(durable, op);
     final text = OperationTextSequence.render(updated).trimRight();
