@@ -125,10 +125,59 @@ do zabezpieczenia `NotebookRepository` jej ID; nieoznaczony ubytek
 pozostaje blokowany. Regresje: `editor_controller_layering_test.dart`. Jest to naprawa bezpieczeństwa w aktywnym edytorze
 v1, **nie** obsługa operacyjnego Undo/Redo v2 z tombstones.
 
-To NIE jest produkcyjny cutover. Brakuje integracji z `EditorController`,
-trwałego odwzorowania/rebase atomów CRDT przy każdej edycji Quill,
-bezpiecznego Undo/Redo tożsamości z tombstones, zdalnej projekcji
-SQLite i odtworzenia po restarcie. Nie wolno włączać jednocześnie
-writerów v1 i v2 ani usuwać snapshotowego zapisu przed zakończeniem
-tych prac. Testy wymagają uruchomienia przez Flutter/Dart; samo dodanie
-regresji nie oznacza ich zaliczenia.
+### Kolejny przyrost implementacji — opt-in (2026-11-05)
+
+Dodano `EditorSqliteProjector` bez zmiany schematu Drift. Zatwierdzone
+operacje stron i ink aktualizują ich docelowe rekordy SQLite; usunięcie
+ostatniej strony jest blokowane. Dla tekstu `object.create` i
+`object.set` modyfikują typed rows, natomiast
+`text.insert/delete/format` odtwarzają atomy CRDT z dziennika,
+nakładają operację i zapisują `text` oraz Delta Quill. Replay
+`OperationStore.textAtoms` zachowuje także tombstones atomów.
+Operacje zdalne mogą używać tego samego callbacku
+`EditorSqliteProjector.apply` w transakcji `OperationStore.applyRemote`.
+Poprzedzające operacje, projekcja i outbox pozostają atomowe.
+Metoda replay jest ograniczona do 50000 tekstowych envelope'ów,
+bez niebezpiecznej kompaktacji; długie historie wymagają przyszłych
+snapshotów/checkpointów CRDT.
+
+`EditorV2OperationWriter` wiąże most z `SyncEngine.writeLocalBatch`
+i tą samą instancją `NotesDatabase`; odczytuje trwałe atomy przed
+przygotowaniem edycji, nie tworzy pustych wsadów i nie wywołuje
+`NotebookRepository.saveNotebook`. Nowe testy:
+`test/editor_sqlite_projector_test.dart` i
+`test/editor_v2_operation_writer_test.dart`, obejmujące rollback,
+offline outbox, ink, formatowanie, restart i idempotentny remote replay.
+Nie były wykonane w środowisku bez SDK Flutter/Dart.
+
+**Granice:** projektor odrzuca `image/pdf`, embedy Quill,
+`asset.attach/detach`, `document.create`, `object.move` i inne
+niewspierane mutacje. Nie zapewnia jeszcze uzgodnień LWW per pole ani
+rebase przy jednoczesnych edycjach. `EditorV2OperationWriter` nie
+jest wpięty do produkcyjnego `EditorController`. Undo/Redo v2 wymaga
+osobnego odwzorowania inverse intents oraz nowych identyfikatorów przy
+tombstone; nie można po prostu odtworzyć usuniętego UID.
+
+To NIE jest produkcyjny cutover. Aktywne konto nadal zapisuje v1.
+Przed przełączeniem należy zakończyć obsługę assetów, przekazanie wszystkich
+akcji `EditorController`, bezpieczny Undo/Redo, synchronizację remote z
+rebase, migrację dokumentów/outboxu, wsparcie platform i testy E2E.
+Nie wolno włączać jednocześnie writerów v1 i v2 ani usuwać snapshotowego
+zapisu przed zakończeniem tych prac.
+
+### Ręczna weryfikacja, gdy dostępne będzie środowisko Flutter
+
+1. W izolowanym katalogu konta utworzyć notebook z dwiema stronami
+   i aktywować jedynie opt-in writer v2 na dokumencie testowym.
+2. Offline dopisać i skasować stroke, edytować Quill (w tym styl),
+   uruchomić Undo/Redo w docelowej integracji i ponownie uruchomić app.
+   `operations`, `operation_outbox` i tabela obiektów muszą być spójne.
+3. Przesłać wsad do API, zerwać połączenie przed ACK, ponowić;
+   powtórny ACK nie może ponownie odmalować obiektu.
+4. Na drugim urządzeniu odbierać niezależną zmianę. Po konflikcie
+   nie wolno nadpisać lokalnego outboxu ani wrócić do starego snapshotu.
+5. Sprawdzić usunięcie elementu i strony; żaden backup v1 nie może
+   przywrócić tombstone. Powtórzyć po restartach i na Web/Android/iOS/Linux.
+
+Testów ręcznych ani automatycznych nie uznajemy za wykonane.
+
