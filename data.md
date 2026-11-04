@@ -29,6 +29,21 @@ Ten dokument jest źródłem prawdy dla lokalnego zapisu, migracji, backupu
 serwerowego i synchronizacji. Lokalny Drift/SQLite pozostaje podstawą pracy
 offline również po zalogowaniu.
 
+## Etap 2 — obsługa embedów Quill (2026-11-04)
+
+Protokół operacji v2 dopuszcza w `text.insert` pojedynczy atom
+`U+FFFC` z `embed: {"image": "asset:<assetId>"}` albo
+`embed: {"pdf": "asset:<assetId>"}`. Poprzedzająca operacja
+`asset.attach` wymaga ukończonego transportu pliku SHA-256. Projekcja
+sprawdza obecność assetu przy tym samym obiekcie tekstowym i jego MIME.
+Nie wolno odłączać assetu wykorzystywanego przez widoczny embed. Najpierw
+należy usunąć atom przez `text.delete`. Ścieżki lokalne i URL zewnętrzne
+nie są akceptowane jako referencje do embedów.
+
+Produkcja nadal korzysta z writerów v1. Podłączenie edytora do
+`OperationStore` jest osobnym etapem 3; bez niego obsługa embedów nie
+stanowi jeszcze gwarancji synchronizacji E2E.
+
 ## Tryby danych
 
 - Przy pierwszym uruchomieniu użytkownik jawnie wybiera rejestrację, logowanie

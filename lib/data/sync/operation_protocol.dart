@@ -115,8 +115,8 @@ class OperationEnvelope {
 
   /// Validates payloads supported by the actual v2 PostgreSQL projector.
   ///
-  /// The envelope itself also supports future text and asset operation kinds.
-  /// Those kinds must not enter a durable outbox until their reducers exist.
+  /// Inline Quill embeds must use attached asset IDs. The projector verifies
+  /// their presence and MIME before an atom becomes visible.
   void validateForV2Projection() {
     validateV2Payload(
       kind: kind,
