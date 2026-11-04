@@ -110,6 +110,41 @@ void main() {
     expect(() => adapter.plan(atoms: initial, newText: 'AX'), throwsStateError);
   });
 
+  test('Quill terminal newline survives trimmed editor plain text', () {
+    final adapter = ShareTextEditAdapter();
+    const delta = r'[{"insert":"Hi\n"}]';
+    final inserted = adapter.plan(
+      atoms: {},
+      newText: 'Hi',
+      changedDeltaJson: delta,
+    );
+    var atoms = applyPlan({}, inserted);
+    expect(OperationTextSequence.render(atoms), 'Hi\n');
+    expect(OperationTextSequence.renderDelta(atoms), [
+      {'insert': 'Hi\n'},
+    ]);
+
+    final updated = adapter.plan(
+      atoms: atoms,
+      newText: 'Bye',
+      changedDeltaJson: r'[{"insert":"Bye\n"}]',
+    );
+    atoms = applyPlan(atoms, updated);
+    expect(OperationTextSequence.render(atoms), 'Bye\n');
+  });
+
+  test('Quill content mismatch cannot hide inside whitespace', () {
+    final adapter = ShareTextEditAdapter();
+    expect(
+      () => adapter.plan(
+        atoms: {},
+        newText: 'Hi',
+        changedDeltaJson: r'[{"insert":"Wrong\n"}]',
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('duplicate atom IDs are rejected before emitting an intent', () {
     const reusedId = '00000000-0000-4000-8000-000000000001';
     final adapter = ShareTextEditAdapter(createAtomId: () => reusedId);
