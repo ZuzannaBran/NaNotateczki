@@ -394,10 +394,20 @@ void main() {
       final uploadsBeforeLogout = remoteBackupService.calls;
       remoteBackupService.failNextUpload = true;
       await tester.tap(find.byKey(const ValueKey('account-logout')));
-      await tester.pumpAndSettle();
+      for (var i = 0;
+          i < 100 && find.text('Account sync not complete').evaluate().isEmpty;
+          i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(find.text('Account sync not complete'), findsOneWidget);
       expect(session.isSignedIn, isTrue);
       expect(remoteBackupService.calls, uploadsBeforeLogout + 1);
       expect(sync.isStarted, isTrue);
+      // An incomplete backup requires an explicit decision; it must not
+      // silently log out or leave a spinning progress indicator.
+      await tester.tap(find.text('Stay signed in'));
+      await tester.pumpAndSettle();
+      expect(find.text('Account sync not complete'), findsNothing);
       expect(find.byKey(const ValueKey('account-logout')), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('account-logout')));

@@ -204,10 +204,10 @@ void main() {
       expect((await repo3.fetchNotebooks()).single.uid, local.uid);
       expect(await repo3.getNotebook(notebook.uid), isNull);
       expect(jsonDecode(stored['app_prefs.json']!)['darkMode'], false);
-      expect(
-        jsonDecode(stored['library_folders.json']!)['folders'],
-        containsAll(['Local work', 'School']),
-      );
+      // Remote backup must not resurrect an empty historical folder.
+      expect(jsonDecode(stored['library_folders.json']!)['folders'], [
+        'Local work',
+      ]);
     },
   );
 
