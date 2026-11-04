@@ -58,6 +58,7 @@ class EditorOperationBridge {
     required NotePage after,
     Map<String, Map<String, dynamic>> textAtomsById = const {},
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
+    Map<String, String> existingAssetIds = const {},
   }) {
     if (action is MoveImageBetweenPagesAction) {
       throw ArgumentError('Use planCrossPageImageMove for cross-page edits.');
@@ -67,6 +68,7 @@ class EditorOperationBridge {
       after: after,
       textAtomsById: textAtomsById,
       verifiedAssets: verifiedAssets,
+      existingAssetIds: existingAssetIds,
     );
   }
 
@@ -75,6 +77,7 @@ class EditorOperationBridge {
     required NotePage after,
     Map<String, Map<String, dynamic>> textAtomsById = const {},
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
+    Map<String, String> existingAssetIds = const {},
   }) {
     if (before.id.isEmpty || before.id != after.id) {
       throw ArgumentError('A committed edit must preserve its page ID.');
@@ -116,11 +119,17 @@ class EditorOperationBridge {
       final old = oldTexts[block.id];
       final geometry = _textGeometry(block, entry.key);
       if (old == null) {
-        _rejectUnattachedEmbeds(block.deltaJson);
         result.add(_create(after.id, block.id, {
           'objectType': 'text',
           ...geometry,
         }));
+        result.addAll(_attachQuillEmbeds(
+          pageId: after.id,
+          objectId: block.id,
+          beforeDelta: null,
+          afterDelta: block.deltaJson,
+          verifiedAssets: verifiedAssets,
+        ));
         for (final intent in _text.plan(
           atoms: const {},
           newText: block.text,
@@ -136,7 +145,6 @@ class EditorOperationBridge {
         result.add(_set(after.id, block.id, changed));
       }
       if (old.text != block.text || old.deltaJson != block.deltaJson) {
-        _rejectUnattachedEmbeds(block.deltaJson);
         final atoms = textAtomsById[block.id];
         if (atoms == null) {
           throw StateError('A text change needs the durable CRDT atom state.');
@@ -144,6 +152,13 @@ class EditorOperationBridge {
         if (OperationTextSequence.render(atoms) != old.text) {
           throw StateError('Stale text atom projection cannot be edited.');
         }
+        result.addAll(_attachQuillEmbeds(
+          pageId: after.id,
+          objectId: block.id,
+          beforeDelta: old.deltaJson,
+          afterDelta: block.deltaJson,
+          verifiedAssets: verifiedAssets,
+        ));
         for (final intent in _text.plan(
           atoms: atoms,
           newText: block.text,
@@ -151,6 +166,12 @@ class EditorOperationBridge {
         )) {
           result.add(_textIntent(after.id, block.id, intent));
         }
+        result.addAll(_detachUnusedQuillEmbeds(
+          pageId: after.id,
+          objectId: block.id,
+          beforeDelta: old.deltaJson,
+          afterDelta: block.deltaJson,
+        ));
       }
     }
 
@@ -170,13 +191,7 @@ class EditorOperationBridge {
         if (asset == null) {
           throw StateError('Image/PDF must be uploaded and verified first.');
         }
-        OperationEnvelope.validateV2Payload(
-          kind: OperationKind.assetAttach,
-          payload: asset.attachPayload,
-          documentId: 'editor-bridge',
-          pageId: after.id,
-          objectId: image.id,
-        );
+        _validateImageAsset(image, asset);
         result.add(_create(after.id, image.id, {
           'objectType': 'image',
           'assetId': asset.assetId,
@@ -190,10 +205,41 @@ class EditorOperationBridge {
         ));
         continue;
       }
-      _assertSameImageAsset(old, image);
       final oldIndex = before.imageBlocks.indexWhere((b) => b.id == image.id);
       final changed = _diff(_imageGeometry(old, oldIndex), geometry);
-      if (changed.isNotEmpty) {
+      if (!_sameImageAsset(old, image)) {
+        final asset = verifiedAssets[image.id];
+        final previousId = existingAssetIds[image.id];
+        if (asset == null ||
+            previousId == null ||
+            previousId == asset.assetId) {
+          throw StateError(
+            'Image replacement needs a new verified asset and old asset ID.',
+          );
+        }
+        _validateImageAsset(image, asset);
+        OperationEnvelope.validateV2Payload(
+          kind: OperationKind.assetDetach,
+          payload: {'assetId': previousId},
+          documentId: 'editor-bridge',
+          pageId: after.id,
+          objectId: image.id,
+        );
+        result.add(LocalOperationDraft(
+          kind: OperationKind.assetAttach,
+          pageId: after.id,
+          objectId: image.id,
+          payload: asset.attachPayload,
+        ));
+        changed['assetId'] = asset.assetId;
+        result.add(_set(after.id, image.id, changed));
+        result.add(LocalOperationDraft(
+          kind: OperationKind.assetDetach,
+          pageId: after.id,
+          objectId: image.id,
+          payload: {'assetId': previousId},
+        ));
+      } else if (changed.isNotEmpty) {
         result.add(_set(after.id, image.id, changed));
       }
     }
@@ -268,17 +314,117 @@ class EditorOperationBridge {
     ];
   }
 
-  static void _rejectUnattachedEmbeds(String? deltaJson) {
-    if (deltaJson == null) return;
-    final delta = jsonDecode(deltaJson);
-    if (delta is! List) {
+  /// Assets are attached before the first atom that references them.
+  /// Each text object has its own attachment scope.
+  static List<LocalOperationDraft> _attachQuillEmbeds({
+    required String pageId,
+    required String objectId,
+    required String? beforeDelta,
+    required String? afterDelta,
+    required Map<String, VerifiedEditorAsset> verifiedAssets,
+  }) {
+    final previous = _quillEmbeds(beforeDelta);
+    final next = _quillEmbeds(afterDelta);
+    final drafts = <LocalOperationDraft>[];
+    for (final entry in next.entries) {
+      if (previous.containsKey(entry.key)) {
+        if (previous[entry.key] != entry.value) {
+          throw StateError('An existing asset cannot change embed type.');
+        }
+        continue;
+      }
+      final asset = verifiedAssets[entry.key];
+      if (asset == null || asset.assetId != entry.key) {
+        throw StateError('A Quill embed needs a verified asset upload.');
+      }
+      final isImage = entry.value == 'image';
+      if (isImage
+          ? !const {'image/png', 'image/jpeg', 'image/webp'}
+              .contains(asset.mediaType)
+          : asset.mediaType != 'application/pdf') {
+        throw StateError('Quill embed media type does not match the asset.');
+      }
+      _validateAsset(asset, pageId: pageId, objectId: objectId);
+      drafts.add(LocalOperationDraft(
+        kind: OperationKind.assetAttach,
+        pageId: pageId,
+        objectId: objectId,
+        payload: asset.attachPayload,
+      ));
+    }
+    return drafts;
+  }
+
+  /// Removed embeds are detached only after their atoms have been deleted.
+  static List<LocalOperationDraft> _detachUnusedQuillEmbeds({
+    required String pageId,
+    required String objectId,
+    required String? beforeDelta,
+    required String? afterDelta,
+  }) {
+    final previous = _quillEmbeds(beforeDelta);
+    final next = _quillEmbeds(afterDelta);
+    return [
+      for (final id in previous.keys)
+        if (!next.containsKey(id))
+          LocalOperationDraft(
+            kind: OperationKind.assetDetach,
+            pageId: pageId,
+            objectId: objectId,
+            payload: {'assetId': id},
+          ),
+    ];
+  }
+
+  static Map<String, String> _quillEmbeds(String? deltaJson) {
+    if (deltaJson == null) {
+      return const {};
+    }
+    final decoded = jsonDecode(deltaJson);
+    if (decoded is! List) {
       throw const FormatException('Invalid Quill delta.');
     }
-    for (final entry in delta) {
-      if (entry is Map && entry['insert'] is Map) {
-        throw UnsupportedError('Quill embeds need verified asset references.');
+    final result = <String, String>{};
+    for (final entry in decoded) {
+      if (entry is! Map || !entry.containsKey('insert')) {
+        throw const FormatException('Invalid Quill delta operation.');
       }
+      final insert = entry['insert'];
+      if (insert is! Map) {
+        continue;
+      }
+      final id = OperationEnvelope.embedAssetId(insert);
+      final kind = insert.keys.single as String;
+      if (result.containsKey(id) && result[id] != kind) {
+        throw const FormatException('Conflicting Quill embed types.');
+      }
+      result[id] = kind;
     }
+    return result;
+  }
+
+  static void _validateAsset(
+    VerifiedEditorAsset asset, {
+    required String pageId,
+    required String objectId,
+  }) {
+    OperationEnvelope.validateV2Payload(
+      kind: OperationKind.assetAttach,
+      payload: asset.attachPayload,
+      documentId: 'editor-bridge',
+      pageId: pageId,
+      objectId: objectId,
+    );
+  }
+
+  static void _validateImageAsset(
+    ImageBlock image,
+    VerifiedEditorAsset asset,
+  ) {
+    if (image.imageMime != null && image.imageMime != asset.mediaType) {
+      throw StateError('Image/PDF MIME differs from the verified upload.');
+    }
+    _validateAsset(asset, pageId: 'editor-page', objectId: image.id);
   }
 
   static Map<String, dynamic> _textGeometry(TextBlock block, int index) => {
@@ -304,12 +450,15 @@ class EditorOperationBridge {
     'sortIndex': index,
   };
 
+  static bool _sameImageAsset(ImageBlock before, ImageBlock after) =>
+      before.path == after.path &&
+      before.imageMime == after.imageMime &&
+      before.imageExt == after.imageExt &&
+      _bytes.equals(before.bytes, after.bytes);
+
   static void _assertSameImageAsset(ImageBlock before, ImageBlock after) {
-    if (before.path != after.path ||
-        before.imageMime != after.imageMime ||
-        before.imageExt != after.imageExt ||
-        !_bytes.equals(before.bytes, after.bytes)) {
-      throw StateError('Changed image bytes require verified asset replacement.');
+    if (!_sameImageAsset(before, after)) {
+      throw StateError('Cross-page moves cannot replace image content.');
     }
   }
 
