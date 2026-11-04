@@ -2628,3 +2628,23 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   zachowuje kompatybilność, inne błędy nie przełączają writera.
   Regresje: `test/api_client_test.dart`; backend: auth.py
   kanoniczny i mirror, `test_account_protocol_fence.py`.
+
+
+## Stage 2 — nowy protokół danych i assetów (2026-11-04)
+
+- `lib/data/sync/operation_protocol.dart`: rodzaje i walidacja
+  `text.format`, `object.move`, `asset.attach`, `asset.detach`.
+- `lib/data/sync/operation_text_sequence.dart`: CRDT Quill,
+  formatowanie per atom i `renderDelta`.
+- `lib/data/sync/share_text_edit_adapter.dart`: planowanie intentów
+  tekstowych ze snapshotów Delta Quill. Osadzone embedy fail-closed.
+- `lib/data/sync/operation_asset_gateway.dart`: osobny upload i download
+  plików z kontrolą SHA-256, rozmiaru i zakresu uprawnień Share.
+- `test/operation_asset_gateway_test.dart`: kontrola uploadu, pobrania,
+  błędów integralności i uprawnień; `test/operation_protocol_test.dart`:
+  walidacja metadanych assetu.
+- Backend kanoniczny: `NaNotateczki-serwer/api/app/asset_store.py`,
+  `routers/assets.py`, `operation_projection.py` oraz
+  `migrations/0014_verified_assets.sql`. Katalog `server/` to lustro.
+- Te klasy nie są jeszcze writerem `EditorController`, czego dotyczy
+  etap 3; brak automatycznego cutover i pełnego E2E.

@@ -774,3 +774,27 @@ wciąż używa `LiveWebSyncService` v1. Przełączenie silnika operacyjnego,
 Share v2 i aktywny import Local do konta pozostają otwartymi blokadami.
 NIE uruchamiać tego narzędzia na realnych danych i nie używać starej
 wersji API po aktywacji konta v2.
+
+
+## Stage 2 v2 — tekst formatowany i pliki (2026-11-04)
+
+Nowe reduktory protokołu, ale **nie produkcyjny cutover**:
+- `text.insert` przechowuje opcjonalne atrybuty Quill; `text.format`
+  aktualizuje per-atom atrybuty według rankingu Lamport. Usunięcie stylu
+  używa `null`. `OperationTextSequence.renderDelta` odtwarza formatowanie.
+- `object.move` przenosi obiekt z `pageId` do `toPageId`, zachowując
+  pozostałe właściwości. Porządek na stronie określa `sortIndex`
+  i stabilny identyfikator obiektu.
+- `OperationAssetGateway` przesyła obrazy PNG/JPEG/WebP i PDF po SHA-256.
+  Backend zapisuje pliki w `/data/assets-v2/<owner>/<prefix>/<sha256>`.
+  `asset.attach` wymaga zweryfikowanego pliku i rekordu właściciela
+  `verified_assets`; `asset.detach` usuwa wyłącznie referencję.
+  Po pobraniu klient ponownie sprawdza checksum oraz rozmiar.
+- Serwer wymaga dodatkowej **migracji 0014_verified_assets.sql** przed
+  wdrożeniem API. Zastosowanie jej nie aktywuje konta v2.
+- Osadzane obiekty `insert: { ... }` w Delta Quill pozostają odrzucane
+  do czasu połączenia ich z referencjami zweryfikowanych assetów.
+  Produkcyjny edytor nadal zapisuje v1, aż zakończy się krok 3.
+
+Nie wolno usuwać aktywnych writerów v1 ani włączać v2 dla kont produkcyjnych
+tylko z powodu dodania tej migracji i reduktorów.

@@ -370,4 +370,48 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('v2 asset attach/detach enforce verified metadata shape', () {
+    final payload = {
+      'assetId': 'photo-1',
+      'sha256': List.filled(64, 'a').join(),
+      'sizeBytes': 100,
+      'mediaType': 'image/png',
+    };
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.assetAttach,
+        documentId: 'document',
+        objectId: 'image-1',
+        payload: payload,
+      ),
+      returnsNormally,
+    );
+    expect(
+      () => OperationEnvelope.validateV2Payload(
+        kind: OperationKind.assetDetach,
+        documentId: 'document',
+        objectId: 'image-1',
+        payload: const {'assetId': 'photo-1'},
+      ),
+      returnsNormally,
+    );
+    for (final corrupt in [
+      {...payload, 'sizeBytes': -1},
+      {...payload, 'mediaType': 'text/html'},
+      {...payload, 'sha256': 'not-a-checksum'},
+      {...payload, 'unexpected': true},
+    ]) {
+      expect(
+        () => OperationEnvelope.validateV2Payload(
+          kind: OperationKind.assetAttach,
+          documentId: 'document',
+          objectId: 'image-1',
+          payload: corrupt,
+        ),
+        throwsFormatException,
+      );
+    }
+  });
+
 }
