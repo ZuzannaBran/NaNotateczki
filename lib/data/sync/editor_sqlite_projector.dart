@@ -174,6 +174,21 @@ class EditorSqliteProjector {
         'Pages containing images/PDFs require verified asset detachment.',
       );
     }
+    final assetPrefix = 'page:[${jsonEncode(pageId)},';
+    final attached = await _row(
+      'SELECT asset_id FROM asset_references '
+      'WHERE document_id = ? AND substr(object_id, 1, ?) = ? LIMIT 1',
+      [
+        Variable<String>(op.documentId),
+        Variable<int>(assetPrefix.length),
+        Variable<String>(assetPrefix),
+      ],
+    );
+    if (attached != null) {
+      throw UnsupportedError(
+        'Page still has durable asset references requiring detach.',
+      );
+    }
     // A legacy Quill embed is not necessarily stored as an image row.
     // Never discard its reference before the asset projector is available.
     final textRows = await database.customSelect(
