@@ -402,9 +402,9 @@ class AccountSessionController extends ChangeNotifier {
     StackTrace? remoteStack;
     try {
       if (refreshToken != null && apiClient.accessToken != null) {
-        await apiClient.postJson('/v1/auth/logout', {
-          'refreshToken': refreshToken,
-        }).timeout(const Duration(seconds: 5));
+        await apiClient
+            .postJson('/v1/auth/logout', {'refreshToken': refreshToken})
+            .timeout(const Duration(seconds: 5));
       }
     } catch (failure, stackTrace) {
       // Local sign-out must still work without an available server.

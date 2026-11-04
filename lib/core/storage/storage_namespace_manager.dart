@@ -14,11 +14,10 @@ class StorageNamespace {
   factory StorageNamespace.local() =>
       const StorageNamespace._(StorageNamespaceKind.local, 'local');
 
-  factory StorageNamespace.account(String userId) =>
-      StorageNamespace._(
-        StorageNamespaceKind.account,
-        'accounts/${_digest(userId)}',
-      );
+  factory StorageNamespace.account(String userId) => StorageNamespace._(
+    StorageNamespaceKind.account,
+    'accounts/${_digest(userId)}',
+  );
 
   factory StorageNamespace.share(String shareId, String guestActorId) =>
       StorageNamespace._(
@@ -88,9 +87,7 @@ class StorageNamespaceManager {
   bool get isActive => _active;
 
   bool accepts(StorageNamespace namespace, int expectedGeneration) =>
-      _active &&
-      _current == namespace &&
-      _generation == expectedGeneration;
+      _active && _current == namespace && _generation == expectedGeneration;
 
   Future<void> switchTo(
     StorageNamespace next, {

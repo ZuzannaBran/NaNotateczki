@@ -132,7 +132,6 @@ const operationTombstoneV4Migration = <String>[
   'ALTER TABLE object_tombstones_v4 RENAME TO object_tombstones',
 ];
 
- 
 /// v6 adds task tombstones without rewriting accepted operations or IDs.
 const operationTombstoneV6Migration = <String>[
   '''

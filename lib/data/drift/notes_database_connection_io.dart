@@ -69,7 +69,7 @@ Future<NotesDatabaseConnection> openNotesDatabaseConnection(String name) async {
     recoveryReason: recoveryReason,
     legacyImageDirectory:
         name != 'notes.sqlite' ||
-        migration.conflictingPaths.any((path) => path.startsWith('images/'))
+            migration.conflictingPaths.any((path) => path.startsWith('images/'))
         ? null
         : '${documents.path}/images',
     imageDirectory: '${file.parent.path}/images',

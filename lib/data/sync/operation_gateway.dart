@@ -38,11 +38,7 @@ abstract class OperationGateway {
 
 /// REST v2 is authoritative. WebSocket only signals that REST should run.
 class HttpOperationGateway implements OperationGateway {
-  HttpOperationGateway(
-    this.apiClient, {
-    this.shareId,
-    this.guestTicket,
-  }) {
+  HttpOperationGateway(this.apiClient, {this.shareId, this.guestTicket}) {
     if ((shareId == null) != (guestTicket == null)) {
       throw ArgumentError('Share operations require a scoped guest ticket.');
     }
@@ -62,10 +58,7 @@ class HttpOperationGateway implements OperationGateway {
 
   Map<String, String>? get _shareHeaders => shareId == null
       ? null
-      : {
-          'X-Share-Id': shareId!,
-          'Authorization': 'Bearer $guestTicket',
-        };
+      : {'X-Share-Id': shareId!, 'Authorization': 'Bearer $guestTicket'};
 
   @override
   Future<List<OperationReceipt>> send(

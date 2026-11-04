@@ -107,15 +107,16 @@ Future<void> _recoverAtomicWrite(File file) async {
 
 Future<File> _fileForKey(String key, {String? directoryPath}) async {
   // The identity profile is global so a restart can choose its namespace.
-  final path = directoryPath ??
+  final path =
+      directoryPath ??
       (key.startsWith('account_profile.json')
           ? await getRootAppDataPath()
           : await getAppDataPath());
   if (key.startsWith('/') ||
       key.contains('\\') ||
-      key.split('/').any(
-        (part) => part.isEmpty || part == '.' || part == '..',
-      )) {
+      key
+          .split('/')
+          .any((part) => part.isEmpty || part == '.' || part == '..')) {
     throw ArgumentError.value(key, 'key', 'Invalid relative storage key');
   }
   final file = File('$path/$key');

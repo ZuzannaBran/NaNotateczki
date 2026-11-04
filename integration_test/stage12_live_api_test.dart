@@ -124,7 +124,9 @@ void main() {
           objectId: 'stroke-a',
           kind: OperationKind.objectCreate,
           payload: const {
-            'value': {'points': [1, 2]},
+            'value': {
+              'points': [1, 2],
+            },
           },
           apply: (operation) => applyObject(dbA, operation),
         );
@@ -141,7 +143,9 @@ void main() {
           objectId: 'stroke-b',
           kind: OperationKind.objectCreate,
           payload: const {
-            'value': {'points': [3, 4]},
+            'value': {
+              'points': [3, 4],
+            },
           },
           apply: (operation) => applyObject(dbB, operation),
         );
@@ -164,9 +168,7 @@ void main() {
         expect(await objects(dbA), ['stroke-b']);
         expect(await objects(dbB), ['stroke-b']);
 
-        final apiSnapshot = await apiA.get(
-          '/v2/documents/$document/snapshot',
-        );
+        final apiSnapshot = await apiA.get('/v2/documents/$document/snapshot');
         final snapshot = Map<String, dynamic>.from(
           apiSnapshot.decodeJson() as Map,
         );

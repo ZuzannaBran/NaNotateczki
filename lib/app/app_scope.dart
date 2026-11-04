@@ -49,8 +49,7 @@ class AppScope extends StatefulWidget {
 }
 
 class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
-  late final Future<DatabaseOpenResult> _openFuture =
-      _openScopedDatabase();
+  late final Future<DatabaseOpenResult> _openFuture = _openScopedDatabase();
   StorageNamespace? _namespace;
   bool _switchingNamespace = false;
   Object? _namespaceSwitchFailure;
@@ -125,15 +124,17 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
   Future<void> _switchNamespaceIfNeeded() async {
     final session = _accountSession;
-    if (session == null || !session.profileLoaded || session.isBusy ||
+    if (session == null ||
+        !session.profileLoaded ||
+        session.isBusy ||
         _switchingNamespace) {
       return;
     }
     final next = session.isSignedIn
         ? StorageNamespace.account(session.userId!)
         : session.preferredMode == AccountDataMode.localOnly
-            ? StorageNamespace.local()
-            : _namespace;
+        ? StorageNamespace.local()
+        : _namespace;
     if (next == null || _namespace == next) {
       return;
     }
@@ -148,7 +149,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       }
     } catch (error, stackTrace) {
       AppErrorLog.instance.record(
-        error, stackTrace, source: 'AppScope.namespaceSwitch',
+        error,
+        stackTrace,
+        source: 'AppScope.namespaceSwitch',
       );
       if (mounted) {
         setState(() {
@@ -165,8 +168,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         final expected = session.isSignedIn
             ? StorageNamespace.account(session.userId!)
             : session.preferredMode == AccountDataMode.localOnly
-                ? StorageNamespace.local()
-                : _namespace;
+            ? StorageNamespace.local()
+            : _namespace;
         if (_namespaceSwitchFailure != null) {
           return _StartupErrorScreen(error: _namespaceSwitchFailure!);
         }
@@ -237,8 +240,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     _diagnosticsUpload?.dispose();
     _accountSession?.dispose();
     _apiClient?.close();
-    unawaited(_openFuture.then((opened) => opened.database.close())
-        .catchError((Object _, StackTrace __) {}));
+    unawaited(
+      _openFuture
+          .then((opened) => opened.database.close())
+          .catchError((Object _, StackTrace __) {}),
+    );
     final backupService = _backupService;
     if (backupService != null) {
       backupService.dispose();
@@ -274,9 +280,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     return ui.AppExitResponse.cancel;
   }
 
-  Future<void> _finishPendingWorkAndExit({
-    bool preserveOffline = false,
-  }) async {
+  Future<void> _finishPendingWorkAndExit({bool preserveOffline = false}) async {
     final repository = _repository;
     final backupService = _backupService;
     final scheduler = _backupScheduler;
@@ -603,9 +607,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         Object? recoveryFailure;
         // A new installation has no presence marker. If IndexedDB/SQLite
         // vanished after an earlier successful account start, recover it.
-        final needsRecovery = _databaseWasReset ||
-            (_databaseFreshFile &&
-                await backup.wasDatabaseInitialized(userId));
+        final needsRecovery =
+            _databaseWasReset ||
+            (_databaseFreshFile && await backup.wasDatabaseInitialized(userId));
         if (needsRecovery) {
           try {
             restored = await backup.hydrateFromLatestAccountBackup(
@@ -862,8 +866,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               final target = accountSession.isSignedIn
                   ? StorageNamespace.account(accountSession.userId!)
                   : accountSession.preferredMode == AccountDataMode.localOnly
-                      ? StorageNamespace.local()
-                      : _namespace;
+                  ? StorageNamespace.local()
+                  : _namespace;
               if (target != _namespace) {
                 _remoteBackupScheduler?.disable();
                 _settingsPoll?.cancel();

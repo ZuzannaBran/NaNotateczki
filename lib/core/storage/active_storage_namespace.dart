@@ -15,8 +15,7 @@ class ActiveStorageNamespace {
     required StorageNamespace? expected,
     required bool switching,
     required bool failed,
-  }) =>
-      opened != null && expected == opened && !switching && !failed;
+  }) => opened != null && expected == opened && !switching && !failed;
 
   static void activate(StorageNamespace namespace) {
     _current = namespace;
@@ -38,8 +37,9 @@ class ActiveStorageNamespace {
       return StorageNamespace.local();
     }
     if (id is! String ||
-        !RegExp(r'^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$')
-            .hasMatch(id)) {
+        !RegExp(
+          r'^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$',
+        ).hasMatch(id)) {
       throw const FormatException('Invalid account storage identity.');
     }
     return StorageNamespace.account(id.toLowerCase());

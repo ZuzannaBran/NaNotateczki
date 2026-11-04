@@ -21,8 +21,12 @@ class ShutdownInterrupted implements Exception {
 
   @override
   String toString() =>
-      'Shutdown stopped at ' + phase.name +
-      ' (localSafe: ' + localSafe.toString() + '): ' + reason.toString();
+      'Shutdown stopped at ' +
+      phase.name +
+      ' (localSafe: ' +
+      localSafe.toString() +
+      '): ' +
+      reason.toString();
 }
 
 /// Shared by explicit logout and the desktop window-close guard.

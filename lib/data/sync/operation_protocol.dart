@@ -182,9 +182,7 @@ class OperationEnvelope {
         kind == OperationKind.strokeCreate || kind.wireName.endsWith('.create');
     final fieldName = creating ? 'value' : 'properties';
     final value = payload[fieldName];
-    if (value is! Map ||
-        payload.length != 1 ||
-        (!creating && value.isEmpty)) {
+    if (value is! Map || payload.length != 1 || (!creating && value.isEmpty)) {
       throw FormatException('Expected exactly one $fieldName object.');
     }
     if (!creating &&

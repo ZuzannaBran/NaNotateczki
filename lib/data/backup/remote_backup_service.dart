@@ -266,9 +266,7 @@ class RemoteBackupService {
     // reset has no surviving cursor to protect.
     if (!databaseWasReset && verified.operationCheckpoint.isNotEmpty) {
       final rows = await repository.database
-          .customSelect(
-            'SELECT scope, server_sequence FROM sync_checkpoints',
-          )
+          .customSelect('SELECT scope, server_sequence FROM sync_checkpoints')
           .get();
       for (final row in rows) {
         final scope = row.read<String>('scope');
@@ -514,7 +512,8 @@ class RemoteBackupService {
             envelope['deviceId'] != backup['deviceId']) {
           throw const FormatException('Unsupported account backup envelope.');
         }
-        final hasMetadata = envelope.containsKey('accountId') ||
+        final hasMetadata =
+            envelope.containsKey('accountId') ||
             envelope.containsKey('schemaVersion') ||
             envelope.containsKey('operationCheckpoint');
         var operationCheckpoint = <String, int>{};
