@@ -19,7 +19,7 @@ class ShareTextIntent {
 /// Rich-text Quill deltas require a separate attribute CRDT: fail closed.
 class ShareTextEditAdapter {
   ShareTextEditAdapter({String Function()? createAtomId})
-      : _createAtomId = createAtomId ?? const Uuid().v4;
+    : _createAtomId = createAtomId ?? const Uuid().v4;
 
   static const maxCodePoints = 50000;
   static final _uuidPattern = RegExp(
@@ -68,26 +68,33 @@ class ShareTextEditAdapter {
     }
     final deletedIds = oldIds.sublist(prefix, oldIds.length - suffix);
     final inserted = nextCharacters.sublist(
-      prefix, nextCharacters.length - suffix,
+      prefix,
+      nextCharacters.length - suffix,
     );
     if (deletedIds.isEmpty && inserted.isEmpty) {
       return const [];
     }
     final result = <ShareTextIntent>[];
-    for (var offset = 0; offset < deletedIds.length;
-        offset += OperationTextSequence.maxAtomsPerOperation) {
+    for (
+      var offset = 0;
+      offset < deletedIds.length;
+      offset += OperationTextSequence.maxAtomsPerOperation
+    ) {
       final requested = offset + OperationTextSequence.maxAtomsPerOperation;
-      final end = requested < deletedIds.length
-          ? requested
-          : deletedIds.length;
-      result.add(ShareTextIntent(OperationKind.textDelete, {
-        'atomIds': deletedIds.sublist(offset, end),
-      }));
+      final end = requested < deletedIds.length ? requested : deletedIds.length;
+      result.add(
+        ShareTextIntent(OperationKind.textDelete, {
+          'atomIds': deletedIds.sublist(offset, end),
+        }),
+      );
     }
     var anchor = prefix == 0 ? null : oldIds[prefix - 1];
     final used = {...atoms.keys};
-    for (var offset = 0; offset < inserted.length;
-        offset += OperationTextSequence.maxAtomsPerOperation) {
+    for (
+      var offset = 0;
+      offset < inserted.length;
+      offset += OperationTextSequence.maxAtomsPerOperation
+    ) {
       final requested = offset + OperationTextSequence.maxAtomsPerOperation;
       final end = requested < inserted.length ? requested : inserted.length;
       final batch = <Map<String, dynamic>>[];
@@ -100,10 +107,12 @@ class ShareTextEditAdapter {
         }
         batch.add({'id': atomId, 'text': character});
       }
-      result.add(ShareTextIntent(OperationKind.textInsert, {
-        'afterAtomId': anchor,
-        'atoms': batch,
-      }));
+      result.add(
+        ShareTextIntent(OperationKind.textInsert, {
+          'afterAtomId': anchor,
+          'atoms': batch,
+        }),
+      );
       anchor = batch.last['id'] as String;
     }
     return result;

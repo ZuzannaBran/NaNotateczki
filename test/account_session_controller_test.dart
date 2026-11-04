@@ -748,8 +748,9 @@ void main() {
     expect(restarted.isSignedIn, isTrue);
     expect(restarted.userId, 'user-b');
     expect(
-      jsonDecode(stored[AccountSessionController.profileStorageKey]!)
-          ['boundUserId'],
+      jsonDecode(
+        stored[AccountSessionController.profileStorageKey]!,
+      )['boundUserId'],
       'user-b',
     );
     first.dispose();
@@ -766,15 +767,18 @@ void main() {
     };
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((_) async => http.Response(
-        jsonEncode({
-          'accessToken': 'access',
-          'refreshToken': 'refresh',
-          'expiresIn': 600,
-          'userId': 'user-other',
-          'username': 'other_user',
-        }), 200,
-      )),
+      httpClient: MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'accessToken': 'access',
+            'refreshToken': 'refresh',
+            'expiresIn': 600,
+            'userId': 'user-other',
+            'username': 'other_user',
+          }),
+          200,
+        ),
+      ),
     );
     final session = AccountSessionController(
       client,

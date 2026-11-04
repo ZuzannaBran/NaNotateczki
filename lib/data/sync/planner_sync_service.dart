@@ -204,11 +204,7 @@ class PlannerSyncService {
       }
       final source = local[id];
       final server = remote[id];
-      final decision = ledger.decide(
-        id: id,
-        local: source,
-        remote: server,
-      );
+      final decision = ledger.decide(id: id, local: source, remote: server);
       switch (decision) {
         case PlannerSyncDecision.unchanged:
           if (server != null) {
@@ -232,10 +228,7 @@ class PlannerSyncService {
           if (_stopped || session.userId != user) {
             return;
           }
-          planner.applyRemoteRecords(
-            [server],
-            revisionAuthoritative: true,
-          );
+          planner.applyRemoteRecords([server], revisionAuthoritative: true);
           await planner.flush();
           ledger.acknowledge(server);
           await writeStoredText(ledgerKey, ledger.encode());
@@ -250,15 +243,13 @@ class PlannerSyncService {
             Uuid.NAMESPACE_URL,
             'planner:$user:$id:$expected:$signature',
           );
-          final answer = await apiClient.putJson(
-            '/v2/planner/entries/${Uri.encodeComponent(id)}',
-            {
-              'operationId': operationId,
-              'expectedRevision': expected,
-              'deleted': source['deleted'],
-              'entry': source['entry'],
-            },
-          );
+          final answer = await apiClient
+              .putJson('/v2/planner/entries/${Uri.encodeComponent(id)}', {
+                'operationId': operationId,
+                'expectedRevision': expected,
+                'deleted': source['deleted'],
+                'entry': source['entry'],
+              });
           if (_stopped || session.userId != user) {
             return;
           }
@@ -273,10 +264,7 @@ class PlannerSyncService {
           final latest = planner.syncRecords[id];
           if (latest != null &&
               PlannerRevisionLedger.signature(latest) == signature) {
-            planner.applyRemoteRecords(
-              [accepted],
-              revisionAuthoritative: true,
-            );
+            planner.applyRemoteRecords([accepted], revisionAuthoritative: true);
             await planner.flush();
           }
           break;

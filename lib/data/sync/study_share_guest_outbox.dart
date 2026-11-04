@@ -25,8 +25,10 @@ class PendingStudyShareEdit {
 /// Do not clear it until the server accepts the submitted changes.
 class StudyShareGuestOutbox {
   StudyShareGuestOutbox(String shareId)
-    : _key = StorageNamespace.share(shareId, 'legacy-web-guest')
-          .fileKey('outbox.json');
+    : _key = StorageNamespace.share(
+        shareId,
+        'legacy-web-guest',
+      ).fileKey('outbox.json');
 
   final String _key;
 

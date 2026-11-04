@@ -902,9 +902,7 @@ class _AccountDialogState extends State<_AccountDialog> {
   }
 
   /// Flush all local writes before any network operation or credential change.
-  Future<void> _finishSignedInSession({
-    bool preserveOffline = false,
-  }) async {
+  Future<void> _finishSignedInSession({bool preserveOffline = false}) async {
     final session = context.read<AccountSessionController>();
     if (!session.isSignedIn) {
       return;
@@ -980,23 +978,25 @@ class _AccountDialogState extends State<_AccountDialog> {
             title: const Text('Account sync not complete'),
             content: Text(
               'Local changes are saved. Remote sync or backup stopped '
-              'at ' + failure.phase.name + '. Your unsent changes will remain '
-              'on this device.',
+                      'at ' +
+                  failure.phase.name +
+                  '. Your unsent changes will remain '
+                      'on this device.',
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(dialogContext)
-                    .pop(_LogoutRecovery.cancel),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(_LogoutRecovery.cancel),
                 child: const Text('Stay signed in'),
               ),
               TextButton(
-                onPressed: () => Navigator.of(dialogContext)
-                    .pop(_LogoutRecovery.retry),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(_LogoutRecovery.retry),
                 child: const Text('Retry'),
               ),
               TextButton(
-                onPressed: () => Navigator.of(dialogContext)
-                    .pop(_LogoutRecovery.offline),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(_LogoutRecovery.offline),
                 child: const Text('Log out offline'),
               ),
             ],

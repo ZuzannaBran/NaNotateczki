@@ -287,7 +287,8 @@ class EditorController extends ChangeNotifier {
     if (stroke != null) {
       // A color/geometry update must not silently bring the stroke to front.
       // Only an explicit layer operation is allowed to move it.
-      final index = sortIndex ??
+      final index =
+          sortIndex ??
           (previousInkIndex < 0 ? inkStrokes.length : previousInkIndex);
       inkStrokes.insert(index.clamp(0, inkStrokes.length).toInt(), stroke);
     }

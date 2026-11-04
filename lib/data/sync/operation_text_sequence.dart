@@ -168,10 +168,9 @@ class OperationTextSequence {
     return visible;
   }
 
-  static String render(Map<String, dynamic> atoms) =>
-      visibleIds(atoms)
-          .map((id) => (atoms[id] as Map)['text'] as String)
-          .join();
+  static String render(Map<String, dynamic> atoms) => visibleIds(
+    atoms,
+  ).map((id) => (atoms[id] as Map)['text'] as String).join();
 
   /// Position refers to the visible text, not tombstones or local viewport.
   static String? anchorBefore(

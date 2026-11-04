@@ -113,12 +113,7 @@ class ShareOperationProjection {
     if (kind == OperationKind.pageSet) {
       final mutablePage = Map<String, dynamic>.from(page as Map);
       pages[pageId] = mutablePage;
-      _merge(
-        mutablePage,
-        _fields(op, create: false),
-        op,
-        force: optimistic,
-      );
+      _merge(mutablePage, _fields(op, create: false), op, force: optimistic);
       return ShareOperationProjection._(next, deleted);
     }
 
@@ -158,8 +153,7 @@ class ShareOperationProjection {
     }
     final mutableObject = Map<String, dynamic>.from(object);
     objects[objectId] = mutableObject;
-    if (kind == OperationKind.textInsert ||
-        kind == OperationKind.textDelete) {
+    if (kind == OperationKind.textInsert || kind == OperationKind.textDelete) {
       final properties = Map<String, dynamic>.from(
         mutableObject['properties'] as Map,
       );
@@ -182,8 +176,7 @@ class ShareOperationProjection {
       return ShareOperationProjection._(next, deleted);
     }
     final fields = _fields(op, create: false);
-    if (mutableObject.containsKey('textAtoms') &&
-        fields.containsKey('text')) {
+    if (mutableObject.containsKey('textAtoms') && fields.containsKey('text')) {
       throw StateError('CRDT text cannot be replaced with object.set.');
     }
     _merge(mutableObject, fields, op, force: optimistic);
@@ -259,14 +252,13 @@ class PendingShareProjection {
     var result = confirmed;
     unresolved.clear();
     for (final op in pending.values) {
-      final targetDeleted = result.tombstones.contains('document') ||
+      final targetDeleted =
+          result.tombstones.contains('document') ||
           (op.pageId != null &&
               result.tombstones.contains('page:${op.pageId}')) ||
           (op.objectId != null &&
               op.pageId != null &&
-              result.tombstones.contains(
-                'object:${op.pageId}:${op.objectId}',
-              ));
+              result.tombstones.contains('object:${op.pageId}:${op.objectId}'));
       if (targetDeleted && !op.kind.wireName.endsWith('.delete')) {
         unresolved[op.operationId] =
             'The target was deleted remotely; keep this pending edit.';

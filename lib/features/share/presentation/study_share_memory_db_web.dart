@@ -35,19 +35,15 @@ Future<NotesDatabase> openSharedGuestOperationDatabase(
       RegExp(r'[\x00-\x1f\x7f]').hasMatch(guestActorId)) {
     throw const FormatException('Invalid guest actor namespace.');
   }
-  final key = sha256.convert(
-    utf8.encode(jsonEncode([shareId.toLowerCase(), guestActorId])),
-  ).toString();
+  final key = sha256
+      .convert(utf8.encode(jsonEncode([shareId.toLowerCase(), guestActorId])))
+      .toString();
   final sqlite = await WasmSqlite3.loadFromUrl(sharedGuestWasmUri(Uri.base));
   final fileSystem = await IndexedDbFileSystem.open(
     dbName: 'nanotateczki_share_ops_v2_$key',
   );
   sqlite.registerVirtualFileSystem(fileSystem, makeDefault: true);
   return NotesDatabase(
-    WasmDatabase(
-      sqlite3: sqlite,
-      path: '/database',
-      fileSystem: fileSystem,
-    ),
+    WasmDatabase(sqlite3: sqlite, path: '/database', fileSystem: fileSystem),
   );
 }

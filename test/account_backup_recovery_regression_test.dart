@@ -78,8 +78,7 @@ void main() {
     },
   );
 
-  test('an older checkpoint cannot roll back an existing database',
-      () async {
+  test('an older checkpoint cannot roll back an existing database', () async {
     final repo = _repository();
     await repo.database.customStatement(
       'INSERT INTO sync_checkpoints '
@@ -96,9 +95,11 @@ void main() {
     );
     expect(await service.hydrateFromLatestAccountBackup(), isFalse);
     expect(stored.containsKey('study_planner.json'), isFalse);
-    final cursor = await repo.database.customSelect(
-      "SELECT server_sequence FROM sync_checkpoints WHERE scope = 'account'",
-    ).getSingle();
+    final cursor = await repo.database
+        .customSelect(
+          "SELECT server_sequence FROM sync_checkpoints WHERE scope = 'account'",
+        )
+        .getSingle();
     expect(cursor.read<int>('server_sequence'), 15);
   });
 

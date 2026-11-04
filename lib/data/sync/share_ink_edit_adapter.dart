@@ -49,12 +49,9 @@ class ShareInkEditAdapter {
 
     for (final old in before.inkStrokes) {
       if (!current.containsKey(old.id)) {
-        intents.add(_intent(
-          OperationKind.objectDelete,
-          before.id,
-          old.id,
-          const {},
-        ));
+        intents.add(
+          _intent(OperationKind.objectDelete, before.id, old.id, const {}),
+        );
       }
     }
     for (var index = 0; index < after.inkStrokes.length; index++) {
@@ -62,25 +59,20 @@ class ShareInkEditAdapter {
       final older = previous[stroke.id];
       final fields = _fields(stroke, index);
       if (older == null) {
-        intents.add(_intent(
-          OperationKind.strokeCreate,
-          after.id,
-          stroke.id,
-          {'value': fields},
-        ));
+        intents.add(
+          _intent(OperationKind.strokeCreate, after.id, stroke.id, {
+            'value': fields,
+          }),
+        );
         continue;
       }
       final original = _fields(older, previousOrder[stroke.id]!);
-      if (!_equalPoints(
-        original['points'] as List,
-        fields['points'] as List,
-      )) {
-        intents.add(_intent(
-          OperationKind.objectTransform,
-          after.id,
-          stroke.id,
-          {'properties': {'points': fields['points']}},
-        ));
+      if (!_equalPoints(original['points'] as List, fields['points'] as List)) {
+        intents.add(
+          _intent(OperationKind.objectTransform, after.id, stroke.id, {
+            'properties': {'points': fields['points']},
+          }),
+        );
       }
       final style = <String, dynamic>{};
       for (final key in ['colorValue', 'width', 'toolIndex']) {
@@ -89,20 +81,18 @@ class ShareInkEditAdapter {
         }
       }
       if (style.isNotEmpty) {
-        intents.add(_intent(
-          OperationKind.objectSet,
-          after.id,
-          stroke.id,
-          {'properties': style},
-        ));
+        intents.add(
+          _intent(OperationKind.objectSet, after.id, stroke.id, {
+            'properties': style,
+          }),
+        );
       }
       if (previousOrder[stroke.id] != index) {
-        intents.add(_intent(
-          OperationKind.objectReorder,
-          after.id,
-          stroke.id,
-          {'properties': {'sortIndex': index}},
-        ));
+        intents.add(
+          _intent(OperationKind.objectReorder, after.id, stroke.id, {
+            'properties': {'sortIndex': index},
+          }),
+        );
       }
     }
     return intents;
@@ -145,15 +135,16 @@ class ShareInkEditAdapter {
     for (final raw in rawPoints) {
       if (raw is! List ||
           raw.length != 3 ||
-          raw.any((value) =>
-              value is! num || !value.toDouble().isFinite)) {
+          raw.any((value) => value is! num || !value.toDouble().isFinite)) {
         throw const FormatException('Invalid projected ink point.');
       }
-      points.add(InkPoint(
-        dx: (raw[0] as num).toDouble(),
-        dy: (raw[1] as num).toDouble(),
-        pressure: (raw[2] as num).toDouble(),
-      ));
+      points.add(
+        InkPoint(
+          dx: (raw[0] as num).toDouble(),
+          dy: (raw[1] as num).toDouble(),
+          pressure: (raw[2] as num).toDouble(),
+        ),
+      );
     }
     return InkStroke(
       id: objectId,
@@ -181,10 +172,12 @@ class ShareInkEditAdapter {
         stroke.width <= 0 ||
         stroke.points.isEmpty ||
         stroke.points.length > maxPointsPerStroke ||
-        stroke.points.any((point) =>
-            !point.dx.isFinite ||
-            !point.dy.isFinite ||
-            !point.pressure.isFinite)) {
+        stroke.points.any(
+          (point) =>
+              !point.dx.isFinite ||
+              !point.dy.isFinite ||
+              !point.pressure.isFinite,
+        )) {
       throw StateError('Invalid committed ink stroke.');
     }
     return {
@@ -194,8 +187,7 @@ class ShareInkEditAdapter {
       'toolIndex': stroke.tool.index,
       'sortIndex': index,
       'points': [
-        for (final point in stroke.points)
-          [point.dx, point.dy, point.pressure],
+        for (final point in stroke.points) [point.dx, point.dy, point.pressure],
       ],
     };
   }

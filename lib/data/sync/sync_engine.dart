@@ -59,8 +59,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
         (gateway as HttpOperationGateway).shareId != shareId) {
       throw ArgumentError('Share IDs must match REST and WebSocket.');
     }
-    if (gateway is HttpOperationGateway &&
-        gateway.guestTicket != guestTicket) {
+    if (gateway is HttpOperationGateway && gateway.guestTicket != guestTicket) {
       throw ArgumentError('REST and WebSocket credentials must match.');
     }
   }
