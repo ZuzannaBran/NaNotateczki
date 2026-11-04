@@ -40,7 +40,8 @@ Instrukcja administratora: kanoniczny serwer
 
 Kanoniczne API wystawia uwierzytelnione `GET /v1/auth/protocol`.
 `AppScope` odpytuje je przed recovery, `LiveWebSyncService.start`
-i uruchomieniem schedulerów backupu v1. Odpowiedź `v2` zatrzymuje
+i uruchomieniem schedulerów backupu v1. Wywołania synchronizacji
+ustawień sprzed rozruchu również oczekują na pozytywną weryfikację. Odpowiedź `v2` zatrzymuje
 rozruch starszego synchronizatora i pozostawia lokalne dane/outbox.
 Jedynie HTTP 404 ze starszego backendu pozwala użyć kontraktu v1;
 inne błędy blokują bootstrap bez utraty lokalnych danych. Serwerowe

@@ -70,6 +70,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   Timer? _rememberedLoginRetry;
   bool _appIsForeground = true;
   String? _bootstrappedAccount;
+  String? _legacyProtocolReadyUser;
   String? _clockCheckedForUser;
   final GlobalKey<ScaffoldMessengerState> _notificationMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
@@ -344,6 +345,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   }
 
   Future<void> _syncAccountSettings() async {
+    // Settings can be triggered by listeners before the account bootstrap.
+    // Do not issue v1 requests until this account's protocol is verified.
+    if (_accountSession?.isSignedIn == true &&
+        _legacyProtocolReadyUser != _accountSession?.userId) {
+      return;
+    }
     try {
       // A planner task may still be in its short local save debounce.
       // Flush it before reading library_folders.json for cloud sync.
@@ -476,6 +483,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (!mounted || session.userId != userId || !session.isSignedIn) {
           return;
         }
+        _legacyProtocolReadyUser = userId;
         var restored = false;
         Object? recoveryFailure;
         // A new installation has no presence marker. If IndexedDB/SQLite
@@ -727,6 +735,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               unawaited(_startAccountSync());
             } else if (!accountSession.isSignedIn) {
               _bootstrappedAccount = null;
+              _legacyProtocolReadyUser = null;
               _clockCheckedForUser = null;
               _settingsPoll?.cancel();
               _settingsDebounce?.cancel();
