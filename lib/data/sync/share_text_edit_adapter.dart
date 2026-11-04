@@ -194,7 +194,7 @@ class ShareTextEditAdapter {
           continue;
         }
         if (groupedChanges != null &&
-            (!_sameAttributes(changes, groupedChanges!) ||
+            (!_sameAttributes(changes, groupedChanges) ||
                 groupedIds.length >=
                     OperationTextSequence.maxAtomsPerOperation)) {
           flush();
