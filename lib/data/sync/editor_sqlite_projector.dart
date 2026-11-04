@@ -165,6 +165,35 @@ class EditorSqliteProjector {
     if ((count?['total'] as int? ?? 0) <= 1) {
       throw StateError('The last notebook page cannot be deleted.');
     }
+    final images = await _row(
+      'SELECT COUNT(*) AS total FROM image_block_rows WHERE page_uid = ?',
+      [Variable<String>(pageId)],
+    );
+    if ((images?['total'] as int? ?? 0) > 0) {
+      throw UnsupportedError(
+        'Pages containing images/PDFs require verified asset detachment.',
+      );
+    }
+    // A legacy Quill embed is not necessarily stored as an image row.
+    // Never discard its reference before the asset projector is available.
+    final textRows = await database.customSelect(
+      'SELECT delta_json FROM text_block_rows WHERE page_uid = ? '
+      'AND delta_json IS NOT NULL',
+      variables: [Variable<String>(pageId)],
+    ).get();
+    for (final row in textRows) {
+      final decoded = jsonDecode(row.read<String>('delta_json'));
+      if (decoded is! List) {
+        throw const FormatException('Invalid stored Quill Delta.');
+      }
+      if (decoded.any(
+        (entry) => entry is Map && entry['insert'] is Map,
+      )) {
+        throw UnsupportedError(
+          'Quill embedded assets require verified asset detachment.',
+        );
+      }
+    }
     for (final table in [
       'ink_stroke_rows',
       'text_block_rows',
