@@ -115,6 +115,11 @@ indeksowane po ID bloku obrazu lub po ID assetu dla embedu Quill.
 To wyłącznie planowanie operacji, **nie dowód istnienia uploadu**:
 warstwa wywołująca musi osobno sprawdzić potwierdzenie z asset gateway.
 
+Poprawiono istniejącą historię `EditorController`: Undo/Redo zachowuje
+ID strony po zmianie aktualnej strony, a usunięcie strony unieważnia jej
+stare wpisy historii. Jest to naprawa bezpieczeństwa w aktywnym edytorze
+v1, **nie** obsługa operacyjnego Undo/Redo v2 z tombstones.
+
 To NIE jest produkcyjny cutover. Brakuje integracji z `EditorController`,
 trwałego odwzorowania/rebase atomów CRDT przy każdej edycji Quill,
 bezpiecznego Undo/Redo tożsamości z tombstones, zdalnej projekcji
