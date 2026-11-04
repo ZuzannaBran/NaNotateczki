@@ -105,6 +105,24 @@ void main() {
     expect((atoms.first as Map)['attributes'], {'bold': true});
   });
 
+  test('Quill terminal newline is retained while text stays trimmed', () {
+    final before = _page();
+    final block = _text('Hi').copyWith(
+      deltaJson: r'[{"insert":"Hi\n"}]',
+    );
+    final drafts = bridge.planPageChange(
+      before: before,
+      after: _page(texts: [block]),
+    );
+    expect(drafts.map((draft) => draft.kind), [
+      OperationKind.objectCreate,
+      OperationKind.textInsert,
+    ]);
+    final inserted = drafts.last.payload['atoms'] as List;
+    expect(inserted, hasLength(3));
+    expect((inserted.last as Map)['text'], '\n');
+  });
+
   test('text update without durable atoms fails before save', () {
     final old = _text('Hi');
     final updated = _text('Bye');
