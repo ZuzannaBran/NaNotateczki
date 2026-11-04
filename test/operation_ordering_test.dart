@@ -57,12 +57,16 @@ void main() {
       'value': {'plannerUid': 'planner-1', 'title': 'Initial'},
     });
     register.apply(created);
-    register.apply(task(a2, 2, OperationKind.taskSet, {
-      'properties': {'title': 'Revised'},
-    }));
-    register.apply(task(b1, 3, OperationKind.taskMove, {
-      'properties': {'plannerUid': 'planner-2'},
-    }));
+    register.apply(
+      task(a2, 2, OperationKind.taskSet, {
+        'properties': {'title': 'Revised'},
+      }),
+    );
+    register.apply(
+      task(b1, 3, OperationKind.taskMove, {
+        'properties': {'plannerUid': 'planner-2'},
+      }),
+    );
     expect(register.fieldsFor(created), {
       'plannerUid': 'planner-2',
       'title': 'Revised',
