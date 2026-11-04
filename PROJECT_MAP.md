@@ -1288,12 +1288,15 @@ usunięte stroke'y i ich pierwotne indeksy zamiast pełnej kopii strony.
 
 `EditorOperationBridge` planuje v2 z już zatwierdzonych zmian strony,
 korzystając z istniejących adapterów Ink/Quill. Obsługuje stronę,
-rysowanie/gumkę, geometrię, tworzenie tekstu i zweryfikowane assety.
-Wymaga trwałych atomów CRDT przy aktualizacji tekstu; zmiana zawartości
-assetu i embedy Quill są celowo blokowane do obsługi upload/rebase.
-Nie jest jeszcze podłączony do produkcyjnego `EditorController`.
+rysowanie/gumkę, geometrię i tworzenie tekstu. Dla Quill embedów
+wymaga ukończonego, zweryfikowanego uploadu (asset.attach przed
+text.insert, asset.detach dopiero po usunięciu referencji). Wymiana
+obrazu/PDF wymaga nowego asset ID oraz starego ID z trwałej projekcji;
+generuje attach → object.set → detach, nigdy ścieżkę lokalną.
+Aktualizacja tekstu nadal wymaga trwałych atomów CRDT i rebase.
+Most nie jest podłączony do produkcyjnego `EditorController`.
 Regresje: `test/editor_operation_bridge_test.dart` oraz batch/rollback
-w `test/sync_engine_test.dart`.
+w `test/sync_engine_test.dart`. 
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
 
