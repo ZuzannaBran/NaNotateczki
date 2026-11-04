@@ -590,6 +590,44 @@ void main() {
     },
   );
 
+  test('a replayed remote operation notifies the editor once', () async {
+    gateway.seed(_remote('other-actor', 'remote-once'));
+    engine.dispose();
+    var notifications = 0;
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (remote, _) => database.customStatement(
+        'INSERT INTO projection_probe VALUES (?, ?)',
+        [remote.objectId, 'committed'],
+      ),
+      onRemoteCommitted: (remote) async {
+        notifications++;
+        expect(remote.objectId, 'remote-once');
+      },
+    );
+    await engine.start();
+    expect(notifications, 1);
+    expect(await store.checkpoint('user-A-v2'), 1);
+
+    // A later feed gap can force a cursor replay without rolling back
+    // the already committed SQLite projection or remounting the editor.
+    await database.customStatement(
+      'UPDATE sync_checkpoints SET server_sequence = 0 WHERE scope = ?',
+      ['user-A-v2'],
+    );
+    await engine.syncNow();
+    expect(await store.checkpoint('user-A-v2'), 1);
+    expect(notifications, 1);
+    final rows = await database.customSelect(
+      'SELECT id FROM projection_probe',
+    ).get();
+    expect(rows, hasLength(1));
+  });
+
   test('an ACKed local echo cannot repaint after cursor replay', () async {
     engine.dispose();
     var notifications = 0;
