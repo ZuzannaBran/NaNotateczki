@@ -452,8 +452,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   bloków tekstowych. Rzutowanie atomów korzysta z `OperationStore.textAtoms`.
   Nie wspiera jeszcze obrazów/PDF, embedów, document.create, object.move,
   conflict rebase; takie operacje są odrzucane zamiast zapisywać częściowy
-  niepoprawny stan. Blokuje też niejednoznaczne ID między warstwami
-  i rozbieżny Delta Quill. Projektor jest wyłącznie opt-in i nigdy nie należy
+  niepoprawny stan. Blokuje też niejednoznaczne ID między warstwami,
+  rozbieżny Delta Quill oraz usuwanie stron zawierających obrazy,
+  osadzone referencje Quill lub nieodłączone asset_references.
+  Projektor jest wyłącznie opt-in i nigdy nie należy
   używać go równolegle z legacy writerem tego dokumentu.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
   Quill CRDT, tombstones, ACK, restart i ochrona usunięć.
