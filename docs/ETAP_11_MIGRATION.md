@@ -104,3 +104,17 @@ SQLite v6 rozszerza trwałe lokalne tombstones o `task`. Narzędzie
 `stage11_migrate.py` rozpoznaje `user_version=6`, kopiuje i zachowuje
 źródłowe bajty oraz działa nadal wyłącznie w trybie `staged-not-activated`.
 Test regresyjny sprawdza staging bazy v6 bez zmiany źródła.
+
+## Uzupełnienie przy etapie 13 — trwała bariera protokołów
+
+Backend po migracji `0013_account_protocol_fence.sql` zachowuje dla
+każdego konta tryb v1, dopóki administrator nie utworzy trwałego
+markera `account_sync_protocol`. Mutacje v1 PUT/DELETE oraz v2 batch
+sprawdzają go w tej samej blokadzie transakcyjnej właściciela.
+Aktywacja istniejącego konta nadal jest **niedostępna**: najpierw wymaga
+bezstratnej konwersji jego dokumentów, assetów, operacji offline,
+tombstones i checkpointów. Narzędzie
+`scripts/stage13-activate-empty-canary.sh` dopuszcza wyłącznie nowy,
+pusty identyfikator testowy (przy zatrzymanym API). Ten mechanizm
+**nie zamyka etapu 11** ani nie zmienia aktywnej aplikacji.
+
