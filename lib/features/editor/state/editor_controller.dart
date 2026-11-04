@@ -34,6 +34,13 @@ import 'input_mode.dart';
 import 'ink_color_presets.dart';
 import 'page_background.dart';
 
+class _EditorHistoryEntry {
+  const _EditorHistoryEntry(this.pageId, this.action);
+
+  final String pageId;
+  final EditorAction action;
+}
+
 class LassoSelection {
   LassoSelection({
     required this.pageIndex,
@@ -121,8 +128,8 @@ class EditorController extends ChangeNotifier {
   final List<Color> quickColors = List.of(InkColorPreset.blue.colors);
   final List<Color> recentColors = <Color>[];
 
-  final List<EditorAction> _undoActions = <EditorAction>[];
-  final List<EditorAction> _redoActions = <EditorAction>[];
+  final List<_EditorHistoryEntry> _undoActions = <_EditorHistoryEntry>[];
+  final List<_EditorHistoryEntry> _redoActions = <_EditorHistoryEntry>[];
   final Map<String, ValueNotifier<int>> _inkPageRevisions =
       <String, ValueNotifier<int>>{};
   final ValueNotifier<int> inkRevision = ValueNotifier<int>(0);
@@ -1635,20 +1642,29 @@ class EditorController extends ChangeNotifier {
     if (_undoActions.isEmpty) {
       return;
     }
-    final action = _undoActions.removeLast();
+    final entry = _undoActions.removeLast();
+    final action = entry.action;
     if (action is MoveImageBetweenPagesAction) {
       _applyCrossPageImageMove(action, undo: true);
-      _redoActions.add(action);
+      _redoActions.add(entry);
       _notifyHistoryChanged();
       notifyListeners();
       _save();
       return;
     }
-    final before = currentPage;
+    final index = pages.indexWhere((page) => page.id == entry.pageId);
+    if (index < 0) {
+      _undoActions.clear();
+      _redoActions.clear();
+      _notifyHistoryChanged();
+      return;
+    }
+    final before = pages[index];
     final updated = action.revert(before);
     _recordExpectedRemovals(action, before, updated, undo: true);
-    _redoActions.add(action);
+    _redoActions.add(entry);
     _notifyHistoryChanged();
+    currentPageIndex = index;
     _updatePage(updated);
     if (action is UpdateInkStrokeAction) {
       _touchInkPageRevision(updated.id);
@@ -1661,20 +1677,29 @@ class EditorController extends ChangeNotifier {
     if (_redoActions.isEmpty) {
       return;
     }
-    final action = _redoActions.removeLast();
+    final entry = _redoActions.removeLast();
+    final action = entry.action;
     if (action is MoveImageBetweenPagesAction) {
       _applyCrossPageImageMove(action, undo: false);
-      _undoActions.add(action);
+      _undoActions.add(entry);
       _notifyHistoryChanged();
       notifyListeners();
       _save();
       return;
     }
-    final before = currentPage;
+    final index = pages.indexWhere((page) => page.id == entry.pageId);
+    if (index < 0) {
+      _undoActions.clear();
+      _redoActions.clear();
+      _notifyHistoryChanged();
+      return;
+    }
+    final before = pages[index];
     final updated = action.apply(before);
     _recordExpectedRemovals(action, before, updated);
-    _undoActions.add(action);
+    _undoActions.add(entry);
     _notifyHistoryChanged();
+    currentPageIndex = index;
     _updatePage(updated);
     if (action is UpdateInkStrokeAction) {
       _touchInkPageRevision(updated.id);
@@ -1700,6 +1725,18 @@ class EditorController extends ChangeNotifier {
     if (pages.length <= 1) {
       return;
     }
+    final removedPageId = pages.last.id;
+    bool referencesRemovedPage(_EditorHistoryEntry entry) {
+      final action = entry.action;
+      return entry.pageId == removedPageId ||
+          (action is MoveImageBetweenPagesAction &&
+              (action.fromPageId == removedPageId ||
+                  action.toPageId == removedPageId));
+    }
+
+    _undoActions.removeWhere(referencesRemovedPage);
+    _redoActions.removeWhere(referencesRemovedPage);
+    _notifyHistoryChanged();
     pages = pages.take(pages.length - 1).toList();
     currentPageIndex = currentPageIndex.clamp(0, pages.length - 1).toInt();
     activeTextBlockId = null;
@@ -3027,7 +3064,7 @@ class EditorController extends ChangeNotifier {
     _commitActiveTextEdit();
     if (action is MoveImageBetweenPagesAction) {
       _applyCrossPageImageMove(action, undo: false);
-      _undoActions.add(action);
+      _undoActions.add(_EditorHistoryEntry(currentPage.id, action));
       _redoActions.clear();
       _notifyHistoryChanged();
       notifyListeners();
@@ -3036,7 +3073,7 @@ class EditorController extends ChangeNotifier {
     final before = currentPage;
     final updated = action.apply(before);
     _recordExpectedRemovals(action, before, updated);
-    _undoActions.add(action);
+    _undoActions.add(_EditorHistoryEntry(currentPage.id, action));
     _redoActions.clear();
     _notifyHistoryChanged();
     _updatePage(updated);
@@ -3059,7 +3096,7 @@ class EditorController extends ChangeNotifier {
     final before = currentPage;
     final updated = action.apply(before);
     _recordExpectedRemovals(action, before, updated);
-    _undoActions.add(action);
+    _undoActions.add(_EditorHistoryEntry(currentPage.id, action));
     _redoActions.clear();
     _notifyHistoryChanged();
     pages = [
@@ -3089,7 +3126,7 @@ class EditorController extends ChangeNotifier {
     final before = currentPage;
     final updated = action.apply(before);
     _recordExpectedRemovals(action, before, updated);
-    _undoActions.add(action);
+    _undoActions.add(_EditorHistoryEntry(currentPage.id, action));
     _redoActions.clear();
     _notifyHistoryChanged();
     pages = [
@@ -3209,7 +3246,12 @@ class EditorController extends ChangeNotifier {
     if (before.text == after.text && before.deltaJson == after.deltaJson) {
       return;
     }
-    _undoActions.add(UpdateTextAction(before: before, after: after));
+    _undoActions.add(
+      _EditorHistoryEntry(
+        pages[pageIndex].id,
+        UpdateTextAction(before: before, after: after),
+      ),
+    );
     _redoActions.clear();
     _scheduleSave(pageId: pages[pageIndex].id);
   }
