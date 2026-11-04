@@ -113,3 +113,26 @@ Nie dodawano nowej migracji SQL backendu, bo
 Nie uruchamiać GitHub Actions bez polecenia użytkownika. Nie wdrażać
 tych testów ani zmian protokołu na produkcyjnym serwerze. Etap 13
 wymaga osobnej procedury backupu, migracji i kontrolowanego rolloutu.
+
+## Korekta etapów 11–13: trwały tryb konta
+
+Nowa migracja backendu `0013_account_protocol_fence.sql` dodaje
+trwały marker v2 konta i blokuje każde v1 PUT/DELETE po jego aktywacji,
+także dla nowego UID. Konto bez markera nie może wykonać v2 batch.
+Zestaw `test_stage12_real_stack.py` bada tę barierę na prawdziwej bazie.
+`run-stage12-real.sh` tworzy oddzielne konto v2 w disposable PostgreSQL
+i przekazuje jego token do `stage12_live_api_test.dart`.
+Dotychczasowa rejestracja kont testowych bez markera pozostaje w trybie v1.
+
+Testy nowej bariery (Python, po pobraniu zależności):
+
+```bash
+python -m pytest -q api/tests/test_account_protocol_fence.py \\
+  api/tests/test_stage13_rollout.py
+python3 -m unittest discover -s scripts/tests -p 'test_stage13*.py'
+```
+
+**Niezmienione blokady:** pełne dwuurządzeniowe gesty host/gość,
+transfer Local→A→B, pełna migracja istniejących dokumentów i test
+backup/restore na osobnym środowisku. Nie publikować canary na produkcji,
+dopóki nie ma rzeczywistych wyników tych testów.
