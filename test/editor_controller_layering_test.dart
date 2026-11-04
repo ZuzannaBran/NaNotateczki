@@ -105,6 +105,41 @@ void main() {
     expect(saved?.pages, hasLength(1));
   });
 
+  test('an unmarked populated page deletion remains blocked', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final incidents = <DataIntegrityIncident>[];
+    final repository = NotebookRepository(
+      database,
+      dataIntegrityIncidentHandler: (incident, _, _) async {
+        incidents.add(incident);
+      },
+    );
+    final source = await repository.createNotebook();
+    final editor = EditorController(repository: repository, notebook: source);
+    addTearDown(editor.dispose);
+
+    editor.addPage();
+    editor.addInkStroke(const [
+      InkPoint(dx: 8, dy: 9, pressure: 0.5),
+    ]);
+    await editor.flushPendingSaves();
+    final stored = (await repository.getNotebook(source.uid))!;
+    expect(stored.pages, hasLength(2));
+    expect(stored.pages.last.inkStrokes, hasLength(1));
+
+    await expectLater(
+      repository.saveNotebook(
+        stored.copyWith(pages: [stored.pages.first]),
+        preserveMetadata: true,
+      ),
+      throwsA(isA<DataIntegrityProtectionException>()),
+    );
+    expect(incidents, hasLength(1));
+    final persisted = await repository.getNotebook(source.uid);
+    expect(persisted?.pages.last.inkStrokes, hasLength(1));
+  });
+
   test('image deletion does not produce a false data-loss incident', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
