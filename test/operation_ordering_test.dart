@@ -34,6 +34,48 @@ OperationEnvelope op({
 );
 
 void main() {
+  test('property register rejects specialized stage-2 operations', () {
+    final register = OperationPropertyRegister();
+    for (final kind in [
+      OperationKind.objectMove,
+      OperationKind.textFormat,
+      OperationKind.assetAttach,
+      OperationKind.assetDetach,
+    ]) {
+      final payload = switch (kind) {
+        OperationKind.objectMove => <String, dynamic>{
+          'toPageId': 'other-page',
+          'sortIndex': 1,
+        },
+        OperationKind.textFormat => <String, dynamic>{
+          'atomIds': [a1],
+          'attributes': {'bold': true},
+        },
+        OperationKind.assetAttach => <String, dynamic>{
+          'assetId': 'image',
+          'sha256': 'a' * 64,
+          'sizeBytes': 10,
+          'mediaType': 'image/png',
+        },
+        OperationKind.assetDetach => <String, dynamic>{'assetId': 'image'},
+        _ => throw StateError('Unexpected operation kind'),
+      };
+      expect(
+        () => register.apply(
+          op(
+            id: a2,
+            actor: 'user',
+            sequence: 1,
+            clock: 2,
+            kind: kind,
+            payload: payload,
+          ),
+        ),
+        throwsUnsupportedError,
+      );
+    }
+  });
+
   test('task register separates task fields and preserves deletes', () {
     final register = OperationPropertyRegister();
     OperationEnvelope task(

@@ -455,8 +455,10 @@ class OperationPropertyRegister {
       case OperationKind.taskSet:
       case OperationKind.taskMove:
         break;
+      case OperationKind.objectMove:
       case OperationKind.textInsert:
       case OperationKind.textDelete:
+      case OperationKind.textFormat:
       case OperationKind.assetAttach:
       case OperationKind.assetDetach:
         throw UnsupportedError('Domain-specific reducer required.');
