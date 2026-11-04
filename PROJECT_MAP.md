@@ -432,7 +432,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - `lib/data/sync/operation_store.dart`: transakcyjny zapis projekcji i
   `OperationEnvelope`, rosnący `actorSeq`, idempotencja, lokalny outbox,
-  atomowy ACK, tombstones, checkpointy i checksummed snapshots.
+  atomowe wieloobiektowe gesty przez `writeLocalBatch` (jeden commit
+  projekcji, aktora i outboxu), ACK, tombstones oraz checkpointy i snapshoty.
   Referencje nowych assetów mają klucz z pageId i objectId,
   bez usuwania starszych odwołań o nieznanej stronie.
   Snapshot jest blokowany, jeśli cofa potwierdzony kursor ACK albo

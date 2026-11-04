@@ -24,6 +24,25 @@ class StoredDocumentSnapshot {
   final String sha256;
 }
 
+/// A single object-level intent within one atomic editor gesture.
+class LocalOperationDraft {
+  const LocalOperationDraft({
+    required this.kind,
+    required this.payload,
+    this.pageId,
+    this.objectId,
+    this.revertsOperationId,
+    this.dependencies = const [],
+  });
+
+  final OperationKind kind;
+  final Map<String, dynamic> payload;
+  final String? pageId;
+  final String? objectId;
+  final String? revertsOperationId;
+  final List<String> dependencies;
+}
+
 /// Stores operations and their SQLite projections in one Drift transaction.
 ///
 /// Projection callbacks must write through [database]. Asset bytes should be
@@ -100,86 +119,147 @@ class OperationStore {
     String? revertsOperationId,
     List<String> dependencies = const [],
   }) {
-    return _perDocument(documentId, () async {
-      return database.transaction(() async {
-        final state = await _row(
-          'SELECT last_seq, last_clock, last_operation_id '
-          'FROM operation_actor_state WHERE actor_id = ?',
-          [actorId],
-        );
-        final previousId = state?['last_operation_id'] as String?;
-        // A new local intent observes the durable remote actor frontier.
-        // This must be read inside the same transaction as actorSeq.
-        final observed = await database
-            .customSelect(
-              'SELECT actor.last_operation_id FROM operation_actor_state actor '
-              'JOIN operations latest '
-              'ON latest.operation_id = actor.last_operation_id '
-              'WHERE actor.actor_id != ? AND latest.document_id = ? '
-              'ORDER BY actor.actor_id',
-              variables: [
-                Variable<String>(actorId),
-                Variable<String>(documentId),
-              ],
-            )
-            .get();
-        final observedIds = <String>{
-          for (final row in observed) row.read<String>('last_operation_id'),
-        };
-        final requiredIds = <String>{
-          ...dependencies,
-          if (revertsOperationId != null) revertsOperationId,
-          if (previousId != null) previousId,
-        };
-        final available = <String, OperationEnvelope>{};
-        var nextClock = state?['last_clock'] as int? ?? 0;
-        for (final id in {...observedIds, ...requiredIds}) {
-          final dependency = await operation(id);
-          if (dependency == null || dependency.documentId != documentId) {
-            throw StateError('Invalid document dependency: $id');
-          }
-          available[id] = dependency;
-          if (dependency.logicalClock > nextClock) {
-            nextClock = dependency.logicalClock;
-          }
-        }
-        // A frontier already required by another observed operation is
-        // causally implied. Never drop explicit, undo or actor predecessors.
-        final coveredIds = <String>{
-          for (final op in available.values)
-            for (final id in op.dependencies)
-              if (observedIds.contains(id)) id,
-        };
-        final causalIds = <String>{
-          ...requiredIds,
-          for (final id in observedIds)
-            if (!coveredIds.contains(id)) id,
-        }.toList()..sort();
-        if (causalIds.length > 256) {
-          throw StateError('Too many independent causal actor frontiers.');
-        }
-        final nextSeq = (state?['last_seq'] as int? ?? 0) + 1;
-        if (nextSeq > OperationEnvelope.maxSafeInteger ||
-            nextClock >= OperationEnvelope.maxSafeInteger) {
-          throw StateError('Actor clock exhausted.');
-        }
-        final next = OperationEnvelope(
-          operationId: _uuid.v4(),
+    return _perDocument(
+      documentId,
+      () => database.transaction(
+        () => _writeLocalInTransaction(
           actorId: actorId,
-          actorSeq: nextSeq,
-          logicalClock: nextClock + 1,
           documentId: documentId,
-          pageId: pageId,
-          objectId: objectId,
           kind: kind,
           payload: payload,
-          dependencies: causalIds,
+          apply: apply,
+          pageId: pageId,
+          objectId: objectId,
           revertsOperationId: revertsOperationId,
-        );
-        await _commit(next, source: 'local', apply: () => apply(next));
-        return next;
+          dependencies: dependencies,
+        ),
+      ),
+    );
+  }
+
+  /// Commits all object changes of a gesture in the same SQLite transaction.
+  ///
+  /// The projection must write through [database]. On failure, no counter,
+  /// projection row or outbox item from the gesture may survive.
+  Future<List<OperationEnvelope>> writeLocalBatch({
+    required String actorId,
+    required String documentId,
+    required List<LocalOperationDraft> operations,
+    required Future<void> Function(OperationEnvelope operation) apply,
+  }) {
+    if (operations.isEmpty) {
+      throw ArgumentError.value(operations, 'operations', 'Empty gesture.');
+    }
+    return _perDocument(documentId, () {
+      return database.transaction(() async {
+        final committed = <OperationEnvelope>[];
+        for (final draft in operations) {
+          committed.add(
+            await _writeLocalInTransaction(
+              actorId: actorId,
+              documentId: documentId,
+              kind: draft.kind,
+              payload: draft.payload,
+              pageId: draft.pageId,
+              objectId: draft.objectId,
+              revertsOperationId: draft.revertsOperationId,
+              dependencies: draft.dependencies,
+              apply: apply,
+            ),
+          );
+        }
+        return committed;
       });
     });
+  }
+
+  Future<OperationEnvelope> _writeLocalInTransaction({
+    required String actorId,
+    required String documentId,
+    required OperationKind kind,
+    required Map<String, dynamic> payload,
+    required Future<void> Function(OperationEnvelope operation) apply,
+    String? pageId,
+    String? objectId,
+    String? revertsOperationId,
+    List<String> dependencies = const [],
+  }) async {
+    final state = await _row(
+      'SELECT last_seq, last_clock, last_operation_id '
+      'FROM operation_actor_state WHERE actor_id = ?',
+      [actorId],
+    );
+    final previousId = state?['last_operation_id'] as String?;
+    // A new local intent observes the durable remote actor frontier.
+    // This must be read inside the same transaction as actorSeq.
+    final observed = await database
+        .customSelect(
+          'SELECT actor.last_operation_id FROM operation_actor_state actor '
+          'JOIN operations latest '
+          'ON latest.operation_id = actor.last_operation_id '
+          'WHERE actor.actor_id != ? AND latest.document_id = ? '
+          'ORDER BY actor.actor_id',
+          variables: [
+            Variable<String>(actorId),
+            Variable<String>(documentId),
+          ],
+        )
+        .get();
+    final observedIds = <String>{
+      for (final row in observed) row.read<String>('last_operation_id'),
+    };
+    final requiredIds = <String>{
+      ...dependencies,
+      if (revertsOperationId != null) revertsOperationId,
+      if (previousId != null) previousId,
+    };
+    final available = <String, OperationEnvelope>{};
+    var nextClock = state?['last_clock'] as int? ?? 0;
+    for (final id in {...observedIds, ...requiredIds}) {
+      final dependency = await operation(id);
+      if (dependency == null || dependency.documentId != documentId) {
+        throw StateError('Invalid document dependency: $id');
+      }
+      available[id] = dependency;
+      if (dependency.logicalClock > nextClock) {
+        nextClock = dependency.logicalClock;
+      }
+    }
+    // A frontier already required by another observed operation is
+    // causally implied. Never drop explicit, undo or actor predecessors.
+    final coveredIds = <String>{
+      for (final op in available.values)
+        for (final id in op.dependencies)
+          if (observedIds.contains(id)) id,
+    };
+    final causalIds = <String>{
+      ...requiredIds,
+      for (final id in observedIds)
+        if (!coveredIds.contains(id)) id,
+    }.toList()..sort();
+    if (causalIds.length > 256) {
+      throw StateError('Too many independent causal actor frontiers.');
+    }
+    final nextSeq = (state?['last_seq'] as int? ?? 0) + 1;
+    if (nextSeq > OperationEnvelope.maxSafeInteger ||
+        nextClock >= OperationEnvelope.maxSafeInteger) {
+      throw StateError('Actor clock exhausted.');
+    }
+    final next = OperationEnvelope(
+      operationId: _uuid.v4(),
+      actorId: actorId,
+      actorSeq: nextSeq,
+      logicalClock: nextClock + 1,
+      documentId: documentId,
+      pageId: pageId,
+      objectId: objectId,
+      kind: kind,
+      payload: payload,
+      dependencies: causalIds,
+      revertsOperationId: revertsOperationId,
+    );
+    await _commit(next, source: 'local', apply: () => apply(next));
+    return next;
   }
 
   /// An explicit envelope may be retried using its original operation ID.

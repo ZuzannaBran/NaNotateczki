@@ -18,6 +18,11 @@ transakcji SQLite. Rzutowanie operacji i zapis plików assetów są obowiązkiem
 wywołującego: projekcja musi pisać przez tę samą instancję
 `NotesDatabase`, a asset musi być wcześniej trwale zapisany i mieć SHA-256.
 
+`writeLocalBatch` zatwierdza jeden złożony gest (np. zaznaczenie z wieloma
+obiektami) atomowo: wszystkie projekcje, actorSeq i wpisy outboxu albo
+wszystkie są wycofywane. To fundament przyszłego `EditorOperationBridge`,
+a nie jeszcze przełączenie edytora produkcyjnego.
+
 Przy odbiorze z serwera operacja, projekcja i checkpoint są zatwierdzane
 razem. ACK usuwa z outboxu wyłącznie potwierdzony identyfikator. Duplikat
 tego samego envelope nie wykonuje ponownie projekcji. Snapshot nie może

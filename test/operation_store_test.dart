@@ -89,6 +89,97 @@ void main() {
     expect((await store.pending()).length, 1);
   });
 
+  test('a multi-object gesture commits one actor chain', () async {
+    final committed = await store.writeLocalBatch(
+      actorId: 'device-one',
+      documentId: 'document-one',
+      operations: [
+        for (final id in ['stroke-one', 'text-one', 'image-one'])
+          LocalOperationDraft(
+            pageId: 'page-one',
+            objectId: id,
+            kind: OperationKind.objectCreate,
+            payload: {'value': {'label': id}},
+          ),
+      ],
+      apply: (operation) => database.customStatement(
+        'INSERT INTO projection_probe (id, value) VALUES (?, ?)',
+        [operation.objectId!, operation.objectId!],
+      ),
+    );
+    expect(committed.map((op) => op.actorSeq).toList(), [1, 2, 3]);
+    expect(committed[1].dependencies, contains(committed[0].operationId));
+    expect(committed[2].dependencies, contains(committed[1].operationId));
+    expect(
+      (await store.pending()).map((op) => op.operationId).toList(),
+      committed.map((op) => op.operationId).toList(),
+    );
+    expect(
+      (await database.customSelect('SELECT * FROM projection_probe').get())
+          .length,
+      3,
+    );
+  });
+
+  test('failed gesture rolls back all projections and outbox items', () async {
+    await expectLater(
+      store.writeLocalBatch(
+        actorId: 'device-one',
+        documentId: 'document-one',
+        operations: [
+          for (final id in ['before-failure', 'fail', 'after-failure'])
+            LocalOperationDraft(
+              pageId: 'page-one',
+              objectId: id,
+              kind: OperationKind.objectCreate,
+              payload: {'value': {'label': id}},
+            ),
+        ],
+        apply: (operation) async {
+          if (operation.objectId == 'fail') {
+            throw StateError('Projection failed mid-gesture.');
+          }
+          await database.customStatement(
+            'INSERT INTO projection_probe (id, value) VALUES (?, ?)',
+            [operation.objectId!, operation.objectId!],
+          );
+        },
+      ),
+      throwsStateError,
+    );
+    expect(await store.pending(), isEmpty);
+    expect(
+      await database.customSelect('SELECT * FROM projection_probe').get(),
+      isEmpty,
+    );
+    expect((await add('retry-after-failure')).actorSeq, 1);
+  });
+
+  test('single write does not interleave into a multi-object gesture', () async {
+    final tasks = await Future.wait([
+      store.writeLocalBatch(
+        actorId: 'device-one',
+        documentId: 'document-one',
+        operations: [
+          for (final id in ['first', 'second'])
+            LocalOperationDraft(
+              pageId: 'page-one',
+              objectId: id,
+              kind: OperationKind.objectCreate,
+              payload: {'value': {'label': id}},
+            ),
+        ],
+        apply: (operation) => database.customStatement(
+          'INSERT INTO projection_probe VALUES (?, ?)',
+          [operation.objectId!, operation.objectId!],
+        ),
+      ).then((ops) => ops.map((op) => op.actorSeq).toList()),
+      add('third').then((op) => [op.actorSeq]),
+    ]);
+    expect(tasks, [[1, 2], [3]]);
+    expect(await store.pending(), hasLength(3));
+  });
+
   test('failed projection rolls back actor counter and outbox', () async {
     await expectLater(
       store.writeLocal(
