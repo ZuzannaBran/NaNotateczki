@@ -2543,6 +2543,13 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - `integration_test/stage12_live_api_test.dart`: opt-in dwa silniki
   Flutter synchronizujące dopiski i usunięcia z prawdziwym API v2 przez
   lokalny serwer HTTP i PostgreSQL, bez testu rzeczywistych gestów.
+- Etap 13: `server/migrations/0013_account_protocol_fence.sql`,
+  `server/api/app/account_protocol.py`, `server/scripts/stage13-activate-empty-canary.sh`
+  — trwałe, domyślnie v1, nieodwracalne przełączenie WYŁĄCZNIE pustego
+  konta testowego; blokada HTTP 409 zapisu v1 na koncie v2 i odwrotnie.
+  Regresje: `server/api/tests/test_account_protocol_fence.py`,
+  `server/scripts/tests/test_stage13_canary_activation.py`.
+  Runner Flutter E2E zakłada testowego właściciela v2 w disposable PostgreSQL.
 - `docs/ETAP_12_TESTS.md`: uruchomienie i otwarte kryteria. Testy
   backendowe nie zastępują Flutter↔API v2 testów dwóch urządzeń ani
   nieaktywnego cutover etapu 11; brak SDK/Dockera nie oznacza zaliczenia.
