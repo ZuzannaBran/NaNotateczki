@@ -47,7 +47,7 @@ void main() {
   test('wrong server checksum prevents an asset attach', () async {
     final gateway = OperationAssetGateway(clientFor((_) async {
       return http.Response(jsonEncode({
-        'sha256': '0' * 64,
+        'sha256': List.filled(64, '0').join(),
         'sizeBytes': png.length,
         'mediaType': 'image/png',
       }), 200);
