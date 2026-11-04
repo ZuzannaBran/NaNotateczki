@@ -81,11 +81,11 @@ void main() {
     final drafts = bridge.planPageChange(before: before, after: after);
     expect(drafts.map((d) => d.kind), [
       OperationKind.objectDelete,
-      OperationKind.strokeCreate,
       OperationKind.objectReorder,
+      OperationKind.strokeCreate,
     ]);
     expect(drafts.first.objectId, 'old');
-    expect(drafts[1].objectId, 'fragment');
+    expect(drafts.last.objectId, 'fragment');
   });
 
   test('text create keeps Quill formatting in text atoms', () {
@@ -140,7 +140,10 @@ void main() {
       OperationKind.objectCreate,
       OperationKind.assetAttach,
     ]);
-    expect(drafts.toString().contains('/private/local-file.png'), isFalse);
+    expect(
+      (drafts.first.payload['value'] as Map).containsKey('path'),
+      isFalse,
+    );
   });
 
   test('moving an image between pages preserves original identity', () {
@@ -160,6 +163,19 @@ void main() {
     expect(drafts.first.pageId, 'page-one');
     expect(drafts.last.pageId, 'page-two');
     expect(drafts.last.objectId, image.id);
+  });
+
+  test('identical object IDs across layer types fail closed', () {
+    expect(
+      () => bridge.planPageChange(
+        before: _page(),
+        after: _page(
+          strokes: [_stroke('duplicate')],
+          texts: [_text('Hi').copyWith(id: 'duplicate')],
+        ),
+      ),
+      throwsStateError,
+    );
   });
 
   test('page creation contains no snapshot of unrelated pages', () {

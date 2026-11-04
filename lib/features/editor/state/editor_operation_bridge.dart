@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 
 import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/operation_store.dart';
+import '../../../data/sync/operation_text_sequence.dart';
 import '../../../data/sync/share_ink_edit_adapter.dart';
 import '../../../data/sync/share_text_edit_adapter.dart';
 import '../../notebook/domain/image_block.dart';
@@ -78,6 +79,8 @@ class EditorOperationBridge {
     if (before.id.isEmpty || before.id != after.id) {
       throw ArgumentError('A committed edit must preserve its page ID.');
     }
+    _checkObjectIds(before);
+    _checkObjectIds(after);
     final result = <LocalOperationDraft>[];
     final pageProperties = <String, dynamic>{
       if (before.title != after.title) 'title': after.title,
@@ -137,6 +140,9 @@ class EditorOperationBridge {
         final atoms = textAtomsById[block.id];
         if (atoms == null) {
           throw StateError('A text change needs the durable CRDT atom state.');
+        }
+        if (OperationTextSequence.render(atoms) != old.text) {
+          throw StateError('Stale text atom projection cannot be edited.');
         }
         for (final intent in _text.plan(
           atoms: atoms,
@@ -304,6 +310,19 @@ class EditorOperationBridge {
         before.imageExt != after.imageExt ||
         !_bytes.equals(before.bytes, after.bytes)) {
       throw StateError('Changed image bytes require verified asset replacement.');
+    }
+  }
+
+  static void _checkObjectIds(NotePage page) {
+    final seen = <String>{};
+    for (final id in [
+      ...page.inkStrokes.map((item) => item.id),
+      ...page.textBlocks.map((item) => item.id),
+      ...page.imageBlocks.map((item) => item.id),
+    ]) {
+      if (id.isEmpty || !seen.add(id)) {
+        throw StateError('Object IDs must be unique across all types.');
+      }
     }
   }
 
