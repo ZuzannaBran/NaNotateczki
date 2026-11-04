@@ -1,0 +1,121 @@
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/editor_sqlite_projector.dart';
+import 'package:program/data/sync/operation_gateway.dart';
+import 'package:program/data/sync/operation_protocol.dart';
+import 'package:program/data/sync/operation_store.dart';
+import 'package:program/data/sync/sync_engine.dart';
+import 'package:program/features/editor/state/editor_controller.dart';
+import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
+import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/ink_stroke.dart';
+
+import 'support/native_test_documents.dart';
+
+class _OfflineGateway implements OperationGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async => throw StateError('No network in this regression.');
+
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async =>
+      throw StateError('No network in this regression.');
+}
+
+void main() {
+  useIsolatedNativeTestDocuments();
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('opt-in editor uses v2 outbox but never the snapshot writer',
+      () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    var repositoryWrites = 0;
+    final repository = NotebookRepository(
+      database,
+      onChanged: (changes) => repositoryWrites += changes.length,
+    );
+    final notebook = await repository.createNotebook();
+    repositoryWrites = 0;
+    final store = OperationStore(database);
+    final projector = EditorSqliteProjector(database);
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'v2-editor',
+      checkpointScope: 'v2-editor-test',
+      enableRealtime: false,
+      applyRemote: (operation, pending) => projector.apply(operation),
+    );
+    addTearDown(engine.stop);
+    final controller = EditorController(
+      repository: repository,
+      notebook: notebook,
+      operationWriter: EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: projector,
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    controller.addInkStroke(const [
+      InkPoint(dx: 4, dy: 5, pressure: 0.6),
+    ]);
+    await controller.flushPendingSaves();
+    final created = await store.pending();
+    expect(created, hasLength(1));
+    expect(created.single.kind, OperationKind.strokeCreate);
+    expect(repositoryWrites, 0);
+    expect(
+      (await repository.getNotebook(notebook.uid))
+          ?.pages.single.inkStrokes,
+      hasLength(1),
+    );
+    // v2 tombstones cannot be undone by recreating the old object ID.
+    expect(controller.canUndo, isFalse);
+    controller.undo();
+    await controller.flushPendingSaves();
+    expect(await store.pending(), hasLength(1));
+
+    controller.addPage();
+    await controller.flushPendingSaves();
+    final saved = (await repository.getNotebook(notebook.uid))!;
+    expect(saved.pages, hasLength(2));
+    expect(saved.pages.first.inkStrokes, hasLength(1));
+    expect((await store.pending()).last.kind, OperationKind.pageCreate);
+    expect(repositoryWrites, 0);
+  });
+
+  test('opt-in controller rejects a projection from a different SQLite',
+      () async {
+    final first = NotesDatabase(NativeDatabase.memory());
+    final second = NotesDatabase(NativeDatabase.memory());
+    addTearDown(first.close);
+    addTearDown(second.close);
+    final repository = NotebookRepository(first);
+    final notebook = await repository.createNotebook();
+    final engine = SyncEngine(
+      store: OperationStore(second),
+      gateway: _OfflineGateway(),
+      actorId: 'wrong-database',
+      checkpointScope: 'wrong-namespace',
+      enableRealtime: false,
+      applyRemote: (_, __) async {},
+    );
+    addTearDown(engine.stop);
+    final writer = EditorV2OperationWriter(
+      syncEngine: engine,
+      projector: EditorSqliteProjector(second),
+    );
+    expect(
+      () => EditorController(
+        repository: repository,
+        notebook: notebook,
+        operationWriter: writer,
+      ),
+      throwsArgumentError,
+    );
+  });
+}
