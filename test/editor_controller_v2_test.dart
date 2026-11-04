@@ -59,6 +59,36 @@ void main() {
       ),
     );
     addTearDown(controller.dispose);
+    await expectLater(
+      repository.saveNotebook(notebook, preserveMetadata: true),
+      throwsStateError,
+    );
+    await expectLater(
+      repository.saveNotebookPages(
+        notebook,
+        {notebook.pages.single.id},
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      repository.updateNotebookMetadata(notebook.uid, title: 'legacy'),
+      throwsStateError,
+    );
+    await expectLater(
+      repository.deleteNotebook(notebook.uid),
+      throwsStateError,
+    );
+    expect(
+      () => EditorController(
+        repository: repository,
+        notebook: notebook,
+        operationWriter: EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+        ),
+      ),
+      throwsStateError,
+    );
 
     controller.addInkStroke(const [
       InkPoint(dx: 4, dy: 5, pressure: 0.6),
