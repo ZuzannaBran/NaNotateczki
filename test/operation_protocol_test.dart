@@ -197,10 +197,7 @@ void main() {
   });
 
   test('wire UUIDs must not accept a trailing newline', () {
-    expect(
-      () => operation(operationId: '$firstId\n'),
-      throwsFormatException,
-    );
+    expect(() => operation(operationId: '$firstId\n'), throwsFormatException);
     expect(
       () => operation(dependencies: ['$secondId\n']),
       throwsFormatException,

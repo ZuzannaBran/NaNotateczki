@@ -139,8 +139,7 @@ class OperationEnvelope {
       final atoms = payload['atoms'];
       if (payload.length != 2 ||
           !payload.containsKey('afterAtomId') ||
-          (anchor != null &&
-              (anchor is! String || !_isValidUuid(anchor))) ||
+          (anchor != null && (anchor is! String || !_isValidUuid(anchor))) ||
           atoms is! List ||
           atoms.isEmpty ||
           atoms.length > 256) {
@@ -274,8 +273,7 @@ class OperationEnvelope {
       throw FormatException('Unsupported operation schema: $schemaVersion');
     }
     if (!_isValidUuid(operationId) ||
-        (revertsOperationId != null &&
-            !_isValidUuid(revertsOperationId!))) {
+        (revertsOperationId != null && !_isValidUuid(revertsOperationId!))) {
       throw const FormatException('Invalid operation UUID.');
     }
     if (actorId.isEmpty ||
