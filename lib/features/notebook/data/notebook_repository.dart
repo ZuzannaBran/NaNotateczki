@@ -585,6 +585,7 @@ class NotebookRepository {
     Notebook notebook, {
     bool preserveMetadata = false,
     Map<String, Set<String>> expectedRemovedIdsByPage = const {},
+    Set<String> expectedRemovedPageIds = const {},
   }) async {
     final normalizedNotebook = InkEraserEngine.normalizeNotebook(notebook);
     if (normalizedNotebook.pages.isEmpty) {
@@ -605,6 +606,7 @@ class NotebookRepository {
         requestStackTrace,
         preserveMetadata: preserveMetadata,
         expectedRemovedIdsByPage: expectedRemovedIdsByPage,
+        expectedRemovedPageIds: expectedRemovedPageIds,
       );
     } finally {
       completion.complete();
@@ -730,6 +732,7 @@ class NotebookRepository {
     StackTrace requestStackTrace, {
     bool preserveMetadata = false,
     required Map<String, Set<String>> expectedRemovedIdsByPage,
+    required Set<String> expectedRemovedPageIds,
   }) async {
     if (_lastCorruptNotebookIds.contains(notebook.uid)) {
       debugPrint(
@@ -769,6 +772,7 @@ class NotebookRepository {
         affectedPageIds: notebook.pages.map((page) => page.id).toSet(),
         requestStackTrace: requestStackTrace,
         expectedRemovedIdsByPage: expectedRemovedIdsByPage,
+        expectedRemovedPageIds: expectedRemovedPageIds,
       );
     }
     final notebookToSave = await _persistInlineImages(notebook);
@@ -1046,6 +1050,7 @@ class NotebookRepository {
     required Set<String> affectedPageIds,
     required StackTrace requestStackTrace,
     required Map<String, Set<String>> expectedRemovedIdsByPage,
+    Set<String> expectedRemovedPageIds = const {},
   }) async {
     final beforeSummary = _NotebookContentSummary.fromNotebook(before);
     final attemptedSummary = _NotebookContentSummary.fromNotebook(attempted);
@@ -1072,6 +1077,7 @@ class NotebookRepository {
           before,
           attempted,
           expectedRemovedIdsByPage,
+          expectedRemovedPageIds,
         )) {
       return;
     }
@@ -1104,8 +1110,16 @@ class NotebookRepository {
     Notebook before,
     Notebook attempted,
     Map<String, Set<String>> expectedRemovedIdsByPage,
+    Set<String> expectedRemovedPageIds,
   ) {
-    if (before.pages.length != attempted.pages.length) {
+    final beforeIds = {for (final page in before.pages) page.id};
+    final attemptedIds = {for (final page in attempted.pages) page.id};
+    final removedPageIds = beforeIds.difference(attemptedIds);
+    // Deletion is allowed only for IDs the active editor explicitly marked.
+    // A replacement page cannot hide an unexpected loss.
+    if (!expectedRemovedPageIds.containsAll(removedPageIds) ||
+        attemptedIds.difference(beforeIds).isNotEmpty ||
+        before.pages.length != attempted.pages.length + removedPageIds.length) {
       return false;
     }
     final attemptedPages = {for (final page in attempted.pages) page.id: page};
@@ -1119,7 +1133,8 @@ class NotebookRepository {
     for (final page in before.pages) {
       final next = attemptedPages[page.id];
       if (next == null) {
-        return false;
+        removed = true;
+        continue;
       }
       final approved = expectedRemovedIdsByPage[page.id] ?? const <String>{};
       final nextInk = {for (final ink in next.inkStrokes) ink.id: ink};
