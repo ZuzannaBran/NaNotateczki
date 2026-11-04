@@ -105,7 +105,10 @@ strony na `LocalOperationDraft` używając istniejących adapterów ink/tekst.
 przed planowaniem wysyłki i waliduje wszystkie payloady zawczasu.
 
 Most obsługuje teraz zweryfikowane embedy Quill oraz wymianę
-obrazu/PDF przy znanym starym asset ID. Sekwencja osadzonego zasobu to
+obrazu/PDF przy znanym starym asset ID.
+Konwersja Quill zachowuje końcowy znak `\\n` jako atom CRDT, choć
+edytor przechowuje przycięte `TextBlock.text`; rozbieżna treść
+Delta nadal blokuje operację. Sekwencja osadzonego zasobu to
 `object.create → asset.attach → text.insert`; usunięcie referencji
 poprzedza `asset.detach`. Wymiana istniejącego obrazu używa
 `asset.attach → object.set(assetId) → asset.detach`. Nieweryfikowany
