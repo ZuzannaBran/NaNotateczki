@@ -127,6 +127,7 @@ class EditorController extends ChangeNotifier {
   late Notebook _v2PersistedNotebook;
   Future<void>? _v2SaveTail;
   Future<void>? _v2HistoryTail;
+  bool _v2HistoryCommitting = false;
   final List<_V2HistoryEntry> _v2Undo = [];
   final List<_V2HistoryEntry> _v2Redo = [];
   Duration saveDebounce;
@@ -1946,19 +1947,38 @@ class EditorController extends ChangeNotifier {
       current: original,
       desired: desired,
     );
-    final committed = await operationWriter!.writeNotebookChange(
-      before: original,
-      after: restored,
-    );
+    final visibleBeforeCommit = pages;
+    _v2HistoryCommitting = true;
+    late final List<dynamic> committed;
+    try {
+      committed = await operationWriter!.writeNotebookChange(
+        before: original,
+        after: restored,
+      );
+    } finally {
+      _v2HistoryCommitting = false;
+    }
     if (committed.isEmpty) {
       source.removeLast();
       (undo ? _v2Redo : _v2Undo).add(entry);
       _notifyHistoryChanged();
       return;
     }
-    final selectedId = currentPage.id;
     _v2PersistedNotebook = restored;
     notebook = restored;
+    if (!identical(pages, visibleBeforeCommit)) {
+      // A new gesture arrived during the inverse write. Preserve its
+      // optimistic state instead of silently replacing it with the inverse.
+      _integritySaveBlocked = true;
+      _fullSavePending = true;
+      _dirtyPageIds.addAll(pages.map((page) => page.id));
+      source.removeLast();
+      (undo ? _v2Redo : _v2Undo).add(entry);
+      _notifyHistoryChanged();
+      notifyListeners();
+      return;
+    }
+    final selectedId = currentPage.id;
     pages = restored.pages;
     final selected = pages.indexWhere((page) => page.id == selectedId);
     currentPageIndex = selected < 0
@@ -1989,11 +2009,12 @@ class EditorController extends ChangeNotifier {
   }) {
     final pageIds = {for (final page in current.pages) page.id};
     final objectIds = <String>{
-      for (final page in current.pages) ...[
+      for (final page in current.pages)
         ...page.inkStrokes.map((item) => item.id),
+      for (final page in current.pages)
         ...page.textBlocks.map((item) => item.id),
+      for (final page in current.pages)
         ...page.imageBlocks.map((item) => item.id),
-      ],
     };
     return desired.copyWith(pages: [
       for (final page in desired.pages)
@@ -3643,8 +3664,14 @@ class EditorController extends ChangeNotifier {
     _notebookSaveDebounce = null;
     _fullSavePending = true;
     final previous = _v2SaveTail ?? Future<void>.value();
+    // Undo/Redo may be awaiting a remote asset upload. A normal save must
+    // never prepare drafts against the pre-inverse SQLite baseline.
+    final activeInverse = _v2HistoryCommitting ? _v2HistoryTail : null;
     late final Future<void> next;
     next = previous.then((_) async {
+      if (activeInverse != null) {
+        await activeInverse;
+      }
       final savedPages = pages;
       final proposed = notebook.copyWith(
         pages: savedPages,
