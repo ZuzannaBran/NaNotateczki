@@ -195,17 +195,23 @@ class EditorSqliteProjector {
     if (changes.isEmpty) {
       return const {};
     }
-    final pageTarget = operation.kind.target == OperationTarget.page;
-    final kinds = pageTarget
-        ? "('page.create', 'page.set')"
-        : "('stroke.create', 'object.create', 'object.set', "
-            "'object.transform', 'object.reorder', 'object.move')";
+    final target = operation.kind.target;
+    final documentTarget = target == OperationTarget.document;
+    final pageTarget = target == OperationTarget.page;
+    final kinds = documentTarget
+        ? "('document.create', 'document.set')"
+        : pageTarget
+            ? "('page.create', 'page.set')"
+            : "('stroke.create', 'object.create', 'object.set', "
+                "'object.transform', 'object.reorder', 'object.move')";
     final rows = await database.customSelect(
       'SELECT envelope_json FROM operations '
-      'WHERE document_id = ? AND object_id = ? AND kind IN $kinds',
+      'WHERE document_id = ? AND '
+      '${documentTarget ? 'object_id IS NULL' : 'object_id = ?'} '
+      'AND kind IN $kinds',
       variables: [
         Variable<String>(operation.documentId),
-        Variable<String>(operation.objectId!),
+        if (!documentTarget) Variable<String>(operation.objectId!),
       ],
     ).get();
     if (rows.length > 50000) {
@@ -224,9 +230,11 @@ class EditorSqliteProjector {
         continue;
       }
       final fields = switch (previous.kind) {
+        OperationKind.documentCreate ||
         OperationKind.pageCreate ||
         OperationKind.objectCreate ||
         OperationKind.strokeCreate => previous.payload['value'],
+        OperationKind.documentSet ||
         OperationKind.pageSet ||
         OperationKind.objectSet ||
         OperationKind.objectTransform ||
