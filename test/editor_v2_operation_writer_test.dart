@@ -412,7 +412,7 @@ void main() {
         expect(request.bodyBytes, rawBytes);
         return http.Response(
           jsonEncode({
-            'sha256': rejectReceipt ? '0' * 64 : digest,
+            'sha256': rejectReceipt ? List.filled(64, '0').join() : digest,
             'sizeBytes': rawBytes.length,
             'mediaType': 'image/png',
           }),
