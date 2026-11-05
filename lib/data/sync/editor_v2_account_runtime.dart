@@ -1,5 +1,3 @@
-import 'package:uuid/uuid.dart';
-
 import '../../features/editor/state/editor_controller.dart';
 import '../../features/editor/state/editor_v2_operation_writer.dart';
 import '../../features/editor/state/editor_v2_remote_patch_dispatcher.dart';
@@ -33,10 +31,11 @@ class EditorV2AccountRuntime {
     required NotebookRepository repository,
     required ApiClient apiClient,
     required String accountId,
+    required String actorId,
     Future<void> Function()? onLibraryChanged,
   }) {
-    if (accountId.isEmpty) {
-      throw ArgumentError('V2 account identity is required.');
+    if (accountId.isEmpty || actorId.isEmpty) {
+      throw ArgumentError('V2 account and persistent actor IDs are required.');
     }
     final store = OperationStore(repository.database);
     final buffer = VerifiedEditorAssetBuffer();
@@ -49,7 +48,7 @@ class EditorV2AccountRuntime {
     final engine = SyncEngine(
       store: store,
       gateway: HttpOperationGateway(apiClient),
-      actorId: const Uuid().v4(),
+      actorId: actorId,
       checkpointScope: 'account:$accountId',
       apiClient: apiClient,
       applyRemote: (operation, pendingLocal) async {
