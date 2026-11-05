@@ -16,6 +16,7 @@ import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/ink_stroke.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/notebook.dart';
+import '../../notebook/domain/text_block.dart';
 import 'editor_actions.dart';
 import 'editor_operation_bridge.dart';
 
@@ -177,7 +178,7 @@ class EditorV2OperationWriter {
   ///
   /// Ink stays unchanged during a move. Image geometry may change, but
   /// its verified asset ID and binary content must remain identical.
-  /// Text moves still require a cross-page CRDT checkpoint.
+  /// Text moves preserve their CRDT identity and immutable atom history.
   Future<List<OperationEnvelope>> writeNotebookChange({
     required Notebook before,
     required Notebook after,
@@ -250,6 +251,14 @@ class EditorV2OperationWriter {
       for (final page in after.pages)
         for (final stroke in page.inkStrokes) stroke.id: stroke,
     };
+    final oldTexts = <String, TextBlock>{
+      for (final page in before.pages)
+        for (final block in page.textBlocks) block.id: block,
+    };
+    final newTexts = <String, TextBlock>{
+      for (final page in after.pages)
+        for (final block in page.textBlocks) block.id: block,
+    };
     final oldImages = <String, ImageBlock>{
       for (final page in before.pages)
         for (final image in page.imageBlocks) image.id: image,
@@ -259,6 +268,7 @@ class EditorV2OperationWriter {
         for (final image in page.imageBlocks) image.id: image,
     };
     final movedInkIds = <String>{};
+    final movedTextIds = <String>{};
     final movedImageIds = <String>{};
     final touchedPages = <String>{};
     for (final entry in newObjects.entries) {
@@ -283,7 +293,19 @@ class EditorV2OperationWriter {
             ],
           )) {
         movedInkIds.add(entry.key);
-      } else {
+      } else if (oldTexts[entry.key] case final oldText?)
+        {
+          final nextText = newTexts[entry.key];
+          if (nextText == null ||
+              oldText.text != nextText.text ||
+              oldText.deltaJson != nextText.deltaJson) {
+            throw UnsupportedError(
+              'Cross-page text moves cannot edit CRDT contents.',
+            );
+          }
+          movedTextIds.add(entry.key);
+        }
+      else {
         final oldImage = oldImages[entry.key];
         final newImage = newImages[entry.key];
         if (oldImage == null || newImage == null ||
@@ -296,7 +318,7 @@ class EditorV2OperationWriter {
               newImage.bytes,
             )) {
           throw UnsupportedError(
-            'Cross-page moves require unchanged ink or image assets.',
+            'Cross-page moves require unchanged ink, text or image assets.',
           );
         }
         movedImageIds.add(entry.key);
@@ -313,6 +335,10 @@ class EditorV2OperationWriter {
           inkStrokes: [
             for (final stroke in page.inkStrokes)
               if (!movedInkIds.contains(stroke.id)) stroke,
+          ],
+          textBlocks: [
+            for (final block in page.textBlocks)
+              if (!movedTextIds.contains(block.id)) block,
           ],
           imageBlocks: [
             for (final image in page.imageBlocks)
@@ -350,6 +376,25 @@ class EditorV2OperationWriter {
         final nextInk = List<InkStroke>.from(current.inkStrokes);
         nextInk.insert(index.clamp(0, nextInk.length).toInt(), stroke);
         staged[page.id] = current.copyWith(inkStrokes: nextInk);
+      }
+      for (var index = 0; index < page.textBlocks.length; index++) {
+        final block = page.textBlocks[index];
+        if (!movedTextIds.contains(block.id)) {
+          continue;
+        }
+        drafts.add(LocalOperationDraft(
+          kind: OperationKind.objectMove,
+          pageId: oldObjects[block.id]!,
+          objectId: block.id,
+          payload: {'toPageId': page.id, 'sortIndex': index},
+        ));
+        final current = staged[page.id]!;
+        final nextTexts = List<TextBlock>.from(current.textBlocks);
+        nextTexts.insert(
+          index.clamp(0, nextTexts.length).toInt(),
+          oldTexts[block.id]!,
+        );
+        staged[page.id] = current.copyWith(textBlocks: nextTexts);
       }
       for (var index = 0; index < page.imageBlocks.length; index++) {
         final image = page.imageBlocks[index];
@@ -408,6 +453,26 @@ class EditorV2OperationWriter {
             kind: OperationKind.objectReorder,
             pageId: page.id,
             objectId: stroke.id,
+            payload: {
+              'properties': {'sortIndex': index},
+            },
+          ));
+        }
+        for (var index = 0; index < page.textBlocks.length; index++) {
+          final block = page.textBlocks[index];
+          if (movedTextIds.contains(block.id) ||
+              drafts.any((draft) =>
+                  draft.pageId == page.id &&
+                  draft.objectId == block.id &&
+                  draft.kind == OperationKind.objectSet &&
+                  (draft.payload['properties'] as Map)
+                      .containsKey('sortIndex'))) {
+            continue;
+          }
+          drafts.add(LocalOperationDraft(
+            kind: OperationKind.objectSet,
+            pageId: page.id,
+            objectId: block.id,
             payload: {
               'properties': {'sortIndex': index},
             },
