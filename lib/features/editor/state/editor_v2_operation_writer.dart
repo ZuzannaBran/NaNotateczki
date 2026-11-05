@@ -7,6 +7,7 @@ import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/operation_store.dart';
 import '../../../data/sync/operation_text_sequence.dart';
 import '../../../data/sync/sync_engine.dart';
+import '../../notebook/domain/ink_stroke.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/notebook.dart';
 import 'editor_actions.dart';
@@ -33,10 +34,10 @@ class EditorV2OperationWriter {
   final EditorSqliteProjector projector;
   final EditorOperationBridge _bridge;
 
-  /// Commits the complete effect of a multi-page gesture atomically.
+  /// Commits a multi-page gesture and stable-ID ink moves in one batch.
   ///
-  /// Moves that retain an object ID on a different page require object.move
-  /// and must never be emulated as delete/create with a partial commit.
+  /// Content changes to a stroke being moved must be separate operations.
+  /// Quill and image moves remain guarded until their projections are complete.
   Future<List<OperationEnvelope>> writeNotebookChange({
     required Notebook before,
     required Notebook after,
@@ -48,6 +49,7 @@ class EditorV2OperationWriter {
         after.pages.isEmpty) {
       throw ArgumentError('Unsupported notebook identity or metadata edit.');
     }
+
     Map<String, NotePage> uniquePages(Notebook notebook) {
       final result = <String, NotePage>{};
       for (final page in notebook.pages) {
@@ -81,12 +83,6 @@ class EditorV2OperationWriter {
     final newPages = uniquePages(after);
     final oldObjects = objectPages(before);
     final newObjects = objectPages(after);
-    for (final entry in newObjects.entries) {
-      final origin = oldObjects[entry.key];
-      if (origin != null && origin != entry.value) {
-        throw UnsupportedError('Cross-page objects require object.move.');
-      }
-    }
     final originalOrder = [
       for (final page in before.pages)
         if (newPages.containsKey(page.id)) page.id,
@@ -99,22 +95,125 @@ class EditorV2OperationWriter {
       throw UnsupportedError('Page reordering is not yet in v2.');
     }
 
+    final oldInk = <String, InkStroke>{
+      for (final page in before.pages)
+        for (final stroke in page.inkStrokes) stroke.id: stroke,
+    };
+    final newInk = <String, InkStroke>{
+      for (final page in after.pages)
+        for (final stroke in page.inkStrokes) stroke.id: stroke,
+    };
+    final movedIds = <String>{};
+    final touchedPages = <String>{};
+    for (final entry in newObjects.entries) {
+      final origin = oldObjects[entry.key];
+      if (origin == null || origin == entry.value) {
+        continue;
+      }
+      final from = oldInk[entry.key];
+      final to = newInk[entry.key];
+      if (from == null || to == null ||
+          from.color.toARGB32() != to.color.toARGB32() ||
+          from.width != to.width ||
+          from.tool != to.tool ||
+          !const DeepCollectionEquality().equals(
+            [
+              for (final point in from.points)
+                [point.dx, point.dy, point.pressure],
+            ],
+            [
+              for (final point in to.points)
+                [point.dx, point.dy, point.pressure],
+            ],
+          )) {
+        throw UnsupportedError(
+          'Only unchanged ink can move between pages in v2.',
+        );
+      }
+      movedIds.add(entry.key);
+      touchedPages.add(origin);
+      touchedPages.add(entry.value);
+    }
+
+    // Build the temporary pre-move projection without changing user pages.
+    // Newly created destination pages must exist before object.move.
+    final staged = <String, NotePage>{
+      for (final page in before.pages)
+        page.id: page.copyWith(
+          inkStrokes: [
+            for (final stroke in page.inkStrokes)
+              if (!movedIds.contains(stroke.id)) stroke,
+          ],
+        ),
+    };
     final drafts = <LocalOperationDraft>[];
     for (final page in after.pages) {
-      final old = oldPages[page.id];
-      if (old == null) {
-        drafts.addAll(_bridge.planCreatePage(page));
-      } else {
-        final atoms = await _textAtoms(
-          documentId: after.uid,
-          before: old,
-          after: page,
+      if (!oldPages.containsKey(page.id)) {
+        final empty = page.copyWith(
+          inkStrokes: [],
+          textBlocks: [],
+          imageBlocks: [],
         );
-        drafts.addAll(_bridge.planPageChange(
-          before: old,
-          after: page,
-          textAtomsById: atoms,
+        staged[page.id] = empty;
+        drafts.addAll(_bridge.planCreatePage(empty));
+      }
+    }
+
+    for (final page in after.pages) {
+      for (var index = 0; index < page.inkStrokes.length; index++) {
+        final stroke = page.inkStrokes[index];
+        if (!movedIds.contains(stroke.id)) {
+          continue;
+        }
+        final origin = oldObjects[stroke.id]!;
+        drafts.add(LocalOperationDraft(
+          kind: OperationKind.objectMove,
+          pageId: origin,
+          objectId: stroke.id,
+          payload: {'toPageId': page.id, 'sortIndex': index},
         ));
+        final current = staged[page.id]!;
+        final nextInk = List<InkStroke>.from(current.inkStrokes);
+        nextInk.insert(index.clamp(0, nextInk.length).toInt(), stroke);
+        staged[page.id] = current.copyWith(inkStrokes: nextInk);
+      }
+    }
+
+    for (final page in after.pages) {
+      final baseline = staged[page.id]!;
+      final atoms = await _textAtoms(
+        documentId: after.uid,
+        before: baseline,
+        after: page,
+      );
+      drafts.addAll(_bridge.planPageChange(
+        before: baseline,
+        after: page,
+        textAtomsById: atoms,
+      ));
+      if (touchedPages.contains(page.id)) {
+        // A move can shift the old sortIndex of an untouched stroke.
+        // Re-state the final order using stable IDs, without recreation.
+        for (var index = 0; index < page.inkStrokes.length; index++) {
+          final stroke = page.inkStrokes[index];
+          if (movedIds.contains(stroke.id) ||
+              drafts.any(
+                (draft) =>
+                    draft.pageId == page.id &&
+                    draft.objectId == stroke.id &&
+                    draft.kind == OperationKind.objectReorder,
+              )) {
+            continue;
+          }
+          drafts.add(LocalOperationDraft(
+            kind: OperationKind.objectReorder,
+            pageId: page.id,
+            objectId: stroke.id,
+            payload: {
+              'properties': {'sortIndex': index},
+            },
+          ));
+        }
       }
     }
     for (final page in before.pages) {
