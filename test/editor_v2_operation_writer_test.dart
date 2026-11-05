@@ -124,6 +124,16 @@ void main() {
     expect(updated.single.kind, OperationKind.documentSet);
     expect((await repository.getNotebook(saved.uid))!.title,
         'Renamed by v2');
+
+    final removed = await writer.writeDeleteNotebook(documentId: saved.uid);
+    expect(removed, hasLength(1));
+    expect(removed.single.kind, OperationKind.documentDelete);
+    expect(await repository.getNotebook(saved.uid), isNull);
+    await expectLater(
+      writer.writeCreateNotebook(notebook: blank),
+      throwsStateError,
+    );
+    expect((await store.pending()).last.kind, OperationKind.documentDelete);
   });
 
   test('one complete stroke creates one durable operation, no snapshot',
