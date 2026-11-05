@@ -106,3 +106,15 @@ propagowane na wszystkie urządzenia.
 - [ ] Widget regression `test/verified_quill_embed_builder_test.dart`:
   obsługa osadzonego PDF i odmowa odczytu zewnętrznego URL.
   Test dodany, nie uruchomiony (brak lokalnego SDK Flutter).
+
+## Lokalna kontrola przed przełączeniem
+
+```bash
+bash tool/verify_stage3_local.sh
+```
+
+Skrypt nie modyfikuje kodu i nie uruchamia GitHub Actions.
+Warunkiem jest lokalnie zainstalowany Flutter/Dart.
+Zaliczony test na jednej platformie nie daje automatycznie zgody na
+przełączenie kont, backupów i współdzielenia na v2. Wyniki muszą zostać
+zarejestrowane po rzeczywistym uruchomieniu.

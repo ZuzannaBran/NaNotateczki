@@ -2853,3 +2853,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   nie instaluje tego writera. Brak lokalnej projekcji osadzonych plików
   Quill, trwałej historii Undo/Redo po restarcie, produkcyjnego cutover
   i E2E; etap 3 pozostaje częściowy.
+
+### Lokalna weryfikacja etapu 3
+
+`tool/verify_stage3_local.sh`: tylko odczytowy format-check,
+`dart analyze`, wąskie testy v2 i pełny `flutter test` bez GitHub Actions.
+Nie zastępuje testu migracji na czterech platformach ani E2E.
