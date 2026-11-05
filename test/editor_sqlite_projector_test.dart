@@ -65,6 +65,57 @@ void main() {
     return [for (final row in rows) row.data];
   }
 
+  test('a fresh repository cannot overwrite committed v2 history',
+      () async {
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.strokeCreate,
+        pageId: pageId,
+        objectId: 'protected-ink',
+        payload: {'value': _stroke()},
+      ),
+    ]);
+    final reopenedRepository = NotebookRepository(database);
+    final existing = (await reopenedRepository.getNotebook(documentId))!;
+    expect(existing.pages.first.inkStrokes.single.id, 'protected-ink');
+
+    await expectLater(
+      reopenedRepository.saveNotebook(existing),
+      throwsStateError,
+    );
+    await expectLater(
+      reopenedRepository.saveNotebookPages(
+        existing,
+        {pageId},
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      reopenedRepository.updateNotebookMetadata(
+        documentId,
+        title: 'Legacy overwrite',
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      reopenedRepository.importNotebooksAtomically([existing]),
+      throwsStateError,
+    );
+    await expectLater(
+      reopenedRepository.deleteNotebook(documentId),
+      throwsStateError,
+    );
+    expect(
+      (await reopenedRepository.getNotebook(documentId))!
+          .pages.first.inkStrokes.single.id,
+      'protected-ink',
+    );
+
+    // A different document without operational history remains writable.
+    final sibling = await reopenedRepository.createNotebook();
+    expect(await reopenedRepository.saveNotebook(sibling), isTrue);
+  });
+
   test('ink create, transform and delete persist as atomic operations',
       () async {
     final added = await write([
