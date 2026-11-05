@@ -474,8 +474,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   (granica 50000 envelope'ów). Konkurencyjne `object.move` porównuje
   według tej samej rangi: starszy przegrywający zapisuje actorSeq
   bez poruszania obiektu, nowszy przenosi go z rzeczywistej strony.
-  Causally nieprawidłowe źródło nadal jest odrzucane. Nie jest to
-  jeszcze pełny rebase usunięć/tombstones i historycznych move.
+  Causally nieprawidłowe źródło nadal jest odrzucane. Backend
+  `NaNotateczki-serwer/main` również zachowuje rank i zwycięzcę
+  równoczesnego `object.move`, dzięki czemu obie kolejności dostarczenia
+  dają ten sam cel i sortIndex. Nie jest to jeszcze pełny rebase
+  usunięć/tombstones i historycznych move.
   Projektor jest wyłącznie opt-in i nigdy nie należy
   używać go równolegle z legacy writerem tego dokumentu.
 - `lib/data/sync/verified_editor_asset_buffer.dart`: bufor tylko
