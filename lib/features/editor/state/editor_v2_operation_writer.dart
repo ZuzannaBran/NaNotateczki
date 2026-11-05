@@ -7,6 +7,7 @@ import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/operation_store.dart';
 import '../../../data/sync/operation_text_sequence.dart';
 import '../../../data/sync/sync_engine.dart';
+import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/ink_stroke.dart';
 import '../../notebook/domain/note_page.dart';
 import '../../notebook/domain/notebook.dart';
@@ -36,8 +37,9 @@ class EditorV2OperationWriter {
 
   /// Commits a multi-page gesture and stable-ID ink moves in one batch.
   ///
-  /// Content changes to a stroke being moved must be separate operations.
-  /// Quill and image moves remain guarded until their projections are complete.
+  /// Ink stays unchanged during a move. Image geometry may change, but
+  /// its verified asset ID and binary content must remain identical.
+  /// Text moves still require a cross-page CRDT checkpoint.
   Future<List<OperationEnvelope>> writeNotebookChange({
     required Notebook before,
     required Notebook after,
@@ -103,7 +105,16 @@ class EditorV2OperationWriter {
       for (final page in after.pages)
         for (final stroke in page.inkStrokes) stroke.id: stroke,
     };
-    final movedIds = <String>{};
+    final oldImages = <String, ImageBlock>{
+      for (final page in before.pages)
+        for (final image in page.imageBlocks) image.id: image,
+    };
+    final newImages = <String, ImageBlock>{
+      for (final page in after.pages)
+        for (final image in page.imageBlocks) image.id: image,
+    };
+    final movedInkIds = <String>{};
+    final movedImageIds = <String>{};
     final touchedPages = <String>{};
     for (final entry in newObjects.entries) {
       final origin = oldObjects[entry.key];
@@ -112,11 +123,11 @@ class EditorV2OperationWriter {
       }
       final from = oldInk[entry.key];
       final to = newInk[entry.key];
-      if (from == null || to == null ||
-          from.color.toARGB32() != to.color.toARGB32() ||
-          from.width != to.width ||
-          from.tool != to.tool ||
-          !const DeepCollectionEquality().equals(
+      if (from != null && to != null &&
+          from.color.toARGB32() == to.color.toARGB32() &&
+          from.width == to.width &&
+          from.tool == to.tool &&
+          const DeepCollectionEquality().equals(
             [
               for (final point in from.points)
                 [point.dx, point.dy, point.pressure],
@@ -126,11 +137,25 @@ class EditorV2OperationWriter {
                 [point.dx, point.dy, point.pressure],
             ],
           )) {
-        throw UnsupportedError(
-          'Only unchanged ink can move between pages in v2.',
-        );
+        movedInkIds.add(entry.key);
+      } else {
+        final oldImage = oldImages[entry.key];
+        final newImage = newImages[entry.key];
+        if (oldImage == null || newImage == null ||
+            oldImage.path != newImage.path ||
+            oldImage.ocrText != newImage.ocrText ||
+            oldImage.imageMime != newImage.imageMime ||
+            oldImage.imageExt != newImage.imageExt ||
+            !const ListEquality<int>().equals(
+              oldImage.bytes,
+              newImage.bytes,
+            )) {
+          throw UnsupportedError(
+            'Cross-page moves require unchanged ink or image assets.',
+          );
+        }
+        movedImageIds.add(entry.key);
       }
-      movedIds.add(entry.key);
       touchedPages.add(origin);
       touchedPages.add(entry.value);
     }
@@ -142,7 +167,11 @@ class EditorV2OperationWriter {
         page.id: page.copyWith(
           inkStrokes: [
             for (final stroke in page.inkStrokes)
-              if (!movedIds.contains(stroke.id)) stroke,
+              if (!movedInkIds.contains(stroke.id)) stroke,
+          ],
+          imageBlocks: [
+            for (final image in page.imageBlocks)
+              if (!movedImageIds.contains(image.id)) image,
           ],
         ),
     };
@@ -162,7 +191,7 @@ class EditorV2OperationWriter {
     for (final page in after.pages) {
       for (var index = 0; index < page.inkStrokes.length; index++) {
         final stroke = page.inkStrokes[index];
-        if (!movedIds.contains(stroke.id)) {
+        if (!movedInkIds.contains(stroke.id)) {
           continue;
         }
         final origin = oldObjects[stroke.id]!;
@@ -176,6 +205,25 @@ class EditorV2OperationWriter {
         final nextInk = List<InkStroke>.from(current.inkStrokes);
         nextInk.insert(index.clamp(0, nextInk.length).toInt(), stroke);
         staged[page.id] = current.copyWith(inkStrokes: nextInk);
+      }
+      for (var index = 0; index < page.imageBlocks.length; index++) {
+        final image = page.imageBlocks[index];
+        if (!movedImageIds.contains(image.id)) {
+          continue;
+        }
+        drafts.add(LocalOperationDraft(
+          kind: OperationKind.objectMove,
+          pageId: oldObjects[image.id]!,
+          objectId: image.id,
+          payload: {'toPageId': page.id, 'sortIndex': index},
+        ));
+        final current = staged[page.id]!;
+        final nextImages = List<ImageBlock>.from(current.imageBlocks);
+        nextImages.insert(
+          index.clamp(0, nextImages.length).toInt(),
+          oldImages[image.id]!,
+        );
+        staged[page.id] = current.copyWith(imageBlocks: nextImages);
       }
     }
 
@@ -196,7 +244,7 @@ class EditorV2OperationWriter {
         // Re-state the final order using stable IDs, without recreation.
         for (var index = 0; index < page.inkStrokes.length; index++) {
           final stroke = page.inkStrokes[index];
-          if (movedIds.contains(stroke.id) ||
+          if (movedInkIds.contains(stroke.id) ||
               drafts.any(
                 (draft) =>
                     draft.pageId == page.id &&
@@ -209,6 +257,26 @@ class EditorV2OperationWriter {
             kind: OperationKind.objectReorder,
             pageId: page.id,
             objectId: stroke.id,
+            payload: {
+              'properties': {'sortIndex': index},
+            },
+          ));
+        }
+        for (var index = 0; index < page.imageBlocks.length; index++) {
+          final image = page.imageBlocks[index];
+          if (movedImageIds.contains(image.id) ||
+              drafts.any((draft) =>
+                  draft.pageId == page.id &&
+                  draft.objectId == image.id &&
+                  draft.kind == OperationKind.objectSet &&
+                  (draft.payload['properties'] as Map)
+                      .containsKey('sortIndex'))) {
+            continue;
+          }
+          drafts.add(LocalOperationDraft(
+            kind: OperationKind.objectSet,
+            pageId: page.id,
+            objectId: image.id,
             payload: {
               'properties': {'sortIndex': index},
             },
