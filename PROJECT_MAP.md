@@ -1359,8 +1359,9 @@ wymaga ukończonego, zweryfikowanego uploadu (asset.attach przed
 text.insert, asset.detach dopiero po usunięciu referencji). Wymiana
 obrazu/PDF wymaga nowego asset ID oraz starego ID z trwałej projekcji;
 generuje attach → object.set → detach, nigdy ścieżkę lokalną.
-Aktualizacja tekstu nadal wymaga trwałych atomów CRDT i rebase.
-Most nie jest podłączony do produkcyjnego `EditorController`.
+Aktualizacja tekstu wymaga trwałych atomów CRDT; niezmieniony blok
+Quill można przenieść między stronami bez zmiany ID i utraty historii.
+Most nie jest podłączony do produkcyjnego `AppScope`.
 Regresje: `test/editor_operation_bridge_test.dart` oraz batch/rollback
 w `test/sync_engine_test.dart`.
 
@@ -1385,9 +1386,9 @@ Po restarcie `EditorSqliteProjector.prepareRemoteMedia`
 odtwarza receipt z trwałego dziennika i pobiera nowy asset przed
 `object.set(assetId)`; `SyncEngine` wywołuje prefetch także dla
 zdalnych podmian. Produkcyjny AppScope nadal nie przekazuje gateway.
-Przenoszenie tekstu nadal zablokowane;
-odrzuca zmianę
-kolejności stron oraz edycję z nieaktualnym Delta Quill.
+Przenoszenie tekstu bez embedów zachowuje CRDT i sortIndex;
+odrzuca jednoczesną zmianę treści przy przenoszeniu, zmianę kolejności
+stron oraz edycję z nieaktualnym Delta Quill.
 Adapter przyjmuje też mapę `verifiedAssets` dla tworzenia
 obrazów/PDF po przygotowaniu bajtów. `registerVerifiedAsset`
 przechowuje receipt do udanego commita, co pozwala kontrolerowi
@@ -1396,13 +1397,18 @@ Jest podłączony jako opt-in
 do `EditorController`, ale nie jest aktywowany przez produkcyjny
 `AppScope`. W trybie v2
 Undo/Redo jest celowo wyłączone do czasu inverse intents i remint ID.
-Nie wspiera pełnego transferu assetów ani zdalnego rebase.
+W trybie opt-in i przy skonfigurowanym `OperationAssetGateway` automatycznie
+przesyła obrazy/PDF i odkłada zweryfikowane bajty przed transakcją; zły
+receipt oraz zmiana bajtów po uploadzie blokują commit. Brak gateway
+nadal kończy się bezpieczną odmową. Nie wspiera Quill embedów, pełnego
+zdalnego rebase ani Undo/Redo.
 Usuwanie zweryfikowanego obrazu lub tekstu z embedem Quill usuwa
 scoped asset references razem z obiektem w transakcji SQLite;
 nie usuwa fizycznych plików i odmawia usunięcia brakującego assetu.
 `page.delete` może usuwać powiązane obrazy/Quill wraz z referencjami
 w jednej transakcji; osierocone i legacy referencje są blokowane.
-Test: `test/editor_v2_operation_writer_test.dart`.
+Test: `test/editor_v2_operation_writer_test.dart` (m.in. automatyczny
+upload, odrzucenie starego receipt i przenoszenie Quill między stronami).
 
 ### `lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart`
 
@@ -2815,5 +2821,6 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - Backend kanoniczny: `NaNotateczki-serwer/api/app/asset_store.py`,
   `routers/assets.py`, `operation_projection.py` oraz
   `migrations/0014_verified_assets.sql`. Katalog `server/` to lustro.
-- Te klasy nie są jeszcze writerem `EditorController`, czego dotyczy
-  etap 3; brak automatycznego cutover i pełnego E2E.
+- `EditorController` może używać opt-in writera v2. Zwykły
+  `AppScope` nadal go nie instaluje. Brak pełnego Undo/Redo, projekcji
+  osadzonych plików Quill, cutover i E2E; etap 3 pozostaje częściowy.
