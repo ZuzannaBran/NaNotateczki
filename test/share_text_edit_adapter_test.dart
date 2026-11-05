@@ -9,19 +9,40 @@ Map<String, dynamic> applyPlan(
   List<ShareTextIntent> plan,
 ) {
   var state = initial;
+  // Each fixture batch occurs after all earlier inserts and formatting.
+  // Reusing clock 100 across calls makes undo nondeterministic.
+  var nextClock = 1;
+  for (final value in initial.values) {
+    if (value is! Map) {
+      continue;
+    }
+    final ranks = <Object?>[
+      value['order'],
+      if (value['attributeVersions'] is Map)
+        ...(value['attributeVersions'] as Map).values,
+    ];
+    for (final rank in ranks) {
+      if (rank is List &&
+          rank.isNotEmpty &&
+          rank.first is int &&
+          (rank.first as int) >= nextClock) {
+        nextClock = (rank.first as int) + 1;
+      }
+    }
+  }
   for (var index = 0; index < plan.length; index++) {
     final intent = plan[index];
     final op = OperationEnvelope(
       operationId: const Uuid().v4(),
       actorId: 'local-guest',
-      actorSeq: index + 1,
+      actorSeq: nextClock + index,
       documentId: 'doc',
       pageId: 'page',
       objectId: 'text',
       kind: intent.kind,
       payload: intent.payload,
       dependencies: const [],
-      logicalClock: index + 100,
+      logicalClock: nextClock + index,
     );
     op.validateForV2Projection();
     state = OperationTextSequence.apply(state, op);

@@ -619,7 +619,7 @@ void main() {
 
     final upgraded = NotesDatabase(NativeDatabase(file));
     final upgradedStore = OperationStore(upgraded);
-    expect(upgraded.schemaVersion, 6);
+    expect(upgraded.schemaVersion, 7);
     expect(
       (await upgradedStore.pending()).single.operationId,
       original.operationId,
@@ -702,7 +702,7 @@ void main() {
         ),
         isFalse,
       );
-      expect(upgraded.schemaVersion, 6);
+      expect(upgraded.schemaVersion, 7);
     } finally {
       await upgraded.close();
     }
@@ -732,6 +732,7 @@ void main() {
         'sync_checkpoints',
         'document_snapshots',
         'asset_references',
+        'operation_asset_bytes',
         'operation_actor_state',
         'operations',
       ]) {
@@ -758,7 +759,7 @@ void main() {
           )
           .getSingle();
       expect(operations.read<String>('name'), 'operations');
-      expect(upgraded.schemaVersion, 6);
+      expect(upgraded.schemaVersion, 7);
     } finally {
       await upgraded.close();
     }

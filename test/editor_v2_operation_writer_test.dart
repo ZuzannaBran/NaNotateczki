@@ -28,6 +28,8 @@ import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
 
+import 'support/native_test_documents.dart';
+
 class _OfflineGateway implements OperationGateway {
   @override
   Future<List<OperationReceipt>> send(
@@ -43,6 +45,7 @@ class _OfflineGateway implements OperationGateway {
 }
 
 void main() {
+  useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late NotesDatabase database;
@@ -217,9 +220,10 @@ void main() {
       before: notebook,
       after: after,
     );
+    // Destination pages must be created before later object/page edits.
     expect(ops.map((operation) => operation.kind), [
-      OperationKind.strokeCreate,
       OperationKind.pageCreate,
+      OperationKind.strokeCreate,
     ]);
     expect(ops[1].dependencies, contains(ops[0].operationId));
     final saved = (await repository.getNotebook(notebook.uid))!;
@@ -830,8 +834,7 @@ void main() {
       objectId: image.id,
       assetId: 'asset-verified',
       storagePath: 'assets/asset-verified',
-      checksumSha256:
-          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      checksumSha256: crypto.sha256.convert(image.bytes!).toString(),
       byteLength: 4,
     );
     final persisted = (await repository.getNotebook(notebook.uid))!;

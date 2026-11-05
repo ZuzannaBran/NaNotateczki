@@ -127,3 +127,14 @@ brakujących `dependencies` w `OperationEnvelope`, kolizji
 `isNotNull` oraz niepoprawnym `const` w teście projekcji.
 Naprawy wprowadzono w `3c5d494`; wynik ponownej analizy i testów
 wymaga rzeczywistego przebiegu CI. Nie odblokowuje to migracji v2.
+
+## Regresje po pierwszym pełnym zestawie testów (2026-11-05)
+
+Analiza Darta przeszła w przebiegu `42069076051`; zestaw testów
+zgłosił siedem niepowodzeń. Skorygowano test konstrukcji stron
+(wymagane `page.create` przed dalszymi mutacjami), skonfigurowano
+izolowany katalog dla obrazu, zastąpiono nieprawdziwy checksum
+obliczeniem SHA-256, zaktualizowano oczekiwania migracji do SQLite v7,
+a pomocniczy generator zdarzeń tekstowych testuje Undo z monotonicznym
+zegarem. W teście synchronizacji uwzględniono także echo dwóch lokalnych
+operacji, stąd checkpoint 3. Ponowny wynik CI pozostaje do weryfikacji.

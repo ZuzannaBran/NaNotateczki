@@ -787,7 +787,10 @@ void main() {
     expect(downloaded, 0);
     expect(applied, 0);
     expect(await store.operation(stale.operationId), isNotNull);
-    expect(await store.checkpoint('user-A-v2'), 1);
+    // The gateway also accepts and echoes two queued local tombstone edits.
+    // The third feed row is the stale remote media operation.
+    expect(gateway.accepted, hasLength(3));
+    expect(await store.checkpoint('user-A-v2'), 3);
   });
 
   test('a replayed remote operation notifies the editor once', () async {
