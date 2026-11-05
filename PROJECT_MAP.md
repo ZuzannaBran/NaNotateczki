@@ -447,7 +447,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/editor_sqlite_projector.dart`:
   `EditorSqliteProjector.apply` mutuje w tej samej transakcji istniejące
   tabele Drift. Obsługuje create/set/delete stron (z ochroną ostatniej)
-  i ink (create/style/transform/reorder/delete), tekstowe object.create,
+  i ink (create/style/transform/reorder/delete oraz ink object.move
+  między stronami z zachowaniem ID), tekstowe object.create,
   geometrię, plain-text Quill CRDT insert/delete/format oraz usunięcia
   bloków tekstowych. Rzutowanie atomów korzysta z `OperationStore.textAtoms`.
   Nie wspiera jeszcze obrazów/PDF, embedów, document.create, object.move,
@@ -1334,13 +1335,26 @@ tożsamość instancji bazy dziennika i projekcji, pobiera trwałe atomy
 tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 `writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`
 oraz `writeNotebookChange` — atomowy wsad wielostronicowy.
-Odrzuca przenoszenie obiektu między stronami bez `object.move`,
-zmianę kolejności stron oraz edycję z nieaktualnym Delta Quill.
+Przenoszenie niezmienionej kreski między stronami używa `object.move`,
+zachowuje ID i naprawia indeksy sortowania na obu stronach.
+Przenoszenie tekstu i obrazu pozostaje zablokowane; odrzuca zmianę
+kolejności stron oraz edycję z nieaktualnym Delta Quill.
 Adapter jest podłączony jako opt-in do `EditorController`, ale
 nie jest aktywowany przez produkcyjny `AppScope`. W trybie v2
 Undo/Redo jest celowo wyłączone do czasu inverse intents i remint ID.
 Nie wspiera pełnego transferu assetów ani zdalnego rebase.
 Test: `test/editor_v2_operation_writer_test.dart`.
+
+### `lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart`
+
+`EditorV2RemotePatchDispatcher.onRemoteCommitted` odbiera tylko
+operację uprzednio zatwierdzoną w SQLite przez `SyncEngine`. Pobiera
+aktualny obiekt/stronę z repozytorium i aktualizuje wskazany fragment
+`EditorController`, bez snapshotowego odmalowywania całego notatnika.
+Dla `object.move` usuwa źródłowy obiekt z widoku i dodaje go w celu.
+Aktywny gest lub niezapisana zmiana blokuje callback — `SyncEngine`
+ponawia dostarczenie; brak przełączenia `AppScope` na v2.
+Test: `test/editor_v2_remote_patch_dispatcher_test.dart`.
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
 
@@ -1372,6 +1386,8 @@ zgodą na zamknięcie aplikacji. Opcjonalny `operationWriter` kieruje
 zapis wyłącznie do v2 z serializacją zmian i utrwaloną bazą stanu;
 `NotebookRepository` blokuje wtedy legacy snapshot writery na tym UID.
 Undo/Redo w trybie v2 pozostaje zablokowane, aby nie odtworzyć tombstone.
+`applyConfirmedV2PagePatch` wprowadza zdalną stronę bez remountu,
+nie zmieniając zoomu i aktualnego wyboru strony.
 Regresja: `test/editor_controller_v2_test.dart`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
