@@ -43,6 +43,7 @@ class EditorV2OperationWriter {
   Future<List<OperationEnvelope>> writeNotebookChange({
     required Notebook before,
     required Notebook after,
+    Map<String, VerifiedEditorAsset> verifiedAssets = const {},
   }) async {
     if (before.uid != after.uid ||
         before.kind != after.kind ||
@@ -238,6 +239,7 @@ class EditorV2OperationWriter {
         before: baseline,
         after: page,
         textAtomsById: atoms,
+        verifiedAssets: verifiedAssets,
       ));
       if (touchedPages.contains(page.id)) {
         // A move can shift the old sortIndex of an untouched stroke.
@@ -297,6 +299,7 @@ class EditorV2OperationWriter {
     required EditorAction action,
     required NotePage before,
     required NotePage after,
+    Map<String, VerifiedEditorAsset> verifiedAssets = const {},
   }) async {
     final atoms = await _textAtoms(
       documentId: documentId,
@@ -308,6 +311,7 @@ class EditorV2OperationWriter {
       before: before,
       after: after,
       textAtomsById: atoms,
+      verifiedAssets: verifiedAssets,
     );
     return _commit(documentId, drafts);
   }
@@ -317,6 +321,7 @@ class EditorV2OperationWriter {
     required String documentId,
     required NotePage before,
     required NotePage after,
+    Map<String, VerifiedEditorAsset> verifiedAssets = const {},
   }) async {
     final atoms = await _textAtoms(
       documentId: documentId,
@@ -327,6 +332,7 @@ class EditorV2OperationWriter {
       before: before,
       after: after,
       textAtomsById: atoms,
+      verifiedAssets: verifiedAssets,
     );
     return _commit(documentId, drafts);
   }
@@ -334,7 +340,11 @@ class EditorV2OperationWriter {
   Future<List<OperationEnvelope>> writeCreatePage({
     required String documentId,
     required NotePage page,
-  }) => _commit(documentId, _bridge.planCreatePage(page));
+    Map<String, VerifiedEditorAsset> verifiedAssets = const {},
+  }) => _commit(
+    documentId,
+    _bridge.planCreatePage(page, verifiedAssets: verifiedAssets),
+  );
 
   Future<List<OperationEnvelope>> writeDeletePage({
     required String documentId,
