@@ -52,6 +52,8 @@ class EditorSqliteProjector {
         } else {
           await _updateStroke(operation);
         }
+      case OperationKind.objectMove:
+        await _moveStroke(operation);
       case OperationKind.objectTransform:
       case OperationKind.objectReorder:
         await _updateStroke(operation);
@@ -281,6 +283,57 @@ class EditorSqliteProjector {
         _pointsJson(fields['points'] as List),
         index,
       ],
+    );
+  }
+
+  /// Moves a stroke without deleting and recreating its stable identity.
+  ///
+  /// Text moves require CRDT history to follow the object across page IDs;
+  /// image moves require verified asset-reference relocation. Both remain
+  /// explicitly unsupported until those reducers are complete.
+  Future<void> _moveStroke(OperationEnvelope op) async {
+    final sourceId = op.pageId!;
+    final destinationId = op.payload['toPageId'] as String;
+    final index = _index(op.payload['sortIndex']);
+    await _pageExists(op, sourceId);
+    await _pageExists(op, destinationId);
+    if (await _store.isTombstoned(
+      op.documentId,
+      'page',
+      destinationId,
+    )) {
+      throw StateError('Destination page has been tombstoned.');
+    }
+    final existing = await _row(
+      'SELECT uid FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
+      [Variable<String>(op.objectId!), Variable<String>(sourceId)],
+    );
+    if (existing == null) {
+      throw UnsupportedError(
+        'Only unchanged ink objects can move between pages in v2.',
+      );
+    }
+    final shadow = await _row(
+      'SELECT uid FROM text_block_rows WHERE uid = ? '
+      'UNION ALL SELECT uid FROM image_block_rows WHERE uid = ? LIMIT 1',
+      [Variable<String>(op.objectId!), Variable<String>(op.objectId!)],
+    );
+    if (shadow != null) {
+      throw StateError('Ambiguous cross-layer identity cannot move.');
+    }
+    final sourceAssetKey = 'page:${jsonEncode([sourceId, op.objectId])}';
+    final linkedAsset = await _row(
+      'SELECT asset_id FROM asset_references '
+      'WHERE document_id = ? AND object_id = ? LIMIT 1',
+      [Variable<String>(op.documentId), Variable<String>(sourceAssetKey)],
+    );
+    if (linkedAsset != null) {
+      throw UnsupportedError('Asset-bearing objects require a move reducer.');
+    }
+    await database.customStatement(
+      'UPDATE ink_stroke_rows SET page_uid = ?, sort_index = ? '
+      'WHERE uid = ? AND page_uid = ?',
+      [destinationId, index, op.objectId, sourceId],
     );
   }
 
