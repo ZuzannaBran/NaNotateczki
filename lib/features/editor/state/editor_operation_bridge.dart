@@ -91,20 +91,24 @@ class EditorOperationBridge {
         'isBookmarked': after.isBookmarked,
     };
     if (pageProperties.isNotEmpty) {
-      result.add(LocalOperationDraft(
-        kind: OperationKind.pageSet,
-        objectId: after.id,
-        payload: {'properties': pageProperties},
-      ));
+      result.add(
+        LocalOperationDraft(
+          kind: OperationKind.pageSet,
+          objectId: after.id,
+          payload: {'properties': pageProperties},
+        ),
+      );
     }
 
     for (final intent in _ink.plan(before: before, after: after)) {
-      result.add(LocalOperationDraft(
-        kind: intent.kind,
-        pageId: intent.pageId,
-        objectId: intent.objectId,
-        payload: intent.payload,
-      ));
+      result.add(
+        LocalOperationDraft(
+          kind: intent.kind,
+          pageId: intent.pageId,
+          objectId: intent.objectId,
+          payload: intent.payload,
+        ),
+      );
     }
 
     final oldTexts = _index(before.textBlocks, (TextBlock b) => b.id);
@@ -119,17 +123,18 @@ class EditorOperationBridge {
       final old = oldTexts[block.id];
       final geometry = _textGeometry(block, entry.key);
       if (old == null) {
-        result.add(_create(after.id, block.id, {
-          'objectType': 'text',
-          ...geometry,
-        }));
-        result.addAll(_attachQuillEmbeds(
-          pageId: after.id,
-          objectId: block.id,
-          beforeDelta: null,
-          afterDelta: block.deltaJson,
-          verifiedAssets: verifiedAssets,
-        ));
+        result.add(
+          _create(after.id, block.id, {'objectType': 'text', ...geometry}),
+        );
+        result.addAll(
+          _attachQuillEmbeds(
+            pageId: after.id,
+            objectId: block.id,
+            beforeDelta: null,
+            afterDelta: block.deltaJson,
+            verifiedAssets: verifiedAssets,
+          ),
+        );
         for (final intent in _text.plan(
           atoms: const {},
           newText: block.text,
@@ -156,13 +161,15 @@ class EditorOperationBridge {
                 atomText.trimRight() != old.text)) {
           throw StateError('Stale text atom projection cannot be edited.');
         }
-        result.addAll(_attachQuillEmbeds(
-          pageId: after.id,
-          objectId: block.id,
-          beforeDelta: old.deltaJson,
-          afterDelta: block.deltaJson,
-          verifiedAssets: verifiedAssets,
-        ));
+        result.addAll(
+          _attachQuillEmbeds(
+            pageId: after.id,
+            objectId: block.id,
+            beforeDelta: old.deltaJson,
+            afterDelta: block.deltaJson,
+            verifiedAssets: verifiedAssets,
+          ),
+        );
         for (final intent in _text.plan(
           atoms: atoms,
           newText: block.text,
@@ -170,12 +177,14 @@ class EditorOperationBridge {
         )) {
           result.add(_textIntent(after.id, block.id, intent));
         }
-        result.addAll(_detachUnusedQuillEmbeds(
-          pageId: after.id,
-          objectId: block.id,
-          beforeDelta: old.deltaJson,
-          afterDelta: block.deltaJson,
-        ));
+        result.addAll(
+          _detachUnusedQuillEmbeds(
+            pageId: after.id,
+            objectId: block.id,
+            beforeDelta: old.deltaJson,
+            afterDelta: block.deltaJson,
+          ),
+        );
       }
     }
 
@@ -196,17 +205,21 @@ class EditorOperationBridge {
           throw StateError('Image/PDF must be uploaded and verified first.');
         }
         _validateImageAsset(image, asset);
-        result.add(_create(after.id, image.id, {
-          'objectType': 'image',
-          'assetId': asset.assetId,
-          ...geometry,
-        }));
-        result.add(LocalOperationDraft(
-          kind: OperationKind.assetAttach,
-          pageId: after.id,
-          objectId: image.id,
-          payload: asset.attachPayload,
-        ));
+        result.add(
+          _create(after.id, image.id, {
+            'objectType': 'image',
+            'assetId': asset.assetId,
+            ...geometry,
+          }),
+        );
+        result.add(
+          LocalOperationDraft(
+            kind: OperationKind.assetAttach,
+            pageId: after.id,
+            objectId: image.id,
+            payload: asset.attachPayload,
+          ),
+        );
         continue;
       }
       final oldIndex = before.imageBlocks.indexWhere((b) => b.id == image.id);
@@ -229,20 +242,24 @@ class EditorOperationBridge {
           pageId: after.id,
           objectId: image.id,
         );
-        result.add(LocalOperationDraft(
-          kind: OperationKind.assetAttach,
-          pageId: after.id,
-          objectId: image.id,
-          payload: asset.attachPayload,
-        ));
+        result.add(
+          LocalOperationDraft(
+            kind: OperationKind.assetAttach,
+            pageId: after.id,
+            objectId: image.id,
+            payload: asset.attachPayload,
+          ),
+        );
         changed['assetId'] = asset.assetId;
         result.add(_set(after.id, image.id, changed));
-        result.add(LocalOperationDraft(
-          kind: OperationKind.assetDetach,
-          pageId: after.id,
-          objectId: image.id,
-          payload: {'assetId': previousId},
-        ));
+        result.add(
+          LocalOperationDraft(
+            kind: OperationKind.assetDetach,
+            pageId: after.id,
+            objectId: image.id,
+            payload: {'assetId': previousId},
+          ),
+        );
       } else if (changed.isNotEmpty) {
         result.add(_set(after.id, image.id, changed));
       }
@@ -267,10 +284,7 @@ class EditorOperationBridge {
         kind: OperationKind.pageCreate,
         objectId: page.id,
         payload: {
-          'value': {
-            'title': page.title,
-            'isBookmarked': page.isBookmarked,
-          },
+          'value': {'title': page.title, 'isBookmarked': page.isBookmarked},
         },
       ),
       ...planPageChange(
@@ -308,13 +322,9 @@ class EditorOperationBridge {
         kind: OperationKind.objectMove,
         pageId: action.fromPageId,
         objectId: action.before.id,
-        payload: {
-          'toPageId': action.toPageId,
-          'sortIndex': targetIndex,
-        },
+        payload: {'toPageId': action.toPageId, 'sortIndex': targetIndex},
       ),
-      if (changed.isNotEmpty)
-        _set(action.toPageId, action.before.id, changed),
+      if (changed.isNotEmpty) _set(action.toPageId, action.before.id, changed),
     ];
   }
 
@@ -343,18 +353,23 @@ class EditorOperationBridge {
       }
       final isImage = entry.value == 'image';
       if (isImage
-          ? !const {'image/png', 'image/jpeg', 'image/webp'}
-              .contains(asset.mediaType)
+          ? !const {
+              'image/png',
+              'image/jpeg',
+              'image/webp',
+            }.contains(asset.mediaType)
           : asset.mediaType != 'application/pdf') {
         throw StateError('Quill embed media type does not match the asset.');
       }
       _validateAsset(asset, pageId: pageId, objectId: objectId);
-      drafts.add(LocalOperationDraft(
-        kind: OperationKind.assetAttach,
-        pageId: pageId,
-        objectId: objectId,
-        payload: asset.attachPayload,
-      ));
+      drafts.add(
+        LocalOperationDraft(
+          kind: OperationKind.assetAttach,
+          pageId: pageId,
+          objectId: objectId,
+          payload: asset.attachPayload,
+        ),
+      );
     }
     return drafts;
   }
@@ -421,10 +436,7 @@ class EditorOperationBridge {
     );
   }
 
-  static void _validateImageAsset(
-    ImageBlock image,
-    VerifiedEditorAsset asset,
-  ) {
+  static void _validateImageAsset(ImageBlock image, VerifiedEditorAsset asset) {
     if (image.imageMime != null && image.imageMime != asset.mediaType) {
       throw StateError('Image/PDF MIME differs from the verified upload.');
     }
@@ -479,10 +491,7 @@ class EditorOperationBridge {
     }
   }
 
-  static Map<String, T> _index<T>(
-    List<T> items,
-    String Function(T item) idOf,
-  ) {
+  static Map<String, T> _index<T>(List<T> items, String Function(T item) idOf) {
     final indexed = <String, T>{};
     for (final item in items) {
       final id = idOf(item);

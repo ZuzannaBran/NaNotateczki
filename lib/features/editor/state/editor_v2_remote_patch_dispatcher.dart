@@ -168,10 +168,10 @@ class EditorV2RemotePatchDispatcher {
       sortIndex: ink.isNotEmpty
           ? ink.single.index
           : text.isNotEmpty
-              ? text.single.index
-              : images.isNotEmpty
-                  ? images.single.index
-                  : null,
+          ? text.single.index
+          : images.isNotEmpty
+          ? images.single.index
+          : null,
     );
     if (!applied) {
       throw StateError('Committed object patch was deferred.');

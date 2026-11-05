@@ -79,10 +79,7 @@ class EditorV2OperationWriter {
   Map<String, VerifiedEditorAsset> _assetsFor(
     String documentId,
     Map<String, VerifiedEditorAsset> explicit,
-  ) => {
-    ...?_registeredAssets[documentId],
-    ...explicit,
-  };
+  ) => {...?_registeredAssets[documentId], ...explicit};
 
   /// Stages new or replaced image bytes before opening the SQLite batch.
   ///
@@ -111,7 +108,8 @@ class EditorV2OperationWriter {
             const ListEquality<int>().equals(old.bytes, image.bytes)) {
           continue;
         }
-        final verified = verifiedAssets[image.id] ??
+        final verified =
+            verifiedAssets[image.id] ??
             _registeredAssets[documentId]?[image.id];
         if (verified != null) {
           // A retry must never commit the receipt of an older image edit.
@@ -119,7 +117,8 @@ class EditorV2OperationWriter {
               image.imageMime != verified.mediaType) {
             throw StateError('The verified media type has changed.');
           }
-          final localBytes = image.bytes ??
+          final localBytes =
+              image.bytes ??
               (image.path.isEmpty || kIsWeb
                   ? null
                   : await File(image.path).readAsBytes());
@@ -137,9 +136,10 @@ class EditorV2OperationWriter {
           // The bridge will reject this edit without touching SQLite.
           continue;
         }
-        final extension =
-            (image.imageExt ?? image.path.split('.').last).toLowerCase();
-        final mime = image.imageMime ??
+        final extension = (image.imageExt ?? image.path.split('.').last)
+            .toLowerCase();
+        final mime =
+            image.imageMime ??
             switch (extension) {
               'png' => 'image/png',
               'jpg' || 'jpeg' => 'image/jpeg',
@@ -150,7 +150,8 @@ class EditorV2OperationWriter {
         if (!OperationAssetGateway.supportedMimeTypes.contains(mime)) {
           throw UnsupportedError('Unsupported v2 image/PDF media type.');
         }
-        final bytes = image.bytes ??
+        final bytes =
+            image.bytes ??
             (kIsWeb || image.path.isEmpty
                 ? (throw StateError('Missing image bytes for v2 upload.'))
                 : await File(image.path).readAsBytes());
@@ -219,10 +220,7 @@ class EditorV2OperationWriter {
   Future<List<OperationEnvelope>> writeDeleteNotebook({
     required String documentId,
   }) => _commit(documentId, [
-    LocalOperationDraft(
-      kind: OperationKind.documentDelete,
-      payload: const {},
-    ),
+    LocalOperationDraft(kind: OperationKind.documentDelete, payload: const {}),
   ]);
 
   /// Commits a multi-page gesture and stable-ID ink moves in one batch.
@@ -327,7 +325,8 @@ class EditorV2OperationWriter {
       }
       final from = oldInk[entry.key];
       final to = newInk[entry.key];
-      if (from != null && to != null &&
+      if (from != null &&
+          to != null &&
           from.color.toARGB32() == to.color.toARGB32() &&
           from.width == to.width &&
           from.tool == to.tool &&
@@ -355,15 +354,13 @@ class EditorV2OperationWriter {
       } else {
         final oldImage = oldImages[entry.key];
         final newImage = newImages[entry.key];
-        if (oldImage == null || newImage == null ||
+        if (oldImage == null ||
+            newImage == null ||
             oldImage.path != newImage.path ||
             oldImage.ocrText != newImage.ocrText ||
             oldImage.imageMime != newImage.imageMime ||
             oldImage.imageExt != newImage.imageExt ||
-            !const ListEquality<int>().equals(
-              oldImage.bytes,
-              newImage.bytes,
-            )) {
+            !const ListEquality<int>().equals(oldImage.bytes, newImage.bytes)) {
           throw UnsupportedError(
             'Cross-page moves require unchanged ink, text or image assets.',
           );
@@ -424,12 +421,14 @@ class EditorV2OperationWriter {
           continue;
         }
         final origin = oldObjects[stroke.id]!;
-        drafts.add(LocalOperationDraft(
-          kind: OperationKind.objectMove,
-          pageId: origin,
-          objectId: stroke.id,
-          payload: {'toPageId': page.id, 'sortIndex': index},
-        ));
+        drafts.add(
+          LocalOperationDraft(
+            kind: OperationKind.objectMove,
+            pageId: origin,
+            objectId: stroke.id,
+            payload: {'toPageId': page.id, 'sortIndex': index},
+          ),
+        );
         final current = staged[page.id]!;
         final nextInk = List<InkStroke>.from(current.inkStrokes);
         nextInk.insert(index.clamp(0, nextInk.length).toInt(), stroke);
@@ -440,12 +439,14 @@ class EditorV2OperationWriter {
         if (!movedTextIds.contains(block.id)) {
           continue;
         }
-        drafts.add(LocalOperationDraft(
-          kind: OperationKind.objectMove,
-          pageId: oldObjects[block.id]!,
-          objectId: block.id,
-          payload: {'toPageId': page.id, 'sortIndex': index},
-        ));
+        drafts.add(
+          LocalOperationDraft(
+            kind: OperationKind.objectMove,
+            pageId: oldObjects[block.id]!,
+            objectId: block.id,
+            payload: {'toPageId': page.id, 'sortIndex': index},
+          ),
+        );
         final current = staged[page.id]!;
         final nextTexts = List<TextBlock>.from(current.textBlocks);
         nextTexts.insert(
@@ -459,12 +460,14 @@ class EditorV2OperationWriter {
         if (!movedImageIds.contains(image.id)) {
           continue;
         }
-        drafts.add(LocalOperationDraft(
-          kind: OperationKind.objectMove,
-          pageId: oldObjects[image.id]!,
-          objectId: image.id,
-          payload: {'toPageId': page.id, 'sortIndex': index},
-        ));
+        drafts.add(
+          LocalOperationDraft(
+            kind: OperationKind.objectMove,
+            pageId: oldObjects[image.id]!,
+            objectId: image.id,
+            payload: {'toPageId': page.id, 'sortIndex': index},
+          ),
+        );
         final current = staged[page.id]!;
         final nextImages = List<ImageBlock>.from(current.imageBlocks);
         nextImages.insert(
@@ -482,17 +485,19 @@ class EditorV2OperationWriter {
         before: baseline,
         after: page,
       );
-      drafts.addAll(_bridge.planPageChange(
-        before: baseline,
-        after: page,
-        textAtomsById: atoms,
-        verifiedAssets: _assetsFor(after.uid, verifiedAssets),
-        existingAssetIds: await _existingImageAssets(
-          documentId: after.uid,
+      drafts.addAll(
+        _bridge.planPageChange(
           before: baseline,
           after: page,
+          textAtomsById: atoms,
+          verifiedAssets: _assetsFor(after.uid, verifiedAssets),
+          existingAssetIds: await _existingImageAssets(
+            documentId: after.uid,
+            before: baseline,
+            after: page,
+          ),
         ),
-      ));
+      );
       if (touchedPages.contains(page.id)) {
         // A move can shift the old sortIndex of an untouched stroke.
         // Re-state the final order using stable IDs, without recreation.
@@ -507,54 +512,66 @@ class EditorV2OperationWriter {
               )) {
             continue;
           }
-          drafts.add(LocalOperationDraft(
-            kind: OperationKind.objectReorder,
-            pageId: page.id,
-            objectId: stroke.id,
-            payload: {
-              'properties': {'sortIndex': index},
-            },
-          ));
+          drafts.add(
+            LocalOperationDraft(
+              kind: OperationKind.objectReorder,
+              pageId: page.id,
+              objectId: stroke.id,
+              payload: {
+                'properties': {'sortIndex': index},
+              },
+            ),
+          );
         }
         for (var index = 0; index < page.textBlocks.length; index++) {
           final block = page.textBlocks[index];
           if (movedTextIds.contains(block.id) ||
-              drafts.any((draft) =>
-                  draft.pageId == page.id &&
-                  draft.objectId == block.id &&
-                  draft.kind == OperationKind.objectSet &&
-                  (draft.payload['properties'] as Map)
-                      .containsKey('sortIndex'))) {
+              drafts.any(
+                (draft) =>
+                    draft.pageId == page.id &&
+                    draft.objectId == block.id &&
+                    draft.kind == OperationKind.objectSet &&
+                    (draft.payload['properties'] as Map).containsKey(
+                      'sortIndex',
+                    ),
+              )) {
             continue;
           }
-          drafts.add(LocalOperationDraft(
-            kind: OperationKind.objectSet,
-            pageId: page.id,
-            objectId: block.id,
-            payload: {
-              'properties': {'sortIndex': index},
-            },
-          ));
+          drafts.add(
+            LocalOperationDraft(
+              kind: OperationKind.objectSet,
+              pageId: page.id,
+              objectId: block.id,
+              payload: {
+                'properties': {'sortIndex': index},
+              },
+            ),
+          );
         }
         for (var index = 0; index < page.imageBlocks.length; index++) {
           final image = page.imageBlocks[index];
           if (movedImageIds.contains(image.id) ||
-              drafts.any((draft) =>
-                  draft.pageId == page.id &&
-                  draft.objectId == image.id &&
-                  draft.kind == OperationKind.objectSet &&
-                  (draft.payload['properties'] as Map)
-                      .containsKey('sortIndex'))) {
+              drafts.any(
+                (draft) =>
+                    draft.pageId == page.id &&
+                    draft.objectId == image.id &&
+                    draft.kind == OperationKind.objectSet &&
+                    (draft.payload['properties'] as Map).containsKey(
+                      'sortIndex',
+                    ),
+              )) {
             continue;
           }
-          drafts.add(LocalOperationDraft(
-            kind: OperationKind.objectSet,
-            pageId: page.id,
-            objectId: image.id,
-            payload: {
-              'properties': {'sortIndex': index},
-            },
-          ));
+          drafts.add(
+            LocalOperationDraft(
+              kind: OperationKind.objectSet,
+              pageId: page.id,
+              objectId: image.id,
+              payload: {
+                'properties': {'sortIndex': index},
+              },
+            ),
+          );
         }
       }
     }
@@ -571,9 +588,7 @@ class EditorV2OperationWriter {
     required NotePage before,
     required NotePage after,
   }) async {
-    final previous = {
-      for (final image in before.imageBlocks) image.id: image,
-    };
+    final previous = {for (final image in before.imageBlocks) image.id: image};
     final result = <String, String>{};
     for (final next in after.imageBlocks) {
       final old = previous[next.id];
@@ -723,9 +738,7 @@ class EditorV2OperationWriter {
     required NotePage before,
     required NotePage after,
   }) async {
-    final latest = {
-      for (final text in after.textBlocks) text.id: text,
-    };
+    final latest = {for (final text in after.textBlocks) text.id: text};
     final result = <String, Map<String, dynamic>>{};
     for (final old in before.textBlocks) {
       final changed = latest[old.id];

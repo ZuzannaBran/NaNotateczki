@@ -206,14 +206,10 @@ class EditorController extends ChangeNotifier {
 
   bool get canUndo => operationWriter == null
       ? _undoActions.isNotEmpty
-      : _v2Undo.isNotEmpty ||
-          _fullSavePending ||
-          _dirtyPageIds.isNotEmpty;
+      : _v2Undo.isNotEmpty || _fullSavePending || _dirtyPageIds.isNotEmpty;
   bool get canRedo => operationWriter == null
       ? _redoActions.isNotEmpty
-      : _v2Redo.isNotEmpty &&
-          !_fullSavePending &&
-          _dirtyPageIds.isEmpty;
+      : _v2Redo.isNotEmpty && !_fullSavePending && _dirtyPageIds.isEmpty;
   bool get allowsFingerDrawing => pointerInputMode.allowsFingerDrawing;
   bool get isObjectTransformActive => _isObjectTransformActive;
   bool get isActiveImageEdit =>
@@ -492,7 +488,8 @@ class EditorController extends ChangeNotifier {
         if (entry.id != objectId) entry,
     ];
     if (text != null) {
-      final index = sortIndex ??
+      final index =
+          sortIndex ??
           (previousTextIndex < 0 ? textBlocks.length : previousTextIndex);
       textBlocks.insert(index.clamp(0, textBlocks.length).toInt(), text);
     }
@@ -504,7 +501,8 @@ class EditorController extends ChangeNotifier {
         if (entry.id != objectId) entry,
     ];
     if (image != null) {
-      final index = sortIndex ??
+      final index =
+          sortIndex ??
           (previousImageIndex < 0 ? imageBlocks.length : previousImageIndex);
       imageBlocks.insert(index.clamp(0, imageBlocks.length).toInt(), image);
     }
@@ -650,9 +648,11 @@ class EditorController extends ChangeNotifier {
       if (lastCommit == null) {
         repository.unregisterOperationWriter(notebook.uid);
       } else {
-        unawaited(lastCommit.whenComplete(
-          () => repository.unregisterOperationWriter(notebook.uid),
-        ));
+        unawaited(
+          lastCommit.whenComplete(
+            () => repository.unregisterOperationWriter(notebook.uid),
+          ),
+        );
       }
     }
     _isDisposed = true;
@@ -1968,8 +1968,10 @@ class EditorController extends ChangeNotifier {
     next = previous
         .then((_) => _applyV2History(undo: undo))
         .catchError((Object error, StackTrace stackTrace) {
-          debugPrint('EditorController v2 history blocked: '
-              '$error\\n$stackTrace');
+          debugPrint(
+            'EditorController v2 history blocked: '
+            '$error\\n$stackTrace',
+          );
         })
         .whenComplete(() {
           if (identical(_v2HistoryTail, next)) {
@@ -2071,30 +2073,32 @@ class EditorController extends ChangeNotifier {
       for (final page in current.pages)
         ...page.imageBlocks.map((item) => item.id),
     };
-    return desired.copyWith(pages: [
-      for (final page in desired.pages)
-        page.copyWith(
-          id: pageIds.contains(page.id) ? page.id : _uuid.v4(),
-          inkStrokes: [
-            for (final stroke in page.inkStrokes)
-              objectIds.contains(stroke.id)
-                  ? stroke
-                  : stroke.copyWith(id: _uuid.v4()),
-          ],
-          textBlocks: [
-            for (final block in page.textBlocks)
-              objectIds.contains(block.id)
-                  ? block
-                  : block.copyWith(id: _uuid.v4()),
-          ],
-          imageBlocks: [
-            for (final block in page.imageBlocks)
-              objectIds.contains(block.id)
-                  ? block
-                  : block.copyWith(id: _uuid.v4()),
-          ],
-        ),
-    ]);
+    return desired.copyWith(
+      pages: [
+        for (final page in desired.pages)
+          page.copyWith(
+            id: pageIds.contains(page.id) ? page.id : _uuid.v4(),
+            inkStrokes: [
+              for (final stroke in page.inkStrokes)
+                objectIds.contains(stroke.id)
+                    ? stroke
+                    : stroke.copyWith(id: _uuid.v4()),
+            ],
+            textBlocks: [
+              for (final block in page.textBlocks)
+                objectIds.contains(block.id)
+                    ? block
+                    : block.copyWith(id: _uuid.v4()),
+            ],
+            imageBlocks: [
+              for (final block in page.imageBlocks)
+                objectIds.contains(block.id)
+                    ? block
+                    : block.copyWith(id: _uuid.v4()),
+            ],
+          ),
+      ],
+    );
   }
 
   void addPage() {
@@ -3721,10 +3725,12 @@ class EditorController extends ChangeNotifier {
     if (operationWriter == null || _isDisposed || _v2DocumentDeleted) {
       return;
     }
-    _v2GestureCheckpoints.add(notebook.copyWith(
-      pages: List<NotePage>.of(pages),
-      updatedAt: DateTime.now(),
-    ));
+    _v2GestureCheckpoints.add(
+      notebook.copyWith(
+        pages: List<NotePage>.of(pages),
+        updatedAt: DateTime.now(),
+      ),
+    );
   }
 
   /// Serializes v2 writes without ever invoking snapshot repository saves.
@@ -3741,67 +3747,68 @@ class EditorController extends ChangeNotifier {
     // never prepare drafts against the pre-inverse SQLite baseline.
     final activeInverse = _v2HistoryCommitting ? _v2HistoryTail : null;
     late final Future<void> next;
-    next = previous.then((_) async {
-      if (activeInverse != null) {
-        await activeInverse;
-      }
-      final savedPages = pages;
-      final proposed = notebook.copyWith(
-        pages: savedPages,
-        updatedAt: DateTime.now(),
-      );
-      try {
-        if (_v2DocumentDeleted) {
-          throw StateError('A deleted v2 notebook cannot be edited.');
-        }
-        Future<void> persist(Notebook target) async {
-          final baseline = _v2PersistedNotebook;
-          final committed = await operationWriter!.writeNotebookChange(
-            before: baseline,
-            after: target,
-          );
-          _v2PersistedNotebook = target;
-          if (committed.isNotEmpty) {
-            _v2Undo.add(_V2HistoryEntry(baseline, target));
-            if (_v2Undo.length > 50) {
-              _v2Undo.removeAt(0);
-            }
-            _v2Redo.clear();
-            _undoActions.clear();
-            _redoActions.clear();
-            _notifyHistoryChanged();
+    next = previous
+        .then((_) async {
+          if (activeInverse != null) {
+            await activeInverse;
           }
-        }
+          final savedPages = pages;
+          final proposed = notebook.copyWith(
+            pages: savedPages,
+            updatedAt: DateTime.now(),
+          );
+          try {
+            if (_v2DocumentDeleted) {
+              throw StateError('A deleted v2 notebook cannot be edited.');
+            }
+            Future<void> persist(Notebook target) async {
+              final baseline = _v2PersistedNotebook;
+              final committed = await operationWriter!.writeNotebookChange(
+                before: baseline,
+                after: target,
+              );
+              _v2PersistedNotebook = target;
+              if (committed.isNotEmpty) {
+                _v2Undo.add(_V2HistoryEntry(baseline, target));
+                if (_v2Undo.length > 50) {
+                  _v2Undo.removeAt(0);
+                }
+                _v2Redo.clear();
+                _undoActions.clear();
+                _redoActions.clear();
+                _notifyHistoryChanged();
+              }
+            }
 
-        final gestures = List<Notebook>.of(_v2GestureCheckpoints);
-        for (final gesture in gestures) {
-          await persist(gesture);
-          _v2GestureCheckpoints.removeAt(0);
-        }
-        // A later gesture during I/O must not be overwritten by this save.
-        if (identical(pages, savedPages)) {
-          await persist(proposed);
-        }
-        _integritySaveBlocked = false;
-        if (identical(pages, savedPages) &&
-            _v2GestureCheckpoints.isEmpty) {
-          _fullSavePending = false;
-          _dirtyPageIds.clear();
-          _expectedRemovedIdsByPage.clear();
-          _expectedRemovedPageIds.clear();
-        }
-      } catch (error, stackTrace) {
-        // Never fall back to saveNotebook after a failed v2 batch. Leave
-        // optimistic state dirty and block shutdown until it can be saved.
-        _integritySaveBlocked = true;
-        _fullSavePending = true;
-        debugPrint('EditorController._saveV2 blocked: $error\n$stackTrace');
-      }
-    }).whenComplete(() {
-      if (identical(_v2SaveTail, next)) {
-        _v2SaveTail = null;
-      }
-    });
+            final gestures = List<Notebook>.of(_v2GestureCheckpoints);
+            for (final gesture in gestures) {
+              await persist(gesture);
+              _v2GestureCheckpoints.removeAt(0);
+            }
+            // A later gesture during I/O must not be overwritten by this save.
+            if (identical(pages, savedPages)) {
+              await persist(proposed);
+            }
+            _integritySaveBlocked = false;
+            if (identical(pages, savedPages) && _v2GestureCheckpoints.isEmpty) {
+              _fullSavePending = false;
+              _dirtyPageIds.clear();
+              _expectedRemovedIdsByPage.clear();
+              _expectedRemovedPageIds.clear();
+            }
+          } catch (error, stackTrace) {
+            // Never fall back to saveNotebook after a failed v2 batch. Leave
+            // optimistic state dirty and block shutdown until it can be saved.
+            _integritySaveBlocked = true;
+            _fullSavePending = true;
+            debugPrint('EditorController._saveV2 blocked: $error\n$stackTrace');
+          }
+        })
+        .whenComplete(() {
+          if (identical(_v2SaveTail, next)) {
+            _v2SaveTail = null;
+          }
+        });
     _v2SaveTail = next;
     return next;
   }

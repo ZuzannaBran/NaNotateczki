@@ -118,10 +118,12 @@ class NotebookRepository {
         'Legacy snapshot writer is disabled for v2 notebook: $uid',
       );
     }
-    final accepted = await database.customSelect(
-      'SELECT operation_id FROM operations WHERE document_id = ? LIMIT 1',
-      variables: [Variable<String>(uid)],
-    ).getSingleOrNull();
+    final accepted = await database
+        .customSelect(
+          'SELECT operation_id FROM operations WHERE document_id = ? LIMIT 1',
+          variables: [Variable<String>(uid)],
+        )
+        .getSingleOrNull();
     if (accepted != null) {
       _operationProtocolDocuments.add(uid);
       throw LegacyProtocolWriteBlocked(
@@ -130,7 +132,9 @@ class NotebookRepository {
     }
     if (_operationProtocolDocuments.contains(uid) ||
         _operationOwnedDocuments.contains(uid)) {
-      throw LegacyProtocolWriteBlocked('V2 writer claimed notebook during legacy validation.');
+      throw LegacyProtocolWriteBlocked(
+        'V2 writer claimed notebook during legacy validation.',
+      );
     }
   }
 
