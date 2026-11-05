@@ -334,6 +334,88 @@ void main() {
     );
   });
 
+  test('object.move preserves the stroke identity across notebook pages',
+      () async {
+    const destination = 'second-page';
+    await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageCreate,
+        objectId: destination,
+        payload: {
+          'value': {'title': 'Second', 'isBookmarked': false},
+        },
+      ),
+      LocalOperationDraft(
+        kind: OperationKind.strokeCreate,
+        pageId: pageId,
+        objectId: 'moved-stroke',
+        payload: {'value': _stroke()},
+      ),
+    ]);
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.objectMove,
+        pageId: pageId,
+        objectId: 'moved-stroke',
+        payload: const {
+          'toPageId': destination,
+          'sortIndex': 2,
+        },
+      ),
+    ]);
+    final notebook = (await notebooks.getNotebook(documentId))!;
+    expect(notebook.pages.first.inkStrokes, isEmpty);
+    expect(notebook.pages.last.inkStrokes.single.id, 'moved-stroke');
+    expect(
+      (await database.customSelect(
+        'SELECT sort_index FROM ink_stroke_rows '
+        'WHERE uid = ? AND page_uid = ?',
+        variables: [
+          const Variable<String>('moved-stroke'),
+          const Variable<String>(destination),
+        ],
+      ).get()).single.read<int>('sort_index'),
+      2,
+    );
+    expect(
+      await store.isTombstoned(
+        documentId,
+        'object',
+        'moved-stroke',
+        pageId: pageId,
+      ),
+      isFalse,
+    );
+    expect(
+      await store.isTombstoned(
+        documentId,
+        'object',
+        'moved-stroke',
+        pageId: destination,
+      ),
+      isFalse,
+    );
+    await expectLater(
+      write([
+        LocalOperationDraft(
+          kind: OperationKind.objectMove,
+          pageId: pageId,
+          objectId: 'moved-stroke',
+          payload: const {
+            'toPageId': destination,
+            'sortIndex': 2,
+          },
+        ),
+      ]),
+      throwsUnsupportedError,
+    );
+    expect(
+      (await notebooks.getNotebook(documentId))!
+          .pages.last.inkStrokes.single.id,
+      'moved-stroke',
+    );
+  });
+
   test('ambiguous cross-layer identity cannot delete either object',
       () async {
     await write([
