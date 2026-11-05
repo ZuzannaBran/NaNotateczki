@@ -413,13 +413,46 @@ class EditorSqliteProjector {
     );
   }
 
-  /// Moves a verified object without reusing or tombstoning its ID.
+  /// Resolves concurrent moves by the same durable v2 rank as field writes.
   ///
-  /// Text moves require a cross-page CRDT checkpoint and remain unsupported.
+  /// A move from another actor may have already relocated the object. A newer
+  /// concurrent move then applies from that actual page, while an older one is
+  /// an accepted no-op. A causally wrong source still fails closed.
   Future<void> _moveObject(OperationEnvelope op) async {
     final sourceId = op.pageId!;
     final destinationId = op.payload['toPageId'] as String;
     final index = _index(op.payload['sortIndex']);
+    final priorMoves = await database.customSelect(
+      'SELECT envelope_json FROM operations '
+      "WHERE document_id = ? AND object_id = ? AND kind = 'object.move'",
+      variables: [
+        Variable<String>(op.documentId),
+        Variable<String>(op.objectId!),
+      ],
+    ).get();
+    if (priorMoves.length > 50000) {
+      throw StateError('Move history requires a durable checkpoint.');
+    }
+    OperationEnvelope? previousWinner;
+    for (final row in priorMoves) {
+      final value = jsonDecode(row.read<String>('envelope_json'));
+      if (value is! Map) {
+        throw const FormatException('Malformed durable move envelope.');
+      }
+      final previous = OperationEnvelope.fromJson(
+        Map<String, dynamic>.from(value),
+      );
+      if (previousWinner == null ||
+          _compareRank(previous, previousWinner) > 0) {
+        previousWinner = previous;
+      }
+    }
+    if (previousWinner != null &&
+        _compareRank(previousWinner, op) >= 0) {
+      // Its actorSeq and checkpoint must still be recorded by OperationStore.
+      return;
+    }
+
     await _pageExists(op, sourceId);
     await _pageExists(op, destinationId);
     if (await _store.isTombstoned(
@@ -430,42 +463,37 @@ class EditorSqliteProjector {
       throw StateError('Destination page has been tombstoned.');
     }
     final ink = await _row(
-      'SELECT uid FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
-      [Variable<String>(op.objectId!), Variable<String>(sourceId)],
+      'SELECT page_uid FROM ink_stroke_rows WHERE uid = ?',
+      [Variable<String>(op.objectId!)],
     );
-    final image = await _imageRow(op);
-    final text = await _textRow(op);
+    final image = await _row(
+      'SELECT page_uid FROM image_block_rows WHERE uid = ?',
+      [Variable<String>(op.objectId!)],
+    );
+    final text = await _row(
+      'SELECT page_uid FROM text_block_rows WHERE uid = ?',
+      [Variable<String>(op.objectId!)],
+    );
     final matches = (ink == null ? 0 : 1) +
         (image == null ? 0 : 1) +
         (text == null ? 0 : 1);
     if (matches != 1) {
-      throw StateError('Missing or ambiguous move source.');
-    }
-    // A matching identity in a different page/layer must not be overwritten.
-    final conflicting = await _row(
-      'SELECT uid FROM ink_stroke_rows '
-      'WHERE uid = ? AND page_uid != ? '
-      'UNION ALL SELECT uid FROM image_block_rows '
-      'WHERE uid = ? AND page_uid != ? '
-      'UNION ALL SELECT uid FROM text_block_rows '
-      'WHERE uid = ? AND page_uid != ? LIMIT 1',
-      [
-        Variable<String>(op.objectId!),
-        Variable<String>(sourceId),
-        Variable<String>(op.objectId!),
-        Variable<String>(sourceId),
-        Variable<String>(op.objectId!),
-        Variable<String>(sourceId),
-      ],
-    );
-    if (conflicting != null) {
-      throw StateError('Move target identity is already occupied.');
+      throw StateError('Missing or ambiguous move target identity.');
     }
     if (text != null) {
       throw UnsupportedError('Text moves need cross-page CRDT history.');
     }
-
-    final sourceAssetKey = 'page:${jsonEncode([sourceId, op.objectId])}';
+    final actualSourceId = (ink ?? image)!['page_uid'] as String;
+    if (actualSourceId != sourceId) {
+      if (previousWinner == null ||
+          previousWinner.actorId == op.actorId ||
+          op.dependencies.contains(previousWinner.operationId)) {
+        throw UnsupportedError('Causal move source is inconsistent.');
+      }
+    }
+    await _pageExists(op, actualSourceId);
+    final sourceAssetKey =
+        'page:${jsonEncode([actualSourceId, op.objectId])}';
     final destinationAssetKey =
         'page:${jsonEncode([destinationId, op.objectId])}';
     final linked = await database.customSelect(
@@ -484,7 +512,7 @@ class EditorSqliteProjector {
         'Image moves require durable scoped asset references.',
       );
     }
-    if (image != null) {
+    if (image != null && actualSourceId != destinationId) {
       final destinationRefs = await _row(
         'SELECT asset_id FROM asset_references '
         'WHERE document_id = ? AND object_id = ? LIMIT 1',
@@ -506,7 +534,7 @@ class EditorSqliteProjector {
     await database.customStatement(
       'UPDATE $table SET page_uid = ?, sort_index = ? '
       'WHERE uid = ? AND page_uid = ?',
-      [destinationId, index, op.objectId, sourceId],
+      [destinationId, index, op.objectId, actualSourceId],
     );
   }
 
