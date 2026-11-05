@@ -492,6 +492,13 @@ Przy przekazanym `OperationAssetGateway` zwykłe wstawienie lub podmiana
 obrazu przygotowuje automatyczny upload i zweryfikowany bufor **przed**
 otwarciem transakcji. Brak gateway, błędny checksum lub przestarzały
 receipt blokują całą operację bez snapshotowego zapisu awaryjnego.
+Świeży notatnik może zostać utworzony bez v1 przez
+`EditorV2OperationWriter.writeCreateNotebook`: `document.create`,
+`page.create` i ewentualna zawartość są zatwierdzane w jednej transakcji
+SQLite wraz z actorSeq i outboxem. `document.set` aktualizuje tytuł
+i folder, a `writeDeleteNotebook` usuwa lokalną projekcję i zachowuje
+tombstone w trwałym dzienniku. Produkcyjny `AppScope` nadal nie
+wykorzystuje tych metod, więc nie stanowią cutover.
 Nie usuwa fizycznych plików. `prepareRemoteMedia` może ponownie
 pobrać zawartość po restarcie na podstawie receipt z dziennika;
 aktywny `AppScope` jeszcze tego nie konfiguruje.
