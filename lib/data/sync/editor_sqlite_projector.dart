@@ -86,9 +86,10 @@ class EditorSqliteProjector {
       throw StateError('The committed notebook disappeared from SQLite.');
     }
     final now = DateTime.now().toUtc();
-    final updated = now.isAfter(row.updatedAt)
-        ? now
-        : row.updatedAt.add(const Duration(seconds: 1));
+    final minimum = row.updatedAt.add(const Duration(seconds: 1));
+    // Drift dateTime() stores epoch seconds by default. A subsecond
+    // advance would disappear when reloaded from SQLite.
+    final updated = now.isAfter(minimum) ? now : minimum;
     await (database.update(database.notebookRows)
           ..where((item) => item.uid.equals(uid)))
         .write(NotebookRowsCompanion(updatedAt: Value(updated)));
