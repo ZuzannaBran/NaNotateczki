@@ -508,6 +508,34 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   niepotrzebne usuwanie stron i tekstów przy zwykłej edycji.
 - `docs/ETAP_3_SQLITE.md`: wymagania wdrożeniowe i testy crash-recovery.
 
+### Produkcyjne połączenie z edytorem — preview v2 (2026-11-05)
+
+- `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
+  `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
+  tylko dla konta z potwierdzonym protokołem v2. Wysyłanie lokalnego outboxu
+  poprzedza przyjęcie zdalnej operacji dla tego samego dokumentu; konflikty
+  bez rebase blokują kursor zamiast nadpisywać lokalny gest.
+- `lib/app/app_scope.dart`: przełączenie konta v2 jest **opt-in** przez
+  `--dart-define=NN_ENABLE_V2_ACCOUNT=true`. Bez tej flagi konto v2
+  pozostaje na ekranie blokady zgodności; konto v1 nadal używa starego
+  silnika. Aktywacja wymaga braku lokalnych dokumentów legacy. Nie
+  uruchamia legacy backupu i planera dla kont v2.
+- `lib/features/library/presentation/library_screen.dart` przekazuje
+  operacyjny writer do rzeczywistego `EditorController`, rejestruje
+  dispatcher zdalnych zmian i odłącza go przy dispose. Share v1
+  jest zablokowany w preview v2. Przejście v1↔v2 tworzy nowy
+  kontroler, bez jednoczesnego zapisu obu wersji.
+- `notebook_repository.dart` kieruje w preview tworzenie notebooków,
+  boardów, zmianę tytułu/folderu i usuwanie do trwałego dziennika v2.
+  `EditorV2OperationWriter.onCommitted` aktualizuje cache i harmonogram
+  backupu **dopiero po commicie**, również dla operacji edytora.
+  Brak obsługi Planera w tym preview jest jawnie blokowany.
+  `test/notebook_repository_v2_account_test.dart` sprawdza ścieżkę
+  CRUD, brak fallbacku snapshotowego i powiadomienie po commicie.
+- Do zamknięcia etapu 3 nadal potrzebne są testy Flutter i bezstratna
+  obsługa offline mediów, Quill, rebase oraz przełączenie bez preview.
+  Nie traktować tej częściowej integracji jako dopuszczenia produkcji v2.
+
 ### Operacyjny silnik v2 (etap 5, opt-in)
 
 - `lib/data/sync/operation_gateway.dart`: `OperationGateway`,
