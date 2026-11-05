@@ -85,14 +85,36 @@ class NotebookRepository {
 
   /// Selects v2 only after the owning account protocol is verified.
   /// Existing v1 documents must be migrated before enabling this path.
-  void enableAccountOperations(EditorV2OperationWriter writer) {
+  Future<void> enableAccountOperations(
+    EditorV2OperationWriter writer,
+  ) async {
     if (!identical(writer.projector.database, database) ||
         hasPendingSaves ||
+        _operationOwnedDocuments.isNotEmpty ||
         (_accountOperationWriter != null &&
             !identical(_accountOperationWriter, writer))) {
       throw StateError('Cannot switch the active repository writer to v2.');
     }
+    if (identical(_accountOperationWriter, writer)) {
+      return;
+    }
+    // Fence any concurrent v1 caller before the first await. Existing rows
+    // must have a committed document.create in the journal.
     _accountOperationWriter = writer;
+    try {
+      final legacy = await database.customSelect(
+        'SELECT n.uid FROM notebook_rows n WHERE NOT EXISTS '
+        '(SELECT 1 FROM operations o WHERE o.document_id = n.uid) LIMIT 1',
+      ).getSingleOrNull();
+      if (legacy != null) {
+        throw StateError('Account contains an unmigrated legacy document.');
+      }
+    } catch (_) {
+      if (identical(_accountOperationWriter, writer)) {
+        _accountOperationWriter = null;
+      }
+      rethrow;
+    }
   }
 
   bool _lastFetchSkippedCorruptRows = false;
@@ -159,6 +181,11 @@ class NotebookRepository {
 
   /// Refuses legacy snapshots after any durable v2 operation, even on restart.
   Future<void> _requireLegacyWritable(String uid) async {
+    if (_accountOperationWriter != null) {
+      throw LegacyProtocolWriteBlocked(
+        'Legacy snapshot writer is disabled for the active v2 account.',
+      );
+    }
     if (_operationProtocolDocuments.contains(uid) ||
         _operationOwnedDocuments.contains(uid)) {
       throw LegacyProtocolWriteBlocked(
@@ -177,7 +204,8 @@ class NotebookRepository {
         'Durable v2 history prohibits legacy snapshot writes: $uid',
       );
     }
-    if (_operationProtocolDocuments.contains(uid) ||
+    if (_accountOperationWriter != null ||
+        _operationProtocolDocuments.contains(uid) ||
         _operationOwnedDocuments.contains(uid)) {
       throw LegacyProtocolWriteBlocked(
         'V2 writer claimed notebook during legacy validation.',
