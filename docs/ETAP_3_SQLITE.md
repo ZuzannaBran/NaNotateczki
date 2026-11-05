@@ -130,8 +130,9 @@ v1, **nie** obsługa operacyjnego Undo/Redo v2 z tombstones.
 Dodano `EditorSqliteProjector` bez zmiany schematu Drift. Zatwierdzone
 operacje stron i ink aktualizują ich docelowe rekordy SQLite; usunięcie
 ostatniej strony jest blokowane. Usunięcie strony z obrazem/PDF lub
-embedem Quill lub rekordami `asset_references` jest odrzucane
-do chwili obsługi detach assetów
+embedem Quill początkowo było odrzucane. Teraz operacja weryfikuje
+wszystkie scoped referencje i usuwa je wraz ze stroną w jednym commicie;
+niepowiązane, brakujące i legacy assety nadal blokują operację
 (regresje w `test/editor_sqlite_projector_test.dart`).
 Dla tekstu `object.create` i
 `object.set` modyfikują typed rows, natomiast
@@ -176,7 +177,7 @@ pliku przed transakcją SQLite. `OperationAssetGateway.uploadAndStage`
 i `downloadAndStage` przygotowują bajty po odpowiedzi API.
 `asset.detach` jest obsługiwany dla nieużywanych referencji Quill,
 bez usuwania plików; aktywne obrazy nie mogą stracić ostatniego
-assetu. Nadal odrzucane są podmiana/usuwanie obrazów/PDF,
+assetu. Nadal odrzucane są podmiany obrazów/PDF,
 nowe embedy Quill, `document.create` i przenoszenie tekstu.
 Materiał BLOB może być duży — wymaga późniejszej kontroli pamięci
 i trwałego content-addressed magazynu dla pełnego cutover. Ink `object.move` zachowuje
@@ -260,3 +261,15 @@ bufora. Nadal wymagają wykonania w Flutter/Dart.
 
 Testów ręcznych ani automatycznych nie uznajemy za wykonane.
 
+
+### Przyrost 2026-11-05: bezpieczne usuwanie powiązanych zasobów
+
+`object.delete` usuwa obraz lub blok Quill wraz z jego scoped
+`asset_references` w jednej transakcji z tombstone i outboxem. Obraz bez
+referencji oraz Quill z brakującym assetem są odrzucane przed zmianą stanu.
+`page.delete` realizuje podobny commit dla całej strony, ale tylko jeśli
+każdy obraz i embed ma powiązaną referencję, bez obcych referencji.
+Pozostaje zakaz fizycznego kasowania blobów przed bezpiecznym GC.
+Regresje: `editor_sqlite_projector_test.dart` i
+`editor_v2_operation_writer_test.dart`. Kod nie został zweryfikowany przez
+Flutter SDK/CI w tej sesji; aktywacja produkcyjna nadal jest zabroniona.
