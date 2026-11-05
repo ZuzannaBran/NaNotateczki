@@ -96,12 +96,14 @@ class EditorV2RemotePatchDispatcher {
           (stroke: page.inkStrokes[i], index: i),
     ];
     final text = [
-      for (final entry in page.textBlocks)
-        if (entry.id == objectId) entry,
+      for (var i = 0; i < page.textBlocks.length; i++)
+        if (page.textBlocks[i].id == objectId)
+          (block: page.textBlocks[i], index: i),
     ];
     final images = [
-      for (final entry in page.imageBlocks)
-        if (entry.id == objectId) entry,
+      for (var i = 0; i < page.imageBlocks.length; i++)
+        if (page.imageBlocks[i].id == objectId)
+          (block: page.imageBlocks[i], index: i),
     ];
     if (ink.length + text.length + images.length > 1) {
       throw StateError('Ambiguous object identity in the SQLite projection.');
@@ -111,10 +113,16 @@ class EditorV2RemotePatchDispatcher {
       pageId: page.id,
       objectId: objectId,
       stroke: ink.isEmpty ? null : ink.single.stroke,
-      text: text.isEmpty ? null : text.single,
-      image: images.isEmpty ? null : images.single,
+      text: text.isEmpty ? null : text.single.block,
+      image: images.isEmpty ? null : images.single.block,
       deleted: !supplied,
-      sortIndex: ink.isEmpty ? null : ink.single.index,
+      sortIndex: ink.isNotEmpty
+          ? ink.single.index
+          : text.isNotEmpty
+              ? text.single.index
+              : images.isNotEmpty
+                  ? images.single.index
+                  : null,
     );
     if (!applied) {
       throw StateError('Committed object patch was deferred.');
