@@ -44,7 +44,8 @@ flutter test --concurrency=1 \
   test/editor_v2_operation_writer_test.dart \
   test/editor_v2_remote_patch_dispatcher_test.dart \
   test/editor_v2_crash_recovery_test.dart \
-  test/verified_quill_embed_builder_test.dart
+  test/verified_quill_embed_builder_test.dart \
+  test/notebook_repository_v2_account_test.dart
 
 echo "[stage3] Full unit and widget test suite"
 flutter test --concurrency=2
