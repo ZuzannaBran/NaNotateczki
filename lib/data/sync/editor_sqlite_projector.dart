@@ -519,10 +519,8 @@ class EditorSqliteProjector {
     if (matches != 1) {
       throw StateError('Missing or ambiguous move target identity.');
     }
-    if (text != null) {
-      throw UnsupportedError('Text moves need cross-page CRDT history.');
-    }
-    final actualSourceId = (ink ?? image)!['page_uid'] as String;
+    final actualSourceId =
+        (ink ?? image ?? text)!['page_uid'] as String;
     if (actualSourceId != sourceId) {
       if (previousWinner == null ||
           previousWinner.actorId == op.actorId ||
@@ -545,6 +543,11 @@ class EditorSqliteProjector {
     ).get();
     if (ink != null && linked.isNotEmpty) {
       throw UnsupportedError('Ink cannot move with attached media assets.');
+    }
+    if (text != null && linked.isNotEmpty) {
+      throw UnsupportedError(
+        'Moving Quill embeds requires durable text asset relocation.',
+      );
     }
     if (image != null && linked.isEmpty) {
       throw UnsupportedError(
@@ -569,7 +572,11 @@ class EditorSqliteProjector {
         [destinationAssetKey, op.documentId, sourceAssetKey],
       );
     }
-    final table = ink != null ? 'ink_stroke_rows' : 'image_block_rows';
+    final table = ink != null
+        ? 'ink_stroke_rows'
+        : image != null
+            ? 'image_block_rows'
+            : 'text_block_rows';
     await database.customStatement(
       'UPDATE $table SET page_uid = ?, sort_index = ? '
       'WHERE uid = ? AND page_uid = ?',
