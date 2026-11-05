@@ -165,9 +165,21 @@ identyfikator istnieje w kilku warstwach. Nowe testy:
 offline outbox, ink, formatowanie, restart i idempotentny remote replay.
 Nie były wykonane w środowisku bez SDK Flutter/Dart.
 
-**Granice:** projektor odrzuca tworzenie/usuwanie/wymianę
-assetów `image/pdf`, embedy Quill, `asset.attach/detach`,
-`document.create` i przenoszenie tekstu. Ink `object.move` zachowuje
+**Granice:** projektor obsługuje tworzenie nowych obrazów/PDF
+dopiero po `asset.attach` z bajtami sprawdzonymi przez
+`VerifiedEditorAssetBuffer`. `object.create` nie tworzy pustego
+obrazu: odkłada metadane w dzienniku, a `asset.attach` weryfikuje
+receipt i materializuje BLOB oraz scoped `asset_references`.
+Brak transferu skutkuje rollbackiem bez przesunięcia checkpointu.
+`SyncEngine.prepareRemoteOperation` służy do wstępnego pobrania
+pliku przed transakcją SQLite. `OperationAssetGateway.uploadAndStage`
+i `downloadAndStage` przygotowują bajty po odpowiedzi API.
+`asset.detach` jest obsługiwany dla nieużywanych referencji Quill,
+bez usuwania plików; aktywne obrazy nie mogą stracić ostatniego
+assetu. Nadal odrzucane są podmiana/usuwanie obrazów/PDF,
+nowe embedy Quill, `document.create` i przenoszenie tekstu.
+Materiał BLOB może być duży — wymaga późniejszej kontroli pamięci
+i trwałego content-addressed magazynu dla pełnego cutover. Ink `object.move` zachowuje
 ID bez attached assetów, a obraz `object.move` wymaga trwałej
 referencji; żaden z nich nie odłącza ani nie usuwa pliku.
 
@@ -224,6 +236,13 @@ zachowuje kolejność ink, tekstu i obrazów. Jeśli trwa lokalny gest, zwraca
 błąd i silnik może ponowić callback. Nie dotyczy to jeszcze
 automatycznego przełączania kont w `AppScope` ani LWW/rebase.
 Test: `test/editor_v2_remote_patch_dispatcher_test.dart`.
+Dla obrazów zdalnych sprawdzane jest odroczenie pojawienia się
+obiektu do `asset.attach` bez niepotrzebnego odmalowania. Testy
+`test/verified_editor_asset_buffer_test.dart`,
+`test/editor_v2_operation_writer_test.dart` i
+`test/editor_sqlite_projector_test.dart` obejmują uszkodzony digest,
+wycofanie wsadu i odtworzenie bajtów z SQLite po wyczyszczeniu
+bufora. Nadal wymagają wykonania w Flutter/Dart.
 
 ### Ręczna weryfikacja, gdy dostępne będzie środowisko Flutter
 
