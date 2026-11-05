@@ -36,6 +36,10 @@ class EditorSqliteProjector {
 
   Future<void> apply(OperationEnvelope operation) async {
     operation.validateForV2Projection();
+    if (operation.kind == OperationKind.documentCreate) {
+      await _createDocument(operation);
+      return;
+    }
     final document = await _row(
       'SELECT uid FROM notebook_rows WHERE uid = ?',
       [Variable<String>(operation.documentId)],
@@ -44,6 +48,8 @@ class EditorSqliteProjector {
       throw StateError('The target notebook must be imported first.');
     }
     switch (operation.kind) {
+      case OperationKind.documentSet:
+        await _setDocument(operation);
       case OperationKind.pageCreate:
         await _createPage(operation);
       case OperationKind.pageSet:
@@ -87,6 +93,74 @@ class EditorSqliteProjector {
         );
     }
     await _touchNotebook(operation.documentId);
+  }
+
+  /// Creates a fresh operational document and its pages through one v2 batch.
+  /// No legacy repository writer participates in the bootstrap.
+  Future<void> _createDocument(OperationEnvelope op) async {
+    final existing = await _row(
+      'SELECT uid FROM notebook_rows WHERE uid = ?',
+      [Variable<String>(op.documentId)],
+    );
+    if (existing != null) {
+      throw StateError('V2 document creation cannot import a legacy row.');
+    }
+    final value = Map<String, dynamic>.from(op.payload['value'] as Map);
+    if (value.length != 4 ||
+        value['title'] is! String ||
+        (value['title'] as String).isEmpty ||
+        value['folder'] is! String ||
+        (value['folder'] as String).isEmpty ||
+        value['kindIndex'] is! int ||
+        !const {0, 1}.contains(value['kindIndex']) ||
+        value['createdAt'] is! String) {
+      throw const FormatException('Invalid v2 notebook creation.');
+    }
+    final createdAt = DateTime.tryParse(value['createdAt'] as String);
+    if (createdAt == null) {
+      throw const FormatException('Invalid v2 notebook creation time.');
+    }
+    await database.into(database.notebookRows).insert(
+      NotebookRowsCompanion.insert(
+        uid: op.documentId,
+        title: value['title'] as String,
+        kindIndex: value['kindIndex'] as int,
+        folder: value['folder'] as String,
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      ),
+    );
+  }
+
+  Future<void> _setDocument(OperationEnvelope op) async {
+    final raw = Map<String, dynamic>.from(
+      op.payload['properties'] as Map,
+    );
+    if (raw.isEmpty ||
+        raw.keys.any((key) => key != 'title' && key != 'folder') ||
+        raw.values.any((value) => value is! String || value.isEmpty)) {
+      throw const FormatException('Unsupported v2 notebook metadata edit.');
+    }
+    final changes = await _winningProperties(op, raw);
+    if (changes.isEmpty) {
+      return;
+    }
+    final notebook = await _row(
+      'SELECT title, folder FROM notebook_rows WHERE uid = ?',
+      [Variable<String>(op.documentId)],
+    );
+    if (notebook == null) {
+      throw StateError('Cannot change a missing v2 notebook.');
+    }
+    await database.customStatement(
+      'UPDATE notebook_rows SET title = ?, folder = ? WHERE uid = ?',
+      [
+        changes['title'] ?? notebook['title'],
+        changes['folder'] ?? notebook['folder'],
+        op.documentId,
+      ],
+    );
+    await _touchNotebook(op.documentId);
   }
 
   /// Updates notebook metadata inside the same journal/projection transaction.
