@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -9,7 +11,9 @@ import 'package:program/data/sync/sync_engine.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/ink_stroke.dart';
+import 'package:program/features/notebook/domain/text_block.dart';
 
 import 'support/native_test_documents.dart';
 
@@ -123,6 +127,95 @@ void main() {
     );
     expect((await store.pending()).last.kind, OperationKind.pageDelete);
     expect(repositoryWrites, 0);
+  });
+
+  test('remote text and image patches keep their layer order', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final projector = EditorSqliteProjector(database);
+    final engine = SyncEngine(
+      store: OperationStore(database),
+      gateway: _OfflineGateway(),
+      actorId: 'remote-layer-test',
+      checkpointScope: 'remote-layer-test',
+      enableRealtime: false,
+      applyRemote: (_, __) async {},
+    );
+    addTearDown(engine.stop);
+    final controller = EditorController(
+      repository: repository,
+      notebook: notebook,
+      operationWriter: EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: projector,
+      ),
+    );
+    addTearDown(controller.dispose);
+    final id = notebook.pages.single.id;
+    TextBlock text(String id, String contents) => TextBlock(
+      id: id,
+      text: contents,
+      position: Offset.zero,
+      width: 100,
+      fontSize: 18,
+      color: const Color(0xFF112233),
+    );
+    ImageBlock image(String id) => ImageBlock(
+      id: id,
+      path: '',
+      ocrText: '',
+      position: Offset.zero,
+      width: 100,
+      height: 80,
+    );
+
+    expect(controller.applyConfirmedShareObjectPatch(
+      pageId: id,
+      objectId: 'text-a',
+      text: text('text-a', 'A'),
+      sortIndex: 0,
+    ), isTrue);
+    expect(controller.applyConfirmedShareObjectPatch(
+      pageId: id,
+      objectId: 'text-b',
+      text: text('text-b', 'B'),
+      sortIndex: 1,
+    ), isTrue);
+    expect(controller.applyConfirmedShareObjectPatch(
+      pageId: id,
+      objectId: 'text-a',
+      text: text('text-a', 'Changed'),
+      sortIndex: 0,
+    ), isTrue);
+    expect(
+      controller.currentPage.textBlocks.map((e) => e.id).toList(),
+      ['text-a', 'text-b'],
+    );
+
+    expect(controller.applyConfirmedShareObjectPatch(
+      pageId: id,
+      objectId: 'image-a',
+      image: image('image-a'),
+      sortIndex: 0,
+    ), isTrue);
+    expect(controller.applyConfirmedShareObjectPatch(
+      pageId: id,
+      objectId: 'image-b',
+      image: image('image-b'),
+      sortIndex: 1,
+    ), isTrue);
+    expect(controller.applyConfirmedShareObjectPatch(
+      pageId: id,
+      objectId: 'image-a',
+      image: image('image-a'),
+      sortIndex: 1,
+    ), isTrue);
+    expect(
+      controller.currentPage.imageBlocks.map((e) => e.id).toList(),
+      ['image-b', 'image-a'],
+    );
   });
 
   test('opt-in controller rejects a projection from a different SQLite',
