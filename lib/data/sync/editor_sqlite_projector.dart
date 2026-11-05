@@ -1262,11 +1262,7 @@ class EditorSqliteProjector {
       throw StateError('Ambiguous media object identity.');
     }
     if (existingText != null) {
-      await _storeTextAsset(
-        operation: operation,
-        bytes: bytes,
-        sha: sha,
-      );
+      await _storeTextAsset(operation: operation, bytes: bytes, sha: sha);
       return;
     }
     final original = await _row(
