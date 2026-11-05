@@ -1810,6 +1810,13 @@ class NotebookRepository {
     Map<String, Set<String>> pageIdsByNotebook,
   ) async {
     for (final entry in pageIdsByNotebook.entries) {
+      // Legacy normalization deletes and reinserts the page's ink rows.
+      // It must never run after v2 adopted this document.
+      try {
+        await _requireLegacyWritable(entry.key);
+      } on StateError {
+        continue;
+      }
       final previous = _saveTails[entry.key] ?? Future<void>.value();
       final completion = Completer<void>();
       _saveTails[entry.key] = completion.future;
@@ -1831,6 +1838,11 @@ class NotebookRepository {
             if (pageIds.contains(page.id)) page.id: page,
         };
         await database.transaction(() async {
+          try {
+            await _requireLegacyWritable(entry.key);
+          } on StateError {
+            return;
+          }
           for (final pageId in pageIds) {
             final page = pagesById[pageId];
             if (page == null) {
