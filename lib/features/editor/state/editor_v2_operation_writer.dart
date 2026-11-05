@@ -294,15 +294,15 @@ class EditorV2OperationWriter {
           )) {
         movedInkIds.add(entry.key);
       } else if (oldTexts[entry.key] case final oldText?) {
-          final nextText = newTexts[entry.key];
-          if (nextText == null ||
-              oldText.text != nextText.text ||
-              oldText.deltaJson != nextText.deltaJson) {
-            throw UnsupportedError(
-              'Cross-page text moves cannot edit CRDT contents.',
-            );
-          }
-          movedTextIds.add(entry.key);
+        final nextText = newTexts[entry.key];
+        if (nextText == null ||
+            oldText.text != nextText.text ||
+            oldText.deltaJson != nextText.deltaJson) {
+          throw UnsupportedError(
+            'Cross-page text moves cannot edit CRDT contents.',
+          );
+        }
+        movedTextIds.add(entry.key);
       } else {
         final oldImage = oldImages[entry.key];
         final newImage = newImages[entry.key];
