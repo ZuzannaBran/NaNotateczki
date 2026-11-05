@@ -174,6 +174,48 @@ class EditorV2OperationWriter {
     }
   }
 
+  /// Boots a new notebook directly into the v2 document journal.
+  ///
+  /// The first document, page, content and outbox share one transaction.
+  /// Never call legacy createNotebook() for this identity beforehand.
+  Future<List<OperationEnvelope>> writeCreateNotebook({
+    required Notebook notebook,
+    Map<String, VerifiedEditorAsset> verifiedAssets = const {},
+  }) async {
+    if (notebook.uid.isEmpty ||
+        notebook.pages.isEmpty ||
+        notebook.kind.index > 1 ||
+        notebook.title.isEmpty ||
+        notebook.folder.isEmpty) {
+      throw ArgumentError('Invalid operational notebook identity or kind.');
+    }
+    await _prepareImageAssets(
+      documentId: notebook.uid,
+      before: const <NotePage>[],
+      after: notebook.pages,
+      verifiedAssets: verifiedAssets,
+    );
+    final drafts = <LocalOperationDraft>[
+      LocalOperationDraft(
+        kind: OperationKind.documentCreate,
+        payload: {
+          'value': {
+            'title': notebook.title,
+            'folder': notebook.folder,
+            'kindIndex': notebook.kind.index,
+            'createdAt': notebook.createdAt.toUtc().toIso8601String(),
+          },
+        },
+      ),
+      for (final page in notebook.pages)
+        ..._bridge.planCreatePage(
+          page,
+          verifiedAssets: _assetsFor(notebook.uid, verifiedAssets),
+        ),
+    ];
+    return _commit(notebook.uid, drafts);
+  }
+
   /// Commits a multi-page gesture and stable-ID ink moves in one batch.
   ///
   /// Ink stays unchanged during a move. Image geometry may change, but
@@ -186,8 +228,6 @@ class EditorV2OperationWriter {
   }) async {
     if (before.uid != after.uid ||
         before.kind != after.kind ||
-        before.title != after.title ||
-        before.folder != after.folder ||
         after.pages.isEmpty) {
       throw ArgumentError('Unsupported notebook identity or metadata edit.');
     }
@@ -344,7 +384,18 @@ class EditorV2OperationWriter {
           ],
         ),
     };
-    final drafts = <LocalOperationDraft>[];
+    final drafts = <LocalOperationDraft>[
+      if (before.title != after.title || before.folder != after.folder)
+        LocalOperationDraft(
+          kind: OperationKind.documentSet,
+          payload: {
+            'properties': {
+              if (before.title != after.title) 'title': after.title,
+              if (before.folder != after.folder) 'folder': after.folder,
+            },
+          },
+        ),
+    ];
     for (final page in after.pages) {
       if (!oldPages.containsKey(page.id)) {
         final empty = page.copyWith(
