@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -8,6 +10,8 @@ import 'package:program/data/sync/operation_store.dart';
 import 'package:program/data/sync/sync_engine.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/drawing_tool.dart';
+import 'package:program/features/notebook/domain/ink_stroke.dart';
 
 import 'support/native_test_documents.dart';
 
@@ -100,4 +104,61 @@ void main() {
       throwsStateError,
     );
   });
+  test('v2 edit notifies changed pages only after durable commit', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final notifications = <NotebookRepositoryChange>[];
+    final repository = NotebookRepository(
+      database,
+      onChanged: (changes) => notifications.addAll(changes),
+    );
+    final store = OperationStore(database);
+    final projector = EditorSqliteProjector(database);
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'backup-v2-test',
+      checkpointScope: 'backup-v2-test',
+      enableRealtime: false,
+      applyRemote: (operation, pending) => projector.apply(operation),
+    );
+    addTearDown(engine.stop);
+    final writer = EditorV2OperationWriter(
+      syncEngine: engine,
+      projector: projector,
+      onCommitted: repository.reportOperationCommit,
+    );
+    repository.enableAccountOperations(writer);
+
+    final notebook = await repository.createNotebook();
+    expect(notifications, hasLength(1));
+    expect(notifications.single.isFull, isTrue);
+    notifications.clear();
+
+    final before = notebook.pages.single;
+    final stroke = InkStroke(
+      id: 'v2-backup-stroke',
+      color: const Color(0xFF112233),
+      width: 2,
+      tool: DrawingTool.pen,
+      points: [const InkPoint(dx: 1, dy: 2, pressure: 0.5)],
+    );
+    await writer.writePageChange(
+      documentId: notebook.uid,
+      before: before,
+      after: before.copyWith(inkStrokes: [stroke]),
+    );
+    expect(notifications, hasLength(1));
+    expect(notifications.single.uid, notebook.uid);
+    expect(notifications.single.pageIds, {before.id});
+
+    notifications.clear();
+    await expectLater(
+      writer.writeCreateNotebook(notebook: notebook),
+      throwsStateError,
+    );
+    expect(notifications, isEmpty);
+    expect(await store.pending(), hasLength(3));
+  });
+
 }
