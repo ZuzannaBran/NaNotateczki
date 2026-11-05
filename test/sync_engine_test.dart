@@ -706,6 +706,72 @@ void main() {
     expect(committed, 1);
   });
 
+  test('deleted media target never triggers stale verified download',
+      () async {
+    const doc = 'document-one';
+    const page = 'page-one';
+    const object = 'deleted-media';
+    final created = await store.writeLocal(
+      actorId: 'tombstone-actor',
+      documentId: doc,
+      kind: OperationKind.objectCreate,
+      pageId: page,
+      objectId: object,
+      payload: const {'value': {'objectType': 'image'}},
+      apply: (_) async {},
+    );
+    await store.writeLocal(
+      actorId: 'tombstone-actor',
+      documentId: doc,
+      kind: OperationKind.objectDelete,
+      pageId: page,
+      objectId: object,
+      payload: const {},
+      dependencies: [created.operationId],
+      apply: (_) async {},
+    );
+    final stale = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'late-remote-media',
+      actorSeq: 1,
+      logicalClock: 1,
+      documentId: doc,
+      pageId: page,
+      objectId: object,
+      kind: OperationKind.assetAttach,
+      payload: const {
+        'assetId': 'deleted-asset',
+        'sha256':
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'sizeBytes': 12,
+        'mediaType': 'image/png',
+      },
+    );
+    gateway.seed(stale);
+    engine.dispose();
+    var downloaded = 0;
+    var applied = 0;
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      prepareRemoteOperation: (_) async {
+        downloaded++;
+        throw StateError('Deleted image must not download.');
+      },
+      applyRemote: (operation, pending) async {
+        applied++;
+      },
+    );
+    await engine.start();
+    expect(downloaded, 0);
+    expect(applied, 0);
+    expect(await store.operation(stale.operationId), isNotNull);
+    expect(await store.checkpoint('user-A-v2'), 1);
+  });
+
   test('a replayed remote operation notifies the editor once', () async {
     gateway.seed(_remote('other-actor', 'remote-once'));
     engine.dispose();

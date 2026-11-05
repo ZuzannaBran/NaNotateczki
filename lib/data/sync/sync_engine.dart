@@ -342,7 +342,8 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
               (item.operation.payload['properties'] as Map)
                   .containsKey('assetId');
           if ((isMediaAttach || isMediaSwitch) &&
-              await store.operation(item.operation.operationId) == null) {
+              await store.operation(item.operation.operationId) == null &&
+              !await _hasDeletedMediaTarget(item.operation)) {
             await prepareRemoteOperation?.call(item.operation);
           }
           await store.applyRemote(
@@ -419,6 +420,34 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     }
     // Keep processing long feeds without monopolizing the UI event loop.
     _requested = true;
+  }
+
+  /// Old remote media events targeting tombstones are recorded as no-ops.
+  /// Downloading their binaries first could permanently block the feed.
+  Future<bool> _hasDeletedMediaTarget(OperationEnvelope operation) async {
+    final documentId = operation.documentId;
+    if (await store.isTombstoned(
+      documentId,
+      'document',
+      documentId,
+    )) {
+      return true;
+    }
+    final pageId = operation.pageId;
+    if (pageId == null) {
+      return false;
+    }
+    if (await store.isTombstoned(documentId, 'page', pageId)) {
+      return true;
+    }
+    final objectId = operation.objectId;
+    return objectId != null &&
+        await store.isTombstoned(
+          documentId,
+          'object',
+          objectId,
+          pageId: pageId,
+        );
   }
 
   Future<void> _push(int generation) async {
