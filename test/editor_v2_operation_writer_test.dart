@@ -268,14 +268,14 @@ void main() {
       isFalse,
     );
 
-    final modified = a.copyWith(width: 3);
+    final modified = b.copyWith(width: 3);
     final invalid = notebook.copyWith(pages: [
-      firstPage.copyWith(inkStrokes: [b, a]),
+      firstPage.copyWith(inkStrokes: [a]),
       secondPage.copyWith(inkStrokes: [c, modified]),
     ]);
     await expectLater(
       writer.writeNotebookChange(before: starting, after: invalid),
-      throwsStateError,
+      throwsUnsupportedError,
     );
   });
 
