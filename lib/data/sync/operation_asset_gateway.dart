@@ -87,10 +87,7 @@ class OperationAssetGateway {
       bytes: bytes,
       mediaType: mediaType,
     );
-    buffer.stage(
-      receipt: receipt,
-      bytes: Uint8List.fromList(bytes),
-    );
+    buffer.stage(receipt: receipt, bytes: Uint8List.fromList(bytes));
     return receipt;
   }
 

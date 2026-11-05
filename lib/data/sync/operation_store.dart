@@ -121,18 +121,17 @@ class OperationStore {
     if (documentId.isEmpty || pageId.isEmpty || objectId.isEmpty) {
       throw ArgumentError('Text CRDT lookup needs complete identity.');
     }
-    final rows = await database.customSelect(
-      'SELECT envelope_json FROM operations '
-      // Object IDs are unique throughout a notebook. A v2 object.move
-      // changes its page, not its CRDT identity or earlier atom history.
-      'WHERE document_id = ? AND object_id = ? '
-      "AND kind IN ('text.insert', 'text.delete', 'text.format') "
-      'ORDER BY rowid',
-      variables: [
-        Variable<String>(documentId),
-        Variable<String>(objectId),
-      ],
-    ).get();
+    final rows = await database
+        .customSelect(
+          'SELECT envelope_json FROM operations '
+          // Object IDs are unique throughout a notebook. A v2 object.move
+          // changes its page, not its CRDT identity or earlier atom history.
+          'WHERE document_id = ? AND object_id = ? '
+          "AND kind IN ('text.insert', 'text.delete', 'text.format') "
+          'ORDER BY rowid',
+          variables: [Variable<String>(documentId), Variable<String>(objectId)],
+        )
+        .get();
     // Replay is intentionally bounded until verified text checkpoints exist.
     // Refuse to truncate history or silently discard causally required atoms.
     if (rows.length > 50000) {
@@ -244,10 +243,7 @@ class OperationStore {
           'ON latest.operation_id = actor.last_operation_id '
           'WHERE actor.actor_id != ? AND latest.document_id = ? '
           'ORDER BY actor.actor_id',
-          variables: [
-            Variable<String>(actorId),
-            Variable<String>(documentId),
-          ],
+          variables: [Variable<String>(actorId), Variable<String>(documentId)],
         )
         .get();
     final observedIds = <String>{

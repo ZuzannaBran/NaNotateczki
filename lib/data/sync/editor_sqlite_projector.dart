@@ -24,10 +24,8 @@ import 'verified_editor_asset_buffer.dart';
 /// until their durable projection is implemented. Quill embeds require a
 /// verified asset store and are refused here. This is not a cutover switch.
 class EditorSqliteProjector {
-  EditorSqliteProjector(
-    this.database, {
-    this.verifiedAssetBuffer,
-  }) : _store = OperationStore(database);
+  EditorSqliteProjector(this.database, {this.verifiedAssetBuffer})
+    : _store = OperationStore(database);
 
   final NotesDatabase database;
   final VerifiedEditorAssetBuffer? verifiedAssetBuffer;
@@ -40,10 +38,9 @@ class EditorSqliteProjector {
       await _createDocument(operation);
       return;
     }
-    final document = await _row(
-      'SELECT uid FROM notebook_rows WHERE uid = ?',
-      [Variable<String>(operation.documentId)],
-    );
+    final document = await _row('SELECT uid FROM notebook_rows WHERE uid = ?', [
+      Variable<String>(operation.documentId),
+    ]);
     if (document == null) {
       throw StateError('The target notebook must be imported first.');
     }
@@ -101,10 +98,9 @@ class EditorSqliteProjector {
   /// Creates a fresh operational document and its pages through one v2 batch.
   /// No legacy repository writer participates in the bootstrap.
   Future<void> _createDocument(OperationEnvelope op) async {
-    final existing = await _row(
-      'SELECT uid FROM notebook_rows WHERE uid = ?',
-      [Variable<String>(op.documentId)],
-    );
+    final existing = await _row('SELECT uid FROM notebook_rows WHERE uid = ?', [
+      Variable<String>(op.documentId),
+    ]);
     if (existing != null) {
       throw StateError('V2 document creation cannot import a legacy row.');
     }
@@ -123,16 +119,18 @@ class EditorSqliteProjector {
     if (createdAt == null) {
       throw const FormatException('Invalid v2 notebook creation time.');
     }
-    await database.into(database.notebookRows).insert(
-      NotebookRowsCompanion.insert(
-        uid: op.documentId,
-        title: value['title'] as String,
-        kindIndex: value['kindIndex'] as int,
-        folder: value['folder'] as String,
-        createdAt: createdAt,
-        updatedAt: createdAt,
-      ),
-    );
+    await database
+        .into(database.notebookRows)
+        .insert(
+          NotebookRowsCompanion.insert(
+            uid: op.documentId,
+            title: value['title'] as String,
+            kindIndex: value['kindIndex'] as int,
+            folder: value['folder'] as String,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+          ),
+        );
   }
 
   /// Deletes the entire document projection in one operation transaction.
@@ -157,16 +155,13 @@ class EditorSqliteProjector {
       'DELETE FROM page_rows WHERE notebook_uid = ?',
       [op.documentId],
     );
-    await database.customStatement(
-      'DELETE FROM notebook_rows WHERE uid = ?',
-      [op.documentId],
-    );
+    await database.customStatement('DELETE FROM notebook_rows WHERE uid = ?', [
+      op.documentId,
+    ]);
   }
 
   Future<void> _setDocument(OperationEnvelope op) async {
-    final raw = Map<String, dynamic>.from(
-      op.payload['properties'] as Map,
-    );
+    final raw = Map<String, dynamic>.from(op.payload['properties'] as Map);
     if (raw.isEmpty ||
         raw.keys.any((key) => key != 'title' && key != 'folder') ||
         raw.values.any((value) => value is! String || value.isEmpty)) {
@@ -195,9 +190,9 @@ class EditorSqliteProjector {
 
   /// Updates notebook metadata inside the same journal/projection transaction.
   Future<void> _touchNotebook(String uid) async {
-    final row = await (database.select(database.notebookRows)
-          ..where((item) => item.uid.equals(uid)))
-        .getSingleOrNull();
+    final row = await (database.select(
+      database.notebookRows,
+    )..where((item) => item.uid.equals(uid))).getSingleOrNull();
     if (row == null) {
       throw StateError('The committed notebook disappeared from SQLite.');
     }
@@ -231,19 +226,21 @@ class EditorSqliteProjector {
     final kinds = documentTarget
         ? "('document.create', 'document.set')"
         : pageTarget
-            ? "('page.create', 'page.set')"
-            : "('stroke.create', 'object.create', 'object.set', "
-                "'object.transform', 'object.reorder', 'object.move')";
-    final rows = await database.customSelect(
-      'SELECT envelope_json FROM operations '
-      'WHERE document_id = ? AND '
-      '${documentTarget ? 'object_id IS NULL' : 'object_id = ?'} '
-      'AND kind IN $kinds',
-      variables: [
-        Variable<String>(operation.documentId),
-        if (!documentTarget) Variable<String>(operation.objectId!),
-      ],
-    ).get();
+        ? "('page.create', 'page.set')"
+        : "('stroke.create', 'object.create', 'object.set', "
+              "'object.transform', 'object.reorder', 'object.move')";
+    final rows = await database
+        .customSelect(
+          'SELECT envelope_json FROM operations '
+          'WHERE document_id = ? AND '
+          '${documentTarget ? 'object_id IS NULL' : 'object_id = ?'} '
+          'AND kind IN $kinds',
+          variables: [
+            Variable<String>(operation.documentId),
+            if (!documentTarget) Variable<String>(operation.objectId!),
+          ],
+        )
+        .get();
     if (rows.length > 50000) {
       throw StateError('Field versions require a durable checkpoint.');
     }
@@ -289,10 +286,7 @@ class EditorSqliteProjector {
     };
   }
 
-  static int _compareRank(
-    OperationEnvelope left,
-    OperationEnvelope right,
-  ) {
+  static int _compareRank(OperationEnvelope left, OperationEnvelope right) {
     final clock = left.logicalClock.compareTo(right.logicalClock);
     if (clock != 0) {
       return clock;
@@ -331,17 +325,14 @@ class EditorSqliteProjector {
   Future<void> _createPage(OperationEnvelope op) async {
     final id = op.objectId!;
     final value = Map<String, dynamic>.from(op.payload['value'] as Map);
-    if (value.keys.any(
-          (key) => key != 'title' && key != 'isBookmarked',
-        ) ||
+    if (value.keys.any((key) => key != 'title' && key != 'isBookmarked') ||
         value['title'] is! String ||
         value['isBookmarked'] is! bool) {
       throw const FormatException('Invalid page creation properties.');
     }
-    final existing = await _row(
-      'SELECT uid FROM page_rows WHERE uid = ?',
-      [Variable<String>(id)],
-    );
+    final existing = await _row('SELECT uid FROM page_rows WHERE uid = ?', [
+      Variable<String>(id),
+    ]);
     if (existing != null) {
       throw StateError('Page identity is already in use.');
     }
@@ -363,15 +354,10 @@ class EditorSqliteProjector {
   Future<void> _setPage(OperationEnvelope op) async {
     final id = op.objectId!;
     await _pageExists(op, id);
-    var changes = Map<String, dynamic>.from(
-      op.payload['properties'] as Map,
-    );
+    var changes = Map<String, dynamic>.from(op.payload['properties'] as Map);
     if (changes.isEmpty ||
-        changes.keys.any(
-          (key) => key != 'title' && key != 'isBookmarked',
-        ) ||
-        (changes.containsKey('title') &&
-            changes['title'] is! String) ||
+        changes.keys.any((key) => key != 'title' && key != 'isBookmarked') ||
+        (changes.containsKey('title') && changes['title'] is! String) ||
         (changes.containsKey('isBookmarked') &&
             changes['isBookmarked'] is! bool)) {
       throw const FormatException('Invalid page update properties.');
@@ -411,30 +397,32 @@ class EditorSqliteProjector {
       throw StateError('The last notebook page cannot be deleted.');
     }
 
-    final imageRows = await database.customSelect(
-      'SELECT uid FROM image_block_rows WHERE page_uid = ?',
-      variables: [Variable<String>(pageId)],
-    ).get();
-    final textRows = await database.customSelect(
-      'SELECT uid, delta_json FROM text_block_rows WHERE page_uid = ?',
-      variables: [Variable<String>(pageId)],
-    ).get();
-    final imageIds = {
-      for (final row in imageRows) row.read<String>('uid'),
-    };
-    final textIds = {
-      for (final row in textRows) row.read<String>('uid'),
-    };
+    final imageRows = await database
+        .customSelect(
+          'SELECT uid FROM image_block_rows WHERE page_uid = ?',
+          variables: [Variable<String>(pageId)],
+        )
+        .get();
+    final textRows = await database
+        .customSelect(
+          'SELECT uid, delta_json FROM text_block_rows WHERE page_uid = ?',
+          variables: [Variable<String>(pageId)],
+        )
+        .get();
+    final imageIds = {for (final row in imageRows) row.read<String>('uid')};
+    final textIds = {for (final row in textRows) row.read<String>('uid')};
     final prefix = 'page:[${jsonEncode(pageId)},';
-    final attached = await database.customSelect(
-      'SELECT object_id, asset_id FROM asset_references '
-      'WHERE document_id = ? AND substr(object_id, 1, ?) = ?',
-      variables: [
-        Variable<String>(op.documentId),
-        Variable<int>(prefix.length),
-        Variable<String>(prefix),
-      ],
-    ).get();
+    final attached = await database
+        .customSelect(
+          'SELECT object_id, asset_id FROM asset_references '
+          'WHERE document_id = ? AND substr(object_id, 1, ?) = ?',
+          variables: [
+            Variable<String>(op.documentId),
+            Variable<int>(prefix.length),
+            Variable<String>(prefix),
+          ],
+        )
+        .get();
     final assetsByOwner = <String, Set<String>>{};
     for (final row in attached) {
       final encodedOwner = row.read<String>('object_id');
@@ -494,10 +482,9 @@ class EditorSqliteProjector {
       'text_block_rows',
       'image_block_rows',
     ]) {
-      await database.customStatement(
-        'DELETE FROM $table WHERE page_uid = ?',
-        [pageId],
-      );
+      await database.customStatement('DELETE FROM $table WHERE page_uid = ?', [
+        pageId,
+      ]);
     }
     await database.customStatement(
       'DELETE FROM page_rows WHERE uid = ? AND notebook_uid = ?',
@@ -527,9 +514,7 @@ class EditorSqliteProjector {
     final objectId = op.objectId!;
     await _pageExists(op, pageId);
     await _objectIdUnused(objectId);
-    final fields = Map<String, dynamic>.from(
-      op.payload['value'] as Map,
-    );
+    final fields = Map<String, dynamic>.from(op.payload['value'] as Map);
     if (fields['objectType'] != 'stroke' ||
         fields.keys.any(
           (key) => !const {
@@ -573,14 +558,16 @@ class EditorSqliteProjector {
     final sourceId = op.pageId!;
     final destinationId = op.payload['toPageId'] as String;
     final index = _index(op.payload['sortIndex']);
-    final priorMoves = await database.customSelect(
-      'SELECT envelope_json FROM operations '
-      "WHERE document_id = ? AND object_id = ? AND kind = 'object.move'",
-      variables: [
-        Variable<String>(op.documentId),
-        Variable<String>(op.objectId!),
-      ],
-    ).get();
+    final priorMoves = await database
+        .customSelect(
+          'SELECT envelope_json FROM operations '
+          "WHERE document_id = ? AND object_id = ? AND kind = 'object.move'",
+          variables: [
+            Variable<String>(op.documentId),
+            Variable<String>(op.objectId!),
+          ],
+        )
+        .get();
     if (priorMoves.length > 50000) {
       throw StateError('Move history requires a durable checkpoint.');
     }
@@ -598,19 +585,14 @@ class EditorSqliteProjector {
         previousWinner = previous;
       }
     }
-    if (previousWinner != null &&
-        _compareRank(previousWinner, op) >= 0) {
+    if (previousWinner != null && _compareRank(previousWinner, op) >= 0) {
       // Its actorSeq and checkpoint must still be recorded by OperationStore.
       return;
     }
 
     await _pageExists(op, sourceId);
     await _pageExists(op, destinationId);
-    if (await _store.isTombstoned(
-      op.documentId,
-      'page',
-      destinationId,
-    )) {
+    if (await _store.isTombstoned(op.documentId, 'page', destinationId)) {
       throw StateError('Destination page has been tombstoned.');
     }
     final ink = await _row(
@@ -625,14 +607,14 @@ class EditorSqliteProjector {
       'SELECT page_uid FROM text_block_rows WHERE uid = ?',
       [Variable<String>(op.objectId!)],
     );
-    final matches = (ink == null ? 0 : 1) +
+    final matches =
+        (ink == null ? 0 : 1) +
         (image == null ? 0 : 1) +
         (text == null ? 0 : 1);
     if (matches != 1) {
       throw StateError('Missing or ambiguous move target identity.');
     }
-    final actualSourceId =
-        (ink ?? image ?? text)!['page_uid'] as String;
+    final actualSourceId = (ink ?? image ?? text)!['page_uid'] as String;
     if (actualSourceId != sourceId) {
       if (previousWinner == null ||
           previousWinner.actorId == op.actorId ||
@@ -641,18 +623,19 @@ class EditorSqliteProjector {
       }
     }
     await _pageExists(op, actualSourceId);
-    final sourceAssetKey =
-        'page:${jsonEncode([actualSourceId, op.objectId])}';
+    final sourceAssetKey = 'page:${jsonEncode([actualSourceId, op.objectId])}';
     final destinationAssetKey =
         'page:${jsonEncode([destinationId, op.objectId])}';
-    final linked = await database.customSelect(
-      'SELECT asset_id FROM asset_references '
-      'WHERE document_id = ? AND object_id = ?',
-      variables: [
-        Variable<String>(op.documentId),
-        Variable<String>(sourceAssetKey),
-      ],
-    ).get();
+    final linked = await database
+        .customSelect(
+          'SELECT asset_id FROM asset_references '
+          'WHERE document_id = ? AND object_id = ?',
+          variables: [
+            Variable<String>(op.documentId),
+            Variable<String>(sourceAssetKey),
+          ],
+        )
+        .get();
     if (ink != null && linked.isNotEmpty) {
       throw UnsupportedError('Ink cannot move with attached media assets.');
     }
@@ -687,8 +670,8 @@ class EditorSqliteProjector {
     final table = ink != null
         ? 'ink_stroke_rows'
         : image != null
-            ? 'image_block_rows'
-            : 'text_block_rows';
+        ? 'image_block_rows'
+        : 'text_block_rows';
     await database.customStatement(
       'UPDATE $table SET page_uid = ?, sort_index = ? '
       'WHERE uid = ? AND page_uid = ?',
@@ -696,9 +679,7 @@ class EditorSqliteProjector {
     );
   }
 
-  Future<Map<String, dynamic>> _storedStroke(
-    OperationEnvelope op,
-  ) async {
+  Future<Map<String, dynamic>> _storedStroke(OperationEnvelope op) async {
     await _pageExists(op, op.pageId!);
     final row = await _row(
       'SELECT color_value, width, tool_index, points_json, sort_index '
@@ -733,16 +714,13 @@ class EditorSqliteProjector {
 
   Future<void> _updateStroke(OperationEnvelope op) async {
     final before = await _storedStroke(op);
-    var changes = Map<String, dynamic>.from(
-      op.payload['properties'] as Map,
-    );
+    var changes = Map<String, dynamic>.from(op.payload['properties'] as Map);
     final allowed = switch (op.kind) {
       OperationKind.objectTransform => {'points'},
       OperationKind.objectReorder => {'sortIndex'},
       _ => {'colorValue', 'width', 'toolIndex'},
     };
-    if (changes.isEmpty ||
-        changes.keys.any((key) => !allowed.contains(key))) {
+    if (changes.isEmpty || changes.keys.any((key) => !allowed.contains(key))) {
       throw const FormatException('Unsupported ink update property.');
     }
     changes = await _winningProperties(op, changes);
@@ -782,7 +760,8 @@ class EditorSqliteProjector {
       'SELECT uid FROM image_block_rows WHERE uid = ? AND page_uid = ?',
       [Variable<String>(op.objectId!), Variable<String>(op.pageId!)],
     );
-    final matches = (ink == null ? 0 : 1) +
+    final matches =
+        (ink == null ? 0 : 1) +
         (text == null ? 0 : 1) +
         (image == null ? 0 : 1);
     if (matches != 1) {
@@ -790,17 +769,17 @@ class EditorSqliteProjector {
     }
 
     final scopedId = 'page:${jsonEncode([op.pageId, op.objectId])}';
-    final attached = await database.customSelect(
-      'SELECT asset_id FROM asset_references '
-      'WHERE document_id = ? AND object_id = ?',
-      variables: [
-        Variable<String>(op.documentId),
-        Variable<String>(scopedId),
-      ],
-    ).get();
-    final assetIds = {
-      for (final row in attached) row.read<String>('asset_id'),
-    };
+    final attached = await database
+        .customSelect(
+          'SELECT asset_id FROM asset_references '
+          'WHERE document_id = ? AND object_id = ?',
+          variables: [
+            Variable<String>(op.documentId),
+            Variable<String>(scopedId),
+          ],
+        )
+        .get();
+    final assetIds = {for (final row in attached) row.read<String>('asset_id')};
     if (image != null && assetIds.isEmpty) {
       throw UnsupportedError('Image deletion requires a verified asset.');
     }
@@ -863,10 +842,11 @@ class EditorSqliteProjector {
     if (reference == null) {
       if (image != null &&
           await verifiedImageAssetId(
-            documentId: operation.documentId,
-            pageId: pageId,
-            objectId: objectId,
-          ) != assetId) {
+                documentId: operation.documentId,
+                pageId: pageId,
+                objectId: objectId,
+              ) !=
+              assetId) {
         // Another concurrent replacement already detached this old ID.
         return;
       }
@@ -910,7 +890,6 @@ class EditorSqliteProjector {
     );
   }
 
-
   /// Finds the durable receipt for an asset already attached to this object.
   Future<Map<String, dynamic>?> _attachedReceipt({
     required String documentId,
@@ -918,16 +897,18 @@ class EditorSqliteProjector {
     required String objectId,
     required String assetId,
   }) async {
-    final rows = await database.customSelect(
-      'SELECT envelope_json FROM operations WHERE document_id = ? '
-      'AND page_id = ? AND object_id = ? AND kind = ?',
-      variables: [
-        Variable<String>(documentId),
-        Variable<String>(pageId),
-        Variable<String>(objectId),
-        const Variable<String>('asset.attach'),
-      ],
-    ).get();
+    final rows = await database
+        .customSelect(
+          'SELECT envelope_json FROM operations WHERE document_id = ? '
+          'AND page_id = ? AND object_id = ? AND kind = ?',
+          variables: [
+            Variable<String>(documentId),
+            Variable<String>(pageId),
+            Variable<String>(objectId),
+            const Variable<String>('asset.attach'),
+          ],
+        )
+        .get();
     if (rows.length > 50000) {
       throw StateError('Asset history requires a checkpoint.');
     }
@@ -1017,14 +998,13 @@ class EditorSqliteProjector {
     }
     final digest = crypto.sha256.convert(bytes).toString();
     final scopedId = 'page:${jsonEncode([pageId, objectId])}';
-    final references = await database.customSelect(
-      'SELECT asset_id, checksum_sha256 FROM asset_references '
-      'WHERE document_id = ? AND object_id = ?',
-      variables: [
-        Variable<String>(documentId),
-        Variable<String>(scopedId),
-      ],
-    ).get();
+    final references = await database
+        .customSelect(
+          'SELECT asset_id, checksum_sha256 FROM asset_references '
+          'WHERE document_id = ? AND object_id = ?',
+          variables: [Variable<String>(documentId), Variable<String>(scopedId)],
+        )
+        .get();
     final matching = [
       for (final row in references)
         if (row.read<String>('checksum_sha256') == digest)
@@ -1054,9 +1034,7 @@ class EditorSqliteProjector {
     if (row == null) {
       throw StateError('Missing image object.');
     }
-    var changes = Map<String, dynamic>.from(
-      op.payload['properties'] as Map,
-    );
+    var changes = Map<String, dynamic>.from(op.payload['properties'] as Map);
     final allowed = <String, String>{
       'dx': 'dx',
       'dy': 'dy',
@@ -1098,9 +1076,7 @@ class EditorSqliteProjector {
       return;
     }
     final replacementId = changes.remove('assetId') as String?;
-    final updates = [
-      for (final key in changes.keys) '${allowed[key]} = ?',
-    ];
+    final updates = [for (final key in changes.keys) '${allowed[key]} = ?'];
     final values = <Object?>[...changes.values];
     if (replacementId != null) {
       final currentId = await verifiedImageAssetId(
@@ -1220,8 +1196,15 @@ class EditorSqliteProjector {
   static void _validateImageGeometry(Map<String, dynamic> value) {
     _index(value['sortIndex']);
     for (final name in [
-      'dx', 'dy', 'width', 'height', 'rotation',
-      'cropLeft', 'cropTop', 'cropRight', 'cropBottom',
+      'dx',
+      'dy',
+      'width',
+      'height',
+      'rotation',
+      'cropLeft',
+      'cropTop',
+      'cropRight',
+      'cropBottom',
     ]) {
       final number = value[name];
       if (number is! num ||
@@ -1387,10 +1370,7 @@ class EditorSqliteProjector {
     required String sha,
     required String mime,
   }) async {
-    final owner = 'page:${jsonEncode([
-      operation.pageId,
-      operation.objectId,
-    ])}';
+    final owner = 'page:${jsonEncode([operation.pageId, operation.objectId])}';
     final existingId = await _row(
       'SELECT checksum_sha256, byte_length FROM asset_references '
       'WHERE asset_id = ? LIMIT 1',
@@ -1555,20 +1535,19 @@ class EditorSqliteProjector {
     if (row == null) {
       throw StateError('Missing text object.');
     }
-    var changes = Map<String, dynamic>.from(
-      op.payload['properties'] as Map,
-    );
-    if (changes.isEmpty || changes.keys.any(
-      (key) => !const {
-        'fontSize',
-        'colorValue',
-        'width',
-        'rotation',
-        'dx',
-        'dy',
-        'sortIndex',
-      }.contains(key),
-    )) {
+    var changes = Map<String, dynamic>.from(op.payload['properties'] as Map);
+    if (changes.isEmpty ||
+        changes.keys.any(
+          (key) => !const {
+            'fontSize',
+            'colorValue',
+            'width',
+            'rotation',
+            'dx',
+            'dy',
+            'sortIndex',
+          }.contains(key),
+        )) {
       throw const FormatException('Unsupported text property update.');
     }
     final merged = <String, dynamic>{
@@ -1665,8 +1644,10 @@ class EditorSqliteProjector {
           Variable<String>(op.documentId),
           Variable<String>(owner),
           Variable<String>(assetId),
-          Variable<String>('sqlite-asset:' +
-              (await _assetChecksum(op.documentId, owner, assetId))),
+          Variable<String>(
+            'sqlite-asset:' +
+                (await _assetChecksum(op.documentId, owner, assetId)),
+          ),
         ],
       );
       final mime = linked?['media_type'];
@@ -1710,7 +1691,8 @@ class EditorSqliteProjector {
     }
     for (final key in ['fontSize', 'width', 'rotation', 'dx', 'dy']) {
       final value = fields[key];
-      if (value is! num || !value.toDouble().isFinite ||
+      if (value is! num ||
+          !value.toDouble().isFinite ||
           (const {'fontSize', 'width'}.contains(key) && value <= 0)) {
         throw const FormatException('Invalid text geometry.');
       }
@@ -1727,10 +1709,6 @@ class EditorSqliteProjector {
 
   static String _pointsJson(List points) => jsonEncode([
     for (final point in points)
-      {
-        'dx': point[0],
-        'dy': point[1],
-        'pressure': point[2],
-      },
+      {'dx': point[0], 'dy': point[1], 'pressure': point[2]},
   ]);
 }

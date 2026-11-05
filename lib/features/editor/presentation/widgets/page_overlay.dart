@@ -909,17 +909,17 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                               config: quill.QuillEditorConfig(
                                 embedBuilders:
                                     controller.operationWriter == null
-                                        ? null
-                                        : [
-                                            VerifiedQuillEmbedBuilder(
-                                              type: 'image',
-                                              load: _readVerifiedEmbed,
-                                            ),
-                                            VerifiedQuillEmbedBuilder(
-                                              type: 'pdf',
-                                              load: _readVerifiedEmbed,
-                                            ),
-                                          ],
+                                    ? null
+                                    : [
+                                        VerifiedQuillEmbedBuilder(
+                                          type: 'image',
+                                          load: _readVerifiedEmbed,
+                                        ),
+                                        VerifiedQuillEmbedBuilder(
+                                          type: 'pdf',
+                                          load: _readVerifiedEmbed,
+                                        ),
+                                      ],
                                 scrollable: false,
                                 padding: EdgeInsets.zero,
                                 autoFocus: false,
@@ -3063,10 +3063,7 @@ Offset _globalDeltaToLocalDelta(
 
 /// Resolves embedded media exclusively from verified SQLite bytes.
 class VerifiedQuillEmbedBuilder extends quill.EmbedBuilder {
-  const VerifiedQuillEmbedBuilder({
-    required this.type,
-    required this.load,
-  });
+  const VerifiedQuillEmbedBuilder({required this.type, required this.load});
 
   final String type;
   final Future<Uint8List> Function(String id) load;

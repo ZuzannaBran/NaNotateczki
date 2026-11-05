@@ -339,8 +339,9 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
           final isMediaSwitch =
               item.operation.kind == OperationKind.objectSet &&
               item.operation.payload['properties'] is Map &&
-              (item.operation.payload['properties'] as Map)
-                  .containsKey('assetId');
+              (item.operation.payload['properties'] as Map).containsKey(
+                'assetId',
+              );
           if ((isMediaAttach || isMediaSwitch) &&
               await store.operation(item.operation.operationId) == null &&
               !await _hasDeletedMediaTarget(item.operation)) {
@@ -426,11 +427,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   /// Downloading their binaries first could permanently block the feed.
   Future<bool> _hasDeletedMediaTarget(OperationEnvelope operation) async {
     final documentId = operation.documentId;
-    if (await store.isTombstoned(
-      documentId,
-      'document',
-      documentId,
-    )) {
+    if (await store.isTombstoned(documentId, 'document', documentId)) {
       return true;
     }
     final pageId = operation.pageId;
