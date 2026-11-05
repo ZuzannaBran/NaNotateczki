@@ -483,11 +483,18 @@ obiektów BLOB.
 W trybie opt-in obsługuje już podmianę zweryfikowanych obrazów/PDF
 przez `asset.attach → object.set(assetId) → asset.detach`, a także
 ich usuwanie i atomowe usuwanie stron z prawidłowymi referencjami.
+Przy przekazanym `OperationAssetGateway` zwykłe wstawienie lub podmiana
+obrazu przygotowuje automatyczny upload i zweryfikowany bufor **przed**
+otwarciem transakcji. Brak gateway, błędny checksum lub przestarzały
+receipt blokują całą operację bez snapshotowego zapisu awaryjnego.
 Nie usuwa fizycznych plików. `prepareRemoteMedia` może ponownie
 pobrać zawartość po restarcie na podstawie receipt z dziennika;
 aktywny `AppScope` jeszcze tego nie konfiguruje.
-Nadal nie obsługuje nowych embedów Quill, przenoszenia tekstu, zakładania dokumentów v2
-ani pełnego rebase. `asset.detach` usuwa tylko referencje, których
+Przenoszenie niezmienionego bloku Quill między stronami działa przez
+`object.move`, z zachowaniem pierwotnej historii CRDT indeksowanej po
+identyfikatorze obiektu w całym dokumencie. Osadzone assety Quill,
+równoczesne przenoszenie i zmianę treści, zakładanie dokumentów v2
+oraz pełny rebase nadal blokuje. `asset.detach` usuwa tylko referencje, których
 nie używa bieżący Quill; nie usuwa bajtów ani aktywnych obrazów. Niezmieniona kreska może być przeniesiona między
 stronami przez `object.move` bez usuwania jej ID. Obraz może być
 przeniesiony wyłącznie przy niezmienionych bajtach/MIME i trwałej
