@@ -58,22 +58,31 @@ class EditorV2RemotePatchDispatcher {
     final sourceId = operation.pageId!;
     if (operation.kind == OperationKind.objectMove) {
       final destinationId = operation.payload['toPageId'] as String;
+      final source = _page(notebook.pages, sourceId);
       final destination = _page(notebook.pages, destinationId);
-      final sourceExists = editor.pageById(sourceId) != null;
-      if (sourceExists) {
-        final removed = editor.applyConfirmedShareObjectPatch(
-          pageId: sourceId,
-          objectId: operation.objectId!,
-          deleted: true,
-        );
-        if (!removed) {
-          throw StateError('The move source patch was deferred.');
-        }
+      if (source == null || destination == null) {
+        throw StateError('Committed move pages are absent from SQLite.');
       }
-      if (destination == null) {
-        throw StateError('Moved destination is absent from SQLite.');
+      final movedId = operation.objectId!;
+      final sourceStillOwns = source.inkStrokes.any(
+            (stroke) => stroke.id == movedId,
+          ) ||
+          source.textBlocks.any((text) => text.id == movedId) ||
+          source.imageBlocks.any((image) => image.id == movedId);
+      final destinationOwns = destination.inkStrokes.any(
+            (stroke) => stroke.id == movedId,
+          ) ||
+          destination.textBlocks.any((text) => text.id == movedId) ||
+          destination.imageBlocks.any((image) => image.id == movedId);
+      if (sourceStillOwns || !destinationOwns) {
+        throw StateError('Committed move projection has inconsistent IDs.');
       }
-      _applyObject(destination, operation.objectId!);
+      if (!editor.applyConfirmedV2PageMovePatch(
+        source: source,
+        destination: destination,
+      )) {
+        throw StateError('Committed move patch was deferred.');
+      }
       return;
     }
 
