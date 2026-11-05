@@ -160,7 +160,6 @@ class EditorSqliteProjector {
         op.documentId,
       ],
     );
-    await _touchNotebook(op.documentId);
   }
 
   /// Updates notebook metadata inside the same journal/projection transaction.
