@@ -107,11 +107,24 @@ void main() {
           ?.pages.single.inkStrokes,
       hasLength(1),
     );
-    // v2 tombstones cannot be undone by recreating the old object ID.
-    expect(controller.canUndo, isFalse);
+    expect(controller.canUndo, isTrue);
     controller.undo();
     await controller.flushPendingSaves();
-    expect(await store.pending(), hasLength(1));
+    expect((await store.pending()).last.kind, OperationKind.objectDelete);
+    expect(
+      (await repository.getNotebook(notebook.uid))!
+          .pages.single.inkStrokes,
+      isEmpty,
+    );
+    expect(controller.canRedo, isTrue);
+    controller.redo();
+    await controller.flushPendingSaves();
+    final restored = (await repository.getNotebook(notebook.uid))!
+        .pages.single.inkStrokes.single;
+    // Redo is a fresh insert: the old UID remains tombstoned.
+    expect(restored.id, isNot(created.single.objectId));
+    expect((await store.pending()).last.kind, OperationKind.strokeCreate);
+    expect(repositoryWrites, 0);
 
     controller.addPage();
     await controller.flushPendingSaves();
