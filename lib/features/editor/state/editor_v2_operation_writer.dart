@@ -293,8 +293,7 @@ class EditorV2OperationWriter {
             ],
           )) {
         movedInkIds.add(entry.key);
-      } else if (oldTexts[entry.key] case final oldText?)
-        {
+      } else if (oldTexts[entry.key] case final oldText?) {
           final nextText = newTexts[entry.key];
           if (nextText == null ||
               oldText.text != nextText.text ||
@@ -304,8 +303,7 @@ class EditorV2OperationWriter {
             );
           }
           movedTextIds.add(entry.key);
-        }
-      else {
+      } else {
         final oldImage = oldImages[entry.key];
         final newImage = newImages[entry.key];
         if (oldImage == null || newImage == null ||
