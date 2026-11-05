@@ -46,6 +46,11 @@ class NotebookRepositoryChange {
 typedef RepositoryChangeHandler =
     void Function(Iterable<NotebookRepositoryChange> changes);
 
+/// A v1 writer cannot mutate a notebook that entered the v2 journal.
+class LegacyProtocolWriteBlocked extends StateError {
+  LegacyProtocolWriteBlocked(super.message);
+}
+
 class PortableBackupData {
   const PortableBackupData({
     required this.notebooks,
@@ -109,7 +114,7 @@ class NotebookRepository {
   Future<void> _requireLegacyWritable(String uid) async {
     if (_operationProtocolDocuments.contains(uid) ||
         _operationOwnedDocuments.contains(uid)) {
-      throw StateError(
+      throw LegacyProtocolWriteBlocked(
         'Legacy snapshot writer is disabled for v2 notebook: $uid',
       );
     }
@@ -119,13 +124,13 @@ class NotebookRepository {
     ).getSingleOrNull();
     if (accepted != null) {
       _operationProtocolDocuments.add(uid);
-      throw StateError(
+      throw LegacyProtocolWriteBlocked(
         'Durable v2 history prohibits legacy snapshot writes: $uid',
       );
     }
     if (_operationProtocolDocuments.contains(uid) ||
         _operationOwnedDocuments.contains(uid)) {
-      throw StateError('V2 writer claimed notebook during legacy validation.');
+      throw LegacyProtocolWriteBlocked('V2 writer claimed notebook during legacy validation.');
     }
   }
 
@@ -1814,7 +1819,7 @@ class NotebookRepository {
       // It must never run after v2 adopted this document.
       try {
         await _requireLegacyWritable(entry.key);
-      } on StateError {
+      } on LegacyProtocolWriteBlocked {
         continue;
       }
       final previous = _saveTails[entry.key] ?? Future<void>.value();
@@ -1840,7 +1845,7 @@ class NotebookRepository {
         await database.transaction(() async {
           try {
             await _requireLegacyWritable(entry.key);
-          } on StateError {
+          } on LegacyProtocolWriteBlocked {
             return;
           }
           for (final pageId in pageIds) {
