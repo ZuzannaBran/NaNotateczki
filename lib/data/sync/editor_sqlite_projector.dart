@@ -74,6 +74,24 @@ class EditorSqliteProjector {
           'No verified SQLite editor reducer for ${operation.kind.wireName}.',
         );
     }
+    await _touchNotebook(operation.documentId);
+  }
+
+  /// Updates notebook metadata inside the same journal/projection transaction.
+  Future<void> _touchNotebook(String uid) async {
+    final row = await (database.select(database.notebookRows)
+          ..where((item) => item.uid.equals(uid)))
+        .getSingleOrNull();
+    if (row == null) {
+      throw StateError('The committed notebook disappeared from SQLite.');
+    }
+    final now = DateTime.now().toUtc();
+    final updated = now.isAfter(row.updatedAt)
+        ? now
+        : row.updatedAt.add(const Duration(milliseconds: 1));
+    await (database.update(database.notebookRows)
+          ..where((item) => item.uid.equals(uid)))
+        .write(NotebookRowsCompanion(updatedAt: Value(updated)));
   }
 
   /// Resolves field-wise conflicts by the same deterministic v2 rank
