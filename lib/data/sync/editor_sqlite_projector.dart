@@ -49,14 +49,20 @@ class EditorSqliteProjector {
       case OperationKind.objectSet:
         if (await _textRow(operation) != null) {
           await _setText(operation);
+        } else if (await _imageRow(operation) != null) {
+          await _updateImage(operation);
         } else {
           await _updateStroke(operation);
         }
       case OperationKind.objectMove:
-        await _moveStroke(operation);
+        await _moveObject(operation);
       case OperationKind.objectTransform:
       case OperationKind.objectReorder:
-        await _updateStroke(operation);
+        if (await _imageRow(operation) != null) {
+          await _updateImage(operation);
+        } else {
+          await _updateStroke(operation);
+        }
       case OperationKind.textInsert:
       case OperationKind.textDelete:
       case OperationKind.textFormat:
@@ -286,12 +292,10 @@ class EditorSqliteProjector {
     );
   }
 
-  /// Moves a stroke without deleting and recreating its stable identity.
+  /// Moves a verified object without reusing or tombstoning its ID.
   ///
-  /// Text moves require CRDT history to follow the object across page IDs;
-  /// image moves require verified asset-reference relocation. Both remain
-  /// explicitly unsupported until those reducers are complete.
-  Future<void> _moveStroke(OperationEnvelope op) async {
+  /// Text moves require a cross-page CRDT checkpoint and remain unsupported.
+  Future<void> _moveObject(OperationEnvelope op) async {
     final sourceId = op.pageId!;
     final destinationId = op.payload['toPageId'] as String;
     final index = _index(op.payload['sortIndex']);
@@ -304,34 +308,82 @@ class EditorSqliteProjector {
     )) {
       throw StateError('Destination page has been tombstoned.');
     }
-    final existing = await _row(
+    final ink = await _row(
       'SELECT uid FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
       [Variable<String>(op.objectId!), Variable<String>(sourceId)],
     );
-    if (existing == null) {
+    final image = await _imageRow(op);
+    final text = await _textRow(op);
+    final matches = (ink == null ? 0 : 1) +
+        (image == null ? 0 : 1) +
+        (text == null ? 0 : 1);
+    if (matches != 1) {
+      throw StateError('Missing or ambiguous move source.');
+    }
+    // A matching identity in a different page/layer must not be overwritten.
+    final conflicting = await _row(
+      'SELECT uid FROM ink_stroke_rows '
+      'WHERE uid = ? AND page_uid != ? '
+      'UNION ALL SELECT uid FROM image_block_rows '
+      'WHERE uid = ? AND page_uid != ? '
+      'UNION ALL SELECT uid FROM text_block_rows '
+      'WHERE uid = ? AND page_uid != ? LIMIT 1',
+      [
+        Variable<String>(op.objectId!),
+        Variable<String>(sourceId),
+        Variable<String>(op.objectId!),
+        Variable<String>(sourceId),
+        Variable<String>(op.objectId!),
+        Variable<String>(sourceId),
+      ],
+    );
+    if (conflicting != null) {
+      throw StateError('Move target identity is already occupied.');
+    }
+    if (text != null) {
+      throw UnsupportedError('Text moves need cross-page CRDT history.');
+    }
+
+    final sourceAssetKey = 'page:${jsonEncode([sourceId, op.objectId])}';
+    final destinationAssetKey =
+        'page:${jsonEncode([destinationId, op.objectId])}';
+    final linked = await database.customSelect(
+      'SELECT asset_id FROM asset_references '
+      'WHERE document_id = ? AND object_id = ?',
+      variables: [
+        Variable<String>(op.documentId),
+        Variable<String>(sourceAssetKey),
+      ],
+    ).get();
+    if (ink != null && linked.isNotEmpty) {
+      throw UnsupportedError('Ink cannot move with attached media assets.');
+    }
+    if (image != null && linked.isEmpty) {
       throw UnsupportedError(
-        'Only unchanged ink objects can move between pages in v2.',
+        'Image moves require durable scoped asset references.',
       );
     }
-    final shadow = await _row(
-      'SELECT uid FROM text_block_rows WHERE uid = ? '
-      'UNION ALL SELECT uid FROM image_block_rows WHERE uid = ? LIMIT 1',
-      [Variable<String>(op.objectId!), Variable<String>(op.objectId!)],
-    );
-    if (shadow != null) {
-      throw StateError('Ambiguous cross-layer identity cannot move.');
+    if (image != null) {
+      final destinationRefs = await _row(
+        'SELECT asset_id FROM asset_references '
+        'WHERE document_id = ? AND object_id = ? LIMIT 1',
+        [
+          Variable<String>(op.documentId),
+          Variable<String>(destinationAssetKey),
+        ],
+      );
+      if (destinationRefs != null) {
+        throw StateError('Destination already owns asset references.');
+      }
+      await database.customStatement(
+        'UPDATE asset_references SET object_id = ? '
+        'WHERE document_id = ? AND object_id = ?',
+        [destinationAssetKey, op.documentId, sourceAssetKey],
+      );
     }
-    final sourceAssetKey = 'page:${jsonEncode([sourceId, op.objectId])}';
-    final linkedAsset = await _row(
-      'SELECT asset_id FROM asset_references '
-      'WHERE document_id = ? AND object_id = ? LIMIT 1',
-      [Variable<String>(op.documentId), Variable<String>(sourceAssetKey)],
-    );
-    if (linkedAsset != null) {
-      throw UnsupportedError('Asset-bearing objects require a move reducer.');
-    }
+    final table = ink != null ? 'ink_stroke_rows' : 'image_block_rows';
     await database.customStatement(
-      'UPDATE ink_stroke_rows SET page_uid = ?, sort_index = ? '
+      'UPDATE $table SET page_uid = ?, sort_index = ? '
       'WHERE uid = ? AND page_uid = ?',
       [destinationId, index, op.objectId, sourceId],
     );
@@ -432,6 +484,65 @@ class EditorSqliteProjector {
           ? 'DELETE FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?'
           : 'DELETE FROM text_block_rows WHERE uid = ? AND page_uid = ?',
       [op.objectId, op.pageId],
+    );
+  }
+
+  Future<Map<String, dynamic>?> _imageRow(OperationEnvelope op) => _row(
+    'SELECT dx, dy, width, height, rotation, crop_left, crop_top, '
+    'crop_right, crop_bottom, sort_index FROM image_block_rows '
+    'WHERE uid = ? AND page_uid = ?',
+    [Variable<String>(op.objectId!), Variable<String>(op.pageId!)],
+  );
+
+  /// Only geometry and z-order may change; asset content never changes here.
+  Future<void> _updateImage(OperationEnvelope op) async {
+    await _pageExists(op, op.pageId!);
+    final row = await _imageRow(op);
+    if (row == null) {
+      throw StateError('Missing image object.');
+    }
+    final changes = Map<String, dynamic>.from(
+      op.payload['properties'] as Map,
+    );
+    final allowed = <String, String>{
+      'dx': 'dx',
+      'dy': 'dy',
+      'width': 'width',
+      'height': 'height',
+      'rotation': 'rotation',
+      'cropLeft': 'crop_left',
+      'cropTop': 'crop_top',
+      'cropRight': 'crop_right',
+      'cropBottom': 'crop_bottom',
+      'sortIndex': 'sort_index',
+    };
+    if (changes.isEmpty ||
+        changes.keys.any((key) => !allowed.containsKey(key))) {
+      throw const FormatException('Unsupported image geometry properties.');
+    }
+    for (final entry in changes.entries) {
+      if (entry.key == 'sortIndex') {
+        _index(entry.value);
+      } else if (entry.value is! num ||
+          !(entry.value as num).toDouble().isFinite ||
+          (const {'width', 'height'}.contains(entry.key) &&
+              (entry.value as num) <= 0) ||
+          (entry.key.startsWith('crop') &&
+              ((entry.value as num) < 0 || (entry.value as num) > 1))) {
+        throw const FormatException('Invalid image geometry.');
+      }
+    }
+    final updates = [
+      for (final key in changes.keys) '${allowed[key]} = ?',
+    ];
+    await database.customStatement(
+      'UPDATE image_block_rows SET ${updates.join(', ')} '
+      'WHERE uid = ? AND page_uid = ?',
+      [
+        for (final entry in changes.entries) entry.value,
+        op.objectId,
+        op.pageId,
+      ],
     );
   }
 
