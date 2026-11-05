@@ -31,6 +31,7 @@ class EditorV2OperationWriter {
     required this.syncEngine,
     required this.projector,
     this.assetGateway,
+    this.onCommitted,
     EditorOperationBridge? bridge,
   }) : _bridge = bridge ?? EditorOperationBridge() {
     if (!identical(syncEngine.store.database, projector.database)) {
@@ -41,6 +42,10 @@ class EditorV2OperationWriter {
   final SyncEngine syncEngine;
   final EditorSqliteProjector projector;
   final OperationAssetGateway? assetGateway;
+
+  /// Called after a successful atomic journal and SQLite commit.
+  /// The callback must not cause a durable gesture to be retried.
+  final void Function(String, List<OperationEnvelope>)? onCommitted;
   final EditorOperationBridge _bridge;
   final Map<String, Map<String, VerifiedEditorAsset>> _registeredAssets = {};
 
@@ -728,6 +733,23 @@ class EditorV2OperationWriter {
       }
       if (registered.isEmpty) {
         _registeredAssets.remove(documentId);
+      }
+    }
+    if (committed.isNotEmpty && onCommitted != null) {
+      try {
+        onCommitted!(
+          documentId,
+          List<OperationEnvelope>.unmodifiable(committed),
+        );
+      } catch (error, stackTrace) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stackTrace,
+            library: 'editor v2',
+            context: ErrorDescription('notifying a durable journal commit'),
+          ),
+        );
       }
     }
     return committed;
