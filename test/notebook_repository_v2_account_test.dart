@@ -1,0 +1,103 @@
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/editor_sqlite_projector.dart';
+import 'package:program/data/sync/operation_gateway.dart';
+import 'package:program/data/sync/operation_protocol.dart';
+import 'package:program/data/sync/operation_store.dart';
+import 'package:program/data/sync/sync_engine.dart';
+import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
+import 'package:program/features/notebook/data/notebook_repository.dart';
+
+import 'support/native_test_documents.dart';
+
+class _OfflineGateway implements OperationGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async => throw StateError('No HTTP calls should occur in this test.');
+
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async =>
+      throw StateError('No HTTP calls should occur in this test.');
+}
+
+void main() {
+  useIsolatedNativeTestDocuments();
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('v2 account repository never falls back to document snapshots',
+      () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    var commits = 0;
+    final repository = NotebookRepository(
+      database,
+      onChanged: (changes) => commits += changes.length,
+    );
+    final store = OperationStore(database);
+    final projector = EditorSqliteProjector(database);
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'repository-v2-test',
+      checkpointScope: 'repository-v2-test',
+      enableRealtime: false,
+      applyRemote: (operation, pending) => projector.apply(operation),
+    );
+    addTearDown(engine.stop);
+    final writer = EditorV2OperationWriter(
+      syncEngine: engine,
+      projector: projector,
+    );
+    repository.enableAccountOperations(writer);
+
+    final notebook = await repository.createNotebook();
+    final board = await repository.createBoard();
+    expect(await store.pending(), hasLength(4));
+    expect((await store.pending()).map((op) => op.kind), [
+      OperationKind.documentCreate,
+      OperationKind.pageCreate,
+      OperationKind.documentCreate,
+      OperationKind.pageCreate,
+    ]);
+    expect(commits, 2);
+
+    await expectLater(
+      repository.saveNotebook(notebook),
+      throwsA(isA<LegacyProtocolWriteBlocked>()),
+    );
+    await expectLater(
+      repository.saveNotebookPages(
+        notebook,
+        {notebook.pages.single.id},
+      ),
+      throwsA(isA<LegacyProtocolWriteBlocked>()),
+    );
+    final renamed = await repository.updateNotebookMetadata(
+      notebook.uid,
+      title: 'Renamed through operations',
+      folder: 'School',
+    );
+    expect(renamed?.title, 'Renamed through operations');
+    expect(renamed?.folder, 'School');
+    expect((await store.pending()).last.kind, OperationKind.documentSet);
+    final pending = (await store.pending()).length;
+    await repository.updateNotebookMetadata(
+      notebook.uid,
+      title: 'Renamed through operations',
+      folder: 'School',
+    );
+    expect(await store.pending(), hasLength(pending));
+
+    await repository.deleteNotebook(board.uid);
+    expect(await repository.getNotebook(board.uid), isNull);
+    expect((await store.pending()).last.kind, OperationKind.documentDelete);
+    expect(commits, 4);
+    await expectLater(repository.createPlanner(), throwsUnsupportedError);
+    await expectLater(
+      writer.writeCreateNotebook(notebook: board),
+      throwsStateError,
+    );
+  });
+}
