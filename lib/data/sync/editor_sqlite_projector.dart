@@ -218,10 +218,11 @@ class EditorSqliteProjector {
   Future<void> _setPage(OperationEnvelope op) async {
     final id = op.objectId!;
     await _pageExists(op, id);
-    final changes = Map<String, dynamic>.from(
+    var changes = Map<String, dynamic>.from(
       op.payload['properties'] as Map,
     );
-    if (changes.keys.any(
+    if (changes.isEmpty ||
+        changes.keys.any(
           (key) => key != 'title' && key != 'isBookmarked',
         ) ||
         (changes.containsKey('title') &&
@@ -229,6 +230,10 @@ class EditorSqliteProjector {
         (changes.containsKey('isBookmarked') &&
             changes['isBookmarked'] is! bool)) {
       throw const FormatException('Invalid page update properties.');
+    }
+    changes = await _winningProperties(op, changes);
+    if (changes.isEmpty) {
+      return;
     }
     final columns = <String>[];
     final values = <Object>[];
@@ -513,7 +518,7 @@ class EditorSqliteProjector {
 
   Future<void> _updateStroke(OperationEnvelope op) async {
     final before = await _storedStroke(op);
-    final changes = Map<String, dynamic>.from(
+    var changes = Map<String, dynamic>.from(
       op.payload['properties'] as Map,
     );
     final allowed = switch (op.kind) {
@@ -521,8 +526,13 @@ class EditorSqliteProjector {
       OperationKind.objectReorder => {'sortIndex'},
       _ => {'colorValue', 'width', 'toolIndex'},
     };
-    if (changes.keys.any((key) => !allowed.contains(key))) {
+    if (changes.isEmpty ||
+        changes.keys.any((key) => !allowed.contains(key))) {
       throw const FormatException('Unsupported ink update property.');
+    }
+    changes = await _winningProperties(op, changes);
+    if (changes.isEmpty) {
+      return;
     }
     final merged = {...before, ...changes};
     final stroke = _ink.decode(op.objectId!, {
@@ -588,7 +598,7 @@ class EditorSqliteProjector {
     if (row == null) {
       throw StateError('Missing image object.');
     }
-    final changes = Map<String, dynamic>.from(
+    var changes = Map<String, dynamic>.from(
       op.payload['properties'] as Map,
     );
     final allowed = <String, String>{
@@ -618,6 +628,10 @@ class EditorSqliteProjector {
               ((entry.value as num) < 0 || (entry.value as num) > 1))) {
         throw const FormatException('Invalid image geometry.');
       }
+    }
+    changes = await _winningProperties(op, changes);
+    if (changes.isEmpty) {
+      return;
     }
     final updates = [
       for (final key in changes.keys) '${allowed[key]} = ?',
@@ -677,10 +691,10 @@ class EditorSqliteProjector {
     if (row == null) {
       throw StateError('Missing text object.');
     }
-    final changes = Map<String, dynamic>.from(
+    var changes = Map<String, dynamic>.from(
       op.payload['properties'] as Map,
     );
-    if (changes.keys.any(
+    if (changes.isEmpty || changes.keys.any(
       (key) => !const {
         'fontSize',
         'colorValue',
@@ -704,6 +718,23 @@ class EditorSqliteProjector {
       ...changes,
     };
     _validateTextGeometry(merged);
+    changes = await _winningProperties(op, changes);
+    if (changes.isEmpty) {
+      return;
+    }
+    for (final field in const {
+      'fontSize': 'font_size',
+      'colorValue': 'color_value',
+      'width': 'width',
+      'rotation': 'rotation',
+      'dx': 'dx',
+      'dy': 'dy',
+      'sortIndex': 'sort_index',
+    }.entries) {
+      if (!changes.containsKey(field.key)) {
+        merged[field.key] = row[field.value];
+      }
+    }
     await database.customStatement(
       'UPDATE text_block_rows SET font_size = ?, color_value = ?, '
       'width = ?, rotation = ?, dx = ?, dy = ?, sort_index = ? '
