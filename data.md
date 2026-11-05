@@ -1,5 +1,20 @@
 # Dane NaNotateczki
 
+## Przegląd v2 konta (2026-11-05)
+
+W `AppScope` istnieje odizolowana, opcjonalna ścieżka operacyjnego
+edytora dla konta już oznaczonego na serwerze jako v2.
+Wymaga jawnego `--dart-define=NN_ENABLE_V2_ACCOUNT=true` i
+odmawia uruchomienia, jeśli lokalna baza zawiera wciąż dokument v1.
+Tworzenie dokumentów, tytuły, folder dokumentu i usuwanie
+korzystają z `EditorV2OperationWriter`; aktywny edytor zapisuje
+operacje i przyjmuje przyrostowe patche, bez legacy snapshotów.
+Backup lokalny dostaje powiadomienie po commicie operacji.
+Planer, Share i stary remote backup nie zostały przełączone.
+Konflikt bez pełnego rebase blokuje odbiór zamiast nadpisywać.
+Ścieżka jest testowa, domyślnie wyłączona. Brak zaliczenia
+E2E i testów platform; produkcyjny cutover **nie jest zakończony**.
+
 ## Aktualny stan cutover (2026-11-04)
 
 Od czystej instalacji tryby Local i każde konto mają oddzielne SQLite
