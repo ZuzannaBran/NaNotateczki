@@ -138,3 +138,10 @@ obliczeniem SHA-256, zaktualizowano oczekiwania migracji do SQLite v7,
 a pomocniczy generator zdarzeń tekstowych testuje Undo z monotonicznym
 zegarem. W teście synchronizacji uwzględniono także echo dwóch lokalnych
 operacji, stąd checkpoint 3. Ponowny wynik CI pozostaje do weryfikacji.
+
+Drugi przebieg `42070224438` zaliczył 821 testów i ujawnił
+jeden błąd przygotowania testu przenoszenia obrazu: poprzednio
+źródłowy obraz pochodził z v1, a sprawdzano bajty SQLite z v2.
+Scenariusz poprawiono tak, by od początku utworzyć materiał przez
+zweryfikowane `asset.attach` v2, następnie przenieść i usunąć bez
+utraty bajtów. Wynik ponownego przebiegu pozostaje do potwierdzenia.

@@ -827,17 +827,39 @@ void main() {
         second,
       ],
     );
-    expect(await repository.saveNotebook(initial), isTrue);
-    await store.attachAssetReference(
-      documentId: notebook.uid,
-      pageId: page.id,
-      objectId: image.id,
-      assetId: 'asset-verified',
-      storagePath: 'assets/asset-verified',
-      checksumSha256: crypto.sha256.convert(image.bytes!).toString(),
-      byteLength: 4,
+    // The image must be bootstrapped by v2. A legacy image is stored
+    // as a file reference with bytes == null, which tests a different path.
+    final buffer = VerifiedEditorAssetBuffer();
+    final verifiedProjector = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
     );
+    final verifiedWriter = EditorV2OperationWriter(
+      syncEngine: engine,
+      projector: verifiedProjector,
+    );
+    final verified = VerifiedEditorAsset(
+      assetId: 'asset-verified',
+      sha256: crypto.sha256.convert(image.bytes!).toString(),
+      sizeBytes: image.bytes!.length,
+      mediaType: 'image/png',
+    );
+    buffer.stage(receipt: verified.attachPayload, bytes: image.bytes!);
+    final created = await verifiedWriter.writeNotebookChange(
+      before: notebook,
+      after: initial,
+      verifiedAssets: {image.id: verified},
+    );
+    expect(created.map((op) => op.kind), [
+      OperationKind.pageCreate,
+      OperationKind.objectCreate,
+      OperationKind.assetAttach,
+    ]);
     final persisted = (await repository.getNotebook(notebook.uid))!;
+    expect(
+      persisted.pages.first.imageBlocks.single.bytes,
+      orderedEquals(image.bytes!),
+    );
     final relocated = persisted.copyWith(
       pages: [
         persisted.pages.first.copyWith(imageBlocks: []),
@@ -850,7 +872,7 @@ void main() {
         ),
       ],
     );
-    final written = await writer.writeNotebookChange(
+    final written = await verifiedWriter.writeNotebookChange(
       before: persisted,
       after: relocated,
     );
@@ -892,7 +914,7 @@ void main() {
         relocated.pages.last.copyWith(imageBlocks: []),
       ],
     );
-    final deleted = await writer.writeNotebookChange(
+    final deleted = await verifiedWriter.writeNotebookChange(
       before: relocated,
       after: removed,
     );
