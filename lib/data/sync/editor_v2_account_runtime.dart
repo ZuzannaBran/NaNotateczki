@@ -72,6 +72,7 @@ class EditorV2AccountRuntime {
         syncEngine: engine,
         projector: projector,
         assetGateway: assetGateway,
+        onCommitted: repository.reportOperationCommit,
       ),
       engine: engine,
       projector: projector,
@@ -116,6 +117,7 @@ class EditorV2AccountRuntime {
         repository: repository,
       ).onRemoteCommitted(operation);
     }
+    repository.reportOperationCommit(operation.documentId, [operation]);
     if (editor == null ||
         operation.kind.target == OperationTarget.document) {
       await onLibraryChanged?.call();
