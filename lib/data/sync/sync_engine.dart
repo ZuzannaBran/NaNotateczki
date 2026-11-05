@@ -28,6 +28,12 @@ typedef RemoteOperationReducer =
 typedef RemoteOperationCommitted =
     Future<void> Function(OperationEnvelope remote);
 
+/// Prepares verified external bytes before opening the SQLite transaction.
+/// The callback may download assets; the reducer must use staged local bytes
+/// and must not initiate network I/O while the journal is being committed.
+typedef RemoteOperationPreparer =
+    Future<void> Function(OperationEnvelope remote);
+
 /// The opt-in v2 journal driver. A migrated namespace must own one instance.
 ///
 /// Legacy v1 snapshot writers must not run for documents driven by this
@@ -39,6 +45,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     required this.actorId,
     required this.checkpointScope,
     required this.applyRemote,
+    this.prepareRemoteOperation,
     this.onRemoteCommitted,
     this.apiClient,
     this.shareId,
@@ -75,6 +82,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   final String actorId;
   final String checkpointScope;
   final RemoteOperationReducer applyRemote;
+  final RemoteOperationPreparer? prepareRemoteOperation;
   final RemoteOperationCommitted? onRemoteCommitted;
   final ApiClient? apiClient;
   final String? shareId;
@@ -326,6 +334,10 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       for (final item in page.operations) {
         try {
           final queuedEcho = await store.isPending(item.operation.operationId);
+          if (item.operation.kind == OperationKind.assetAttach &&
+              await store.operation(item.operation.operationId) == null) {
+            await prepareRemoteOperation?.call(item.operation);
+          }
           await store.applyRemote(
             item.operation,
             serverSequence: item.cursor,
