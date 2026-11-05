@@ -161,6 +161,51 @@ void main() {
     expect(await reopenedRepository.saveNotebook(sibling), isTrue);
   });
 
+  test('v2 commits advance notebook timestamps even within one second',
+      () async {
+    final original = (await notebooks.getNotebook(documentId))!.updatedAt;
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.strokeCreate,
+        pageId: pageId,
+        objectId: 'timestamp-ink',
+        payload: {'value': _stroke()},
+      ),
+    ]);
+    final first = (await notebooks.getNotebook(documentId))!.updatedAt;
+    expect(first.isAfter(original), isTrue);
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.objectSet,
+        pageId: pageId,
+        objectId: 'timestamp-ink',
+        payload: const {
+          'properties': {'width': 3.5},
+        },
+      ),
+    ]);
+    final second = (await notebooks.getNotebook(documentId))!.updatedAt;
+    expect(second.isAfter(first), isTrue);
+    final previousOutbox = await store.pending();
+    await expectLater(
+      write([
+        LocalOperationDraft(
+          kind: OperationKind.objectSet,
+          pageId: pageId,
+          objectId: 'timestamp-ink',
+          payload: const {
+            'properties': {'width': -1.0},
+          },
+        ),
+      ]),
+      throwsFormatException,
+    );
+    final afterRollback =
+        (await notebooks.getNotebook(documentId))!.updatedAt;
+    expect(afterRollback, second);
+    expect(await store.pending(), hasLength(previousOutbox.length));
+  });
+
   test('ink create, transform and delete persist as atomic operations',
       () async {
     final added = await write([
