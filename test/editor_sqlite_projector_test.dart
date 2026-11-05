@@ -336,6 +336,154 @@ void main() {
     );
   });
 
+  test('concurrent ink fields converge despite reverse delivery',
+      () async {
+    final create = (await write([
+      LocalOperationDraft(
+        kind: OperationKind.strokeCreate,
+        pageId: pageId,
+        objectId: 'concurrent-ink',
+        payload: {'value': _stroke()},
+      ),
+    ])).single;
+    OperationEnvelope style({
+      required String actor,
+      required int clock,
+      required Map<String, dynamic> properties,
+    }) => OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: actor,
+      actorSeq: 1,
+      logicalClock: clock,
+      documentId: documentId,
+      pageId: pageId,
+      objectId: 'concurrent-ink',
+      kind: OperationKind.objectSet,
+      payload: {'properties': properties},
+      dependencies: [create.operationId],
+    );
+    final newer = style(
+      actor: 'newer-device',
+      clock: 40,
+      properties: {'colorValue': 0xFFAA0000},
+    );
+    final older = style(
+      actor: 'older-device',
+      clock: 30,
+      properties: {
+        'colorValue': 0xFF00AA00,
+        'width': 4.0,
+      },
+    );
+    await store.applyRemote(
+      newer,
+      serverSequence: 1,
+      checkpointScope: 'ink-fields',
+      apply: () => projector.apply(newer),
+    );
+    await store.applyRemote(
+      older,
+      serverSequence: 2,
+      checkpointScope: 'ink-fields',
+      apply: () => projector.apply(older),
+    );
+    final persisted = (await notebooks.getNotebook(documentId))!
+        .pages.first.inkStrokes.single;
+    expect(persisted.color.toARGB32(), 0xFFAA0000);
+    expect(persisted.width, 4.0);
+    expect(await store.checkpoint('ink-fields'), 2);
+  });
+
+  test('page metadata uses field rank rather than receipt order',
+      () async {
+    OperationEnvelope renamed({
+      required String actor,
+      required int clock,
+      required String title,
+    }) => OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: actor,
+      actorSeq: 1,
+      logicalClock: clock,
+      documentId: documentId,
+      objectId: pageId,
+      kind: OperationKind.pageSet,
+      payload: {
+        'properties': {'title': title},
+      },
+      dependencies: const [],
+    );
+    final newer = renamed(
+      actor: 'remote-newer',
+      clock: 20,
+      title: 'Newer title',
+    );
+    final older = renamed(
+      actor: 'remote-older',
+      clock: 10,
+      title: 'Stale title',
+    );
+    await store.applyRemote(
+      newer,
+      serverSequence: 1,
+      checkpointScope: 'page-fields',
+      apply: () => projector.apply(newer),
+    );
+    await store.applyRemote(
+      older,
+      serverSequence: 2,
+      checkpointScope: 'page-fields',
+      apply: () => projector.apply(older),
+    );
+    expect(
+      (await notebooks.getNotebook(documentId))?.pages.first.title,
+      'Newer title',
+    );
+  });
+
+  test('equal clocks resolve object colors by actor identity',
+      () async {
+    final created = (await write([
+      LocalOperationDraft(
+        kind: OperationKind.strokeCreate,
+        pageId: pageId,
+        objectId: 'tie-ink',
+        payload: {'value': _stroke()},
+      ),
+    ])).single;
+    OperationEnvelope update(String actor, int color) => OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: actor,
+      actorSeq: 1,
+      logicalClock: 5,
+      documentId: documentId,
+      pageId: pageId,
+      objectId: 'tie-ink',
+      kind: OperationKind.objectSet,
+      payload: {
+        'properties': {'colorValue': color},
+      },
+      dependencies: [created.operationId],
+    );
+    final winning = update('actor-z', 0xFF112233);
+    final losing = update('actor-a', 0xFF998877);
+    await store.applyRemote(
+      winning,
+      serverSequence: 1,
+      apply: () => projector.apply(winning),
+    );
+    await store.applyRemote(
+      losing,
+      serverSequence: 2,
+      apply: () => projector.apply(losing),
+    );
+    expect(
+      (await notebooks.getNotebook(documentId))!
+          .pages.first.inkStrokes.single.color.toARGB32(),
+      0xFF112233,
+    );
+  });
+
   test('object.move preserves the stroke identity across notebook pages',
       () async {
     const destination = 'second-page';
