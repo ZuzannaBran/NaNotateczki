@@ -8,6 +8,7 @@ import 'operation_protocol.dart';
 import 'operation_store.dart';
 import 'operation_text_sequence.dart';
 import 'share_ink_edit_adapter.dart';
+import 'verified_editor_asset_buffer.dart';
 
 /// Applies v2 page and ink operations to the production Drift tables.
 ///
@@ -19,10 +20,13 @@ import 'share_ink_edit_adapter.dart';
 /// until their durable projection is implemented. Quill embeds require a
 /// verified asset store and are refused here. This is not a cutover switch.
 class EditorSqliteProjector {
-  EditorSqliteProjector(this.database)
-      : _store = OperationStore(database);
+  EditorSqliteProjector(
+    this.database, {
+    this.verifiedAssetBuffer,
+  }) : _store = OperationStore(database);
 
   final NotesDatabase database;
+  final VerifiedEditorAssetBuffer? verifiedAssetBuffer;
   final OperationStore _store;
   final ShareInkEditAdapter _ink = ShareInkEditAdapter();
 
@@ -45,7 +49,7 @@ class EditorSqliteProjector {
       case OperationKind.strokeCreate:
         await _createStroke(operation);
       case OperationKind.objectCreate:
-        await _createText(operation);
+        await _createObject(operation);
       case OperationKind.objectSet:
         if (await _textRow(operation) != null) {
           await _setText(operation);
@@ -69,6 +73,8 @@ class EditorSqliteProjector {
         await _applyText(operation);
       case OperationKind.objectDelete:
         await _deleteObject(operation);
+      case OperationKind.assetAttach:
+        await _attachVerifiedAsset(operation);
       case OperationKind.assetDetach:
         await _detachUnusedAsset(operation);
       default:
@@ -734,6 +740,189 @@ class EditorSqliteProjector {
     'WHERE uid = ? AND page_uid = ?',
     [Variable<String>(op.objectId!), Variable<String>(op.pageId!)],
   );
+
+  /// Creates image metadata only; the visible row is written at attach time.
+  ///
+  /// This avoids exposing an empty or damaged placeholder to a remote editor
+  /// when an object.create event arrives before verified asset.attach.
+  Future<void> _createObject(OperationEnvelope op) async {
+    final value = Map<String, dynamic>.from(op.payload['value'] as Map);
+    if (value['objectType'] == 'image') {
+      await _validateImageCreate(op, value);
+      return;
+    }
+    await _createText(op);
+  }
+
+  Future<void> _validateImageCreate(
+    OperationEnvelope operation,
+    Map<String, dynamic> value,
+  ) async {
+    await _pageExists(operation, operation.pageId!);
+    await _objectIdUnused(operation.objectId!);
+    const expected = <String>{
+      'objectType',
+      'assetId',
+      'dx',
+      'dy',
+      'width',
+      'height',
+      'rotation',
+      'cropLeft',
+      'cropTop',
+      'cropRight',
+      'cropBottom',
+      'sortIndex',
+    };
+    final assetId = value['assetId'];
+    if (value.length != expected.length ||
+        value.keys.any((key) => !expected.contains(key)) ||
+        assetId is! String ||
+        assetId.isEmpty ||
+        assetId.length > 128 ||
+        RegExp(r'[\\x00-\\x1f\\x7f]').hasMatch(assetId)) {
+      throw const FormatException('Invalid v2 image creation payload.');
+    }
+    _validateImageGeometry(value);
+  }
+
+  static void _validateImageGeometry(Map<String, dynamic> value) {
+    _index(value['sortIndex']);
+    for (final name in [
+      'dx', 'dy', 'width', 'height', 'rotation',
+      'cropLeft', 'cropTop', 'cropRight', 'cropBottom',
+    ]) {
+      final number = value[name];
+      if (number is! num ||
+          !number.toDouble().isFinite ||
+          (const {'width', 'height'}.contains(name) && number <= 0) ||
+          (name.startsWith('crop') && (number < 0 || number > 1))) {
+        throw const FormatException('Invalid v2 image geometry.');
+      }
+    }
+  }
+
+  /// Converts a separately verified upload into a durable SQLite image.
+  /// No external network call is made while the journal transaction is open.
+  Future<void> _attachVerifiedAsset(OperationEnvelope operation) async {
+    final pageId = operation.pageId!;
+    final objectId = operation.objectId!;
+    await _pageExists(operation, pageId);
+    final cache = verifiedAssetBuffer;
+    if (cache == null) {
+      throw UnsupportedError('Verified asset staging has not been installed.');
+    }
+    final receipt = operation.payload;
+    final bytes = cache.requireBytes(receipt);
+    final assetId = receipt['assetId'] as String;
+    final sha = receipt['sha256'] as String;
+    final mime = receipt['mediaType'] as String;
+    final existingImage = await _imageRow(operation);
+    final existingText = await _textRow(operation);
+    if (existingText != null) {
+      throw UnsupportedError(
+        'Quill embed assets need a durable media resolver.',
+      );
+    }
+    final original = await _row(
+      'SELECT envelope_json FROM operations '
+      'WHERE document_id = ? AND page_id = ? AND object_id = ? '
+      "AND kind = 'object.create' ORDER BY rowid LIMIT 1",
+      [
+        Variable<String>(operation.documentId),
+        Variable<String>(pageId),
+        Variable<String>(objectId),
+      ],
+    );
+    if (original == null) {
+      throw StateError('Image must have an authenticated create operation.');
+    }
+    final envelope = OperationEnvelope.fromJson(
+      Map<String, dynamic>.from(
+        jsonDecode(original['envelope_json'] as String) as Map,
+      ),
+    );
+    final creation = Map<String, dynamic>.from(
+      envelope.payload['value'] as Map,
+    );
+    if (creation['objectType'] != 'image') {
+      throw StateError('Asset identity belongs to a non-image object.');
+    }
+    if (existingImage == null && creation['assetId'] != assetId) {
+      throw StateError('Image creation must attach its declared asset ID.');
+    }
+
+    final scopedObjectId = 'page:${jsonEncode([pageId, objectId])}';
+    final alreadyAttached = await _row(
+      'SELECT checksum_sha256, byte_length, storage_path '
+      'FROM asset_references '
+      'WHERE document_id = ? AND object_id = ? AND asset_id = ?',
+      [
+        Variable<String>(operation.documentId),
+        Variable<String>(scopedObjectId),
+        Variable<String>(assetId),
+      ],
+    );
+    if (alreadyAttached != null &&
+        (alreadyAttached['checksum_sha256'] != sha ||
+            alreadyAttached['byte_length'] != bytes.length)) {
+      throw StateError('Asset ID reused with incompatible bytes.');
+    }
+    if (alreadyAttached == null) {
+      await database.customStatement(
+        'INSERT INTO asset_references '
+        '(document_id, object_id, asset_id, storage_path, '
+        'checksum_sha256, byte_length) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          operation.documentId,
+          scopedObjectId,
+          assetId,
+          'sqlite-blob:$sha',
+          sha,
+          bytes.length,
+        ],
+      );
+    }
+
+    if (existingImage == null) {
+      await _validateImageCreate(operation, creation);
+      final ext = _imageExtension(mime);
+      await database.customStatement(
+        'INSERT INTO image_block_rows '
+        '(uid, page_uid, path, ocr_text, bytes, image_ext, image_mime, '
+        'width, height, rotation, dx, dy, crop_left, crop_top, '
+        'crop_right, crop_bottom, sort_index) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          objectId,
+          pageId,
+          '',
+          '',
+          bytes,
+          ext,
+          mime,
+          (creation['width'] as num).toDouble(),
+          (creation['height'] as num).toDouble(),
+          (creation['rotation'] as num).toDouble(),
+          (creation['dx'] as num).toDouble(),
+          (creation['dy'] as num).toDouble(),
+          (creation['cropLeft'] as num).toDouble(),
+          (creation['cropTop'] as num).toDouble(),
+          (creation['cropRight'] as num).toDouble(),
+          (creation['cropBottom'] as num).toDouble(),
+          creation['sortIndex'],
+        ],
+      );
+    }
+  }
+
+  static String _imageExtension(String mime) => switch (mime) {
+    'image/png' => 'png',
+    'image/jpeg' => 'jpg',
+    'image/webp' => 'webp',
+    'application/pdf' => 'pdf',
+    _ => throw const FormatException('Unsupported materialized MIME type.'),
+  };
 
   Future<void> _createText(OperationEnvelope op) async {
     final pageId = op.pageId!;
