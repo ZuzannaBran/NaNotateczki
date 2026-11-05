@@ -629,7 +629,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           onLibraryChanged: library.loadItems,
         );
     _v2AccountRuntime = runtime;
-    repository.enableAccountOperations(runtime.writer);
+    await repository.enableAccountOperations(runtime.writer);
     await runtime.start();
     if (!mounted ||
         _accountSession?.userId != userId ||
