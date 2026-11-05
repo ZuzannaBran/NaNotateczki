@@ -335,9 +335,9 @@ class EditorController extends ChangeNotifier {
     if (sourceIndex < 0 || destinationIndex < 0) {
       throw StateError('V2 move pages have changed since SQLite commit.');
     }
-    final updated = List<NotePage>.from(pages)
-      ..[sourceIndex] = source
-      ..[destinationIndex] = destination;
+    final updated = List<NotePage>.from(pages);
+    updated[sourceIndex] = source;
+    updated[destinationIndex] = destination;
     pages = updated;
     notebook = notebook.copyWith(pages: updated);
     _v2PersistedNotebook = notebook;
