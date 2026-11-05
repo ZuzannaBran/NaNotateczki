@@ -69,6 +69,8 @@ class EditorSqliteProjector {
         await _applyText(operation);
       case OperationKind.objectDelete:
         await _deleteObject(operation);
+      case OperationKind.assetDetach:
+        await _detachUnusedAsset(operation);
       default:
         throw UnsupportedError(
           'No verified SQLite editor reducer for ${operation.kind.wireName}.',
@@ -602,6 +604,64 @@ class EditorSqliteProjector {
           ? 'DELETE FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?'
           : 'DELETE FROM text_block_rows WHERE uid = ? AND page_uid = ?',
       [op.objectId, op.pageId],
+    );
+  }
+
+  /// Detaches an asset only after no persisted object still references it.
+  ///
+  /// Bytes/files are never deleted here. Physical garbage collection waits
+  /// for acknowledged checkpoints and remains a separate migration step.
+  Future<void> _detachUnusedAsset(OperationEnvelope operation) async {
+    final pageId = operation.pageId!;
+    final objectId = operation.objectId!;
+    await _pageExists(operation, pageId);
+    final assetId = operation.payload['assetId'] as String;
+    final scopedId = 'page:${jsonEncode([pageId, objectId])}';
+    final reference = await _row(
+      'SELECT checksum_sha256 FROM asset_references '
+      'WHERE document_id = ? AND object_id = ? AND asset_id = ?',
+      [
+        Variable<String>(operation.documentId),
+        Variable<String>(scopedId),
+        Variable<String>(assetId),
+      ],
+    );
+    if (reference == null) {
+      throw StateError('An asset must be attached before detachment.');
+    }
+
+    final text = await _textRow(operation);
+    final image = await _imageRow(operation);
+    if (text != null && image != null) {
+      throw StateError('Ambiguous image and Quill asset ownership.');
+    }
+    if (image != null) {
+      // Image IDs are not fully persisted in the legacy image rows.
+      // Without assetId mapping, we cannot prove this is not the last copy.
+      throw UnsupportedError(
+        'Detaching an active image requires verified asset replacement.',
+      );
+    }
+    if (text != null && text['delta_json'] != null) {
+      final delta = jsonDecode(text['delta_json'] as String);
+      if (delta is! List) {
+        throw const FormatException('Malformed persisted Quill Delta.');
+      }
+      for (final item in delta) {
+        if (item is! Map) {
+          throw const FormatException('Malformed persisted Quill entry.');
+        }
+        final insert = item['insert'];
+        if (insert is Map &&
+            OperationEnvelope.embedAssetId(insert) == assetId) {
+          throw StateError('A live Quill embed still references this asset.');
+        }
+      }
+    }
+    await database.customStatement(
+      'DELETE FROM asset_references '
+      'WHERE document_id = ? AND object_id = ? AND asset_id = ?',
+      [operation.documentId, scopedId, assetId],
     );
   }
 
