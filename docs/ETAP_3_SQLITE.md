@@ -149,9 +149,11 @@ snapshotów/checkpointów CRDT.
 i tą samą instancją `NotesDatabase`; odczytuje trwałe atomy przed
 przygotowaniem edycji, nie tworzy pustych wsadów i nie wywołuje
 `NotebookRepository.saveNotebook`. `writeNotebookChange` scala zmiany
-wielu stron w jedną transakcję. Zmiana przypisania ID obiektu do innej
-strony lub zmiana kolejności stron bez obsługi `object.move` jest
-odrzucana. Rozbieżny początkowy Delta Quill nie może nadpisać atomów
+wielu stron w jedną transakcję. Niezmieniona kreska może
+przechodzić między stronami przez `object.move`, z korektą sortIndex
+bez ponownego tworzenia i tombstone. Modyfikacja treści kreski w ramach
+przenoszenia, przenoszenie tekstu/obrazu i zmiana kolejności stron
+nadal są odrzucane. Rozbieżny początkowy Delta Quill nie może nadpisać atomów
 z trwałej projekcji. Projektor odmawia też kasowania ID, jeśli ten sam
 identyfikator istnieje w kilku warstwach. Nowe testy:
 `test/editor_sqlite_projector_test.dart` i
@@ -159,9 +161,11 @@ identyfikator istnieje w kilku warstwach. Nowe testy:
 offline outbox, ink, formatowanie, restart i idempotentny remote replay.
 Nie były wykonane w środowisku bez SDK Flutter/Dart.
 
-**Granice:** projektor odrzuca `image/pdf`, embedy Quill,
-`asset.attach/detach`, `document.create`, `object.move` i inne
-niewspierane mutacje. Nie zapewnia jeszcze uzgodnień LWW per pole ani
+**Granice:** projektor odrzuca tworzenie/usuwanie/zmianę
+assetów `image/pdf`, embedy Quill, `asset.attach/detach`,
+`document.create` i przenoszenie innych obiektów niż ink.
+Ink `object.move` zachowuje pierwotne ID i jest ograniczony do
+rzeczywiście istniejących stron oraz obiektów bez referencji assetów. Nie zapewnia jeszcze uzgodnień LWW per pole ani
 rebase przy jednoczesnych edycjach. `EditorController` ma teraz
 opcjonalny parametr `operationWriter`; jeśli został podany, `_save`,
 `_saveDirtyPages` i flush używają wyłącznie kolejki operacyjnej v2
@@ -190,6 +194,15 @@ ponownego callbacku UI w tej samej sesji `SyncEngine` (maksymalnie
 ponowić; po restarcie silnika pamięć powiadomień jest czyszczona.
 Regresja: `test/sync_engine_test.dart`. Nie zastępuje to trwałego
 stanu odtworzenia warstwy UI ani rebase konfliktów.
+
+Dodatkowo istnieje `EditorV2RemotePatchDispatcher`, przekazywany
+jako callback `SyncEngine.onRemoteCommitted`. Po commicie SQLite odczytuje
+rzeczywisty docelowy obiekt lub stronę i aktualizuje wyłącznie ten fragment
+kontrolera. Ruch `object.move` odzwierciedla w źródle i celu bez
+ponownego montowania całego edytora. Jeśli trwa lokalny gest, zwraca
+błąd i silnik może ponowić callback. Nie dotyczy to jeszcze
+automatycznego przełączania kont w `AppScope` ani LWW/rebase.
+Test: `test/editor_v2_remote_patch_dispatcher_test.dart`.
 
 ### Ręczna weryfikacja, gdy dostępne będzie środowisko Flutter
 
