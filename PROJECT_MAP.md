@@ -1371,8 +1371,9 @@ w `test/sync_engine_test.dart`.
 `SyncEngine.writeLocalBatch` i `EditorSqliteProjector.apply`; sprawdza
 tożsamość instancji bazy dziennika i projekcji, pobiera trwałe atomy
 tekstowe z `OperationStore` i pomija puste zmiany. Metody:
-`writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`
-oraz `writeNotebookChange` — atomowy wsad wielostronicowy.
+`writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`,
+`writeCreateNotebook`, `writeDeleteNotebook` oraz `writeNotebookChange`
+— atomowy wsad wielostronicowy lub bootstrap/del dokumentu bez v1.
 Przenoszenie niezmienionej kreski między stronami używa `object.move`,
 zachowuje ID i naprawia indeksy sortowania na obu stronach.
 Przenoszenie obrazu dopuszczalne jest tylko przy niezmienionych
@@ -2828,6 +2829,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `routers/assets.py`, `operation_projection.py` oraz
   `migrations/0014_verified_assets.sql`. Katalog `server/` to lustro.
 - `EditorController` może używać opt-in writera v2 i odwróconych
-  operacji z nowymi ID. Zwykły `AppScope` nadal go nie instaluje. Brak
-  lokalnej projekcji osadzonych plików Quill, trwałej historii Undo/Redo po
-  restarcie, produkcyjnego cutover i E2E; etap 3 pozostaje częściowy.
+  operacji z nowymi ID. `EditorSqliteProjector` tworzy i usuwa notebook
+  atomowo przez `document.create/document.delete`, a `document.set`
+  zapisuje tytuł/folder z deterministyczną rewizją. `AppScope` nadal
+  nie instaluje tego writera. Brak lokalnej projekcji osadzonych plików
+  Quill, trwałej historii Undo/Redo po restarcie, produkcyjnego cutover
+  i E2E; etap 3 pozostaje częściowy.
