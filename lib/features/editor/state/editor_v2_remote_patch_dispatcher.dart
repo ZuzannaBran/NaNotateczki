@@ -56,6 +56,13 @@ class EditorV2RemotePatchDispatcher {
     }
 
     final sourceId = operation.pageId!;
+    // Image creation announces only metadata. Its verified bytes become
+    // renderable at asset.attach, not at object.create.
+    if (operation.kind == OperationKind.objectCreate &&
+        operation.payload['value'] is Map &&
+        (operation.payload['value'] as Map)['objectType'] == 'image') {
+      return;
+    }
     if (operation.kind == OperationKind.objectMove) {
       final destinationId = operation.payload['toPageId'] as String;
       final source = _page(notebook.pages, sourceId);
