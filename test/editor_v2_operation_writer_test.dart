@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
 
@@ -5,8 +6,12 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/editor_sqlite_projector.dart';
+import 'package:program/data/sync/operation_asset_gateway.dart';
 import 'package:program/data/sync/operation_gateway.dart';
 import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
@@ -389,6 +394,98 @@ void main() {
           .pages.first.imageBlocks.single.bytes,
       orderedEquals(rawBytes),
     );
+  });
+
+
+  test('normal v2 image insert uploads before SQLite and retries safely',
+      () async {
+    final rawBytes = Uint8List.fromList([137, 80, 78, 71, 0, 1]);
+    final digest = crypto.sha256.convert(rawBytes).toString();
+    var rejectReceipt = true;
+    var uploads = 0;
+    final api = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        uploads++;
+        expect(request.method, 'PUT');
+        expect(request.url.path, '/v2/assets/$digest');
+        expect(request.bodyBytes, rawBytes);
+        return http.Response(
+          jsonEncode({
+            'sha256': rejectReceipt ? '0' * 64 : digest,
+            'sizeBytes': rawBytes.length,
+            'mediaType': 'image/png',
+          }),
+          200,
+        );
+      }),
+    );
+    api.setAccessToken('owner-token');
+    addTearDown(api.close);
+    final buffer = VerifiedEditorAssetBuffer();
+    final projector = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
+    );
+    final mediaEngine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'automatic-media',
+      checkpointScope: 'automatic-media',
+      enableRealtime: false,
+      applyRemote: (operation, pending) => projector.apply(operation),
+    );
+    addTearDown(mediaEngine.stop);
+    final mediaWriter = EditorV2OperationWriter(
+      syncEngine: mediaEngine,
+      projector: projector,
+      assetGateway: OperationAssetGateway(api),
+    );
+    final notebook = await repository.createNotebook();
+    final page = notebook.pages.single;
+    final changed = page.copyWith(
+      imageBlocks: [
+        ImageBlock(
+          id: 'automatic-image',
+          path: '',
+          ocrText: '',
+          bytes: rawBytes,
+          imageMime: 'image/png',
+          position: Offset.zero,
+          width: 100,
+          height: 100,
+        ),
+      ],
+    );
+    await expectLater(
+      mediaWriter.writePageChange(
+        documentId: notebook.uid,
+        before: page,
+        after: changed,
+      ),
+      throwsFormatException,
+    );
+    expect(await store.pending(), isEmpty);
+    expect((await repository.getNotebook(notebook.uid))!
+        .pages.single.imageBlocks, isEmpty);
+
+    rejectReceipt = false;
+    final written = await mediaWriter.writePageChange(
+      documentId: notebook.uid,
+      before: page,
+      after: changed,
+    );
+    expect(written.map((entry) => entry.kind), [
+      OperationKind.objectCreate,
+      OperationKind.assetAttach,
+    ]);
+    expect(uploads, 2);
+    expect(
+      (await repository.getNotebook(notebook.uid))!
+          .pages.single.imageBlocks.single.bytes,
+      orderedEquals(rawBytes),
+    );
+    expect((await store.pending()), hasLength(2));
   });
 
   test('image replacement swaps verified bytes and detaches the old ID',
