@@ -30,8 +30,7 @@ void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('v2 account repository never falls back to document snapshots',
-      () async {
+  test('v2 repository routes CRUD exclusively through journal', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     var commits = 0;
