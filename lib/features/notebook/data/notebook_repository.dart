@@ -12,6 +12,7 @@ import '../../../core/diagnostics/data_integrity_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../core/storage/app_data_directory.dart';
 import '../../../data/drift/notes_database.dart';
+import '../../../data/sync/operation_protocol.dart';
 import '../../editor/state/editor_v2_operation_writer.dart';
 import '../domain/drawing_tool.dart';
 import '../domain/image_block.dart';
@@ -102,6 +103,37 @@ class NotebookRepository {
   final Set<String> _operationProtocolDocuments = <String>{};
   final Map<String, Notebook> _notebookCache = <String, Notebook>{};
   bool _isNotebookCacheComplete = false;
+
+  /// Invalidate snapshot caches and schedule backups after the journal
+  /// commit, not while a gesture or SQLite transaction is still pending.
+  void reportOperationCommit(
+    String documentId,
+    List<OperationEnvelope> operations,
+  ) {
+    if (operations.isEmpty ||
+        operations.any((operation) => operation.documentId != documentId)) {
+      throw ArgumentError('Invalid operational commit notification.');
+    }
+    _notebookCache.remove(documentId);
+    _isNotebookCacheComplete = false;
+    _latestPersistedUpdates.remove(documentId);
+    final full = operations.any(
+      (operation) =>
+          operation.kind.target == OperationTarget.document ||
+          operation.kind.target == OperationTarget.page ||
+          operation.kind == OperationKind.objectMove,
+    );
+    final pages = <String>{
+      for (final operation in operations)
+        if (operation.pageId != null) operation.pageId!,
+    };
+    onChanged?.call([
+      if (full || pages.isEmpty)
+        NotebookRepositoryChange.full(documentId)
+      else
+        NotebookRepositoryChange.pages(documentId, pages),
+    ]);
+  }
 
   bool get lastFetchSkippedCorruptRows => _lastFetchSkippedCorruptRows;
   bool get hasPendingSaves => _saveTails.isNotEmpty;
@@ -577,7 +609,9 @@ class NotebookRepository {
       await saveNotebook(notebook);
     } else {
       await writer.writeCreateNotebook(notebook: notebook);
-      onChanged?.call([NotebookRepositoryChange.full(notebook.uid)]);
+      if (writer.onCommitted == null) {
+        onChanged?.call([NotebookRepositoryChange.full(notebook.uid)]);
+      }
     }
     return notebook;
   }
@@ -608,7 +642,9 @@ class NotebookRepository {
       await saveNotebook(board);
     } else {
       await writer.writeCreateNotebook(notebook: board);
-      onChanged?.call([NotebookRepositoryChange.full(board.uid)]);
+      if (writer.onCommitted == null) {
+        onChanged?.call([NotebookRepositoryChange.full(board.uid)]);
+      }
     }
     return board;
   }
@@ -963,7 +999,9 @@ class NotebookRepository {
         throw StateError('V2 metadata commit has no durable projection.');
       }
       _notebookCache[uid] = updated;
-      onChanged?.call([NotebookRepositoryChange.metadata(uid)]);
+      if (writer.onCommitted == null) {
+        onChanged?.call([NotebookRepositoryChange.metadata(uid)]);
+      }
       return updated;
     }
     await _requireLegacyWritable(uid);
@@ -1449,7 +1487,9 @@ class NotebookRepository {
       await writer.writeDeleteNotebook(documentId: uid);
       _latestPersistedUpdates.remove(uid);
       _notebookCache.remove(uid);
-      onChanged?.call([NotebookRepositoryChange.full(uid)]);
+      if (writer.onCommitted == null) {
+        onChanged?.call([NotebookRepositoryChange.full(uid)]);
+      }
       return;
     }
     await _requireLegacyWritable(uid);
