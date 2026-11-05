@@ -470,9 +470,20 @@ utworzeniu nowego repozytorium i restarcie aplikacji. Każdy legacy
 writer ponawia kontrolę wewnątrz transakcji, a automatyczna migracja
 legacy gumki nie może przepisywać strony z v2 operacjami.
 W opt-in v2 Undo/Redo jest wyłączone (brak inverse intents).
-Nie obsługuje jeszcze tworzenia/usuwania/wymiany assetów,
-Quill embedów, przenoszenia tekstu, zakładania dokumentów v2 ani
-pełnego rebase. Niezmieniona kreska może być przeniesiona między
+Obsługuje już tworzenie nowych obrazów/PDF z potwierdzonych transferów
+przez `VerifiedEditorAssetBuffer`: `object.create` zapisuje wyłącznie
+metadane w dzienniku, a dopiero `asset.attach` zapisuje bajty do
+`image_block_rows.bytes` i trwałą referencję w tej samej transakcji.
+`OperationAssetGateway.uploadAndStage/downloadAndStage` weryfikuje
+SHA-256, rozmiar i MIME poza transakcją. `SyncEngine.prepareRemoteOperation`
+może przygotować pobranie przed lokalnym `applyRemote`, tak aby brak
+assetu nie przesunął kursora. Zapisane bajty nie zależą od życia
+bufora; jest to rozwiązanie opt-in, potencjalnie kosztowne dla dużych
+obiektów BLOB.
+Nadal nie obsługuje wymiany i usuwania obrazów/PDF,
+nowych embedów Quill, przenoszenia tekstu, zakładania dokumentów v2
+ani pełnego rebase. `asset.detach` usuwa tylko referencje, których
+nie używa bieżący Quill; nie usuwa bajtów ani aktywnych obrazów. Niezmieniona kreska może być przeniesiona między
 stronami przez `object.move` bez usuwania jej ID. Obraz może być
 przeniesiony wyłącznie przy niezmienionych bajtach/MIME i trwałej
 scoped referencji assetu: jedna transakcja aktualizuje pageUid,
