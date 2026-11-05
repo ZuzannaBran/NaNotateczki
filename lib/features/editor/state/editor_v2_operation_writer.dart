@@ -34,6 +34,47 @@ class EditorV2OperationWriter {
   final SyncEngine syncEngine;
   final EditorSqliteProjector projector;
   final EditorOperationBridge _bridge;
+  final Map<String, Map<String, VerifiedEditorAsset>> _registeredAssets = {};
+
+  /// Call after a verified upload has been staged for the same document.
+  /// The receipt survives a rolled-back editor gesture for safe retry.
+  void registerVerifiedAsset({
+    required String documentId,
+    required String objectId,
+    required VerifiedEditorAsset asset,
+  }) {
+    if (documentId.isEmpty || objectId.isEmpty) {
+      throw ArgumentError('Asset registration requires stable identities.');
+    }
+    OperationEnvelope.validateV2Payload(
+      kind: OperationKind.assetAttach,
+      payload: asset.attachPayload,
+      documentId: documentId,
+      pageId: 'staged-editor-page',
+      objectId: objectId,
+    );
+    final registered = _registeredAssets.putIfAbsent(
+      documentId,
+      () => <String, VerifiedEditorAsset>{},
+    );
+    final previous = registered[objectId];
+    if (previous != null &&
+        !const DeepCollectionEquality().equals(
+          previous.attachPayload,
+          asset.attachPayload,
+        )) {
+      throw StateError('Pending asset identity cannot change on retry.');
+    }
+    registered[objectId] = asset;
+  }
+
+  Map<String, VerifiedEditorAsset> _assetsFor(
+    String documentId,
+    Map<String, VerifiedEditorAsset> explicit,
+  ) => {
+    ...?_registeredAssets[documentId],
+    ...explicit,
+  };
 
   /// Commits a multi-page gesture and stable-ID ink moves in one batch.
   ///
@@ -239,7 +280,7 @@ class EditorV2OperationWriter {
         before: baseline,
         after: page,
         textAtomsById: atoms,
-        verifiedAssets: verifiedAssets,
+        verifiedAssets: _assetsFor(after.uid, verifiedAssets),
       ));
       if (touchedPages.contains(page.id)) {
         // A move can shift the old sortIndex of an untouched stroke.
@@ -311,7 +352,7 @@ class EditorV2OperationWriter {
       before: before,
       after: after,
       textAtomsById: atoms,
-      verifiedAssets: verifiedAssets,
+      verifiedAssets: _assetsFor(documentId, verifiedAssets),
     );
     return _commit(documentId, drafts);
   }
@@ -332,7 +373,7 @@ class EditorV2OperationWriter {
       before: before,
       after: after,
       textAtomsById: atoms,
-      verifiedAssets: verifiedAssets,
+      verifiedAssets: _assetsFor(documentId, verifiedAssets),
     );
     return _commit(documentId, drafts);
   }
@@ -343,7 +384,10 @@ class EditorV2OperationWriter {
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
   }) => _commit(
     documentId,
-    _bridge.planCreatePage(page, verifiedAssets: verifiedAssets),
+    _bridge.planCreatePage(
+      page,
+      verifiedAssets: _assetsFor(documentId, verifiedAssets),
+    ),
   );
 
   Future<List<OperationEnvelope>> writeDeletePage({
@@ -354,15 +398,35 @@ class EditorV2OperationWriter {
   Future<List<OperationEnvelope>> _commit(
     String documentId,
     List<LocalOperationDraft> drafts,
-  ) {
+  ) async {
     if (drafts.isEmpty) {
-      return Future.value(const <OperationEnvelope>[]);
+      return const <OperationEnvelope>[];
     }
-    return syncEngine.writeLocalBatch(
+    final committed = await syncEngine.writeLocalBatch(
       documentId: documentId,
       operations: drafts,
       apply: projector.apply,
     );
+    final registered = _registeredAssets[documentId];
+    if (registered != null) {
+      for (final operation in committed) {
+        if (operation.kind != OperationKind.assetAttach) {
+          continue;
+        }
+        final previous = registered[operation.objectId];
+        if (previous != null &&
+            const DeepCollectionEquality().equals(
+              previous.attachPayload,
+              operation.payload,
+            )) {
+          registered.remove(operation.objectId);
+        }
+      }
+      if (registered.isEmpty) {
+        _registeredAssets.remove(documentId);
+      }
+    }
+    return committed;
   }
 
   Future<Map<String, Map<String, dynamic>>> _textAtoms({
