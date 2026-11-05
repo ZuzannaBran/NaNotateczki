@@ -59,7 +59,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (1016 linii)
+### `lib/app/app_scope.dart` (1589 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -80,13 +80,14 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   niezależny od migracji bazy notatek.
 - Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
   backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
-- 36: `AppScope`; 43: `_AppScopeState`; 130: `didRequestAppExit`;
+- 45: `AppScope`; 54: `_AppScopeState`; 282: `didRequestAppExit`;
   `_startAccountSync` automatycznie odtwarza stan po logowaniu i restarcie
   na wszystkich platformach, zanim uruchomi backup.
-- 235: `_syncAccountSettings`; 269: `_startAccountSync`;
-  568: `AppUiScale`; 616: `_ExitGuardOverlay`;
-  639: `_FinishingExitOverlay`; 747: `_BackupScheduler`;
-  943: `flushForExit`.
+- 488: `_syncAccountSettings`; 588: `_v2ActorId`;
+  592: `_startV2Account`; 644: `_startAccountSync`;
+  1080: `AppUiScale`; 1128: `_ExitGuardOverlay`;
+  1211: `_FinishingExitOverlay`; 1319: `_BackupScheduler`;
+  1515: `flushForExit`.
 
 ## 3. Core
 
@@ -537,6 +538,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Nie traktować tej częściowej integracji jako dopuszczenia produkcji v2.
 
 ### Operacyjny silnik v2 (etap 5, opt-in)
+
+- `lib/data/sync/persistent_operation_actor.dart`:
+  `loadPersistentOperationActor` odczytuje UUID z aktywnej przestrzeni
+  konta, waliduje wersję i czeka na trwały zapis przed zwróceniem nowego ID.
+  Brak pliku przy zaległym outboxie (także blocked/retry) blokuje start;
+  błędny plik pozostaje nienaruszony do odzyskania.
+  `test/persistent_operation_actor_test.dart` sprawdza restart plikowej
+  SQLite i kontynuację actorSeq, błędne ID, brak ID i awarię zapisu.
 
 - `lib/data/sync/operation_gateway.dart`: `OperationGateway`,
   `HttpOperationGateway`, `OperationReceipt`, `OperationFeedPage`.

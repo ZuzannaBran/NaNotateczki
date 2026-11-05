@@ -4,6 +4,27 @@ Stan na 2026-11-05. Aktywna produkcja pozostaje na v1. Każdy przyrost
 jest realizowany na `NaNotateczki/dev`. Żaden punkt nie może być
 uznany za zaliczony na podstawie samego dodania testu.
 
+## Naprawa P0 — 6 listopada 2026
+
+Logi `42115891175` ujawniły błąd parsera w `_v2ActorId` oraz
+zdublowaną końcówkę `app_scope.dart`, która blokowała wszystkie buildy.
+Usunięto duplikat, zachowując nowszą ścieżkę z trwałym aktorem i oczekiwaniem
+na `enableAccountOperations`. Odczyt aktora wydzielono do
+`persistent_operation_actor.dart`; brak ID przy niewysłanych, opóźnionych
+lub zablokowanych operacjach odmawia startu bez zmiany danych.
+Test restartu używa pliku SQLite i potwierdza ciągłość actorSeq.
+
+Naprawiono też formatowanie czterech plików wskazanych przez CI oraz
+nowej regresji usuwania strony. `dart format` parsuje już cały projekt.
+Analiza i testy Flutter wymagają potwierdzenia dla tego przyrostu.
+Serwer: poprawiono test przegrywającego move po usunięciu strony;
+lokalnie 272 testy przeszły, 8 scenariuszy PostgreSQL pominięto.
+
+Granica zakresu: najpierw pełny lokalny zapis edytora v2 (etap 3),
+następnie rebase dwóch klientów, synchronizacja całego konta i cutover
+(etap 4). Starsze sekcje C/D zawierają również te późniejsze warunki;
+nie wymagają przedwczesnej aktywacji flagi ani usunięcia v1.
+
 ## Integracja z 5 listopada 2026 — nadal niezamknięty etap 3
 
 - Dodano opt-in `EditorV2AccountRuntime` dla konta o potwierdzonym

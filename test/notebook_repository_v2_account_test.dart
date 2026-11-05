@@ -68,9 +68,7 @@ void main() {
 
     await expectLater(
       repository.saveNotebook(
-        notebook.copyWith(
-          uid: 'ccab00f6-a8c8-47d6-82bc-de3165a2889d',
-        ),
+        notebook.copyWith(uid: 'ccab00f6-a8c8-47d6-82bc-de3165a2889d'),
       ),
       throwsA(isA<LegacyProtocolWriteBlocked>()),
     );
@@ -79,10 +77,7 @@ void main() {
       throwsA(isA<LegacyProtocolWriteBlocked>()),
     );
     await expectLater(
-      repository.saveNotebookPages(
-        notebook,
-        {notebook.pages.single.id},
-      ),
+      repository.saveNotebookPages(notebook, {notebook.pages.single.id}),
       throwsA(isA<LegacyProtocolWriteBlocked>()),
     );
     final renamed = await repository.updateNotebookMetadata(
@@ -197,5 +192,4 @@ void main() {
     expect(await repository.saveNotebook(old), isTrue);
     expect(await store.pending(), isEmpty);
   });
-
 }

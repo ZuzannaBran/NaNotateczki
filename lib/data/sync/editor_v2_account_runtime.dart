@@ -62,8 +62,7 @@ class EditorV2AccountRuntime {
       },
       prepareRemoteOperation: (operation) =>
           projector.prepareRemoteMedia(operation, assetGateway),
-      onRemoteCommitted: (operation) =>
-          runtime._onRemoteCommitted(operation),
+      onRemoteCommitted: (operation) => runtime._onRemoteCommitted(operation),
     );
     runtime = EditorV2AccountRuntime._(
       repository: repository,
@@ -117,8 +116,7 @@ class EditorV2AccountRuntime {
       ).onRemoteCommitted(operation);
     }
     repository.reportOperationCommit(operation.documentId, [operation]);
-    if (editor == null ||
-        operation.kind.target == OperationTarget.document) {
+    if (editor == null || operation.kind.target == OperationTarget.document) {
       await onLibraryChanged?.call();
     }
   }

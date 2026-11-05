@@ -2036,9 +2036,7 @@ class _LibraryWorkspace extends StatelessWidget {
 
     final operationRuntime = context.read<EditorV2AccountRuntime?>();
     return _PersistentWorkspaceEditor(
-      key: ValueKey(
-        '${item!.uid}:${operationRuntime == null ? 'v1' : 'v2'}',
-      ),
+      key: ValueKey('${item!.uid}:${operationRuntime == null ? 'v1' : 'v2'}'),
       operationRuntime: operationRuntime,
       item: item!,
       repository: context.read<NotebookRepository>(),

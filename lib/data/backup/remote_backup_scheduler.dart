@@ -5,11 +5,10 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-
-import '../../core/input/ink_activity_tracker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/error/app_error_log.dart';
+import '../../core/input/ink_activity_tracker.dart';
 import '../../core/storage/text_storage.dart';
 import '../sync/account_session_controller.dart';
 import 'remote_backup_service.dart';

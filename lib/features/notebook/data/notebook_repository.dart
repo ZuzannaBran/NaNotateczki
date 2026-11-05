@@ -85,9 +85,7 @@ class NotebookRepository {
 
   /// Selects v2 only after the owning account protocol is verified.
   /// Existing v1 documents must be migrated before enabling this path.
-  Future<void> enableAccountOperations(
-    EditorV2OperationWriter writer,
-  ) async {
+  Future<void> enableAccountOperations(EditorV2OperationWriter writer) async {
     if (!identical(writer.projector.database, database) ||
         hasPendingSaves ||
         _operationOwnedDocuments.isNotEmpty ||
@@ -102,10 +100,12 @@ class NotebookRepository {
     // must have a committed document.create in the journal.
     _accountOperationWriter = writer;
     try {
-      final legacy = await database.customSelect(
-        'SELECT n.uid FROM notebook_rows n WHERE NOT EXISTS '
-        '(SELECT 1 FROM operations o WHERE o.document_id = n.uid) LIMIT 1',
-      ).getSingleOrNull();
+      final legacy = await database
+          .customSelect(
+            'SELECT n.uid FROM notebook_rows n WHERE NOT EXISTS '
+            '(SELECT 1 FROM operations o WHERE o.document_id = n.uid) LIMIT 1',
+          )
+          .getSingleOrNull();
       if (legacy != null) {
         throw StateError('Account contains an unmigrated legacy document.');
       }
