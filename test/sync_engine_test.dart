@@ -653,6 +653,59 @@ void main() {
     expect(await store.checkpoint('user-A-v2'), 1);
   });
 
+  test('replacement is prepared before remote projection and after restart',
+      () async {
+    final replacement = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'image-switch-actor',
+      actorSeq: 1,
+      logicalClock: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'image-to-replace',
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'assetId': 'verified-replacement'},
+      },
+    );
+    gateway.seed(replacement);
+    engine.dispose();
+    var prepared = 0;
+    var committed = 0;
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      prepareRemoteOperation: (operation) async {
+        expect(operation.operationId, replacement.operationId);
+        expect(await store.operation(replacement.operationId), isNull);
+        prepared++;
+      },
+      applyRemote: (operation, pending) async {
+        expect(prepared, 1);
+        await database.customStatement(
+          'INSERT INTO projection_probe VALUES (?, ?)',
+          [operation.objectId, 'switched'],
+        );
+        committed++;
+      },
+    );
+    await engine.start();
+    expect(prepared, 1);
+    expect(committed, 1);
+    expect(await store.checkpoint('user-A-v2'), 1);
+
+    await database.customStatement(
+      'UPDATE sync_checkpoints SET server_sequence = 0 WHERE scope = ?',
+      ['user-A-v2'],
+    );
+    await engine.syncNow();
+    expect(prepared, 1);
+    expect(committed, 1);
+  });
+
   test('a replayed remote operation notifies the editor once', () async {
     gateway.seed(_remote('other-actor', 'remote-once'));
     engine.dispose();

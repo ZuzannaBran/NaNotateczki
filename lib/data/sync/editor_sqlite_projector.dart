@@ -7,6 +7,7 @@ import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
 
 import '../drift/notes_database.dart';
+import 'operation_asset_gateway.dart';
 import 'operation_protocol.dart';
 import 'operation_store.dart';
 import 'operation_text_sequence.dart';
@@ -791,6 +792,87 @@ class EditorSqliteProjector {
   }
 
 
+  /// Finds the durable receipt for an asset already attached to this object.
+  Future<Map<String, dynamic>?> _attachedReceipt({
+    required String documentId,
+    required String pageId,
+    required String objectId,
+    required String assetId,
+  }) async {
+    final rows = await database.customSelect(
+      'SELECT envelope_json FROM operations WHERE document_id = ? '
+      'AND page_id = ? AND object_id = ? AND kind = ?',
+      variables: [
+        Variable<String>(documentId),
+        Variable<String>(pageId),
+        Variable<String>(objectId),
+        const Variable<String>('asset.attach'),
+      ],
+    ).get();
+    if (rows.length > 50000) {
+      throw StateError('Asset history requires a checkpoint.');
+    }
+    Map<String, dynamic>? receipt;
+    for (final row in rows) {
+      final decoded = jsonDecode(row.read<String>('envelope_json'));
+      if (decoded is! Map) {
+        throw const FormatException('Malformed asset operation.');
+      }
+      final candidate = OperationEnvelope.fromJson(
+        Map<String, dynamic>.from(decoded),
+      );
+      if (candidate.payload['assetId'] == assetId) {
+        receipt = candidate.payload;
+      }
+    }
+    return receipt;
+  }
+
+  /// Downloads verified bytes before a remote attach or image switch.
+  ///
+  /// An already committed attach may precede an object.set by a restart.
+  /// The receipt is recovered from the journal and can be downloaded again.
+  /// Never call this method while a SQLite transaction is open.
+  Future<void> prepareRemoteMedia(
+    OperationEnvelope operation,
+    OperationAssetGateway gateway,
+  ) async {
+    final buffer = verifiedAssetBuffer;
+    if (buffer == null) {
+      throw UnsupportedError('Verified asset staging is unavailable.');
+    }
+    Map<String, dynamic>? receipt;
+    if (operation.kind == OperationKind.assetAttach) {
+      receipt = operation.payload;
+    } else if (operation.kind == OperationKind.objectSet) {
+      final properties = operation.payload['properties'];
+      if (properties is Map && properties['assetId'] is String) {
+        receipt = await _attachedReceipt(
+          documentId: operation.documentId,
+          pageId: operation.pageId!,
+          objectId: operation.objectId!,
+          assetId: properties['assetId'] as String,
+        );
+      }
+    }
+    if (receipt == null) {
+      if (operation.kind == OperationKind.assetAttach) {
+        throw StateError('Asset attach has no verified receipt.');
+      }
+      if (operation.kind == OperationKind.objectSet &&
+          (operation.payload['properties'] as Map).containsKey('assetId')) {
+        throw StateError('Image replacement has no durable asset receipt.');
+      }
+      return;
+    }
+    try {
+      buffer.requireBytes(receipt);
+      return;
+    } on StateError {
+      await gateway.downloadAndStage(receipt: receipt, buffer: buffer);
+    }
+  }
+
   /// Returns the one verified asset currently rendered by an image.
   ///
   /// Content hashes distinguish the live reference from staged replacements.
@@ -923,32 +1005,12 @@ class EditorSqliteProjector {
       if (reference == null) {
         throw StateError('Replacement asset has not been attached.');
       }
-      final receipts = await database.customSelect(
-        'SELECT envelope_json FROM operations WHERE document_id = ? '
-        'AND page_id = ? AND object_id = ? AND kind = ?',
-        variables: [
-          Variable<String>(op.documentId),
-          Variable<String>(op.pageId!),
-          Variable<String>(op.objectId!),
-          const Variable<String>('asset.attach'),
-        ],
-      ).get();
-      if (receipts.length > 50000) {
-        throw StateError('Asset history requires a checkpoint.');
-      }
-      Map<String, dynamic>? receipt;
-      for (final row in receipts) {
-        final decoded = jsonDecode(row.read<String>('envelope_json'));
-        if (decoded is! Map) {
-          throw const FormatException('Malformed asset operation.');
-        }
-        final candidate = OperationEnvelope.fromJson(
-          Map<String, dynamic>.from(decoded),
-        );
-        if (candidate.payload['assetId'] == replacementId) {
-          receipt = candidate.payload;
-        }
-      }
+      final receipt = await _attachedReceipt(
+        documentId: op.documentId,
+        pageId: op.pageId!,
+        objectId: op.objectId!,
+        assetId: replacementId,
+      );
       if (receipt == null ||
           receipt['sha256'] != reference['checksum_sha256'] ||
           receipt['sizeBytes'] != reference['byte_length']) {

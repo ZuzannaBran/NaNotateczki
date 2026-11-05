@@ -334,7 +334,14 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       for (final item in page.operations) {
         try {
           final queuedEcho = await store.isPending(item.operation.operationId);
-          if (item.operation.kind == OperationKind.assetAttach &&
+          final isMediaAttach =
+              item.operation.kind == OperationKind.assetAttach;
+          final isMediaSwitch =
+              item.operation.kind == OperationKind.objectSet &&
+              item.operation.payload['properties'] is Map &&
+              (item.operation.payload['properties'] as Map)
+                  .containsKey('assetId');
+          if ((isMediaAttach || isMediaSwitch) &&
               await store.operation(item.operation.operationId) == null) {
             await prepareRemoteOperation?.call(item.operation);
           }

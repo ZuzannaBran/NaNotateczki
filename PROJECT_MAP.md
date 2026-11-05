@@ -1372,8 +1372,10 @@ bajtach/MIME i trwałej referencji assetu; geometria może się zmienić
 w tej samej transakcji. Zmiana treści istniejącego obrazu planuje operacje attach → set →
 detach i wymaga aktualnego `assetId` odczytanego z trwałych
 referencji SQLite, z identyczną tożsamością obiektu; nie ma fallbacku
-do niezaufanej lokalnej ścieżki. Brak bufora assetów po restarcie może
-zatrzymać remote replay do ponownego pobrania danych.
+do niezaufanej lokalnej ścieżki. Po restarcie `EditorSqliteProjector.prepareRemoteMedia`
+odtwarza receipt z trwałego dziennika i pobiera nowy asset przed
+`object.set(assetId)`; `SyncEngine` wywołuje prefetch także dla
+zdalnych podmian. Produkcyjny AppScope nadal nie przekazuje gateway.
 Przenoszenie tekstu nadal zablokowane;
 odrzuca zmianę
 kolejności stron oraz edycję z nieaktualnym Delta Quill.

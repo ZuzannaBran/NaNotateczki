@@ -33,7 +33,8 @@ ten sam stan i trwały outbox.
 
 - [ ] Lokalna podmiana obrazu: attach → object.set → detach przy
   zweryfikowanym uploadzie, z wersjonowaniem pola `assetId` i rollbackiem.
-  Kod dodany, wymaga testów i obsługi restartu między operacjami.
+  Kod dodany; prefetch po restarcie oparty na trwałym attach receipt.
+  Wymaga testów Flutter i podłączenia gateway w AppScope.
 
 
 1. Zdefiniować kanoniczne powiązanie `assetId` ↔ SHA-256 ↔
