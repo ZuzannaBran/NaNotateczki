@@ -29,6 +29,7 @@ import '../data/sync/app_activity_wake_service.dart';
 import '../data/sync/cloud_sync_service.dart';
 import '../data/sync/diagnostics_upload_service.dart';
 import '../data/sync/device_clock_check.dart';
+import '../data/sync/editor_v2_account_runtime.dart';
 import '../data/sync/live_web_sync_service.dart';
 import '../data/sync/planner_sync_service.dart';
 import '../features/editor/state/ink_color_presets.dart';
@@ -62,6 +63,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   RemoteBackupService? _remoteBackupService;
   RemoteBackupScheduler? _remoteBackupScheduler;
   LiveWebSyncService? _liveSync;
+  EditorV2AccountRuntime? _v2AccountRuntime;
+  static const bool _enableV2AccountPreview = bool.fromEnvironment(
+    'NN_ENABLE_V2_ACCOUNT',
+    defaultValue: false,
+  );
   AccountSettingsSyncService? _accountSettingsSync;
   PlannerSyncService? _plannerSync;
   Future<void>? _plannerReady;
@@ -114,6 +120,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     await SharedRecentColors.load();
     await waitForPendingTextStorageOperations();
     await _liveSync?.stop();
+    await _v2AccountRuntime?.stop();
     _plannerSync?.stop();
     _accountSettingsSync?.stop();
     await _remoteBackupScheduler?.stop();
@@ -220,6 +227,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     _backupScheduler?.dispose();
     _remoteBackupScheduler?.dispose();
     _liveSync?.dispose();
+    _v2AccountRuntime?.dispose();
     final scheduler = _remoteBackupScheduler;
     if (scheduler != null) {
       SharedRecentColors.revision.removeListener(scheduler.markDirty);
@@ -310,11 +318,21 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         await backupService.waitUntilIdle();
         await waitForPendingTextStorageOperations();
         if (_accountSession?.isSignedIn == true) {
-          await _liveSync?.flushPersistedOutbox();
+          if (_v2AccountRuntime == null) {
+            await _liveSync?.flushPersistedOutbox();
+          }
         }
       },
       syncRemote: () async {
         if (_accountSession?.isSignedIn != true) {
+          return;
+        }
+        final v2 = _v2AccountRuntime;
+        if (v2 != null) {
+          await v2.engine.syncNow();
+          if (v2.engine.lastError != null) {
+            throw StateError('Pending v2 account sync failed.');
+          }
           return;
         }
         if (_liveSync == null) {
@@ -327,6 +345,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       },
       verifyBackup: () async {
         if (_accountSession?.isSignedIn != true) {
+          return;
+        }
+        if (_v2AccountRuntime != null) {
+          // The legacy snapshot protocol must not back up a v2 account.
           return;
         }
         final remote = _remoteBackupScheduler;
@@ -484,7 +506,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   }
 
   Future<void> _syncPlanner() async {
-    if (_bootstrappedAccount == null || _plannerSync == null) {
+    if (_bootstrappedAccount == null ||
+        _legacyProtocolReadyUser != _bootstrappedAccount ||
+        _plannerSync == null) {
       return;
     }
     try {
@@ -553,6 +577,57 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
   }
 
+  /// Starts an isolated operational engine only for an explicitly confirmed
+  /// v2 account. The preview flag keeps normal installations on v1 until
+  /// the remaining Planner, Share and backup cutover is verified.
+  Future<void> _startV2Account(String userId) async {
+    if (!_enableV2AccountPreview) {
+      throw AccountProtocolNotSupported();
+    }
+    final repository = _repository;
+    final apiClient = _apiClient;
+    final library = _libraryController;
+    if (repository == null || apiClient == null || library == null) {
+      throw StateError('V2 account cannot start without its SQLite scope.');
+    }
+    // Never silently reinterpret old document rows as an operational
+    // projection. A separate, verified migration is required first.
+    final legacy = await repository.database.customSelect(
+      'SELECT n.uid FROM notebook_rows n WHERE NOT EXISTS '
+      '(SELECT 1 FROM operations o WHERE o.document_id = n.uid) LIMIT 1',
+    ).getSingleOrNull();
+    if (legacy != null) {
+      throw StateError(
+        'Legacy documents must be migrated before enabling account v2.',
+      );
+    }
+    final runtime = _v2AccountRuntime ??
+        EditorV2AccountRuntime(
+          repository: repository,
+          apiClient: apiClient,
+          accountId: userId,
+          onLibraryChanged: library.loadItems,
+        );
+    _v2AccountRuntime = runtime;
+    repository.enableAccountOperations(runtime.writer);
+    await runtime.start();
+    if (!mounted ||
+        _accountSession?.userId != userId ||
+        _accountSession?.isSignedIn != true) {
+      await runtime.stop();
+      return;
+    }
+    await library.loadItems();
+    _bootstrappedAccount = userId;
+    // Planner, Share and legacy remote snapshot services remain disabled
+    // until they have their own verified v2 cutover.
+    if (mounted) {
+      setState(() {
+        _incompatibleProtocolUser = null;
+      });
+    }
+  }
+
   Future<void> _startAccountSync() {
     final session = _accountSession;
     final backup = _remoteBackupService;
@@ -592,7 +667,21 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         await _plannerReady;
         // Never restore an older snapshot or start v1 writers for a v2
         // account. Keep local data and the outbox untouched on failure.
-        await _apiClient!.ensureLegacyAccountProtocol();
+        try {
+          await _apiClient!.ensureLegacyAccountProtocol();
+        } on AccountProtocolNotSupported {
+          try {
+            await _startV2Account(userId);
+          } catch (_) {
+            if (mounted &&
+                session.userId == userId &&
+                session.isSignedIn) {
+              setState(() => _incompatibleProtocolUser = userId);
+            }
+            rethrow;
+          }
+          return;
+        }
         if (!mounted || session.userId != userId || !session.isSignedIn) {
           return;
         }
@@ -916,6 +1005,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               value: remoteBackupScheduler,
             ),
             ChangeNotifierProvider<LiveWebSyncService>.value(value: liveSync),
+            Provider<EditorV2AccountRuntime?>.value(
+              value: _v2AccountRuntime,
+            ),
             ChangeNotifierProvider<LibraryController>.value(
               value: libraryController,
             ),
