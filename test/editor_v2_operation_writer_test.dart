@@ -545,7 +545,7 @@ void main() {
   );
 
   test(
-    'normal v2 image insert uploads before SQLite and retries safely',
+    'normal v2 image commits offline and upload retries preserve its outbox',
     () async {
       final rawBytes = Uint8List.fromList([137, 80, 78, 71, 0, 1]);
       final digest = crypto.sha256.convert(rawBytes).toString();
@@ -605,21 +605,6 @@ void main() {
           ),
         ],
       );
-      await expectLater(
-        mediaWriter.writePageChange(
-          documentId: notebook.uid,
-          before: page,
-          after: changed,
-        ),
-        throwsFormatException,
-      );
-      expect(await store.pending(), isEmpty);
-      expect(
-        (await repository.getNotebook(notebook.uid))!.pages.single.imageBlocks,
-        isEmpty,
-      );
-
-      rejectReceipt = false;
       final written = await mediaWriter.writePageChange(
         documentId: notebook.uid,
         before: page,
@@ -629,6 +614,16 @@ void main() {
         OperationKind.objectCreate,
         OperationKind.assetAttach,
       ]);
+      expect(uploads, 0);
+      buffer.clear();
+      final gateway = OperationAssetGateway(api);
+      await expectLater(
+        gateway.uploadPendingAssets(written, projector.verifiedUploadBytes),
+        throwsFormatException,
+      );
+      expect(await store.pending(), hasLength(2));
+      rejectReceipt = false;
+      await gateway.uploadPendingAssets(written, projector.verifiedUploadBytes);
       expect(uploads, 2);
       expect(
         (await repository.getNotebook(
@@ -1098,7 +1093,7 @@ void main() {
         final pendingBeforeMove = await store.pending(includeDeferred: true);
         await expectLater(
           store.writeLocalBatch(
-            actorId: 'local',
+            actorId: pendingBeforeMove.last.actorId,
             documentId: notebook.uid,
             operations: [
               LocalOperationDraft(

@@ -4,9 +4,10 @@ import 'package:crypto/crypto.dart' as crypto;
 
 import 'operation_protocol.dart';
 
-/// In-memory buffer of transfers already confirmed by the v2 asset API.
+/// In-memory buffer of locally checksum-verified media.
 ///
-/// Stage only the authenticated upload receipt or a verified download.
+/// Staging local bytes does not imply that a server has received them.
+/// The outbox uploads them before transmitting their asset.attach operation.
 /// The SQLite projector refuses references for absent or mismatched bytes.
 /// This buffer is deliberately not a durable cache; committed image bytes
 /// are copied to SQLite in the same transaction as asset.attach.

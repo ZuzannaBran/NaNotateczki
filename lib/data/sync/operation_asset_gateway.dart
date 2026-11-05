@@ -3,9 +3,10 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart' as crypto;
 
 import 'api_client.dart';
+import 'operation_protocol.dart';
 import 'verified_editor_asset_buffer.dart';
 
-/// Verified bytes are uploaded before an asset.attach operation is enqueued.
+/// Verified bytes are uploaded before local asset.attach operations are sent.
 ///
 /// The returned digest is content-addressed; a server ACK without matching
 /// checksum, length and MIME is never treated as a durable upload.
@@ -37,6 +38,30 @@ class OperationAssetGateway {
   Map<String, String>? get _shareHeaders => shareId == null
       ? null
       : {'X-Share-Id': shareId!, 'Authorization': 'Bearer $guestTicket'};
+
+  /// The durable outbox itself records which attachments still need upload.
+  /// Repeating a content-addressed PUT after a lost ACK is safe.
+  Future<void> uploadPendingAssets(
+    List<OperationEnvelope> operations,
+    Future<Uint8List> Function(Map<String, dynamic>) readBytes,
+  ) async {
+    for (final operation in operations) {
+      if (operation.kind != OperationKind.assetAttach) {
+        continue;
+      }
+      final receipt = operation.payload;
+      final bytes = await readBytes(receipt);
+      if (crypto.sha256.convert(bytes).toString() != receipt['sha256'] ||
+          bytes.length != receipt['sizeBytes']) {
+        throw const FormatException('Pending upload bytes differ from attach.');
+      }
+      await upload(
+        assetId: receipt['assetId'] as String,
+        bytes: bytes,
+        mediaType: receipt['mediaType'] as String,
+      );
+    }
+  }
 
   /// Uploads validated bytes and returns a safe payload for asset.attach.
   Future<Map<String, dynamic>> upload({

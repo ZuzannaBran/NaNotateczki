@@ -60,6 +60,27 @@ otwarcie/zamknięcie, tożsamość writera, blokadę snapshotu i brak
 zbędnych operacji. Test dołączono do celowanej weryfikacji etapu 3;
 wynik Flutter pozostaje do potwierdzenia w CI.
 
+### Lokalny zapis obrazów/PDF bez sieci — implementacja
+
+Usunięto upload poprzedzający lokalny gest. Writer lokalnie tworzy digest
+i stage'uje bajty, a projector utrwala je w istniejącym
+`operation_asset_bytes` w tej samej transakcji co operacje i outbox.
+Niewysłane `asset.attach` jest trwałym znacznikiem oczekującego uploadu.
+Runtime konta przez `SyncEngine.prepareLocalOperations` wysyła pliki
+przed zależnymi operacjami (również przy wysyłaniu bezpiecznego prefiksu).
+Sprawdza digest/MIME/rozmiar bajtów z SQLite oraz potwierdzenie serwera.
+Nie usuwa fizycznych bajtów przy usunięciu obiektu/strony; brak ACK
+pozwala powtórzyć content-addressed PUT po restarcie.
+
+Dodano `editor_v2_offline_media_test.dart`: dwa typy mediów × pozostawienie
+lub usunięcie obiektu przed restartem, plikowa SQLite, uszkodzenie BLOB,
+odmowa wysyłki offline i upload przed operacjami po odzyskaniu sieci.
+Zmieniono stary test oczekujący uploadu przed zapisem: lokalny commit ma
+teraz zero żądań HTTP, a błędny receipt nie usuwa jego outboxu.
+Formatowanie zweryfikowano lokalnie; testy Flutter wymagają wyniku CI.
+Automatyczne wykrywanie nowych embedów w Delta, transport po przeniesieniu
+między urządzeniami i pełne E2E pozostają niezamknięte.
+
 ## Integracja z 5 listopada 2026 — nadal niezamknięty etap 3
 
 - Dodano opt-in `EditorV2AccountRuntime` dla konta o potwierdzonym

@@ -1,8 +1,8 @@
 import 'dart:convert';
-
-import 'package:crypto/crypto.dart' as crypto;
+import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:drift/drift.dart';
 
 import '../drift/notes_database.dart';
@@ -1235,7 +1235,7 @@ class EditorSqliteProjector {
     }
   }
 
-  /// Converts a separately verified upload into a durable SQLite image.
+  /// Converts checksum-verified local or downloaded bytes into a durable image.
   /// No external network call is made while the journal transaction is open.
   Future<void> _attachVerifiedAsset(OperationEnvelope operation) async {
     final pageId = operation.pageId!;
@@ -1250,6 +1250,12 @@ class EditorSqliteProjector {
     final assetId = receipt['assetId'] as String;
     final sha = receipt['sha256'] as String;
     final mime = receipt['mediaType'] as String;
+    await _storeAssetBytes(
+      operation: operation,
+      bytes: bytes,
+      sha: sha,
+      mime: mime,
+    );
     final existingImage = await _imageRow(operation);
     final existingText = await _textRow(operation);
     if (existingText != null && existingImage != null) {
@@ -1260,7 +1266,6 @@ class EditorSqliteProjector {
         operation: operation,
         bytes: bytes,
         sha: sha,
-        mime: mime,
       );
       return;
     }
@@ -1379,17 +1384,12 @@ class EditorSqliteProjector {
     }
   }
 
-  /// Persists Quill embed bytes transactionally with their scoped reference.
-  ///
-  /// This is separate from the image-row BLOB so restarting without network
-  /// access does not strand embedded images or PDF references.
-  Future<void> _storeTextAsset({
+  Future<void> _storeAssetBytes({
     required OperationEnvelope operation,
     required Uint8List bytes,
     required String sha,
     required String mime,
   }) async {
-    final owner = 'page:${jsonEncode([operation.pageId, operation.objectId])}';
     final existingId = await _row(
       'SELECT checksum_sha256, byte_length FROM asset_references '
       'WHERE asset_id = ? LIMIT 1',
@@ -1411,7 +1411,7 @@ class EditorSqliteProjector {
           prior['byte_length'] != bytes.length ||
           stored is! Uint8List ||
           !const ListEquality<int>().equals(stored, bytes)) {
-        throw StateError('Existing embed bytes do not match receipt.');
+        throw StateError('Existing asset bytes do not match receipt.');
       }
     } else {
       await database.customStatement(
@@ -1421,6 +1421,18 @@ class EditorSqliteProjector {
         [sha, mime, bytes.length, bytes],
       );
     }
+  }
+
+  /// Persists Quill embed bytes transactionally with their scoped reference.
+  ///
+  /// This is separate from the image-row BLOB so restarting without network
+  /// access does not strand embedded images or PDF references.
+  Future<void> _storeTextAsset({
+    required OperationEnvelope operation,
+    required Uint8List bytes,
+    required String sha,
+  }) async {
+    final owner = 'page:${jsonEncode([operation.pageId, operation.objectId])}';
     final reference = await _row(
       'SELECT checksum_sha256, byte_length, storage_path '
       'FROM asset_references '
@@ -1472,6 +1484,26 @@ class EditorSqliteProjector {
       throw StateError('Missing scoped embed reference.');
     }
     return ref['checksum_sha256'] as String;
+  }
+
+  /// Reads upload bytes independently of visible objects or scoped references.
+  /// Deleted offline objects may still have unacknowledged attach operations.
+  Future<Uint8List> verifiedUploadBytes(Map<String, dynamic> receipt) async {
+    final sha = receipt['sha256'] as String;
+    final row = await _row(
+      'SELECT bytes, byte_length, media_type FROM operation_asset_bytes '
+      'WHERE checksum_sha256 = ?',
+      [Variable<String>(sha)],
+    );
+    final bytes = row?['bytes'];
+    if (bytes is! Uint8List ||
+        row?['byte_length'] != receipt['sizeBytes'] ||
+        row?['media_type'] != receipt['mediaType'] ||
+        bytes.length != receipt['sizeBytes'] ||
+        crypto.sha256.convert(bytes).toString() != sha) {
+      throw const FormatException('Missing or corrupt durable upload bytes.');
+    }
+    return Uint8List.fromList(bytes);
   }
 
   /// Returns checksum-verified persisted embed bytes after an app restart.

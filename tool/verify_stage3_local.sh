@@ -18,6 +18,9 @@ dart format --output=none --set-exit-if-changed \
   lib/data/sync/editor_sqlite_projector.dart \
   lib/data/sync/editor_v2_account_runtime.dart \
   lib/data/sync/persistent_operation_actor.dart \
+  lib/data/sync/operation_asset_gateway.dart \
+  lib/data/sync/sync_engine.dart \
+  lib/data/sync/verified_editor_asset_buffer.dart \
   lib/features/editor/state/editor_controller.dart \
   lib/features/editor/state/editor_v2_operation_writer.dart \
   lib/features/notebook/data/notebook_repository.dart \
@@ -33,7 +36,9 @@ dart format --output=none --set-exit-if-changed \
   test/persistent_operation_actor_test.dart \
   test/verified_quill_embed_builder_test.dart \
   test/notebook_repository_v2_account_test.dart \
-  test/library_v2_settings_test.dart
+  test/library_v2_settings_test.dart \
+  test/editor_v2_offline_media_test.dart \
+  test/operation_asset_gateway_test.dart
 
 echo "[stage3] Dart static analysis"
 dart analyze
@@ -50,7 +55,9 @@ flutter test --concurrency=1 \
   test/editor_v2_crash_recovery_test.dart \
   test/verified_quill_embed_builder_test.dart \
   test/notebook_repository_v2_account_test.dart \
-  test/library_v2_settings_test.dart
+  test/library_v2_settings_test.dart \
+  test/editor_v2_offline_media_test.dart \
+  test/operation_asset_gateway_test.dart
 
 echo "[stage3] Full unit and widget test suite"
 flutter test --concurrency=2

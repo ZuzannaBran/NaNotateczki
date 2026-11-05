@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' as crypto;
@@ -86,10 +87,7 @@ class EditorV2OperationWriter {
     Map<String, VerifiedEditorAsset> explicit,
   ) => {...?_registeredAssets[documentId], ...explicit};
 
-  /// Stages new or replaced image bytes before opening the SQLite batch.
-  ///
-  /// Failed HTTP/checksum validation leaves the durable projection and outbox
-  /// untouched. An already verified receipt is reused on a local retry.
+  /// Verifies local media before the SQLite batch, without requiring network.
   Future<void> _prepareImageAssets({
     required String documentId,
     required Iterable<NotePage> before,
@@ -135,9 +133,8 @@ class EditorV2OperationWriter {
           }
           continue;
         }
-        final gateway = assetGateway;
         final buffer = projector.verifiedAssetBuffer;
-        if (gateway == null || buffer == null) {
+        if (buffer == null) {
           // The bridge will reject this edit without touching SQLite.
           continue;
         }
@@ -160,12 +157,13 @@ class EditorV2OperationWriter {
             (kIsWeb || image.path.isEmpty
                 ? (throw StateError('Missing image bytes for v2 upload.'))
                 : await File(image.path).readAsBytes());
-        final receipt = await gateway.uploadAndStage(
-          assetId: const Uuid().v4(),
-          bytes: bytes,
-          mediaType: mime,
-          buffer: buffer,
-        );
+        final receipt = <String, dynamic>{
+          'assetId': const Uuid().v4(),
+          'sha256': crypto.sha256.convert(bytes).toString(),
+          'sizeBytes': bytes.length,
+          'mediaType': mime,
+        };
+        buffer.stage(receipt: receipt, bytes: Uint8List.fromList(bytes));
         registerVerifiedAsset(
           documentId: documentId,
           objectId: image.id,

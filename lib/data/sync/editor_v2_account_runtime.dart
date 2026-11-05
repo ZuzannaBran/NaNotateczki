@@ -62,6 +62,10 @@ class EditorV2AccountRuntime {
       },
       prepareRemoteOperation: (operation) =>
           projector.prepareRemoteMedia(operation, assetGateway),
+      prepareLocalOperations: (operations) => assetGateway.uploadPendingAssets(
+        operations,
+        projector.verifiedUploadBytes,
+      ),
       onRemoteCommitted: (operation) => runtime._onRemoteCommitted(operation),
     );
     runtime = EditorV2AccountRuntime._(

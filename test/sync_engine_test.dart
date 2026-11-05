@@ -171,6 +171,36 @@ void main() {
     );
   }
 
+  test(
+    'stopping during asset preparation cannot send old account edits',
+    () async {
+      final operation = await local('uploading-object');
+      engine.dispose();
+      final preparing = Completer<void>();
+      final release = Completer<void>();
+      engine = SyncEngine(
+        store: store,
+        gateway: gateway,
+        actorId: 'actor-local',
+        checkpointScope: 'user-A-v2',
+        enableRealtime: false,
+        applyRemote: (_, __) async {},
+        prepareLocalOperations: (_) async {
+          preparing.complete();
+          await release.future;
+        },
+      );
+      final starting = engine.start();
+      await preparing.future;
+      final stopping = engine.stop();
+      release.complete();
+      await starting;
+      await stopping;
+      expect(gateway.batches, isEmpty);
+      expect(await store.isPending(operation.operationId), isTrue);
+    },
+  );
+
   test('batch API commits and ACKs a completed gesture once', () async {
     final drafts = [
       for (final id in ['ink-a', 'ink-b', 'ink-c'])

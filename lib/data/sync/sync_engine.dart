@@ -46,6 +46,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     required this.checkpointScope,
     required this.applyRemote,
     this.prepareRemoteOperation,
+    this.prepareLocalOperations,
     this.onRemoteCommitted,
     this.apiClient,
     this.shareId,
@@ -83,6 +84,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   final String checkpointScope;
   final RemoteOperationReducer applyRemote;
   final RemoteOperationPreparer? prepareRemoteOperation;
+  final Future<void> Function(List<OperationEnvelope>)? prepareLocalOperations;
   final RemoteOperationCommitted? onRemoteCommitted;
   final ApiClient? apiClient;
   final String? shareId;
@@ -519,7 +521,13 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     List<OperationEnvelope> batch,
   ) async {
     try {
-      final receipts = await _authorized(() => gateway.send(batch));
+      final receipts = await _authorized(() async {
+        await prepareLocalOperations?.call(batch);
+        if (!_isActive(generation)) {
+          throw StateError('Sync stopped while preparing local assets.');
+        }
+        return gateway.send(batch);
+      });
       if (!_isActive(generation)) {
         return;
       }
@@ -540,7 +548,13 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
               error.statusCode == 422)) {
         try {
           final first = [batch.first];
-          final receipts = await _authorized(() => gateway.send(first));
+          final receipts = await _authorized(() async {
+            await prepareLocalOperations?.call(first);
+            if (!_isActive(generation)) {
+              throw StateError('Sync stopped while preparing local assets.');
+            }
+            return gateway.send(first);
+          });
           if (!_isActive(generation)) {
             return;
           }

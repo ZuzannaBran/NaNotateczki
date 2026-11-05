@@ -1,5 +1,23 @@
 # Dane NaNotateczki
 
+## Lokalny zapis mediów v2 (2026-11-06, opt-in)
+
+Obraz/PDF jest weryfikowany lokalnie przez SHA-256, rozmiar i MIME,
+a następnie zapisany wraz z `asset.attach` i outboxem w jednej transakcji
+SQLite. `operation_asset_bytes` przechowuje również bajty zwykłych obrazów,
+nie tylko embedów. Usunięcie obiektu lub strony nie usuwa tych BLOB-ów:
+niepotwierdzona operacja może nadal wymagać wysłania pliku po restarcie.
+
+Niepotwierdzone `asset.attach` w istniejącym outboxie stanowi trwałą
+informację o oczekującym uploadzie; nie powstaje druga kolejka.
+Runtime konta przed wysłaniem wsadu operacji odczytuje zweryfikowane bajty
+z SQLite i wykonuje idempotentny PUT `/v2/assets/<sha256>`. Nieprawidłowe
+potwierdzenie uploadu lub brak sieci wstrzymuje transport operacji,
+zachowując lokalny dokument. Po utracie ACK można bezpiecznie powtórzyć
+PUT; wyłącznie potwierdzenie operacji usuwa ją z outboxu.
+Schemat SQLite pozostaje bez zmian. Pełny cutover i automatyczne
+przygotowanie wszystkich wariantów embedów Quill pozostają do ukończenia.
+
 ## Przegląd v2 konta (2026-11-05)
 
 W `AppScope` istnieje odizolowana, opcjonalna ścieżka operacyjnego

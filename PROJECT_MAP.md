@@ -1449,11 +1449,19 @@ do `EditorController`, ale nie jest aktywowany przez produkcyjny
 identyfikatory odtwarzanych obiektów/stron zamiast wskrzeszać tombstones.
 Historia przechowuje 50 zatwierdzonych stanów bieżącej sesji;
 przypadkowe zdalne zmiany ją unieważniają.
-W trybie opt-in i przy skonfigurowanym `OperationAssetGateway` automatycznie
-przesyła obrazy/PDF i odkłada zweryfikowane bajty przed transakcją; zły
-receipt oraz zmiana bajtów po uploadzie blokują commit. Brak gateway
-nadal kończy się bezpieczną odmową. Nie wspiera Quill embedów, pełnego
-zdalnego rebase ani Undo/Redo.
+W trybie opt-in przygotowuje obrazy/PDF lokalnie w
+`VerifiedEditorAssetBuffer`, bez oczekiwania na upload.
+Projector utrwala wszystkie bajty w `operation_asset_bytes` razem z
+projekcją, operacjami i outboxem. `verifiedUploadBytes` sprawdza digest,
+MIME i długość również po restarcie i po usunięciu widocznego obiektu.
+`SyncEngine.prepareLocalOperations` wywołuje przed każdym wysłaniem
+`OperationAssetGateway.uploadPendingAssets`; runtime konta podłącza
+odczyt BLOB z SQLite. Błąd uploadu pozostawia operacje w outboxie,
+a ponowny PUT po restarcie jest idempotentny. Sam lokalny zapis działa
+bez sieci i bez gateway. Zatrzymanie silnika podczas uploadu blokuje
+późniejsze wysłanie wsadu starego konta; regresja jest w
+`test/sync_engine_test.dart`. Automatyczne przygotowanie nowych embedów
+Quill i pełny zdalny rebase wymagają dalszych prac.
 Usuwanie zweryfikowanego obrazu lub tekstu z embedem Quill usuwa
 scoped asset references razem z obiektem w transakcji SQLite;
 nie usuwa fizycznych plików i odmawia usunięcia brakującego assetu.
@@ -1467,6 +1475,9 @@ upload, odrzucenie starego receipt, przenoszenie Quill z obrazem/PDF
 między stronami oraz rollback takiego gestu)
 oraz `test/editor_sqlite_projector_test.dart` (usunięcie strony zwalnia
 tylko scoped referencje, nie asset użyty przez inną stronę).
+`test/editor_v2_offline_media_test.dart`: PNG/PDF w plikowej SQLite,
+restart z outboxem, usunięcie przed uploadem, uszkodzony BLOB,
+offline retry i obowiązkowy upload przed wysłaniem zależnych operacji.
 
 ### `lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart`
 
