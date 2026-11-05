@@ -477,14 +477,21 @@ void main() {
       relocated.pages.first,
       relocated.pages.last.copyWith(imageBlocks: []),
     ]);
-    await expectLater(
-      writer.writeNotebookChange(before: relocated, after: removed),
-      throwsUnsupportedError,
+    final deleted = await writer.writeNotebookChange(
+      before: relocated,
+      after: removed,
+    );
+    expect(deleted.map((op) => op.kind), [OperationKind.objectDelete]);
+    expect(
+      (await repository.getNotebook(notebook.uid))!.pages.last.imageBlocks,
+      isEmpty,
     );
     expect(
-      (await repository.getNotebook(notebook.uid))!
-          .pages.last.imageBlocks.single.id,
-      image.id,
+      await database.customSelect(
+        'SELECT asset_id FROM asset_references WHERE asset_id = ?',
+        variables: [const Variable<String>('asset-verified')],
+      ).get(),
+      isEmpty,
     );
   });
 

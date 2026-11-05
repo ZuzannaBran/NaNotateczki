@@ -1213,6 +1213,118 @@ void main() {
     );
   });
 
+
+  test('verified image deletion is atomic and releases scoped asset',
+      () async {
+    const imageId = 'delete-verified-image';
+    await database.customStatement(
+      'INSERT INTO image_block_rows '
+      '(uid, page_uid, path, ocr_text, width, height, rotation, dx, dy, '
+      'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        imageId, pageId, '/private/deletion.pdf', '',
+        100.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0,
+      ],
+    );
+    final deletion = LocalOperationDraft(
+      kind: OperationKind.objectDelete,
+      pageId: pageId,
+      objectId: imageId,
+      payload: const {},
+    );
+    final pending = (await store.pending()).length;
+    await expectLater(write([deletion]), throwsUnsupportedError);
+    expect(await store.pending(), hasLength(pending));
+    await store.attachAssetReference(
+      documentId: documentId,
+      pageId: pageId,
+      objectId: imageId,
+      assetId: 'deleted-asset',
+      storagePath: '/private/deletion.pdf',
+      checksumSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      byteLength: 24,
+    );
+    await write([deletion]);
+    expect(
+      await database.customSelect(
+        'SELECT uid FROM image_block_rows WHERE uid = ?',
+        variables: [const Variable<String>(imageId)],
+      ).get(),
+      isEmpty,
+    );
+    expect(
+      await database.customSelect(
+        'SELECT asset_id FROM asset_references WHERE asset_id = ?',
+        variables: [const Variable<String>('deleted-asset')],
+      ).get(),
+      isEmpty,
+    );
+  });
+
+  test('Quill deletion rejects missing assets and releases verified ones',
+      () async {
+    const textId = 'deleted-text';
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.objectCreate,
+        pageId: pageId,
+        objectId: textId,
+        payload: const {
+          'value': {
+            'objectType': 'text',
+            'dx': 0.0, 'dy': 0.0,
+            'width': 200.0, 'fontSize': 18.0, 'rotation': 0.0,
+            'colorValue': 0xFF000000, 'sortIndex': 0,
+          },
+        },
+      ),
+    ]);
+    await database.customStatement(
+      'UPDATE text_block_rows SET text = ?, delta_json = ? WHERE uid = ?',
+      [
+        '\\uFFFC',
+        '[{"insert":{"image":"asset:deleted-text-asset"}}]',
+        textId,
+      ],
+    );
+    final deletion = LocalOperationDraft(
+      kind: OperationKind.objectDelete,
+      pageId: pageId,
+      objectId: textId,
+      payload: const {},
+    );
+    final pending = (await store.pending()).length;
+    await expectLater(write([deletion]), throwsUnsupportedError);
+    expect(await store.pending(), hasLength(pending));
+    await store.attachAssetReference(
+      documentId: documentId,
+      pageId: pageId,
+      objectId: textId,
+      assetId: 'deleted-text-asset',
+      storagePath: '/private/embedded',
+      checksumSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      byteLength: 24,
+    );
+    await write([deletion]);
+    expect(
+      await database.customSelect(
+        'SELECT uid FROM text_block_rows WHERE uid = ?',
+        variables: [const Variable<String>(textId)],
+      ).get(),
+      isEmpty,
+    );
+    expect(
+      await database.customSelect(
+        'SELECT asset_id FROM asset_references WHERE asset_id = ?',
+        variables: [const Variable<String>('deleted-text-asset')],
+      ).get(),
+      isEmpty,
+    );
+  });
+
   test('v2 page deletion cannot orphan a stored image asset', () async {
     const target = 'asset-page';
     await write([

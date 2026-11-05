@@ -1381,6 +1381,9 @@ do `EditorController`, ale nie jest aktywowany przez produkcyjny
 `AppScope`. W trybie v2
 Undo/Redo jest celowo wyłączone do czasu inverse intents i remint ID.
 Nie wspiera pełnego transferu assetów ani zdalnego rebase.
+Usuwanie zweryfikowanego obrazu lub tekstu z embedem Quill usuwa
+scoped asset references razem z obiektem w transakcji SQLite;
+nie usuwa fizycznych plików i odmawia usunięcia brakującego assetu.
 Test: `test/editor_v2_operation_writer_test.dart`.
 
 ### `lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart`

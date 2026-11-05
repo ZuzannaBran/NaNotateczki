@@ -613,7 +613,7 @@ class EditorSqliteProjector {
     );
   }
 
-  Future<void> _deleteObject(OperationEnvelope op) async {
+Future<void> _deleteObject(OperationEnvelope op) async {
     await _pageExists(op, op.pageId!);
     final ink = await _row(
       'SELECT uid FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
@@ -630,15 +630,56 @@ class EditorSqliteProjector {
     if (matches != 1) {
       throw StateError('Missing or ambiguous editor object identity.');
     }
-    if (image != null) {
-      throw UnsupportedError('Image deletion requires asset detachment.');
+
+    final scopedId = 'page:${jsonEncode([op.pageId, op.objectId])}';
+    final attached = await database.customSelect(
+      'SELECT asset_id FROM asset_references '
+      'WHERE document_id = ? AND object_id = ?',
+      variables: [
+        Variable<String>(op.documentId),
+        Variable<String>(scopedId),
+      ],
+    ).get();
+    final assetIds = {
+      for (final row in attached) row.read<String>('asset_id'),
+    };
+    if (image != null && assetIds.isEmpty) {
+      throw UnsupportedError('Image deletion requires a verified asset.');
+    }
+    if (ink != null && assetIds.isNotEmpty) {
+      throw UnsupportedError('Ink cannot own a verified media asset.');
+    }
+    if (text != null && text['delta_json'] != null) {
+      final delta = jsonDecode(text['delta_json'] as String);
+      if (delta is! List) {
+        throw const FormatException('Invalid stored Quill Delta.');
+      }
+      for (final item in delta) {
+        if (item is! Map) {
+          throw const FormatException('Invalid stored Quill entry.');
+        }
+        final insert = item['insert'];
+        if (insert is Map &&
+            !assetIds.contains(OperationEnvelope.embedAssetId(insert))) {
+          throw UnsupportedError('Quill embed is missing its asset.');
+        }
+      }
     }
     await database.customStatement(
       ink != null
           ? 'DELETE FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?'
+          : image != null
+          ? 'DELETE FROM image_block_rows WHERE uid = ? AND page_uid = ?'
           : 'DELETE FROM text_block_rows WHERE uid = ? AND page_uid = ?',
       [op.objectId, op.pageId],
     );
+    if (assetIds.isNotEmpty) {
+      await database.customStatement(
+        'DELETE FROM asset_references '
+        'WHERE document_id = ? AND object_id = ?',
+        [op.documentId, scopedId],
+      );
+    }
   }
 
   /// Detaches an asset only after no persisted object still references it.
