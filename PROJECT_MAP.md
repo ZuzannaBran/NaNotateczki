@@ -467,8 +467,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rozbieżny Delta Quill oraz usuwanie stron zawierających obrazy,
   osadzone referencje Quill lub nieodłączone asset_references.
   Rejestr rank pól jest odtwarzany z niekompaktowanego dziennika
-  (granica 50000 envelope'ów); dla równoczesnego `object.move`
-  nadal potrzebna jest spójna reguła konfliktowa.
+  (granica 50000 envelope'ów). Konkurencyjne `object.move` porównuje
+  według tej samej rangi: starszy przegrywający zapisuje actorSeq
+  bez poruszania obiektu, nowszy przenosi go z rzeczywistej strony.
+  Causally nieprawidłowe źródło nadal jest odrzucane. Nie jest to
+  jeszcze pełny rebase usunięć/tombstones i historycznych move.
   Projektor jest wyłącznie opt-in i nigdy nie należy
   używać go równolegle z legacy writerem tego dokumentu.
 - `lib/data/sync/verified_editor_asset_buffer.dart`: bufor tylko
@@ -1370,7 +1373,10 @@ w tej samej transakcji. Przenoszenie tekstu nadal zablokowane;
 odrzuca zmianę
 kolejności stron oraz edycję z nieaktualnym Delta Quill.
 Adapter przyjmuje też mapę `verifiedAssets` dla tworzenia
-obrazów/PDF po przygotowaniu bajtów. Jest podłączony jako opt-in
+obrazów/PDF po przygotowaniu bajtów. `registerVerifiedAsset`
+przechowuje receipt do udanego commita, co pozwala kontrolerowi
+bezpiecznie ponowić wcześniej odrzucony gest po uploadzie.
+Jest podłączony jako opt-in
 do `EditorController`, ale nie jest aktywowany przez produkcyjny
 `AppScope`. W trybie v2
 Undo/Redo jest celowo wyłączone do czasu inverse intents i remint ID.
@@ -1386,6 +1392,9 @@ aktualny obiekt/stronę z repozytorium i aktualizuje wskazany fragment
 Dla `object.move` usuwa źródłowy obiekt z widoku i dodaje go w celu.
 Przy image `object.create` nie powiadamia UI o pustym
 placeholderze; dopiero zweryfikowany `asset.attach` dodaje obraz.
+Przy konflikcie `object.move` korzysta ze strony obiektu rzeczywiście
+zatwierdzonej w SQLite, nie ze strony przegrywającej operacji;
+żadna taka notyfikacja nie może blokować kursora bez powodu.
 Zachowuje kolejność tekstów i obrazów (sortIndex) przy aktualizacjach.
 Aktywny gest lub niezapisana zmiana blokuje callback — `SyncEngine`
 ponawia dostarczenie; brak przełączenia `AppScope` na v2.
@@ -1405,7 +1414,7 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/editor_controller.dart` (3207 linii)
+### `lib/features/editor/state/editor_controller.dart` (opt-in v2)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
 preferencje, viewport i zapis. `applyConfirmedRemoteNotebook` odświeża
@@ -1422,7 +1431,9 @@ zapis wyłącznie do v2 z serializacją zmian i utrwaloną bazą stanu;
 `NotebookRepository` blokuje wtedy legacy snapshot writery na tym UID.
 Undo/Redo w trybie v2 pozostaje zablokowane, aby nie odtworzyć tombstone.
 `applyConfirmedV2PagePatch` wprowadza zdalną stronę bez remountu,
-nie zmieniając zoomu i aktualnego wyboru strony.
+nie zmieniając zoomu i aktualnego wyboru strony. Metoda
+`registerVerifiedImageAsset` wiąże potwierdzony upload z blokiem
+obrazu i ponawia nieukończony v2 zapis bez snapshotów v1.
 Regresja: `test/editor_controller_v2_test.dart`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
