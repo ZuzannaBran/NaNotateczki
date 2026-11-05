@@ -30,6 +30,7 @@ import '../../notebook/domain/notebook.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/domain/text_block.dart';
 import 'editor_actions.dart';
+import 'editor_operation_bridge.dart';
 import 'editor_v2_operation_writer.dart';
 import 'input_mode.dart';
 import 'ink_color_presets.dart';
@@ -3426,6 +3427,33 @@ class EditorController extends ChangeNotifier {
   void _discardActiveTextEdit() {
     _activeTextEditPageIndex = null;
     _activeTextEditBefore = null;
+  }
+
+  /// Completes an opt-in image upload after its receipt and bytes have
+  /// already been verified and staged outside the SQLite transaction.
+  ///
+  /// Re-queues a failed local gesture without using a legacy snapshot writer.
+  void registerVerifiedImageAsset({
+    required String imageId,
+    required VerifiedEditorAsset asset,
+  }) {
+    final writer = operationWriter;
+    if (writer == null || _isDisposed) {
+      throw StateError('Only an active v2 editor can register image assets.');
+    }
+    final matching = [
+      for (final page in pages)
+        if (page.imageBlocks.any((image) => image.id == imageId)) page.id,
+    ];
+    if (matching.length != 1) {
+      throw StateError('Verified image has no unique page in this editor.');
+    }
+    writer.registerVerifiedAsset(
+      documentId: notebook.uid,
+      objectId: imageId,
+      asset: asset,
+    );
+    _scheduleSave(pageId: matching.single);
   }
 
   void _scheduleSave({String? pageId}) {
