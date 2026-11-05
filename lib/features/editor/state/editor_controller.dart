@@ -1949,16 +1949,16 @@ class EditorController extends ChangeNotifier {
     );
     final visibleBeforeCommit = pages;
     _v2HistoryCommitting = true;
-    late final List<dynamic> committed;
+    late final bool hasCommitted;
     try {
-      committed = await operationWriter!.writeNotebookChange(
+      hasCommitted = (await operationWriter!.writeNotebookChange(
         before: original,
         after: restored,
-      );
+      )).isNotEmpty;
     } finally {
       _v2HistoryCommitting = false;
     }
-    if (committed.isEmpty) {
+    if (!hasCommitted) {
       source.removeLast();
       (undo ? _v2Redo : _v2Undo).add(entry);
       _notifyHistoryChanged();
