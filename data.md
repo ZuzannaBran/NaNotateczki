@@ -464,6 +464,11 @@ zamiast wywołań legacy saveNotebook/saveNotebookPages. Kontroler
 utrzymuje potwierdzony baseline i serializuje zapisy; repozytorium
 rezerwuje UID za pomocą `registerOperationWriter` i blokuje stare
 snapshoty, import, restore, metadata i delete na zajętym UID.
+Po zapisaniu pierwszej operacji trwały dziennik `operations` dodatkowo
+blokuje v1 przez `_requireLegacyWritable` także po zamknięciu edytora,
+utworzeniu nowego repozytorium i restarcie aplikacji. Każdy legacy
+writer ponawia kontrolę wewnątrz transakcji, a automatyczna migracja
+legacy gumki nie może przepisywać strony z v2 operacjami.
 W opt-in v2 Undo/Redo jest wyłączone (brak inverse intents).
 Nie obsługuje jeszcze tworzenia/usuwania/wymiany assetów,
 Quill embedów, przenoszenia tekstu, zakładania dokumentów v2 ani
