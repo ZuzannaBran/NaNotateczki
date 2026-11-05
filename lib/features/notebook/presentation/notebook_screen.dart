@@ -23,6 +23,12 @@ class NotebookScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
 
+    if (controller.isV2DocumentDeleted) {
+      return const EmptyState(
+        title: 'Document deleted',
+        message: 'This document was deleted on another device.',
+      );
+    }
     if (controller.pages.isEmpty) {
       return const EmptyState(
         title: 'Empty notebook',

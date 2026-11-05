@@ -307,3 +307,9 @@ zapis pod skasowanym UID. Dispatcher udostępnia callback
 `onDocumentCommitted`, który musi zostać podłączony do biblioteki przy
 produkcyjnej aktywacji v2. Test regresyjny obejmuje obie operacje oraz
 powtórne powiadomienie usunięcia. Pełny cutover nadal jest osobny.
+
+Dla operacji dokumentów nieaktywnych w edytorze dispatcher przekazuje
+zdarzenie przez `onDocumentCommitted` zamiast je porzucać. NotebookScreen i
+BoardScreen pokazują stan usunięcia dokumentu, uniemożliwiając dalszą
+interakcję z nieaktualnym canvasem. Produkcyjny callback biblioteki i
+aktualizacja protokołu konta nadal nie są podłączone.

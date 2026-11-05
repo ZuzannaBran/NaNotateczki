@@ -521,6 +521,11 @@ class _BoardScreenState extends State<BoardScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EditorController>();
+    if (controller.isV2DocumentDeleted) {
+      return const Center(
+        child: Text('This document was deleted on another device.'),
+      );
+    }
     final activeTextBlockId = controller.activeTextBlockId;
     final activeTextBlock = activeTextBlockId == null
         ? null

@@ -1420,7 +1420,9 @@ operację uprzednio zatwierdzoną w SQLite przez `SyncEngine`. Pobiera
 aktualny obiekt/stronę z repozytorium i aktualizuje wskazany fragment
 `EditorController`, bez snapshotowego odmalowywania całego notatnika.
 Operacje `document.set` odświeżają tylko tytuł/folder, a `document.delete`
-blokuje dalszy zapis skasowanego UID. Callback pozwala odświeżyć bibliotekę.
+blokuje dalszy zapis skasowanego UID i pokazuje stan usunięcia na notebooku
+lub boardzie. Callback obejmuje również zmiany innych dokumentów, dzięki
+czemu katalog może odświeżać się niezależnie od aktywnego edytora.
 Dla `object.move` usuwa źródłowy obiekt z widoku i dodaje go w celu.
 Przy image `object.create` nie powiadamia UI o pustym
 placeholderze; dopiero zweryfikowany `asset.attach` dodaje obraz.

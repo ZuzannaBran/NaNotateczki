@@ -392,10 +392,30 @@ void main() {
     expect(editor.canApplyConfirmedRemoteNotebook, isFalse);
     expect(await repository.getNotebook(notebook.uid), isNull);
     await dispatcher.onRemoteCommitted(deletion);
+    final another = await repository.createNotebook();
+    final changedOtherDocument = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-other-doc',
+      actorSeq: 1,
+      logicalClock: 3,
+      documentId: another.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Another document'},
+      },
+    );
+    await store.applyRemote(
+      changedOtherDocument,
+      serverSequence: 3,
+      apply: () => projector.apply(changedOtherDocument),
+    );
+    await dispatcher.onRemoteCommitted(changedOtherDocument);
+    expect(editor.isV2DocumentDeleted, isTrue);
     expect(notifications, [
       OperationKind.documentSet,
       OperationKind.documentDelete,
       OperationKind.documentDelete,
+      OperationKind.documentSet,
     ]);
   });
 

@@ -28,6 +28,9 @@ class EditorV2RemotePatchDispatcher {
 
   Future<void> onRemoteCommitted(OperationEnvelope operation) async {
     if (operation.documentId != editor.notebook.uid) {
+      if (operation.kind.target == OperationTarget.document) {
+        await onDocumentCommitted?.call(operation);
+      }
       return;
     }
     if (operation.kind.target == OperationTarget.document) {
