@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:collection/collection.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -109,9 +110,24 @@ class EditorV2OperationWriter {
             const ListEquality<int>().equals(old.bytes, image.bytes)) {
           continue;
         }
-        if (verifiedAssets.containsKey(image.id) ||
-            (_registeredAssets[documentId]?.containsKey(image.id) ??
-                false)) {
+        final verified = verifiedAssets[image.id] ??
+            _registeredAssets[documentId]?[image.id];
+        if (verified != null) {
+          // A retry must never commit the receipt of an older image edit.
+          if (image.imageMime != null &&
+              image.imageMime != verified.mediaType) {
+            throw StateError('The verified media type has changed.');
+          }
+          final localBytes = image.bytes ??
+              (image.path.isEmpty || kIsWeb
+                  ? null
+                  : await File(image.path).readAsBytes());
+          if (localBytes != null &&
+              (localBytes.length != verified.sizeBytes ||
+                  crypto.sha256.convert(localBytes).toString() !=
+                      verified.sha256)) {
+            throw StateError('The verified image has changed since upload.');
+          }
           continue;
         }
         final gateway = assetGateway;
