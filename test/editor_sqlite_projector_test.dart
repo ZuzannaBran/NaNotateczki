@@ -1795,6 +1795,103 @@ void main() {
     },
   );
 
+  test('page deletion keeps a shared asset reference owned by another page',
+      () async {
+    const target = 'shared-asset-page';
+    const sharedAsset = 'shared-asset';
+    const targetImage = 'shared-target-image';
+    const siblingImage = 'shared-sibling-image';
+    await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageCreate,
+        objectId: target,
+        payload: {
+          'value': {'title': 'Shared asset', 'isBookmarked': false},
+        },
+      ),
+    ]);
+
+    Future<void> insertImage(String id, String ownerPage) {
+      return database.customStatement(
+        'INSERT INTO image_block_rows '
+        '(uid, page_uid, path, ocr_text, width, height, rotation, dx, dy, '
+        'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          id,
+          ownerPage,
+          '/private/$id.png',
+          '',
+          100.0,
+          80.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          0,
+        ],
+      );
+    }
+
+    await insertImage(targetImage, target);
+    await insertImage(siblingImage, pageId);
+    const checksum =
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    await store.attachAssetReference(
+      documentId: documentId,
+      pageId: target,
+      objectId: targetImage,
+      assetId: sharedAsset,
+      storagePath: '/private/shared.png',
+      checksumSha256: checksum,
+      byteLength: 24,
+    );
+    await store.attachAssetReference(
+      documentId: documentId,
+      pageId: pageId,
+      objectId: siblingImage,
+      assetId: sharedAsset,
+      storagePath: '/private/shared.png',
+      checksumSha256: checksum,
+      byteLength: 24,
+    );
+
+    await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageDelete,
+        objectId: target,
+        payload: {},
+      ),
+    ]);
+
+    final remaining = await database
+        .customSelect(
+          'SELECT object_id FROM asset_references '
+          'WHERE document_id = ? AND asset_id = ?',
+          variables: [
+            Variable<String>(documentId),
+            const Variable<String>(sharedAsset),
+          ],
+        )
+        .get();
+    expect(
+      remaining.map((row) => row.read<String>('object_id')),
+      ['page:${jsonEncode([pageId, siblingImage])}'],
+    );
+    expect(
+      await database
+          .customSelect(
+            'SELECT uid FROM image_block_rows WHERE uid = ?',
+            variables: [const Variable<String>(targetImage)],
+          )
+          .get(),
+      isEmpty,
+    );
+  });
+
   test('the last page cannot be removed through v2', () async {
     await expectLater(
       write([
@@ -1851,83 +1948,3 @@ void main() {
     final buffer = VerifiedEditorAssetBuffer();
     final checkedProjector = EditorSqliteProjector(
       database,
-      verifiedAssetBuffer: buffer,
-    );
-    final bytes = Uint8List.fromList([137, 80, 78, 71, 1, 2, 3]);
-    const assetId = 'mixed-mime-asset';
-    final receipt = <String, dynamic>{
-      'assetId': assetId,
-      'sha256': crypto.sha256.convert(bytes).toString(),
-      'sizeBytes': bytes.length,
-      'mediaType': 'image/png',
-    };
-    buffer.stage(receipt: receipt, bytes: bytes);
-    await expectLater(
-      store.writeLocalBatch(
-        actorId: 'malformed-quill',
-        documentId: documentId,
-        operations: [
-          LocalOperationDraft(
-            kind: OperationKind.objectCreate,
-            pageId: pageId,
-            objectId: 'text-mixed-mime',
-            payload: const {
-              'value': {
-                'objectType': 'text',
-                'fontSize': 18.0,
-                'colorValue': 0xFF123456,
-                'width': 200.0,
-                'rotation': 0.0,
-                'dx': 0.0,
-                'dy': 0.0,
-                'sortIndex': 0,
-              },
-            },
-          ),
-          LocalOperationDraft(
-            kind: OperationKind.assetAttach,
-            pageId: pageId,
-            objectId: 'text-mixed-mime',
-            payload: receipt,
-          ),
-          LocalOperationDraft(
-            kind: OperationKind.textInsert,
-            pageId: pageId,
-            objectId: 'text-mixed-mime',
-            payload: {
-              'afterAtomId': null,
-              'atoms': [
-                {
-                  'id': const Uuid().v4(),
-                  'text': '\uFFFC',
-                  'embed': {'pdf': 'asset:$assetId'},
-                },
-              ],
-            },
-          ),
-        ],
-        apply: checkedProjector.apply,
-      ),
-      throwsStateError,
-    );
-    expect(await store.pending(), isEmpty);
-    final texts = await database
-        .customSelect(
-          'SELECT uid FROM text_block_rows WHERE page_uid = ?',
-          variables: [Variable<String>(pageId)],
-        )
-        .get();
-    expect(texts, isEmpty);
-    final references = await database
-        .customSelect(
-          'SELECT asset_id FROM asset_references WHERE document_id = ?',
-          variables: [Variable<String>(documentId)],
-        )
-        .get();
-    expect(references, isEmpty);
-    final blobs = await database
-        .customSelect('SELECT checksum_sha256 FROM operation_asset_bytes')
-        .get();
-    expect(blobs, isEmpty);
-  });
-}

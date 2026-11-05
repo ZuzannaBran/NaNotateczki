@@ -28,7 +28,9 @@ uznany za zaliczony na podstawie samego dodania testu.
 - [x] Ink `object.move`; obraz `object.move` tylko z referencją assetu.
 - [ ] `page.delete` usuwa zweryfikowane obrazy/Quill i ich scoped
   referencje atomowo; nadal odrzuca obce, niepowiązane i brakujące assety.
-  Kod dodany, ale wymaga wykonania testów i analizy statycznej.
+  Dodano regresję dla współdzielonego assetu: kasowanie strony usuwa tylko
+  jej scoped referencję, zachowując referencję drugiej strony. Wymaga
+  wykonania testów i analizy statycznej.
 - [ ] `object.delete` dla obrazu/Quill usuwa scoped referencję w tej
   samej transakcji; niezweryfikowany media object blokuje operację.
   Kod dodany, ale wymaga wykonania testów i analizy statycznej.
