@@ -257,6 +257,58 @@ class EditorController extends ChangeNotifier {
     return true;
   }
 
+  /// Updates only one committed page in a migrated v2 editor.
+  ///
+  /// No snapshot writer, history action, scroll or zoom is created here.
+  /// A busy editor rejects the patch so SyncEngine can retry the delivery.
+  bool applyConfirmedV2PagePatch({
+    required String pageId,
+    NotePage? page,
+    int? pageIndex,
+  }) {
+    if (operationWriter == null) {
+      throw StateError('A v2 page patch requires operation-mode editing.');
+    }
+    if (pageId.isEmpty || (page != null && page.id != pageId)) {
+      throw ArgumentError('Invalid v2 page patch identity.');
+    }
+    if (!canApplyConfirmedRemoteNotebook) {
+      return false;
+    }
+    final previous = pages.indexWhere((entry) => entry.id == pageId);
+    final updated = List<NotePage>.from(pages);
+    if (page == null) {
+      if (previous < 0) {
+        return true;
+      }
+      if (updated.length <= 1) {
+        throw StateError('Cannot remove the final notebook page.');
+      }
+      updated.removeAt(previous);
+    } else if (previous >= 0) {
+      updated[previous] = page;
+    } else {
+      if (pageIndex == null || pageIndex < 0 || pageIndex > updated.length) {
+        throw ArgumentError('New v2 pages require a valid insertion index.');
+      }
+      updated.insert(pageIndex, page);
+    }
+    final selectedId = currentPage.id;
+    pages = updated;
+    notebook = notebook.copyWith(pages: updated);
+    _v2PersistedNotebook = notebook;
+    final selected = updated.indexWhere((entry) => entry.id == selectedId);
+    currentPageIndex = selected < 0
+        ? currentPageIndex.clamp(0, updated.length - 1).toInt()
+        : selected;
+    _undoActions.clear();
+    _redoActions.clear();
+    _notifyHistoryChanged();
+    _touchInkPageRevision(pageId);
+    notifyListeners();
+    return true;
+  }
+
   /// Displays one committed v2 Share object delta without remounting the editor.
   ///
   /// The caller must persist the matching operation in the same transaction
