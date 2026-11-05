@@ -349,11 +349,15 @@ void main() {
     );
 
     buffer.stage(receipt: receipt, bytes: rawBytes);
+    bufferedWriter.registerVerifiedAsset(
+      documentId: notebook.uid,
+      objectId: 'image-object',
+      asset: verified,
+    );
     final committed = await bufferedWriter.writePageChange(
       documentId: notebook.uid,
       before: before,
       after: after,
-      verifiedAssets: {'image-object': verified},
     );
     expect(committed.map((op) => op.kind), [
       OperationKind.objectCreate,
