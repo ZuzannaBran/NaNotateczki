@@ -1,0 +1,165 @@
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/editor_sqlite_projector.dart';
+import 'package:program/data/sync/operation_gateway.dart';
+import 'package:program/data/sync/operation_protocol.dart';
+import 'package:program/data/sync/operation_store.dart';
+import 'package:program/data/sync/sync_engine.dart';
+import 'package:program/features/editor/state/editor_controller.dart';
+import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
+import 'package:program/features/editor/state/editor_v2_remote_patch_dispatcher.dart';
+import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:uuid/uuid.dart';
+
+import 'support/native_test_documents.dart';
+
+class _OfflineGateway implements OperationGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async => throw StateError('No network.');
+
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async =>
+      throw StateError('No network.');
+}
+
+void main() {
+  useIsolatedNativeTestDocuments();
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('remote patches modify one page and preserve object identity',
+      () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final store = OperationStore(database);
+    final projector = EditorSqliteProjector(database);
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'local',
+      checkpointScope: 'remote-patch-test',
+      enableRealtime: false,
+      applyRemote: (operation, pending) => projector.apply(operation),
+    );
+    addTearDown(engine.stop);
+    final editor = EditorController(
+      repository: repository,
+      notebook: notebook,
+      operationWriter: EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: projector,
+      ),
+    );
+    addTearDown(editor.dispose);
+    final dispatcher = EditorV2RemotePatchDispatcher(
+      editor: editor,
+      repository: repository,
+    );
+    var clock = 0;
+    String? previous;
+
+    Future<OperationEnvelope> remote({
+      required OperationKind kind,
+      required String objectId,
+      required Map<String, dynamic> payload,
+      String? pageId,
+    }) async {
+      clock++;
+      final current = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'other-device',
+        actorSeq: clock,
+        logicalClock: clock,
+        documentId: notebook.uid,
+        pageId: pageId,
+        objectId: objectId,
+        kind: kind,
+        payload: payload,
+        dependencies: previous == null ? [] : [previous!],
+      );
+      await store.applyRemote(
+        current,
+        serverSequence: clock,
+        checkpointScope: 'remote-patch-test',
+        apply: () => projector.apply(current),
+      );
+      previous = current.operationId;
+      return current;
+    }
+
+    final created = await remote(
+      kind: OperationKind.strokeCreate,
+      pageId: notebook.pages.first.id,
+      objectId: 'remote-ink',
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF223344,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [4.0, 6.0, 0.5],
+          ],
+        },
+      },
+    );
+    await dispatcher.onRemoteCommitted(created);
+    expect(editor.currentPage.id, notebook.pages.first.id);
+    expect(editor.currentPage.inkStrokes.single.id, 'remote-ink');
+    await dispatcher.onRemoteCommitted(created);
+    expect(editor.currentPage.inkStrokes, hasLength(1));
+
+    final pageCreated = await remote(
+      kind: OperationKind.pageCreate,
+      objectId: 'remote-page',
+      payload: const {
+        'value': {'title': 'Remote', 'isBookmarked': false},
+      },
+    );
+    await dispatcher.onRemoteCommitted(pageCreated);
+    expect(editor.pages, hasLength(2));
+    expect(editor.currentPage.id, notebook.pages.first.id);
+
+    final moved = await remote(
+      kind: OperationKind.objectMove,
+      pageId: notebook.pages.first.id,
+      objectId: 'remote-ink',
+      payload: const {'toPageId': 'remote-page', 'sortIndex': 0},
+    );
+    await dispatcher.onRemoteCommitted(moved);
+    expect(editor.pages.first.inkStrokes, isEmpty);
+    expect(editor.pages.last.inkStrokes.single.id, 'remote-ink');
+
+    final deleted = await remote(
+      kind: OperationKind.objectDelete,
+      pageId: 'remote-page',
+      objectId: 'remote-ink',
+      payload: const {},
+    );
+    editor.activeTextBlockId = 'active-editor-text';
+    await expectLater(
+      dispatcher.onRemoteCommitted(deleted),
+      throwsStateError,
+    );
+    expect(editor.pages.last.inkStrokes.single.id, 'remote-ink');
+    editor.activeTextBlockId = null;
+    await dispatcher.onRemoteCommitted(deleted);
+    expect(editor.pages.last.inkStrokes, isEmpty);
+
+    final pageDeleted = await remote(
+      kind: OperationKind.pageDelete,
+      objectId: 'remote-page',
+      payload: const {},
+    );
+    await dispatcher.onRemoteCommitted(pageDeleted);
+    expect(editor.pages, hasLength(1));
+    expect(editor.currentPage.id, notebook.pages.first.id);
+    expect(await store.checkpoint('remote-patch-test'), 5);
+    expect(await store.pending(), isEmpty);
+  });
+}
