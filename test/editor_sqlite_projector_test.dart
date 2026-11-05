@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:drift/drift.dart' hide isNull;
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1041,6 +1041,7 @@ void main() {
         actorId: 'remote-image-actor',
         actorSeq: 1,
         logicalClock: 1,
+        dependencies: const [],
         documentId: documentId,
         pageId: pageId,
         objectId: 'remote-image',
@@ -1395,7 +1396,7 @@ void main() {
       );
       await expectLater(
         write([
-          const LocalOperationDraft(
+          LocalOperationDraft(
             kind: OperationKind.assetDetach,
             pageId: pageId,
             objectId: imageId,

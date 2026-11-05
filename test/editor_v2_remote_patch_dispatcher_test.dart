@@ -80,6 +80,7 @@ void main() {
       actorId: 'remote-image-peer',
       actorSeq: 1,
       logicalClock: 1,
+      dependencies: const [],
       documentId: notebook.uid,
       pageId: notebook.pages.first.id,
       objectId: 'remote-image-object',
@@ -391,6 +392,7 @@ void main() {
       actorId: 'remote-other-doc',
       actorSeq: 1,
       logicalClock: 3,
+      dependencies: const [],
       documentId: another.uid,
       kind: OperationKind.documentSet,
       payload: const {
