@@ -1413,6 +1413,9 @@ scoped asset references razem z obiektem w transakcji SQLite;
 nie usuwa fizycznych plików i odmawia usunięcia brakującego assetu.
 `page.delete` może usuwać powiązane obrazy/Quill wraz z referencjami
 w jednej transakcji; osierocone i legacy referencje są blokowane.
+Test restartu na pliku SQLite:
+`test/editor_v2_crash_recovery_test.dart` (journal, outbox, Quill BLOB,
+blokada snapshotu legacy po ponownym otwarciu).
 Test: `test/editor_v2_operation_writer_test.dart` (m.in. automatyczny
 upload, odrzucenie starego receipt i przenoszenie Quill między stronami).
 

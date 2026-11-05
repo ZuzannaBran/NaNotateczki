@@ -323,3 +323,12 @@ cofnąć nowego widoku. Pozostały niezapisane gesty nie są usuwane po
 błędzie, a końcowy diff zachowuje zmiany bez `EditorAction` (np. Quill).
 Regresja: dwie szybkie kreski oraz Undo/Redo jednej z nich w
 `test/editor_controller_v2_test.dart`. Nie uruchomiono bez SDK Flutter.
+
+### Odtwarzanie po restarcie na plikowej bazie (SQLite v7)
+
+`test/editor_v2_crash_recovery_test.dart` zapisuje kreskę i osadzony
+obraz Quill wraz z 4 operacjami w outboxie, zamyka bazę, otwiera ją
+ponownie i kontroluje tożsamość operacji, stan projekcji, sprawdzenie
+assetu oraz blokadę legacy snapshotu. Do zaliczenia wymagane jest
+`flutter test test/editor_v2_crash_recovery_test.dart` na platformie native.
+Nie należy traktować dodania testu jako jego pozytywnego wykonania.
