@@ -43,6 +43,13 @@ class _EditorHistoryEntry {
   final EditorAction action;
 }
 
+class _V2HistoryEntry {
+  const _V2HistoryEntry(this.before, this.after);
+
+  final Notebook before;
+  final Notebook after;
+}
+
 class LassoSelection {
   LassoSelection({
     required this.pageIndex,
@@ -119,6 +126,9 @@ class EditorController extends ChangeNotifier {
   Notebook notebook;
   late Notebook _v2PersistedNotebook;
   Future<void>? _v2SaveTail;
+  Future<void>? _v2HistoryTail;
+  final List<_V2HistoryEntry> _v2Undo = [];
+  final List<_V2HistoryEntry> _v2Redo = [];
   Duration saveDebounce;
   final Uuid _uuid = const Uuid();
   final ImagePicker _imagePicker = ImagePicker();
@@ -191,10 +201,16 @@ class EditorController extends ChangeNotifier {
 
   NotePage get currentPage => pages[currentPageIndex];
 
-  // Inverse intents and new IDs for tombstoned objects are not yet wired.
-  // An optimistic legacy Undo must not resurrect a deleted v2 object.
-  bool get canUndo => operationWriter == null && _undoActions.isNotEmpty;
-  bool get canRedo => operationWriter == null && _redoActions.isNotEmpty;
+  bool get canUndo => operationWriter == null
+      ? _undoActions.isNotEmpty
+      : _v2Undo.isNotEmpty ||
+          _fullSavePending ||
+          _dirtyPageIds.isNotEmpty;
+  bool get canRedo => operationWriter == null
+      ? _redoActions.isNotEmpty
+      : _v2Redo.isNotEmpty &&
+          !_fullSavePending &&
+          _dirtyPageIds.isEmpty;
   bool get allowsFingerDrawing => pointerInputMode.allowsFingerDrawing;
   bool get isObjectTransformActive => _isObjectTransformActive;
   bool get isActiveImageEdit =>
@@ -304,6 +320,8 @@ class EditorController extends ChangeNotifier {
         : selected;
     _undoActions.clear();
     _redoActions.clear();
+    _v2Undo.clear();
+    _v2Redo.clear();
     _notifyHistoryChanged();
     _touchInkPageRevision(pageId);
     notifyListeners();
@@ -344,6 +362,8 @@ class EditorController extends ChangeNotifier {
     _v2PersistedNotebook = notebook;
     _undoActions.clear();
     _redoActions.clear();
+    _v2Undo.clear();
+    _v2Redo.clear();
     _notifyHistoryChanged();
     _touchInkPageRevision(source.id);
     _touchInkPageRevision(destination.id);
@@ -448,10 +468,11 @@ class EditorController extends ChangeNotifier {
       // a new local operation during the next editor save.
       _v2PersistedNotebook = notebook;
     }
-    // v2 undo/redo must ultimately emit inverse operations. Until stage 11
-    // binds them, do not allow a stale legacy action to undo remote changes.
+    // A remote operation invalidates local inverse snapshots.
     _undoActions.clear();
     _redoActions.clear();
+    _v2Undo.clear();
+    _v2Redo.clear();
     _notifyHistoryChanged();
     if (hasInk) {
       _touchInkPageRevision(pageId);
@@ -486,6 +507,7 @@ class EditorController extends ChangeNotifier {
       _activePrefsSave != null ||
       _notebookSaveDebounce != null ||
       _v2SaveTail != null ||
+      _v2HistoryTail != null ||
       _fullSavePending ||
       _dirtyPageIds.isNotEmpty ||
       _activeTextEditBefore != null;
@@ -514,6 +536,7 @@ class EditorController extends ChangeNotifier {
     if (operationWriter != null) {
       // The v2 journal and its projection commit together; no legacy writer
       // is allowed to run on the same document during flush or shutdown.
+      await _v2HistoryTail;
       await _v2SaveTail;
       if (_fullSavePending || _dirtyPageIds.isNotEmpty) {
         await _saveV2();
@@ -1798,6 +1821,7 @@ class EditorController extends ChangeNotifier {
 
   void undo() {
     if (operationWriter != null) {
+      _queueV2History(undo: true);
       return;
     }
     _commitActiveTextEdit();
@@ -1837,6 +1861,7 @@ class EditorController extends ChangeNotifier {
 
   void redo() {
     if (operationWriter != null) {
+      _queueV2History(undo: false);
       return;
     }
     _commitActiveTextEdit();
@@ -1872,6 +1897,128 @@ class EditorController extends ChangeNotifier {
       _touchInkPageRevision(updated.id);
     }
     _save();
+  }
+
+  /// Queues inverse edits behind any in-flight local v2 batch.
+  ///
+  /// Each inverse is a new durable operation; no old tombstoned identity is
+  /// resurrected. Failed inverses leave both the UI and the history intact.
+  void _queueV2History({required bool undo}) {
+    if (_isDisposed) {
+      return;
+    }
+    final previous = _v2HistoryTail ?? Future<void>.value();
+    late final Future<void> next;
+    next = previous
+        .then((_) => _applyV2History(undo: undo))
+        .catchError((Object error, StackTrace stackTrace) {
+          debugPrint('EditorController v2 history blocked: '
+              '$error\\n$stackTrace');
+        })
+        .whenComplete(() {
+          if (identical(_v2HistoryTail, next)) {
+            _v2HistoryTail = null;
+          }
+        });
+    _v2HistoryTail = next;
+  }
+
+  Future<void> _applyV2History({required bool undo}) async {
+    if (InkActivityTracker.instance.hasActiveContacts) {
+      return;
+    }
+    _commitActiveTextEdit();
+    await _v2SaveTail;
+    if (_fullSavePending || _dirtyPageIds.isNotEmpty) {
+      await _saveV2();
+    }
+    if (_integritySaveBlocked) {
+      throw StateError('Cannot undo an uncommitted editor change.');
+    }
+    final source = undo ? _v2Undo : _v2Redo;
+    if (source.isEmpty) {
+      return;
+    }
+    final entry = source.last;
+    final original = _v2PersistedNotebook;
+    final desired = undo ? entry.before : entry.after;
+    final restored = _reidentifyV2RestoredObjects(
+      current: original,
+      desired: desired,
+    );
+    final committed = await operationWriter!.writeNotebookChange(
+      before: original,
+      after: restored,
+    );
+    if (committed.isEmpty) {
+      source.removeLast();
+      (undo ? _v2Redo : _v2Undo).add(entry);
+      _notifyHistoryChanged();
+      return;
+    }
+    final selectedId = currentPage.id;
+    _v2PersistedNotebook = restored;
+    notebook = restored;
+    pages = restored.pages;
+    final selected = pages.indexWhere((page) => page.id == selectedId);
+    currentPageIndex = selected < 0
+        ? currentPageIndex.clamp(0, pages.length - 1).toInt()
+        : selected;
+    activeTextBlockId = null;
+    activeTextController = null;
+    activeImageBlockId = null;
+    lassoSelection = null;
+    _undoActions.clear();
+    _redoActions.clear();
+    _fullSavePending = false;
+    _dirtyPageIds.clear();
+    _expectedRemovedIdsByPage.clear();
+    _expectedRemovedPageIds.clear();
+    source.removeLast();
+    (undo ? _v2Redo : _v2Undo).add(entry);
+    _notifyHistoryChanged();
+    for (final page in pages) {
+      _touchInkPageRevision(page.id);
+    }
+    notifyListeners();
+  }
+
+  Notebook _reidentifyV2RestoredObjects({
+    required Notebook current,
+    required Notebook desired,
+  }) {
+    final pageIds = {for (final page in current.pages) page.id};
+    final objectIds = <String>{
+      for (final page in current.pages) ...[
+        ...page.inkStrokes.map((item) => item.id),
+        ...page.textBlocks.map((item) => item.id),
+        ...page.imageBlocks.map((item) => item.id),
+      ],
+    };
+    return desired.copyWith(pages: [
+      for (final page in desired.pages)
+        page.copyWith(
+          id: pageIds.contains(page.id) ? page.id : _uuid.v4(),
+          inkStrokes: [
+            for (final stroke in page.inkStrokes)
+              objectIds.contains(stroke.id)
+                  ? stroke
+                  : stroke.copyWith(id: _uuid.v4()),
+          ],
+          textBlocks: [
+            for (final block in page.textBlocks)
+              objectIds.contains(block.id)
+                  ? block
+                  : block.copyWith(id: _uuid.v4()),
+          ],
+          imageBlocks: [
+            for (final block in page.imageBlocks)
+              objectIds.contains(block.id)
+                  ? block
+                  : block.copyWith(id: _uuid.v4()),
+          ],
+        ),
+    ]);
   }
 
   void addPage() {
@@ -3504,11 +3651,22 @@ class EditorController extends ChangeNotifier {
         updatedAt: DateTime.now(),
       );
       try {
-        await operationWriter!.writeNotebookChange(
-          before: _v2PersistedNotebook,
+        final baseline = _v2PersistedNotebook;
+        final committed = await operationWriter!.writeNotebookChange(
+          before: baseline,
           after: proposed,
         );
         _v2PersistedNotebook = proposed;
+        if (committed.isNotEmpty) {
+          _v2Undo.add(_V2HistoryEntry(baseline, proposed));
+          if (_v2Undo.length > 50) {
+            _v2Undo.removeAt(0);
+          }
+          _v2Redo.clear();
+          _undoActions.clear();
+          _redoActions.clear();
+          _notifyHistoryChanged();
+        }
         _integritySaveBlocked = false;
         if (identical(pages, savedPages)) {
           _fullSavePending = false;
