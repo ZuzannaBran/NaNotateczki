@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -681,6 +682,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   Timer? _selectionTimer;
   String? _lastDeltaJson;
   late EditorController _editorController;
+  final Map<String, Future<Uint8List>> _embedReads = {};
   bool _isNormalizing = false;
 
   @override
@@ -712,6 +714,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         widget.block.deltaJson == null &&
         oldWidget.block.text != widget.block.text;
     if (hasDeltaChange || hasTextChange) {
+      _embedReads.clear();
       _initQuill();
     } else if (oldWidget.block.color != widget.block.color) {
       _clearDarkDisplayController();
@@ -733,6 +736,25 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _previewTextController.dispose();
     _quillController.dispose();
     super.dispose();
+  }
+
+  Future<Uint8List> _readVerifiedEmbed(String id) {
+    final writer = _editorController.operationWriter;
+    if (writer == null) {
+      return Future<Uint8List>.error(
+        StateError('Verified inline media require a v2 editor.'),
+      );
+    }
+    final pageId = _editorController.pageAt(widget.pageIndex).id;
+    return _embedReads.putIfAbsent(
+      '$pageId:$id',
+      () => writer.projector.verifiedTextAssetBytes(
+        documentId: _editorController.notebook.uid,
+        pageId: pageId,
+        objectId: widget.block.id,
+        assetId: id,
+      ),
+    );
   }
 
   @override
@@ -885,6 +907,19 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                               focusNode: _focusNode,
                               scrollController: _scrollController,
                               config: quill.QuillEditorConfig(
+                                embedBuilders:
+                                    controller.operationWriter == null
+                                        ? null
+                                        : [
+                                            VerifiedQuillEmbedBuilder(
+                                              type: 'image',
+                                              load: _readVerifiedEmbed,
+                                            ),
+                                            VerifiedQuillEmbedBuilder(
+                                              type: 'pdf',
+                                              load: _readVerifiedEmbed,
+                                            ),
+                                          ],
                                 scrollable: false,
                                 padding: EdgeInsets.zero,
                                 autoFocus: false,
@@ -3024,4 +3059,64 @@ Offset _globalDeltaToLocalDelta(
   }
   return MatrixUtils.transformPoint(transform, end) -
       MatrixUtils.transformPoint(transform, start);
+}
+
+/// Resolves embedded media exclusively from verified SQLite bytes.
+class VerifiedQuillEmbedBuilder extends quill.EmbedBuilder {
+  const VerifiedQuillEmbedBuilder({
+    required this.type,
+    required this.load,
+  });
+
+  final String type;
+  final Future<Uint8List> Function(String id) load;
+
+  @override
+  String get key => type;
+
+  @override
+  bool get expanded => false;
+
+  @override
+  Widget build(BuildContext context, quill.EmbedContext embedContext) {
+    final source = embedContext.node.value.data;
+    if (source is! String ||
+        !source.startsWith('asset:') ||
+        source.length <= 6) {
+      return const Icon(Icons.broken_image_outlined, size: 24);
+    }
+    return FutureBuilder<Uint8List>(
+      future: load(source.substring(6)),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Icon(Icons.broken_image_outlined, size: 24);
+        }
+        if (!snapshot.hasData) {
+          return const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          );
+        }
+        if (type == 'pdf') {
+          return const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.picture_as_pdf_outlined, size: 22),
+              SizedBox(width: 6),
+              Text('Embedded PDF'),
+            ],
+          );
+        }
+        return Image.memory(
+          snapshot.data!,
+          width: 180,
+          height: 180,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.broken_image_outlined, size: 24),
+        );
+      },
+    );
+  }
 }

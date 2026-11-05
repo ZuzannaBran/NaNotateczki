@@ -1866,6 +1866,9 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 
 ## 9. Board
 
+Quill embed renderer opt-in v2 `VerifiedQuillEmbedBuilder` czyta
+obrazy/PDF z trwałej tabeli assetów; bez URL i ścieżek lokalnych.
+
 ### `lib/features/board/presentation/board_screen.dart` (896 linie)
 
 Jednostronicowa, swobodna tablica z pan/zoom, wspólnym kontrolerem i

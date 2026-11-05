@@ -99,3 +99,6 @@ propagowane na wszystkie urządzenia.
   sytuacja grożąca utratą danych.
 - Kod fail-closed i opt-in nie oznacza gotowego produkcyjnego cutover.
 - Nie uruchamiać GitHub Actions bez wyraźnego upoważnienia użytkownika.
+
+- [ ] Quill embed renderer `VerifiedQuillEmbedBuilder` dodany do edytora
+  v2, wymaga testów widgetowych Flutter przed cutover.

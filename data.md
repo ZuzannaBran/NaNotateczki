@@ -907,3 +907,7 @@ tylko referencję. Bajty pozostają do późniejszego GC i są dostępne
 przez `verifiedTextAssetBytes` po restarcie i wyczyszczeniu bufora.
 Migracja v6→v7 jest addytywna; render Quill embedów w aktywnym edytorze
 i pełne E2E nadal wymagają osobnej weryfikacji.
+
+W trybie opt-in v2 Quill obraz jest renderowany przez `Image.memory`
+na podstawie zweryfikowanego BLOB; PDF pokazuje oznaczenie osadzonego
+pliku (nie strony PDF). Brak assetu pokazuje ikonę błędu.
