@@ -1462,6 +1462,8 @@ Rejestruje się w `AppSaveCoordinator`;
 czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
 zgodą na zamknięcie aplikacji. Opcjonalny `operationWriter` kieruje
 zapis wyłącznie do v2 z serializacją zmian i utrwaloną bazą stanu;
+w opt-in v2 każdy zakończony gest zachowuje oddzielny checkpoint
+pozwalający cofnąć go niezależnie od innych działań w debounce;
 `NotebookRepository` blokuje wtedy legacy snapshot writery na tym UID.
 Undo/Redo w trybie v2 działa na zatwierdzonych stanach przez nowe operacje
 i nowe ID odtwarzanych obiektów; nie odtwarza tombstone. Równoległy gest

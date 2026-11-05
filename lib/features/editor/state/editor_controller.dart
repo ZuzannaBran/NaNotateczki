@@ -130,6 +130,7 @@ class EditorController extends ChangeNotifier {
   bool _v2HistoryCommitting = false;
   final List<_V2HistoryEntry> _v2Undo = [];
   final List<_V2HistoryEntry> _v2Redo = [];
+  final List<Notebook> _v2GestureCheckpoints = [];
   Duration saveDebounce;
   final Uuid _uuid = const Uuid();
   final ImagePicker _imagePicker = ImagePicker();
@@ -562,6 +563,7 @@ class EditorController extends ChangeNotifier {
       _notebookSaveDebounce != null ||
       _v2SaveTail != null ||
       _v2HistoryTail != null ||
+      _v2GestureCheckpoints.isNotEmpty ||
       _fullSavePending ||
       _dirtyPageIds.isNotEmpty ||
       _activeTextEditBefore != null;
@@ -2104,6 +2106,7 @@ class EditorController extends ChangeNotifier {
     activeTextBlockId = null;
     activeTextController = null;
     activeImageBlockId = null;
+    _captureV2Gesture();
     _save();
     notifyListeners();
   }
@@ -2131,6 +2134,7 @@ class EditorController extends ChangeNotifier {
     activeTextBlockId = null;
     activeTextController = null;
     activeImageBlockId = null;
+    _captureV2Gesture();
     _save();
     notifyListeners();
   }
@@ -3460,6 +3464,7 @@ class EditorController extends ChangeNotifier {
       _undoActions.add(_EditorHistoryEntry(currentPage.id, action));
       _redoActions.clear();
       _notifyHistoryChanged();
+      _captureV2Gesture();
       notifyListeners();
       return;
     }
@@ -3470,6 +3475,7 @@ class EditorController extends ChangeNotifier {
     _redoActions.clear();
     _notifyHistoryChanged();
     _updatePage(updated);
+    _captureV2Gesture();
   }
 
   void _applyCrossPageImageMove(
@@ -3497,6 +3503,7 @@ class EditorController extends ChangeNotifier {
         if (i == currentPageIndex) updated else pages[i],
     ];
     _touchInkPageRevision(updated.id);
+    _captureV2Gesture();
   }
 
   void _touchInkPageRevision(String pageId) {
@@ -3526,6 +3533,7 @@ class EditorController extends ChangeNotifier {
       for (var i = 0; i < pages.length; i++)
         if (i == currentPageIndex) updated else pages[i],
     ];
+    _captureV2Gesture();
   }
 
   void _recordExpectedRemovals(
@@ -3646,6 +3654,7 @@ class EditorController extends ChangeNotifier {
       ),
     );
     _redoActions.clear();
+    _captureV2Gesture();
     _scheduleSave(pageId: pages[pageIndex].id);
   }
 
@@ -3707,6 +3716,17 @@ class EditorController extends ChangeNotifier {
     });
   }
 
+  /// Keeps each completed action independent of the next debounce period.
+  void _captureV2Gesture() {
+    if (operationWriter == null || _isDisposed || _v2DocumentDeleted) {
+      return;
+    }
+    _v2GestureCheckpoints.add(notebook.copyWith(
+      pages: List<NotePage>.of(pages),
+      updatedAt: DateTime.now(),
+    ));
+  }
+
   /// Serializes v2 writes without ever invoking snapshot repository saves.
   ///
   /// The committed baseline advances only after the SQLite transaction.
@@ -3734,24 +3754,37 @@ class EditorController extends ChangeNotifier {
         if (_v2DocumentDeleted) {
           throw StateError('A deleted v2 notebook cannot be edited.');
         }
-        final baseline = _v2PersistedNotebook;
-        final committed = await operationWriter!.writeNotebookChange(
-          before: baseline,
-          after: proposed,
-        );
-        _v2PersistedNotebook = proposed;
-        if (committed.isNotEmpty) {
-          _v2Undo.add(_V2HistoryEntry(baseline, proposed));
-          if (_v2Undo.length > 50) {
-            _v2Undo.removeAt(0);
+        Future<void> persist(Notebook target) async {
+          final baseline = _v2PersistedNotebook;
+          final committed = await operationWriter!.writeNotebookChange(
+            before: baseline,
+            after: target,
+          );
+          _v2PersistedNotebook = target;
+          if (committed.isNotEmpty) {
+            _v2Undo.add(_V2HistoryEntry(baseline, target));
+            if (_v2Undo.length > 50) {
+              _v2Undo.removeAt(0);
+            }
+            _v2Redo.clear();
+            _undoActions.clear();
+            _redoActions.clear();
+            _notifyHistoryChanged();
           }
-          _v2Redo.clear();
-          _undoActions.clear();
-          _redoActions.clear();
-          _notifyHistoryChanged();
+        }
+
+        final gestures = List<Notebook>.of(_v2GestureCheckpoints);
+        for (final gesture in gestures) {
+          await persist(gesture);
+          _v2GestureCheckpoints.removeAt(0);
+        }
+        // A later gesture during I/O must not be overwritten by this save.
+        if (identical(pages, savedPages)) {
+          await persist(proposed);
         }
         _integritySaveBlocked = false;
-        if (identical(pages, savedPages)) {
+        if (identical(pages, savedPages) &&
+            _v2GestureCheckpoints.isEmpty) {
           _fullSavePending = false;
           _dirtyPageIds.clear();
           _expectedRemovedIdsByPage.clear();

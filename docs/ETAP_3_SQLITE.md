@@ -313,3 +313,13 @@ zdarzenie przez `onDocumentCommitted` zamiast je porzucać. NotebookScreen i
 BoardScreen pokazują stan usunięcia dokumentu, uniemożliwiając dalszą
 interakcję z nieaktualnym canvasem. Produkcyjny callback biblioteki i
 aktualizacja protokołu konta nadal nie są podłączone.
+
+### Granice gestów v2 (2026-11-05)
+
+Zakończone `EditorAction`, kreski oraz zmiany stron są kolejno
+utrwalane w osobnych transakcjach v2, także gdy wystąpiły przed jednym
+wyzwoleniem debounce. Rozpoczęcie następnej akcji podczas I/O nie może
+cofnąć nowego widoku. Pozostały niezapisane gesty nie są usuwane po
+błędzie, a końcowy diff zachowuje zmiany bez `EditorAction` (np. Quill).
+Regresja: dwie szybkie kreski oraz Undo/Redo jednej z nich w
+`test/editor_controller_v2_test.dart`. Nie uruchomiono bez SDK Flutter.

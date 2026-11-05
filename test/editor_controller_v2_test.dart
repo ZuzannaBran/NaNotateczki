@@ -271,4 +271,51 @@ void main() {
       throwsArgumentError,
     );
   });
+  test('rapid independent strokes have separate v2 Undo boundaries',
+      () async {
+    final db = NotesDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final repo = NotebookRepository(db);
+    final notebook = await repo.createNotebook();
+    final store = OperationStore(db);
+    final projector = EditorSqliteProjector(db);
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'gesture-peer',
+      checkpointScope: 'gesture-test',
+      enableRealtime: false,
+      applyRemote: (op, _) => projector.apply(op),
+    );
+    addTearDown(engine.stop);
+    final editor = EditorController(
+      repository: repo,
+      notebook: notebook,
+      operationWriter: EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: projector,
+      ),
+    );
+    addTearDown(editor.dispose);
+    editor.addInkStroke(const [InkPoint(dx: 1, dy: 2, pressure: 0.5)]);
+    editor.addInkStroke(const [InkPoint(dx: 3, dy: 4, pressure: 0.6)]);
+    await editor.flushPendingSaves();
+    expect((await store.pending()).map((e) => e.kind), [
+      OperationKind.strokeCreate,
+      OperationKind.strokeCreate,
+    ]);
+    editor.undo();
+    await editor.flushPendingSaves();
+    expect(
+      (await repo.getNotebook(notebook.uid))!.pages.single.inkStrokes,
+      hasLength(1),
+    );
+    editor.redo();
+    await editor.flushPendingSaves();
+    expect(
+      (await repo.getNotebook(notebook.uid))!.pages.single.inkStrokes,
+      hasLength(2),
+    );
+  });
+
 }
