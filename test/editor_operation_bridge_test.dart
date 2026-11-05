@@ -107,9 +107,7 @@ void main() {
 
   test('Quill terminal newline is retained while text stays trimmed', () {
     final before = _page();
-    final block = _text('Hi').copyWith(
-      deltaJson: r'[{"insert":"Hi\n"}]',
-    );
+    final block = _text('Hi').copyWith(deltaJson: r'[{"insert":"Hi\n"}]');
     final drafts = bridge.planPageChange(
       before: before,
       after: _page(texts: [block]),
@@ -158,16 +156,13 @@ void main() {
       OperationKind.objectCreate,
       OperationKind.assetAttach,
     ]);
-    expect(
-      (drafts.first.payload['value'] as Map).containsKey('path'),
-      isFalse,
-    );
+    expect((drafts.first.payload['value'] as Map).containsKey('path'), isFalse);
   });
 
   test('verified Quill image is attached before its text atom', () {
-    final block = _text('\uFFFC').copyWith(
-      deltaJson: '[{"insert":{"image":"asset:embed-one"}}]',
-    );
+    final block = _text(
+      '\uFFFC',
+    ).copyWith(deltaJson: '[{"insert":{"image":"asset:embed-one"}}]');
     final drafts = bridge.planPageChange(
       before: _page(),
       after: _page(texts: [block]),
@@ -192,7 +187,8 @@ void main() {
 
   test('repeated Quill asset references attach only once', () {
     final block = _text('\uFFFC\uFFFC').copyWith(
-      deltaJson: '[{"insert":{"pdf":"asset:pdf-one"}},'
+      deltaJson:
+          '[{"insert":{"pdf":"asset:pdf-one"}},'
           '{"insert":{"pdf":"asset:pdf-one"}}]',
     );
     final drafts = bridge.planPageChange(
@@ -217,9 +213,9 @@ void main() {
   });
 
   test('unverified or external Quill embeds fail closed', () {
-    final block = _text('\uFFFC').copyWith(
-      deltaJson: '[{"insert":{"image":"asset:missing"}}]',
-    );
+    final block = _text(
+      '\uFFFC',
+    ).copyWith(deltaJson: '[{"insert":{"image":"asset:missing"}}]');
     expect(
       () => bridge.planPageChange(
         before: _page(),
@@ -230,20 +226,22 @@ void main() {
     expect(
       () => bridge.planPageChange(
         before: _page(),
-        after: _page(texts: [
-          block.copyWith(
-            deltaJson: '[{"insert":{"image":"https://example.org/x.png"}}]',
-          ),
-        ]),
+        after: _page(
+          texts: [
+            block.copyWith(
+              deltaJson: '[{"insert":{"image":"https://example.org/x.png"}}]',
+            ),
+          ],
+        ),
       ),
       throwsFormatException,
     );
   });
 
   test('Quill embed MIME cannot differ from verified file', () {
-    final block = _text('\uFFFC').copyWith(
-      deltaJson: '[{"insert":{"pdf":"asset:one"}}]',
-    );
+    final block = _text(
+      '\uFFFC',
+    ).copyWith(deltaJson: '[{"insert":{"pdf":"asset:one"}}]');
     expect(
       () => bridge.planPageChange(
         before: _page(),
@@ -287,10 +285,7 @@ void main() {
       OperationKind.objectSet,
       OperationKind.assetDetach,
     ]);
-    expect(
-      (drafts[1].payload['properties'] as Map)['assetId'],
-      'new-asset',
-    );
+    expect((drafts[1].payload['properties'] as Map)['assetId'], 'new-asset');
     expect(drafts.last.payload, {'assetId': 'old-asset'});
   });
 
@@ -299,9 +294,9 @@ void main() {
     expect(
       () => bridge.planPageChange(
         before: _page(images: [original]),
-        after: _page(images: [
-          original.copyWith(path: '/private/replaced.jpg'),
-        ]),
+        after: _page(
+          images: [original.copyWith(path: '/private/replaced.jpg')],
+        ),
         verifiedAssets: {
           'image-one': const VerifiedEditorAsset(
             assetId: 'new-asset',

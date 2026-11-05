@@ -58,9 +58,7 @@ void main() {
     editor.addPage();
     final secondId = editor.currentPage.id;
     await editor.flushPendingSaves();
-    editor.addInkStroke(const [
-      InkPoint(dx: 20, dy: 30, pressure: 0.5),
-    ]);
+    editor.addInkStroke(const [InkPoint(dx: 20, dy: 30, pressure: 0.5)]);
     await editor.flushPendingSaves();
 
     editor.setCurrentPage(0);
@@ -91,9 +89,7 @@ void main() {
     addTearDown(editor.dispose);
 
     editor.addPage();
-    editor.addInkStroke(const [
-      InkPoint(dx: 6, dy: 7, pressure: 0.5),
-    ]);
+    editor.addInkStroke(const [InkPoint(dx: 6, dy: 7, pressure: 0.5)]);
     expect(editor.canUndo, isTrue);
     editor.deleteLastPage();
     expect(editor.canUndo, isFalse);
@@ -120,9 +116,7 @@ void main() {
     addTearDown(editor.dispose);
 
     editor.addPage();
-    editor.addInkStroke(const [
-      InkPoint(dx: 8, dy: 9, pressure: 0.5),
-    ]);
+    editor.addInkStroke(const [InkPoint(dx: 8, dy: 9, pressure: 0.5)]);
     await editor.flushPendingSaves();
     final stored = (await repository.getNotebook(source.uid))!;
     expect(stored.pages, hasLength(2));

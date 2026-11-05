@@ -60,16 +60,17 @@ void main() {
   }
 
   Future<List<Map<String, dynamic>>> inkRows() async {
-    final rows = await database.customSelect(
-      'SELECT uid, points_json, color_value, sort_index '
-      'FROM ink_stroke_rows WHERE page_uid = ?',
-      variables: [Variable<String>(pageId)],
-    ).get();
+    final rows = await database
+        .customSelect(
+          'SELECT uid, points_json, color_value, sort_index '
+          'FROM ink_stroke_rows WHERE page_uid = ?',
+          variables: [Variable<String>(pageId)],
+        )
+        .get();
     return [for (final row in rows) row.data];
   }
 
-  test('legacy eraser migration cannot rewrite a v2 ink document',
-      () async {
+  test('legacy eraser migration cannot rewrite a v2 ink document', () async {
     await write([
       LocalOperationDraft(
         kind: OperationKind.strokeCreate,
@@ -96,14 +97,15 @@ void main() {
       ],
     );
     Future<List<String>> persistedIds() async {
-      final rows = await database.customSelect(
-        'SELECT uid FROM ink_stroke_rows WHERE page_uid = ? ORDER BY uid',
-        variables: [Variable<String>(pageId)],
-      ).get();
-      return [
-        for (final row in rows) row.read<String>('uid'),
-      ];
+      final rows = await database
+          .customSelect(
+            'SELECT uid FROM ink_stroke_rows WHERE page_uid = ? ORDER BY uid',
+            variables: [Variable<String>(pageId)],
+          )
+          .get();
+      return [for (final row in rows) row.read<String>('uid')];
     }
+
     final beforeRead = await persistedIds();
     expect(beforeRead, contains('legacy-eraser'));
     final freshRepository = NotebookRepository(database);
@@ -112,8 +114,7 @@ void main() {
     expect(await store.pending(), hasLength(1));
   });
 
-  test('a fresh repository cannot overwrite committed v2 history',
-      () async {
+  test('a fresh repository cannot overwrite committed v2 history', () async {
     await write([
       LocalOperationDraft(
         kind: OperationKind.strokeCreate,
@@ -131,10 +132,7 @@ void main() {
       throwsStateError,
     );
     await expectLater(
-      reopenedRepository.saveNotebookPages(
-        existing,
-        {pageId},
-      ),
+      reopenedRepository.saveNotebookPages(existing, {pageId}),
       throwsStateError,
     );
     await expectLater(
@@ -153,8 +151,9 @@ void main() {
       throwsStateError,
     );
     expect(
-      (await reopenedRepository.getNotebook(documentId))!
-          .pages.first.inkStrokes.single.id,
+      (await reopenedRepository.getNotebook(
+        documentId,
+      ))!.pages.first.inkStrokes.single.id,
       'protected-ink',
     );
 
@@ -163,8 +162,7 @@ void main() {
     expect(await reopenedRepository.saveNotebook(sibling), isTrue);
   });
 
-  test('rapid v2 commits never invent future notebook timestamps',
-      () async {
+  test('rapid v2 commits never invent future notebook timestamps', () async {
     final original = (await notebooks.getNotebook(documentId))!.updatedAt;
     await write([
       LocalOperationDraft(
@@ -196,10 +194,10 @@ void main() {
       second.isAfter(DateTime.now().toUtc().add(const Duration(seconds: 1))),
       isFalse,
     );
-    expect(
-      (await store.pending()).map((operation) => operation.actorSeq),
-      [1, 2],
-    );
+    expect((await store.pending()).map((operation) => operation.actorSeq), [
+      1,
+      2,
+    ]);
     final previousOutbox = await store.pending();
     await expectLater(
       write([
@@ -214,120 +212,122 @@ void main() {
       ]),
       throwsFormatException,
     );
-    final afterRollback =
-        (await notebooks.getNotebook(documentId))!.updatedAt;
+    final afterRollback = (await notebooks.getNotebook(documentId))!.updatedAt;
     expect(afterRollback, second);
     expect(await store.pending(), hasLength(previousOutbox.length));
   });
 
-  test('ink create, transform and delete persist as atomic operations',
-      () async {
-    final added = await write([
-      LocalOperationDraft(
-        kind: OperationKind.strokeCreate,
-        pageId: pageId,
-        objectId: 'stroke-one',
-        payload: {'value': _stroke()},
-      ),
-    ]);
-    expect(added, hasLength(1));
-    expect(await inkRows(), hasLength(1));
-    expect((await store.pending()).single.operationId,
-        added.single.operationId);
-
-    await write([
-      LocalOperationDraft(
-        kind: OperationKind.objectTransform,
-        pageId: pageId,
-        objectId: 'stroke-one',
-        payload: {
-          'properties': {
-            'points': [
-              [2.0, 3.0, 0.8],
-            ],
-          },
-        },
-      ),
-      LocalOperationDraft(
-        kind: OperationKind.objectSet,
-        pageId: pageId,
-        objectId: 'stroke-one',
-        payload: {
-          'properties': {'colorValue': 0xFFABCDEF},
-        },
-      ),
-    ]);
-    final after = (await notebooks.getNotebook(documentId))!;
-    expect(after.pages.single.inkStrokes.single.points.single.dx, 2);
-    expect(
-      after.pages.single.inkStrokes.single.color.toARGB32(),
-      0xFFABCDEF,
-    );
-
-    await write([
-      LocalOperationDraft(
-        kind: OperationKind.objectDelete,
-        pageId: pageId,
-        objectId: 'stroke-one',
-        payload: const {},
-      ),
-    ]);
-    expect(await inkRows(), isEmpty);
-    expect(
-      await store.isTombstoned(
-        documentId,
-        'object',
-        'stroke-one',
-        pageId: pageId,
-      ),
-      isTrue,
-    );
-    await expectLater(
-      write([
+  test(
+    'ink create, transform and delete persist as atomic operations',
+    () async {
+      final added = await write([
         LocalOperationDraft(
           kind: OperationKind.strokeCreate,
           pageId: pageId,
           objectId: 'stroke-one',
           payload: {'value': _stroke()},
         ),
-      ]),
-      throwsStateError,
-    );
-  });
+      ]);
+      expect(added, hasLength(1));
+      expect(await inkRows(), hasLength(1));
+      expect(
+        (await store.pending()).single.operationId,
+        added.single.operationId,
+      );
 
-  test('invalid second operation rolls back projection and actor sequence',
-      () async {
-    await expectLater(
-      write([
+      await write([
         LocalOperationDraft(
-          kind: OperationKind.strokeCreate,
+          kind: OperationKind.objectTransform,
           pageId: pageId,
-          objectId: 'stroke-one',
-          payload: {'value': _stroke()},
-        ),
-        const LocalOperationDraft(
-          kind: OperationKind.objectSet,
-          pageId: 'wrong-page',
           objectId: 'stroke-one',
           payload: {
-            'properties': {'colorValue': 0xFF987654},
+            'properties': {
+              'points': [
+                [2.0, 3.0, 0.8],
+              ],
+            },
           },
         ),
-      ]),
-      throwsStateError,
-    );
-    expect(await inkRows(), isEmpty);
-    expect(await store.pending(), isEmpty);
-    final committed = await write([
-      LocalOperationDraft(
-        kind: OperationKind.strokeCreate,
-        pageId: pageId,
-        objectId: 'stroke-one',
-        payload: {'value': _stroke()},
-      ),
-    ]);
-    expect(committed.single.actorSeq, 1);
-  });
+        LocalOperationDraft(
+          kind: OperationKind.objectSet,
+          pageId: pageId,
+          objectId: 'stroke-one',
+          payload: {
+            'properties': {'colorValue': 0xFFABCDEF},
+          },
+        ),
+      ]);
+      final after = (await notebooks.getNotebook(documentId))!;
+      expect(after.pages.single.inkStrokes.single.points.single.dx, 2);
+      expect(after.pages.single.inkStrokes.single.color.toARGB32(), 0xFFABCDEF);
+
+      await write([
+        LocalOperationDraft(
+          kind: OperationKind.objectDelete,
+          pageId: pageId,
+          objectId: 'stroke-one',
+          payload: const {},
+        ),
+      ]);
+      expect(await inkRows(), isEmpty);
+      expect(
+        await store.isTombstoned(
+          documentId,
+          'object',
+          'stroke-one',
+          pageId: pageId,
+        ),
+        isTrue,
+      );
+      await expectLater(
+        write([
+          LocalOperationDraft(
+            kind: OperationKind.strokeCreate,
+            pageId: pageId,
+            objectId: 'stroke-one',
+            payload: {'value': _stroke()},
+          ),
+        ]),
+        throwsStateError,
+      );
+    },
+  );
+
+  test(
+    'invalid second operation rolls back projection and actor sequence',
+    () async {
+      await expectLater(
+        write([
+          LocalOperationDraft(
+            kind: OperationKind.strokeCreate,
+            pageId: pageId,
+            objectId: 'stroke-one',
+            payload: {'value': _stroke()},
+          ),
+          const LocalOperationDraft(
+            kind: OperationKind.objectSet,
+            pageId: 'wrong-page',
+            objectId: 'stroke-one',
+            payload: {
+              'properties': {'colorValue': 0xFF987654},
+            },
+          ),
+        ]),
+        throwsStateError,
+      );
+      expect(await inkRows(), isEmpty);
+      expect(await store.pending(), isEmpty);
+      final committed = await write([
+        LocalOperationDraft(
+          kind: OperationKind.strokeCreate,
+          pageId: pageId,
+          objectId: 'stroke-one',
+          payload: {'value': _stroke()},
+        ),
+      ]);
+      expect(committed.single.actorSeq, 1);
+    },
+  );
 
   test('remote operation commits projection and checkpoint once', () async {
     final local = (await write([
@@ -405,8 +405,16 @@ void main() {
         payload: const {
           'afterAtomId': null,
           'atoms': [
-            {'id': atomA, 'text': 'H', 'attributes': {'bold': true}},
-            {'id': atomB, 'text': 'i', 'attributes': {'bold': true}},
+            {
+              'id': atomA,
+              'text': 'H',
+              'attributes': {'bold': true},
+            },
+            {
+              'id': atomB,
+              'text': 'i',
+              'attributes': {'bold': true},
+            },
             {'id': atomNewline, 'text': '\n'},
           ],
         },
@@ -442,8 +450,9 @@ void main() {
         },
       ),
     ]);
-    final changed = (await notebooks.getNotebook(documentId))!
-        .pages.single.textBlocks.single;
+    final changed = (await notebooks.getNotebook(
+      documentId,
+    ))!.pages.single.textBlocks.single;
     expect(changed.text, 'i');
     expect(changed.deltaJson, contains('italic'));
     expect(changed.deltaJson, isNot(contains('"bold":true')));
@@ -491,8 +500,7 @@ void main() {
     );
   });
 
-  test('concurrent ink fields converge despite reverse delivery',
-      () async {
+  test('concurrent ink fields converge despite reverse delivery', () async {
     final create = (await write([
       LocalOperationDraft(
         kind: OperationKind.strokeCreate,
@@ -525,10 +533,7 @@ void main() {
     final older = style(
       actor: 'older-device',
       clock: 30,
-      properties: {
-        'colorValue': 0xFF00AA00,
-        'width': 4.0,
-      },
+      properties: {'colorValue': 0xFF00AA00, 'width': 4.0},
     );
     await store.applyRemote(
       newer,
@@ -542,15 +547,15 @@ void main() {
       checkpointScope: 'ink-fields',
       apply: () => projector.apply(older),
     );
-    final persisted = (await notebooks.getNotebook(documentId))!
-        .pages.first.inkStrokes.single;
+    final persisted = (await notebooks.getNotebook(
+      documentId,
+    ))!.pages.first.inkStrokes.single;
     expect(persisted.color.toARGB32(), 0xFFAA0000);
     expect(persisted.width, 4.0);
     expect(await store.checkpoint('ink-fields'), 2);
   });
 
-  test('page metadata uses field rank rather than receipt order',
-      () async {
+  test('page metadata uses field rank rather than receipt order', () async {
     OperationEnvelope renamed({
       required String actor,
       required int clock,
@@ -596,8 +601,7 @@ void main() {
     );
   });
 
-  test('equal clocks resolve object colors by actor identity',
-      () async {
+  test('equal clocks resolve object colors by actor identity', () async {
     final created = (await write([
       LocalOperationDraft(
         kind: OperationKind.strokeCreate,
@@ -633,8 +637,9 @@ void main() {
       apply: () => projector.apply(losing),
     );
     expect(
-      (await notebooks.getNotebook(documentId))!
-          .pages.first.inkStrokes.single.color.toARGB32(),
+      (await notebooks.getNotebook(
+        documentId,
+      ))!.pages.first.inkStrokes.single.color.toARGB32(),
       0xFF112233,
     );
   });
@@ -705,10 +710,7 @@ void main() {
       final result = (await notebooks.getNotebook(documentId))!;
       expect(result.pages.first.inkStrokes, isEmpty);
       expect(result.pages[1].inkStrokes, isEmpty);
-      expect(
-        result.pages[2].inkStrokes.single.id,
-        'concurrent-move-ink',
-      );
+      expect(result.pages[2].inkStrokes.single.id, 'concurrent-move-ink');
       expect(await store.checkpoint('concurrent-ink'), 2);
       expect(
         await store.isTombstoned(
@@ -722,90 +724,90 @@ void main() {
     });
   }
 
-  test('object.move preserves the stroke identity across notebook pages',
-      () async {
-    const destination = 'second-page';
-    await write([
-      const LocalOperationDraft(
-        kind: OperationKind.pageCreate,
-        objectId: destination,
-        payload: {
-          'value': {'title': 'Second', 'isBookmarked': false},
-        },
-      ),
-      LocalOperationDraft(
-        kind: OperationKind.strokeCreate,
-        pageId: pageId,
-        objectId: 'moved-stroke',
-        payload: {'value': _stroke()},
-      ),
-    ]);
-    await write([
-      LocalOperationDraft(
-        kind: OperationKind.objectMove,
-        pageId: pageId,
-        objectId: 'moved-stroke',
-        payload: const {
-          'toPageId': destination,
-          'sortIndex': 2,
-        },
-      ),
-    ]);
-    final notebook = (await notebooks.getNotebook(documentId))!;
-    expect(notebook.pages.first.inkStrokes, isEmpty);
-    expect(notebook.pages.last.inkStrokes.single.id, 'moved-stroke');
-    expect(
-      (await database.customSelect(
-        'SELECT sort_index FROM ink_stroke_rows '
-        'WHERE uid = ? AND page_uid = ?',
-        variables: [
-          const Variable<String>('moved-stroke'),
-          const Variable<String>(destination),
-        ],
-      ).get()).single.read<int>('sort_index'),
-      2,
-    );
-    expect(
-      await store.isTombstoned(
-        documentId,
-        'object',
-        'moved-stroke',
-        pageId: pageId,
-      ),
-      isFalse,
-    );
-    expect(
-      await store.isTombstoned(
-        documentId,
-        'object',
-        'moved-stroke',
-        pageId: destination,
-      ),
-      isFalse,
-    );
-    await expectLater(
-      write([
+  test(
+    'object.move preserves the stroke identity across notebook pages',
+    () async {
+      const destination = 'second-page';
+      await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: destination,
+          payload: {
+            'value': {'title': 'Second', 'isBookmarked': false},
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.strokeCreate,
+          pageId: pageId,
+          objectId: 'moved-stroke',
+          payload: {'value': _stroke()},
+        ),
+      ]);
+      await write([
         LocalOperationDraft(
           kind: OperationKind.objectMove,
           pageId: pageId,
           objectId: 'moved-stroke',
-          payload: const {
-            'toPageId': destination,
-            'sortIndex': 2,
-          },
+          payload: const {'toPageId': destination, 'sortIndex': 2},
         ),
-      ]),
-      throwsUnsupportedError,
-    );
-    expect(
-      (await notebooks.getNotebook(documentId))!
-          .pages.last.inkStrokes.single.id,
-      'moved-stroke',
-    );
-  });
+      ]);
+      final notebook = (await notebooks.getNotebook(documentId))!;
+      expect(notebook.pages.first.inkStrokes, isEmpty);
+      expect(notebook.pages.last.inkStrokes.single.id, 'moved-stroke');
+      expect(
+        (await database
+                .customSelect(
+                  'SELECT sort_index FROM ink_stroke_rows '
+                  'WHERE uid = ? AND page_uid = ?',
+                  variables: [
+                    const Variable<String>('moved-stroke'),
+                    const Variable<String>(destination),
+                  ],
+                )
+                .get())
+            .single
+            .read<int>('sort_index'),
+        2,
+      );
+      expect(
+        await store.isTombstoned(
+          documentId,
+          'object',
+          'moved-stroke',
+          pageId: pageId,
+        ),
+        isFalse,
+      );
+      expect(
+        await store.isTombstoned(
+          documentId,
+          'object',
+          'moved-stroke',
+          pageId: destination,
+        ),
+        isFalse,
+      );
+      await expectLater(
+        write([
+          LocalOperationDraft(
+            kind: OperationKind.objectMove,
+            pageId: pageId,
+            objectId: 'moved-stroke',
+            payload: const {'toPageId': destination, 'sortIndex': 2},
+          ),
+        ]),
+        throwsUnsupportedError,
+      );
+      expect(
+        (await notebooks.getNotebook(
+          documentId,
+        ))!.pages.last.inkStrokes.single.id,
+        'moved-stroke',
+      );
+    },
+  );
 
-  test('ambiguous cross-layer identity cannot delete either object',
-      () async {
+  test('ambiguous cross-layer identity cannot delete either object', () async {
     await write([
       LocalOperationDraft(
         kind: OperationKind.strokeCreate,
@@ -819,8 +821,19 @@ void main() {
       '(uid, page_uid, text, delta_json, font_size, color_value, '
       'width, rotation, dx, dy, sort_index) '
       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      ['duplicate', pageId, '', null, 18.0, 0xFF000000,
-        100.0, 0.0, 0.0, 0.0, 0],
+      [
+        'duplicate',
+        pageId,
+        '',
+        null,
+        18.0,
+        0xFF000000,
+        100.0,
+        0.0,
+        0.0,
+        0.0,
+        0,
+      ],
     );
     await expectLater(
       write([
@@ -835,10 +848,12 @@ void main() {
     );
     expect(await inkRows(), hasLength(1));
     expect(
-      (await database.customSelect(
-        'SELECT uid FROM text_block_rows WHERE uid = ?',
-        variables: [const Variable<String>('duplicate')],
-      ).get()),
+      (await database
+          .customSelect(
+            'SELECT uid FROM text_block_rows WHERE uid = ?',
+            variables: [const Variable<String>('duplicate')],
+          )
+          .get()),
       hasLength(1),
     );
     expect(
@@ -909,8 +924,7 @@ void main() {
     expect(result.pages.single.textBlocks.single.deltaJson, contains('bold'));
   });
 
-  test('image move relocates the durable asset reference atomically',
-      () async {
+  test('image move relocates the durable asset reference atomically', () async {
     const target = 'media-destination';
     const imageId = 'existing-image';
     final bytes = Uint8List.fromList([137, 80, 78, 71]);
@@ -930,8 +944,23 @@ void main() {
       'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        imageId, pageId, '', '', bytes, 'png', 'image/png',
-        100.0, 80.0, 0.0, 10.0, 20.0, 0.0, 0.0, 1.0, 1.0, 0,
+        imageId,
+        pageId,
+        '',
+        '',
+        bytes,
+        'png',
+        'image/png',
+        100.0,
+        80.0,
+        0.0,
+        10.0,
+        20.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        0,
       ],
     );
     final move = LocalOperationDraft(
@@ -971,278 +1000,293 @@ void main() {
     expect(saved.pages.last.imageBlocks.single.position.dx, 33);
     expect(saved.pages.last.imageBlocks.single.cropRight, 0.8);
     expect(saved.pages.last.imageBlocks.single.bytes, orderedEquals(bytes));
-    final references = await database.customSelect(
-      'SELECT object_id FROM asset_references '
-      'WHERE document_id = ? AND asset_id = ?',
-      variables: [
-        Variable<String>(documentId),
-        const Variable<String>('media-asset-one'),
-      ],
-    ).get();
+    final references = await database
+        .customSelect(
+          'SELECT object_id FROM asset_references '
+          'WHERE document_id = ? AND asset_id = ?',
+          variables: [
+            Variable<String>(documentId),
+            const Variable<String>('media-asset-one'),
+          ],
+        )
+        .get();
     expect(references, hasLength(1));
     expect(
       references.single.read<String>('object_id'),
       'page:${jsonEncode([target, imageId])}',
     );
     expect(
-      await store.isTombstoned(
-        documentId,
-        'object',
-        imageId,
-        pageId: pageId,
-      ),
+      await store.isTombstoned(documentId, 'object', imageId, pageId: pageId),
       isFalse,
     );
   });
 
-  test('remote image stays invisible until verified asset materialization',
-      () async {
-    final buffer = VerifiedEditorAssetBuffer();
-    final activeProjector = EditorSqliteProjector(
-      database,
-      verifiedAssetBuffer: buffer,
-    );
-    final bytes = Uint8List.fromList([137, 80, 78, 71, 4, 3, 2, 1]);
-    final receipt = <String, dynamic>{
-      'assetId': 'remote-asset',
-      'sha256': crypto.sha256.convert(bytes).toString(),
-      'sizeBytes': bytes.length,
-      'mediaType': 'image/png',
-    };
-    final created = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'remote-image-actor',
-      actorSeq: 1,
-      logicalClock: 1,
-      documentId: documentId,
-      pageId: pageId,
-      objectId: 'remote-image',
-      kind: OperationKind.objectCreate,
-      payload: const {
-        'value': {
-          'objectType': 'image',
-          'assetId': 'remote-asset',
-          'dx': 11.0,
-          'dy': 13.0,
-          'width': 120.0,
-          'height': 80.0,
-          'rotation': 0.0,
-          'cropLeft': 0.0,
-          'cropTop': 0.0,
-          'cropRight': 1.0,
-          'cropBottom': 1.0,
-          'sortIndex': 0,
-        },
-      },
-    );
-    final attached = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'remote-image-actor',
-      actorSeq: 2,
-      logicalClock: 2,
-      documentId: documentId,
-      pageId: pageId,
-      objectId: 'remote-image',
-      kind: OperationKind.assetAttach,
-      payload: receipt,
-      dependencies: [created.operationId],
-    );
-    expect(
-      await store.applyRemote(
-        created,
-        serverSequence: 1,
-        checkpointScope: 'remote-media',
-        apply: () => activeProjector.apply(created),
-      ),
-      isTrue,
-    );
-    expect(await store.checkpoint('remote-media'), 1);
-    expect(
-      (await notebooks.getNotebook(documentId))!.pages.first.imageBlocks,
-      isEmpty,
-    );
-    await expectLater(
-      store.applyRemote(
-        attached,
-        serverSequence: 2,
-        checkpointScope: 'remote-media',
-        apply: () => activeProjector.apply(attached),
-      ),
-      throwsStateError,
-    );
-    expect(await store.operation(attached.operationId), isNull);
-    expect(await store.checkpoint('remote-media'), 1);
-    expect(
-      (await notebooks.getNotebook(documentId))!.pages.first.imageBlocks,
-      isEmpty,
-    );
-
-    buffer.stage(receipt: receipt, bytes: bytes);
-    expect(
-      await store.applyRemote(
-        attached,
-        serverSequence: 2,
-        checkpointScope: 'remote-media',
-        apply: () => activeProjector.apply(attached),
-      ),
-      isTrue,
-    );
-    buffer.clear();
-    final image =
-        (await notebooks.getNotebook(documentId))!.pages.first.imageBlocks.single;
-    expect(image.id, 'remote-image');
-    expect(image.position.dx, 11);
-    expect(image.bytes, orderedEquals(bytes));
-    expect(await store.checkpoint('remote-media'), 2);
-    expect(await store.pending(), isEmpty);
-  });
-
-  test('remote image switch keeps old bytes until verified object.set',
-      () async {
-    final buffer = VerifiedEditorAssetBuffer();
-    final bufferedProjector = EditorSqliteProjector(
-      database,
-      verifiedAssetBuffer: buffer,
-    );
-    final oldBytes = Uint8List.fromList([137, 80, 78, 71, 1, 1]);
-    final newBytes = Uint8List.fromList([137, 80, 78, 71, 2, 2]);
-    Map<String, dynamic> receipt(String id, Uint8List bytes) => {
-      'assetId': id,
-      'sha256': crypto.sha256.convert(bytes).toString(),
-      'sizeBytes': bytes.length,
-      'mediaType': 'image/png',
-    };
-    final oldReceipt = receipt('original', oldBytes);
-    final newReceipt = receipt('replacement', newBytes);
-    buffer.stage(receipt: oldReceipt, bytes: oldBytes);
-    final initial = await store.writeLocalBatch(
-      actorId: 'image-seed-actor',
-      documentId: documentId,
-      operations: [
-        LocalOperationDraft(
-          kind: OperationKind.objectCreate,
-          pageId: pageId,
-          objectId: 'remote-swapped-image',
-          payload: const {
-            'value': {
-              'objectType': 'image',
-              'assetId': 'original',
-              'dx': 11.0,
-              'dy': 13.0,
-              'width': 120.0,
-              'height': 80.0,
-              'rotation': 0.0,
-              'cropLeft': 0.0,
-              'cropTop': 0.0,
-              'cropRight': 1.0,
-              'cropBottom': 1.0,
-              'sortIndex': 0,
-            },
+  test(
+    'remote image stays invisible until verified asset materialization',
+    () async {
+      final buffer = VerifiedEditorAssetBuffer();
+      final activeProjector = EditorSqliteProjector(
+        database,
+        verifiedAssetBuffer: buffer,
+      );
+      final bytes = Uint8List.fromList([137, 80, 78, 71, 4, 3, 2, 1]);
+      final receipt = <String, dynamic>{
+        'assetId': 'remote-asset',
+        'sha256': crypto.sha256.convert(bytes).toString(),
+        'sizeBytes': bytes.length,
+        'mediaType': 'image/png',
+      };
+      final created = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'remote-image-actor',
+        actorSeq: 1,
+        logicalClock: 1,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'remote-image',
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'value': {
+            'objectType': 'image',
+            'assetId': 'remote-asset',
+            'dx': 11.0,
+            'dy': 13.0,
+            'width': 120.0,
+            'height': 80.0,
+            'rotation': 0.0,
+            'cropLeft': 0.0,
+            'cropTop': 0.0,
+            'cropRight': 1.0,
+            'cropBottom': 1.0,
+            'sortIndex': 0,
           },
+        },
+      );
+      final attached = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'remote-image-actor',
+        actorSeq: 2,
+        logicalClock: 2,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'remote-image',
+        kind: OperationKind.assetAttach,
+        payload: receipt,
+        dependencies: [created.operationId],
+      );
+      expect(
+        await store.applyRemote(
+          created,
+          serverSequence: 1,
+          checkpointScope: 'remote-media',
+          apply: () => activeProjector.apply(created),
         ),
-        LocalOperationDraft(
-          kind: OperationKind.assetAttach,
-          pageId: pageId,
-          objectId: 'remote-swapped-image',
-          payload: oldReceipt,
+        isTrue,
+      );
+      expect(await store.checkpoint('remote-media'), 1);
+      expect(
+        (await notebooks.getNotebook(documentId))!.pages.first.imageBlocks,
+        isEmpty,
+      );
+      await expectLater(
+        store.applyRemote(
+          attached,
+          serverSequence: 2,
+          checkpointScope: 'remote-media',
+          apply: () => activeProjector.apply(attached),
         ),
-      ],
-      apply: bufferedProjector.apply,
-    );
-    final newAttach = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'remote-image-swap',
-      actorSeq: 1,
-      logicalClock: 10,
-      documentId: documentId,
-      pageId: pageId,
-      objectId: 'remote-swapped-image',
-      kind: OperationKind.assetAttach,
-      payload: newReceipt,
-      dependencies: [initial.last.operationId],
-    );
-    final changed = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'remote-image-swap',
-      actorSeq: 2,
-      logicalClock: 11,
-      documentId: documentId,
-      pageId: pageId,
-      objectId: 'remote-swapped-image',
-      kind: OperationKind.objectSet,
-      payload: const {
-        'properties': {'assetId': 'replacement'},
-      },
-      dependencies: [newAttach.operationId],
-    );
-    final oldDetach = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'remote-image-swap',
-      actorSeq: 3,
-      logicalClock: 12,
-      documentId: documentId,
-      pageId: pageId,
-      objectId: 'remote-swapped-image',
-      kind: OperationKind.assetDetach,
-      payload: const {'assetId': 'original'},
-      dependencies: [changed.operationId],
-    );
-    buffer.stage(receipt: newReceipt, bytes: newBytes);
-    expect(await store.applyRemote(
-      newAttach,
-      checkpointScope: 'replacement-feed',
-      serverSequence: 1,
-      apply: () => bufferedProjector.apply(newAttach),
-    ), isTrue);
-    expect(
-      (await notebooks.getNotebook(documentId))!
-          .pages.single.imageBlocks.single.bytes,
-      orderedEquals(oldBytes),
-    );
-    buffer.clear();
-    await expectLater(
-      store.applyRemote(
-        changed,
-        checkpointScope: 'replacement-feed',
-        serverSequence: 2,
-        apply: () => bufferedProjector.apply(changed),
-      ),
-      throwsStateError,
-    );
-    expect(await store.checkpoint('replacement-feed'), 1);
-    expect(await store.operation(changed.operationId), isNull);
-    expect(
-      (await notebooks.getNotebook(documentId))!
-          .pages.single.imageBlocks.single.bytes,
-      orderedEquals(oldBytes),
-    );
-    buffer.stage(receipt: newReceipt, bytes: newBytes);
-    expect(await store.applyRemote(
-      changed,
-      checkpointScope: 'replacement-feed',
-      serverSequence: 2,
-      apply: () => bufferedProjector.apply(changed),
-    ), isTrue);
-    expect(await store.applyRemote(
-      oldDetach,
-      checkpointScope: 'replacement-feed',
-      serverSequence: 3,
-      apply: () => bufferedProjector.apply(oldDetach),
-    ), isTrue);
-    expect(await store.checkpoint('replacement-feed'), 3);
-    final stored = (await notebooks.getNotebook(documentId))!
-        .pages.single.imageBlocks.single;
-    expect(stored.bytes, orderedEquals(newBytes));
-    expect(stored.id, 'remote-swapped-image');
-    final refs = await database.customSelect(
-      'SELECT asset_id FROM asset_references WHERE document_id = ?',
-      variables: [Variable<String>(documentId)],
-    ).get();
-    expect(refs.map((row) => row.read<String>('asset_id')), ['replacement']);
-  });
+        throwsStateError,
+      );
+      expect(await store.operation(attached.operationId), isNull);
+      expect(await store.checkpoint('remote-media'), 1);
+      expect(
+        (await notebooks.getNotebook(documentId))!.pages.first.imageBlocks,
+        isEmpty,
+      );
 
-  test('asset.detach cannot remove a still referenced Quill embed',
-      () async {
+      buffer.stage(receipt: receipt, bytes: bytes);
+      expect(
+        await store.applyRemote(
+          attached,
+          serverSequence: 2,
+          checkpointScope: 'remote-media',
+          apply: () => activeProjector.apply(attached),
+        ),
+        isTrue,
+      );
+      buffer.clear();
+      final image = (await notebooks.getNotebook(
+        documentId,
+      ))!.pages.first.imageBlocks.single;
+      expect(image.id, 'remote-image');
+      expect(image.position.dx, 11);
+      expect(image.bytes, orderedEquals(bytes));
+      expect(await store.checkpoint('remote-media'), 2);
+      expect(await store.pending(), isEmpty);
+    },
+  );
+
+  test(
+    'remote image switch keeps old bytes until verified object.set',
+    () async {
+      final buffer = VerifiedEditorAssetBuffer();
+      final bufferedProjector = EditorSqliteProjector(
+        database,
+        verifiedAssetBuffer: buffer,
+      );
+      final oldBytes = Uint8List.fromList([137, 80, 78, 71, 1, 1]);
+      final newBytes = Uint8List.fromList([137, 80, 78, 71, 2, 2]);
+      Map<String, dynamic> receipt(String id, Uint8List bytes) => {
+        'assetId': id,
+        'sha256': crypto.sha256.convert(bytes).toString(),
+        'sizeBytes': bytes.length,
+        'mediaType': 'image/png',
+      };
+      final oldReceipt = receipt('original', oldBytes);
+      final newReceipt = receipt('replacement', newBytes);
+      buffer.stage(receipt: oldReceipt, bytes: oldBytes);
+      final initial = await store.writeLocalBatch(
+        actorId: 'image-seed-actor',
+        documentId: documentId,
+        operations: [
+          LocalOperationDraft(
+            kind: OperationKind.objectCreate,
+            pageId: pageId,
+            objectId: 'remote-swapped-image',
+            payload: const {
+              'value': {
+                'objectType': 'image',
+                'assetId': 'original',
+                'dx': 11.0,
+                'dy': 13.0,
+                'width': 120.0,
+                'height': 80.0,
+                'rotation': 0.0,
+                'cropLeft': 0.0,
+                'cropTop': 0.0,
+                'cropRight': 1.0,
+                'cropBottom': 1.0,
+                'sortIndex': 0,
+              },
+            },
+          ),
+          LocalOperationDraft(
+            kind: OperationKind.assetAttach,
+            pageId: pageId,
+            objectId: 'remote-swapped-image',
+            payload: oldReceipt,
+          ),
+        ],
+        apply: bufferedProjector.apply,
+      );
+      final newAttach = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'remote-image-swap',
+        actorSeq: 1,
+        logicalClock: 10,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'remote-swapped-image',
+        kind: OperationKind.assetAttach,
+        payload: newReceipt,
+        dependencies: [initial.last.operationId],
+      );
+      final changed = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'remote-image-swap',
+        actorSeq: 2,
+        logicalClock: 11,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'remote-swapped-image',
+        kind: OperationKind.objectSet,
+        payload: const {
+          'properties': {'assetId': 'replacement'},
+        },
+        dependencies: [newAttach.operationId],
+      );
+      final oldDetach = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'remote-image-swap',
+        actorSeq: 3,
+        logicalClock: 12,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'remote-swapped-image',
+        kind: OperationKind.assetDetach,
+        payload: const {'assetId': 'original'},
+        dependencies: [changed.operationId],
+      );
+      buffer.stage(receipt: newReceipt, bytes: newBytes);
+      expect(
+        await store.applyRemote(
+          newAttach,
+          checkpointScope: 'replacement-feed',
+          serverSequence: 1,
+          apply: () => bufferedProjector.apply(newAttach),
+        ),
+        isTrue,
+      );
+      expect(
+        (await notebooks.getNotebook(
+          documentId,
+        ))!.pages.single.imageBlocks.single.bytes,
+        orderedEquals(oldBytes),
+      );
+      buffer.clear();
+      await expectLater(
+        store.applyRemote(
+          changed,
+          checkpointScope: 'replacement-feed',
+          serverSequence: 2,
+          apply: () => bufferedProjector.apply(changed),
+        ),
+        throwsStateError,
+      );
+      expect(await store.checkpoint('replacement-feed'), 1);
+      expect(await store.operation(changed.operationId), isNull);
+      expect(
+        (await notebooks.getNotebook(
+          documentId,
+        ))!.pages.single.imageBlocks.single.bytes,
+        orderedEquals(oldBytes),
+      );
+      buffer.stage(receipt: newReceipt, bytes: newBytes);
+      expect(
+        await store.applyRemote(
+          changed,
+          checkpointScope: 'replacement-feed',
+          serverSequence: 2,
+          apply: () => bufferedProjector.apply(changed),
+        ),
+        isTrue,
+      );
+      expect(
+        await store.applyRemote(
+          oldDetach,
+          checkpointScope: 'replacement-feed',
+          serverSequence: 3,
+          apply: () => bufferedProjector.apply(oldDetach),
+        ),
+        isTrue,
+      );
+      expect(await store.checkpoint('replacement-feed'), 3);
+      final stored = (await notebooks.getNotebook(
+        documentId,
+      ))!.pages.single.imageBlocks.single;
+      expect(stored.bytes, orderedEquals(newBytes));
+      expect(stored.id, 'remote-swapped-image');
+      final refs = await database
+          .customSelect(
+            'SELECT asset_id FROM asset_references WHERE document_id = ?',
+            variables: [Variable<String>(documentId)],
+          )
+          .get();
+      expect(refs.map((row) => row.read<String>('asset_id')), ['replacement']);
+    },
+  );
+
+  test('asset.detach cannot remove a still referenced Quill embed', () async {
     await write([
       LocalOperationDraft(
         kind: OperationKind.objectCreate,
@@ -1274,23 +1318,22 @@ void main() {
     );
     await database.customStatement(
       'UPDATE text_block_rows SET text = ?, delta_json = ? WHERE uid = ?',
-      [
-        '\uFFFC',
-        '[{"insert":{"image":"asset:attachment-one"}}]',
-        'asset-text',
-      ],
+      ['\uFFFC', '[{"insert":{"image":"asset:attachment-one"}}]', 'asset-text'],
     );
     Future<int> references() async {
-      final rows = await database.customSelect(
-        'SELECT asset_id FROM asset_references '
-        'WHERE document_id = ? AND asset_id = ?',
-        variables: [
-          Variable<String>(documentId),
-          const Variable<String>('attachment-one'),
-        ],
-      ).get();
+      final rows = await database
+          .customSelect(
+            'SELECT asset_id FROM asset_references '
+            'WHERE document_id = ? AND asset_id = ?',
+            variables: [
+              Variable<String>(documentId),
+              const Variable<String>('attachment-one'),
+            ],
+          )
+          .get();
       return rows.length;
     }
+
     final count = (await store.pending()).length;
     final detach = LocalOperationDraft(
       kind: OperationKind.assetDetach,
@@ -1314,52 +1357,66 @@ void main() {
     expect(await references(), 0);
   });
 
-  test('active images cannot lose their only durable asset reference',
-      () async {
-    const imageId = 'active-image';
-    await database.customStatement(
-      'INSERT INTO image_block_rows '
-      '(uid, page_uid, path, ocr_text, width, height, rotation, dx, dy, '
-      'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        imageId, pageId, '/tmp/asset.png', '',
-        100.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0,
-      ],
-    );
-    await store.attachAssetReference(
-      documentId: documentId,
-      pageId: pageId,
-      objectId: imageId,
-      assetId: 'image-asset',
-      storagePath: '/tmp/asset.png',
-      checksumSha256:
-          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      byteLength: 10,
-    );
-    await expectLater(
-      write([
-        const LocalOperationDraft(
-          kind: OperationKind.assetDetach,
-          pageId: pageId,
-          objectId: imageId,
-          payload: {'assetId': 'image-asset'},
-        ),
-      ]),
-      throwsUnsupportedError,
-    );
-    expect(
-      await database.customSelect(
-        'SELECT asset_id FROM asset_references WHERE asset_id = ?',
-        variables: [const Variable<String>('image-asset')],
-      ).get(),
-      hasLength(1),
-    );
-  });
+  test(
+    'active images cannot lose their only durable asset reference',
+    () async {
+      const imageId = 'active-image';
+      await database.customStatement(
+        'INSERT INTO image_block_rows '
+        '(uid, page_uid, path, ocr_text, width, height, rotation, dx, dy, '
+        'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          imageId,
+          pageId,
+          '/tmp/asset.png',
+          '',
+          100.0,
+          80.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          0,
+        ],
+      );
+      await store.attachAssetReference(
+        documentId: documentId,
+        pageId: pageId,
+        objectId: imageId,
+        assetId: 'image-asset',
+        storagePath: '/tmp/asset.png',
+        checksumSha256:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        byteLength: 10,
+      );
+      await expectLater(
+        write([
+          const LocalOperationDraft(
+            kind: OperationKind.assetDetach,
+            pageId: pageId,
+            objectId: imageId,
+            payload: {'assetId': 'image-asset'},
+          ),
+        ]),
+        throwsUnsupportedError,
+      );
+      expect(
+        await database
+            .customSelect(
+              'SELECT asset_id FROM asset_references WHERE asset_id = ?',
+              variables: [const Variable<String>('image-asset')],
+            )
+            .get(),
+        hasLength(1),
+      );
+    },
+  );
 
-
-  test('verified image deletion is atomic and releases scoped asset',
-      () async {
+  test('verified image deletion is atomic and releases scoped asset', () async {
     const imageId = 'delete-verified-image';
     await database.customStatement(
       'INSERT INTO image_block_rows '
@@ -1367,8 +1424,20 @@ void main() {
       'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        imageId, pageId, '/private/deletion.pdf', '',
-        100.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0,
+        imageId,
+        pageId,
+        '/private/deletion.pdf',
+        '',
+        100.0,
+        80.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        0,
       ],
     );
     final deletion = LocalOperationDraft(
@@ -1392,82 +1461,92 @@ void main() {
     );
     await write([deletion]);
     expect(
-      await database.customSelect(
-        'SELECT uid FROM image_block_rows WHERE uid = ?',
-        variables: [const Variable<String>(imageId)],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT uid FROM image_block_rows WHERE uid = ?',
+            variables: [const Variable<String>(imageId)],
+          )
+          .get(),
       isEmpty,
     );
     expect(
-      await database.customSelect(
-        'SELECT asset_id FROM asset_references WHERE asset_id = ?',
-        variables: [const Variable<String>('deleted-asset')],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT asset_id FROM asset_references WHERE asset_id = ?',
+            variables: [const Variable<String>('deleted-asset')],
+          )
+          .get(),
       isEmpty,
     );
   });
 
-  test('Quill deletion rejects missing assets and releases verified ones',
-      () async {
-    const textId = 'deleted-text';
-    await write([
-      LocalOperationDraft(
-        kind: OperationKind.objectCreate,
+  test(
+    'Quill deletion rejects missing assets and releases verified ones',
+    () async {
+      const textId = 'deleted-text';
+      await write([
+        LocalOperationDraft(
+          kind: OperationKind.objectCreate,
+          pageId: pageId,
+          objectId: textId,
+          payload: const {
+            'value': {
+              'objectType': 'text',
+              'dx': 0.0,
+              'dy': 0.0,
+              'width': 200.0,
+              'fontSize': 18.0,
+              'rotation': 0.0,
+              'colorValue': 0xFF000000,
+              'sortIndex': 0,
+            },
+          },
+        ),
+      ]);
+      await database.customStatement(
+        'UPDATE text_block_rows SET text = ?, delta_json = ? WHERE uid = ?',
+        ['\uFFFC', '[{"insert":{"image":"asset:deleted-text-asset"}}]', textId],
+      );
+      final deletion = LocalOperationDraft(
+        kind: OperationKind.objectDelete,
         pageId: pageId,
         objectId: textId,
-        payload: const {
-          'value': {
-            'objectType': 'text',
-            'dx': 0.0, 'dy': 0.0,
-            'width': 200.0, 'fontSize': 18.0, 'rotation': 0.0,
-            'colorValue': 0xFF000000, 'sortIndex': 0,
-          },
-        },
-      ),
-    ]);
-    await database.customStatement(
-      'UPDATE text_block_rows SET text = ?, delta_json = ? WHERE uid = ?',
-      [
-        '\uFFFC',
-        '[{"insert":{"image":"asset:deleted-text-asset"}}]',
-        textId,
-      ],
-    );
-    final deletion = LocalOperationDraft(
-      kind: OperationKind.objectDelete,
-      pageId: pageId,
-      objectId: textId,
-      payload: const {},
-    );
-    final pending = (await store.pending()).length;
-    await expectLater(write([deletion]), throwsUnsupportedError);
-    expect(await store.pending(), hasLength(pending));
-    await store.attachAssetReference(
-      documentId: documentId,
-      pageId: pageId,
-      objectId: textId,
-      assetId: 'deleted-text-asset',
-      storagePath: '/private/embedded',
-      checksumSha256:
-          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      byteLength: 24,
-    );
-    await write([deletion]);
-    expect(
-      await database.customSelect(
-        'SELECT uid FROM text_block_rows WHERE uid = ?',
-        variables: [const Variable<String>(textId)],
-      ).get(),
-      isEmpty,
-    );
-    expect(
-      await database.customSelect(
-        'SELECT asset_id FROM asset_references WHERE asset_id = ?',
-        variables: [const Variable<String>('deleted-text-asset')],
-      ).get(),
-      isEmpty,
-    );
-  });
+        payload: const {},
+      );
+      final pending = (await store.pending()).length;
+      await expectLater(write([deletion]), throwsUnsupportedError);
+      expect(await store.pending(), hasLength(pending));
+      await store.attachAssetReference(
+        documentId: documentId,
+        pageId: pageId,
+        objectId: textId,
+        assetId: 'deleted-text-asset',
+        storagePath: '/private/embedded',
+        checksumSha256:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        byteLength: 24,
+      );
+      await write([deletion]);
+      expect(
+        await database
+            .customSelect(
+              'SELECT uid FROM text_block_rows WHERE uid = ?',
+              variables: [const Variable<String>(textId)],
+            )
+            .get(),
+        isEmpty,
+      );
+      expect(
+        await database
+            .customSelect(
+              'SELECT asset_id FROM asset_references WHERE asset_id = ?',
+              variables: [const Variable<String>('deleted-text-asset')],
+            )
+            .get(),
+        isEmpty,
+      );
+    },
+  );
 
   test('v2 page deletion cannot orphan a stored image asset', () async {
     const target = 'asset-page';
@@ -1486,8 +1565,20 @@ void main() {
       'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        'media-one', target, '/private/asset.pdf', '',
-        100.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0,
+        'media-one',
+        target,
+        '/private/asset.pdf',
+        '',
+        100.0,
+        80.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        0,
       ],
     );
     final queued = await store.pending();
@@ -1503,23 +1594,26 @@ void main() {
     );
     expect(await store.pending(), hasLength(queued.length));
     expect(
-      await database.customSelect(
-        'SELECT uid FROM page_rows WHERE uid = ?',
-        variables: [const Variable<String>(target)],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT uid FROM page_rows WHERE uid = ?',
+            variables: [const Variable<String>(target)],
+          )
+          .get(),
       hasLength(1),
     );
     expect(
-      await database.customSelect(
-        'SELECT uid FROM image_block_rows WHERE uid = ?',
-        variables: [const Variable<String>('media-one')],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT uid FROM image_block_rows WHERE uid = ?',
+            variables: [const Variable<String>('media-one')],
+          )
+          .get(),
       hasLength(1),
     );
   });
 
-  test('v2 page deletion preserves durable asset reference rows',
-      () async {
+  test('v2 page deletion preserves durable asset reference rows', () async {
     const target = 'reference-page';
     await write([
       const LocalOperationDraft(
@@ -1553,11 +1647,13 @@ void main() {
     );
     expect(await store.pending(), hasLength(queued.length));
     expect(
-      await database.customSelect(
-        'SELECT asset_id FROM asset_references '
-        'WHERE document_id = ?',
-        variables: [Variable<String>(documentId)],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT asset_id FROM asset_references '
+            'WHERE document_id = ?',
+            variables: [Variable<String>(documentId)],
+          )
+          .get(),
       hasLength(1),
     );
   });
@@ -1579,9 +1675,17 @@ void main() {
       'width, rotation, dx, dy, sort_index) '
       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        'quill-one', target, '\uFFFC',
+        'quill-one',
+        target,
+        '\uFFFC',
         '[{"insert":{"image":"asset:asset-one"}}]',
-        18.0, 0xFF000000, 120.0, 0.0, 0.0, 0.0, 0,
+        18.0,
+        0xFF000000,
+        120.0,
+        0.0,
+        0.0,
+        0.0,
+        0,
       ],
     );
     final queued = await store.pending();
@@ -1597,76 +1701,98 @@ void main() {
     );
     expect(await store.pending(), hasLength(queued.length));
     expect(
-      await database.customSelect(
-        'SELECT uid FROM text_block_rows WHERE uid = ?',
-        variables: [const Variable<String>('quill-one')],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT uid FROM text_block_rows WHERE uid = ?',
+            variables: [const Variable<String>('quill-one')],
+          )
+          .get(),
       hasLength(1),
     );
   });
 
-  test('page deletion releases only fully linked media in one commit',
-      () async {
-    const page = 'delete-linked-page';
-    const media = 'page-linked-image';
-    await write([
-      const LocalOperationDraft(
-        kind: OperationKind.pageCreate,
-        objectId: page,
-        payload: {
-          'value': {'title': 'Linked', 'isBookmarked': false},
-        },
-      ),
-    ]);
-    await database.customStatement(
-      'INSERT INTO image_block_rows '
-      '(uid, page_uid, path, ocr_text, width, height, rotation, dx, dy, '
-      'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        media, page, '/private/linked.pdf', '',
-        100.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0,
-      ],
-    );
-    await store.attachAssetReference(
-      documentId: documentId,
-      pageId: page,
-      objectId: media,
-      assetId: 'linked-asset',
-      storagePath: '/private/linked.pdf',
-      checksumSha256:
-          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      byteLength: 24,
-    );
-    await write([
-      const LocalOperationDraft(
-        kind: OperationKind.pageDelete,
-        objectId: page,
-        payload: {},
-      ),
-    ]);
-    expect(
-      await database.customSelect(
-        'SELECT uid FROM page_rows WHERE uid = ?',
-        variables: [const Variable<String>(page)],
-      ).get(),
-      isEmpty,
-    );
-    expect(
-      await database.customSelect(
-        'SELECT uid FROM image_block_rows WHERE uid = ?',
-        variables: [const Variable<String>(media)],
-      ).get(),
-      isEmpty,
-    );
-    expect(
-      await database.customSelect(
-        'SELECT asset_id FROM asset_references WHERE asset_id = ?',
-        variables: [const Variable<String>('linked-asset')],
-      ).get(),
-      isEmpty,
-    );
-  });
+  test(
+    'page deletion releases only fully linked media in one commit',
+    () async {
+      const page = 'delete-linked-page';
+      const media = 'page-linked-image';
+      await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: page,
+          payload: {
+            'value': {'title': 'Linked', 'isBookmarked': false},
+          },
+        ),
+      ]);
+      await database.customStatement(
+        'INSERT INTO image_block_rows '
+        '(uid, page_uid, path, ocr_text, width, height, rotation, dx, dy, '
+        'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          media,
+          page,
+          '/private/linked.pdf',
+          '',
+          100.0,
+          80.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          0,
+        ],
+      );
+      await store.attachAssetReference(
+        documentId: documentId,
+        pageId: page,
+        objectId: media,
+        assetId: 'linked-asset',
+        storagePath: '/private/linked.pdf',
+        checksumSha256:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        byteLength: 24,
+      );
+      await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageDelete,
+          objectId: page,
+          payload: {},
+        ),
+      ]);
+      expect(
+        await database
+            .customSelect(
+              'SELECT uid FROM page_rows WHERE uid = ?',
+              variables: [const Variable<String>(page)],
+            )
+            .get(),
+        isEmpty,
+      );
+      expect(
+        await database
+            .customSelect(
+              'SELECT uid FROM image_block_rows WHERE uid = ?',
+              variables: [const Variable<String>(media)],
+            )
+            .get(),
+        isEmpty,
+      );
+      expect(
+        await database
+            .customSelect(
+              'SELECT asset_id FROM asset_references WHERE asset_id = ?',
+              variables: [const Variable<String>('linked-asset')],
+            )
+            .get(),
+        isEmpty,
+      );
+    },
+  );
 
   test('the last page cannot be removed through v2', () async {
     await expectLater(
@@ -1706,13 +1832,10 @@ void main() {
 
     final reopened = NotesDatabase(NativeDatabase(file));
     addTearDown(reopened.close);
-    final recovered = await NotebookRepository(reopened).getNotebook(
-      notebook.uid,
-    );
-    expect(
-      recovered?.pages.single.inkStrokes.single.id,
-      'restart-ink',
-    );
+    final recovered = await NotebookRepository(
+      reopened,
+    ).getNotebook(notebook.uid);
+    expect(recovered?.pages.single.inkStrokes.single.id, 'restart-ink');
     final recoveredStore = OperationStore(reopened);
     expect(
       (await recoveredStore.pending()).single.operationId,
@@ -1723,8 +1846,7 @@ void main() {
       1,
     );
   });
-  test('invalid Quill embed MIME rolls back journal and asset BLOB',
-      () async {
+  test('invalid Quill embed MIME rolls back journal and asset BLOB', () async {
     final buffer = VerifiedEditorAssetBuffer();
     final checkedProjector = EditorSqliteProjector(
       database,
@@ -1788,20 +1910,23 @@ void main() {
       throwsStateError,
     );
     expect(await store.pending(), isEmpty);
-    final texts = await database.customSelect(
-      'SELECT uid FROM text_block_rows WHERE page_uid = ?',
-      variables: [Variable<String>(pageId)],
-    ).get();
+    final texts = await database
+        .customSelect(
+          'SELECT uid FROM text_block_rows WHERE page_uid = ?',
+          variables: [Variable<String>(pageId)],
+        )
+        .get();
     expect(texts, isEmpty);
-    final references = await database.customSelect(
-      'SELECT asset_id FROM asset_references WHERE document_id = ?',
-      variables: [Variable<String>(documentId)],
-    ).get();
+    final references = await database
+        .customSelect(
+          'SELECT asset_id FROM asset_references WHERE document_id = ?',
+          variables: [Variable<String>(documentId)],
+        )
+        .get();
     expect(references, isEmpty);
-    final blobs = await database.customSelect(
-      'SELECT checksum_sha256 FROM operation_asset_bytes',
-    ).get();
+    final blobs = await database
+        .customSelect('SELECT checksum_sha256 FROM operation_asset_bytes')
+        .get();
     expect(blobs, isEmpty);
   });
-
 }

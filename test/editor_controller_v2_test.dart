@@ -32,8 +32,7 @@ void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('opt-in editor uses v2 outbox but never the snapshot writer',
-      () async {
+  test('opt-in editor uses v2 outbox but never the snapshot writer', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     var repositoryWrites = 0;
@@ -68,10 +67,7 @@ void main() {
       throwsStateError,
     );
     await expectLater(
-      repository.saveNotebookPages(
-        notebook,
-        {notebook.pages.single.id},
-      ),
+      repository.saveNotebookPages(notebook, {notebook.pages.single.id}),
       throwsStateError,
     );
     await expectLater(
@@ -94,17 +90,14 @@ void main() {
       throwsStateError,
     );
 
-    controller.addInkStroke(const [
-      InkPoint(dx: 4, dy: 5, pressure: 0.6),
-    ]);
+    controller.addInkStroke(const [InkPoint(dx: 4, dy: 5, pressure: 0.6)]);
     await controller.flushPendingSaves();
     final created = await store.pending();
     expect(created, hasLength(1));
     expect(created.single.kind, OperationKind.strokeCreate);
     expect(repositoryWrites, 0);
     expect(
-      (await repository.getNotebook(notebook.uid))
-          ?.pages.single.inkStrokes,
+      (await repository.getNotebook(notebook.uid))?.pages.single.inkStrokes,
       hasLength(1),
     );
     expect(controller.canUndo, isTrue);
@@ -112,15 +105,15 @@ void main() {
     await controller.flushPendingSaves();
     expect((await store.pending()).last.kind, OperationKind.objectDelete);
     expect(
-      (await repository.getNotebook(notebook.uid))!
-          .pages.single.inkStrokes,
+      (await repository.getNotebook(notebook.uid))!.pages.single.inkStrokes,
       isEmpty,
     );
     expect(controller.canRedo, isTrue);
     controller.redo();
     await controller.flushPendingSaves();
-    final restored = (await repository.getNotebook(notebook.uid))!
-        .pages.single.inkStrokes.single;
+    final restored = (await repository.getNotebook(
+      notebook.uid,
+    ))!.pages.single.inkStrokes.single;
     // Redo is a fresh insert: the old UID remains tombstoned.
     expect(restored.id, isNot(created.single.objectId));
     expect((await store.pending()).last.kind, OperationKind.strokeCreate);
@@ -134,10 +127,7 @@ void main() {
     expect((await store.pending()).last.kind, OperationKind.pageCreate);
     controller.deleteLastPage();
     await controller.flushPendingSaves();
-    expect(
-      (await repository.getNotebook(notebook.uid))?.pages,
-      hasLength(1),
-    );
+    expect((await repository.getNotebook(notebook.uid))?.pages, hasLength(1));
     expect((await store.pending()).last.kind, OperationKind.pageDelete);
     controller.undo();
     await controller.flushPendingSaves();
@@ -194,85 +184,104 @@ void main() {
       height: 80,
     );
 
-    expect(controller.applyConfirmedShareObjectPatch(
-      pageId: id,
-      objectId: 'text-a',
-      text: text('text-a', 'A'),
-      sortIndex: 0,
-    ), isTrue);
-    expect(controller.applyConfirmedShareObjectPatch(
-      pageId: id,
-      objectId: 'text-b',
-      text: text('text-b', 'B'),
-      sortIndex: 1,
-    ), isTrue);
-    expect(controller.applyConfirmedShareObjectPatch(
-      pageId: id,
-      objectId: 'text-a',
-      text: text('text-a', 'Changed'),
-      sortIndex: 0,
-    ), isTrue);
     expect(
-      controller.currentPage.textBlocks.map((e) => e.id).toList(),
-      ['text-a', 'text-b'],
-    );
-
-    expect(controller.applyConfirmedShareObjectPatch(
-      pageId: id,
-      objectId: 'image-a',
-      image: image('image-a'),
-      sortIndex: 0,
-    ), isTrue);
-    expect(controller.applyConfirmedShareObjectPatch(
-      pageId: id,
-      objectId: 'image-b',
-      image: image('image-b'),
-      sortIndex: 1,
-    ), isTrue);
-    expect(controller.applyConfirmedShareObjectPatch(
-      pageId: id,
-      objectId: 'image-a',
-      image: image('image-a'),
-      sortIndex: 1,
-    ), isTrue);
-    expect(
-      controller.currentPage.imageBlocks.map((e) => e.id).toList(),
-      ['image-b', 'image-a'],
-    );
-  });
-
-  test('opt-in controller rejects a projection from a different SQLite',
-      () async {
-    final first = NotesDatabase(NativeDatabase.memory());
-    final second = NotesDatabase(NativeDatabase.memory());
-    addTearDown(first.close);
-    addTearDown(second.close);
-    final repository = NotebookRepository(first);
-    final notebook = await repository.createNotebook();
-    final engine = SyncEngine(
-      store: OperationStore(second),
-      gateway: _OfflineGateway(),
-      actorId: 'wrong-database',
-      checkpointScope: 'wrong-namespace',
-      enableRealtime: false,
-      applyRemote: (_, __) async {},
-    );
-    addTearDown(engine.stop);
-    final writer = EditorV2OperationWriter(
-      syncEngine: engine,
-      projector: EditorSqliteProjector(second),
-    );
-    expect(
-      () => EditorController(
-        repository: repository,
-        notebook: notebook,
-        operationWriter: writer,
+      controller.applyConfirmedShareObjectPatch(
+        pageId: id,
+        objectId: 'text-a',
+        text: text('text-a', 'A'),
+        sortIndex: 0,
       ),
-      throwsArgumentError,
+      isTrue,
     );
+    expect(
+      controller.applyConfirmedShareObjectPatch(
+        pageId: id,
+        objectId: 'text-b',
+        text: text('text-b', 'B'),
+        sortIndex: 1,
+      ),
+      isTrue,
+    );
+    expect(
+      controller.applyConfirmedShareObjectPatch(
+        pageId: id,
+        objectId: 'text-a',
+        text: text('text-a', 'Changed'),
+        sortIndex: 0,
+      ),
+      isTrue,
+    );
+    expect(controller.currentPage.textBlocks.map((e) => e.id).toList(), [
+      'text-a',
+      'text-b',
+    ]);
+
+    expect(
+      controller.applyConfirmedShareObjectPatch(
+        pageId: id,
+        objectId: 'image-a',
+        image: image('image-a'),
+        sortIndex: 0,
+      ),
+      isTrue,
+    );
+    expect(
+      controller.applyConfirmedShareObjectPatch(
+        pageId: id,
+        objectId: 'image-b',
+        image: image('image-b'),
+        sortIndex: 1,
+      ),
+      isTrue,
+    );
+    expect(
+      controller.applyConfirmedShareObjectPatch(
+        pageId: id,
+        objectId: 'image-a',
+        image: image('image-a'),
+        sortIndex: 1,
+      ),
+      isTrue,
+    );
+    expect(controller.currentPage.imageBlocks.map((e) => e.id).toList(), [
+      'image-b',
+      'image-a',
+    ]);
   });
-  test('rapid independent strokes have separate v2 Undo boundaries',
-      () async {
+
+  test(
+    'opt-in controller rejects a projection from a different SQLite',
+    () async {
+      final first = NotesDatabase(NativeDatabase.memory());
+      final second = NotesDatabase(NativeDatabase.memory());
+      addTearDown(first.close);
+      addTearDown(second.close);
+      final repository = NotebookRepository(first);
+      final notebook = await repository.createNotebook();
+      final engine = SyncEngine(
+        store: OperationStore(second),
+        gateway: _OfflineGateway(),
+        actorId: 'wrong-database',
+        checkpointScope: 'wrong-namespace',
+        enableRealtime: false,
+        applyRemote: (_, __) async {},
+      );
+      addTearDown(engine.stop);
+      final writer = EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: EditorSqliteProjector(second),
+      );
+      expect(
+        () => EditorController(
+          repository: repository,
+          notebook: notebook,
+          operationWriter: writer,
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
+  test('rapid independent strokes have separate v2 Undo boundaries', () async {
     final db = NotesDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     final repo = NotebookRepository(db);
@@ -317,5 +326,4 @@ void main() {
       hasLength(2),
     );
   });
-
 }

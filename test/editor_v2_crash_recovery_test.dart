@@ -33,8 +33,7 @@ class _OfflineGateway implements OperationGateway {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('v2 journal, verified inline asset and outbox survive reopen',
-      () async {
+  test('v2 journal, verified inline asset and outbox survive reopen', () async {
     final directory = await Directory.systemTemp.createTemp('nn-v2-crash-');
     addTearDown(() => directory.delete(recursive: true));
     final dbFile = File('${directory.path}/notes.sqlite');
@@ -84,8 +83,7 @@ void main() {
         TextBlock(
           id: 'inline-recovery',
           text: '\uFFFC',
-          deltaJson:
-              r'[{"insert":{"image":"asset:recovery-inline-image"}}]',
+          deltaJson: r'[{"insert":{"image":"asset:recovery-inline-image"}}]',
           position: Offset.zero,
           fontSize: 18,
           color: const Color(0xFF123456),
@@ -115,8 +113,10 @@ void main() {
     final recoveredStore = OperationStore(reopened);
     final loaded = (await recovered.getNotebook(notebook.uid))!;
     expect(loaded.pages.single.inkStrokes.single.id, 'ink-recovery');
-    expect(loaded.pages.single.textBlocks.single.deltaJson,
-        contains('asset:recovery-inline-image'));
+    expect(
+      loaded.pages.single.textBlocks.single.deltaJson,
+      contains('asset:recovery-inline-image'),
+    );
     expect(
       (await recoveredStore.pending())
           .map((operation) => operation.operationId)
@@ -133,9 +133,6 @@ void main() {
       ),
       orderedEquals(bytes),
     );
-    await expectLater(
-      recovered.saveNotebook(loaded),
-      throwsStateError,
-    );
+    await expectLater(recovered.saveNotebook(loaded), throwsStateError);
   });
 }
