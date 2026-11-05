@@ -1395,8 +1395,10 @@ przechowuje receipt do udanego commita, co pozwala kontrolerowi
 bezpiecznie ponowić wcześniej odrzucony gest po uploadzie.
 Jest podłączony jako opt-in
 do `EditorController`, ale nie jest aktywowany przez produkcyjny
-`AppScope`. W trybie v2
-Undo/Redo jest celowo wyłączone do czasu inverse intents i remint ID.
+`AppScope`. W trybie v2 Undo/Redo zapisuje nowe operacje atomowe, remintując
+identyfikatory odtwarzanych obiektów/stron zamiast wskrzeszać tombstones.
+Historia przechowuje 50 zatwierdzonych stanów bieżącej sesji;
+przypadkowe zdalne zmiany ją unieważniają.
 W trybie opt-in i przy skonfigurowanym `OperationAssetGateway` automatycznie
 przesyła obrazy/PDF i odkłada zweryfikowane bajty przed transakcją; zły
 receipt oraz zmiana bajtów po uploadzie blokują commit. Brak gateway
@@ -1456,12 +1458,16 @@ czeka na istniejące zapisy repozytorium i wymusza zapis dirty stron przed
 zgodą na zamknięcie aplikacji. Opcjonalny `operationWriter` kieruje
 zapis wyłącznie do v2 z serializacją zmian i utrwaloną bazą stanu;
 `NotebookRepository` blokuje wtedy legacy snapshot writery na tym UID.
-Undo/Redo w trybie v2 pozostaje zablokowane, aby nie odtworzyć tombstone.
+Undo/Redo w trybie v2 działa na zatwierdzonych stanach przez nowe operacje
+i nowe ID odtwarzanych obiektów; nie odtwarza tombstone. Równoległy gest
+podczas asynchronicznego inverse pozostaje w UI i blokuje zapis zamiast
+zostać nadpisany. Historia nie jest jeszcze odtwarzana po restarcie.
 `applyConfirmedV2PagePatch` wprowadza zdalną stronę bez remountu,
 nie zmieniając zoomu i aktualnego wyboru strony. Metoda
 `registerVerifiedImageAsset` wiąże potwierdzony upload z blokiem
 obrazu i ponawia nieukończony v2 zapis bez snapshotów v1.
-Regresja: `test/editor_controller_v2_test.dart`.
+Regresja: `test/editor_controller_v2_test.dart`, w tym cofanie i
+ponawianie ink oraz stron bez ponownego użycia tombstones.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
@@ -2821,6 +2827,7 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 - Backend kanoniczny: `NaNotateczki-serwer/api/app/asset_store.py`,
   `routers/assets.py`, `operation_projection.py` oraz
   `migrations/0014_verified_assets.sql`. Katalog `server/` to lustro.
-- `EditorController` może używać opt-in writera v2. Zwykły
-  `AppScope` nadal go nie instaluje. Brak pełnego Undo/Redo, projekcji
-  osadzonych plików Quill, cutover i E2E; etap 3 pozostaje częściowy.
+- `EditorController` może używać opt-in writera v2 i odwróconych
+  operacji z nowymi ID. Zwykły `AppScope` nadal go nie instaluje. Brak
+  lokalnej projekcji osadzonych plików Quill, trwałej historii Undo/Redo po
+  restarcie, produkcyjnego cutover i E2E; etap 3 pozostaje częściowy.
