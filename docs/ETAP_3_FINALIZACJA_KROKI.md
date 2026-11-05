@@ -118,3 +118,12 @@ Warunkiem jest lokalnie zainstalowany Flutter/Dart.
 Zaliczony test na jednej platformie nie daje automatycznie zgody na
 przełączenie kont, backupów i współdzielenia na v2. Wyniki muszą zostać
 zarejestrowane po rzeczywistym uruchomieniu.
+
+## Weryfikacja analizy Darta — 5 listopada 2026
+
+Przebieg `42067981768` potwierdził brak błędów formatowania, lecz
+`dart analyze` zatrzymał się na ośmiu błędach w testach: sześciu
+brakujących `dependencies` w `OperationEnvelope`, kolizji
+`isNotNull` oraz niepoprawnym `const` w teście projekcji.
+Naprawy wprowadzono w `3c5d494`; wynik ponownej analizy i testów
+wymaga rzeczywistego przebiegu CI. Nie odblokowuje to migracji v2.
