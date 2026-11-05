@@ -466,8 +466,16 @@ rezerwuje UID za pomocą `registerOperationWriter` i blokuje stare
 snapshoty, import, restore, metadata i delete na zajętym UID.
 W opt-in v2 Undo/Redo jest wyłączone (brak inverse intents).
 Nie obsługuje jeszcze zweryfikowanych assetów, Quill embedów,
-cross-page moves, zakładania dokumentów v2 ani rebase konfliktów.
-Produkcja nadal nie przekazuje do `EditorController` tego writera.
+tworzenia/usuwania obrazów/PDF, przenoszenia tekstu i obrazów,
+zakładania dokumentów v2 ani rebase konfliktów. Niezmieniona kreska
+może być przeniesiona do innej istniejącej lub tworzonej strony
+przez `object.move`, bez usuwania jej ID; konflikt asset referencji
+powoduje odmowę wykonania.
+`EditorV2RemotePatchDispatcher` wprowadza zatwierdzone zdalne zmiany
+pojedynczego obiektu/strony po SQLite commit, a zajęty edytor blokuje
+callback do ponowienia bez odmalowywania całego dokumentu.
+Produkcja nadal nie przekazuje do `EditorController` tego writera
+ani nie wiąże dispatcher z aktywnym `AppScope`.
 Wielokrotne odczytywanie atomów z pełnego dziennika ma ograniczenie
 wydajnościowe; wymagane będą sprawdzone checkpointy tekstu.
 Ta implementacja nie daje zgody na uruchomienie v2 dla kont produkcyjnych.
