@@ -79,6 +79,7 @@ class NotebookRepository {
   final Map<String, DateTime> _latestPersistedUpdates = <String, DateTime>{};
   final Map<String, Future<void>> _saveTails = <String, Future<void>>{};
   final Set<String> _operationOwnedDocuments = <String>{};
+  final Set<String> _operationProtocolDocuments = <String>{};
   final Map<String, Notebook> _notebookCache = <String, Notebook>{};
   bool _isNotebookCacheComplete = false;
 
@@ -95,17 +96,36 @@ class NotebookRepository {
         !_operationOwnedDocuments.add(uid)) {
       throw StateError('A snapshot or v2 writer already owns this notebook.');
     }
+    // The protocol fence outlives the editor's UI lifetime. Releasing the
+    // session must not re-enable v1 writers for an operational document.
+    _operationProtocolDocuments.add(uid);
   }
 
   void unregisterOperationWriter(String uid) {
     _operationOwnedDocuments.remove(uid);
   }
 
-  void _requireLegacyWritable(String uid) {
-    if (_operationOwnedDocuments.contains(uid)) {
+  /// Refuses legacy snapshots after any durable v2 operation, even on restart.
+  Future<void> _requireLegacyWritable(String uid) async {
+    if (_operationProtocolDocuments.contains(uid) ||
+        _operationOwnedDocuments.contains(uid)) {
       throw StateError(
-        'Legacy snapshot write blocked while v2 owns notebook: $uid',
+        'Legacy snapshot writer is disabled for v2 notebook: $uid',
       );
+    }
+    final accepted = await database.customSelect(
+      'SELECT operation_id FROM operations WHERE document_id = ? LIMIT 1',
+      variables: [Variable<String>(uid)],
+    ).getSingleOrNull();
+    if (accepted != null) {
+      _operationProtocolDocuments.add(uid);
+      throw StateError(
+        'Durable v2 history prohibits legacy snapshot writes: $uid',
+      );
+    }
+    if (_operationProtocolDocuments.contains(uid) ||
+        _operationOwnedDocuments.contains(uid)) {
+      throw StateError('V2 writer claimed notebook during legacy validation.');
     }
   }
 
@@ -251,7 +271,7 @@ class NotebookRepository {
     bool notifyChanges = true,
   }) async {
     for (final notebook in notebooks) {
-      _requireLegacyWritable(notebook.uid);
+      await _requireLegacyWritable(notebook.uid);
     }
     if (notebooks.isEmpty) {
       return 0;
@@ -326,7 +346,7 @@ class NotebookRepository {
     bool serializeWithLocalSaves = false,
   }) async {
     for (final notebook in notebooks) {
-      _requireLegacyWritable(notebook.uid);
+      await _requireLegacyWritable(notebook.uid);
     }
     if (notebooks.isEmpty) {
       return 0;
@@ -618,7 +638,7 @@ class NotebookRepository {
     Map<String, Set<String>> expectedRemovedIdsByPage = const {},
     Set<String> expectedRemovedPageIds = const {},
   }) async {
-    _requireLegacyWritable(notebook.uid);
+    await _requireLegacyWritable(notebook.uid);
     final normalizedNotebook = InkEraserEngine.normalizeNotebook(notebook);
     if (normalizedNotebook.pages.isEmpty) {
       throw ArgumentError.value(
@@ -653,7 +673,7 @@ class NotebookRepository {
     Set<String> pageIds, {
     Map<String, Set<String>> expectedRemovedIdsByPage = const {},
   }) async {
-    _requireLegacyWritable(notebook.uid);
+    await _requireLegacyWritable(notebook.uid);
     if (pageIds.isEmpty) {
       return true;
     }
@@ -874,7 +894,7 @@ class NotebookRepository {
     String? title,
     String? folder,
   }) async {
-    _requireLegacyWritable(uid);
+    await _requireLegacyWritable(uid);
     DateTime? preciseUpdatedAt;
     final updated = await database.transaction(() async {
       final existing = await (database.select(
@@ -1344,7 +1364,7 @@ class NotebookRepository {
   }
 
   Future<void> deleteNotebook(String uid) async {
-    _requireLegacyWritable(uid);
+    await _requireLegacyWritable(uid);
     final notebook = await getNotebook(uid);
     if (_lastCorruptNotebookIds.contains(uid)) {
       throw StateError(
