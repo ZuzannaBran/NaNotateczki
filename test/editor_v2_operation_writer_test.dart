@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,8 @@ import 'package:program/data/sync/operation_gateway.dart';
 import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
 import 'package:program/data/sync/sync_engine.dart';
+import 'package:program/data/sync/verified_editor_asset_buffer.dart';
+import 'package:program/features/editor/state/editor_operation_bridge.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
@@ -279,6 +282,108 @@ void main() {
     await expectLater(
       writer.writeNotebookChange(before: starting, after: invalid),
       throwsUnsupportedError,
+    );
+  });
+
+  test('image creation stores authenticated bytes in the same v2 batch',
+      () async {
+    final buffer = VerifiedEditorAssetBuffer();
+    final bufferedProjector = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
+    );
+    final bufferedEngine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'image-create-actor',
+      checkpointScope: 'image-create-checkpoint',
+      enableRealtime: false,
+      applyRemote: (operation, pending) => bufferedProjector.apply(operation),
+    );
+    addTearDown(bufferedEngine.stop);
+    final bufferedWriter = EditorV2OperationWriter(
+      syncEngine: bufferedEngine,
+      projector: bufferedProjector,
+    );
+    final rawBytes = Uint8List.fromList([137, 80, 78, 71, 0, 1]);
+    final digest = crypto.sha256.convert(rawBytes).toString();
+    final receipt = <String, dynamic>{
+      'assetId': 'image-verified',
+      'sha256': digest,
+      'sizeBytes': rawBytes.length,
+      'mediaType': 'image/png',
+    };
+    final notebook = await repository.createNotebook();
+    final before = notebook.pages.first;
+    final image = ImageBlock(
+      id: 'image-object',
+      path: '',
+      ocrText: '',
+      bytes: rawBytes,
+      imageExt: 'png',
+      imageMime: 'image/png',
+      position: const Offset(4, 5),
+      width: 160,
+      height: 120,
+    );
+    final after = before.copyWith(imageBlocks: [image]);
+    final verified = VerifiedEditorAsset(
+      assetId: 'image-verified',
+      sha256: digest,
+      sizeBytes: rawBytes.length,
+      mediaType: 'image/png',
+    );
+    await expectLater(
+      bufferedWriter.writePageChange(
+        documentId: notebook.uid,
+        before: before,
+        after: after,
+        verifiedAssets: {'image-object': verified},
+      ),
+      throwsStateError,
+    );
+    expect(await store.pending(), isEmpty);
+    expect(
+      (await repository.getNotebook(notebook.uid))!.pages.first.imageBlocks,
+      isEmpty,
+    );
+
+    buffer.stage(receipt: receipt, bytes: rawBytes);
+    final committed = await bufferedWriter.writePageChange(
+      documentId: notebook.uid,
+      before: before,
+      after: after,
+      verifiedAssets: {'image-object': verified},
+    );
+    expect(committed.map((op) => op.kind), [
+      OperationKind.objectCreate,
+      OperationKind.assetAttach,
+    ]);
+    final saved = (await repository.getNotebook(notebook.uid))!
+        .pages.first.imageBlocks.single;
+    expect(saved.id, image.id);
+    expect(saved.bytes, orderedEquals(rawBytes));
+    expect(saved.position.dx, 4);
+    final references = await database.customSelect(
+      'SELECT storage_path, checksum_sha256, byte_length '
+      'FROM asset_references WHERE document_id = ? AND asset_id = ?',
+      variables: [
+        Variable<String>(notebook.uid),
+        const Variable<String>('image-verified'),
+      ],
+    ).get();
+    expect(references, hasLength(1));
+    expect(references.single.read<String>('checksum_sha256'), digest);
+    expect(references.single.read<int>('byte_length'), rawBytes.length);
+    expect(
+      references.single.read<String>('storage_path'),
+      'sqlite-blob:$digest',
+    );
+    buffer.clear();
+    expect(
+      (await repository.getNotebook(notebook.uid))!
+          .pages.first.imageBlocks.single.bytes,
+      orderedEquals(rawBytes),
     );
   });
 
