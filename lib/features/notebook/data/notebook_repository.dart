@@ -296,6 +296,9 @@ class NotebookRepository {
       }
 
       await database.transaction(() async {
+        for (final notebook in persisted) {
+          await _requireLegacyWritable(notebook.uid);
+        }
         if (!await _isDatabaseEmptyForRestore()) {
           throw StateError('Atomic recovery requires an empty database.');
         }
@@ -429,6 +432,9 @@ class NotebookRepository {
       }
 
       await database.transaction(() async {
+        for (final notebook in persisted) {
+          await _requireLegacyWritable(notebook.uid);
+        }
         for (final notebook in persisted) {
           final existing = await (database.select(
             database.notebookRows,
@@ -747,6 +753,7 @@ class NotebookRepository {
     );
     DateTime? persistedAt;
     final saved = await database.transaction(() async {
+      await _requireLegacyWritable(notebook.uid);
       final existing = await (database.select(
         database.notebookRows,
       )..where((row) => row.uid.equals(notebook.uid))).getSingleOrNull();
@@ -834,6 +841,7 @@ class NotebookRepository {
     var effectiveTitle = notebookToSave.title;
     var effectiveFolder = notebookToSave.folder;
     final saved = await database.transaction(() async {
+      await _requireLegacyWritable(notebookToSave.uid);
       final existing = await (database.select(
         database.notebookRows,
       )..where((row) => row.uid.equals(notebookToSave.uid))).getSingleOrNull();
@@ -897,6 +905,7 @@ class NotebookRepository {
     await _requireLegacyWritable(uid);
     DateTime? preciseUpdatedAt;
     final updated = await database.transaction(() async {
+      await _requireLegacyWritable(uid);
       final existing = await (database.select(
         database.notebookRows,
       )..where((row) => row.uid.equals(uid))).getSingleOrNull();
@@ -1384,6 +1393,7 @@ class NotebookRepository {
     }
     await archiveNotebookBeforeDelete(notebook);
     await database.transaction(() async {
+      await _requireLegacyWritable(uid);
       await _deleteNotebookChildren(uid);
       await (database.delete(
         database.notebookRows,
