@@ -4,6 +4,21 @@ Stan na 2026-11-05. Aktywna produkcja pozostaje na v1. Każdy przyrost
 jest realizowany na `NaNotateczki/dev`. Żaden punkt nie może być
 uznany za zaliczony na podstawie samego dodania testu.
 
+## Integracja z 5 listopada 2026 — nadal niezamknięty etap 3
+
+- Dodano opt-in `EditorV2AccountRuntime` dla konta o potwierdzonym
+  protokole v2; flagę `NN_ENABLE_V2_ACCOUNT` domyślnie wyłączono.
+- Produkcyjny kontroler edytora otrzymuje writer v2 po aktywacji,
+  a `NotebookRepository` nie wysyła tworzenia, rename i delete
+  dokumentów v2 przez legacy snapshots.
+- Po commicie operacji v2 wysyłane jest powiadomienie o aktualizacji
+  strony / dokumentu, co umożliwia odświeżenie cache i backupu.
+  Dodano test regresyjny `notebook_repository_v2_account_test.dart`.
+- Bez lokalnego Flutter/Dart testy pozostają **nieuruchomione**.
+- Brakuje pełnego rebase, offline transferu mediów, zamknięcia
+  Quill, przełączenia całej aplikacji i testów E2E.
+  Nie wolno włączać flagi na rzeczywistych danych użytkownika.
+
 ## A. Integralność istniejącego zapisu v2 — pierwszeństwo
 
 - [x] Jeden transakcyjny commit projekcji Drift, actorSeq i outboxu.
