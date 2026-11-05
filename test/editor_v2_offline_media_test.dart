@@ -19,12 +19,17 @@ import 'package:program/data/sync/sync_engine.dart';
 import 'package:program/data/sync/verified_editor_asset_buffer.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/image_block.dart';
+import 'package:program/features/notebook/domain/ink_stroke.dart';
+import 'package:program/features/notebook/domain/text_block.dart';
 
 class _AcknowledgingGateway implements OperationGateway {
   _AcknowledgingGateway(this.events);
   final List<String> events;
   final List<SequencedOperation> accepted = [];
+  bool loseNextAck = false;
+  bool holdFeed = false;
 
   @override
   Future<List<OperationReceipt>> send(
@@ -36,23 +41,156 @@ class _AcknowledgingGateway implements OperationGateway {
     events.add('operations');
     final receipts = <OperationReceipt>[];
     for (final operation in operations) {
-      final cursor = accepted.length + 1;
-      accepted.add(SequencedOperation(cursor, operation));
+      final existing = accepted.where(
+        (entry) => entry.operation.operationId == operation.operationId,
+      );
+      final cursor = existing.isEmpty
+          ? accepted.length + 1
+          : existing.single.cursor;
+      if (existing.isEmpty) {
+        accepted.add(SequencedOperation(cursor, operation));
+      }
       receipts.add(OperationReceipt(operation.operationId, cursor));
+    }
+    if (loseNextAck) {
+      loseNextAck = false;
+      holdFeed = true;
+      throw const SocketException('Committed but response lost.');
     }
     return receipts;
   }
 
   @override
   Future<OperationFeedPage> readAfter(int cursor) async => OperationFeedPage(
-    cursor: accepted.length,
+    cursor: holdFeed ? cursor : accepted.length,
     hasMore: false,
-    operations: accepted.where((op) => op.cursor > cursor).toList(),
+    operations: holdFeed
+        ? []
+        : accepted.where((op) => op.cursor > cursor).toList(),
   );
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'twenty-page offline notebook reopens after mixed content deletion',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'nn-twenty-pages-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/notes.sqlite');
+      final database = NotesDatabase(NativeDatabase(file));
+      final repository = NotebookRepository(database);
+      final events = <String>[];
+      final projector = EditorSqliteProjector(
+        database,
+        verifiedAssetBuffer: VerifiedEditorAssetBuffer(),
+      );
+      final engine = SyncEngine(
+        store: OperationStore(database),
+        gateway: _AcknowledgingGateway(events),
+        actorId: 'offline-book',
+        checkpointScope: 'offline-book',
+        enableRealtime: false,
+        applyRemote: (operation, _) => projector.apply(operation),
+      );
+      final writer = EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: projector,
+      );
+      await repository.enableAccountOperations(writer);
+      final notebook = await repository.createNotebook();
+      final template = notebook.pages.single;
+      final pages = List.generate(
+        20,
+        (index) => template.copyWith(
+          id: index == 0 ? template.id : 'offline-page-$index',
+          title: 'Page ${index + 1}',
+          inkStrokes: [
+            InkStroke(
+              id: 'offline-ink-$index',
+              color: const Color(0xFF112233),
+              width: 2,
+              tool: DrawingTool.pen,
+              points: [InkPoint(dx: index.toDouble(), dy: 4, pressure: 0.5)],
+            ),
+          ],
+          textBlocks: [
+            TextBlock(
+              id: 'offline-text-$index',
+              text: 'Page $index',
+              deltaJson: jsonEncode([
+                {
+                  'insert': 'Page $index',
+                  'attributes': {'bold': true},
+                },
+                {'insert': '\n'},
+              ]),
+              position: const Offset(10, 20),
+              fontSize: 18,
+              color: const Color(0xFF112233),
+              width: 200,
+            ),
+          ],
+          imageBlocks: [
+            ImageBlock(
+              id: 'offline-media-$index',
+              path: '',
+              ocrText: '',
+              bytes: Uint8List.fromList([1, 2, 3, index]),
+              imageExt: index.isEven ? 'png' : 'pdf',
+              imageMime: index.isEven ? 'image/png' : 'application/pdf',
+              position: const Offset(30, 40),
+              width: 120,
+              height: 80,
+            ),
+          ],
+        ),
+      );
+      await writer.writeNotebookChange(
+        before: notebook,
+        after: notebook.copyWith(pages: pages),
+      );
+      final populated = (await repository.getNotebook(notebook.uid))!;
+      expect(populated.pages, hasLength(20));
+      final retained = [
+        for (var i = 0; i < populated.pages.length; i++)
+          if (i % 4 != 0) populated.pages[i],
+      ];
+      await writer.writeNotebookChange(
+        before: populated,
+        after: populated.copyWith(pages: retained),
+      );
+      final expected = (await repository.getNotebook(notebook.uid))!;
+      expect(expected.pages, hasLength(15));
+      final expectedDocument = repository.encodeNotebooks([expected]).single;
+      final pending = (await engine.store.pending(
+        limit: 1000,
+        includeDeferred: true,
+      )).map((op) => op.operationId).toList();
+      expect(events, isEmpty);
+      await engine.stop();
+      await database.close();
+
+      final reopened = NotesDatabase(NativeDatabase(file));
+      addTearDown(reopened.close);
+      final reopenedRepository = NotebookRepository(reopened);
+      final loaded = (await reopenedRepository.getNotebook(notebook.uid))!;
+      expect(
+        reopenedRepository.encodeNotebooks([loaded]).single,
+        expectedDocument,
+      );
+      expect(
+        (await OperationStore(reopened).pending(
+          limit: 1000,
+          includeDeferred: true,
+        )).map((op) => op.operationId),
+        pending,
+      );
+    },
+  );
 
   for (final mime in ['image/png', 'application/pdf']) {
     for (final deleteBeforeRestart in [false, true]) {
@@ -124,7 +262,8 @@ void main() {
           await first.close();
 
           final reopened = NotesDatabase(NativeDatabase(file));
-          addTearDown(reopened.close);
+          var databaseToClose = reopened;
+          addTearDown(() => databaseToClose.close());
           final recoveredStore = OperationStore(reopened);
           final recoveredProjector = EditorSqliteProjector(reopened);
           final recovered = (await NotebookRepository(
@@ -213,12 +352,39 @@ void main() {
             hasLength(pendingIds.length),
           );
           offline = false;
+          transport.loseNextAck = true;
           await reopened.customStatement(
             'UPDATE operation_outbox SET retry_after = 0',
           );
           await recoveredEngine.syncNow();
           expect(events, ['upload', 'operations']);
-          expect(await recoveredStore.pending(includeDeferred: true), isEmpty);
+          expect(
+            await recoveredStore.pending(includeDeferred: true),
+            hasLength(pendingIds.length),
+          );
+          await recoveredEngine.stop();
+          await reopened.close();
+
+          // The server committed, but no operation ACK reached this database.
+          databaseToClose = NotesDatabase(NativeDatabase(file));
+          final afterCrashStore = OperationStore(databaseToClose);
+          final afterCrashProjector = EditorSqliteProjector(databaseToClose);
+          final afterCrashEngine = SyncEngine(
+            store: afterCrashStore,
+            gateway: transport,
+            actorId: 'offline-media',
+            checkpointScope: 'offline-media',
+            enableRealtime: false,
+            applyRemote: (operation, _) => afterCrashProjector.apply(operation),
+            prepareLocalOperations: (operations) => assets.uploadPendingAssets(
+              operations,
+              afterCrashProjector.verifiedUploadBytes,
+            ),
+          );
+          addTearDown(afterCrashEngine.stop);
+          transport.holdFeed = false;
+          await afterCrashEngine.start();
+          expect(await afterCrashStore.pending(includeDeferred: true), isEmpty);
           expect(
             transport.accepted.map((op) => op.operation.operationId),
             pendingIds,

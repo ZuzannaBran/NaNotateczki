@@ -75,6 +75,12 @@ pozwala powtórzyć content-addressed PUT po restarcie.
 Dodano `editor_v2_offline_media_test.dart`: dwa typy mediów × pozostawienie
 lub usunięcie obiektu przed restartem, plikowa SQLite, uszkodzenie BLOB,
 odmowa wysyłki offline i upload przed operacjami po odzyskaniu sieci.
+Ten sam scenariusz gubi ACK po przyjęciu operacji, zamyka i ponownie
+otwiera plik SQLite, a następnie odbiera echo serwera. Sprawdza opróżnienie
+outboxu i brak duplikacji identyfikatorów, także po lokalnym usunięciu medium.
+Dodano lokalny scenariusz 20 stron z ink, sformatowanym Quill i obrazami/PDF:
+po usunięciu pięciu stron restart ma zachować cały zakodowany dokument
+oraz identyczną kolejkę operacji. Wykonanie wymaga potwierdzenia w CI.
 Zmieniono stary test oczekujący uploadu przed zapisem: lokalny commit ma
 teraz zero żądań HTTP, a błędny receipt nie usuwa jego outboxu.
 Formatowanie zweryfikowano lokalnie; testy Flutter wymagają wyniku CI.

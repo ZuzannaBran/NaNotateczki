@@ -1478,6 +1478,9 @@ tylko scoped referencje, nie asset użyty przez inną stronę).
 `test/editor_v2_offline_media_test.dart`: PNG/PDF w plikowej SQLite,
 restart z outboxem, usunięcie przed uploadem, uszkodzony BLOB,
 offline retry i obowiązkowy upload przed wysłaniem zależnych operacji.
+Obejmuje także utratę ACK po commicie serwera i ponowne otwarcie SQLite.
+Drugi scenariusz tworzy 20 stron z ink, formatowanym Quill i obrazami/PDF,
+usuwa pięć stron i porównuje cały zakodowany notebook po restarcie.
 
 ### `lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart`
 
