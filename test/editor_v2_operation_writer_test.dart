@@ -194,6 +194,91 @@ void main() {
     expect(await store.pending(), isEmpty);
   });
 
+  test('cross-page ink move preserves one ID and both page orders',
+      () async {
+    final notebook = await repository.createNotebook();
+    final firstPage = notebook.pages.single;
+    final secondPage = firstPage.copyWith(
+      id: 'ink-destination',
+      title: 'Destination',
+      inkStrokes: [],
+      textBlocks: [],
+      imageBlocks: [],
+    );
+    InkStroke stroke(String id) => InkStroke(
+      id: id,
+      color: const Color(0xFF223344),
+      width: 1.5,
+      tool: DrawingTool.pen,
+      points: [const InkPoint(dx: 1.0, dy: 2.0, pressure: 0.6)],
+    );
+    final a = stroke('ink-a');
+    final b = stroke('ink-b');
+    final c = stroke('ink-c');
+    final starting = notebook.copyWith(pages: [
+      firstPage.copyWith(inkStrokes: [a, b]),
+      secondPage.copyWith(inkStrokes: [c]),
+    ]);
+    await writer.writeNotebookChange(before: notebook, after: starting);
+    final moved = notebook.copyWith(pages: [
+      firstPage.copyWith(inkStrokes: [b]),
+      secondPage.copyWith(inkStrokes: [c, a]),
+    ]);
+    final operations = await writer.writeNotebookChange(
+      before: starting,
+      after: moved,
+    );
+    expect(
+      operations.where((op) => op.kind == OperationKind.objectMove),
+      hasLength(1),
+    );
+    expect(
+      operations.where((op) => op.kind == OperationKind.objectDelete),
+      isEmpty,
+    );
+    expect(
+      operations.where((op) => op.kind == OperationKind.strokeCreate),
+      isEmpty,
+    );
+    final saved = (await repository.getNotebook(notebook.uid))!;
+    expect(
+      saved.pages.first.inkStrokes.map((s) => s.id).toList(),
+      ['ink-b'],
+    );
+    expect(
+      saved.pages.last.inkStrokes.map((s) => s.id).toList(),
+      ['ink-c', 'ink-a'],
+    );
+    expect(
+      await store.isTombstoned(
+        notebook.uid,
+        'object',
+        'ink-a',
+        pageId: firstPage.id,
+      ),
+      isFalse,
+    );
+    expect(
+      await store.isTombstoned(
+        notebook.uid,
+        'object',
+        'ink-a',
+        pageId: secondPage.id,
+      ),
+      isFalse,
+    );
+
+    final modified = a.copyWith(width: 3);
+    final invalid = notebook.copyWith(pages: [
+      firstPage.copyWith(inkStrokes: [b, a]),
+      secondPage.copyWith(inkStrokes: [c, modified]),
+    ]);
+    await expectLater(
+      writer.writeNotebookChange(before: starting, after: invalid),
+      throwsStateError,
+    );
+  });
+
   test('Quill update reuses SQLite atom identity after each commit',
       () async {
     final notebook = await repository.createNotebook();
