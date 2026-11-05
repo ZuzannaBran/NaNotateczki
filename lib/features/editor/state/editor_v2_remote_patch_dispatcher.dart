@@ -64,25 +64,21 @@ class EditorV2RemotePatchDispatcher {
       return;
     }
     if (operation.kind == OperationKind.objectMove) {
-      final destinationId = operation.payload['toPageId'] as String;
-      final source = _page(notebook.pages, sourceId);
-      final destination = _page(notebook.pages, destinationId);
-      if (source == null || destination == null) {
-        throw StateError('Committed move pages are absent from SQLite.');
-      }
       final movedId = operation.objectId!;
-      final sourceStillOwns = source.inkStrokes.any(
-            (stroke) => stroke.id == movedId,
-          ) ||
-          source.textBlocks.any((text) => text.id == movedId) ||
-          source.imageBlocks.any((image) => image.id == movedId);
-      final destinationOwns = destination.inkStrokes.any(
-            (stroke) => stroke.id == movedId,
-          ) ||
-          destination.textBlocks.any((text) => text.id == movedId) ||
-          destination.imageBlocks.any((image) => image.id == movedId);
-      if (sourceStillOwns || !destinationOwns) {
-        throw StateError('Committed move projection has inconsistent IDs.');
+      final source = _page(notebook.pages, sourceId);
+      final owners = [
+        for (final page in notebook.pages)
+          if (_ownsObject(page, movedId)) page,
+      ];
+      if (source == null || owners.length != 1) {
+        throw StateError('Committed move has no unique SQLite target.');
+      }
+      // A concurrent operation with a lower rank may have committed as a
+      // no-op. Use the durable winning location, not its stale toPageId.
+      final destination = owners.single;
+      if (destination.id == source.id) {
+        _applyObject(source, movedId);
+        return;
       }
       if (!editor.applyConfirmedV2PageMovePatch(
         source: source,
@@ -144,6 +140,11 @@ class EditorV2RemotePatchDispatcher {
       throw StateError('Committed object patch was deferred.');
     }
   }
+
+  static bool _ownsObject(NotePage page, String id) =>
+      page.inkStrokes.any((stroke) => stroke.id == id) ||
+      page.textBlocks.any((text) => text.id == id) ||
+      page.imageBlocks.any((image) => image.id == id);
 
   static NotePage? _page(List<NotePage> pages, String id) {
     for (final page in pages) {
