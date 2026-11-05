@@ -391,6 +391,120 @@ void main() {
     );
   });
 
+  test('image replacement swaps verified bytes and detaches the old ID',
+      () async {
+    final buffer = VerifiedEditorAssetBuffer();
+    final projector = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
+    );
+    final imageEngine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'asset-replace-actor',
+      checkpointScope: 'asset-replace-scope',
+      enableRealtime: false,
+      applyRemote: (operation, pending) => projector.apply(operation),
+    );
+    addTearDown(imageEngine.stop);
+    final imageWriter = EditorV2OperationWriter(
+      syncEngine: imageEngine,
+      projector: projector,
+    );
+    final notebook = await repository.createNotebook();
+    final originalBytes = Uint8List.fromList([137, 80, 78, 71, 0, 1]);
+    final updatedBytes = Uint8List.fromList([137, 80, 78, 71, 0, 2]);
+    final originalId = 'first-asset';
+    final replacementId = 'second-asset';
+    VerifiedEditorAsset receipt(String assetId, Uint8List bytes) {
+      final digest = crypto.sha256.convert(bytes).toString();
+      final result = VerifiedEditorAsset(
+        assetId: assetId,
+        sha256: digest,
+        sizeBytes: bytes.length,
+        mediaType: 'image/png',
+      );
+      buffer.stage(receipt: result.attachPayload, bytes: bytes);
+      return result;
+    }
+
+    final first = receipt(originalId, originalBytes);
+    final image = ImageBlock(
+      id: 'swapped-image',
+      path: '',
+      ocrText: '',
+      bytes: originalBytes,
+      imageExt: 'png',
+      imageMime: 'image/png',
+      position: const Offset(10, 20),
+      width: 100,
+      height: 80,
+    );
+    final start = notebook.pages.single;
+    await imageWriter.writePageChange(
+      documentId: notebook.uid,
+      before: start,
+      after: start.copyWith(imageBlocks: [image]),
+      verifiedAssets: {image.id: first},
+    );
+    final persisted = (await repository.getNotebook(notebook.uid))!;
+    final prior = persisted.pages.single;
+    final second = VerifiedEditorAsset(
+      assetId: replacementId,
+      sha256: crypto.sha256.convert(updatedBytes).toString(),
+      sizeBytes: updatedBytes.length,
+      mediaType: 'image/png',
+    );
+    final changed = prior.copyWith(imageBlocks: [
+      prior.imageBlocks.single.copyWith(bytes: updatedBytes),
+    ]);
+    final pending = (await store.pending()).length;
+    await expectLater(
+      imageWriter.writePageChange(
+        documentId: notebook.uid,
+        before: prior,
+        after: changed,
+        verifiedAssets: {image.id: second},
+      ),
+      throwsStateError,
+    );
+    expect(await store.pending(), hasLength(pending));
+    expect(
+      (await repository.getNotebook(notebook.uid))!
+          .pages.single.imageBlocks.single.bytes,
+      orderedEquals(originalBytes),
+    );
+
+    buffer.stage(receipt: second.attachPayload, bytes: updatedBytes);
+    final operations = await imageWriter.writePageChange(
+      documentId: notebook.uid,
+      before: prior,
+      after: changed,
+      verifiedAssets: {image.id: second},
+    );
+    expect(operations.map((operation) => operation.kind), [
+      OperationKind.assetAttach,
+      OperationKind.objectSet,
+      OperationKind.assetDetach,
+    ]);
+    final saved = (await repository.getNotebook(notebook.uid))!
+        .pages.single.imageBlocks.single;
+    expect(saved.id, image.id);
+    expect(saved.bytes, orderedEquals(updatedBytes));
+    expect(saved.position, image.position);
+    final refs = await database.customSelect(
+      'SELECT asset_id FROM asset_references WHERE document_id = ?',
+      variables: [Variable<String>(notebook.uid)],
+    ).get();
+    expect(refs.map((row) => row.read<String>('asset_id')), [replacementId]);
+    buffer.clear();
+    expect(
+      (await repository.getNotebook(notebook.uid))!
+          .pages.single.imageBlocks.single.bytes,
+      orderedEquals(updatedBytes),
+    );
+  });
+
   test('image move preserves the asset and never recreates its ID',
       () async {
     final notebook = await repository.createNotebook();
