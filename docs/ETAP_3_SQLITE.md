@@ -185,9 +185,16 @@ opcjonalny parametr `operationWriter`; jeśli został podany, `_save`,
 z utrwalonym baseline, bez wywołania `saveNotebook` ani
 `saveNotebookPages`. `NotebookRepository.registerOperationWriter`
 rezerwuje UID na czas pracy kontrolera i blokuje legacy writery,
-import, restore, metadata i delete na zajętym dokumencie. Zwolnienie
-własności następuje dopiero po opróżnieniu kolejki przy dispose.
-Regresja: `test/editor_controller_v2_test.dart`.
+import, restore, metadata i delete na zajętym dokumencie.
+Blokada protokołu pozostaje w pamięci repozytorium nawet po `dispose`
+edytora, a po restarcie jest odtwarzana przez sprawdzenie
+`operations.document_id` przed każdą legacy modyfikacją.
+Każda ścieżka legacy powtarza tę kontrolę również wewnątrz
+transakcji SQLite. Automatyczne przepisywanie starych masek gumki
+jest zabronione dla dokumentów v2; naruszenie blokady nie jest
+traktowane jak przypadkowy błąd migracji. Regresje:
+`test/editor_controller_v2_test.dart` i
+`test/editor_sqlite_projector_test.dart`.
 W trybie opt-in Undo/Redo jest celowo wyłączone; wymaga osobnego
 odwzorowania inverse intents oraz nowych identyfikatorów przy
 tombstone. Nie wolno po prostu odtworzyć usuniętego UID.
