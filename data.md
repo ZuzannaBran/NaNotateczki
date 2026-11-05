@@ -898,3 +898,12 @@ Nowe reduktory protokołu, ale **nie produkcyjny cutover**:
 
 Nie wolno usuwać aktywnych writerów v1 ani włączać v2 dla kont produkcyjnych
 tylko z powodu dodania tej migracji i reduktorów.
+
+**SQLite v7 (2026-11-05):** nowa tabela `operation_asset_bytes` przechowuje
+checksumowane BLOB obrazów i PDF osadzonych w Quill. `asset.attach` na
+obiekcie tekstowym atomowo zapisuje bajty i scoped referencję;
+`text.insert` wymaga jej przed użyciem embeda, a `asset.detach` usuwa
+tylko referencję. Bajty pozostają do późniejszego GC i są dostępne
+przez `verifiedTextAssetBytes` po restarcie i wyczyszczeniu bufora.
+Migracja v6→v7 jest addytywna; render Quill embedów w aktywnym edytorze
+i pełne E2E nadal wymagają osobnej weryfikacji.

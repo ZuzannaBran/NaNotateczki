@@ -351,7 +351,7 @@ class NotesDatabase extends _$NotesDatabase {
   }
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -393,6 +393,16 @@ class NotesDatabase extends _$NotesDatabase {
         for (final statement in operationTombstoneV6Migration) {
           await customStatement(statement);
         }
+      }
+      if (from >= 3 && from < 7 && to >= 7) {
+        await customStatement('''
+          CREATE TABLE IF NOT EXISTS operation_asset_bytes (
+            checksum_sha256 TEXT NOT NULL PRIMARY KEY,
+            media_type TEXT NOT NULL,
+            byte_length INTEGER NOT NULL CHECK(byte_length > 0),
+            bytes BLOB NOT NULL
+          )
+        ''');
       }
     },
     beforeOpen: (details) async {

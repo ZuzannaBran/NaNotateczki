@@ -1009,4 +1009,89 @@ void main() {
       isEmpty,
     );
   });
+  test('verified Quill embed survives buffer loss and detaches atomically',
+      () async {
+    final notebook = await repository.createNotebook();
+    final page = notebook.pages.single;
+    final buffer = VerifiedEditorAssetBuffer();
+    final projectorWithAssets = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
+    );
+    final withAssets = EditorV2OperationWriter(
+      syncEngine: engine,
+      projector: projectorWithAssets,
+    );
+    final raw = Uint8List.fromList([137, 80, 78, 71, 1, 4, 8]);
+    final digest = crypto.sha256.convert(raw).toString();
+    const assetId = 'inline-quill-image';
+    final verified = VerifiedEditorAsset(
+      assetId: assetId,
+      sha256: digest,
+      sizeBytes: raw.length,
+      mediaType: 'image/png',
+    );
+    buffer.stage(receipt: verified.attachPayload, bytes: raw);
+    TextBlock rich(String text, String delta) => TextBlock(
+      id: 'inline-text',
+      text: text,
+      deltaJson: delta,
+      position: Offset.zero,
+      fontSize: 18,
+      color: const Color(0xFF112233),
+      width: 200,
+    );
+    final inserted = page.copyWith(textBlocks: [
+      rich('\uFFFC', r'[{"insert":{"image":"asset:inline-quill-image"}}]'),
+    ]);
+    final committed = await withAssets.writePageChange(
+      documentId: notebook.uid,
+      before: page,
+      after: inserted,
+      verifiedAssets: {assetId: verified},
+    );
+    expect(committed.map((op) => op.kind), [
+      OperationKind.objectCreate,
+      OperationKind.assetAttach,
+      OperationKind.textInsert,
+    ]);
+    buffer.clear();
+    final reopenedProjector = EditorSqliteProjector(database);
+    expect(
+      await reopenedProjector.verifiedTextAssetBytes(
+        documentId: notebook.uid,
+        pageId: page.id,
+        objectId: 'inline-text',
+        assetId: assetId,
+      ),
+      orderedEquals(raw),
+    );
+    expect(
+      (await repository.getNotebook(notebook.uid))!
+          .pages.single.textBlocks.single.deltaJson,
+      contains('asset:inline-quill-image'),
+    );
+    final removed = page.copyWith(textBlocks: [
+      rich('', '[]'),
+    ]);
+    final deleted = await withAssets.writePageChange(
+      documentId: notebook.uid,
+      before: inserted,
+      after: removed,
+    );
+    expect(deleted.map((op) => op.kind), [
+      OperationKind.textDelete,
+      OperationKind.assetDetach,
+    ]);
+    await expectLater(
+      reopenedProjector.verifiedTextAssetBytes(
+        documentId: notebook.uid,
+        pageId: page.id,
+        objectId: 'inline-text',
+        assetId: assetId,
+      ),
+      throwsStateError,
+    );
+  });
+
 }

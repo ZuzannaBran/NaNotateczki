@@ -94,6 +94,14 @@ const operationSchemaStatements = <String>[
     ON asset_references(asset_id)
   ''',
   '''
+  CREATE TABLE IF NOT EXISTS operation_asset_bytes (
+    checksum_sha256 TEXT NOT NULL PRIMARY KEY,
+    media_type TEXT NOT NULL,
+    byte_length INTEGER NOT NULL CHECK(byte_length > 0),
+    bytes BLOB NOT NULL
+  )
+  ''',
+  '''
   CREATE TABLE IF NOT EXISTS operation_actor_state (
     actor_id TEXT NOT NULL PRIMARY KEY,
     last_seq INTEGER NOT NULL CHECK(last_seq >= 0),

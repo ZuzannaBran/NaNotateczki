@@ -1250,10 +1250,17 @@ class EditorSqliteProjector {
     final mime = receipt['mediaType'] as String;
     final existingImage = await _imageRow(operation);
     final existingText = await _textRow(operation);
+    if (existingText != null && existingImage != null) {
+      throw StateError('Ambiguous media object identity.');
+    }
     if (existingText != null) {
-      throw UnsupportedError(
-        'Quill embed assets need a durable media resolver.',
+      await _storeTextAsset(
+        operation: operation,
+        bytes: bytes,
+        sha: sha,
+        mime: mime,
       );
+      return;
     }
     final original = await _row(
       'SELECT envelope_json FROM operations '
@@ -1370,6 +1377,139 @@ class EditorSqliteProjector {
     }
   }
 
+  /// Persists Quill embed bytes transactionally with their scoped reference.
+  ///
+  /// This is separate from the image-row BLOB so restarting without network
+  /// access does not strand embedded images or PDF references.
+  Future<void> _storeTextAsset({
+    required OperationEnvelope operation,
+    required Uint8List bytes,
+    required String sha,
+    required String mime,
+  }) async {
+    final owner = 'page:${jsonEncode([
+      operation.pageId,
+      operation.objectId,
+    ])}';
+    final existingId = await _row(
+      'SELECT checksum_sha256, byte_length FROM asset_references '
+      'WHERE asset_id = ? LIMIT 1',
+      [Variable<String>(operation.payload['assetId'] as String)],
+    );
+    if (existingId != null &&
+        (existingId['checksum_sha256'] != sha ||
+            existingId['byte_length'] != bytes.length)) {
+      throw StateError('Asset identity cannot refer to different bytes.');
+    }
+    final prior = await _row(
+      'SELECT media_type, byte_length, bytes '
+      'FROM operation_asset_bytes WHERE checksum_sha256 = ?',
+      [Variable<String>(sha)],
+    );
+    if (prior != null) {
+      final stored = prior['bytes'];
+      if (prior['media_type'] != mime ||
+          prior['byte_length'] != bytes.length ||
+          stored is! Uint8List ||
+          !const ListEquality<int>().equals(stored, bytes)) {
+        throw StateError('Existing embed bytes do not match receipt.');
+      }
+    } else {
+      await database.customStatement(
+        'INSERT INTO operation_asset_bytes '
+        '(checksum_sha256, media_type, byte_length, bytes) '
+        'VALUES (?, ?, ?, ?)',
+        [sha, mime, bytes.length, bytes],
+      );
+    }
+    final reference = await _row(
+      'SELECT checksum_sha256, byte_length, storage_path '
+      'FROM asset_references '
+      'WHERE document_id = ? AND object_id = ? AND asset_id = ?',
+      [
+        Variable<String>(operation.documentId),
+        Variable<String>(owner),
+        Variable<String>(operation.payload['assetId'] as String),
+      ],
+    );
+    if (reference != null) {
+      if (reference['checksum_sha256'] != sha ||
+          reference['byte_length'] != bytes.length ||
+          reference['storage_path'] != 'sqlite-asset:$sha') {
+        throw StateError('Existing scoped embed reference is inconsistent.');
+      }
+      return;
+    }
+    await database.customStatement(
+      'INSERT INTO asset_references '
+      '(document_id, object_id, asset_id, storage_path, '
+      'checksum_sha256, byte_length) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        operation.documentId,
+        owner,
+        operation.payload['assetId'],
+        'sqlite-asset:$sha',
+        sha,
+        bytes.length,
+      ],
+    );
+  }
+
+  Future<String> _assetChecksum(
+    String documentId,
+    String owner,
+    String assetId,
+  ) async {
+    final ref = await _row(
+      'SELECT checksum_sha256 FROM asset_references '
+      'WHERE document_id = ? AND object_id = ? AND asset_id = ?',
+      [
+        Variable<String>(documentId),
+        Variable<String>(owner),
+        Variable<String>(assetId),
+      ],
+    );
+    if (ref == null) {
+      throw StateError('Missing scoped embed reference.');
+    }
+    return ref['checksum_sha256'] as String;
+  }
+
+  /// Returns checksum-verified persisted embed bytes after an app restart.
+  Future<Uint8List> verifiedTextAssetBytes({
+    required String documentId,
+    required String pageId,
+    required String objectId,
+    required String assetId,
+  }) async {
+    final owner = 'page:${jsonEncode([pageId, objectId])}';
+    final row = await _row(
+      'SELECT r.checksum_sha256, r.byte_length, r.storage_path, '
+      'b.bytes, b.media_type FROM asset_references r '
+      'JOIN operation_asset_bytes b '
+      'ON b.checksum_sha256 = r.checksum_sha256 '
+      'WHERE r.document_id = ? AND r.object_id = ? AND r.asset_id = ?',
+      [
+        Variable<String>(documentId),
+        Variable<String>(owner),
+        Variable<String>(assetId),
+      ],
+    );
+    if (row == null) {
+      throw StateError('Missing durable Quill embed reference.');
+    }
+    final bytes = row['bytes'];
+    final sha = row['checksum_sha256'];
+    if (bytes is! Uint8List ||
+        sha is! String ||
+        row['byte_length'] != bytes.length ||
+        row['storage_path'] != 'sqlite-asset:$sha' ||
+        crypto.sha256.convert(bytes).toString() != sha) {
+      throw const FormatException('Corrupt persistent Quill embed.');
+    }
+    return Uint8List.fromList(bytes);
+  }
+
   static String _imageExtension(String mime) => switch (mime) {
     'image/png' => 'png',
     'image/jpeg' => 'jpg',
@@ -1483,13 +1623,6 @@ class EditorSqliteProjector {
     if (row == null) {
       throw StateError('Text CRDT operation requires a text object.');
     }
-    if (op.kind == OperationKind.textInsert) {
-      for (final atom in op.payload['atoms'] as List) {
-        if ((atom as Map).containsKey('embed')) {
-          throw UnsupportedError('Quill embeds require an asset projector.');
-        }
-      }
-    }
     final durable = await _store.textAtoms(
       documentId: op.documentId,
       pageId: op.pageId!,
@@ -1510,6 +1643,40 @@ class EditorSqliteProjector {
       throw StateError('The Quill Delta differs from the durable atoms.');
     }
     final updated = OperationTextSequence.apply(durable, op);
+    final checkedAssets = <String>{};
+    for (final id in OperationTextSequence.visibleIds(updated)) {
+      final atom = updated[id] as Map;
+      final embed = atom['embed'];
+      if (embed is! Map) {
+        continue;
+      }
+      final assetId = OperationEnvelope.embedAssetId(embed);
+      if (!checkedAssets.add(assetId)) {
+        continue;
+      }
+      final owner = 'page:${jsonEncode([op.pageId, op.objectId])}';
+      final linked = await _row(
+        'SELECT b.media_type FROM asset_references r '
+        'JOIN operation_asset_bytes b '
+        'ON b.checksum_sha256 = r.checksum_sha256 '
+        'WHERE r.document_id = ? AND r.object_id = ? AND r.asset_id = ? '
+        'AND r.storage_path = ? AND r.byte_length = b.byte_length',
+        [
+          Variable<String>(op.documentId),
+          Variable<String>(owner),
+          Variable<String>(assetId),
+          Variable<String>('sqlite-asset:' +
+              (await _assetChecksum(op.documentId, owner, assetId))),
+        ],
+      );
+      final mime = linked?['media_type'];
+      final valid = embed.containsKey('pdf')
+          ? mime == 'application/pdf'
+          : const {'image/png', 'image/jpeg', 'image/webp'}.contains(mime);
+      if (!valid) {
+        throw StateError('Quill embed has no verified matching local asset.');
+      }
+    }
     final text = OperationTextSequence.render(updated).trimRight();
     await database.customStatement(
       'UPDATE text_block_rows SET text = ?, delta_json = ? '

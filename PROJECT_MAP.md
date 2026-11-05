@@ -467,7 +467,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   zasobu; LWW nie może zastąpić nowszych bajtów.
   `prepareRemoteMedia` pobiera ponownie receipt po restarcie przed
   zdalnym `object.set`. Nie ma fizycznego kasowania plików.
-  Nadal brak nowych embedów Quill, document.create, text object.move,
+  Nowe embedy Quill przechowują bajty w `operation_asset_bytes` i
+  wymagają powiązanej referencji SHA-256 oraz zgodnego MIME.
+  Nadal brak pełnego renderera embedów, text object.move,
   pełnego rebase oraz podłączenia produkcyjnego. Blokuje niejednoznaczne
   identyfikatory i rozbieżny Delta Quill.
   Rejestr rank pól jest odtwarzany z niekompaktowanego dziennika
@@ -492,7 +494,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
   Quill CRDT, tombstones, ACK, restart i ochrona usunięć, a także
   brak obrazu do czasu zweryfikowanego `asset.attach`.
-- `lib/data/drift/operation_schema.dart`: SQLite v6 z migracją v3 → v4
+- `lib/data/drift/operation_schema.dart`: SQLite v7 (durable Quill asset BLOB)
+  z migracją v6 → v7 oraz wcześniejszą migracją v3 → v4
   zachowującą tombstones oraz pageId usuniętego obiektu; v5 zapisuje
   trwały status `blocked`, a v6 dodaje kategorię tombstone `task`.
   Tabele są tworzone przez `customStatement` bez nowych mapowań `.g.dart`.

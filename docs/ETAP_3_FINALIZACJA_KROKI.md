@@ -31,6 +31,11 @@ ten sam stan i trwały outbox.
 
 ## B. Kompletny łańcuch plików i Quill
 
+- [ ] Lokalny projector Quill: trwała tabela `operation_asset_bytes`,
+  scoped `asset.attach`, walidacja `text.insert`, odczyt po restarcie.
+  Implementacja oraz test dodane; brak uruchomionych testów Flutter.
+
+
 - [ ] Lokalna podmiana obrazu: attach → object.set → detach przy
   zweryfikowanym uploadzie, z wersjonowaniem pola `assetId` i rollbackiem.
   Kod dodany; prefetch po restarcie oparty na trwałym attach receipt.
