@@ -488,6 +488,45 @@ void main() {
     expect((await store.pending()), hasLength(2));
   });
 
+  test('stale verified asset receipt cannot commit a newer image', () async {
+    final notebook = await repository.createNotebook();
+    final page = notebook.pages.single;
+    final currentBytes = Uint8List.fromList([137, 80, 78, 71, 1]);
+    final oldBytes = Uint8List.fromList([137, 80, 78, 71, 0]);
+    final image = ImageBlock(
+      id: 'changed-after-upload',
+      path: '',
+      ocrText: '',
+      bytes: currentBytes,
+      imageExt: 'png',
+      imageMime: 'image/png',
+      position: Offset.zero,
+      width: 80,
+      height: 80,
+    );
+    await expectLater(
+      writer.writePageChange(
+        documentId: notebook.uid,
+        before: page,
+        after: page.copyWith(imageBlocks: [image]),
+        verifiedAssets: {
+          image.id: VerifiedEditorAsset(
+            assetId: 'old-upload',
+            sha256: crypto.sha256.convert(oldBytes).toString(),
+            sizeBytes: oldBytes.length,
+            mediaType: 'image/png',
+          ),
+        },
+      ),
+      throwsStateError,
+    );
+    expect(await store.pending(), isEmpty);
+    expect(
+      (await repository.getNotebook(notebook.uid))!.pages.single.imageBlocks,
+      isEmpty,
+    );
+  });
+
   test('image replacement swaps verified bytes and detaches the old ID',
       () async {
     final buffer = VerifiedEditorAssetBuffer();
