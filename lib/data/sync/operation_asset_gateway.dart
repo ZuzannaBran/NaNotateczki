@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart' as crypto;
 
 import 'api_client.dart';
+import 'verified_editor_asset_buffer.dart';
 
 /// Verified bytes are uploaded before an asset.attach operation is enqueued.
 ///
@@ -72,6 +73,39 @@ class OperationAssetGateway {
       'sizeBytes': bytes.length,
       'mediaType': mediaType,
     };
+  }
+
+  /// Only authenticated upload acknowledgements can stage local bytes.
+  Future<Map<String, dynamic>> uploadAndStage({
+    required String assetId,
+    required List<int> bytes,
+    required String mediaType,
+    required VerifiedEditorAssetBuffer buffer,
+  }) async {
+    final receipt = await upload(
+      assetId: assetId,
+      bytes: bytes,
+      mediaType: mediaType,
+    );
+    buffer.stage(
+      receipt: receipt,
+      bytes: Uint8List.fromList(bytes),
+    );
+    return receipt;
+  }
+
+  /// Checks remote bytes before making them available to the SQLite reducer.
+  Future<void> downloadAndStage({
+    required Map<String, dynamic> receipt,
+    required VerifiedEditorAssetBuffer buffer,
+  }) async {
+    final digest = receipt['sha256'];
+    final size = receipt['sizeBytes'];
+    if (digest is! String || size is! int) {
+      throw const FormatException('Invalid asset download receipt.');
+    }
+    final bytes = await download(sha256: digest, sizeBytes: size);
+    buffer.stage(receipt: receipt, bytes: bytes);
   }
 
   /// Downloads verified bytes; never exposes corrupt or partial responses.
