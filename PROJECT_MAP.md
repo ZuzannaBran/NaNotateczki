@@ -456,8 +456,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Rzutowanie atomów korzysta z `OperationStore.textAtoms`, a update pól
   porównuje rank `(clock, actor, seq, operationId)` z historią operacji,
   niezależnie od kolejności dostarczenia.
-  Nie wspiera jeszcze tworzenia/usuwania image/PDF, embedów, document.create,
-  text object.move ani pełnego rebase konfliktów; takie operacje odrzuca. Blokuje też niejednoznaczne ID między warstwami,
+  Dla image/PDF `object.create` zapisuje metadane w dzienniku,
+  bez pustego rekordu obrazu. Dopiero `asset.attach` po weryfikacji
+  bajtów w `VerifiedEditorAssetBuffer` materializuje obraz w SQLite
+  wraz z `asset_references`. Brak bajtów cofa transakcję i nie
+  przesuwa checkpointu. `asset.detach` usuwa tylko nieużywaną
+  referencję Quill; nie kasuje pliku. Nadal nie obsługuje podmiany
+  i usuwania obrazu/PDF, attach nowych embedów Quill, document.create,
+  text object.move ani pełnego rebase konfliktów. Blokuje niejednoznaczne ID,
   rozbieżny Delta Quill oraz usuwanie stron zawierających obrazy,
   osadzone referencje Quill lub nieodłączone asset_references.
   Rejestr rank pól jest odtwarzany z niekompaktowanego dziennika
@@ -465,8 +471,17 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   nadal potrzebna jest spójna reguła konfliktowa.
   Projektor jest wyłącznie opt-in i nigdy nie należy
   używać go równolegle z legacy writerem tego dokumentu.
+- `lib/data/sync/verified_editor_asset_buffer.dart`: bufor tylko
+  sprawdzonych transferów SHA-256/MIME/rozmiar; bajty kopiowane do
+  rekordu obrazu w tej samej transakcji co `asset.attach`.
+  `OperationAssetGateway.uploadAndStage/downloadAndStage` wypełnia
+  bufor po potwierdzeniu uploadu/pobraniu. Po restarcie obraz
+  otwiera się z trwałej kolumny BLOB. Bufor nie jest backupem.
+- `test/verified_editor_asset_buffer_test.dart`: checksuma, ochrona
+  zmiany ID i niemutowalność skopiowanych bajtów.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
-  Quill CRDT, tombstones, ACK, restart i ochrona usunięć.
+  Quill CRDT, tombstones, ACK, restart i ochrona usunięć, a także
+  brak obrazu do czasu zweryfikowanego `asset.attach`.
 - `lib/data/drift/operation_schema.dart`: SQLite v6 z migracją v3 → v4
   zachowującą tombstones oraz pageId usuniętego obiektu; v5 zapisuje
   trwały status `blocked`, a v6 dodaje kategorię tombstone `task`.
@@ -1354,8 +1369,10 @@ bajtach/MIME i trwałej referencji assetu; geometria może się zmienić
 w tej samej transakcji. Przenoszenie tekstu nadal zablokowane;
 odrzuca zmianę
 kolejności stron oraz edycję z nieaktualnym Delta Quill.
-Adapter jest podłączony jako opt-in do `EditorController`, ale
-nie jest aktywowany przez produkcyjny `AppScope`. W trybie v2
+Adapter przyjmuje też mapę `verifiedAssets` dla tworzenia
+obrazów/PDF po przygotowaniu bajtów. Jest podłączony jako opt-in
+do `EditorController`, ale nie jest aktywowany przez produkcyjny
+`AppScope`. W trybie v2
 Undo/Redo jest celowo wyłączone do czasu inverse intents i remint ID.
 Nie wspiera pełnego transferu assetów ani zdalnego rebase.
 Test: `test/editor_v2_operation_writer_test.dart`.
@@ -1367,6 +1384,8 @@ operację uprzednio zatwierdzoną w SQLite przez `SyncEngine`. Pobiera
 aktualny obiekt/stronę z repozytorium i aktualizuje wskazany fragment
 `EditorController`, bez snapshotowego odmalowywania całego notatnika.
 Dla `object.move` usuwa źródłowy obiekt z widoku i dodaje go w celu.
+Przy image `object.create` nie powiadamia UI o pustym
+placeholderze; dopiero zweryfikowany `asset.attach` dodaje obraz.
 Zachowuje kolejność tekstów i obrazów (sortIndex) przy aktualizacjach.
 Aktywny gest lub niezapisana zmiana blokuje callback — `SyncEngine`
 ponawia dostarczenie; brak przełączenia `AppScope` na v2.
@@ -2750,7 +2769,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   wcześniejszego `asset.attach` i zgodnego MIME; zewnętrzne URL są odrzucane.
   `asset.detach` nie usuwa assetu, dopóki widoczny embed go używa.
 - `lib/data/sync/operation_asset_gateway.dart`: osobny upload i download
-  plików z kontrolą SHA-256, rozmiaru i zakresu uprawnień Share.
+  plików z kontrolą SHA-256, rozmiaru i zakresu uprawnień Share;
+  `uploadAndStage/downloadAndStage` przygotowują bajty przed
+  transakcją, nigdy w środku writeLocalBatch.
 - `test/operation_asset_gateway_test.dart`: kontrola uploadu, pobrania,
   błędów integralności i uprawnień; `test/operation_protocol_test.dart`,
   `test/operation_text_sequence_test.dart`,
