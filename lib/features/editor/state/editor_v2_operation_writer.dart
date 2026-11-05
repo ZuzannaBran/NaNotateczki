@@ -216,6 +216,15 @@ class EditorV2OperationWriter {
     return _commit(notebook.uid, drafts);
   }
 
+  Future<List<OperationEnvelope>> writeDeleteNotebook({
+    required String documentId,
+  }) => _commit(documentId, [
+    LocalOperationDraft(
+      kind: OperationKind.documentDelete,
+      payload: const {},
+    ),
+  ]);
+
   /// Commits a multi-page gesture and stable-ID ink moves in one batch.
   ///
   /// Ink stays unchanged during a move. Image geometry may change, but
