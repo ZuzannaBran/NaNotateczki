@@ -944,7 +944,7 @@ void main() {
     await database.customStatement(
       'UPDATE text_block_rows SET text = ?, delta_json = ? WHERE uid = ?',
       [
-        '\\uFFFC',
+        '\uFFFC',
         '[{"insert":{"image":"asset:attachment-one"}}]',
         'asset-text',
       ],
