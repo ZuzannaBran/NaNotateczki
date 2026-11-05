@@ -154,9 +154,11 @@ a pomocniczy generator zdarzeń tekstowych testuje Undo z monotonicznym
 zegarem. W teście synchronizacji uwzględniono także echo dwóch lokalnych
 operacji, stąd checkpoint 3. Ponowny wynik CI pozostaje do weryfikacji.
 
-Drugi przebieg `42070224438` zaliczył 821 testów i ujawnił
-jeden błąd przygotowania testu przenoszenia obrazu: poprzednio
-źródłowy obraz pochodził z v1, a sprawdzano bajty SQLite z v2.
-Scenariusz poprawiono tak, by od początku utworzyć materiał przez
-zweryfikowane `asset.attach` v2, następnie przenieść i usunąć bez
-utraty bajtów. Wynik ponownego przebiegu pozostaje do potwierdzenia.
+Drugi przebieg `42070224438` przeszedł analizę Darta i 821 testów,
+ale zakończył się jednym błędem: `image move preserves the asset and
+never recreates its ID`. Przyczyną było przygotowanie scenariusza przez
+legacy zapis, a następnie sprawdzanie bajtów oraz referencji SQLite v2.
+Commit `9a51cb7` przygotowuje obraz od początku przez zweryfikowane
+`asset.attach` v2, po czym przenosi go i usuwa bez utraty bajtów.
+Aktualny `dev` zawiera tę poprawkę; wymagany jest jeszcze przebieg CI
+dla commitu co najmniej `9a51cb7` przed uznaniem regresji za zamkniętą.
