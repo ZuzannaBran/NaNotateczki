@@ -53,7 +53,7 @@ void main() {
       syncEngine: engine,
       projector: projector,
     );
-    repository.enableAccountOperations(writer);
+    await repository.enableAccountOperations(writer);
 
     final notebook = await repository.createNotebook();
     final board = await repository.createBoard();
@@ -66,6 +66,14 @@ void main() {
     ]);
     expect(commits, 2);
 
+    await expectLater(
+      repository.saveNotebook(
+        notebook.copyWith(
+          uid: 'ccab00f6-a8c8-47d6-82bc-de3165a2889d',
+        ),
+      ),
+      throwsA(isA<LegacyProtocolWriteBlocked>()),
+    );
     await expectLater(
       repository.saveNotebook(notebook),
       throwsA(isA<LegacyProtocolWriteBlocked>()),
@@ -127,7 +135,7 @@ void main() {
       projector: projector,
       onCommitted: repository.reportOperationCommit,
     );
-    repository.enableAccountOperations(writer);
+    await repository.enableAccountOperations(writer);
 
     final notebook = await repository.createNotebook();
     expect(notifications, hasLength(1));
@@ -158,6 +166,36 @@ void main() {
     );
     expect(notifications, isEmpty);
     expect(await store.pending(), hasLength(3));
+  });
+
+  test('v2 account activation rejects unmigrated documents', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final old = await repository.createNotebook();
+    final store = OperationStore(database);
+    final projector = EditorSqliteProjector(database);
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'migration-guard-test',
+      checkpointScope: 'migration-guard-test',
+      enableRealtime: false,
+      applyRemote: (operation, pending) => projector.apply(operation),
+    );
+    addTearDown(engine.stop);
+    final writer = EditorV2OperationWriter(
+      syncEngine: engine,
+      projector: projector,
+    );
+    await expectLater(
+      repository.enableAccountOperations(writer),
+      throwsStateError,
+    );
+    // Failed activation must preserve the old document and its v1 writer.
+    expect((await repository.getNotebook(old.uid))!.uid, old.uid);
+    expect(await repository.saveNotebook(old), isTrue);
+    expect(await store.pending(), isEmpty);
   });
 
 }
