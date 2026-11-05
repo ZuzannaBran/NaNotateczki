@@ -336,8 +336,8 @@ class EditorController extends ChangeNotifier {
         (image != null && image.id != objectId)) {
       throw ArgumentError('Expected exactly one matching object or deletion.');
     }
-    if (sortIndex != null && (sortIndex < 0 || stroke == null)) {
-      throw ArgumentError('Ink order requires a nonnegative stroke index.');
+    if (sortIndex != null && (sortIndex < 0 || deleted)) {
+      throw ArgumentError('Object order requires a nonnegative index.');
     }
     if (!canApplyConfirmedRemoteNotebook ||
         activeImageBlockId == objectId ||
@@ -367,18 +367,34 @@ class EditorController extends ChangeNotifier {
           (previousInkIndex < 0 ? inkStrokes.length : previousInkIndex);
       inkStrokes.insert(index.clamp(0, inkStrokes.length).toInt(), stroke);
     }
+    final previousTextIndex = current.textBlocks.indexWhere(
+      (entry) => entry.id == objectId,
+    );
+    final textBlocks = [
+      for (final entry in current.textBlocks)
+        if (entry.id != objectId) entry,
+    ];
+    if (text != null) {
+      final index = sortIndex ??
+          (previousTextIndex < 0 ? textBlocks.length : previousTextIndex);
+      textBlocks.insert(index.clamp(0, textBlocks.length).toInt(), text);
+    }
+    final previousImageIndex = current.imageBlocks.indexWhere(
+      (entry) => entry.id == objectId,
+    );
+    final imageBlocks = [
+      for (final entry in current.imageBlocks)
+        if (entry.id != objectId) entry,
+    ];
+    if (image != null) {
+      final index = sortIndex ??
+          (previousImageIndex < 0 ? imageBlocks.length : previousImageIndex);
+      imageBlocks.insert(index.clamp(0, imageBlocks.length).toInt(), image);
+    }
     final next = current.copyWith(
       inkStrokes: inkStrokes,
-      textBlocks: [
-        for (final entry in current.textBlocks)
-          if (entry.id != objectId) entry,
-        if (text != null) text,
-      ],
-      imageBlocks: [
-        for (final entry in current.imageBlocks)
-          if (entry.id != objectId) entry,
-        if (image != null) image,
-      ],
+      textBlocks: textBlocks,
+      imageBlocks: imageBlocks,
     );
     pages = [
       for (var i = 0; i < pages.length; i++)
