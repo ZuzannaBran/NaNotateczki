@@ -608,9 +608,9 @@ class NotebookRepository {
     if (writer == null) {
       await saveNotebook(notebook);
     } else {
-      await writer.writeCreateNotebook(notebook: notebook);
+      final committed = await writer.writeCreateNotebook(notebook: notebook);
       if (writer.onCommitted == null) {
-        onChanged?.call([NotebookRepositoryChange.full(notebook.uid)]);
+        reportOperationCommit(notebook.uid, committed);
       }
     }
     return notebook;
@@ -641,9 +641,9 @@ class NotebookRepository {
     if (writer == null) {
       await saveNotebook(board);
     } else {
-      await writer.writeCreateNotebook(notebook: board);
+      final committed = await writer.writeCreateNotebook(notebook: board);
       if (writer.onCommitted == null) {
-        onChanged?.call([NotebookRepositoryChange.full(board.uid)]);
+        reportOperationCommit(board.uid, committed);
       }
     }
     return board;
@@ -993,15 +993,18 @@ class NotebookRepository {
       if (after.title == before.title && after.folder == before.folder) {
         return before;
       }
-      await writer.writeNotebookChange(before: before, after: after);
+      final committed = await writer.writeNotebookChange(
+        before: before,
+        after: after,
+      );
+      if (writer.onCommitted == null) {
+        reportOperationCommit(uid, committed);
+      }
       final updated = await getNotebook(uid);
       if (updated == null) {
         throw StateError('V2 metadata commit has no durable projection.');
       }
       _notebookCache[uid] = updated;
-      if (writer.onCommitted == null) {
-        onChanged?.call([NotebookRepositoryChange.metadata(uid)]);
-      }
       return updated;
     }
     await _requireLegacyWritable(uid);
@@ -1484,12 +1487,12 @@ class NotebookRepository {
       if (notebook.kind == NotebookKind.planner) {
         throw UnsupportedError('Planner deletion v2 is not enabled yet.');
       }
-      await writer.writeDeleteNotebook(documentId: uid);
+      final committed = await writer.writeDeleteNotebook(documentId: uid);
+      if (writer.onCommitted == null) {
+        reportOperationCommit(uid, committed);
+      }
       _latestPersistedUpdates.remove(uid);
       _notebookCache.remove(uid);
-      if (writer.onCommitted == null) {
-        onChanged?.call([NotebookRepositoryChange.full(uid)]);
-      }
       return;
     }
     await _requireLegacyWritable(uid);
