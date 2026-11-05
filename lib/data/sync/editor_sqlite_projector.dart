@@ -76,6 +76,93 @@ class EditorSqliteProjector {
     }
   }
 
+  /// Resolves field-wise conflicts by the same deterministic v2 rank
+  /// used by the server projector, independent of REST delivery order.
+  ///
+  /// The un-compacted operation journal owns the previous field versions.
+  /// A future materialized version register can replace this replay safely.
+  Future<Map<String, dynamic>> _winningProperties(
+    OperationEnvelope operation,
+    Map<String, dynamic> changes,
+  ) async {
+    if (changes.isEmpty) {
+      return const {};
+    }
+    final pageTarget = operation.kind.target == OperationTarget.page;
+    final kinds = pageTarget
+        ? "('page.create', 'page.set')"
+        : "('stroke.create', 'object.create', 'object.set', "
+            "'object.transform', 'object.reorder', 'object.move')";
+    final rows = await database.customSelect(
+      'SELECT envelope_json FROM operations '
+      'WHERE document_id = ? AND object_id = ? AND kind IN $kinds',
+      variables: [
+        Variable<String>(operation.documentId),
+        Variable<String>(operation.objectId!),
+      ],
+    ).get();
+    if (rows.length > 50000) {
+      throw StateError('Field versions require a durable checkpoint.');
+    }
+    final losing = <String>{};
+    for (final row in rows) {
+      final raw = jsonDecode(row.read<String>('envelope_json'));
+      if (raw is! Map) {
+        throw const FormatException('Corrupt operation version envelope.');
+      }
+      final previous = OperationEnvelope.fromJson(
+        Map<String, dynamic>.from(raw),
+      );
+      if (_compareRank(previous, operation) < 0) {
+        continue;
+      }
+      final fields = switch (previous.kind) {
+        OperationKind.pageCreate ||
+        OperationKind.objectCreate ||
+        OperationKind.strokeCreate => previous.payload['value'],
+        OperationKind.pageSet ||
+        OperationKind.objectSet ||
+        OperationKind.objectTransform ||
+        OperationKind.objectReorder => previous.payload['properties'],
+        OperationKind.objectMove => {
+          'sortIndex': previous.payload['sortIndex'],
+        },
+        _ => null,
+      };
+      if (fields is! Map) {
+        continue;
+      }
+      for (final field in changes.keys) {
+        if (fields.containsKey(field)) {
+          losing.add(field);
+        }
+      }
+    }
+    return {
+      for (final entry in changes.entries)
+        if (!losing.contains(entry.key)) entry.key: entry.value,
+    };
+  }
+
+  static int _compareRank(
+    OperationEnvelope left,
+    OperationEnvelope right,
+  ) {
+    final clock = left.logicalClock.compareTo(right.logicalClock);
+    if (clock != 0) {
+      return clock;
+    }
+    final actor = left.actorId.compareTo(right.actorId);
+    if (actor != 0) {
+      return actor;
+    }
+    final sequence = left.actorSeq.compareTo(right.actorSeq);
+    if (sequence != 0) {
+      return sequence;
+    }
+    return left.operationId.compareTo(right.operationId);
+  }
+
   Future<Map<String, dynamic>?> _row(
     String statement,
     List<Variable> variables,
