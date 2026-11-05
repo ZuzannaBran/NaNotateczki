@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
@@ -6,6 +9,7 @@ import 'package:program/data/sync/operation_gateway.dart';
 import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
 import 'package:program/data/sync/sync_engine.dart';
+import 'package:program/data/sync/verified_editor_asset_buffer.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/editor/state/editor_v2_remote_patch_dispatcher.dart';
@@ -28,6 +32,108 @@ class _OfflineGateway implements OperationGateway {
 void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('image create does not repaint before verified remote attach',
+      () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final store = OperationStore(database);
+    final buffer = VerifiedEditorAssetBuffer();
+    final projector = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
+    );
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'local',
+      checkpointScope: 'image-patch-test',
+      enableRealtime: false,
+      applyRemote: (operation, _) => projector.apply(operation),
+    );
+    addTearDown(engine.stop);
+    final editor = EditorController(
+      repository: repository,
+      notebook: notebook,
+      operationWriter: EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: projector,
+      ),
+    );
+    addTearDown(editor.dispose);
+    final dispatcher = EditorV2RemotePatchDispatcher(
+      editor: editor,
+      repository: repository,
+    );
+    var repaints = 0;
+    editor.addListener(() => repaints++);
+    final bytes = Uint8List.fromList([137, 80, 78, 71, 1, 2, 3]);
+    final receipt = <String, dynamic>{
+      'assetId': 'remote-verified',
+      'sha256': crypto.sha256.convert(bytes).toString(),
+      'sizeBytes': bytes.length,
+      'mediaType': 'image/png',
+    };
+    final created = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-image-peer',
+      actorSeq: 1,
+      logicalClock: 1,
+      documentId: notebook.uid,
+      pageId: notebook.pages.first.id,
+      objectId: 'remote-image-object',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {
+          'objectType': 'image',
+          'assetId': 'remote-verified',
+          'dx': 5.0,
+          'dy': 6.0,
+          'width': 110.0,
+          'height': 90.0,
+          'rotation': 0.0,
+          'cropLeft': 0.0,
+          'cropTop': 0.0,
+          'cropRight': 1.0,
+          'cropBottom': 1.0,
+          'sortIndex': 0,
+        },
+      },
+    );
+    await store.applyRemote(
+      created,
+      serverSequence: 1,
+      apply: () => projector.apply(created),
+    );
+    await dispatcher.onRemoteCommitted(created);
+    expect(repaints, 0);
+    expect(editor.pages.single.imageBlocks, isEmpty);
+
+    final attached = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-image-peer',
+      actorSeq: 2,
+      logicalClock: 2,
+      documentId: notebook.uid,
+      pageId: notebook.pages.first.id,
+      objectId: 'remote-image-object',
+      kind: OperationKind.assetAttach,
+      payload: receipt,
+      dependencies: [created.operationId],
+    );
+    buffer.stage(receipt: receipt, bytes: bytes);
+    await store.applyRemote(
+      attached,
+      serverSequence: 2,
+      apply: () => projector.apply(attached),
+    );
+    await dispatcher.onRemoteCommitted(attached);
+    expect(repaints, 1);
+    expect(editor.pages.single.imageBlocks.single.bytes, orderedEquals(bytes));
+    expect(editor.pages.single.imageBlocks.single.id, 'remote-image-object');
+  });
 
   test('remote patches modify one page and preserve object identity',
       () async {
