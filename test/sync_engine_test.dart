@@ -590,6 +590,69 @@ void main() {
     },
   );
 
+  test('asset bytes are prepared before the remote SQLite transaction',
+      () async {
+    final asset = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'asset-actor',
+      actorSeq: 1,
+      logicalClock: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'remote-image',
+      kind: OperationKind.assetAttach,
+      payload: const {
+        'assetId': 'asset-one',
+        'sha256':
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'sizeBytes': 12,
+        'mediaType': 'image/png',
+      },
+    );
+    gateway.seed(asset);
+    engine.dispose();
+    var prepared = 0;
+    var committed = 0;
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      prepareRemoteOperation: (operation) async {
+        expect(operation.operationId, asset.operationId);
+        expect(await store.operation(asset.operationId), isNull);
+        final before = await database.customSelect(
+          'SELECT id FROM projection_probe',
+        ).get();
+        expect(before, isEmpty);
+        prepared++;
+      },
+      applyRemote: (operation, pending) async {
+        expect(prepared, 1);
+        await database.customStatement(
+          'INSERT INTO projection_probe VALUES (?, ?)',
+          [operation.objectId, 'committed'],
+        );
+        committed++;
+      },
+    );
+    await engine.start();
+    expect(prepared, 1);
+    expect(committed, 1);
+    expect(await store.checkpoint('user-A-v2'), 1);
+
+    // A replay of the same committed op must not fetch the image again.
+    await database.customStatement(
+      'UPDATE sync_checkpoints SET server_sequence = 0 WHERE scope = ?',
+      ['user-A-v2'],
+    );
+    await engine.syncNow();
+    expect(prepared, 1);
+    expect(committed, 1);
+    expect(await store.checkpoint('user-A-v2'), 1);
+  });
+
   test('a replayed remote operation notifies the editor once', () async {
     gateway.seed(_remote('other-actor', 'remote-once'));
     engine.dispose();
