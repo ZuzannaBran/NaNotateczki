@@ -2581,7 +2581,9 @@ class EditorController extends ChangeNotifier {
         height: initialSize.height,
         bytes: bytes,
         imageExt: normalizedExtension,
-        imageMime: 'image/$normalizedExtension',
+        imageMime: normalizedExtension == 'jpg'
+            ? 'image/jpeg'
+            : 'image/$normalizedExtension',
       );
       _applyAction(AddImageAction(block));
       _activateInsertedImage(block.id);
@@ -2600,7 +2602,9 @@ class EditorController extends ChangeNotifier {
       width: initialSize.width,
       height: initialSize.height,
       imageExt: extension,
-      imageMime: 'image/$extension',
+      imageMime: extension == 'jpg' || extension == 'jpeg'
+          ? 'image/jpeg'
+          : 'image/$extension',
     );
     _applyAction(AddImageAction(block));
     _activateInsertedImage(block.id);
