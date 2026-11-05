@@ -281,6 +281,11 @@ class EditorV2OperationWriter {
         after: page,
         textAtomsById: atoms,
         verifiedAssets: _assetsFor(after.uid, verifiedAssets),
+        existingAssetIds: await _existingImageAssets(
+          documentId: after.uid,
+          before: baseline,
+          after: page,
+        ),
       ));
       if (touchedPages.contains(page.id)) {
         // A move can shift the old sortIndex of an untouched stroke.
@@ -335,6 +340,34 @@ class EditorV2OperationWriter {
     return _commit(after.uid, drafts);
   }
 
+  Future<Map<String, String>> _existingImageAssets({
+    required String documentId,
+    required NotePage before,
+    required NotePage after,
+  }) async {
+    final previous = {
+      for (final image in before.imageBlocks) image.id: image,
+    };
+    final result = <String, String>{};
+    for (final next in after.imageBlocks) {
+      final old = previous[next.id];
+      if (old == null ||
+          (old.path == next.path &&
+              old.ocrText == next.ocrText &&
+              old.imageMime == next.imageMime &&
+              old.imageExt == next.imageExt &&
+              const ListEquality<int>().equals(old.bytes, next.bytes))) {
+        continue;
+      }
+      result[next.id] = await projector.verifiedImageAssetId(
+        documentId: documentId,
+        pageId: before.id,
+        objectId: next.id,
+      );
+    }
+    return result;
+  }
+
   Future<List<OperationEnvelope>> writeAction({
     required String documentId,
     required EditorAction action,
@@ -353,6 +386,11 @@ class EditorV2OperationWriter {
       after: after,
       textAtomsById: atoms,
       verifiedAssets: _assetsFor(documentId, verifiedAssets),
+      existingAssetIds: await _existingImageAssets(
+        documentId: documentId,
+        before: before,
+        after: after,
+      ),
     );
     return _commit(documentId, drafts);
   }
@@ -374,6 +412,11 @@ class EditorV2OperationWriter {
       after: after,
       textAtomsById: atoms,
       verifiedAssets: _assetsFor(documentId, verifiedAssets),
+      existingAssetIds: await _existingImageAssets(
+        documentId: documentId,
+        before: before,
+        after: after,
+      ),
     );
     return _commit(documentId, drafts);
   }

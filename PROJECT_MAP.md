@@ -1369,7 +1369,12 @@ Przenoszenie niezmienionej kreski między stronami używa `object.move`,
 zachowuje ID i naprawia indeksy sortowania na obu stronach.
 Przenoszenie obrazu dopuszczalne jest tylko przy niezmienionych
 bajtach/MIME i trwałej referencji assetu; geometria może się zmienić
-w tej samej transakcji. Przenoszenie tekstu nadal zablokowane;
+w tej samej transakcji. Zmiana treści istniejącego obrazu planuje operacje attach → set →
+detach i wymaga aktualnego `assetId` odczytanego z trwałych
+referencji SQLite, z identyczną tożsamością obiektu; nie ma fallbacku
+do niezaufanej lokalnej ścieżki. Brak bufora assetów po restarcie może
+zatrzymać remote replay do ponownego pobrania danych.
+Przenoszenie tekstu nadal zablokowane;
 odrzuca zmianę
 kolejności stron oraz edycję z nieaktualnym Delta Quill.
 Adapter przyjmuje też mapę `verifiedAssets` dla tworzenia

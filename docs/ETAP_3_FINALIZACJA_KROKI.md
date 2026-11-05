@@ -31,6 +31,11 @@ ten sam stan i trwały outbox.
 
 ## B. Kompletny łańcuch plików i Quill
 
+- [ ] Lokalna podmiana obrazu: attach → object.set → detach przy
+  zweryfikowanym uploadzie, z wersjonowaniem pola `assetId` i rollbackiem.
+  Kod dodany, wymaga testów i obsługi restartu między operacjami.
+
+
 1. Zdefiniować kanoniczne powiązanie `assetId` ↔ SHA-256 ↔
    bajty/pliki na urządzeniu dla Linux, Android, iOS i Web.
 2. Ukończony, sprawdzony upload przed `asset.attach`; pobranie

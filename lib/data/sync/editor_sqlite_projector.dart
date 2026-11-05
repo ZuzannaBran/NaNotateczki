@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart' as crypto;
 
 import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
@@ -736,21 +739,33 @@ class EditorSqliteProjector {
         Variable<String>(assetId),
       ],
     );
+    final image = await _imageRow(operation);
     if (reference == null) {
+      if (image != null &&
+          await verifiedImageAssetId(
+            documentId: operation.documentId,
+            pageId: pageId,
+            objectId: objectId,
+          ) != assetId) {
+        // Another concurrent replacement already detached this old ID.
+        return;
+      }
       throw StateError('An asset must be attached before detachment.');
     }
 
     final text = await _textRow(operation);
-    final image = await _imageRow(operation);
     if (text != null && image != null) {
       throw StateError('Ambiguous image and Quill asset ownership.');
     }
     if (image != null) {
-      // Image IDs are not fully persisted in the legacy image rows.
-      // Without assetId mapping, we cannot prove this is not the last copy.
-      throw UnsupportedError(
-        'Detaching an active image requires verified asset replacement.',
+      final currentId = await verifiedImageAssetId(
+        documentId: operation.documentId,
+        pageId: pageId,
+        objectId: objectId,
       );
+      if (currentId == assetId) {
+        throw UnsupportedError('Cannot detach an active image asset.');
+      }
     }
     if (text != null && text['delta_json'] != null) {
       final delta = jsonDecode(text['delta_json'] as String);
@@ -775,6 +790,51 @@ class EditorSqliteProjector {
     );
   }
 
+
+  /// Returns the one verified asset currently rendered by an image.
+  ///
+  /// Content hashes distinguish the live reference from staged replacements.
+  /// Legacy path-only images and ambiguous aliases cannot be replaced.
+  Future<String> verifiedImageAssetId({
+    required String documentId,
+    required String pageId,
+    required String objectId,
+  }) async {
+    final image = await _row(
+      'SELECT bytes, path FROM image_block_rows '
+      'WHERE uid = ? AND page_uid = ?',
+      [Variable<String>(objectId), Variable<String>(pageId)],
+    );
+    final bytes = image?['bytes'];
+    if (image == null ||
+        image['path'] != '' ||
+        bytes is! Uint8List ||
+        bytes.isEmpty) {
+      throw UnsupportedError(
+        'Only durable verified image bytes can change their asset ID.',
+      );
+    }
+    final digest = crypto.sha256.convert(bytes).toString();
+    final scopedId = 'page:${jsonEncode([pageId, objectId])}';
+    final references = await database.customSelect(
+      'SELECT asset_id, checksum_sha256 FROM asset_references '
+      'WHERE document_id = ? AND object_id = ?',
+      variables: [
+        Variable<String>(documentId),
+        Variable<String>(scopedId),
+      ],
+    ).get();
+    final matching = [
+      for (final row in references)
+        if (row.read<String>('checksum_sha256') == digest)
+          row.read<String>('asset_id'),
+    ];
+    if (matching.length != 1) {
+      throw StateError('Image has no unique verified current asset.');
+    }
+    return matching.single;
+  }
+
   Future<Map<String, dynamic>?> _imageRow(OperationEnvelope op) => _row(
     'SELECT dx, dy, width, height, rotation, crop_left, crop_top, '
     'crop_right, crop_bottom, sort_index FROM image_block_rows '
@@ -782,7 +842,11 @@ class EditorSqliteProjector {
     [Variable<String>(op.objectId!), Variable<String>(op.pageId!)],
   );
 
-  /// Only geometry and z-order may change; asset content never changes here.
+  /// Applies a checked image asset swap or independent geometry fields.
+  ///
+  /// An attach operation must already own the verified new bytes. The
+  /// currently visible image changes only when the winning object.set
+  /// commits; a losing concurrent replacement leaves its bytes unchanged.
   Future<void> _updateImage(OperationEnvelope op) async {
     await _pageExists(op, op.pageId!);
     final row = await _imageRow(op);
@@ -805,11 +869,19 @@ class EditorSqliteProjector {
       'sortIndex': 'sort_index',
     };
     if (changes.isEmpty ||
-        changes.keys.any((key) => !allowed.containsKey(key))) {
-      throw const FormatException('Unsupported image geometry properties.');
+        changes.keys.any(
+          (key) => key != 'assetId' && !allowed.containsKey(key),
+        )) {
+      throw const FormatException('Unsupported image properties.');
     }
     for (final entry in changes.entries) {
-      if (entry.key == 'sortIndex') {
+      if (entry.key == 'assetId') {
+        if (entry.value is! String ||
+            (entry.value as String).isEmpty ||
+            (entry.value as String).length > 128) {
+          throw const FormatException('Invalid replacement asset ID.');
+        }
+      } else if (entry.key == 'sortIndex') {
         _index(entry.value);
       } else if (entry.value is! num ||
           !(entry.value as num).toDouble().isFinite ||
@@ -824,17 +896,91 @@ class EditorSqliteProjector {
     if (changes.isEmpty) {
       return;
     }
+    final replacementId = changes.remove('assetId') as String?;
     final updates = [
       for (final key in changes.keys) '${allowed[key]} = ?',
     ];
+    final values = <Object?>[...changes.values];
+    if (replacementId != null) {
+      final currentId = await verifiedImageAssetId(
+        documentId: op.documentId,
+        pageId: op.pageId!,
+        objectId: op.objectId!,
+      );
+      if (currentId == replacementId) {
+        throw StateError('Replacement must use a new asset identity.');
+      }
+      final scopedId = 'page:${jsonEncode([op.pageId, op.objectId])}';
+      final reference = await _row(
+        'SELECT checksum_sha256, byte_length FROM asset_references '
+        'WHERE document_id = ? AND object_id = ? AND asset_id = ?',
+        [
+          Variable<String>(op.documentId),
+          Variable<String>(scopedId),
+          Variable<String>(replacementId),
+        ],
+      );
+      if (reference == null) {
+        throw StateError('Replacement asset has not been attached.');
+      }
+      final receipts = await database.customSelect(
+        'SELECT envelope_json FROM operations WHERE document_id = ? '
+        'AND page_id = ? AND object_id = ? AND kind = ?',
+        variables: [
+          Variable<String>(op.documentId),
+          Variable<String>(op.pageId!),
+          Variable<String>(op.objectId!),
+          const Variable<String>('asset.attach'),
+        ],
+      ).get();
+      if (receipts.length > 50000) {
+        throw StateError('Asset history requires a checkpoint.');
+      }
+      Map<String, dynamic>? receipt;
+      for (final row in receipts) {
+        final decoded = jsonDecode(row.read<String>('envelope_json'));
+        if (decoded is! Map) {
+          throw const FormatException('Malformed asset operation.');
+        }
+        final candidate = OperationEnvelope.fromJson(
+          Map<String, dynamic>.from(decoded),
+        );
+        if (candidate.payload['assetId'] == replacementId) {
+          receipt = candidate.payload;
+        }
+      }
+      if (receipt == null ||
+          receipt['sha256'] != reference['checksum_sha256'] ||
+          receipt['sizeBytes'] != reference['byte_length']) {
+        throw StateError('Replacement has no verified attachment receipt.');
+      }
+      final cache = verifiedAssetBuffer;
+      if (cache == null) {
+        throw UnsupportedError('Verified asset staging is unavailable.');
+      }
+      final bytes = cache.requireBytes(receipt);
+      updates.addAll([
+        'path = ?',
+        'ocr_text = ?',
+        'bytes = ?',
+        'image_ext = ?',
+        'image_mime = ?',
+      ]);
+      values.addAll([
+        '',
+        '',
+        bytes,
+        _imageExtension(receipt['mediaType'] as String),
+        receipt['mediaType'],
+      ]);
+    }
+    if (updates.isEmpty) {
+      return;
+    }
     await database.customStatement(
       'UPDATE image_block_rows SET ${updates.join(', ')} '
       'WHERE uid = ? AND page_uid = ?',
-      [
-        for (final entry in changes.entries) entry.value,
-        op.objectId,
-        op.pageId,
-      ],
+      [...values, op.objectId, op.pageId],
     );
   }
 
@@ -952,10 +1098,31 @@ class EditorSqliteProjector {
     if (creation['objectType'] != 'image') {
       throw StateError('Asset identity belongs to a non-image object.');
     }
-    if (creation['assetId'] != assetId) {
-      throw UnsupportedError(
-        'Replacing an attached image requires its complete asset protocol.',
+    if (existingImage == null) {
+      if (creation['assetId'] != assetId) {
+        throw StateError('Image creation receipt does not match its asset.');
+      }
+    } else {
+      final currentId = await verifiedImageAssetId(
+        documentId: operation.documentId,
+        pageId: pageId,
+        objectId: objectId,
       );
+      if (currentId == assetId) {
+        throw StateError('Cannot reattach the current image asset.');
+      }
+      final currentRef = await _row(
+        'SELECT checksum_sha256 FROM asset_references '
+        'WHERE document_id = ? AND object_id = ? AND asset_id = ?',
+        [
+          Variable<String>(operation.documentId),
+          Variable<String>('page:${jsonEncode([pageId, objectId])}'),
+          Variable<String>(currentId),
+        ],
+      );
+      if (currentRef == null || currentRef['checksum_sha256'] == sha) {
+        throw StateError('Replacement must have distinct verified bytes.');
+      }
     }
 
     final scopedObjectId = 'page:${jsonEncode([pageId, objectId])}';
