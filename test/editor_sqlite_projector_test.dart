@@ -1097,6 +1097,150 @@ void main() {
     expect(await store.pending(), isEmpty);
   });
 
+  test('remote image switch keeps old bytes until verified object.set',
+      () async {
+    final buffer = VerifiedEditorAssetBuffer();
+    final bufferedProjector = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
+    );
+    final oldBytes = Uint8List.fromList([137, 80, 78, 71, 1, 1]);
+    final newBytes = Uint8List.fromList([137, 80, 78, 71, 2, 2]);
+    Map<String, dynamic> receipt(String id, Uint8List bytes) => {
+      'assetId': id,
+      'sha256': crypto.sha256.convert(bytes).toString(),
+      'sizeBytes': bytes.length,
+      'mediaType': 'image/png',
+    };
+    final oldReceipt = receipt('original', oldBytes);
+    final newReceipt = receipt('replacement', newBytes);
+    buffer.stage(receipt: oldReceipt, bytes: oldBytes);
+    final initial = await store.writeLocalBatch(
+      actorId: 'image-seed-actor',
+      documentId: documentId,
+      operations: [
+        LocalOperationDraft(
+          kind: OperationKind.objectCreate,
+          pageId: pageId,
+          objectId: 'remote-swapped-image',
+          payload: const {
+            'value': {
+              'objectType': 'image',
+              'assetId': 'original',
+              'dx': 11.0,
+              'dy': 13.0,
+              'width': 120.0,
+              'height': 80.0,
+              'rotation': 0.0,
+              'cropLeft': 0.0,
+              'cropTop': 0.0,
+              'cropRight': 1.0,
+              'cropBottom': 1.0,
+              'sortIndex': 0,
+            },
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.assetAttach,
+          pageId: pageId,
+          objectId: 'remote-swapped-image',
+          payload: oldReceipt,
+        ),
+      ],
+      apply: bufferedProjector.apply,
+    );
+    final newAttach = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-image-swap',
+      actorSeq: 1,
+      logicalClock: 10,
+      documentId: documentId,
+      pageId: pageId,
+      objectId: 'remote-swapped-image',
+      kind: OperationKind.assetAttach,
+      payload: newReceipt,
+      dependencies: [initial.last.operationId],
+    );
+    final changed = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-image-swap',
+      actorSeq: 2,
+      logicalClock: 11,
+      documentId: documentId,
+      pageId: pageId,
+      objectId: 'remote-swapped-image',
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'assetId': 'replacement'},
+      },
+      dependencies: [newAttach.operationId],
+    );
+    final oldDetach = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-image-swap',
+      actorSeq: 3,
+      logicalClock: 12,
+      documentId: documentId,
+      pageId: pageId,
+      objectId: 'remote-swapped-image',
+      kind: OperationKind.assetDetach,
+      payload: const {'assetId': 'original'},
+      dependencies: [changed.operationId],
+    );
+    buffer.stage(receipt: newReceipt, bytes: newBytes);
+    expect(await store.applyRemote(
+      newAttach,
+      checkpointScope: 'replacement-feed',
+      serverSequence: 1,
+      apply: () => bufferedProjector.apply(newAttach),
+    ), isTrue);
+    expect(
+      (await notebooks.getNotebook(documentId))!
+          .pages.single.imageBlocks.single.bytes,
+      orderedEquals(oldBytes),
+    );
+    buffer.clear();
+    await expectLater(
+      store.applyRemote(
+        changed,
+        checkpointScope: 'replacement-feed',
+        serverSequence: 2,
+        apply: () => bufferedProjector.apply(changed),
+      ),
+      throwsStateError,
+    );
+    expect(await store.checkpoint('replacement-feed'), 1);
+    expect(await store.operation(changed.operationId), isNull);
+    expect(
+      (await notebooks.getNotebook(documentId))!
+          .pages.single.imageBlocks.single.bytes,
+      orderedEquals(oldBytes),
+    );
+    buffer.stage(receipt: newReceipt, bytes: newBytes);
+    expect(await store.applyRemote(
+      changed,
+      checkpointScope: 'replacement-feed',
+      serverSequence: 2,
+      apply: () => bufferedProjector.apply(changed),
+    ), isTrue);
+    expect(await store.applyRemote(
+      oldDetach,
+      checkpointScope: 'replacement-feed',
+      serverSequence: 3,
+      apply: () => bufferedProjector.apply(oldDetach),
+    ), isTrue);
+    expect(await store.checkpoint('replacement-feed'), 3);
+    final stored = (await notebooks.getNotebook(documentId))!
+        .pages.single.imageBlocks.single;
+    expect(stored.bytes, orderedEquals(newBytes));
+    expect(stored.id, 'remote-swapped-image');
+    final refs = await database.customSelect(
+      'SELECT asset_id FROM asset_references WHERE document_id = ?',
+      variables: [Variable<String>(documentId)],
+    ).get();
+    expect(refs.map((row) => row.read<String>('asset_id')), ['replacement']);
+  });
+
   test('asset.detach cannot remove a still referenced Quill embed',
       () async {
     await write([
