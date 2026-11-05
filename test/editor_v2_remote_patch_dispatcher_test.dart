@@ -251,6 +251,43 @@ void main() {
     expect(editor.pages.first.inkStrokes, isEmpty);
     expect(editor.pages.last.inkStrokes.single.id, 'remote-ink');
 
+    final ignoredPage = await remote(
+      kind: OperationKind.pageCreate,
+      objectId: 'losing-destination',
+      payload: const {
+        'value': {'title': 'Loser', 'isBookmarked': false},
+      },
+    );
+    await dispatcher.onRemoteCommitted(ignoredPage);
+    final ignoredMove = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'concurrent-loser',
+      actorSeq: 1,
+      logicalClock: 2,
+      documentId: notebook.uid,
+      pageId: notebook.pages.first.id,
+      objectId: 'remote-ink',
+      kind: OperationKind.objectMove,
+      payload: const {
+        'toPageId': 'losing-destination',
+        'sortIndex': 0,
+      },
+      dependencies: [created.operationId],
+    );
+    expect(
+      await store.applyRemote(
+        ignoredMove,
+        serverSequence: 5,
+        apply: () => projector.apply(ignoredMove),
+      ),
+      isTrue,
+    );
+    // The new actor's older move was committed as a deterministic no-op.
+    // UI delivery must use the winner's durable location and not block.
+    await dispatcher.onRemoteCommitted(ignoredMove);
+    expect(editor.pages[1].inkStrokes.single.id, 'remote-ink');
+    expect(editor.pages[2].inkStrokes, isEmpty);
+
     final deleted = await remote(
       kind: OperationKind.objectDelete,
       pageId: 'remote-page',
@@ -262,10 +299,10 @@ void main() {
       dispatcher.onRemoteCommitted(deleted),
       throwsStateError,
     );
-    expect(editor.pages.last.inkStrokes.single.id, 'remote-ink');
+    expect(editor.pages[1].inkStrokes.single.id, 'remote-ink');
     editor.activeTextBlockId = null;
     await dispatcher.onRemoteCommitted(deleted);
-    expect(editor.pages.last.inkStrokes, isEmpty);
+    expect(editor.pages[1].inkStrokes, isEmpty);
 
     final pageDeleted = await remote(
       kind: OperationKind.pageDelete,
@@ -273,9 +310,9 @@ void main() {
       payload: const {},
     );
     await dispatcher.onRemoteCommitted(pageDeleted);
-    expect(editor.pages, hasLength(1));
+    expect(editor.pages, hasLength(2));
     expect(editor.currentPage.id, notebook.pages.first.id);
-    expect(await store.checkpoint('remote-patch-test'), 5);
+    expect(await store.checkpoint('remote-patch-test'), 6);
     expect(await store.pending(), isEmpty);
   });
 }
