@@ -139,6 +139,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       });
     }
     if (kIsWeb &&
+        context.read<EditorV2AccountRuntime?>() == null &&
         accountSession != null &&
         liveSync != null &&
         accountSession.isSignedIn &&
@@ -613,6 +614,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     AccountSessionController session,
     LiveWebSyncService sync,
   ) async {
+    if (context.read<EditorV2AccountRuntime?>() != null) {
+      return;
+    }
     final userId = session.userId;
     if (_restoringShare ||
         userId == null ||
@@ -641,6 +645,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _shareItem(Notebook item) async {
+    if (context.read<EditorV2AccountRuntime?>() != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sharing is not available in the v2 preview.'),
+        ),
+      );
+      return;
+    }
     if (!kIsWeb || item.kind == NotebookKind.planner) {
       return;
     }
