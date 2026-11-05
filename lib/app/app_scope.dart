@@ -330,8 +330,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         final v2 = _v2AccountRuntime;
         if (v2 != null) {
           await v2.engine.syncNow();
-          if (v2.engine.lastError != null) {
-            throw StateError('Pending v2 account sync failed.');
+          if (v2.engine.lastError != null ||
+              (await v2.store.pending(
+                limit: 1,
+                includeDeferred: true,
+              )).isNotEmpty) {
+            throw StateError(
+              'V2 outbox is not fully acknowledged; local data is preserved.',
+            );
           }
           return;
         }
