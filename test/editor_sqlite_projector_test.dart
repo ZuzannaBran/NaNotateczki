@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
@@ -519,6 +521,92 @@ void main() {
     final result = (await notebooks.getNotebook(documentId))!;
     expect(result.pages.single.textBlocks.single.text, 'A');
     expect(result.pages.single.textBlocks.single.deltaJson, contains('bold'));
+  });
+
+  test('image move relocates the durable asset reference atomically',
+      () async {
+    const target = 'media-destination';
+    const imageId = 'existing-image';
+    final bytes = Uint8List.fromList([137, 80, 78, 71]);
+    await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageCreate,
+        objectId: target,
+        payload: {
+          'value': {'title': 'Media', 'isBookmarked': false},
+        },
+      ),
+    ]);
+    await database.customStatement(
+      'INSERT INTO image_block_rows '
+      '(uid, page_uid, path, ocr_text, bytes, image_ext, image_mime, '
+      'width, height, rotation, dx, dy, '
+      'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        imageId, pageId, '', '', bytes, 'png', 'image/png',
+        100.0, 80.0, 0.0, 10.0, 20.0, 0.0, 0.0, 1.0, 1.0, 0,
+      ],
+    );
+    final move = LocalOperationDraft(
+      kind: OperationKind.objectMove,
+      pageId: pageId,
+      objectId: imageId,
+      payload: const {'toPageId': target, 'sortIndex': 0},
+    );
+    final queued = await store.pending();
+    await expectLater(write([move]), throwsUnsupportedError);
+    expect(await store.pending(), hasLength(queued.length));
+
+    await store.attachAssetReference(
+      documentId: documentId,
+      pageId: pageId,
+      objectId: imageId,
+      assetId: 'media-asset-one',
+      storagePath: 'assets/media-asset-one',
+      checksumSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      byteLength: 4,
+    );
+    await write([
+      move,
+      const LocalOperationDraft(
+        kind: OperationKind.objectSet,
+        pageId: target,
+        objectId: imageId,
+        payload: {
+          'properties': {'dx': 33.0, 'cropRight': 0.8},
+        },
+      ),
+    ]);
+    final saved = (await notebooks.getNotebook(documentId))!;
+    expect(saved.pages.first.imageBlocks, isEmpty);
+    expect(saved.pages.last.imageBlocks.single.id, imageId);
+    expect(saved.pages.last.imageBlocks.single.position.dx, 33);
+    expect(saved.pages.last.imageBlocks.single.cropRight, 0.8);
+    expect(saved.pages.last.imageBlocks.single.bytes, orderedEquals(bytes));
+    final references = await database.customSelect(
+      'SELECT object_id FROM asset_references '
+      'WHERE document_id = ? AND asset_id = ?',
+      variables: [
+        Variable<String>(documentId),
+        const Variable<String>('media-asset-one'),
+      ],
+    ).get();
+    expect(references, hasLength(1));
+    expect(
+      references.single.read<String>('object_id'),
+      'page:${jsonEncode([target, imageId])}',
+    );
+    expect(
+      await store.isTombstoned(
+        documentId,
+        'object',
+        imageId,
+        pageId: pageId,
+      ),
+      isFalse,
+    );
   });
 
   test('v2 page deletion cannot orphan a stored image asset', () async {
