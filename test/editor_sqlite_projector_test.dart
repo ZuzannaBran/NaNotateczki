@@ -3,12 +3,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart' hide isNull;
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/editor_sqlite_projector.dart';
 import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
+import 'package:program/data/sync/verified_editor_asset_buffer.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:uuid/uuid.dart';
@@ -908,6 +910,108 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('remote image stays invisible until verified asset materialization',
+      () async {
+    final buffer = VerifiedEditorAssetBuffer();
+    final activeProjector = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
+    );
+    final bytes = Uint8List.fromList([137, 80, 78, 71, 4, 3, 2, 1]);
+    final receipt = <String, dynamic>{
+      'assetId': 'remote-asset',
+      'sha256': crypto.sha256.convert(bytes).toString(),
+      'sizeBytes': bytes.length,
+      'mediaType': 'image/png',
+    };
+    final created = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-image-actor',
+      actorSeq: 1,
+      logicalClock: 1,
+      documentId: documentId,
+      pageId: pageId,
+      objectId: 'remote-image',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {
+          'objectType': 'image',
+          'assetId': 'remote-asset',
+          'dx': 11.0,
+          'dy': 13.0,
+          'width': 120.0,
+          'height': 80.0,
+          'rotation': 0.0,
+          'cropLeft': 0.0,
+          'cropTop': 0.0,
+          'cropRight': 1.0,
+          'cropBottom': 1.0,
+          'sortIndex': 0,
+        },
+      },
+    );
+    final attached = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-image-actor',
+      actorSeq: 2,
+      logicalClock: 2,
+      documentId: documentId,
+      pageId: pageId,
+      objectId: 'remote-image',
+      kind: OperationKind.assetAttach,
+      payload: receipt,
+      dependencies: [created.operationId],
+    );
+    expect(
+      await store.applyRemote(
+        created,
+        serverSequence: 1,
+        checkpointScope: 'remote-media',
+        apply: () => activeProjector.apply(created),
+      ),
+      isTrue,
+    );
+    expect(await store.checkpoint('remote-media'), 1);
+    expect(
+      (await notebooks.getNotebook(documentId))!.pages.first.imageBlocks,
+      isEmpty,
+    );
+    await expectLater(
+      store.applyRemote(
+        attached,
+        serverSequence: 2,
+        checkpointScope: 'remote-media',
+        apply: () => activeProjector.apply(attached),
+      ),
+      throwsStateError,
+    );
+    expect(await store.operation(attached.operationId), isNull);
+    expect(await store.checkpoint('remote-media'), 1);
+    expect(
+      (await notebooks.getNotebook(documentId))!.pages.first.imageBlocks,
+      isEmpty,
+    );
+
+    buffer.stage(receipt: receipt, bytes: bytes);
+    expect(
+      await store.applyRemote(
+        attached,
+        serverSequence: 2,
+        checkpointScope: 'remote-media',
+        apply: () => activeProjector.apply(attached),
+      ),
+      isTrue,
+    );
+    buffer.clear();
+    final image =
+        (await notebooks.getNotebook(documentId))!.pages.first.imageBlocks.single;
+    expect(image.id, 'remote-image');
+    expect(image.position.dx, 11);
+    expect(image.bytes, orderedEquals(bytes));
+    expect(await store.checkpoint('remote-media'), 2);
+    expect(await store.pending(), isEmpty);
   });
 
   test('asset.detach cannot remove a still referenced Quill embed',
