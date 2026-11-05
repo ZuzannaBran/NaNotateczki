@@ -480,8 +480,13 @@ może przygotować pobranie przed lokalnym `applyRemote`, tak aby brak
 assetu nie przesunął kursora. Zapisane bajty nie zależą od życia
 bufora; jest to rozwiązanie opt-in, potencjalnie kosztowne dla dużych
 obiektów BLOB.
-Nadal nie obsługuje wymiany i usuwania obrazów/PDF,
-nowych embedów Quill, przenoszenia tekstu, zakładania dokumentów v2
+W trybie opt-in obsługuje już podmianę zweryfikowanych obrazów/PDF
+przez `asset.attach → object.set(assetId) → asset.detach`, a także
+ich usuwanie i atomowe usuwanie stron z prawidłowymi referencjami.
+Nie usuwa fizycznych plików. `prepareRemoteMedia` może ponownie
+pobrać zawartość po restarcie na podstawie receipt z dziennika;
+aktywny `AppScope` jeszcze tego nie konfiguruje.
+Nadal nie obsługuje nowych embedów Quill, przenoszenia tekstu, zakładania dokumentów v2
 ani pełnego rebase. `asset.detach` usuwa tylko referencje, których
 nie używa bieżący Quill; nie usuwa bajtów ani aktywnych obrazów. Niezmieniona kreska może być przeniesiona między
 stronami przez `object.move` bez usuwania jej ID. Obraz może być

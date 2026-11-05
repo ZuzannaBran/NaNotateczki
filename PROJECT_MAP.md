@@ -460,12 +460,16 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   bez pustego rekordu obrazu. Dopiero `asset.attach` po weryfikacji
   bajtów w `VerifiedEditorAssetBuffer` materializuje obraz w SQLite
   wraz z `asset_references`. Brak bajtów cofa transakcję i nie
-  przesuwa checkpointu. `asset.detach` usuwa tylko nieużywaną
-  referencję Quill; nie kasuje pliku. Nadal nie obsługuje podmiany
-  i usuwania obrazu/PDF, attach nowych embedów Quill, document.create,
-  text object.move ani pełnego rebase konfliktów. Blokuje niejednoznaczne ID,
-  rozbieżny Delta Quill oraz usuwanie stron zawierających obrazy,
-  osadzone referencje Quill lub nieodłączone asset_references.
+  przesuwa checkpointu. Zweryfikowane obrazy można usuwać wraz z
+  referencjami; podobnie strony z kompletem przypisanych assetów.
+  Podmiana obrazu/PDF wymaga wcześniej zweryfikowanego assetu,
+  `object.set(assetId)` oraz późniejszego `asset.detach` starego
+  zasobu; LWW nie może zastąpić nowszych bajtów.
+  `prepareRemoteMedia` pobiera ponownie receipt po restarcie przed
+  zdalnym `object.set`. Nie ma fizycznego kasowania plików.
+  Nadal brak nowych embedów Quill, document.create, text object.move,
+  pełnego rebase oraz podłączenia produkcyjnego. Blokuje niejednoznaczne
+  identyfikatory i rozbieżny Delta Quill.
   Rejestr rank pól jest odtwarzany z niekompaktowanego dziennika
   (granica 50000 envelope'ów). Konkurencyjne `object.move` porównuje
   według tej samej rangi: starszy przegrywający zapisuje actorSeq

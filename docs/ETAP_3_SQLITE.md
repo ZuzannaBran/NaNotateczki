@@ -177,8 +177,11 @@ pliku przed transakcją SQLite. `OperationAssetGateway.uploadAndStage`
 i `downloadAndStage` przygotowują bajty po odpowiedzi API.
 `asset.detach` jest obsługiwany dla nieużywanych referencji Quill,
 bez usuwania plików; aktywne obrazy nie mogą stracić ostatniego
-assetu. Nadal odrzucane są podmiany obrazów/PDF,
-nowe embedy Quill, `document.create` i przenoszenie tekstu.
+assetu. Podmiany obrazów/PDF są już obsługiwane w trybie opt-in
+przy zweryfikowanym nowym zasobie oraz starej referencji SQLite.
+Zdalne `object.set(assetId)` wymaga prefetch, również po restarcie.
+Nadal odrzucane są nowe embedy Quill, `document.create`
+i przenoszenie tekstu.
 Materiał BLOB może być duży — wymaga późniejszej kontroli pamięci
 i trwałego content-addressed magazynu dla pełnego cutover. Ink `object.move` zachowuje
 ID bez attached assetów, a obraz `object.move` wymaga trwałej
@@ -273,3 +276,25 @@ Pozostaje zakaz fizycznego kasowania blobów przed bezpiecznym GC.
 Regresje: `editor_sqlite_projector_test.dart` i
 `editor_v2_operation_writer_test.dart`. Kod nie został zweryfikowany przez
 Flutter SDK/CI w tej sesji; aktywacja produkcyjna nadal jest zabroniona.
+
+### Przyrost: podmiana zweryfikowanych obrazów/PDF (2026-11-05)
+
+Dla istniejącego obiektu obrazu wymagane są różne, zweryfikowane bajty
+nowego assetu, jednoznaczna stara referencja i potwierdzenie uploadu.
+Most i `EditorV2OperationWriter` planują `asset.attach`, następnie
+`object.set(assetId)` z geometrią, na końcu `asset.detach` starego
+ID. Projektor aktualizuje bajty dopiero przy `object.set` i wycofuje
+cały lokalny wsad przy błędzie SHA, braku prefetch lub referencji.
+`SyncEngine` przygotowuje pobranie także dla zdalnej aktualizacji
+`object.set(assetId)`; projektor potrafi odtworzyć receipt wcześniejszego
+`asset.attach` z trwałego dziennika po restarcie.
+Backend odrzuca `object.set(assetId)` bez wcześniejszego attach i nie
+pozwala na odłączenie aktywnego assetu obrazu.
+Nowe testy w `test/editor_v2_operation_writer_test.dart`,
+`test/sync_engine_test.dart` i
+`NaNotateczki-serwer/api/tests/test_stage2_assets.py`.
+
+**Uwaga:** aktywny `AppScope` nie tworzy jeszcze gateway i
+`EditorV2OperationWriter` dla produkcyjnego edytora.
+Nie uruchomiono testów Flutter ani Pythona w tej sesji, więc powyższy
+kod i warunki nie są uznane za zweryfikowane produkcyjnie.
