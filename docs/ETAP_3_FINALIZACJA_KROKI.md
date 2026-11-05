@@ -102,3 +102,7 @@ propagowane na wszystkie urządzenia.
 
 - [ ] Quill embed renderer `VerifiedQuillEmbedBuilder` dodany do edytora
   v2, wymaga testów widgetowych Flutter przed cutover.
+
+- [ ] Widget regression `test/verified_quill_embed_builder_test.dart`:
+  obsługa osadzonego PDF i odmowa odczytu zewnętrznego URL.
+  Test dodany, nie uruchomiony (brak lokalnego SDK Flutter).
