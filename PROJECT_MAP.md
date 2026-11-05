@@ -1427,7 +1427,11 @@ Po restarcie `EditorSqliteProjector.prepareRemoteMedia`
 odtwarza receipt z trwałego dziennika i pobiera nowy asset przed
 `object.set(assetId)`; `SyncEngine` wywołuje prefetch także dla
 zdalnych podmian. Produkcyjny AppScope nadal nie przekazuje gateway.
-Przenoszenie tekstu bez embedów zachowuje CRDT i sortIndex;
+Przenoszenie tekstu, także ze zweryfikowanymi embedami, zachowuje CRDT
+i sortIndex; projector przenosi scoped referencje wraz z blokiem,
+sprawdza bajty i odrzuca brakującą referencję lub zajętego właściciela.
+Test przerwanego wsadu move → błędna geometria weryfikuje rollback
+strony, referencji, dziennika i numeracji aktora. Writer
 odrzuca jednoczesną zmianę treści przy przenoszeniu, zmianę kolejności
 stron oraz edycję z nieaktualnym Delta Quill.
 Adapter przyjmuje też mapę `verifiedAssets` dla tworzenia
@@ -1454,7 +1458,8 @@ Test restartu na pliku SQLite:
 `test/editor_v2_crash_recovery_test.dart` (journal, outbox, Quill BLOB,
 blokada snapshotu legacy po ponownym otwarciu).
 Testy: `test/editor_v2_operation_writer_test.dart` (m.in. automatyczny
-upload, odrzucenie starego receipt i przenoszenie Quill między stronami)
+upload, odrzucenie starego receipt, przenoszenie Quill z obrazem/PDF
+między stronami oraz rollback takiego gestu)
 oraz `test/editor_sqlite_projector_test.dart` (usunięcie strony zwalnia
 tylko scoped referencje, nie asset użyty przez inną stronę).
 

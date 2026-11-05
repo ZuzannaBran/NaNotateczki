@@ -1031,6 +1031,202 @@ void main() {
     );
   });
 
+  for (final embedType in ['image', 'pdf']) {
+    test(
+      'Quill $embedType move preserves atoms, bytes and scoped owner',
+      () async {
+        final notebook = await repository.createNotebook();
+        final page = notebook.pages.single;
+        final destination = page.copyWith(id: 'embed-destination');
+        final buffer = VerifiedEditorAssetBuffer();
+        final projector = EditorSqliteProjector(
+          database,
+          verifiedAssetBuffer: buffer,
+        );
+        final embedWriter = EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+        );
+        final bytes = Uint8List.fromList([1, 4, 9, 16]);
+        const assetId = 'moved-inline-asset';
+        final asset = VerifiedEditorAsset(
+          assetId: assetId,
+          sha256: crypto.sha256.convert(bytes).toString(),
+          sizeBytes: bytes.length,
+          mediaType: embedType == 'pdf' ? 'application/pdf' : 'image/png',
+        );
+        buffer.stage(receipt: asset.attachPayload, bytes: bytes);
+        final block = TextBlock(
+          id: 'moved-inline-text',
+          text: 'Label\uFFFC\uFFFC',
+          deltaJson: jsonEncode([
+            {
+              'insert': 'Label',
+              'attributes': {'bold': true},
+            },
+            {
+              'insert': {embedType: 'asset:$assetId'},
+            },
+            {
+              'insert': {embedType: 'asset:$assetId'},
+            },
+            {'insert': '\n'},
+          ]),
+          position: Offset.zero,
+          fontSize: 18,
+          color: const Color(0xFF112233),
+          width: 200,
+        );
+        await embedWriter.writeNotebookChange(
+          before: notebook,
+          after: notebook.copyWith(
+            pages: [
+              page.copyWith(textBlocks: [block]),
+              destination,
+            ],
+          ),
+          verifiedAssets: {assetId: asset},
+        );
+        buffer.clear();
+        final persisted = (await repository.getNotebook(notebook.uid))!;
+        final storedBlock = persisted.pages.first.textBlocks.single;
+        final atoms = await store.textAtoms(
+          documentId: notebook.uid,
+          pageId: page.id,
+          objectId: block.id,
+        );
+        final pendingBeforeMove = await store.pending(includeDeferred: true);
+        await expectLater(
+          store.writeLocalBatch(
+            actorId: 'local',
+            documentId: notebook.uid,
+            operations: [
+              LocalOperationDraft(
+                kind: OperationKind.objectMove,
+                pageId: page.id,
+                objectId: block.id,
+                payload: {'toPageId': destination.id, 'sortIndex': 0},
+              ),
+              LocalOperationDraft(
+                kind: OperationKind.objectSet,
+                pageId: destination.id,
+                objectId: block.id,
+                payload: const {
+                  'properties': {'width': -1.0},
+                },
+              ),
+            ],
+            apply: projector.apply,
+          ),
+          throwsFormatException,
+        );
+        expect(
+          await store.pending(includeDeferred: true),
+          hasLength(pendingBeforeMove.length),
+        );
+        expect(
+          (await repository.getNotebook(
+            notebook.uid,
+          ))!.pages.first.textBlocks.single.id,
+          block.id,
+        );
+        expect(
+          await projector.verifiedTextAssetBytes(
+            documentId: notebook.uid,
+            pageId: page.id,
+            objectId: block.id,
+            assetId: assetId,
+          ),
+          orderedEquals(bytes),
+        );
+        final relocated = persisted.copyWith(
+          pages: [
+            persisted.pages.first.copyWith(textBlocks: []),
+            persisted.pages.last.copyWith(
+              textBlocks: [
+                storedBlock.copyWith(position: const Offset(30, 40)),
+              ],
+            ),
+          ],
+        );
+        final moved = await embedWriter.writeNotebookChange(
+          before: persisted,
+          after: relocated,
+        );
+        expect(
+          moved.where((op) => op.kind == OperationKind.objectMove),
+          hasLength(1),
+        );
+        expect(moved.first.actorSeq, pendingBeforeMove.last.actorSeq + 1);
+        expect(
+          moved.where((op) => op.kind == OperationKind.assetAttach),
+          isEmpty,
+        );
+        expect(
+          moved.where((op) => op.kind == OperationKind.textInsert),
+          isEmpty,
+        );
+        final saved = (await repository.getNotebook(notebook.uid))!;
+        expect(saved.pages.first.textBlocks, isEmpty);
+        final savedBlock = saved.pages.last.textBlocks.single;
+        expect(savedBlock.id, block.id);
+        expect(savedBlock.position, const Offset(30, 40));
+        expect(
+          jsonDecode(savedBlock.deltaJson!),
+          jsonDecode(storedBlock.deltaJson!),
+        );
+        expect(
+          await store.textAtoms(
+            documentId: notebook.uid,
+            pageId: destination.id,
+            objectId: block.id,
+          ),
+          atoms,
+        );
+        final reopened = EditorSqliteProjector(database);
+        expect(
+          await reopened.verifiedTextAssetBytes(
+            documentId: notebook.uid,
+            pageId: destination.id,
+            objectId: block.id,
+            assetId: assetId,
+          ),
+          orderedEquals(bytes),
+        );
+        await expectLater(
+          reopened.verifiedTextAssetBytes(
+            documentId: notebook.uid,
+            pageId: page.id,
+            objectId: block.id,
+            assetId: assetId,
+          ),
+          throwsStateError,
+        );
+
+        // Missing scoped ownership must roll back a subsequent move in full.
+        await database.customStatement(
+          'DELETE FROM asset_references WHERE document_id = ?',
+          [notebook.uid],
+        );
+        final pending = await store.pending(includeDeferred: true);
+        await expectLater(
+          embedWriter.writeNotebookChange(before: saved, after: persisted),
+          throwsStateError,
+        );
+        expect(
+          await store.pending(includeDeferred: true),
+          hasLength(pending.length),
+        );
+        expect(
+          (await repository.getNotebook(
+            notebook.uid,
+          ))!.pages.last.textBlocks.single.position,
+          const Offset(30, 40),
+        );
+      },
+    );
+  }
+
   test('a failed media edit never writes an outbox operation', () async {
     final notebook = await repository.createNotebook();
     final page = notebook.pages.single;

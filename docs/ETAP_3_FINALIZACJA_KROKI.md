@@ -25,6 +25,18 @@ następnie rebase dwóch klientów, synchronizacja całego konta i cutover
 (etap 4). Starsze sekcje C/D zawierają również te późniejsze warunki;
 nie wymagają przedwczesnej aktywacji flagi ani usunięcia v1.
 
+### Przenoszenie Quill z embedami — implementacja
+
+`EditorSqliteProjector._moveObject` przenosi teraz scoped referencje
+Quill razem z blokiem. Przed zmianą sprawdza trwałe bajty i ich SHA-256,
+kompletność referencji embedów oraz brak docelowego właściciela.
+Nie tworzy nowych atomów, nie wysyła ponownie assetu i nie usuwa BLOB.
+Regresje w `editor_v2_operation_writer_test.dart` obejmują obraz i PDF,
+dwukrotne użycie jednego assetu, sformatowaną Delta, geometrię i trwałą
+tożsamość atomów po utracie bufora, brak referencji oraz rollback
+wsadu, w którym po przeniesieniu występuje błędna geometria.
+Wynik testów tego przyrostu pozostaje do odczytania w następnym CI.
+
 ## Integracja z 5 listopada 2026 — nadal niezamknięty etap 3
 
 - Dodano opt-in `EditorV2AccountRuntime` dla konta o potwierdzonym

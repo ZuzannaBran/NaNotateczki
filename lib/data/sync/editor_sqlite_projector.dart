@@ -19,9 +19,9 @@ import 'verified_editor_asset_buffer.dart';
 /// [database] identical to the store's database. No legacy saveNotebook
 /// writer may mutate the same document while this projector is active.
 ///
-/// Media, cross-page moves and document creation deliberately fail closed
-/// until their durable projection is implemented. Quill embeds require a
-/// verified asset store and are refused here. This is not a cutover switch.
+/// Quill media require verified durable bytes and scoped asset references.
+/// Cross-page moves relocate those references in the same SQLite transaction.
+/// This class does not enable the production protocol switch.
 class EditorSqliteProjector {
   EditorSqliteProjector(this.database, {this.verifiedAssetBuffer})
     : _store = OperationStore(database);
@@ -603,7 +603,7 @@ class EditorSqliteProjector {
       [Variable<String>(op.objectId!)],
     );
     final text = await _row(
-      'SELECT page_uid FROM text_block_rows WHERE uid = ?',
+      'SELECT page_uid, delta_json FROM text_block_rows WHERE uid = ?',
       [Variable<String>(op.objectId!)],
     );
     final matches =
@@ -638,17 +638,37 @@ class EditorSqliteProjector {
     if (ink != null && linked.isNotEmpty) {
       throw UnsupportedError('Ink cannot move with attached media assets.');
     }
-    if (text != null && linked.isNotEmpty) {
-      throw UnsupportedError(
-        'Moving Quill embeds requires durable text asset relocation.',
-      );
+    if (text != null) {
+      final assetIds = {for (final row in linked) row.read<String>('asset_id')};
+      for (final assetId in assetIds) {
+        await verifiedTextAssetBytes(
+          documentId: op.documentId,
+          pageId: actualSourceId,
+          objectId: op.objectId!,
+          assetId: assetId,
+        );
+      }
+      final delta = jsonDecode(text['delta_json'] as String? ?? '[]');
+      if (delta is! List) {
+        throw const FormatException('Invalid stored Quill Delta.');
+      }
+      for (final entry in delta) {
+        if (entry is! Map) {
+          throw const FormatException('Invalid stored Quill entry.');
+        }
+        final embed = entry['insert'];
+        if (embed is Map &&
+            !assetIds.contains(OperationEnvelope.embedAssetId(embed))) {
+          throw StateError('Moved Quill embed is missing its scoped asset.');
+        }
+      }
     }
     if (image != null && linked.isEmpty) {
       throw UnsupportedError(
         'Image moves require durable scoped asset references.',
       );
     }
-    if (image != null && actualSourceId != destinationId) {
+    if ((image != null || text != null) && actualSourceId != destinationId) {
       final destinationRefs = await _row(
         'SELECT asset_id FROM asset_references '
         'WHERE document_id = ? AND object_id = ? LIMIT 1',
