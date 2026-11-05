@@ -161,7 +161,7 @@ void main() {
     expect(await reopenedRepository.saveNotebook(sibling), isTrue);
   });
 
-  test('v2 commits advance notebook timestamps even within one second',
+  test('rapid v2 commits never invent future notebook timestamps',
       () async {
     final original = (await notebooks.getNotebook(documentId))!.updatedAt;
     await write([
@@ -173,7 +173,11 @@ void main() {
       ),
     ]);
     final first = (await notebooks.getNotebook(documentId))!.updatedAt;
-    expect(first.isAfter(original), isTrue);
+    expect(!first.isBefore(original), isTrue);
+    expect(
+      first.isAfter(DateTime.now().toUtc().add(const Duration(seconds: 1))),
+      isFalse,
+    );
     await write([
       LocalOperationDraft(
         kind: OperationKind.objectSet,
@@ -185,7 +189,15 @@ void main() {
       ),
     ]);
     final second = (await notebooks.getNotebook(documentId))!.updatedAt;
-    expect(second.isAfter(first), isTrue);
+    expect(!second.isBefore(first), isTrue);
+    expect(
+      second.isAfter(DateTime.now().toUtc().add(const Duration(seconds: 1))),
+      isFalse,
+    );
+    expect(
+      (await store.pending()).map((operation) => operation.actorSeq),
+      [1, 2],
+    );
     final previousOutbox = await store.pending();
     await expectLater(
       write([
