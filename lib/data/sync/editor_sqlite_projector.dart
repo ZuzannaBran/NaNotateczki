@@ -780,7 +780,7 @@ class EditorSqliteProjector {
         assetId is! String ||
         assetId.isEmpty ||
         assetId.length > 128 ||
-        RegExp(r'[\\x00-\\x1f\\x7f]').hasMatch(assetId)) {
+        RegExp(r'[\x00-\x1f\x7f]').hasMatch(assetId)) {
       throw const FormatException('Invalid v2 image creation payload.');
     }
     _validateImageGeometry(value);
@@ -848,8 +848,10 @@ class EditorSqliteProjector {
     if (creation['objectType'] != 'image') {
       throw StateError('Asset identity belongs to a non-image object.');
     }
-    if (existingImage == null && creation['assetId'] != assetId) {
-      throw StateError('Image creation must attach its declared asset ID.');
+    if (creation['assetId'] != assetId) {
+      throw UnsupportedError(
+        'Replacing an attached image requires its complete asset protocol.',
+      );
     }
 
     final scopedObjectId = 'page:${jsonEncode([pageId, objectId])}';
