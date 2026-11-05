@@ -469,7 +469,12 @@ blokuje v1 przez `_requireLegacyWritable` także po zamknięciu edytora,
 utworzeniu nowego repozytorium i restarcie aplikacji. Każdy legacy
 writer ponawia kontrolę wewnątrz transakcji, a automatyczna migracja
 legacy gumki nie może przepisywać strony z v2 operacjami.
-W opt-in v2 Undo/Redo jest wyłączone (brak inverse intents).
+W opt-in v2 Undo/Redo tworzy nowe operacje odwrotne na podstawie
+zatwierdzonych lokalnych stanów (do 50 w bieżącej sesji). Odtwarzane
+strony i obiekty otrzymują nowe identyfikatory zamiast ponownego użycia
+trwałych tombstones. Równoległy gest podczas inverse nie jest nadpisywany,
+lecz blokuje dalszy commit do rozstrzygnięcia. Historia Undo/Redo nie jest
+jeszcze trwała między restartami; nie stanowi mechanizmu recovery.
 Obsługuje już tworzenie nowych obrazów/PDF z potwierdzonych transferów
 przez `VerifiedEditorAssetBuffer`: `object.create` zapisuje wyłącznie
 metadane w dzienniku, a dopiero `asset.attach` zapisuje bajty do
