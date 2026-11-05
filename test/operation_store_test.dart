@@ -99,7 +99,9 @@ void main() {
             pageId: 'page-one',
             objectId: id,
             kind: OperationKind.objectCreate,
-            payload: {'value': {'label': id}},
+            payload: {
+              'value': {'label': id},
+            },
           ),
       ],
       apply: (operation) => database.customStatement(
@@ -132,7 +134,9 @@ void main() {
               pageId: 'page-one',
               objectId: id,
               kind: OperationKind.objectCreate,
-              payload: {'value': {'label': id}},
+              payload: {
+                'value': {'label': id},
+              },
             ),
         ],
         apply: (operation) async {
@@ -155,30 +159,40 @@ void main() {
     expect((await add('retry-after-failure')).actorSeq, 1);
   });
 
-  test('single write does not interleave into a multi-object gesture', () async {
-    final tasks = await Future.wait([
-      store.writeLocalBatch(
-        actorId: 'device-one',
-        documentId: 'document-one',
-        operations: [
-          for (final id in ['first', 'second'])
-            LocalOperationDraft(
-              pageId: 'page-one',
-              objectId: id,
-              kind: OperationKind.objectCreate,
-              payload: {'value': {'label': id}},
-            ),
-        ],
-        apply: (operation) => database.customStatement(
-          'INSERT INTO projection_probe VALUES (?, ?)',
-          [operation.objectId!, operation.objectId!],
-        ),
-      ).then((ops) => ops.map((op) => op.actorSeq).toList()),
-      add('third').then((op) => [op.actorSeq]),
-    ]);
-    expect(tasks, [[1, 2], [3]]);
-    expect(await store.pending(), hasLength(3));
-  });
+  test(
+    'single write does not interleave into a multi-object gesture',
+    () async {
+      final tasks = await Future.wait([
+        store
+            .writeLocalBatch(
+              actorId: 'device-one',
+              documentId: 'document-one',
+              operations: [
+                for (final id in ['first', 'second'])
+                  LocalOperationDraft(
+                    pageId: 'page-one',
+                    objectId: id,
+                    kind: OperationKind.objectCreate,
+                    payload: {
+                      'value': {'label': id},
+                    },
+                  ),
+              ],
+              apply: (operation) => database.customStatement(
+                'INSERT INTO projection_probe VALUES (?, ?)',
+                [operation.objectId!, operation.objectId!],
+              ),
+            )
+            .then((ops) => ops.map((op) => op.actorSeq).toList()),
+        add('third').then((op) => [op.actorSeq]),
+      ]);
+      expect(tasks, [
+        [1, 2],
+        [3],
+      ]);
+      expect(await store.pending(), hasLength(3));
+    },
+  );
 
   test('failed projection rolls back actor counter and outbox', () async {
     await expectLater(

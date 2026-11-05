@@ -31,10 +31,8 @@ void main() {
   test('rejects corrupt upload/download acknowledgements', () {
     final buffer = VerifiedEditorAssetBuffer();
     expect(
-      () => buffer.stage(
-        receipt: receipt,
-        bytes: Uint8List.fromList([0, 1, 2]),
-      ),
+      () =>
+          buffer.stage(receipt: receipt, bytes: Uint8List.fromList([0, 1, 2])),
       throwsFormatException,
     );
     expect(

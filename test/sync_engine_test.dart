@@ -178,7 +178,9 @@ void main() {
           kind: OperationKind.objectCreate,
           pageId: 'page-one',
           objectId: id,
-          payload: {'value': {'label': id}},
+          payload: {
+            'value': {'label': id},
+          },
         ),
     ];
     final committed = await engine.writeLocalBatch(
@@ -219,7 +221,9 @@ void main() {
               kind: OperationKind.objectCreate,
               pageId: 'page-one',
               objectId: id,
-              payload: {'value': {'label': id}},
+              payload: {
+                'value': {'label': id},
+              },
             ),
         ],
         apply: (operation) async {
@@ -242,35 +246,41 @@ void main() {
     expect((await local('recovered')).actorSeq, 1);
   });
 
-  test('batch prevalidates every draft before writing the projection',
-      () async {
-    var touched = false;
-    await expectLater(
-      engine.writeLocalBatch(
-        documentId: 'document-one',
-        operations: const [
-          LocalOperationDraft(
-            kind: OperationKind.objectCreate,
-            pageId: 'page-one',
-            objectId: 'valid',
-            payload: {'value': {'label': 'valid'}},
-          ),
-          LocalOperationDraft(
-            kind: OperationKind.objectCreate,
-            pageId: 'page-one',
-            objectId: 'invalid',
-            payload: {'properties': {'label': 'invalid'}},
-          ),
-        ],
-        apply: (_) async {
-          touched = true;
-        },
-      ),
-      throwsFormatException,
-    );
-    expect(touched, isFalse);
-    expect(await store.pending(), isEmpty);
-  });
+  test(
+    'batch prevalidates every draft before writing the projection',
+    () async {
+      var touched = false;
+      await expectLater(
+        engine.writeLocalBatch(
+          documentId: 'document-one',
+          operations: const [
+            LocalOperationDraft(
+              kind: OperationKind.objectCreate,
+              pageId: 'page-one',
+              objectId: 'valid',
+              payload: {
+                'value': {'label': 'valid'},
+              },
+            ),
+            LocalOperationDraft(
+              kind: OperationKind.objectCreate,
+              pageId: 'page-one',
+              objectId: 'invalid',
+              payload: {
+                'properties': {'label': 'invalid'},
+              },
+            ),
+          ],
+          apply: (_) async {
+            touched = true;
+          },
+        ),
+        throwsFormatException,
+      );
+      expect(touched, isFalse);
+      expect(await store.pending(), isEmpty);
+    },
+  );
 
   test('invalid create is refused before any SQLite or outbox write', () async {
     await expectLater(
@@ -590,124 +600,127 @@ void main() {
     },
   );
 
-  test('asset bytes are prepared before the remote SQLite transaction',
-      () async {
-    final asset = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'asset-actor',
-      actorSeq: 1,
-      logicalClock: 1,
-      documentId: 'document-one',
-      pageId: 'page-one',
-      objectId: 'remote-image',
-      kind: OperationKind.assetAttach,
-      payload: const {
-        'assetId': 'asset-one',
-        'sha256':
-            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        'sizeBytes': 12,
-        'mediaType': 'image/png',
-      },
-    );
-    gateway.seed(asset);
-    engine.dispose();
-    var prepared = 0;
-    var committed = 0;
-    engine = SyncEngine(
-      store: store,
-      gateway: gateway,
-      actorId: 'actor-local',
-      checkpointScope: 'user-A-v2',
-      enableRealtime: false,
-      prepareRemoteOperation: (operation) async {
-        expect(operation.operationId, asset.operationId);
-        expect(await store.operation(asset.operationId), isNull);
-        final before = await database.customSelect(
-          'SELECT id FROM projection_probe',
-        ).get();
-        expect(before, isEmpty);
-        prepared++;
-      },
-      applyRemote: (operation, pending) async {
-        expect(prepared, 1);
-        await database.customStatement(
-          'INSERT INTO projection_probe VALUES (?, ?)',
-          [operation.objectId, 'committed'],
-        );
-        committed++;
-      },
-    );
-    await engine.start();
-    expect(prepared, 1);
-    expect(committed, 1);
-    expect(await store.checkpoint('user-A-v2'), 1);
+  test(
+    'asset bytes are prepared before the remote SQLite transaction',
+    () async {
+      final asset = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'asset-actor',
+        actorSeq: 1,
+        logicalClock: 1,
+        documentId: 'document-one',
+        pageId: 'page-one',
+        objectId: 'remote-image',
+        kind: OperationKind.assetAttach,
+        payload: const {
+          'assetId': 'asset-one',
+          'sha256':
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          'sizeBytes': 12,
+          'mediaType': 'image/png',
+        },
+      );
+      gateway.seed(asset);
+      engine.dispose();
+      var prepared = 0;
+      var committed = 0;
+      engine = SyncEngine(
+        store: store,
+        gateway: gateway,
+        actorId: 'actor-local',
+        checkpointScope: 'user-A-v2',
+        enableRealtime: false,
+        prepareRemoteOperation: (operation) async {
+          expect(operation.operationId, asset.operationId);
+          expect(await store.operation(asset.operationId), isNull);
+          final before = await database
+              .customSelect('SELECT id FROM projection_probe')
+              .get();
+          expect(before, isEmpty);
+          prepared++;
+        },
+        applyRemote: (operation, pending) async {
+          expect(prepared, 1);
+          await database.customStatement(
+            'INSERT INTO projection_probe VALUES (?, ?)',
+            [operation.objectId, 'committed'],
+          );
+          committed++;
+        },
+      );
+      await engine.start();
+      expect(prepared, 1);
+      expect(committed, 1);
+      expect(await store.checkpoint('user-A-v2'), 1);
 
-    // A replay of the same committed op must not fetch the image again.
-    await database.customStatement(
-      'UPDATE sync_checkpoints SET server_sequence = 0 WHERE scope = ?',
-      ['user-A-v2'],
-    );
-    await engine.syncNow();
-    expect(prepared, 1);
-    expect(committed, 1);
-    expect(await store.checkpoint('user-A-v2'), 1);
-  });
+      // A replay of the same committed op must not fetch the image again.
+      await database.customStatement(
+        'UPDATE sync_checkpoints SET server_sequence = 0 WHERE scope = ?',
+        ['user-A-v2'],
+      );
+      await engine.syncNow();
+      expect(prepared, 1);
+      expect(committed, 1);
+      expect(await store.checkpoint('user-A-v2'), 1);
+    },
+  );
 
-  test('replacement is prepared before remote projection and after restart',
-      () async {
-    final replacement = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'image-switch-actor',
-      actorSeq: 1,
-      logicalClock: 1,
-      documentId: 'document-one',
-      pageId: 'page-one',
-      objectId: 'image-to-replace',
-      kind: OperationKind.objectSet,
-      payload: const {
-        'properties': {'assetId': 'verified-replacement'},
-      },
-    );
-    gateway.seed(replacement);
-    engine.dispose();
-    var prepared = 0;
-    var committed = 0;
-    engine = SyncEngine(
-      store: store,
-      gateway: gateway,
-      actorId: 'actor-local',
-      checkpointScope: 'user-A-v2',
-      enableRealtime: false,
-      prepareRemoteOperation: (operation) async {
-        expect(operation.operationId, replacement.operationId);
-        expect(await store.operation(replacement.operationId), isNull);
-        prepared++;
-      },
-      applyRemote: (operation, pending) async {
-        expect(prepared, 1);
-        await database.customStatement(
-          'INSERT INTO projection_probe VALUES (?, ?)',
-          [operation.objectId, 'switched'],
-        );
-        committed++;
-      },
-    );
-    await engine.start();
-    expect(prepared, 1);
-    expect(committed, 1);
-    expect(await store.checkpoint('user-A-v2'), 1);
+  test(
+    'replacement is prepared before remote projection and after restart',
+    () async {
+      final replacement = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'image-switch-actor',
+        actorSeq: 1,
+        logicalClock: 1,
+        documentId: 'document-one',
+        pageId: 'page-one',
+        objectId: 'image-to-replace',
+        kind: OperationKind.objectSet,
+        payload: const {
+          'properties': {'assetId': 'verified-replacement'},
+        },
+      );
+      gateway.seed(replacement);
+      engine.dispose();
+      var prepared = 0;
+      var committed = 0;
+      engine = SyncEngine(
+        store: store,
+        gateway: gateway,
+        actorId: 'actor-local',
+        checkpointScope: 'user-A-v2',
+        enableRealtime: false,
+        prepareRemoteOperation: (operation) async {
+          expect(operation.operationId, replacement.operationId);
+          expect(await store.operation(replacement.operationId), isNull);
+          prepared++;
+        },
+        applyRemote: (operation, pending) async {
+          expect(prepared, 1);
+          await database.customStatement(
+            'INSERT INTO projection_probe VALUES (?, ?)',
+            [operation.objectId, 'switched'],
+          );
+          committed++;
+        },
+      );
+      await engine.start();
+      expect(prepared, 1);
+      expect(committed, 1);
+      expect(await store.checkpoint('user-A-v2'), 1);
 
-    await database.customStatement(
-      'UPDATE sync_checkpoints SET server_sequence = 0 WHERE scope = ?',
-      ['user-A-v2'],
-    );
-    await engine.syncNow();
-    expect(prepared, 1);
-    expect(committed, 1);
-  });
+      await database.customStatement(
+        'UPDATE sync_checkpoints SET server_sequence = 0 WHERE scope = ?',
+        ['user-A-v2'],
+      );
+      await engine.syncNow();
+      expect(prepared, 1);
+      expect(committed, 1);
+    },
+  );
 
-  test('deleted media target never triggers stale verified download',
-      () async {
+  test('deleted media target never triggers stale verified download', () async {
     const doc = 'document-one';
     const page = 'page-one';
     const object = 'deleted-media';
@@ -717,7 +730,9 @@ void main() {
       kind: OperationKind.objectCreate,
       pageId: page,
       objectId: object,
-      payload: const {'value': {'objectType': 'image'}},
+      payload: const {
+        'value': {'objectType': 'image'},
+      },
       apply: (_) async {},
     );
     await store.writeLocal(
@@ -812,9 +827,9 @@ void main() {
     await engine.start();
     // A new editor session can rebuild the view from its durable projection.
     expect(notifications, 2);
-    final rows = await database.customSelect(
-      'SELECT id FROM projection_probe',
-    ).get();
+    final rows = await database
+        .customSelect('SELECT id FROM projection_probe')
+        .get();
     expect(rows, hasLength(1));
   });
 

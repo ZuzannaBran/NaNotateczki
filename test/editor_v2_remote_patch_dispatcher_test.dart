@@ -33,8 +33,7 @@ void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('image create does not repaint before verified remote attach',
-      () async {
+  test('image create does not repaint before verified remote attach', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -135,8 +134,7 @@ void main() {
     expect(editor.pages.single.imageBlocks.single.id, 'remote-image-object');
   });
 
-  test('remote patches modify one page and preserve object identity',
-      () async {
+  test('remote patches modify one page and preserve object identity', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
@@ -244,6 +242,7 @@ void main() {
       expect(editor.pages.first.inkStrokes, isEmpty);
       expect(editor.pages.last.inkStrokes.single.id, 'remote-ink');
     }
+
     editor.addListener(onMove);
     await dispatcher.onRemoteCommitted(moved);
     editor.removeListener(onMove);
@@ -268,10 +267,7 @@ void main() {
       pageId: notebook.pages.first.id,
       objectId: 'remote-ink',
       kind: OperationKind.objectMove,
-      payload: const {
-        'toPageId': 'losing-destination',
-        'sortIndex': 0,
-      },
+      payload: const {'toPageId': 'losing-destination', 'sortIndex': 0},
       dependencies: [created.operationId],
     );
     expect(
@@ -295,10 +291,7 @@ void main() {
       payload: const {},
     );
     editor.activeTextBlockId = 'active-editor-text';
-    await expectLater(
-      dispatcher.onRemoteCommitted(deleted),
-      throwsStateError,
-    );
+    await expectLater(dispatcher.onRemoteCommitted(deleted), throwsStateError);
     expect(editor.pages[1].inkStrokes.single.id, 'remote-ink');
     editor.activeTextBlockId = null;
     await dispatcher.onRemoteCommitted(deleted);
@@ -418,5 +411,4 @@ void main() {
       OperationKind.documentSet,
     ]);
   });
-
 }
