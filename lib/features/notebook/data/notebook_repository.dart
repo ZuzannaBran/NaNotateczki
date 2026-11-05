@@ -12,6 +12,7 @@ import '../../../core/diagnostics/data_integrity_log.dart';
 import '../../../core/error/app_error_log.dart';
 import '../../../core/storage/app_data_directory.dart';
 import '../../../data/drift/notes_database.dart';
+import '../../editor/state/editor_v2_operation_writer.dart';
 import '../domain/drawing_tool.dart';
 import '../domain/image_block.dart';
 import '../domain/ink_eraser_engine.dart';
@@ -79,6 +80,20 @@ class NotebookRepository {
   _readErrorHandler;
   final DataIntegrityIncidentHandler? _dataIntegrityIncidentHandler;
   final Uuid _uuid = const Uuid();
+  EditorV2OperationWriter? _accountOperationWriter;
+
+  /// Selects v2 only after the owning account protocol is verified.
+  /// Existing v1 documents must be migrated before enabling this path.
+  void enableAccountOperations(EditorV2OperationWriter writer) {
+    if (!identical(writer.projector.database, database) ||
+        hasPendingSaves ||
+        (_accountOperationWriter != null &&
+            !identical(_accountOperationWriter, writer))) {
+      throw StateError('Cannot switch the active repository writer to v2.');
+    }
+    _accountOperationWriter = writer;
+  }
+
   bool _lastFetchSkippedCorruptRows = false;
   final List<String> _lastCorruptNotebookIds = <String>[];
   final Map<String, DateTime> _latestPersistedUpdates = <String, DateTime>{};
@@ -557,7 +572,13 @@ class NotebookRepository {
       ],
     );
 
-    await saveNotebook(notebook);
+    final writer = _accountOperationWriter;
+    if (writer == null) {
+      await saveNotebook(notebook);
+    } else {
+      await writer.writeCreateNotebook(notebook: notebook);
+      onChanged?.call([NotebookRepositoryChange.full(notebook.uid)]);
+    }
     return notebook;
   }
 
@@ -582,11 +603,20 @@ class NotebookRepository {
       ],
     );
 
-    await saveNotebook(board);
+    final writer = _accountOperationWriter;
+    if (writer == null) {
+      await saveNotebook(board);
+    } else {
+      await writer.writeCreateNotebook(notebook: board);
+      onChanged?.call([NotebookRepositoryChange.full(board.uid)]);
+    }
     return board;
   }
 
   Future<Notebook> createPlanner({String? title, String? folder}) async {
+    if (_accountOperationWriter != null) {
+      throw UnsupportedError('Planner v2 is not enabled yet.');
+    }
     final now = DateTime.now();
     final planner = Notebook(
       uid: _uuid.v4(),
@@ -911,6 +941,31 @@ class NotebookRepository {
     String? title,
     String? folder,
   }) async {
+    final writer = _accountOperationWriter;
+    if (writer != null) {
+      final before = await getNotebook(uid);
+      if (before == null) {
+        return null;
+      }
+      if (before.kind == NotebookKind.planner) {
+        throw UnsupportedError('Planner metadata v2 is not enabled yet.');
+      }
+      final after = before.copyWith(
+        title: title ?? before.title,
+        folder: folder ?? before.folder,
+      );
+      if (after.title == before.title && after.folder == before.folder) {
+        return before;
+      }
+      await writer.writeNotebookChange(before: before, after: after);
+      final updated = await getNotebook(uid);
+      if (updated == null) {
+        throw StateError('V2 metadata commit has no durable projection.');
+      }
+      _notebookCache[uid] = updated;
+      onChanged?.call([NotebookRepositoryChange.metadata(uid)]);
+      return updated;
+    }
     await _requireLegacyWritable(uid);
     DateTime? preciseUpdatedAt;
     final updated = await database.transaction(() async {
@@ -1382,6 +1437,21 @@ class NotebookRepository {
   }
 
   Future<void> deleteNotebook(String uid) async {
+    final writer = _accountOperationWriter;
+    if (writer != null) {
+      final notebook = await getNotebook(uid);
+      if (notebook == null) {
+        return;
+      }
+      if (notebook.kind == NotebookKind.planner) {
+        throw UnsupportedError('Planner deletion v2 is not enabled yet.');
+      }
+      await writer.writeDeleteNotebook(documentId: uid);
+      _latestPersistedUpdates.remove(uid);
+      _notebookCache.remove(uid);
+      onChanged?.call([NotebookRepositoryChange.full(uid)]);
+      return;
+    }
     await _requireLegacyWritable(uid);
     final notebook = await getNotebook(uid);
     if (_lastCorruptNotebookIds.contains(uid)) {
