@@ -10,6 +10,7 @@ import 'package:program/data/sync/editor_sqlite_projector.dart';
 import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:uuid/uuid.dart';
 
 Map<String, dynamic> _stroke() => {
@@ -64,6 +65,50 @@ void main() {
     ).get();
     return [for (final row in rows) row.data];
   }
+
+  test('legacy eraser migration cannot rewrite a v2 ink document',
+      () async {
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.strokeCreate,
+        pageId: pageId,
+        objectId: 'durable-stroke',
+        payload: {'value': _stroke()},
+      ),
+    ]);
+    await database.customStatement(
+      'INSERT INTO ink_stroke_rows '
+      '(uid, page_uid, color_value, width, tool_index, '
+      'points_json, sort_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [
+        'legacy-eraser',
+        pageId,
+        0xFFFFFFFF,
+        20.0,
+        DrawingTool.eraserArea.index,
+        jsonEncode([
+          {'dx': 90.0, 'dy': 90.0, 'pressure': 1.0},
+          {'dx': 91.0, 'dy': 91.0, 'pressure': 1.0},
+        ]),
+        1,
+      ],
+    );
+    Future<List<String>> persistedIds() async {
+      final rows = await database.customSelect(
+        'SELECT uid FROM ink_stroke_rows WHERE page_uid = ? ORDER BY uid',
+        variables: [Variable<String>(pageId)],
+      ).get();
+      return [
+        for (final row in rows) row.read<String>('uid'),
+      ];
+    }
+    final beforeRead = await persistedIds();
+    expect(beforeRead, contains('legacy-eraser'));
+    final freshRepository = NotebookRepository(database);
+    expect(await freshRepository.getNotebook(documentId), isNotNull);
+    expect(await persistedIds(), beforeRead);
+    expect(await store.pending(), hasLength(1));
+  });
 
   test('a fresh repository cannot overwrite committed v2 history',
       () async {
