@@ -465,12 +465,17 @@ utrzymuje potwierdzony baseline i serializuje zapisy; repozytorium
 rezerwuje UID za pomocą `registerOperationWriter` i blokuje stare
 snapshoty, import, restore, metadata i delete na zajętym UID.
 W opt-in v2 Undo/Redo jest wyłączone (brak inverse intents).
-Nie obsługuje jeszcze zweryfikowanych assetów, Quill embedów,
-tworzenia/usuwania obrazów/PDF, przenoszenia tekstu i obrazów,
-zakładania dokumentów v2 ani rebase konfliktów. Niezmieniona kreska
-może być przeniesiona do innej istniejącej lub tworzonej strony
-przez `object.move`, bez usuwania jej ID; konflikt asset referencji
-powoduje odmowę wykonania.
+Nie obsługuje jeszcze tworzenia/usuwania/wymiany assetów,
+Quill embedów, przenoszenia tekstu, zakładania dokumentów v2 ani
+pełnego rebase. Niezmieniona kreska może być przeniesiona między
+stronami przez `object.move` bez usuwania jej ID. Obraz może być
+przeniesiony wyłącznie przy niezmienionych bajtach/MIME i trwałej
+scoped referencji assetu: jedna transakcja aktualizuje pageUid,
+sortIndex i `asset_references`, nigdy nie usuwa oryginalnego pliku.
+Aktualizacje pojedynczych pól mają rank `(clock, actor, seq, ID)`
+wyliczony z trwałego dziennika, niezależnie od kolejności dostarczenia.
+Nadal brakuje konfliktów jednoczesnych move i materializacji wersji
+dla długiej historii.
 `EditorV2RemotePatchDispatcher` wprowadza zatwierdzone zdalne zmiany
 pojedynczego obiektu/strony po SQLite commit, a zajęty edytor blokuje
 callback do ponowienia bez odmalowywania całego dokumentu.
