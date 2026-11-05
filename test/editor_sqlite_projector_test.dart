@@ -639,6 +639,89 @@ void main() {
     );
   });
 
+  for (final reverseOrder in [false, true]) {
+    test('concurrent ink moves converge, reverse=$reverseOrder', () async {
+      final setup = await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: 'move-destination-a',
+          payload: {
+            'value': {'title': 'A', 'isBookmarked': false},
+          },
+        ),
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: 'move-destination-b',
+          payload: {
+            'value': {'title': 'B', 'isBookmarked': false},
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.strokeCreate,
+          pageId: pageId,
+          objectId: 'concurrent-move-ink',
+          payload: {'value': _stroke()},
+        ),
+      ]);
+      OperationEnvelope remoteMove({
+        required String actor,
+        required String destination,
+        required int logicalClock,
+      }) => OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: actor,
+        actorSeq: 1,
+        logicalClock: logicalClock,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'concurrent-move-ink',
+        kind: OperationKind.objectMove,
+        payload: {'toPageId': destination, 'sortIndex': 0},
+        dependencies: [setup.last.operationId],
+      );
+      final first = remoteMove(
+        actor: 'move-actor-a',
+        destination: 'move-destination-a',
+        logicalClock: 40,
+      );
+      final winning = remoteMove(
+        actor: 'move-actor-z',
+        destination: 'move-destination-b',
+        logicalClock: 50,
+      );
+      final order = reverseOrder ? [winning, first] : [first, winning];
+      for (var i = 0; i < order.length; i++) {
+        final move = order[i];
+        expect(
+          await store.applyRemote(
+            move,
+            serverSequence: i + 1,
+            checkpointScope: 'concurrent-ink',
+            apply: () => projector.apply(move),
+          ),
+          isTrue,
+        );
+      }
+      final result = (await notebooks.getNotebook(documentId))!;
+      expect(result.pages.first.inkStrokes, isEmpty);
+      expect(result.pages[1].inkStrokes, isEmpty);
+      expect(
+        result.pages[2].inkStrokes.single.id,
+        'concurrent-move-ink',
+      );
+      expect(await store.checkpoint('concurrent-ink'), 2);
+      expect(
+        await store.isTombstoned(
+          documentId,
+          'object',
+          'concurrent-move-ink',
+          pageId: pageId,
+        ),
+        isFalse,
+      );
+    });
+  }
+
   test('object.move preserves the stroke identity across notebook pages',
       () async {
     const destination = 'second-page';
