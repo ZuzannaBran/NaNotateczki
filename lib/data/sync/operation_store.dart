@@ -123,12 +123,13 @@ class OperationStore {
     }
     final rows = await database.customSelect(
       'SELECT envelope_json FROM operations '
-      'WHERE document_id = ? AND page_id = ? AND object_id = ? '
+      // Object IDs are unique throughout a notebook. A v2 object.move
+      // changes its page, not its CRDT identity or earlier atom history.
+      'WHERE document_id = ? AND object_id = ? '
       "AND kind IN ('text.insert', 'text.delete', 'text.format') "
       'ORDER BY rowid',
       variables: [
         Variable<String>(documentId),
-        Variable<String>(pageId),
         Variable<String>(objectId),
       ],
     ).get();
