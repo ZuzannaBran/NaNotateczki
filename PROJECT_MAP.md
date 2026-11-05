@@ -467,9 +467,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   używać go równolegle z legacy writerem tego dokumentu.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
   Quill CRDT, tombstones, ACK, restart i ochrona usunięć.
-- `lib/data/drift/operation_schema.dart`: SQLite v5 z migracją v3 → v4
+- `lib/data/drift/operation_schema.dart`: SQLite v6 z migracją v3 → v4
   zachowującą tombstones oraz pageId usuniętego obiektu; v5 zapisuje
-  trwały status `blocked` dla nieodwracalnych błędów wysyłki.
+  trwały status `blocked`, a v6 dodaje kategorię tombstone `task`.
   Tabele są tworzone przez `customStatement` bez nowych mapowań `.g.dart`.
 - `notes_database_connection_io.dart`: WAL + `synchronous=FULL`.
 - `notebook_repository.dart`: `_upsertNotebookPages` i `_upsertPage`
@@ -747,10 +747,15 @@ ponownie, a niskopoziomowa serializacja odrzuca próbę utrwalenia eraser-stroke
 i zmianę samych metadanych, dzięki czemu scheduler może uruchomić backup v6
 tylko dla właściwych stron. Repozytorium udostępnia też oczekiwanie na
 wszystkie trwające zapisy per UID. `registerOperationWriter` i
-`unregisterOperationWriter` rezerwują UID dla edytora v2; stare
+`unregisterOperationWriter` rezerwują UID dla edytora v2; osobna
+trwała blokada `_requireLegacyWritable` sprawdza dziennik `operations`
+również po restarcie/reotwarciu repozytorium. Stare
 saveNotebook/saveNotebookPages, import/restore, metadane i delete
-odmawiają modyfikacji zajętego dokumentu. Nie zastępuje to
-serwerowej blokady protokołu. Atomowe przywracanie i import respektują
+ponownie weryfikują ją w transakcji przed zapisem; automatyczna
+migracja legacy gumki nie może nadpisać takiej projekcji.
+`LegacyProtocolWriteBlocked` odróżnia odmowę od innych błędów SQLite.
+Regresje: `test/editor_sqlite_projector_test.dart`.
+Nie zastępuje to serwerowej blokady protokołu. Atomowe przywracanie i import respektują
 parametr `notifyChanges`, zgłaszając zmianę dopiero po zatwierdzeniu.
 Ręczny eksport pozostaje samowystarczalny
 i zachowuje obrazy inline.
