@@ -332,3 +332,7 @@ ponownie i kontroluje tożsamość operacji, stan projekcji, sprawdzenie
 assetu oraz blokadę legacy snapshotu. Do zaliczenia wymagane jest
 `flutter test test/editor_v2_crash_recovery_test.dart` na platformie native.
 Nie należy traktować dodania testu jako jego pozytywnego wykonania.
+
+Regresja `test/editor_sqlite_projector_test.dart` sprawdza, że
+niespójny MIME embeda PDF nie pozostawia operacji, rekordu Quill,
+referencji ani bajtów w tabeli po nieudanej transakcji.

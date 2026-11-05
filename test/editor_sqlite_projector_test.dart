@@ -1723,4 +1723,85 @@ void main() {
       1,
     );
   });
+  test('invalid Quill embed MIME rolls back journal and asset BLOB',
+      () async {
+    final buffer = VerifiedEditorAssetBuffer();
+    final checkedProjector = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
+    );
+    final bytes = Uint8List.fromList([137, 80, 78, 71, 1, 2, 3]);
+    const assetId = 'mixed-mime-asset';
+    final receipt = <String, dynamic>{
+      'assetId': assetId,
+      'sha256': crypto.sha256.convert(bytes).toString(),
+      'sizeBytes': bytes.length,
+      'mediaType': 'image/png',
+    };
+    buffer.stage(receipt: receipt, bytes: bytes);
+    await expectLater(
+      store.writeLocalBatch(
+        actorId: 'malformed-quill',
+        documentId: documentId,
+        operations: [
+          LocalOperationDraft(
+            kind: OperationKind.objectCreate,
+            pageId: pageId,
+            objectId: 'text-mixed-mime',
+            payload: const {
+              'value': {
+                'objectType': 'text',
+                'fontSize': 18.0,
+                'colorValue': 0xFF123456,
+                'width': 200.0,
+                'rotation': 0.0,
+                'dx': 0.0,
+                'dy': 0.0,
+                'sortIndex': 0,
+              },
+            },
+          ),
+          LocalOperationDraft(
+            kind: OperationKind.assetAttach,
+            pageId: pageId,
+            objectId: 'text-mixed-mime',
+            payload: receipt,
+          ),
+          LocalOperationDraft(
+            kind: OperationKind.textInsert,
+            pageId: pageId,
+            objectId: 'text-mixed-mime',
+            payload: {
+              'afterAtomId': null,
+              'atoms': [
+                {
+                  'id': const Uuid().v4(),
+                  'text': '\uFFFC',
+                  'embed': {'pdf': 'asset:$assetId'},
+                },
+              ],
+            },
+          ),
+        ],
+        apply: checkedProjector.apply,
+      ),
+      throwsStateError,
+    );
+    expect(await store.pending(), isEmpty);
+    final texts = await database.customSelect(
+      'SELECT uid FROM text_block_rows WHERE page_uid = ?',
+      variables: [Variable<String>(pageId)],
+    ).get();
+    expect(texts, isEmpty);
+    final references = await database.customSelect(
+      'SELECT asset_id FROM asset_references WHERE document_id = ?',
+      variables: [Variable<String>(documentId)],
+    ).get();
+    expect(references, isEmpty);
+    final blobs = await database.customSelect(
+      'SELECT checksum_sha256 FROM operation_asset_bytes',
+    ).get();
+    expect(blobs, isEmpty);
+  });
+
 }

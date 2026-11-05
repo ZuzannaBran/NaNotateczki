@@ -1872,6 +1872,8 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 Quill embed renderer opt-in v2 `VerifiedQuillEmbedBuilder` czyta
 obrazy/PDF z trwałej tabeli assetów; bez URL i ścieżek lokalnych.
 Regresja widgetowa: `test/verified_quill_embed_builder_test.dart`.
+`test/editor_sqlite_projector_test.dart` weryfikuje rollback złego MIME
+osadzonego PDF, w tym brak nowej referencji i BLOB po błędzie.
 
 ### `lib/features/board/presentation/board_screen.dart` (896 linie)
 
