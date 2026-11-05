@@ -14,6 +14,7 @@ import '../../../core/widgets/app_dialog_actions.dart';
 import '../../../core/widgets/app_header_divider.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../data/sync/account_session_controller.dart';
+import '../../../data/sync/editor_v2_account_runtime.dart';
 import '../../../data/sync/live_web_sync_service.dart';
 import '../../../data/sync/study_share_service.dart';
 import '../../board/presentation/board_screen.dart';
@@ -697,9 +698,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
         ? null
         : notebook;
     final repository = context.read<NotebookRepository>();
+    final operationRuntime = context.read<EditorV2AccountRuntime?>();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => editorNotebook == null
+        builder: (_) => editorNotebook == null || operationRuntime != null
             ? const EditorSettingsScreen()
             : ChangeNotifierProvider(
                 create: (_) => EditorController(
@@ -2020,8 +2022,12 @@ class _LibraryWorkspace extends StatelessWidget {
       );
     }
 
+    final operationRuntime = context.read<EditorV2AccountRuntime?>();
     return _PersistentWorkspaceEditor(
-      key: ValueKey(item!.uid),
+      key: ValueKey(
+        '${item!.uid}:${operationRuntime == null ? 'v1' : 'v2'}',
+      ),
+      operationRuntime: operationRuntime,
       item: item!,
       repository: context.read<NotebookRepository>(),
       remoteEpoch: remoteEpoch,
@@ -2040,6 +2046,7 @@ class _PersistentWorkspaceEditor extends StatefulWidget {
   const _PersistentWorkspaceEditor({
     required this.item,
     required this.repository,
+    required this.operationRuntime,
     required this.remoteEpoch,
     required this.showToolbar,
     required this.showCompactTimer,
@@ -2052,6 +2059,7 @@ class _PersistentWorkspaceEditor extends StatefulWidget {
 
   final Notebook item;
   final NotebookRepository repository;
+  final EditorV2AccountRuntime? operationRuntime;
   final int remoteEpoch;
   final bool showToolbar;
   final bool showCompactTimer;
@@ -2077,18 +2085,22 @@ class _PersistentWorkspaceEditorState
     repository: widget.repository,
     notebook: widget.item,
     saveDebounce: _shareDebounce,
+    operationWriter: widget.operationRuntime?.writer,
   );
 
   @override
   void initState() {
     super.initState();
+    widget.operationRuntime?.attachEditor(_editor);
     _editor.backgroundSettingsListenable.addListener(_scheduleAppearance);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _registeredSync = context.read<LiveWebSyncService?>();
+    _registeredSync = widget.operationRuntime == null
+        ? context.read<LiveWebSyncService?>()
+        : null;
     _registerRemoteGuard();
     _scheduleAppearance();
   }
@@ -2168,7 +2180,8 @@ class _PersistentWorkspaceEditorState
       _registerRemoteGuard();
       _scheduleAppearance();
     }
-    if (oldWidget.remoteEpoch != widget.remoteEpoch) {
+    if (widget.operationRuntime == null &&
+        oldWidget.remoteEpoch != widget.remoteEpoch) {
       _remoteRefreshRetry?.cancel();
       unawaited(_refreshRemoteContent(widget.remoteEpoch));
     }
@@ -2206,6 +2219,7 @@ class _PersistentWorkspaceEditorState
     _appearanceTimer?.cancel();
     _editor.backgroundSettingsListenable.removeListener(_scheduleAppearance);
     _registeredSync?.clearSharedRemoteApplyGuard(widget.item.uid);
+    widget.operationRuntime?.detachEditor(_editor);
     _editor.dispose();
     super.dispose();
   }
