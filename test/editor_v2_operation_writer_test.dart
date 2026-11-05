@@ -23,6 +23,9 @@ import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/ink_stroke.dart';
+import 'package:program/features/notebook/domain/note_page.dart';
+import 'package:program/features/notebook/domain/notebook.dart';
+import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
 
 class _OfflineGateway implements OperationGateway {
@@ -70,6 +73,57 @@ void main() {
   tearDown(() async {
     await engine.stop();
     await database.close();
+  });
+
+  test('fresh notebook and first page bootstrap only through v2', () async {
+    final now = DateTime.utc(2026, 11, 5);
+    final blank = Notebook(
+      uid: 'a84f7f0f-3d1c-4a3b-81b0-153c83bf5e39',
+      title: 'Fresh v2',
+      kind: NotebookKind.notebook,
+      folder: 'Notes',
+      createdAt: now,
+      updatedAt: now,
+      pages: [
+        NotePage(
+          id: 'page-first',
+          title: 'Page 1',
+          isBookmarked: false,
+          inkStrokes: [],
+          textBlocks: [],
+          imageBlocks: [],
+        ),
+      ],
+    );
+    expect(await repository.getNotebook(blank.uid), isNull);
+    final created = await writer.writeCreateNotebook(notebook: blank);
+    expect(created.map((op) => op.kind), [
+      OperationKind.documentCreate,
+      OperationKind.pageCreate,
+    ]);
+    expect(await store.pending(), hasLength(2));
+    final saved = (await repository.getNotebook(blank.uid))!;
+    expect(saved.title, blank.title);
+    expect(saved.pages.single.id, blank.pages.single.id);
+    await expectLater(
+      repository.saveNotebook(saved),
+      throwsStateError,
+    );
+    await expectLater(
+      writer.writeCreateNotebook(notebook: blank),
+      throwsStateError,
+    );
+    expect(await store.pending(), hasLength(2));
+
+    final renamed = saved.copyWith(title: 'Renamed by v2');
+    final updated = await writer.writeNotebookChange(
+      before: saved,
+      after: renamed,
+    );
+    expect(updated, hasLength(1));
+    expect(updated.single.kind, OperationKind.documentSet);
+    expect((await repository.getNotebook(saved.uid))!.title,
+        'Renamed by v2');
   });
 
   test('one complete stroke creates one durable operation, no snapshot',
