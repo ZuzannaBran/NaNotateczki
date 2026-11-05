@@ -910,6 +910,122 @@ void main() {
     );
   });
 
+  test('asset.detach cannot remove a still referenced Quill embed',
+      () async {
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.objectCreate,
+        pageId: pageId,
+        objectId: 'asset-text',
+        payload: const {
+          'value': {
+            'objectType': 'text',
+            'dx': 0.0,
+            'dy': 0.0,
+            'width': 200.0,
+            'fontSize': 18.0,
+            'rotation': 0.0,
+            'colorValue': 0xFF000000,
+            'sortIndex': 0,
+          },
+        },
+      ),
+    ]);
+    await store.attachAssetReference(
+      documentId: documentId,
+      pageId: pageId,
+      objectId: 'asset-text',
+      assetId: 'attachment-one',
+      storagePath: 'assets/attachment-one',
+      checksumSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      byteLength: 24,
+    );
+    await database.customStatement(
+      'UPDATE text_block_rows SET text = ?, delta_json = ? WHERE uid = ?',
+      [
+        '\\uFFFC',
+        '[{"insert":{"image":"asset:attachment-one"}}]',
+        'asset-text',
+      ],
+    );
+    Future<int> references() async {
+      final rows = await database.customSelect(
+        'SELECT asset_id FROM asset_references '
+        'WHERE document_id = ? AND asset_id = ?',
+        variables: [
+          Variable<String>(documentId),
+          const Variable<String>('attachment-one'),
+        ],
+      ).get();
+      return rows.length;
+    }
+    final count = (await store.pending()).length;
+    final detach = LocalOperationDraft(
+      kind: OperationKind.assetDetach,
+      pageId: pageId,
+      objectId: 'asset-text',
+      payload: const {'assetId': 'attachment-one'},
+    );
+    await expectLater(write([detach]), throwsStateError);
+    expect(await references(), 1);
+    expect(await store.pending(), hasLength(count));
+
+    // Only the actual removal of the embed makes its reference detachable.
+    await database.customStatement(
+      'UPDATE text_block_rows SET text = ?, delta_json = ? WHERE uid = ?',
+      ['', '[{"insert":"\\n"}]', 'asset-text'],
+    );
+    await write([detach]);
+    expect(await references(), 0);
+    expect((await store.pending()).last.kind, OperationKind.assetDetach);
+    await expectLater(write([detach]), throwsStateError);
+    expect(await references(), 0);
+  });
+
+  test('active images cannot lose their only durable asset reference',
+      () async {
+    const imageId = 'active-image';
+    await database.customStatement(
+      'INSERT INTO image_block_rows '
+      '(uid, page_uid, path, ocr_text, width, height, rotation, dx, dy, '
+      'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        imageId, pageId, '/tmp/asset.png', '',
+        100.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0,
+      ],
+    );
+    await store.attachAssetReference(
+      documentId: documentId,
+      pageId: pageId,
+      objectId: imageId,
+      assetId: 'image-asset',
+      storagePath: '/tmp/asset.png',
+      checksumSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      byteLength: 10,
+    );
+    await expectLater(
+      write([
+        const LocalOperationDraft(
+          kind: OperationKind.assetDetach,
+          pageId: pageId,
+          objectId: imageId,
+          payload: {'assetId': 'image-asset'},
+        ),
+      ]),
+      throwsUnsupportedError,
+    );
+    expect(
+      await database.customSelect(
+        'SELECT asset_id FROM asset_references WHERE asset_id = ?',
+        variables: [const Variable<String>('image-asset')],
+      ).get(),
+      hasLength(1),
+    );
+  });
+
   test('v2 page deletion cannot orphan a stored image asset', () async {
     const target = 'asset-page';
     await write([
