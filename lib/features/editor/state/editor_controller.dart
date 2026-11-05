@@ -309,6 +309,47 @@ class EditorController extends ChangeNotifier {
     return true;
   }
 
+  /// Applies both sides of a committed v2 move as one UI mutation.
+  ///
+  /// The pages are read from the durable SQLite projection after commit.
+  /// No intermediate frame can display only the deletion or the insertion.
+  bool applyConfirmedV2PageMovePatch({
+    required NotePage source,
+    required NotePage destination,
+  }) {
+    if (operationWriter == null) {
+      throw StateError('A v2 move patch requires operation-mode editing.');
+    }
+    if (source.id.isEmpty ||
+        destination.id.isEmpty ||
+        source.id == destination.id) {
+      throw ArgumentError('A v2 move requires two distinct page IDs.');
+    }
+    if (!canApplyConfirmedRemoteNotebook) {
+      return false;
+    }
+    final sourceIndex = pages.indexWhere((page) => page.id == source.id);
+    final destinationIndex = pages.indexWhere(
+      (page) => page.id == destination.id,
+    );
+    if (sourceIndex < 0 || destinationIndex < 0) {
+      throw StateError('V2 move pages have changed since SQLite commit.');
+    }
+    final updated = List<NotePage>.from(pages)
+      ..[sourceIndex] = source
+      ..[destinationIndex] = destination;
+    pages = updated;
+    notebook = notebook.copyWith(pages: updated);
+    _v2PersistedNotebook = notebook;
+    _undoActions.clear();
+    _redoActions.clear();
+    _notifyHistoryChanged();
+    _touchInkPageRevision(source.id);
+    _touchInkPageRevision(destination.id);
+    notifyListeners();
+    return true;
+  }
+
   /// Displays one committed v2 Share object delta without remounting the editor.
   ///
   /// The caller must persist the matching operation in the same transaction
