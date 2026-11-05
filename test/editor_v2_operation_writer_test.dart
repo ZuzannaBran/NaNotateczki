@@ -290,6 +290,74 @@ void main() {
     );
   });
 
+  test('moving Quill text keeps its durable atoms and permits later edits',
+      () async {
+    final notebook = await repository.createNotebook();
+    final original = notebook.pages.single;
+    final second = original.copyWith(
+      id: 'text-destination',
+      title: 'Another page',
+      textBlocks: [],
+      imageBlocks: [],
+      inkStrokes: [],
+    );
+    TextBlock block(String value, Offset position) => TextBlock(
+      id: 'stable-text',
+      text: value,
+      deltaJson: '[{"insert":"$value\\n"}]',
+      position: position,
+      fontSize: 18,
+      color: const Color(0xFF123456),
+      width: 200,
+    );
+    final created = notebook.copyWith(pages: [
+      original.copyWith(textBlocks: [block('A', Offset.zero)]),
+      second,
+    ]);
+    await writer.writeNotebookChange(before: notebook, after: created);
+    final persisted = (await repository.getNotebook(notebook.uid))!;
+    final moved = persisted.copyWith(pages: [
+      persisted.pages.first.copyWith(textBlocks: []),
+      persisted.pages.last.copyWith(textBlocks: [
+        block('A', const Offset(20, 30)),
+      ]),
+    ]);
+    final operations = await writer.writeNotebookChange(
+      before: persisted,
+      after: moved,
+    );
+    expect(operations.where((op) => op.kind == OperationKind.objectMove),
+        hasLength(1));
+    expect(
+      operations.where((op) =>
+          op.kind == OperationKind.objectCreate ||
+          op.kind == OperationKind.objectDelete),
+      isEmpty,
+    );
+    final relocated = (await repository.getNotebook(notebook.uid))!;
+    expect(relocated.pages.first.textBlocks, isEmpty);
+    expect(relocated.pages.last.textBlocks.single.id, 'stable-text');
+    expect(relocated.pages.last.textBlocks.single.text, 'A');
+
+    final newPage = relocated.pages.last.copyWith(textBlocks: [
+      block('B', const Offset(20, 30)),
+    ]);
+    final changed = await writer.writePageChange(
+      documentId: notebook.uid,
+      before: relocated.pages.last,
+      after: newPage,
+    );
+    expect(changed.map((op) => op.kind), [
+      OperationKind.textDelete,
+      OperationKind.textInsert,
+    ]);
+    expect(
+      (await repository.getNotebook(notebook.uid))!
+          .pages.last.textBlocks.single.text,
+      'B',
+    );
+  });
+
   test('image creation stores authenticated bytes in the same v2 batch',
       () async {
     final buffer = VerifiedEditorAssetBuffer();
