@@ -1,8 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../data/sync/editor_sqlite_projector.dart';
+import '../../../data/sync/operation_asset_gateway.dart';
 import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/operation_store.dart';
 import '../../../data/sync/operation_text_sequence.dart';
@@ -24,6 +28,7 @@ class EditorV2OperationWriter {
   EditorV2OperationWriter({
     required this.syncEngine,
     required this.projector,
+    this.assetGateway,
     EditorOperationBridge? bridge,
   }) : _bridge = bridge ?? EditorOperationBridge() {
     if (!identical(syncEngine.store.database, projector.database)) {
@@ -33,6 +38,7 @@ class EditorV2OperationWriter {
 
   final SyncEngine syncEngine;
   final EditorSqliteProjector projector;
+  final OperationAssetGateway? assetGateway;
   final EditorOperationBridge _bridge;
   final Map<String, Map<String, VerifiedEditorAsset>> _registeredAssets = {};
 
@@ -75,6 +81,81 @@ class EditorV2OperationWriter {
     ...?_registeredAssets[documentId],
     ...explicit,
   };
+
+  /// Stages new or replaced image bytes before opening the SQLite batch.
+  ///
+  /// Failed HTTP/checksum validation leaves the durable projection and outbox
+  /// untouched. An already verified receipt is reused on a local retry.
+  Future<void> _prepareImageAssets({
+    required String documentId,
+    required Iterable<NotePage> before,
+    required Iterable<NotePage> after,
+    required Map<String, VerifiedEditorAsset> verifiedAssets,
+  }) async {
+    final previous = <String, ImageBlock>{
+      for (final page in before)
+        for (final image in page.imageBlocks) image.id: image,
+    };
+    for (final page in after) {
+      for (final image in page.imageBlocks) {
+        final old = previous[image.id];
+        if (old != null && old.ocrText != image.ocrText) {
+          throw UnsupportedError('OCR metadata is not yet a v2 operation.');
+        }
+        if (old != null &&
+            old.path == image.path &&
+            old.imageMime == image.imageMime &&
+            old.imageExt == image.imageExt &&
+            const ListEquality<int>().equals(old.bytes, image.bytes)) {
+          continue;
+        }
+        if (verifiedAssets.containsKey(image.id) ||
+            (_registeredAssets[documentId]?.containsKey(image.id) ??
+                false)) {
+          continue;
+        }
+        final gateway = assetGateway;
+        final buffer = projector.verifiedAssetBuffer;
+        if (gateway == null || buffer == null) {
+          // The bridge will reject this edit without touching SQLite.
+          continue;
+        }
+        final extension =
+            (image.imageExt ?? image.path.split('.').last).toLowerCase();
+        final mime = image.imageMime ??
+            switch (extension) {
+              'png' => 'image/png',
+              'jpg' || 'jpeg' => 'image/jpeg',
+              'webp' => 'image/webp',
+              'pdf' => 'application/pdf',
+              _ => '',
+            };
+        if (!OperationAssetGateway.supportedMimeTypes.contains(mime)) {
+          throw UnsupportedError('Unsupported v2 image/PDF media type.');
+        }
+        final bytes = image.bytes ??
+            (kIsWeb || image.path.isEmpty
+                ? (throw StateError('Missing image bytes for v2 upload.'))
+                : await File(image.path).readAsBytes());
+        final receipt = await gateway.uploadAndStage(
+          assetId: const Uuid().v4(),
+          bytes: bytes,
+          mediaType: mime,
+          buffer: buffer,
+        );
+        registerVerifiedAsset(
+          documentId: documentId,
+          objectId: image.id,
+          asset: VerifiedEditorAsset(
+            assetId: receipt['assetId'] as String,
+            sha256: receipt['sha256'] as String,
+            sizeBytes: receipt['sizeBytes'] as int,
+            mediaType: receipt['mediaType'] as String,
+          ),
+        );
+      }
+    }
+  }
 
   /// Commits a multi-page gesture and stable-ID ink moves in one batch.
   ///
@@ -138,6 +219,12 @@ class EditorV2OperationWriter {
     if (!const ListEquality<String>().equals(originalOrder, nextOrder)) {
       throw UnsupportedError('Page reordering is not yet in v2.');
     }
+    await _prepareImageAssets(
+      documentId: after.uid,
+      before: before.pages,
+      after: after.pages,
+      verifiedAssets: verifiedAssets,
+    );
 
     final oldInk = <String, InkStroke>{
       for (final page in before.pages)
@@ -375,6 +462,12 @@ class EditorV2OperationWriter {
     required NotePage after,
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
   }) async {
+    await _prepareImageAssets(
+      documentId: documentId,
+      before: [before],
+      after: [after],
+      verifiedAssets: verifiedAssets,
+    );
     final atoms = await _textAtoms(
       documentId: documentId,
       before: before,
@@ -402,6 +495,12 @@ class EditorV2OperationWriter {
     required NotePage after,
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
   }) async {
+    await _prepareImageAssets(
+      documentId: documentId,
+      before: [before],
+      after: [after],
+      verifiedAssets: verifiedAssets,
+    );
     final atoms = await _textAtoms(
       documentId: documentId,
       before: before,
@@ -425,13 +524,21 @@ class EditorV2OperationWriter {
     required String documentId,
     required NotePage page,
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
-  }) => _commit(
-    documentId,
-    _bridge.planCreatePage(
-      page,
-      verifiedAssets: _assetsFor(documentId, verifiedAssets),
-    ),
-  );
+  }) async {
+    await _prepareImageAssets(
+      documentId: documentId,
+      before: const <NotePage>[],
+      after: [page],
+      verifiedAssets: verifiedAssets,
+    );
+    return _commit(
+      documentId,
+      _bridge.planCreatePage(
+        page,
+        verifiedAssets: _assetsFor(documentId, verifiedAssets),
+      ),
+    );
+  }
 
   Future<List<OperationEnvelope>> writeDeletePage({
     required String documentId,
