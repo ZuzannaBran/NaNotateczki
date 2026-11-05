@@ -1284,7 +1284,7 @@ void main() {
     await database.customStatement(
       'UPDATE text_block_rows SET text = ?, delta_json = ? WHERE uid = ?',
       [
-        '\\uFFFC',
+        '\uFFFC',
         '[{"insert":{"image":"asset:deleted-text-asset"}}]',
         textId,
       ],
@@ -1458,6 +1458,69 @@ void main() {
         variables: [const Variable<String>('quill-one')],
       ).get(),
       hasLength(1),
+    );
+  });
+
+  test('page deletion releases only fully linked media in one commit',
+      () async {
+    const page = 'delete-linked-page';
+    const media = 'page-linked-image';
+    await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageCreate,
+        objectId: page,
+        payload: {
+          'value': {'title': 'Linked', 'isBookmarked': false},
+        },
+      ),
+    ]);
+    await database.customStatement(
+      'INSERT INTO image_block_rows '
+      '(uid, page_uid, path, ocr_text, width, height, rotation, dx, dy, '
+      'crop_left, crop_top, crop_right, crop_bottom, sort_index) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        media, page, '/private/linked.pdf', '',
+        100.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0,
+      ],
+    );
+    await store.attachAssetReference(
+      documentId: documentId,
+      pageId: page,
+      objectId: media,
+      assetId: 'linked-asset',
+      storagePath: '/private/linked.pdf',
+      checksumSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      byteLength: 24,
+    );
+    await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageDelete,
+        objectId: page,
+        payload: {},
+      ),
+    ]);
+    expect(
+      await database.customSelect(
+        'SELECT uid FROM page_rows WHERE uid = ?',
+        variables: [const Variable<String>(page)],
+      ).get(),
+      isEmpty,
+    );
+    expect(
+      await database.customSelect(
+        'SELECT uid FROM image_block_rows WHERE uid = ?',
+        variables: [const Variable<String>(media)],
+      ).get(),
+      isEmpty,
+    );
+    expect(
+      await database.customSelect(
+        'SELECT asset_id FROM asset_references WHERE asset_id = ?',
+        variables: [const Variable<String>('linked-asset')],
+      ).get(),
+      isEmpty,
     );
   });
 

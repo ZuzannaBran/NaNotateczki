@@ -294,50 +294,85 @@ class EditorSqliteProjector {
     if ((count?['total'] as int? ?? 0) <= 1) {
       throw StateError('The last notebook page cannot be deleted.');
     }
-    final images = await _row(
-      'SELECT COUNT(*) AS total FROM image_block_rows WHERE page_uid = ?',
-      [Variable<String>(pageId)],
-    );
-    if ((images?['total'] as int? ?? 0) > 0) {
-      throw UnsupportedError(
-        'Pages containing images/PDFs require verified asset detachment.',
-      );
-    }
-    final assetPrefix = 'page:[${jsonEncode(pageId)},';
-    final attached = await _row(
-      'SELECT asset_id FROM asset_references '
-      'WHERE document_id = ? AND substr(object_id, 1, ?) = ? LIMIT 1',
-      [
-        Variable<String>(op.documentId),
-        Variable<int>(assetPrefix.length),
-        Variable<String>(assetPrefix),
-      ],
-    );
-    if (attached != null) {
-      throw UnsupportedError(
-        'Page still has durable asset references requiring detach.',
-      );
-    }
-    // A legacy Quill embed is not necessarily stored as an image row.
-    // Never discard its reference before the asset projector is available.
-    final textRows = await database.customSelect(
-      'SELECT delta_json FROM text_block_rows WHERE page_uid = ? '
-      'AND delta_json IS NOT NULL',
+
+    final imageRows = await database.customSelect(
+      'SELECT uid FROM image_block_rows WHERE page_uid = ?',
       variables: [Variable<String>(pageId)],
     ).get();
-    for (final row in textRows) {
-      final decoded = jsonDecode(row.read<String>('delta_json'));
-      if (decoded is! List) {
-        throw const FormatException('Invalid stored Quill Delta.');
+    final textRows = await database.customSelect(
+      'SELECT uid, delta_json FROM text_block_rows WHERE page_uid = ?',
+      variables: [Variable<String>(pageId)],
+    ).get();
+    final imageIds = {
+      for (final row in imageRows) row.read<String>('uid'),
+    };
+    final textIds = {
+      for (final row in textRows) row.read<String>('uid'),
+    };
+    final prefix = 'page:[${jsonEncode(pageId)},';
+    final attached = await database.customSelect(
+      'SELECT object_id, asset_id FROM asset_references '
+      'WHERE document_id = ? AND substr(object_id, 1, ?) = ?',
+      variables: [
+        Variable<String>(op.documentId),
+        Variable<int>(prefix.length),
+        Variable<String>(prefix),
+      ],
+    ).get();
+    final assetsByOwner = <String, Set<String>>{};
+    for (final row in attached) {
+      final encodedOwner = row.read<String>('object_id');
+      final parts = jsonDecode(encodedOwner.substring('page:'.length));
+      if (parts is! List ||
+          parts.length != 2 ||
+          parts[0] != pageId ||
+          parts[1] is! String) {
+        throw const FormatException('Invalid scoped asset reference.');
       }
-      if (decoded.any(
-        (entry) => entry is Map && entry['insert'] is Map,
-      )) {
+      final owner = parts[1] as String;
+      if (!imageIds.contains(owner) && !textIds.contains(owner)) {
+        throw UnsupportedError('Page has an unowned media reference.');
+      }
+      assetsByOwner
+          .putIfAbsent(owner, () => <String>{})
+          .add(row.read<String>('asset_id'));
+    }
+    for (final id in imageIds) {
+      if (!assetsByOwner.containsKey(id)) {
         throw UnsupportedError(
-          'Quill embedded assets require verified asset detachment.',
+          'Deleting an image/PDF page requires verified asset references.',
         );
       }
     }
+    for (final row in textRows) {
+      final deltaJson = row.readNullable<String>('delta_json');
+      if (deltaJson == null) {
+        continue;
+      }
+      final delta = jsonDecode(deltaJson);
+      if (delta is! List) {
+        throw const FormatException('Invalid stored Quill Delta.');
+      }
+      for (final item in delta) {
+        if (item is! Map) {
+          throw const FormatException('Invalid stored Quill entry.');
+        }
+        final insert = item['insert'];
+        if (insert is Map) {
+          final id = OperationEnvelope.embedAssetId(insert);
+          if (!(assetsByOwner[row.read<String>('uid')]?.contains(id) ??
+              false)) {
+            throw UnsupportedError('Unverified embed on deleted page.');
+          }
+        }
+      }
+    }
+
+    await database.customStatement(
+      'DELETE FROM asset_references WHERE document_id = ? '
+      'AND substr(object_id, 1, ?) = ?',
+      [op.documentId, prefix.length, prefix],
+    );
     for (final table in [
       'ink_stroke_rows',
       'text_block_rows',
@@ -613,7 +648,7 @@ class EditorSqliteProjector {
     );
   }
 
-Future<void> _deleteObject(OperationEnvelope op) async {
+  Future<void> _deleteObject(OperationEnvelope op) async {
     await _pageExists(op, op.pageId!);
     final ink = await _row(
       'SELECT uid FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',

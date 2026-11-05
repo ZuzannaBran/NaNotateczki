@@ -11,6 +11,8 @@ uznany za zaliczony na podstawie samego dodania testu.
 - [x] Trwała blokada v1 dla UID mającego historię operacji v2.
 - [x] Korekty remote UI, stron, ink, z-order, podstawowego tekstu Quill.
 - [x] Ink `object.move`; obraz `object.move` tylko z referencją assetu.
+- [x] `page.delete` usuwa zweryfikowane obrazy/Quill i ich scoped
+  referencje atomowo; nadal odrzuca obce, niepowiązane i brakujące assety.
 - [x] `object.delete` dla obrazu/Quill usuwa scoped referencję w tej
   samej transakcji; niezweryfikowany media object blokuje operację.
 - [x] LWW właściwości na podstawie trwałej historii operacji.

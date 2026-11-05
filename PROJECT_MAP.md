@@ -1384,6 +1384,8 @@ Nie wspiera pełnego transferu assetów ani zdalnego rebase.
 Usuwanie zweryfikowanego obrazu lub tekstu z embedem Quill usuwa
 scoped asset references razem z obiektem w transakcji SQLite;
 nie usuwa fizycznych plików i odmawia usunięcia brakującego assetu.
+`page.delete` może usuwać powiązane obrazy/Quill wraz z referencjami
+w jednej transakcji; osierocone i legacy referencje są blokowane.
 Test: `test/editor_v2_operation_writer_test.dart`.
 
 ### `lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart`
