@@ -50,6 +50,9 @@ class EditorSqliteProjector {
     switch (operation.kind) {
       case OperationKind.documentSet:
         await _setDocument(operation);
+      case OperationKind.documentDelete:
+        await _deleteDocument(operation);
+        return;
       case OperationKind.pageCreate:
         await _createPage(operation);
       case OperationKind.pageSet:
@@ -129,6 +132,34 @@ class EditorSqliteProjector {
         createdAt: createdAt,
         updatedAt: createdAt,
       ),
+    );
+  }
+
+  /// Deletes the entire document projection in one operation transaction.
+  /// Tombstones and the immutable journal are retained by OperationStore.
+  Future<void> _deleteDocument(OperationEnvelope op) async {
+    for (final table in const [
+      'ink_stroke_rows',
+      'text_block_rows',
+      'image_block_rows',
+    ]) {
+      await database.customStatement(
+        'DELETE FROM $table WHERE page_uid IN '
+        '(SELECT uid FROM page_rows WHERE notebook_uid = ?)',
+        [op.documentId],
+      );
+    }
+    await database.customStatement(
+      'DELETE FROM asset_references WHERE document_id = ?',
+      [op.documentId],
+    );
+    await database.customStatement(
+      'DELETE FROM page_rows WHERE notebook_uid = ?',
+      [op.documentId],
+    );
+    await database.customStatement(
+      'DELETE FROM notebook_rows WHERE uid = ?',
+      [op.documentId],
     );
   }
 
