@@ -88,7 +88,7 @@ class EditorSqliteProjector {
     final now = DateTime.now().toUtc();
     final updated = now.isAfter(row.updatedAt)
         ? now
-        : row.updatedAt.add(const Duration(milliseconds: 1));
+        : row.updatedAt.add(const Duration(seconds: 1));
     await (database.update(database.notebookRows)
           ..where((item) => item.uid.equals(uid)))
         .write(NotebookRowsCompanion(updatedAt: Value(updated)));
