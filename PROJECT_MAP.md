@@ -1419,6 +1419,8 @@ upload, odrzucenie starego receipt i przenoszenie Quill między stronami).
 operację uprzednio zatwierdzoną w SQLite przez `SyncEngine`. Pobiera
 aktualny obiekt/stronę z repozytorium i aktualizuje wskazany fragment
 `EditorController`, bez snapshotowego odmalowywania całego notatnika.
+Operacje `document.set` odświeżają tylko tytuł/folder, a `document.delete`
+blokuje dalszy zapis skasowanego UID. Callback pozwala odświeżyć bibliotekę.
 Dla `object.move` usuwa źródłowy obiekt z widoku i dodaje go w celu.
 Przy image `object.create` nie powiadamia UI o pustym
 placeholderze; dopiero zweryfikowany `asset.attach` dodaje obraz.

@@ -12,6 +12,7 @@ class EditorV2RemotePatchDispatcher {
   EditorV2RemotePatchDispatcher({
     required this.editor,
     required this.repository,
+    this.onDocumentCommitted,
   }) {
     if (editor.operationWriter == null ||
         !identical(editor.repository, repository)) {
@@ -22,8 +23,41 @@ class EditorV2RemotePatchDispatcher {
   final EditorController editor;
   final NotebookRepository repository;
 
+  /// Refreshes the owning library after document metadata or deletion.
+  final Future<void> Function(OperationEnvelope)? onDocumentCommitted;
+
   Future<void> onRemoteCommitted(OperationEnvelope operation) async {
     if (operation.documentId != editor.notebook.uid) {
+      return;
+    }
+    if (operation.kind.target == OperationTarget.document) {
+      if (operation.kind == OperationKind.documentDelete) {
+        if (!editor.applyConfirmedV2DocumentDeletion()) {
+          throw StateError('Committed document deletion was deferred.');
+        }
+      } else {
+        if (editor.isV2DocumentDeleted) {
+          return;
+        }
+        if (operation.kind == OperationKind.documentSet) {
+          final notebook = await repository.getNotebook(operation.documentId);
+          if (notebook == null ||
+              !editor.applyConfirmedV2DocumentMetadata(
+                title: notebook.title,
+                folder: notebook.folder,
+              )) {
+            throw StateError('Committed document metadata was deferred.');
+          }
+        } else if (operation.kind != OperationKind.documentCreate) {
+          throw UnsupportedError(
+            'Unknown document operation: ${operation.kind.wireName}.',
+          );
+        }
+      }
+      await onDocumentCommitted?.call(operation);
+      return;
+    }
+    if (editor.isV2DocumentDeleted) {
       return;
     }
     if (operation.kind.target != OperationTarget.object &&

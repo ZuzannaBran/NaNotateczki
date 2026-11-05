@@ -174,6 +174,7 @@ class EditorController extends ChangeNotifier {
   bool _fullSavePending = false;
   bool _integritySaveBlocked = false;
   bool _isDisposed = false;
+  bool _v2DocumentDeleted = false;
 
   String? lastTextFontFamily;
   double lastTextFontSize = 18.0;
@@ -238,8 +239,11 @@ class EditorController extends ChangeNotifier {
     return _inkPageRevisions.putIfAbsent(pageId, () => ValueNotifier<int>(0));
   }
 
+  bool get isV2DocumentDeleted => _v2DocumentDeleted;
+
   bool get canApplyConfirmedRemoteNotebook =>
       !_isDisposed &&
+      !_v2DocumentDeleted &&
       !_hasPendingSaveWork &&
       !repository.hasPendingSaves &&
       activeTextBlockId == null &&
@@ -271,6 +275,55 @@ class EditorController extends ChangeNotifier {
     for (final page in pages) {
       _touchInkPageRevision(page.id);
     }
+    notifyListeners();
+    return true;
+  }
+
+  /// Applies confirmed metadata without replacing the pages or viewport.
+  bool applyConfirmedV2DocumentMetadata({
+    required String title,
+    required String folder,
+  }) {
+    if (operationWriter == null) {
+      throw StateError('Metadata patches require a v2 editor.');
+    }
+    if (title.isEmpty || folder.isEmpty) {
+      throw ArgumentError('Document metadata cannot be empty.');
+    }
+    if (!canApplyConfirmedRemoteNotebook) {
+      return false;
+    }
+    notebook = notebook.copyWith(title: title, folder: folder);
+    _v2PersistedNotebook = _v2PersistedNotebook.copyWith(
+      title: title,
+      folder: folder,
+    );
+    _v2Undo.clear();
+    _v2Redo.clear();
+    _undoActions.clear();
+    _redoActions.clear();
+    _notifyHistoryChanged();
+    notifyListeners();
+    return true;
+  }
+
+  /// Prevents a committed remote tombstone from being overwritten locally.
+  bool applyConfirmedV2DocumentDeletion() {
+    if (operationWriter == null) {
+      throw StateError('Document deletion patches require a v2 editor.');
+    }
+    if (_v2DocumentDeleted) {
+      return true;
+    }
+    if (!canApplyConfirmedRemoteNotebook) {
+      return false;
+    }
+    _v2DocumentDeleted = true;
+    _v2Undo.clear();
+    _v2Redo.clear();
+    _undoActions.clear();
+    _redoActions.clear();
+    _notifyHistoryChanged();
     notifyListeners();
     return true;
   }
@@ -3678,6 +3731,9 @@ class EditorController extends ChangeNotifier {
         updatedAt: DateTime.now(),
       );
       try {
+        if (_v2DocumentDeleted) {
+          throw StateError('A deleted v2 notebook cannot be edited.');
+        }
         final baseline = _v2PersistedNotebook;
         final committed = await operationWriter!.writeNotebookChange(
           before: baseline,

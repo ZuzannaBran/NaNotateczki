@@ -315,4 +315,88 @@ void main() {
     expect(await store.checkpoint('remote-patch-test'), 6);
     expect(await store.pending(), isEmpty);
   });
+  test('remote document set/delete cannot block v2 UI delivery', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final store = OperationStore(database);
+    final projector = EditorSqliteProjector(database);
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'local',
+      checkpointScope: 'document-metadata-test',
+      enableRealtime: false,
+      applyRemote: (op, _) => projector.apply(op),
+    );
+    addTearDown(engine.stop);
+    final editor = EditorController(
+      repository: repository,
+      notebook: notebook,
+      operationWriter: EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: projector,
+      ),
+    );
+    addTearDown(editor.dispose);
+    final notifications = <OperationKind>[];
+    final dispatcher = EditorV2RemotePatchDispatcher(
+      editor: editor,
+      repository: repository,
+      onDocumentCommitted: (op) async {
+        notifications.add(op.kind);
+      },
+    );
+    OperationEnvelope remote(
+      OperationKind kind,
+      int seq,
+      Map<String, dynamic> payload, {
+      List<String> dependencies = const [],
+    }) => OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-doc',
+      actorSeq: seq,
+      logicalClock: seq,
+      documentId: notebook.uid,
+      kind: kind,
+      payload: payload,
+      dependencies: dependencies,
+    );
+    final rename = remote(OperationKind.documentSet, 1, const {
+      'properties': {'title': 'Renamed', 'folder': 'Other'},
+    });
+    await store.applyRemote(
+      rename,
+      serverSequence: 1,
+      apply: () => projector.apply(rename),
+    );
+    await dispatcher.onRemoteCommitted(rename);
+    expect(editor.notebook.title, 'Renamed');
+    expect(editor.notebook.folder, 'Other');
+    expect(editor.pages.single.id, notebook.pages.single.id);
+
+    final deletion = remote(
+      OperationKind.documentDelete,
+      2,
+      const {},
+      dependencies: [rename.operationId],
+    );
+    await store.applyRemote(
+      deletion,
+      serverSequence: 2,
+      apply: () => projector.apply(deletion),
+    );
+    await dispatcher.onRemoteCommitted(deletion);
+    expect(editor.isV2DocumentDeleted, isTrue);
+    expect(editor.canApplyConfirmedRemoteNotebook, isFalse);
+    expect(await repository.getNotebook(notebook.uid), isNull);
+    await dispatcher.onRemoteCommitted(deletion);
+    expect(notifications, [
+      OperationKind.documentSet,
+      OperationKind.documentDelete,
+      OperationKind.documentDelete,
+    ]);
+  });
+
 }

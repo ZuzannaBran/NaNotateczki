@@ -298,3 +298,12 @@ Nowe testy w `test/editor_v2_operation_writer_test.dart`,
 `EditorV2OperationWriter` dla produkcyjnego edytora.
 Nie uruchomiono testów Flutter ani Pythona w tej sesji, więc powyższy
 kod i warunki nie są uznane za zweryfikowane produkcyjnie.
+
+### Zdalne metadane i tombstone dokumentu
+
+Po trwałym commicie `document.set` aktualizuje tytuł i folder aktywnego
+kontrolera bez podmiany stron, a `document.delete` trwale blokuje lokalny
+zapis pod skasowanym UID. Dispatcher udostępnia callback
+`onDocumentCommitted`, który musi zostać podłączony do biblioteki przy
+produkcyjnej aktywacji v2. Test regresyjny obejmuje obie operacje oraz
+powtórne powiadomienie usunięcia. Pełny cutover nadal jest osobny.
