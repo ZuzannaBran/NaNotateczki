@@ -50,6 +50,18 @@ class _V2HistoryEntry {
   final Notebook after;
 }
 
+class _V2GestureCheckpoint {
+  const _V2GestureCheckpoint(
+    this.target,
+    this.historyBefore,
+    this.recordHistory,
+  );
+
+  final Notebook target;
+  final Notebook? historyBefore;
+  final bool recordHistory;
+}
+
 class LassoSelection {
   LassoSelection({
     required this.pageIndex,
@@ -130,7 +142,7 @@ class EditorController extends ChangeNotifier {
   bool _v2HistoryCommitting = false;
   final List<_V2HistoryEntry> _v2Undo = [];
   final List<_V2HistoryEntry> _v2Redo = [];
-  final List<Notebook> _v2GestureCheckpoints = [];
+  final List<_V2GestureCheckpoint> _v2GestureCheckpoints = [];
   Duration saveDebounce;
   final Uuid _uuid = const Uuid();
   final ImagePicker _imagePicker = ImagePicker();
@@ -185,6 +197,7 @@ class EditorController extends ChangeNotifier {
   quill.QuillController? activeTextController;
   int? _activeTextEditPageIndex;
   TextBlock? _activeTextEditBefore;
+  Notebook? _activeV2TextEditBefore;
   String? activeImageBlockId;
   String? activeShapeStrokeId;
   int? activeShapePageIndex;
@@ -206,10 +219,16 @@ class EditorController extends ChangeNotifier {
 
   bool get canUndo => operationWriter == null
       ? _undoActions.isNotEmpty
-      : _v2Undo.isNotEmpty || _fullSavePending || _dirtyPageIds.isNotEmpty;
+      : _v2Undo.isNotEmpty ||
+            _fullSavePending ||
+            _dirtyPageIds.isNotEmpty ||
+            _activeTextEditBefore != null;
   bool get canRedo => operationWriter == null
       ? _redoActions.isNotEmpty
-      : _v2Redo.isNotEmpty && !_fullSavePending && _dirtyPageIds.isEmpty;
+      : _v2Redo.isNotEmpty &&
+            !_fullSavePending &&
+            _dirtyPageIds.isEmpty &&
+            _activeTextEditBefore == null;
   bool get allowsFingerDrawing => pointerInputMode.allowsFingerDrawing;
   bool get isObjectTransformActive => _isObjectTransformActive;
   bool get isActiveImageEdit =>
@@ -3621,6 +3640,7 @@ class EditorController extends ChangeNotifier {
     if (_activeTextEditBefore?.id == blockId) {
       return;
     }
+    _commitActiveTextEdit();
     final pageIndex = _pageIndexContainingTextBlock(blockId);
     if (pageIndex == null) {
       return;
@@ -3630,11 +3650,17 @@ class EditorController extends ChangeNotifier {
     );
     _activeTextEditPageIndex = pageIndex;
     _activeTextEditBefore = block;
+    if (operationWriter != null) {
+      _activeV2TextEditBefore = notebook.copyWith(
+        pages: List<NotePage>.of(pages),
+      );
+    }
   }
 
   void _commitActiveTextEdit() {
     final pageIndex = _activeTextEditPageIndex;
     final before = _activeTextEditBefore;
+    final historyBefore = _activeV2TextEditBefore;
     _discardActiveTextEdit();
     if (pageIndex == null || before == null) {
       return;
@@ -3649,6 +3675,10 @@ class EditorController extends ChangeNotifier {
       return;
     }
     if (before.text == after.text && before.deltaJson == after.deltaJson) {
+      if (historyBefore != null) {
+        _captureV2Gesture(historyBefore: historyBefore, recordHistory: false);
+        _scheduleSave(pageId: pages[pageIndex].id);
+      }
       return;
     }
     _undoActions.add(
@@ -3658,13 +3688,14 @@ class EditorController extends ChangeNotifier {
       ),
     );
     _redoActions.clear();
-    _captureV2Gesture();
+    _captureV2Gesture(historyBefore: historyBefore);
     _scheduleSave(pageId: pages[pageIndex].id);
   }
 
   void _discardActiveTextEdit() {
     _activeTextEditPageIndex = null;
     _activeTextEditBefore = null;
+    _activeV2TextEditBefore = null;
   }
 
   /// Completes an opt-in image upload after its receipt and bytes have
@@ -3721,14 +3752,18 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Keeps each completed action independent of the next debounce period.
-  void _captureV2Gesture() {
+  void _captureV2Gesture({Notebook? historyBefore, bool recordHistory = true}) {
     if (operationWriter == null || _isDisposed || _v2DocumentDeleted) {
       return;
     }
     _v2GestureCheckpoints.add(
-      notebook.copyWith(
-        pages: List<NotePage>.of(pages),
-        updatedAt: DateTime.now(),
+      _V2GestureCheckpoint(
+        notebook.copyWith(
+          pages: List<NotePage>.of(pages),
+          updatedAt: DateTime.now(),
+        ),
+        historyBefore,
+        recordHistory,
       ),
     );
   }
@@ -3753,6 +3788,7 @@ class EditorController extends ChangeNotifier {
             await activeInverse;
           }
           final savedPages = pages;
+          final textEditInProgress = _activeTextEditBefore != null;
           final proposed = notebook.copyWith(
             pages: savedPages,
             updatedAt: DateTime.now(),
@@ -3761,15 +3797,20 @@ class EditorController extends ChangeNotifier {
             if (_v2DocumentDeleted) {
               throw StateError('A deleted v2 notebook cannot be edited.');
             }
-            Future<void> persist(Notebook target) async {
+            Future<void> persist(
+              Notebook target, {
+              Notebook? historyBefore,
+              bool recordHistory = true,
+            }) async {
               final baseline = _v2PersistedNotebook;
               final committed = await operationWriter!.writeNotebookChange(
                 before: baseline,
                 after: target,
               );
               _v2PersistedNotebook = target;
-              if (committed.isNotEmpty) {
-                _v2Undo.add(_V2HistoryEntry(baseline, target));
+              if (recordHistory &&
+                  (committed.isNotEmpty || historyBefore != null)) {
+                _v2Undo.add(_V2HistoryEntry(historyBefore ?? baseline, target));
                 if (_v2Undo.length > 50) {
                   _v2Undo.removeAt(0);
                 }
@@ -3780,14 +3821,20 @@ class EditorController extends ChangeNotifier {
               }
             }
 
-            final gestures = List<Notebook>.of(_v2GestureCheckpoints);
+            final gestures = List<_V2GestureCheckpoint>.of(
+              _v2GestureCheckpoints,
+            );
             for (final gesture in gestures) {
-              await persist(gesture);
+              await persist(
+                gesture.target,
+                historyBefore: gesture.historyBefore,
+                recordHistory: gesture.recordHistory,
+              );
               _v2GestureCheckpoints.removeAt(0);
             }
             // A later gesture during I/O must not be overwritten by this save.
             if (identical(pages, savedPages)) {
-              await persist(proposed);
+              await persist(proposed, recordHistory: !textEditInProgress);
             }
             _integritySaveBlocked = false;
             if (identical(pages, savedPages) && _v2GestureCheckpoints.isEmpty) {

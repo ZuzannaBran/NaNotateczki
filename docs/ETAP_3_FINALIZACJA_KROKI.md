@@ -37,6 +37,19 @@ tożsamość atomów po utracie bufora, brak referencji oraz rollback
 wsadu, w którym po przeniesieniu występuje błędna geometria.
 Wynik testów tego przyrostu pozostaje do odczytania w następnym CI.
 
+### Granica gestu tekstowego — implementacja
+
+Autosave Quill zapisuje lokalne operacje podczas pisania, lecz nie dodaje
+osobnego Undo przy każdym debounce. Kontroler przechowuje stan sprzed
+edycji i dołącza go do końcowego checkpointu gestu. Koniec edycji zachowuje
+historię również wtedy, gdy treść była już zatwierdzona w SQLite i nie ma
+nowych operacji do zapisania. Powrót do oryginalnej treści i Delta nie
+dodaje pustego Undo. Przejście bezpośrednio do innego bloku najpierw
+zamyka poprzedni gest.
+Regresje `editor_controller_v2_test.dart` czekają na rzeczywisty lokalny
+commit dwóch autosave'ów, następnie sprawdzają pojedyncze Undo/Redo oraz
+edycję o zerowym efekcie. Wykonanie testów Flutter potwierdza następne CI.
+
 ## Integracja z 5 listopada 2026 — nadal niezamknięty etap 3
 
 - Dodano opt-in `EditorV2AccountRuntime` dla konta o potwierdzonym

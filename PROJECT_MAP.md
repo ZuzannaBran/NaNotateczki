@@ -1514,6 +1514,10 @@ zgodą na zamknięcie aplikacji. Opcjonalny `operationWriter` kieruje
 zapis wyłącznie do v2 z serializacją zmian i utrwaloną bazą stanu;
 w opt-in v2 każdy zakończony gest zachowuje oddzielny checkpoint
 pozwalający cofnąć go niezależnie od innych działań w debounce;
+autosave aktywnego Quill utrwala operacje bez osobnych kroków historii.
+Zamknięcie edycji zapisuje granicę gestu względem stanu sprzed pisania,
+również gdy ostatni autosave już zatwierdził wszystkie operacje.
+Powrót do pierwotnej treści/Delta nie dodaje pustego kroku Undo.
 `NotebookRepository` blokuje wtedy legacy snapshot writery na tym UID.
 Undo/Redo w trybie v2 działa na zatwierdzonych stanach przez nowe operacje
 i nowe ID odtwarzanych obiektów; nie odtwarza tombstone. Równoległy gest
@@ -1525,6 +1529,10 @@ nie zmieniając zoomu i aktualnego wyboru strony. Metoda
 obrazu i ponawia nieukończony v2 zapis bez snapshotów v1.
 Regresja: `test/editor_controller_v2_test.dart`, w tym cofanie i
 ponawianie ink oraz stron bez ponownego użycia tombstones.
+Ten sam test obejmuje dwa rzeczywiste autosave'y Quill, pojedyncze
+Undo/Redo i edycję o zerowym efekcie. Ważne granice: 588:
+`flushPendingSaves`; 2261: `updateTextBlockContent`; 3660:
+`_commitActiveTextEdit`; 3755: `_captureV2Gesture`; 3776: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod

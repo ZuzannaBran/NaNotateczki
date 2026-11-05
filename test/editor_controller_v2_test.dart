@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:drift/native.dart';
@@ -248,6 +250,115 @@ void main() {
       'image-a',
     ]);
   });
+
+  for (final restoreOriginal in [false, true]) {
+    test(
+      'text autosaves share one history gesture, noop=$restoreOriginal',
+      () async {
+        final database = NotesDatabase(NativeDatabase.memory());
+        addTearDown(database.close);
+        final repository = NotebookRepository(database);
+        final notebook = await repository.createNotebook();
+        final store = OperationStore(database);
+        final projector = EditorSqliteProjector(database);
+        final engine = SyncEngine(
+          store: store,
+          gateway: _OfflineGateway(),
+          actorId: 'text-gesture-test',
+          checkpointScope: 'text-gesture-test',
+          enableRealtime: false,
+          applyRemote: (operation, _) => projector.apply(operation),
+        );
+        addTearDown(engine.stop);
+        Completer<void>? committed;
+        final writer = EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+          onCommitted: (_, __) {
+            if (committed != null && !committed!.isCompleted) {
+              committed!.complete();
+            }
+          },
+        );
+        final original = TextBlock(
+          id: 'autosaved-text',
+          text: 'Original',
+          deltaJson: jsonEncode([
+            {'insert': 'Original\n'},
+          ]),
+          position: Offset.zero,
+          fontSize: 18,
+          color: const Color(0xFF112233),
+          width: 200,
+        );
+        await writer.writePageChange(
+          documentId: notebook.uid,
+          before: notebook.pages.single,
+          after: notebook.pages.single.copyWith(textBlocks: [original]),
+        );
+        final controller = EditorController(
+          repository: repository,
+          notebook: (await repository.getNotebook(notebook.uid))!,
+          operationWriter: writer,
+          saveDebounce: const Duration(milliseconds: 10),
+        );
+        addTearDown(controller.dispose);
+        controller.setActiveTextBlock(original.id, null);
+
+        Future<void> autoSave(String text) async {
+          committed = Completer<void>();
+          controller.updateTextBlockContent(
+            controller.currentPage.textBlocks.single,
+            plainText: text,
+            deltaJson: jsonEncode([
+              {'insert': '$text\n'},
+            ]),
+          );
+          await committed!.future.timeout(const Duration(seconds: 5));
+          expect(
+            (await repository.getNotebook(
+              notebook.uid,
+            ))!.pages.single.textBlocks.single.text,
+            text,
+          );
+        }
+
+        await autoSave('First autosave');
+        await autoSave(restoreOriginal ? 'Original' : 'Second autosave');
+        // End the edit after its latest content is already durable.
+        controller.setActiveTextBlock(null, null);
+        await controller.flushPendingSaves();
+        expect(controller.canUndo, !restoreOriginal);
+        if (restoreOriginal) {
+          expect(
+            (await repository.getNotebook(
+              notebook.uid,
+            ))!.pages.single.textBlocks.single.deltaJson,
+            original.deltaJson,
+          );
+          return;
+        }
+        controller.undo();
+        await controller.flushPendingSaves();
+        expect(
+          (await repository.getNotebook(
+            notebook.uid,
+          ))!.pages.single.textBlocks.single.text,
+          'Original',
+        );
+        expect(controller.canUndo, isFalse);
+        expect(controller.canRedo, isTrue);
+        controller.redo();
+        await controller.flushPendingSaves();
+        expect(
+          (await repository.getNotebook(
+            notebook.uid,
+          ))!.pages.single.textBlocks.single.text,
+          'Second autosave',
+        );
+      },
+    );
+  }
 
   test(
     'opt-in controller rejects a projection from a different SQLite',
