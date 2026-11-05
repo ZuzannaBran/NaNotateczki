@@ -131,7 +131,17 @@ void main() {
       objectId: 'remote-ink',
       payload: const {'toPageId': 'remote-page', 'sortIndex': 0},
     );
+    var moveRepaints = 0;
+    void onMove() {
+      moveRepaints++;
+      // A single UI revision must contain both sides of the move.
+      expect(editor.pages.first.inkStrokes, isEmpty);
+      expect(editor.pages.last.inkStrokes.single.id, 'remote-ink');
+    }
+    editor.addListener(onMove);
     await dispatcher.onRemoteCommitted(moved);
+    editor.removeListener(onMove);
+    expect(moveRepaints, 1);
     expect(editor.pages.first.inkStrokes, isEmpty);
     expect(editor.pages.last.inkStrokes.single.id, 'remote-ink');
 
