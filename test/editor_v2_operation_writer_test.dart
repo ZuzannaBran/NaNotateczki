@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:drift/native.dart';
@@ -11,6 +12,7 @@ import 'package:program/data/sync/sync_engine.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
+import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/ink_stroke.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
 
@@ -276,6 +278,103 @@ void main() {
     await expectLater(
       writer.writeNotebookChange(before: starting, after: invalid),
       throwsUnsupportedError,
+    );
+  });
+
+  test('image move preserves the asset and never recreates its ID',
+      () async {
+    final notebook = await repository.createNotebook();
+    final page = notebook.pages.single;
+    final second = page.copyWith(
+      id: 'image-destination',
+      title: 'Media',
+      inkStrokes: [],
+      textBlocks: [],
+      imageBlocks: [],
+    );
+    final image = ImageBlock(
+      id: 'verified-image',
+      path: '',
+      ocrText: '',
+      bytes: Uint8List.fromList([137, 80, 78, 71]),
+      imageExt: 'png',
+      imageMime: 'image/png',
+      position: const Offset(10, 20),
+      width: 120,
+      height: 80,
+    );
+    final initial = notebook.copyWith(pages: [
+      page.copyWith(imageBlocks: [image]),
+      second,
+    ]);
+    expect(await repository.saveNotebook(initial), isTrue);
+    await store.attachAssetReference(
+      documentId: notebook.uid,
+      pageId: page.id,
+      objectId: image.id,
+      assetId: 'asset-verified',
+      storagePath: 'assets/asset-verified',
+      checksumSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      byteLength: 4,
+    );
+    final persisted = (await repository.getNotebook(notebook.uid))!;
+    final relocated = persisted.copyWith(pages: [
+      persisted.pages.first.copyWith(imageBlocks: []),
+      persisted.pages.last.copyWith(
+        imageBlocks: [
+          persisted.pages.first.imageBlocks.single.copyWith(
+            position: const Offset(60, 90),
+          ),
+        ],
+      ),
+    ]);
+    final written = await writer.writeNotebookChange(
+      before: persisted,
+      after: relocated,
+    );
+    expect(
+      written.where((op) => op.kind == OperationKind.objectMove),
+      hasLength(1),
+    );
+    expect(
+      written.where((op) => op.kind == OperationKind.objectCreate),
+      isEmpty,
+    );
+    expect(
+      written.where((op) => op.kind == OperationKind.objectDelete),
+      isEmpty,
+    );
+    final saved = (await repository.getNotebook(notebook.uid))!;
+    expect(saved.pages.first.imageBlocks, isEmpty);
+    expect(saved.pages.last.imageBlocks.single.id, image.id);
+    expect(saved.pages.last.imageBlocks.single.position.dx, 60);
+    expect(
+      saved.pages.last.imageBlocks.single.bytes,
+      orderedEquals(image.bytes!),
+    );
+    final refs = await database.customSelect(
+      'SELECT object_id FROM asset_references WHERE asset_id = ?',
+      variables: [const Variable<String>('asset-verified')],
+    ).get();
+    expect(refs, hasLength(1));
+    expect(
+      refs.single.read<String>('object_id'),
+      'page:["image-destination","verified-image"]',
+    );
+
+    final removed = relocated.copyWith(pages: [
+      relocated.pages.first,
+      relocated.pages.last.copyWith(imageBlocks: []),
+    ]);
+    await expectLater(
+      writer.writeNotebookChange(before: relocated, after: removed),
+      throwsUnsupportedError,
+    );
+    expect(
+      (await repository.getNotebook(notebook.uid))!
+          .pages.last.imageBlocks.single.id,
+      image.id,
     );
   });
 
