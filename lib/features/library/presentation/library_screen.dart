@@ -713,12 +713,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final operationRuntime = context.read<EditorV2AccountRuntime?>();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => editorNotebook == null || operationRuntime != null
+        builder: (_) => editorNotebook == null
             ? const EditorSettingsScreen()
             : ChangeNotifierProvider(
                 create: (_) => EditorController(
                   repository: repository,
                   notebook: editorNotebook,
+                  operationWriter: operationRuntime?.writer,
                 ),
                 child: const EditorSettingsScreen(),
               ),

@@ -50,6 +50,16 @@ Regresje `editor_controller_v2_test.dart` czekają na rzeczywisty lokalny
 commit dwóch autosave'ów, następnie sprawdzają pojedyncze Undo/Redo oraz
 edycję o zerowym efekcie. Wykonanie testów Flutter potwierdza następne CI.
 
+### Ustawienia katalogu v2 — implementacja
+
+`LibraryScreen._openCatalogSettings` nie pomija już kontrolera edytora
+tylko z powodu aktywnego runtime v2. Przekazuje operacyjny writer,
+zachowując ustawienia rysika i wyglądu bez uruchamiania writera v1.
+`library_v2_settings_test.dart` sprawdza rzeczywisty ekran, dwukrotne
+otwarcie/zamknięcie, tożsamość writera, blokadę snapshotu i brak
+zbędnych operacji. Test dołączono do celowanej weryfikacji etapu 3;
+wynik Flutter pozostaje do potwierdzenia w CI.
+
 ## Integracja z 5 listopada 2026 — nadal niezamknięty etap 3
 
 - Dodano opt-in `EditorV2AccountRuntime` dla konta o potwierdzonym

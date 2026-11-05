@@ -526,6 +526,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   dispatcher zdalnych zmian i odłącza go przy dispose. Share v1
   jest zablokowany w preview v2. Przejście v1↔v2 tworzy nowy
   kontroler, bez jednoczesnego zapisu obu wersji.
+- `_openCatalogSettings` tworzy kontroler ustawień również dla katalogu v2,
+  przekazując ten sam operacyjny writer; ustawienia rysika/tła pozostają
+  dostępne, a snapshotowy zapis UID jest nadal zablokowany.
+  Regresja `test/library_v2_settings_test.dart` otwiera ustawienia dwukrotnie
+  i sprawdza brak nowych operacji oraz prawidłowe zwolnienie kontrolera.
 - `notebook_repository.dart` kieruje w preview tworzenie notebooków,
   boardów, zmianę tytułu/folderu i usuwanie do trwałego dziennika v2.
   `EditorV2OperationWriter.onCommitted` aktualizuje cache i harmonogram

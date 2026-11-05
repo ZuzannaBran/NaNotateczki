@@ -32,7 +32,8 @@ dart format --output=none --set-exit-if-changed \
   test/editor_v2_crash_recovery_test.dart \
   test/persistent_operation_actor_test.dart \
   test/verified_quill_embed_builder_test.dart \
-  test/notebook_repository_v2_account_test.dart
+  test/notebook_repository_v2_account_test.dart \
+  test/library_v2_settings_test.dart
 
 echo "[stage3] Dart static analysis"
 dart analyze
@@ -48,7 +49,8 @@ flutter test --concurrency=1 \
   test/editor_v2_remote_patch_dispatcher_test.dart \
   test/editor_v2_crash_recovery_test.dart \
   test/verified_quill_embed_builder_test.dart \
-  test/notebook_repository_v2_account_test.dart
+  test/notebook_repository_v2_account_test.dart \
+  test/library_v2_settings_test.dart
 
 echo "[stage3] Full unit and widget test suite"
 flutter test --concurrency=2
