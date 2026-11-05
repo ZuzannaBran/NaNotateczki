@@ -450,12 +450,19 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   i ink (create/style/transform/reorder/delete oraz ink object.move
   między stronami z zachowaniem ID), tekstowe object.create,
   geometrię, plain-text Quill CRDT insert/delete/format oraz usunięcia
-  bloków tekstowych. Rzutowanie atomów korzysta z `OperationStore.textAtoms`.
-  Nie wspiera jeszcze obrazów/PDF, embedów, document.create, object.move,
-  conflict rebase; takie operacje są odrzucane zamiast zapisywać częściowy
-  niepoprawny stan. Blokuje też niejednoznaczne ID między warstwami,
+  bloków tekstowych. Obsługuje także geometrię istniejących obrazów
+  i ich `object.move`, przenosząc scoped `asset_references` w jednej
+  transakcji. Brak trwałej referencji blokuje przenoszenie obrazu.
+  Rzutowanie atomów korzysta z `OperationStore.textAtoms`, a update pól
+  porównuje rank `(clock, actor, seq, operationId)` z historią operacji,
+  niezależnie od kolejności dostarczenia.
+  Nie wspiera jeszcze tworzenia/usuwania image/PDF, embedów, document.create,
+  text object.move ani pełnego rebase konfliktów; takie operacje odrzuca. Blokuje też niejednoznaczne ID między warstwami,
   rozbieżny Delta Quill oraz usuwanie stron zawierających obrazy,
   osadzone referencje Quill lub nieodłączone asset_references.
+  Rejestr rank pól jest odtwarzany z niekompaktowanego dziennika
+  (granica 50000 envelope'ów); dla równoczesnego `object.move`
+  nadal potrzebna jest spójna reguła konfliktowa.
   Projektor jest wyłącznie opt-in i nigdy nie należy
   używać go równolegle z legacy writerem tego dokumentu.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
@@ -1337,7 +1344,10 @@ tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 oraz `writeNotebookChange` — atomowy wsad wielostronicowy.
 Przenoszenie niezmienionej kreski między stronami używa `object.move`,
 zachowuje ID i naprawia indeksy sortowania na obu stronach.
-Przenoszenie tekstu i obrazu pozostaje zablokowane; odrzuca zmianę
+Przenoszenie obrazu dopuszczalne jest tylko przy niezmienionych
+bajtach/MIME i trwałej referencji assetu; geometria może się zmienić
+w tej samej transakcji. Przenoszenie tekstu nadal zablokowane;
+odrzuca zmianę
 kolejności stron oraz edycję z nieaktualnym Delta Quill.
 Adapter jest podłączony jako opt-in do `EditorController`, ale
 nie jest aktywowany przez produkcyjny `AppScope`. W trybie v2
@@ -1352,6 +1362,7 @@ operację uprzednio zatwierdzoną w SQLite przez `SyncEngine`. Pobiera
 aktualny obiekt/stronę z repozytorium i aktualizuje wskazany fragment
 `EditorController`, bez snapshotowego odmalowywania całego notatnika.
 Dla `object.move` usuwa źródłowy obiekt z widoku i dodaje go w celu.
+Zachowuje kolejność tekstów i obrazów (sortIndex) przy aktualizacjach.
 Aktywny gest lub niezapisana zmiana blokuje callback — `SyncEngine`
 ponawia dostarczenie; brak przełączenia `AppScope` na v2.
 Test: `test/editor_v2_remote_patch_dispatcher_test.dart`.
