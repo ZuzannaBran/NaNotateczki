@@ -1,5 +1,22 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Produkcyjna edycja złożonego Quill v2 — 2026-11-06
+
+Aktywacja tekstu v2 z mieszanym formatowaniem lub embedem korzysta
+teraz z istniejącego edytora Quill zamiast pola spłaszczającego Delta
+do zwykłego tekstu. Wspólna walidacja jednolitego stylu rozstrzyga
+zarówno podgląd, jak i aktywację. Stabilne klucze zachowują kontroler
+między podglądem a edycją; aktywna sesja pozostaje w Quill również,
+gdy użytkownik uprości treść do jednego stylu. Prosty tekst nadal
+korzysta z dotychczasowego HUD. Nie przełącza to konta na v2.
+
+`page_overlay_v2_quill_edit_test.dart` łączy rzeczywisty PageOverlay,
+QuillController, writer i SQLite. Sześć scenariuszy (tekst mieszany,
+obraz, PDF × jasny/ciemny motyw) sprawdza edycję, zachowanie Delta,
+referencji i bajtów oraz Undo. Jest też przejście do jednolitego tekstu
+bez wymiany aktywnego kontrolera. Testy dodano do zestawu etapu 3;
+wynik wykonania pozostaje do odczytu w następnej sesji.
+
 ## Stabilne ID w wielokrotnym Undo/Redo — 2026-11-06
 
 Usunięte obiekty/strony są odtwarzane pod nowymi ID, ale pozostałe

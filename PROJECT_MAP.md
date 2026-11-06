@@ -1921,7 +1921,15 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (3022 linie)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (3136 linii)
+
+Opt-in v2: aktywny tekst ze złożonym Delta lub embedami pozostaje
+w istniejącym QuillEditor, aby edycja nie spłaszczała treści.
+`_hasUniformTextStyle` jest wspólną granicą podglądu i aktywacji.
+Stabilne klucze zachowują QuillController; sesja nie zmienia edytora
+po uproszczeniu formatowania. Prosty tekst nadal używa TextHudBlock.
+Regresja `test/page_overlay_v2_quill_edit_test.dart` obejmuje rzeczywisty
+zapis SQLite i Undo w obu motywach, dla rich text, obrazu i PDF.
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -1956,15 +1964,15 @@ overlayu. Pojedyncze wskazanie nieaktywnego Quilla jest stosowane po oknie
 double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu na
 `TextHudBlock`.
 
-- 34: `PageOverlay`; 251: `DocumentPageOverlay`;
-  313: `ActiveImageTransformHud`.
+- 35: `_hasUniformTextStyle`; 94: `PageOverlay`;
+  327: `DocumentPageOverlay`; 389: `ActiveImageTransformHud`.
 - aktywny tekst: `TextHudBlock`; fallback nieaktywnego tekstu:
   `_TextBlockWidget` / `_TextBlockWidgetState`.
   Akcje lassa korzystają z kompaktowego paska w kolorze toolbaru,
   z neutralnymi ikonami konturowymi i zachowaną obsługą akcji.
-- 1627: `_ImageBlockWidget`; 1652: `_ImageBlockWidgetState`;
-  2786: `_LassoSelectionWidget`; 2907: `LassoSelectionActionBar`;
-  2966: `_LassoActionButton`.
+- 1684: `_ImageBlockWidget`; 1709: `_ImageBlockWidgetState`;
+  2843: `_LassoSelectionWidget`; 2964: `LassoSelectionActionBar`;
+  3023: `_LassoActionButton`; 3082: `VerifiedQuillEmbedBuilder`.
 
 ## 9. Board
 

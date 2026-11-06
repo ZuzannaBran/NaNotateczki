@@ -32,6 +32,65 @@ const Color _lassoAccentColor = AppColors.inkBlack;
 const double _lassoActionOutset = 48.0;
 const double _lassoActionBarMinWidth = 96.0;
 
+bool _hasUniformTextStyle(String? deltaJson) {
+  if (deltaJson == null || deltaJson.trim().isEmpty) {
+    return true;
+  }
+  try {
+    final operations = jsonDecode(deltaJson);
+    if (operations is! List) {
+      return false;
+    }
+    Map<String, dynamic>? firstInline;
+    String? firstAlignment;
+    for (final raw in operations) {
+      if (raw is! Map) {
+        return false;
+      }
+      final operation = Map<String, dynamic>.from(raw);
+      final insert = operation['insert'];
+      if (insert is! String) {
+        return false;
+      }
+      final attributes = operation['attributes'] is Map
+          ? Map<String, dynamic>.from(operation['attributes'] as Map)
+          : <String, dynamic>{};
+      const supported = {
+        'size',
+        'color',
+        'font',
+        'bold',
+        'italic',
+        'underline',
+        'strike',
+        'align',
+      };
+      if (attributes.keys.any((key) => !supported.contains(key))) {
+        return false;
+      }
+      if (insert.contains('\n')) {
+        final alignment = attributes['align']?.toString() ?? 'left';
+        if (firstAlignment != null && firstAlignment != alignment) {
+          return false;
+        }
+        firstAlignment = alignment;
+      }
+      if (insert.replaceAll('\n', '').isEmpty) {
+        continue;
+      }
+      attributes.remove('align');
+      if (firstInline == null) {
+        firstInline = attributes;
+      } else if (!mapEquals(firstInline, attributes)) {
+        return false;
+      }
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 class PageOverlay extends StatelessWidget {
   const PageOverlay({
     required this.controller,
@@ -175,18 +234,33 @@ class PageOverlay extends StatelessWidget {
           if (renderActive && activeTextId != null)
             for (final block in effectivePage.textBlocks)
               if (block.id == activeTextId)
-                TextHudBlock(
-                  key: ValueKey('text-hud-${block.id}'),
-                  controller: controller,
-                  block: block,
-                  pageIndex: effectivePageIndex,
-                  worldOrigin: worldOrigin,
-                  interactionEnabled: interactionEnabled,
-                ),
+                if (controller.operationWriter != null &&
+                    (!_hasUniformTextStyle(block.deltaJson) ||
+                        controller.activeTextController != null))
+                  _TextBlockWidget(
+                    key: ValueKey('quill-text-${block.id}'),
+                    block: block,
+                    pageIndex: effectivePageIndex,
+                    worldOrigin: worldOrigin,
+                    interactionEnabled: interactionEnabled,
+                    lassoDragDelta: null,
+                    isLassoSelected: false,
+                    doubleTapOnly: false,
+                  )
+                else
+                  TextHudBlock(
+                    key: ValueKey('text-hud-${block.id}'),
+                    controller: controller,
+                    block: block,
+                    pageIndex: effectivePageIndex,
+                    worldOrigin: worldOrigin,
+                    interactionEnabled: interactionEnabled,
+                  ),
           if (renderInactive)
             for (final block in effectivePage.textBlocks)
               if (block.id != activeTextId)
                 _TextBlockWidget(
+                  key: ValueKey('quill-text-${block.id}'),
                   block: block,
                   pageIndex: effectivePageIndex,
                   worldOrigin: worldOrigin,
@@ -203,6 +277,7 @@ class PageOverlay extends StatelessWidget {
             for (final block in effectivePage.textBlocks)
               if (block.id != activeTextId)
                 _TextBlockWidget(
+                  key: ValueKey('quill-text-hit-${block.id}'),
                   block: block,
                   pageIndex: effectivePageIndex,
                   worldOrigin: worldOrigin,
@@ -630,6 +705,7 @@ class _TextBlockWidget extends StatefulWidget {
     required this.lassoDragDelta,
     required this.isLassoSelected,
     required this.doubleTapOnly,
+    super.key,
   });
 
   final TextBlock block;
@@ -766,7 +842,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     final canDoubleTapEdit = widget.interactionEnabled;
     final darkMode = Theme.of(context).brightness == Brightness.dark;
     final typography = textBlockAppearance(context, widget.block);
-    final useEditablePreview = _hasUniformTextStyle(widget.block.deltaJson);
+    final useEditablePreview =
+        !isActive && _hasUniformTextStyle(widget.block.deltaJson);
     final paragraphStyle = quill.DefaultTextBlockStyle(
       typography.textStyle.copyWith(
         fontWeight: FontWeight.normal,
@@ -978,65 +1055,6 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         return positioned(lassoDelta, child!);
       },
     );
-  }
-
-  bool _hasUniformTextStyle(String? deltaJson) {
-    if (deltaJson == null || deltaJson.trim().isEmpty) {
-      return true;
-    }
-    try {
-      final operations = jsonDecode(deltaJson);
-      if (operations is! List) {
-        return false;
-      }
-      Map<String, dynamic>? firstInline;
-      String? firstAlignment;
-      for (final raw in operations) {
-        if (raw is! Map) {
-          return false;
-        }
-        final operation = Map<String, dynamic>.from(raw);
-        final insert = operation['insert'];
-        if (insert is! String) {
-          return false;
-        }
-        final attributes = operation['attributes'] is Map
-            ? Map<String, dynamic>.from(operation['attributes'] as Map)
-            : <String, dynamic>{};
-        const supported = {
-          'size',
-          'color',
-          'font',
-          'bold',
-          'italic',
-          'underline',
-          'strike',
-          'align',
-        };
-        if (attributes.keys.any((key) => !supported.contains(key))) {
-          return false;
-        }
-        if (insert.contains('\n')) {
-          final alignment = attributes['align']?.toString() ?? 'left';
-          if (firstAlignment != null && firstAlignment != alignment) {
-            return false;
-          }
-          firstAlignment = alignment;
-        }
-        if (insert.replaceAll('\n', '').isEmpty) {
-          continue;
-        }
-        attributes.remove('align');
-        if (firstInline == null) {
-          firstInline = attributes;
-        } else if (!mapEquals(firstInline, attributes)) {
-          return false;
-        }
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
   }
 
   Widget _transformFrame({
