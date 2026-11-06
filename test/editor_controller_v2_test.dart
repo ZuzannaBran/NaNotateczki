@@ -105,7 +105,10 @@ void main() {
     expect(controller.canUndo, isTrue);
     controller.undo();
     await controller.flushPendingSaves();
-    expect((await store.pending()).last.kind, OperationKind.objectDelete);
+    final inverse = (await store.pending()).last;
+    expect(inverse.kind, OperationKind.objectDelete);
+    expect(inverse.revertsOperationId, created.single.operationId);
+    expect(inverse.dependencies, contains(created.single.operationId));
     expect(
       (await repository.getNotebook(notebook.uid))!.pages.single.inkStrokes,
       isEmpty,
@@ -118,7 +121,11 @@ void main() {
     ))!.pages.single.inkStrokes.single;
     // Redo is a fresh insert: the old UID remains tombstoned.
     expect(restored.id, isNot(created.single.objectId));
-    expect((await store.pending()).last.kind, OperationKind.strokeCreate);
+    final replay = (await store.pending()).last;
+    expect(replay.kind, OperationKind.strokeCreate);
+    expect(replay.revertsOperationId, inverse.operationId);
+    expect(replay.dependencies, contains(inverse.operationId));
+    expect(replay.operationId, isNot(created.single.operationId));
     expect(repositoryWrites, 0);
 
     controller.addPage();
@@ -251,6 +258,65 @@ void main() {
     ]);
   });
 
+  test(
+    'failed inverse preserves history and retries without a sequence gap',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final notebook = await repository.createNotebook();
+      final store = OperationStore(database);
+      final projector = EditorSqliteProjector(database);
+      final engine = SyncEngine(
+        store: store,
+        gateway: _OfflineGateway(),
+        actorId: 'inverse-retry',
+        checkpointScope: 'inverse-retry',
+        enableRealtime: false,
+        applyRemote: (operation, _) => projector.apply(operation),
+      );
+      addTearDown(engine.stop);
+      final controller = EditorController(
+        repository: repository,
+        notebook: notebook,
+        operationWriter: EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+        ),
+      );
+      addTearDown(controller.dispose);
+      controller.addInkStroke(const [InkPoint(dx: 4, dy: 5, pressure: 0.6)]);
+      await controller.flushPendingSaves();
+      final created = (await store.pending()).single;
+      await database.customStatement('''
+      CREATE TEMP TRIGGER reject_inverse BEFORE INSERT ON operations
+      WHEN NEW.kind = 'object.delete'
+      BEGIN SELECT RAISE(ABORT, 'injected inverse write failure'); END
+    ''');
+      controller.undo();
+      await controller.flushPendingSaves();
+      expect(controller.currentPage.inkStrokes.single.id, created.objectId);
+      expect(
+        (await repository.getNotebook(
+          notebook.uid,
+        ))!.pages.single.inkStrokes.single.id,
+        created.objectId,
+      );
+      expect((await store.pending()).single.operationId, created.operationId);
+      expect(controller.canUndo, isTrue);
+      expect(controller.canRedo, isFalse);
+      await database.customStatement('DROP TRIGGER reject_inverse');
+      controller.undo();
+      await controller.flushPendingSaves();
+      final inverse = (await store.pending()).last;
+      expect(inverse.actorSeq, created.actorSeq + 1);
+      expect(inverse.revertsOperationId, created.operationId);
+      expect(controller.currentPage.inkStrokes, isEmpty);
+      expect(controller.canUndo, isFalse);
+      expect(controller.canRedo, isTrue);
+    },
+  );
+
   for (final restoreOriginal in [false, true]) {
     test(
       'text autosaves share one history gesture, noop=$restoreOriginal',
@@ -338,8 +404,17 @@ void main() {
           );
           return;
         }
+        final originalOperations = await store.pending();
+        final gestureEnd = originalOperations.last.operationId;
         controller.undo();
         await controller.flushPendingSaves();
+        final afterUndo = await store.pending();
+        final inverse = afterUndo.skip(originalOperations.length).toList();
+        expect(inverse, isNotEmpty);
+        for (final operation in inverse) {
+          expect(operation.revertsOperationId, gestureEnd);
+          expect(operation.dependencies, contains(gestureEnd));
+        }
         expect(
           (await repository.getNotebook(
             notebook.uid,
@@ -350,12 +425,32 @@ void main() {
         expect(controller.canRedo, isTrue);
         controller.redo();
         await controller.flushPendingSaves();
+        final afterRedo = await store.pending();
+        final replay = afterRedo.skip(afterUndo.length).toList();
+        expect(replay, isNotEmpty);
+        for (final operation in replay) {
+          expect(operation.revertsOperationId, inverse.last.operationId);
+          expect(operation.dependencies, contains(inverse.last.operationId));
+          expect(
+            originalOperations.map((item) => item.operationId),
+            isNot(contains(operation.operationId)),
+          );
+        }
         expect(
           (await repository.getNotebook(
             notebook.uid,
           ))!.pages.single.textBlocks.single.text,
           'Second autosave',
         );
+        controller.undo();
+        await controller.flushPendingSaves();
+        final repeatedInverse = (await store.pending()).skip(afterRedo.length);
+        expect(repeatedInverse, isNotEmpty);
+        expect(
+          repeatedInverse.map((item) => item.revertsOperationId),
+          everyElement(replay.last.operationId),
+        );
+        expect(controller.currentPage.textBlocks.single.text, 'Original');
       },
     );
   }

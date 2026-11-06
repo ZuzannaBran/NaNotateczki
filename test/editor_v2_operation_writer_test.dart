@@ -75,6 +75,43 @@ void main() {
     await database.close();
   });
 
+  test(
+    'inverse with unknown dependency rolls back the whole gesture',
+    () async {
+      final notebook = await repository.createNotebook();
+      final changed = notebook.copyWith(title: 'Renamed');
+      final original = await writer.writeNotebookChange(
+        before: notebook,
+        after: changed,
+      );
+      final pendingBefore = await store.pending();
+      await expectLater(
+        writer.writeNotebookChange(
+          before: changed,
+          after: notebook,
+          revertsOperationId: '00000000-0000-4000-8000-000000000001',
+        ),
+        throwsStateError,
+      );
+      expect((await repository.getNotebook(notebook.uid))!.title, 'Renamed');
+      expect(
+        (await store.pending()).map((operation) => operation.operationId),
+        pendingBefore.map((operation) => operation.operationId),
+      );
+      final inverse = await writer.writeNotebookChange(
+        before: changed,
+        after: notebook,
+        revertsOperationId: original.last.operationId,
+      );
+      expect(inverse.single.actorSeq, original.last.actorSeq + 1);
+      expect(inverse.single.revertsOperationId, original.last.operationId);
+      expect(
+        (await repository.getNotebook(notebook.uid))!.title,
+        notebook.title,
+      );
+    },
+  );
+
   test('fresh notebook and first page bootstrap only through v2', () async {
     final now = DateTime.utc(2026, 11, 5);
     final blank = Notebook(

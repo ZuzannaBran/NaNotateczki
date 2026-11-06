@@ -44,21 +44,25 @@ class _EditorHistoryEntry {
 }
 
 class _V2HistoryEntry {
-  const _V2HistoryEntry(this.before, this.after);
+  const _V2HistoryEntry(this.before, this.after, this.operationId);
 
   final Notebook before;
   final Notebook after;
+  final String operationId;
+}
+
+class _V2TextGesture {
+  _V2TextGesture(this.before);
+
+  final Notebook before;
+  String? lastOperationId;
 }
 
 class _V2GestureCheckpoint {
-  const _V2GestureCheckpoint(
-    this.target,
-    this.historyBefore,
-    this.recordHistory,
-  );
+  const _V2GestureCheckpoint(this.target, this.textGesture, this.recordHistory);
 
   final Notebook target;
-  final Notebook? historyBefore;
+  final _V2TextGesture? textGesture;
   final bool recordHistory;
 }
 
@@ -197,7 +201,7 @@ class EditorController extends ChangeNotifier {
   quill.QuillController? activeTextController;
   int? _activeTextEditPageIndex;
   TextBlock? _activeTextEditBefore;
-  Notebook? _activeV2TextEditBefore;
+  _V2TextGesture? _activeV2TextGesture;
   String? activeImageBlockId;
   String? activeShapeStrokeId;
   int? activeShapePageIndex;
@@ -2026,17 +2030,27 @@ class EditorController extends ChangeNotifier {
     final visibleBeforeCommit = pages;
     _v2HistoryCommitting = true;
     late final bool hasCommitted;
+    var oppositeEntry = entry;
     try {
-      hasCommitted = (await operationWriter!.writeNotebookChange(
+      final committed = await operationWriter!.writeNotebookChange(
         before: original,
         after: restored,
-      )).isNotEmpty;
+        revertsOperationId: entry.operationId,
+      );
+      hasCommitted = committed.isNotEmpty;
+      if (hasCommitted) {
+        oppositeEntry = _V2HistoryEntry(
+          entry.before,
+          entry.after,
+          committed.last.operationId,
+        );
+      }
     } finally {
       _v2HistoryCommitting = false;
     }
     if (!hasCommitted) {
       source.removeLast();
-      (undo ? _v2Redo : _v2Undo).add(entry);
+      (undo ? _v2Redo : _v2Undo).add(oppositeEntry);
       _notifyHistoryChanged();
       return;
     }
@@ -2049,7 +2063,7 @@ class EditorController extends ChangeNotifier {
       _fullSavePending = true;
       _dirtyPageIds.addAll(pages.map((page) => page.id));
       source.removeLast();
-      (undo ? _v2Redo : _v2Undo).add(entry);
+      (undo ? _v2Redo : _v2Undo).add(oppositeEntry);
       _notifyHistoryChanged();
       notifyListeners();
       return;
@@ -2071,7 +2085,7 @@ class EditorController extends ChangeNotifier {
     _expectedRemovedIdsByPage.clear();
     _expectedRemovedPageIds.clear();
     source.removeLast();
-    (undo ? _v2Redo : _v2Undo).add(entry);
+    (undo ? _v2Redo : _v2Undo).add(oppositeEntry);
     _notifyHistoryChanged();
     for (final page in pages) {
       _touchInkPageRevision(page.id);
@@ -3651,8 +3665,8 @@ class EditorController extends ChangeNotifier {
     _activeTextEditPageIndex = pageIndex;
     _activeTextEditBefore = block;
     if (operationWriter != null) {
-      _activeV2TextEditBefore = notebook.copyWith(
-        pages: List<NotePage>.of(pages),
+      _activeV2TextGesture = _V2TextGesture(
+        notebook.copyWith(pages: List<NotePage>.of(pages)),
       );
     }
   }
@@ -3660,7 +3674,7 @@ class EditorController extends ChangeNotifier {
   void _commitActiveTextEdit() {
     final pageIndex = _activeTextEditPageIndex;
     final before = _activeTextEditBefore;
-    final historyBefore = _activeV2TextEditBefore;
+    final textGesture = _activeV2TextGesture;
     _discardActiveTextEdit();
     if (pageIndex == null || before == null) {
       return;
@@ -3675,8 +3689,8 @@ class EditorController extends ChangeNotifier {
       return;
     }
     if (before.text == after.text && before.deltaJson == after.deltaJson) {
-      if (historyBefore != null) {
-        _captureV2Gesture(historyBefore: historyBefore, recordHistory: false);
+      if (textGesture != null) {
+        _captureV2Gesture(textGesture: textGesture, recordHistory: false);
         _scheduleSave(pageId: pages[pageIndex].id);
       }
       return;
@@ -3688,14 +3702,14 @@ class EditorController extends ChangeNotifier {
       ),
     );
     _redoActions.clear();
-    _captureV2Gesture(historyBefore: historyBefore);
+    _captureV2Gesture(textGesture: textGesture);
     _scheduleSave(pageId: pages[pageIndex].id);
   }
 
   void _discardActiveTextEdit() {
     _activeTextEditPageIndex = null;
     _activeTextEditBefore = null;
-    _activeV2TextEditBefore = null;
+    _activeV2TextGesture = null;
   }
 
   /// Completes an opt-in image upload after its receipt and bytes have
@@ -3752,7 +3766,10 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Keeps each completed action independent of the next debounce period.
-  void _captureV2Gesture({Notebook? historyBefore, bool recordHistory = true}) {
+  void _captureV2Gesture({
+    _V2TextGesture? textGesture,
+    bool recordHistory = true,
+  }) {
     if (operationWriter == null || _isDisposed || _v2DocumentDeleted) {
       return;
     }
@@ -3762,7 +3779,7 @@ class EditorController extends ChangeNotifier {
           pages: List<NotePage>.of(pages),
           updatedAt: DateTime.now(),
         ),
-        historyBefore,
+        textGesture,
         recordHistory,
       ),
     );
@@ -3789,6 +3806,7 @@ class EditorController extends ChangeNotifier {
           }
           final savedPages = pages;
           final textEditInProgress = _activeTextEditBefore != null;
+          final activeTextGesture = _activeV2TextGesture;
           final proposed = notebook.copyWith(
             pages: savedPages,
             updatedAt: DateTime.now(),
@@ -3799,7 +3817,7 @@ class EditorController extends ChangeNotifier {
             }
             Future<void> persist(
               Notebook target, {
-              Notebook? historyBefore,
+              _V2TextGesture? textGesture,
               bool recordHistory = true,
             }) async {
               final baseline = _v2PersistedNotebook;
@@ -3808,9 +3826,20 @@ class EditorController extends ChangeNotifier {
                 after: target,
               );
               _v2PersistedNotebook = target;
-              if (recordHistory &&
-                  (committed.isNotEmpty || historyBefore != null)) {
-                _v2Undo.add(_V2HistoryEntry(historyBefore ?? baseline, target));
+              final operationId = committed.isNotEmpty
+                  ? committed.last.operationId
+                  : textGesture?.lastOperationId;
+              if (textGesture != null && committed.isNotEmpty) {
+                textGesture.lastOperationId = operationId;
+              }
+              if (recordHistory && operationId != null) {
+                _v2Undo.add(
+                  _V2HistoryEntry(
+                    textGesture?.before ?? baseline,
+                    target,
+                    operationId,
+                  ),
+                );
                 if (_v2Undo.length > 50) {
                   _v2Undo.removeAt(0);
                 }
@@ -3827,14 +3856,18 @@ class EditorController extends ChangeNotifier {
             for (final gesture in gestures) {
               await persist(
                 gesture.target,
-                historyBefore: gesture.historyBefore,
+                textGesture: gesture.textGesture,
                 recordHistory: gesture.recordHistory,
               );
               _v2GestureCheckpoints.removeAt(0);
             }
             // A later gesture during I/O must not be overwritten by this save.
             if (identical(pages, savedPages)) {
-              await persist(proposed, recordHistory: !textEditInProgress);
+              await persist(
+                proposed,
+                textGesture: activeTextGesture,
+                recordHistory: !textEditInProgress,
+              );
             }
             _integritySaveBlocked = false;
             if (identical(pages, savedPages) && _v2GestureCheckpoints.isEmpty) {

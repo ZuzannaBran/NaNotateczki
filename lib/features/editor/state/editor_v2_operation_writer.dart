@@ -235,6 +235,7 @@ class EditorV2OperationWriter {
     required Notebook before,
     required Notebook after,
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
+    String? revertsOperationId,
   }) async {
     if (before.uid != after.uid ||
         before.kind != after.kind ||
@@ -583,7 +584,17 @@ class EditorV2OperationWriter {
         drafts.add(_bridge.planDeletePage(page.id));
       }
     }
-    return _commit(after.uid, drafts);
+    return _commit(after.uid, [
+      for (final draft in drafts)
+        LocalOperationDraft(
+          kind: draft.kind,
+          payload: draft.payload,
+          pageId: draft.pageId,
+          objectId: draft.objectId,
+          dependencies: draft.dependencies,
+          revertsOperationId: revertsOperationId ?? draft.revertsOperationId,
+        ),
+    ]);
   }
 
   Future<Map<String, String>> _existingImageAssets({

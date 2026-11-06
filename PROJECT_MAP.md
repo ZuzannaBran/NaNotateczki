@@ -1424,6 +1424,9 @@ tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 `writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`,
 `writeCreateNotebook`, `writeDeleteNotebook` oraz `writeNotebookChange`
 — atomowy wsad wielostronicowy lub bootstrap/del dokumentu bez v1.
+`writeNotebookChange(revertsOperationId:)` wiąże cały inverse z końcową
+operacją cofanej grupy; OperationStore sprawdza trwałą zależność
+w tej samej transakcji. Błędne ID nie zmienia projekcji ani actorSeq.
 Przenoszenie niezmienionej kreski między stronami używa `object.move`,
 zachowuje ID i naprawia indeksy sortowania na obu stronach.
 Przenoszenie obrazu dopuszczalne jest tylko przy niezmienionych
@@ -1546,7 +1549,10 @@ Powrót do pierwotnej treści/Delta nie dodaje pustego kroku Undo.
 Undo/Redo w trybie v2 działa na zatwierdzonych stanach przez nowe operacje
 i nowe ID odtwarzanych obiektów; nie odtwarza tombstone. Równoległy gest
 podczas asynchronicznego inverse pozostaje w UI i blokuje zapis zamiast
-zostać nadpisany. Historia nie jest jeszcze odtwarzana po restarcie.
+zostać nadpisany. `_applyV2History` wiąże inverse przez
+`revertsOperationId`; przeciwna historia pamięta ID nowego inverse.
+Gest Quill zachowuje koniec ostatniego autosave niezależnie od debounce.
+Historia nie jest jeszcze odtwarzana po restarcie.
 `applyConfirmedV2PagePatch` wprowadza zdalną stronę bez remountu,
 nie zmieniając zoomu i aktualnego wyboru strony. Metoda
 `registerVerifiedImageAsset` wiąże potwierdzony upload z blokiem
@@ -1554,9 +1560,10 @@ obrazu i ponawia nieukończony v2 zapis bez snapshotów v1.
 Regresja: `test/editor_controller_v2_test.dart`, w tym cofanie i
 ponawianie ink oraz stron bez ponownego użycia tombstones.
 Ten sam test obejmuje dwa rzeczywiste autosave'y Quill, pojedyncze
-Undo/Redo i edycję o zerowym efekcie. Ważne granice: 588:
-`flushPendingSaves`; 2261: `updateTextBlockContent`; 3660:
-`_commitActiveTextEdit`; 3755: `_captureV2Gesture`; 3776: `_saveV2`.
+Undo/Redo/Undo, zależności inverse i edycję o zerowym efekcie.
+Ważne granice: 596: `flushPendingSaves`; 2011: `_applyV2History`;
+2279: `updateTextBlockContent`; 3678: `_commitActiveTextEdit`;
+3773: `_captureV2Gesture`; 3797: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod

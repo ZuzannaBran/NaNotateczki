@@ -1,5 +1,27 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Potwierdzony CI i powiązania Undo/Redo — 2026-11-06
+
+Przebieg `42134609370` dla `1d867df` zakończył się sukcesem:
+formatowanie, analiza Darta, natywne regresje i próg pokrycia.
+Backend `42128518866` również jest zielony. To potwierdza wcześniejsze
+regresje lokalnego zapisu, mediów, restartów i kalendarza; nie stanowi
+zaliczenia pominiętych platform ani E2E.
+
+Undo/Redo przekazuje teraz `revertsOperationId` do wszystkich operacji
+odwrotnego wsadu. Wskazuje końcową operację cofanej grupy; jej zależności
+obejmują wcześniejsze operacje tego gestu. Kolejne Redo wskazuje koniec
+Undo, a ponowne Undo — koniec Redo. Każdy wsad dostaje nowe operationId.
+Aktywny gest Quill pamięta ostatni zatwierdzony autosave, także gdy
+zakończenie edycji nie wymaga już zapisu. Edycja o zerowym efekcie nadal
+nie tworzy Undo. Nie zmienia to formatu protokołu ani schematu SQLite.
+
+Rozszerzone regresje kontrolera obejmują ink, Quill po dwóch autosave'ach
+i cykl Undo/Redo/Undo; test writera odrzuca brakującą zależność,
+sprawdza zachowanie dokumentu/outboxu i ciągłość actorSeq po ponowieniu.
+Wynik nowych testów należy odczytać w następnym uruchomieniu Actions.
+Historia Undo po restarcie i rebase dwóch klientów pozostają otwarte.
+
 ## Wynik CI po przyroście offline — 2026-11-06
 
 Przebieg `42132119898` przeszedł formatowanie i analizę Darta oraz 841
