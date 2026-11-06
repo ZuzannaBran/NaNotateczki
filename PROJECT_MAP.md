@@ -620,8 +620,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   dostępne, a snapshotowy zapis UID jest nadal zablokowany.
   Regresja `test/library_v2_settings_test.dart` otwiera ustawienia dwukrotnie
   i sprawdza brak nowych operacji oraz prawidłowe zwolnienie kontrolera.
-  Druga regresja przechodzi prawdziwy katalog → NotebookScreen, wykonuje
-  gest ink i weryfikuje outbox v2 oraz odmowę legacy saveNotebook.
+  Druga regresja przechodzi prawdziwy katalog → NotebookScreen przez
+  interaktywny preview kafelka (etykieta nie jest klikalna), wykonuje
+  gest ink i sprawdza outbox v2 oraz odmowę legacy saveNotebook.
 - `notebook_repository.dart` kieruje w preview tworzenie notebooków,
   boardów, zmianę tytułu/folderu i usuwanie do trwałego dziennika v2.
   `EditorV2OperationWriter.onCommitted` aktualizuje cache i harmonogram
@@ -692,6 +693,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `renderDelta`, obsługa usuwania stylu przez `null`.
   `withoutQuillTerminalNewline` usuwa jedynie końcowy strukturalny `\n`,
   zachowując spacje, tabulatory i dodatkowe nowe linie.
+  `EditorHistoryNotebookCodec._embeds` stosuje tę samą normalizację
+  przy walidacji checkpointu, bez utraty końcowych whitespace.
 - `share_text_edit_adapter.dart`: konwersja pełnych snapshotów Delta na
   `text.insert/delete/format` (embedy wymagają jeszcze transportu assetów).
 - Testy: `test/operation_protocol_test.dart`,

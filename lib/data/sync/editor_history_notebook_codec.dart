@@ -15,6 +15,7 @@ import '../../features/notebook/domain/text_block.dart';
 import 'editor_history_checkpoint.dart';
 import 'editor_sqlite_projector.dart';
 import 'operation_protocol.dart';
+import 'operation_text_sequence.dart';
 import 'share_ink_edit_adapter.dart';
 import 'share_text_edit_adapter.dart';
 import 'verified_editor_asset_buffer.dart';
@@ -488,7 +489,9 @@ class EditorHistoryNotebookCodec {
     }
     final actual = plain.toString();
     if (actual != text &&
-        !(actual.endsWith('\n') && actual.trimRight() == text)) {
+        !(actual.endsWith('\n') &&
+            OperationTextSequence.withoutQuillTerminalNewline(actual) ==
+                text)) {
       throw const FormatException('History Delta differs from its text.');
     }
     return result;

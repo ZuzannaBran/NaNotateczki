@@ -142,22 +142,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(
-      find
-          .descendant(
-            of: find.byKey(const ValueKey('catalog-folder-grid')),
-            matching: find.text('Notes'),
-          )
-          .first,
-    );
+    await tester.tap(find.byKey(const ValueKey('catalog-folder-cover:Notes')));
     await tester.pumpAndSettle();
     await tester.tap(
-      find
-          .descendant(
-            of: find.byKey(const ValueKey('catalog-document-grid')),
-            matching: find.text('Real v2 editor'),
-          )
-          .first,
+      find.descendant(
+        of: find.byKey(ValueKey('catalog-document:${notebook.uid}')),
+        matching: find.byKey(const ValueKey('catalog-preview-shadow')),
+      ),
     );
     await tester.pumpAndSettle();
     final editor = tester

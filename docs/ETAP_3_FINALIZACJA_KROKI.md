@@ -963,6 +963,16 @@ Warunek zamknięcia D: aplikacja działa na v2 w produkcji; nie istnieje
 równoległy snapshot writer. Każde usunięcie i nowy obiekt są
 propagowane na wszystkie urządzenia.
 
+## Regresje potwierdzone w testach Flutter (2026-11-06)
+
+Przebieg `42284185439` potwierdził format, analizę Darta i Linux E2E,
+ale wskazał trzy testy Flutter: dwa checkpointy Quill z białymi znakami
+oraz kliknięcie nieinteraktywnej etykiety kafelka w teście UI.
+Walidacja `EditorHistoryNotebookCodec._embeds` używa teraz usunięcia
+wyłącznie strukturalnego końcowego `\\n`; regresje kontrolera rich Quill
+i rich paste pozostają aktywne. Test biblioteki naciska preview InkWell,
+nie tekst. Wynik poprawek wymaga następnego przebiegu CI.
+
 ## Realna ścieżka UI katalog → edytor v2 (2026-11-06)
 
 `test/library_v2_settings_test.dart` sprawdza dodatkowo otwarcie
