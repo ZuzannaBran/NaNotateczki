@@ -36,6 +36,26 @@ void main() {
   });
   for (final entry in files.entries) {
     test(
+      'inline ${entry.key} owns verified bytes without base64 expansion',
+      () {
+        final bytes = Uint8List.fromList(entry.value);
+        final plan = QuillPastePlan.fromMediaBytes(bytes);
+        bytes[bytes.length - 1] ^= 1;
+        expect(plan.characterCount, 1);
+        expect(plan.embedCount, 1);
+        expect(plan.importedByteLength, entry.value.length);
+        expect(plan.existingAssets, isEmpty);
+        final ready = plan.materialize((actual, type) {
+          expect(actual, entry.value);
+          expect(type, entry.key == 'application/pdf' ? 'pdf' : 'image');
+          return 'asset:picked-file';
+        });
+        expect(ready.single['insert'], {
+          entry.key == 'application/pdf' ? 'pdf' : 'image': 'asset:picked-file',
+        });
+      },
+    );
+    test(
       'validates ${entry.key} data without staging before materialization',
       () {
         final type = entry.key == 'application/pdf' ? 'pdf' : 'image';
@@ -86,6 +106,26 @@ void main() {
       },
     );
   }
+
+  test('inline file rejects empty, unsupported and oversized bytes', () {
+    for (final bytes in [
+      Uint8List(0),
+      Uint8List.fromList([1, 2, 3]),
+    ]) {
+      expect(() => QuillPastePlan.fromMediaBytes(bytes), throwsFormatException);
+    }
+    expect(
+      () => QuillPastePlan.fromMediaBytes(
+        Uint8List.fromList(files['image/png']!),
+        byteLimit: files['image/png']!.length - 1,
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => QuillPastePlan.fromMediaBytes(Uint8List(0), byteLimit: 0),
+      throwsArgumentError,
+    );
+  });
 
   test('canonical references require later document scope verification', () {
     final plan = QuillPastePlan.fromDelta([

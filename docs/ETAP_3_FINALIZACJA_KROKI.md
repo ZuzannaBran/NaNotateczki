@@ -1,5 +1,46 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Import pliku do aktywnego Quilla — 2026-11-06
+
+Na początku sesji potwierdzono zielone Actions `42175319331` dla
+`7bef9f0`: format, analiza, 900 testów (2 pominięte), pokrycie 70,22%.
+Potwierdza to poprzedni import inline, toolbar i rich paste, w tym
+regresje Quill/SQLite. Backend `42160118098` dla `6b0da04` również zielony;
+nie wymaga zmiany ani ponowienia.
+
+Pasek aktywnego Quilla v2 ma teraz przycisk `Insert image or PDF into text`.
+`insertQuillFile` odczytuje pojedynczy PNG/JPEG/WebP/PDF przez istniejący
+FilePicker. Na native sprawdza metadane i rzeczywistą długość przed
+wczytaniem pliku; na Web używa bajtów, bez dostępu do niedostępnego path.
+Typ pochodzi z sygnatury. `QuillPastePlan.fromMediaBytes` kopiuje sprawdzone
+bajty bez pośredniego base64. Wspólny `_replaceQuillSelection` zachowuje
+kontrole zakresu, tekstowego budżetu i lifecycle clipboardu. Zastępuje
+tylko uchwycone zaznaczenie, a zwykła mutacja Quill zapisuje asset i tekst
+jedną istniejącą ścieżką v2. PDF pozostaje embedem, bez renderowania go
+na osobne obrazy/strony canvasa. Legacy i prosty HUD zachowują dotychczasowy
+interfejs; przycisk dotyczy aktywnej instancji Quilla.
+
+Anulowany picker, nieaktywny blok, read-only, zmiana tekstu/zaznaczenia,
+zamknięty widget i przegrany równoległy import nie mogą nadpisać treści.
+Błędne typy, bajty, liczba plików, ścieżki i limity nie tworzą attach.
+Dodano 5 testów czystej logiki, 14 regresji kontrolera/pickera/widżetu
+oraz 2 scenariusze dwóch niezależnych, plikowych SQLite (image/PDF).
+Te ostatnie łączą produkcyjne gatewaye HTTP, SyncEngine, writer i dispatcher:
+import offline → restart → upload przed operacjami → utrata ACK → drugi
+restart → echo bez repaintu → pobranie z kontrolą checksum → usunięcie
+na drugim urządzeniu → Undo pod nowym ID z tym samym assetem. Sprawdzają
+również niezmieniony zoom/pan i tożsamość sąsiedniego tekstu. Transport
+HTTP jest kontrolowany w teście; nie jest to pełne E2E PostgreSQL.
+
+Lokalnie: 52 testy czystego Darta na produkcyjnym kodzie przeszły, analiza
+pliku testu planu bez uwag, formatowanie 279 plików Dart i składnia
+skryptu weryfikacji poprawne. Nowe testy Flutter/SQLite/widget i pełna analiza
+pozostają do wykonania w Actions, bez czekania na wynik. Zmieniona jest
+wyłącznie aplikacja; CI ograniczamy do analizy i testów natywnych.
+Następna sesja zaczyna od Actions. Historia Undo/Redo po restarcie,
+przejście prostego HUD do embedów, pełne E2E i produkcyjny cutover pozostają
+otwarte; nie aktywowano flagi i nie usunięto v1.
+
 ## Kontrolowany rich paste — 2026-11-06
 
 Najpierw naprawiono analizę z `42168819661` w commicie `6bcfbaf`.
@@ -11,7 +52,8 @@ zachowuje formatowanie; `QuillPastePlan` waliduje insert-only Delta,
 atrybuty, limit tekstu oraz łączny budżet bajtów przed mutacją dokumentu.
 Obrazy z data URI trafiają przez istniejący staging i normalny zapis gestu;
 powtórzenie tego samego źródła nie duplikuje pliku. Plan obsługuje również
-PDF w Delta, ale nie dodaje pickera PDF ani konwersji HTML object/embed.
+PDF w Delta. Picker do aktywnego Quilla dodano w kolejnym przyroście
+opisanym powyżej; konwersja HTML object/embed nie jest obsługiwana.
 
 Wewnętrzne kopiowanie Quill zachowuje Delta i istniejące asset ID, także
 przed pierwszym autosave. Writer sprawdza zakres dokumentu, typ, rozmiar
@@ -80,7 +122,7 @@ a udany commit zwalnia rejestrację również pod kluczem asset ID.
 
 W tym wcześniejszym przyroście podłączono clipboard obrazów aktywnego
 Quill v2. Kontrolowany HTML/rich paste dodano w przyroście opisanym na
-górze dokumentu; inline PDF z interfejsu nadal wymaga dalszych prac.
+górze dokumentu; kolejny przyrost dodaje picker PDF aktywnego Quilla.
 
 Nowe regresje: cztery formaty, niezmienność kopii bajtów, brak operacji
 przed gestem, Undo/Redo po wyczyszczeniu bufora, restart pliku SQLite
@@ -96,14 +138,15 @@ Actions; nie były uruchamiane lokalnym Flutterem.
 Instrukcje repozytorium znajdują się w `CZAT.md` i `AGENTS.md`.
 Najpierw odczytać Actions aktualnego `dev`. Poprzedni przyrost do
 `e4b1cfc` został potwierdzony zielonym przebiegiem `42160667069`;
-nowe importy inline i rich paste wymagają odczytu aktualnego wyniku. W razie błędu najpierw
-naprawić regresję, nie uruchamiać niezmienionych platform.
+rich paste potwierdzono przebiegiem `42175319331` (900 passed, 2 skipped).
+Nowy picker i test dwóch baz wymagają odczytu aktualnego wyniku.
+W razie błędu najpierw naprawić regresję; nie ponawiać niezmienionych platform.
 
 Backend `6b0da04` dodaje sześć kontraktów inverse mediów i tombstones.
 Lokalnie po tym przyroście: 278 passed, 8 skipped (PostgreSQL).
 Nie zastępuje to E2E Flutter ↔ HTTP ↔ PostgreSQL.
-Po zielonym CI kontynuować brakujące wejścia mediów w UI i pełne
-pokrycie gestów; historia po restarcie nadal nie jest odtwarzana.
+Po zielonym CI kontynuować brakujące przejście prostego HUD do embedów
+i pełne pokrycie gestów; historia po restarcie nadal nie jest odtwarzana.
 Rebase dwóch klientów, synchronizacja całego konta i aktywacja flagi
 pozostają kolejnym etapem. Produkcja nadal korzysta z v1.
 
@@ -427,12 +470,11 @@ propagowane na wszystkie urządzenia.
 - Kod fail-closed i opt-in nie oznacza gotowego produkcyjnego cutover.
 - Nie uruchamiać GitHub Actions bez wyraźnego upoważnienia użytkownika.
 
-- [ ] Quill embed renderer `VerifiedQuillEmbedBuilder` dodany do edytora
-  v2, wymaga testów widgetowych Flutter przed cutover.
+- [x] Quill embed renderer `VerifiedQuillEmbedBuilder` dodany do edytora
+  v2; testy widgetowe zaliczone w `42175319331`, bez aktywacji cutover.
 
-- [ ] Widget regression `test/verified_quill_embed_builder_test.dart`:
-  obsługa osadzonego PDF i odmowa odczytu zewnętrznego URL.
-  Test dodany, nie uruchomiony (brak lokalnego SDK Flutter).
+- [x] Widget regression `test/verified_quill_embed_builder_test.dart`:
+  osadzony PDF i odmowa zewnętrznego URL; zaliczona w `42175319331`.
 
 ## Lokalna kontrola przed przełączeniem
 

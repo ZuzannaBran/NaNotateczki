@@ -23,6 +23,33 @@ class QuillPastePlan {
   final int characterCount;
   int get embedCount => _operations.where((op) => op['insert'] is Map).length;
 
+  factory QuillPastePlan.fromMediaBytes(
+    Uint8List bytes, {
+    int byteLimit = maximumBytes,
+  }) {
+    if (byteLimit < 1 || byteLimit > maximumBytes) {
+      throw ArgumentError('Invalid paste byte limit.');
+    }
+    if (bytes.isEmpty || bytes.length > byteLimit) {
+      throw const FormatException('Invalid inline file size.');
+    }
+    final mime = VerifiedEditorAssetBuffer.inferMediaType(bytes);
+    final type = mime == 'application/pdf' ? 'pdf' : 'image';
+    return QuillPastePlan._(
+      [
+        {
+          'insert': {type: 'asset:paste-0'},
+        },
+      ],
+      [
+        _InlineImport(type, Uint8List.fromList(bytes), [0], 0),
+      ],
+      const {},
+      bytes.length,
+      1,
+    );
+  }
+
   factory QuillPastePlan.fromDelta(
     List<dynamic> delta, {
     int byteLimit = maximumBytes,

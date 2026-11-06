@@ -162,6 +162,19 @@ class TextEditToolbar extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
+                    if (editorController.operationWriter != null &&
+                        editorController.activeTextBlockId == block.id &&
+                        editorController.activeTextController != null)
+                      IconButton(
+                        key: const ValueKey('text-inline-file-button'),
+                        icon: const Icon(Icons.attach_file),
+                        tooltip: 'Insert image or PDF into text',
+                        iconSize: 20,
+                        onPressed:
+                            editorController.activeTextController!.readOnly
+                            ? null
+                            : () => _insertFile(context),
+                      ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline),
                       tooltip: 'Delete text',
@@ -177,6 +190,21 @@ class TextEditToolbar extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _insertFile(BuildContext context) async {
+    try {
+      await editorController.insertQuillFile(
+        blockId: block.id,
+        canInsert: () => context.mounted,
+      );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('Could not insert this file.')),
+        );
+      }
+    }
   }
 
   Widget _styleButton({

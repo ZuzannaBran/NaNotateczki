@@ -31,10 +31,12 @@ dart format --output=none --set-exit-if-changed \
   lib/app/app_scope.dart \
   lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart \
   lib/features/editor/presentation/widgets/page_overlay.dart \
+  lib/features/editor/presentation/widgets/text_edit_toolbar.dart \
   test/editor_controller_v2_test.dart \
   test/quill_style_patch_test.dart \
   test/quill_paste_plan_test.dart \
   test/editor_v2_rich_paste_test.dart \
+  test/editor_v2_inline_file_sync_test.dart \
   test/editor_sqlite_projector_test.dart \
   test/editor_v2_operation_writer_test.dart \
   test/editor_v2_remote_patch_dispatcher_test.dart \
@@ -56,6 +58,7 @@ flutter test --concurrency=1 \
   test/quill_style_patch_test.dart \
   test/quill_paste_plan_test.dart \
   test/editor_v2_rich_paste_test.dart \
+  test/editor_v2_inline_file_sync_test.dart \
   test/operation_store_test.dart \
   test/persistent_operation_actor_test.dart \
   test/sync_engine_test.dart \

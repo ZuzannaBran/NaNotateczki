@@ -2353,13 +2353,107 @@ class EditorController extends ChangeNotifier {
     return 'asset:${asset.assetId}';
   }
 
-  /// Owns asynchronous rich paste so a rejected or stale paste cannot delete
-  /// the current selection through Quill's default replacement callback.
+  /// Owns rich paste so rejected or stale content cannot delete the selection.
   Future<bool> pasteQuillHtml({
     required String blockId,
     required Future<String?> Function() readHtml,
     Future<String?> Function()? readPlainText,
     bool Function()? canPaste,
+  }) => _replaceQuillSelection(
+    blockId: blockId,
+    canInsert: canPaste,
+    readPlan: (target, current) async {
+      final copiedText = target.pastePlainText;
+      final copiedDelta =
+          jsonDecode(jsonEncode(target.pasteDelta.toJson())) as List;
+      final plain = readPlainText == null ? null : await readPlainText();
+      if (!current()) {
+        return null;
+      }
+      if (plain != null &&
+          copiedText.isNotEmpty &&
+          plain == copiedText &&
+          copiedDelta.isNotEmpty) {
+        return QuillPastePlan.fromDelta(copiedDelta);
+      }
+      final html = await readHtml();
+      if (!current() || html == null || html.trim().isEmpty) {
+        return null;
+      }
+      if (html.length > QuillPastePlan.maximumBytes * 3 + 65536) {
+        throw const FormatException('Rich clipboard content is too large.');
+      }
+      return QuillPastePlan.fromDelta(HtmlToDelta().convert(html).toJson());
+    },
+  );
+
+  /// Inserts verified media at the captured Quill selection, without rendering
+  /// PDF pages into unrelated canvas objects or writing before the text gesture.
+  Future<bool> insertQuillFile({
+    required String blockId,
+    Future<Uint8List?> Function()? readBytes,
+    bool Function()? canInsert,
+  }) => _replaceQuillSelection(
+    blockId: blockId,
+    canInsert: canInsert,
+    readPlan: (_, current) async {
+      final bytes = readBytes == null
+          ? await _pickQuillFile(current)
+          : await readBytes();
+      if (!current() || bytes == null) {
+        return null;
+      }
+      return QuillPastePlan.fromMediaBytes(bytes);
+    },
+  );
+
+  Future<Uint8List?> _pickQuillFile(bool Function() current) async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      type: FileType.custom,
+      allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'pdf'],
+      withData: kIsWeb,
+    );
+    if (!current() || result == null) {
+      return null;
+    }
+    if (result.files.length != 1) {
+      throw const FormatException('Select a single inline file.');
+    }
+    final picked = result.files.single;
+    if (picked.size <= 0 || picked.size > QuillPastePlan.maximumBytes) {
+      throw const FormatException('Invalid inline file size.');
+    }
+    // Some native pickers provide bytes without a path as well.
+    if (picked.bytes != null) {
+      return picked.bytes;
+    }
+    if (kIsWeb) {
+      throw const FormatException('Selected file is not accessible.');
+    }
+    final path = picked.path;
+    if (path == null || path.isEmpty) {
+      throw const FormatException('Selected file is not accessible.');
+    }
+    final file = File(path);
+    final length = await file.length();
+    if (!current()) {
+      return null;
+    }
+    if (length <= 0 || length > QuillPastePlan.maximumBytes) {
+      throw const FormatException('Invalid inline file size.');
+    }
+    return file.readAsBytes();
+  }
+
+  Future<bool> _replaceQuillSelection({
+    required String blockId,
+    required Future<QuillPastePlan?> Function(
+      quill.QuillController target,
+      bool Function() current,
+    )
+    readPlan,
+    bool Function()? canInsert,
   }) async {
     final writer = operationWriter;
     if (writer == null) {
@@ -2382,13 +2476,10 @@ class EditorController extends ChangeNotifier {
     if (!selection.isValid || selection.end >= target.document.length) {
       return true;
     }
-    final copiedText = target.pastePlainText;
-    final copiedDelta =
-        jsonDecode(jsonEncode(target.pasteDelta.toJson())) as List;
     bool current() {
       if (_isDisposed ||
           _v2DocumentDeleted ||
-          canPaste?.call() == false ||
+          canInsert?.call() == false ||
           !identical(activeTextController, target) ||
           activeTextBlockId != blockId ||
           target.readOnly ||
@@ -2405,30 +2496,13 @@ class EditorController extends ChangeNotifier {
     if (!current()) {
       return true;
     }
-    final plain = readPlainText == null ? null : await readPlainText();
+    final plan = await readPlan(target, current);
     if (!current()) {
       return true;
     }
-    final List<dynamic> delta;
-    if (plain != null &&
-        copiedText.isNotEmpty &&
-        plain == copiedText &&
-        copiedDelta.isNotEmpty) {
-      delta = copiedDelta;
-    } else {
-      final html = await readHtml();
-      if (!current()) {
-        return true;
-      }
-      if (html == null || html.trim().isEmpty) {
-        return false;
-      }
-      if (html.length > QuillPastePlan.maximumBytes * 3 + 65536) {
-        throw const FormatException('Rich clipboard content is too large.');
-      }
-      delta = HtmlToDelta().convert(html).toJson();
+    if (plan == null) {
+      return false;
     }
-    final plan = QuillPastePlan.fromDelta(delta);
     if (plan.characterCount == 0) {
       return true;
     }

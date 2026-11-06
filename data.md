@@ -14,8 +14,12 @@ kontrolowany HTML/rich paste przez `pasteQuillHtml` i `QuillPastePlan`.
 Domyślny parser clipboard Quilla jest wyłączony: aplikacja sprawdza całą
 Delta przed zastąpieniem zaznaczenia. Zachowuje tekst i formatowanie;
 nowe media wymagają data URI, sygnatury PNG/JPEG/WebP/PDF i wspólnego
-limitu 64 MiB. HTML konwerter obsługuje obrazy; osobny picker inline PDF
-pozostaje do zrobienia. HTTP, ścieżki plikowe i nieznane embedy są odrzucane.
+limitu 64 MiB. HTML konwerter obsługuje obrazy. Przycisk aktywnego Quilla
+`Insert image or PDF into text` używa `insertQuillFile` i tego samego planu
+z bajtów; PDF jest osadzony w tekście. Picker native sprawdza długość pliku
+przed odczytem, Web korzysta z bytes. Przycisk nie zmienia prostego HUD
+ani legacy. Ścieżka pliku pochodzi wyłącznie z jawnego wyboru użytkownika;
+HTTP, ścieżki w clipboardzie i nieznane embedy są odrzucane.
 Kopiowanie między instancjami Quilla korzysta z jego wewnętrznej Delta,
 ale referencje `asset:` muszą przejść kontrolę zakresu dokumentu, MIME,
 rozmiaru i bajtów (również przed pierwszym autosave). Stare zdarzenie po

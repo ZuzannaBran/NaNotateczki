@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:drift/native.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -14,6 +16,7 @@ import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
 import 'package:program/data/sync/sync_engine.dart';
 import 'package:program/data/sync/verified_editor_asset_buffer.dart';
+import 'package:program/features/editor/presentation/widgets/text_edit_toolbar.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/editor/state/quill_paste_plan.dart';
@@ -24,6 +27,32 @@ import 'support/native_test_documents.dart';
 
 final _png = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10, 1]);
 String get _imageUri => 'data:image/png;base64,${base64Encode(_png)}';
+
+class _Picker extends FilePicker {
+  Future<FilePickerResult?> Function()? result;
+  List<String>? extensions;
+
+  @override
+  Future<FilePickerResult?> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    bool allowCompression = true,
+    int compressionQuality = 30,
+    bool allowMultiple = false,
+    bool withData = false,
+    bool withReadStream = false,
+    bool lockParentWindow = false,
+    bool readSequential = false,
+  }) async {
+    expect(type, FileType.custom);
+    expect(allowMultiple, isFalse);
+    extensions = allowedExtensions;
+    return result == null ? null : await result!();
+  }
+}
 
 class _OfflineGateway implements OperationGateway {
   @override
@@ -136,7 +165,10 @@ void main() {
   useIsolatedNativeTestDocuments();
   useInMemoryTestTextStorage();
   late _Fixture fixture;
+  late _Picker picker;
   setUp(() async {
+    picker = _Picker();
+    FilePicker.platform = picker;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           SystemChannels.platform,
@@ -144,6 +176,367 @@ void main() {
         );
     fixture = _Fixture();
     await fixture.initialize();
+  });
+
+  final inlineFiles = <String, List<int>>{
+    'png': [137, 80, 78, 71, 13, 10, 26, 10, 1],
+    'jpeg': [255, 216, 255, 1],
+    'webp': [82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80],
+    'pdf': [37, 80, 68, 70, 45, 49],
+  };
+  for (final entry in inlineFiles.entries) {
+    test(
+      'inline ${entry.key} replaces only selection and survives Undo/Redo',
+      () async {
+        final original = fixture.editor.currentPage.textBlocks.single.deltaJson;
+        final bytes = Uint8List.fromList(entry.value);
+        expect(
+          await fixture.editor.insertQuillFile(
+            blockId: _Fixture.blockId,
+            readBytes: () async => bytes,
+          ),
+          isTrue,
+        );
+        await fixture.flush();
+        final block = fixture.editor.currentPage.textBlocks.single;
+        expect(block.text, contains('Original'));
+        expect(block.text, isNot(contains('Keep')));
+        final delta = jsonDecode(block.deltaJson!) as List;
+        final embed =
+            (delta.singleWhere((dynamic op) => op['insert'] is Map)
+                    as Map)['insert']
+                as Map;
+        final type = entry.key == 'pdf' ? 'pdf' : 'image';
+        expect(embed.keys.single, type);
+        final assetId = (embed.values.single as String).substring(6);
+        expect(
+          await fixture.projector.verifiedTextAssetBytes(
+            documentId: fixture.editor.notebook.uid,
+            pageId: fixture.editor.currentPage.id,
+            objectId: _Fixture.blockId,
+            assetId: assetId,
+          ),
+          entry.value,
+        );
+        expect(
+          (await fixture.store.pending()).where(
+            (op) => op.kind == OperationKind.assetAttach,
+          ),
+          hasLength(1),
+        );
+        expect(fixture.editor.currentPage.imageBlocks, isEmpty);
+        fixture.buffer.clear();
+        fixture.editor.undo();
+        await fixture.flush();
+        expect(
+          fixture.editor.currentPage.textBlocks.single.deltaJson,
+          original,
+        );
+        fixture.editor.redo();
+        await fixture.flush();
+        expect(
+          fixture.editor.currentPage.textBlocks.single.deltaJson,
+          block.deltaJson,
+        );
+      },
+    );
+  }
+
+  test(
+    'inline picker cancellation and invalid bytes preserve selection',
+    () async {
+      final original = fixture.text.document.toDelta().toJson();
+      final selection = fixture.text.selection;
+      final pendingBefore = (await fixture.store.pending()).length;
+      expect(
+        await fixture.editor.insertQuillFile(blockId: _Fixture.blockId),
+        isFalse,
+      );
+      expect(
+        picker.extensions,
+        containsAll(['png', 'jpg', 'jpeg', 'webp', 'pdf']),
+      );
+      await expectLater(
+        fixture.editor.insertQuillFile(
+          blockId: _Fixture.blockId,
+          readBytes: () async => Uint8List.fromList([1, 2, 3]),
+        ),
+        throwsFormatException,
+      );
+      expect(fixture.text.document.toDelta().toJson(), original);
+      expect(fixture.text.selection, selection);
+      expect(await fixture.store.pending(), hasLength(pendingBefore));
+    },
+  );
+
+  test(
+    'inline picker reads native paths and rejects oversized metadata first',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('nn-inline-file-');
+      addTearDown(() => dir.delete(recursive: true));
+      final file = File('${dir.path}/selected.pdf');
+      await file.writeAsBytes(inlineFiles['pdf']!);
+      picker.result = () async => FilePickerResult([
+        PlatformFile(name: 'selected.pdf', size: 6, path: file.path),
+      ]);
+      await fixture.editor.insertQuillFile(blockId: _Fixture.blockId);
+      await fixture.flush();
+      expect(
+        fixture.editor.currentPage.textBlocks.single.deltaJson,
+        contains('"pdf"'),
+      );
+      final before = fixture.text.document.toDelta().toJson();
+      picker.result = () async => FilePickerResult([
+        PlatformFile(
+          name: 'oversized.pdf',
+          size: QuillPastePlan.maximumBytes + 1,
+          path: '${dir.path}/not-readable.pdf',
+        ),
+      ]);
+      await expectLater(
+        fixture.editor.insertQuillFile(blockId: _Fixture.blockId),
+        throwsFormatException,
+      );
+      expect(fixture.text.document.toDelta().toJson(), before);
+    },
+  );
+
+  test(
+    'concurrent inline imports cannot overwrite the first completed import',
+    () async {
+      final firstBytes = Completer<Uint8List?>();
+      final secondBytes = Completer<Uint8List?>();
+      final first = fixture.editor.insertQuillFile(
+        blockId: _Fixture.blockId,
+        readBytes: () => firstBytes.future,
+      );
+      final second = fixture.editor.insertQuillFile(
+        blockId: _Fixture.blockId,
+        readBytes: () => secondBytes.future,
+      );
+      secondBytes.complete(Uint8List.fromList(inlineFiles['pdf']!));
+      await second;
+      firstBytes.complete(_png);
+      await first;
+      await fixture.flush();
+      final delta = fixture.editor.currentPage.textBlocks.single.deltaJson!;
+      expect(delta, contains('"pdf"'));
+      expect(delta, isNot(contains('"image"')));
+      expect(
+        (await fixture.store.pending()).where(
+          (op) => op.kind == OperationKind.assetAttach,
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'inline picker rejects unexpected counts and inaccessible files',
+    () async {
+      final original = fixture.text.document.toDelta().toJson();
+      final file = PlatformFile(name: 'selected.pdf', size: 6);
+      for (final files in <List<PlatformFile>>[
+        [],
+        [file, file],
+        [file],
+      ]) {
+        picker.result = () async => FilePickerResult(files);
+        await expectLater(
+          fixture.editor.insertQuillFile(blockId: _Fixture.blockId),
+          throwsFormatException,
+        );
+        expect(fixture.text.document.toDelta().toJson(), original);
+      }
+      picker.result = () async => throw StateError('Picker unavailable');
+      await expectLater(
+        fixture.editor.insertQuillFile(blockId: _Fixture.blockId),
+        throwsStateError,
+      );
+      expect(fixture.text.document.toDelta().toJson(), original);
+    },
+  );
+
+  test(
+    'inline picker checks actual native length before loading bytes',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('nn-inline-size-');
+      addTearDown(() => dir.delete(recursive: true));
+      final file = File('${dir.path}/large.pdf');
+      final handle = await file.open(mode: FileMode.write);
+      try {
+        await handle.truncate(QuillPastePlan.maximumBytes + 1);
+      } finally {
+        await handle.close();
+      }
+      picker.result = () async => FilePickerResult([
+        PlatformFile(name: 'large.pdf', size: 6, path: file.path),
+      ]);
+      final original = fixture.text.document.toDelta().toJson();
+      await expectLater(
+        fixture.editor.insertQuillFile(blockId: _Fixture.blockId),
+        throwsFormatException,
+      );
+      expect(fixture.text.document.toDelta().toJson(), original);
+      expect(
+        (await fixture.store.pending()).any(
+          (op) => op.kind == OperationKind.assetAttach,
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'inline picker never reads a file after its target becomes inactive',
+    () async {
+      final chosen = Completer<FilePickerResult?>();
+      picker.result = () => chosen.future;
+      final original = fixture.text.document.toDelta().toJson();
+      final pending = fixture.editor.insertQuillFile(blockId: _Fixture.blockId);
+      fixture.editor.clearActiveTextBlock();
+      chosen.complete(
+        FilePickerResult([
+          PlatformFile(
+            name: 'missing.pdf',
+            size: 6,
+            path: '/unavailable/nanotateczki-inline-canceled.pdf',
+          ),
+        ]),
+      );
+      expect(await pending, isTrue);
+      expect(fixture.text.document.toDelta().toJson(), original);
+    },
+  );
+
+  test(
+    'inline picker cancels after selection changes and never opens read-only',
+    () async {
+      final bytes = Completer<Uint8List?>();
+      final original = fixture.text.document.toDelta().toJson();
+      final pending = fixture.editor.insertQuillFile(
+        blockId: _Fixture.blockId,
+        readBytes: () => bytes.future,
+      );
+      fixture.text.updateSelection(
+        const TextSelection.collapsed(offset: 2),
+        quill.ChangeSource.local,
+      );
+      bytes.complete(_png);
+      await pending;
+      expect(fixture.text.document.toDelta().toJson(), original);
+      fixture.text.readOnly = true;
+      await fixture.editor.insertQuillFile(
+        blockId: _Fixture.blockId,
+        readBytes: () async => throw StateError('Must not open picker'),
+      );
+      expect(fixture.text.document.toDelta().toJson(), original);
+      expect(
+        (await fixture.store.pending()).any(
+          (op) => op.kind == OperationKind.assetAttach,
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets('text toolbar imports a PDF through the actual picker callback', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1500, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    picker.result = () async => FilePickerResult([
+      PlatformFile(
+        name: 'document.pdf',
+        size: 6,
+        bytes: Uint8List.fromList(inlineFiles['pdf']!),
+      ),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TextEditToolbar(
+            editorController: fixture.editor,
+            block: fixture.editor.currentPage.textBlocks.single,
+          ),
+        ),
+      ),
+    );
+    final button = find.byKey(const ValueKey('text-inline-file-button'));
+    expect(button, findsOneWidget);
+    await tester.tap(button);
+    await tester.pump();
+    await tester.runAsync(fixture.flush);
+    expect(
+      fixture.editor.currentPage.textBlocks.single.deltaJson,
+      contains('"pdf"'),
+    );
+    expect(fixture.editor.currentPage.imageBlocks, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('text toolbar reports invalid media without changing text', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1500, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final original = fixture.text.document.toDelta().toJson();
+    picker.result = () async => FilePickerResult([
+      PlatformFile(
+        name: 'wrong.pdf',
+        size: 3,
+        bytes: Uint8List.fromList([1, 2, 3]),
+      ),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TextEditToolbar(
+            editorController: fixture.editor,
+            block: fixture.editor.currentPage.textBlocks.single,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('text-inline-file-button')));
+    await tester.pump();
+    expect(find.text('Could not insert this file.'), findsOneWidget);
+    expect(fixture.text.document.toDelta().toJson(), original);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('unmounted text toolbar cancels a pending file picker', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1500, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final chosen = Completer<FilePickerResult?>();
+    picker.result = () => chosen.future;
+    final original = fixture.text.document.toDelta().toJson();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TextEditToolbar(
+            editorController: fixture.editor,
+            block: fixture.editor.currentPage.textBlocks.single,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('text-inline-file-button')));
+    await tester.pumpWidget(const SizedBox.shrink());
+    chosen.complete(
+      FilePickerResult([
+        PlatformFile(
+          name: 'selected.pdf',
+          size: 6,
+          bytes: Uint8List.fromList(inlineFiles['pdf']!),
+        ),
+      ]),
+    );
+    await tester.pump();
+    expect(fixture.text.document.toDelta().toJson(), original);
+    expect(tester.takeException(), isNull);
   });
   tearDown(() async {
     await fixture.close();

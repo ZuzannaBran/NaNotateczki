@@ -1550,16 +1550,22 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/quill_paste_plan.dart` (160 linii)
+### `lib/features/editor/state/quill_paste_plan.dart` (187 linii)
 
-9: `QuillPastePlan`, 26: `fromDelta`, 137: `materialize`: walidacja
+9: `QuillPastePlan`, 26: `fromMediaBytes`, 53: `fromDelta`,
+164: `materialize`: walidacja
 insert-only Delta i atrybutów, limit tekstu i łącznego rozmiaru, data URI
 PNG/JPEG/WebP/PDF z kontrolą sygnatur, deduplikacja źródeł i lista assetów
 do kontroli zakresu. Nie wykonuje I/O; materializacja jest dopuszczalna
 dopiero po sprawdzeniu zakresu i lifecycle w kontrolerze. Nieznane embedy,
 HTTP/file, surowy U+FFFC i błędne bajty są odrzucane przed mutacją.
-Regresje: `test/quill_paste_plan_test.dart` (12 testów) oraz
-`test/editor_v2_rich_paste_test.dart` (13 regresji Quill/SQLite).
+`fromMediaBytes` rozpoznaje wybrany plik z sygnatury i kopiuje jego bajty,
+bez pośredniego base64. Regresje: `test/quill_paste_plan_test.dart`
+(17 testów), `test/editor_v2_rich_paste_test.dart` (27 regresji
+Quill/SQLite/pickera/widżetu) i `test/editor_v2_inline_file_sync_test.dart`
+(2 scenariusze dwóch plikowych SQLite: restart, utracony ACK, upload przed
+attach, odrzucenie uszkodzonego downloadu, remote delete/Undo, brak repaintu
+lokalnego echa i stabilny viewport). HTTP jest kontrolowany, bez PostgreSQL.
 
 ### `lib/features/editor/state/quill_style_patch.dart`
 
@@ -1620,11 +1626,15 @@ przy zmianie rozmiaru. Zmieniają się tylko żądane atrybuty.
 `pasteQuillHtml` przejmuje rich clipboard i wewnętrzną Delta Quilla;
 sprawdza cały plan i assety, zanim zastąpi zaznaczenie normalną mutacją.
 Anuluje opóźniony odczyt po zmianie bloku, kontrolera, treści lub wyboru.
+`insertQuillFile` korzysta z tej samej granicy `_replaceQuillSelection`
+i FilePickera PNG/JPEG/WebP/PDF; weryfikuje rzeczywisty rozmiar native,
+bajty Web i podpis pliku przed przygotowaniem embedu.
 Ważne granice: 596: `flushPendingSaves`; 2011: `_applyV2History`;
 2156: `_remapV2HistoryNotebook`; 2335: `prepareInlineAsset`;
-2358: `pasteQuillHtml`; 2477: `updateTextBlockContent`;
-2492: `updateActiveTextStyle`; 3899: `_commitActiveTextEdit`;
-3994: `_captureV2Gesture`; 4018: `_saveV2`.
+2357: `pasteQuillHtml`; 2392: `insertQuillFile`; 2410: `_pickQuillFile`;
+2449: `_replaceQuillSelection`; 2551: `updateTextBlockContent`;
+2566: `updateActiveTextStyle`; 3973: `_commitActiveTextEdit`;
+4068: `_captureV2Gesture`; 4092: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
@@ -1847,7 +1857,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   14: `EditorToolbar`; 218: dialog tła; 342: selektor gumki;
   410: selektor kształtu; 550: `_colorDot`; 585: `pickColor`;
   952: `_EraserIcon`.
-- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (401):
+- `lib/features/editor/presentation/widgets/text_edit_toolbar.dart` (429):
   pasek formatowania aktywnego `TextBlock` współpracujący bezpośrednio z
   `EditableText`. Selektor czcionki obejmuje rozmiary 8–192; krótkie menu (do 280 px)
   otwiera się tuż pod dolną krawędzią paska i przewija pionowo, z prostą
@@ -1862,7 +1872,10 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   Na ekranach szerokich ma 52 px zewnętrznego i 22 px wewnętrznego
   marginesu bocznego; na telefonach 8 px + 8 px.
   oraz 2 px pionowego paddingu.
-  9: `TextEditToolbar`; 43: `build`.
+  Dla aktywnego Quilla v2 przycisk `Insert image or PDF into text` wywołuje
+  `insertQuillFile`, respektuje read-only i mounted oraz pokazuje odmowę
+  bez kasowania zaznaczenia. Nie jest widoczny dla prostego HUD/legacy.
+  11: `TextEditToolbar`; 56: `build`; 195: `_insertFile`.
 
 - `lib/features/editor/presentation/interaction/object_transform_engine.dart` (362):
   wspólny silnik move/resize dla obiektów nie-ink. Używa typów
