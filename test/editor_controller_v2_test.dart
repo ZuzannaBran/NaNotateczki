@@ -812,6 +812,8 @@ void main() {
       ),
     );
     addTearDown(controller.dispose);
+    await controller.historyReady;
+    await controller.preferencesReady;
     final id = notebook.pages.single.id;
     TextBlock text(String id, String contents) => TextBlock(
       id: id,

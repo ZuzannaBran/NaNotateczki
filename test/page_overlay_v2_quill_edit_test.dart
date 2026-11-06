@@ -94,7 +94,7 @@ void main() {
                 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC'
                 'AAAAC0lEQVR42mP8/x8AAwMCAO+a3xkAAAAASUVORK5CYII=',
               )
-            : Uint8List.fromList([37, 80, 68, 70]);
+            : Uint8List.fromList([37, 80, 68, 70, 45, 49]);
         final asset = VerifiedEditorAsset(
           assetId: 'widget-inline-asset',
           sha256: crypto.sha256.convert(bytes).toString(),
@@ -147,6 +147,8 @@ void main() {
             notebook: stored,
             operationWriter: writer,
           );
+          await editor.historyReady;
+          await editor.preferencesReady;
         });
         addTearDown(editor.dispose);
         Widget screen() => MaterialApp(
@@ -269,12 +271,16 @@ void main() {
           expect(editor.activeTextController, same(active));
           expect(active.readOnly, isFalse);
           await tester.runAsync(editor.flushPendingSaves);
-          editor.undo();
-          await tester.runAsync(editor.flushPendingSaves);
+          await tester.runAsync(() async {
+            editor.undo();
+            await editor.flushPendingSaves();
+          });
           expect(editor.pages.single.textBlocks.single.deltaJson, savedDelta);
         }
-        editor.undo();
-        await tester.runAsync(editor.flushPendingSaves);
+        await tester.runAsync(() async {
+          editor.undo();
+          await editor.flushPendingSaves();
+        });
         expect(editor.pages.single.textBlocks.single.deltaJson, originalDelta);
         await tester.pumpWidget(const SizedBox.shrink());
       });

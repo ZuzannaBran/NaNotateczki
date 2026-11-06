@@ -129,6 +129,8 @@ class _Fixture {
       operationWriter: writer,
       saveDebounce: const Duration(days: 1),
     );
+    await editor.historyReady;
+    await editor.preferencesReady;
     text = quill.QuillController(
       document: quill.Document.fromJson(
         jsonDecode(persisted.pages.single.textBlocks.single.deltaJson!) as List,
@@ -662,8 +664,10 @@ void main() {
           if (type == 'pdf') {
             expect(find.text('Embedded PDF'), findsOneWidget);
           }
-          fixture.editor.undo();
-          await tester.runAsync(fixture.flush);
+          await tester.runAsync(() async {
+            fixture.editor.undo();
+            await fixture.flush();
+          });
           await tester.pump();
           expect(
             fixture.editor.currentPage.textBlocks.single.deltaJson,

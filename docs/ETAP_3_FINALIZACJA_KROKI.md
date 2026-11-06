@@ -1,5 +1,26 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Naprawa regresji ujawnionych przez CI — 2026-11-06, 16:22 UTC
+
+Przy starcie sesji `42244882234` dla `480b70e` nadal wykonywał testy.
+Później został anulowany; log natywnego joba zawierał 18 błędów,
+w tym wtórne błędy po timeoutach. Format, generator i analiza przeszły.
+Backend `42160118098` dla `6b0da04` zakończył się powodzeniem.
+
+Naprawiono konfigurację istniejących regresji bez wyłączania asercji:
+- FilePicker otrzymuje jawny testowy singleton przed zachowaniem jego
+  instancji; sześć testów importu dochodzi do właściwego scenariusza.
+- Sześć testów offline Undo używa bajtów z prawidłową sygnaturą PNG/PDF,
+  a widżet PDF ma pełny nagłówek `%PDF-`; testy uszkodzeń pozostają.
+- Test warstw czeka na faktyczny odczyt historii i preferencji.
+- Testy PageOverlay i HUD uruchamiają asynchroniczne Undo razem z flush
+  w `tester.runAsync`; Future utworzony w FakeAsync nie blokuje wtedy
+  oczekiwania realnej SQLite. Inicjalizacja czeka na `historyReady`.
+
+Lokalnie dostępny jest formatter Darta, brak Flutter SDK. Weryfikacja
+Flutter będzie uruchomiona po kolejnym spójnym commicie tej sesji,
+wyłącznie jobem aplikacji `[ci:failed-only]`; nie czekać na wynik.
+
 ## Wyścig zdalnej projekcji z Undo/Redo — 2026-11-06
 
 Zdalny commit SQLite może poprzedzać dostarczenie patcha do kontrolera.

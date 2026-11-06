@@ -32,7 +32,7 @@ final Uint8List _png = base64Decode(
 
 class _Picker extends FilePicker {
   _Picker(this.file);
-  final File file;
+  final File? file;
 
   @override
   Future<FilePickerResult?> pickFiles({
@@ -48,13 +48,19 @@ class _Picker extends FilePicker {
     bool withReadStream = false,
     bool lockParentWindow = false,
     bool readSequential = false,
-  }) async => FilePickerResult([
-    PlatformFile(
-      name: file.uri.pathSegments.last,
-      size: await file.length(),
-      path: file.path,
-    ),
-  ]);
+  }) async {
+    final selected = file;
+    if (selected == null) {
+      return null;
+    }
+    return FilePickerResult([
+      PlatformFile(
+        name: selected.uri.pathSegments.last,
+        size: await selected.length(),
+        path: selected.path,
+      ),
+    ]);
+  }
 }
 
 class _TemporaryDirectoryProvider extends PathProviderPlatform {
@@ -149,6 +155,9 @@ void main() {
   late File databaseFile;
   late FilePicker originalPicker;
   late PathProviderPlatform originalPaths;
+  setUpAll(() {
+    FilePicker.platform = _Picker(null);
+  });
   setUp(() async {
     directory = await Directory.systemTemp.createTemp(
       'nn-native-media-history-',

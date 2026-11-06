@@ -572,7 +572,9 @@ void main() {
         var session = _Session(file);
         addTearDown(() => session.close());
         final notebook = await session.repository.createNotebook();
-        final bytes = Uint8List.fromList([2, 4, 6, 8]);
+        final bytes = Uint8List.fromList(
+          importBytes[type == 'pdf' ? 'application/pdf' : 'image/png']!,
+        );
         final asset = VerifiedEditorAsset(
           assetId: 'recover-inline-asset',
           sha256: crypto.sha256.convert(bytes).toString(),
