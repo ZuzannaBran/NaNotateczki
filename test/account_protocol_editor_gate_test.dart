@@ -73,7 +73,8 @@ void main() {
   ) async {
     await tester.pumpWidget(app(signedIn: false));
     expect(find.text('Editor content'), findsOneWidget);
-  });  testWidgets('blocked account offers retry and logout', (tester) async {
+  });
+  testWidgets('blocked account offers retry and logout', (tester) async {
     var retries = 0;
     var logouts = 0;
     await tester.pumpWidget(

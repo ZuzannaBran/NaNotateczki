@@ -35,8 +35,7 @@ class AccountProtocolEditorGate extends StatefulWidget {
       _AccountProtocolEditorGateState();
 }
 
-class _AccountProtocolEditorGateState
-    extends State<AccountProtocolEditorGate> {
+class _AccountProtocolEditorGateState extends State<AccountProtocolEditorGate> {
   bool _retrying = false;
   bool _signingOut = false;
   String? _error;
@@ -123,7 +122,9 @@ class _AccountProtocolEditorGateState
                   Text(
                     _error!,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ],
               ],
