@@ -1563,7 +1563,8 @@ wciąż wymaga zweryfikowanego stagingu; pełny rebase pozostaje otwarty.
 obraz/PDF × usunięcie embedu/bloku/strony, cykl Undo/Redo/Undo,
 odmowa obcego dokumentu i uszkodzonych bajtów.
 Ten sam test pokrywa nowe importy PNG/JPEG/WebP/PDF, niemutowalność
-bajtów, Undo/Redo po opróżnieniu stagingu, restart outboxu, zły typ,
+bajtów, Undo/Redo po opróżnieniu stagingu, restart outboxu oraz
+Undo/Redo nowego kontrolera po ponownym otwarciu SQLite, zły typ,
 przekroczenie limitu, obcy dokument oraz retry po rollbacku attach.
 Usuwanie zweryfikowanego obrazu lub tekstu z embedem Quill usuwa
 scoped asset references razem z obiektem w transakcji SQLite;
