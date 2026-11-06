@@ -8,12 +8,16 @@ void main() {
     String? userId,
     String? legacyReadyUser,
     String? v2ReadyUser,
+    Future<void> Function()? onRetry,
+    Future<void> Function()? onLogOut,
   }) => MaterialApp(
     home: AccountProtocolEditorGate(
       isSignedIn: signedIn,
       userId: userId,
       legacyReadyUser: legacyReadyUser,
       v2ReadyUser: v2ReadyUser,
+      onRetry: onRetry ?? () async {},
+      onLogOut: onLogOut ?? () async {},
       child: const Scaffold(body: Text('Editor content')),
     ),
   );
@@ -26,11 +30,7 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     await tester.pumpWidget(
-      app(
-        signedIn: true,
-        userId: 'account-a',
-        legacyReadyUser: 'account-a',
-      ),
+      app(signedIn: true, userId: 'account-a', legacyReadyUser: 'account-a'),
     );
     expect(find.text('Editor content'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -73,5 +73,43 @@ void main() {
   ) async {
     await tester.pumpWidget(app(signedIn: false));
     expect(find.text('Editor content'), findsOneWidget);
+  });  testWidgets('blocked account offers retry and logout', (tester) async {
+    var retries = 0;
+    var logouts = 0;
+    await tester.pumpWidget(
+      app(
+        signedIn: true,
+        userId: 'account-a',
+        onRetry: () async {
+          retries++;
+        },
+        onLogOut: () async {
+          logouts++;
+        },
+      ),
+    );
+    await tester.tap(find.text('Retry'));
+    await tester.pump();
+    expect(retries, 1);
+    await tester.tap(find.text('Log out'));
+    await tester.pump();
+    expect(logouts, 1);
+    expect(find.text('Editor content'), findsNothing);
+  });
+
+  testWidgets('logout failure is shown without unlocking editing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        signedIn: true,
+        userId: 'account-a',
+        onLogOut: () async => throw StateError('offline keyring'),
+      ),
+    );
+    await tester.tap(find.text('Log out'));
+    await tester.pump();
+    expect(find.textContaining('Log out failed'), findsOneWidget);
+    expect(find.text('Editor content'), findsNothing);
   });
 }

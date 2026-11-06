@@ -6,8 +6,9 @@
 użytkownikowi przed potwierdzeniem wersji protokołu serwera. Oddzielne
 warunki zwalniają ekran po zweryfikowanym v1 lub po pełnym starcie runtime
 v2 dla właściwego konta. W razie braku połączenia i braku potwierdzonej
-wersji blokuje edycję, zamiast tworzyć snapshot v1 konta v2. Nie
-włącza globalnego cutover ani nie zmienia bezpiecznej izolacji kont.
+wersji blokuje edycję, zamiast tworzyć snapshot v1 konta v2.
+Retry ponawia sprawdzenie wersji, Log out pozwala opuścić ekran blokady.
+Nie włącza to globalnego cutover ani nie zmienia izolacji kont.
 
 
 ## Weryfikacja obrazu przed przeniesieniem i usunięciem (2026-11-06)

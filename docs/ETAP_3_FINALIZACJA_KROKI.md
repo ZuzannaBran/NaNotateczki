@@ -972,6 +972,7 @@ przed zakończeniem asynchronicznego sprawdzenia wersji konta.
 Regresja widgetowa sprawdza przejście pending → v1/v2 oraz zmianę konta.
 Niedostępne API i brak potwierdzonego protokołu blokują edycję
 (do odzyskania łączności), zamiast dopuszczać niebezpieczny zapis v1.
+Ekran oferuje Retry i Log out, a błędy działań są widoczne.
 Nie oznacza to aktywacji v2 na kontach produkcyjnych.
 
 ## Ochrona końcowych białych znaków w tekście (2026-11-06)

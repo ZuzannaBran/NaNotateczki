@@ -101,7 +101,8 @@ potwierdzi wersję protokołu. V1 otrzymuje dostęp dopiero po udanym
 `ensureLegacyAccountProtocol`, v2 dopiero po uruchomieniu izolowanego
 `EditorV2AccountRuntime` na aktualnym namespace. Nie odblokowuje innego
 użytkownika przez stary stan bootstrapu. W przypadku braku weryfikacji
-odmawia edycji (także offline), bez zapisu v1. Regresja widgetowa:
+odmawia edycji (także offline), bez zapisu v1. Ekran umożliwia
+Retry i Log out, pokazując błędy działań. Regresja widgetowa:
 `test/account_protocol_editor_gate_test.dart`.
 
 ## 3. Core

@@ -201,6 +201,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           userId: session.userId,
           legacyReadyUser: _legacyProtocolReadyUser,
           v2ReadyUser: _v2AccountRuntime == null ? null : _bootstrappedAccount,
+          onRetry: _startAccountSync,
+          onLogOut: session.logout,
           child: const LibraryScreen(),
         );
       },
