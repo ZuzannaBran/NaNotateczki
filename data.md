@@ -1,5 +1,15 @@
 # Dane NaNotateczki
 
+## Ustawienia aktywnego edytora v2 (2026-11-06)
+
+`LibraryScreen` pobiera już zamontowany `EditorController` z
+`EditorV2AccountRuntime.editorForDocument` przy wejściu do ustawień
+otwartego notatnika. Provider używa `.value`, więc nie rejestruje
+drugiego writera tego samego UID ani nie zwalnia kontrolera po
+zamknięciu ustawień. Katalog bez otwartego edytora tworzy i zwalnia
+oddzielny kontroler jak dotąd. Regresja widgetowa sprawdza otwarcie
+ustawień i następny zapis do outboxu.
+
 ## Bariera montowania edytora konta (2026-11-06)
 
 `AppScope` nie pokazuje produkcyjnego `LibraryScreen` zalogowanemu

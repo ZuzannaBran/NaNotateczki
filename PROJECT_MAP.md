@@ -615,11 +615,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   dispatcher zdalnych zmian i odłącza go przy dispose. Share v1
   jest zablokowany w preview v2. Przejście v1↔v2 tworzy nowy
   kontroler, bez jednoczesnego zapisu obu wersji.
-- `_openCatalogSettings` tworzy kontroler ustawień również dla katalogu v2,
-  przekazując ten sam operacyjny writer; ustawienia rysika/tła pozostają
-  dostępne, a snapshotowy zapis UID jest nadal zablokowany.
-  Regresja `test/library_v2_settings_test.dart` otwiera ustawienia dwukrotnie
-  i sprawdza brak nowych operacji oraz prawidłowe zwolnienie kontrolera.
+- `_openCatalogSettings` tworzy kontroler ustawień dla katalogu v2,
+  ale przy otwartym dokumencie pożycza aktywny kontroler od
+  `EditorV2AccountRuntime.editorForDocument`, bez przejęcia jego własności.
+  Nie powstaje drugi writer tego samego UID, a ustawienia rysika i tła
+  pozostają dostępne bez legacy snapshotów. Regresja
+  `test/library_v2_settings_test.dart` obejmuje katalog, aktywny edytor,
+  powrót z ustawień i kolejny zapis operacyjny.
   Druga regresja przechodzi prawdziwy katalog → NotebookScreen przez
   interaktywny preview kafelka (etykieta nie jest klikalna), wykonuje
   gest ink i sprawdza outbox v2 oraz odmowę legacy saveNotebook.

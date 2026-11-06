@@ -1,5 +1,17 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Ustawienia aktywnego dokumentu bez drugiego writera — 2026-11-06
+
+Odkryto brakujący przypadek integracji UI: ustawienia otwarte z aktywnego
+notatnika v2 konstruowały drugi `EditorController` dla tego samego UID.
+`NotebookRepository.registerOperationWriter` słusznie odrzucał tę kolizję.
+Teraz `LibraryScreen` korzysta z kontrolera już zamontowanego przez
+`EditorV2AccountRuntime`, a `ChangeNotifierProvider.value` nie przejmuje
+jego cyklu życia. Ustawienia katalogowe nadal używają osobnego kontrolera.
+Rozszerzony test `library_v2_settings_test.dart` wchodzi do ustawień z
+realnego edytora, weryfikuje tożsamość kontrolera i zapis kolejnej kreski
+po powrocie. Pełne CI wymagane do potwierdzenia; cutover nadal opt-in.
+
 ## Naprawa konfiguracji realnego E2E — 2026-11-06
 
 Ostatni przebieg `42257638993` zaliczył analizę i natywne regresje,

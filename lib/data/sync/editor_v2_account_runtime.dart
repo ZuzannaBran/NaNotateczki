@@ -111,6 +111,15 @@ class EditorV2AccountRuntime {
     }
   }
 
+  /// Returns the mounted writer owner without registering another controller.
+  EditorController? editorForDocument(String documentId) {
+    final editor = _activeEditor;
+    if (editor == null || editor.notebook.uid != documentId) {
+      return null;
+    }
+    return editor;
+  }
+
   Future<void> _onRemoteCommitted(OperationEnvelope operation) async {
     final editor = _activeEditor;
     if (editor != null) {

@@ -711,18 +711,30 @@ class _LibraryScreenState extends State<LibraryScreen> {
         : notebook;
     final repository = context.read<NotebookRepository>();
     final operationRuntime = context.read<EditorV2AccountRuntime?>();
+    final activeV2Editor = editorNotebook == null
+        ? null
+        : operationRuntime?.editorForDocument(editorNotebook.uid);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => editorNotebook == null
-            ? const EditorSettingsScreen()
-            : ChangeNotifierProvider(
-                create: (_) => EditorController(
-                  repository: repository,
-                  notebook: editorNotebook,
-                  operationWriter: operationRuntime?.writer,
-                ),
-                child: const EditorSettingsScreen(),
-              ),
+        builder: (_) {
+          if (editorNotebook == null) {
+            return const EditorSettingsScreen();
+          }
+          if (activeV2Editor != null) {
+            return ChangeNotifierProvider<EditorController>.value(
+              value: activeV2Editor,
+              child: const EditorSettingsScreen(),
+            );
+          }
+          return ChangeNotifierProvider(
+            create: (_) => EditorController(
+              repository: repository,
+              notebook: editorNotebook,
+              operationWriter: operationRuntime?.writer,
+            ),
+            child: const EditorSettingsScreen(),
+          );
+        },
       ),
     );
   }

@@ -171,6 +171,27 @@ void main() {
     );
     expect(tester.takeException(), isNull);
 
+    // Settings must borrow the mounted v2 writer owner, never claim the
+    // same document with a second controller.
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EditorSettingsScreen), findsOneWidget);
+    final settingsEditor = tester
+        .element(find.byType(EditorSettingsScreen))
+        .read<EditorController>();
+    expect(settingsEditor, same(editor));
+    expect(tester.takeException(), isNull);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(NotebookScreen), findsOneWidget);
+    editor.addInkStroke(const [InkPoint(dx: 18, dy: 22, pressure: 0.6)]);
+    await editor.flushPendingSaves();
+    final afterSettings = await runtime.store.pending(includeDeferred: true);
+    expect(afterSettings, hasLength(pending.length + 1));
+    expect(afterSettings.last.kind, OperationKind.strokeCreate);
+    expect(tester.takeException(), isNull);
+
     await tester.pumpWidget(const SizedBox.shrink());
     preferences.dispose();
     library.dispose();
