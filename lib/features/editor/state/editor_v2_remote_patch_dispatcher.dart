@@ -27,6 +27,19 @@ class EditorV2RemotePatchDispatcher {
   final Future<void> Function(OperationEnvelope)? onDocumentCommitted;
 
   Future<void> onRemoteCommitted(OperationEnvelope operation) async {
+    final updatesActiveEditor =
+        operation.documentId == editor.notebook.uid &&
+        operation.kind != OperationKind.documentCreate;
+    if (updatesActiveEditor) {
+      editor.noteV2RemoteCommit();
+    }
+    await _dispatchRemoteCommitted(operation);
+    if (updatesActiveEditor) {
+      editor.completeV2RemotePatch();
+    }
+  }
+
+  Future<void> _dispatchRemoteCommitted(OperationEnvelope operation) async {
     if (operation.documentId != editor.notebook.uid) {
       if (operation.kind.target == OperationTarget.document) {
         await onDocumentCommitted?.call(operation);

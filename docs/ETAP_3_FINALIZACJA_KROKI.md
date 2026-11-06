@@ -1,5 +1,40 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Lokalne gesty pomiędzy zdalnym commitem a patchem — 2026-11-06
+
+Domknięto kolejny wariant wyścigu historii: po zdalnym commicie SQLite,
+lecz przed patchem UI, nowy lokalny zapis mógł przepiąć stary stos Undo
+na nową głowę dziennika. Samo sprawdzenie głowy przy Undo wtedy nie
+wystarczało — inverse utworzenia strony nadal mógł usunąć cudzą treść.
+
+Kontroler sprawdza ciągłość głowy również w transakcji zwykłego gestu.
+Przy rozbieżności zapisuje gest i pusty checkpoint atomowo, a w pamięci
+blokuje Undo/Redo do poprawnego dostarczenia projekcji. Kolejne lokalne
+gesty nadal trafiają do outboxu, lecz nie uzbrajają starego inverse.
+Dispatcher oznacza zdalny commit przed asynchronicznym odczytem UI;
+odroczony lub błędny callback nie zwalnia blokady. Udany patch pozwala
+normalnie cofać nowe gesty. Zmiana nie wymaga migracji ani API serwera.
+
+Regresje rozszerzają `editor_controller_v2_test.dart` o dwa zapisy przed
+patchem i potwierdzają brak tombstone, strat cudzej treści oraz luki actorSeq.
+`editor_v2_remote_patch_dispatcher_test.dart` sprawdza oba stosy podczas
+odroczenia przez aktywny tekst, brak operacji po odrzuconym Undo oraz
+wznowienie historii po retry. Nowy scenariusz w
+`editor_v2_inline_file_sync_test.dart` łączy dwa rzeczywiste kontrolery,
+dwa pliki SQLite, HttpOperationGateway i SyncEngine: jawna bramka po
+zdalnym commicie, dwa lokalne gesty, zachowanie cudzej kreski, osobne
+viewporty, restart oraz Undo/Redo i zbieżność identyfikatorów obiektów.
+HTTP jest kontrolowane; to nie zastępuje E2E z backendem PostgreSQL.
+
+Lokalnie: format całego zestawu Dart oraz `git diff --check`.
+Aktualne regresje Flutter wymagają ograniczonego joba Actions aplikacji;
+wyniku nie sprawdzać w tej sesji po uruchomieniu.
+
+**Następna sesja:** najpierw wynik nowego commita aplikacji (tryb
+`[ci:failed-only]`), potem usunięcie ewentualnych błędów. Po zielonym CI
+kontynuować otwarte bramki produkcyjnego podłączenia i E2E z rzeczywistym
+backendem. Etap 3 i cutover pozostają otwarte; ta zmiana nie aktywuje v2.
+
 ## Naprawa regresji ujawnionych przez CI — 2026-11-06, 16:22 UTC
 
 Przy starcie sesji `42244882234` dla `480b70e` nadal wykonywał testy.
@@ -8,6 +43,7 @@ w tym wtórne błędy po timeoutach. Format, generator i analiza przeszły.
 Backend `42160118098` dla `6b0da04` zakończył się powodzeniem.
 
 Naprawiono konfigurację istniejących regresji bez wyłączania asercji:
+
 - FilePicker otrzymuje jawny testowy singleton przed zachowaniem jego
   instancji; sześć testów importu dochodzi do właściwego scenariusza.
 - Sześć testów offline Undo używa bajtów z prawidłową sygnaturą PNG/PDF,

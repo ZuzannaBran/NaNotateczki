@@ -22,6 +22,12 @@ Odbudowa tego cache'u nie dodaje assetu ani granicy Undo.
 `fitToByteBudget` ogranicza tylko historię, zachowując scope i head;
 nie maskuje błędów integralności. `remapIdentities` przygotowuje nowe ID
 w metadanych bez hydratacji BLOB-ów i odrzuca kolizje.
+Kontroler sprawdza ciągłość głowy także przy zwykłym lokalnym zapisie.
+Gest pomiędzy zdalnym commitem a patchem UI zachowuje outbox, lecz nie
+przenosi starych inverse na nową głowę. Undo/Redo pozostaje zablokowane
+do udanego patcha. Regresje obejmują odroczenie callbacku, dwa kolejne
+zapisy oraz dwa kontrolery/SQLite i restart z Undo/Redo przez kontrolowane
+HTTP; potwierdzenie CI i rzeczywiste E2E nadal pozostają wymagane.
 Bieżący status i przekazanie pracy:
 [ETAP_3_FINALIZACJA_KROKI.md](ETAP_3_FINALIZACJA_KROKI.md).
 Poniższe datowane sekcje opisują również wcześniejsze granice implementacji.

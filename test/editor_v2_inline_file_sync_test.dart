@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/api_client.dart';
+import 'package:program/data/sync/editor_history_store.dart';
 import 'package:program/data/sync/editor_sqlite_projector.dart';
 import 'package:program/data/sync/operation_asset_gateway.dart';
 import 'package:program/data/sync/operation_gateway.dart';
@@ -24,6 +25,7 @@ import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/editor/state/editor_v2_remote_patch_dispatcher.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/ink_stroke.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
 
 import 'support/native_test_documents.dart';
@@ -149,6 +151,7 @@ class _Peer {
           assets.uploadPendingAssets(ops, projector.verifiedUploadBytes),
       prepareRemoteOperation: (op) => projector.prepareRemoteMedia(op, assets),
       onRemoteCommitted: (op) async {
+        await beforeRemotePatch?.call(op);
         final target = editor;
         if (target != null) {
           await EditorV2RemotePatchDispatcher(
@@ -172,6 +175,7 @@ class _Peer {
   EditorController? editor;
   quill.QuillController? text;
   StreamSubscription<quill.DocChange>? subscription;
+  Future<void> Function(OperationEnvelope)? beforeRemotePatch;
   bool closed = false;
 
   Future<void> openEditor(String documentId, {bool editing = false}) async {
@@ -226,6 +230,150 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   useIsolatedNativeTestDocuments();
   useInMemoryTestTextStorage();
+
+  test(
+    'new local gestures cannot revalidate history before a remote patch',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'nn-history-peers-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final transport = _Transport();
+      final firstFile = File('${directory.path}/first.sqlite');
+      var first = _Peer(firstFile, 'history-first', transport);
+      addTearDown(() => first.close());
+      final second = _Peer(
+        File('${directory.path}/second.sqlite'),
+        'history-second',
+        transport,
+      );
+      addTearDown(second.close);
+      await first.repository.enableAccountOperations(first.writer);
+      final notebook = await first.repository.createNotebook();
+      await first.engine.start();
+      await first.engine.stop();
+      await first.openEditor(notebook.uid);
+      first.editor!.addPage();
+      await first.flush();
+      final sharedPageId = first.editor!.currentPage.id;
+      first.editor!.addInkStroke(const [InkPoint(dx: 1, dy: 1, pressure: 0.5)]);
+      await first.flush();
+      first.editor!.undo();
+      await first.flush();
+      expect(first.editor!.canUndo, isTrue);
+      expect(first.editor!.canRedo, isTrue);
+      await first.engine.start();
+      await first.engine.stop();
+      await second.engine.start();
+      await second.engine.stop();
+      await second.openEditor(notebook.uid);
+      second.editor!.currentPageIndex = 1;
+      second.editor!.addInkStroke(const [
+        InkPoint(dx: 3, dy: 4, pressure: 0.5),
+      ]);
+      await second.flush();
+      final remoteId = second.editor!.currentPage.inkStrokes.single.id;
+      await second.engine.start();
+      await second.engine.stop();
+      final remoteOperation = transport.accepted.singleWhere(
+        (op) => op.objectId == remoteId,
+      );
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      first.beforeRemotePatch = (op) async {
+        if (op.operationId == remoteOperation.operationId) {
+          entered.complete();
+          await release.future;
+        }
+      };
+      final pull = first.engine.start();
+      try {
+        await entered.future.timeout(const Duration(seconds: 10));
+        final editor = first.editor!;
+        expect(editor.canUndo, isTrue);
+        expect(editor.canRedo, isTrue);
+        editor.viewScale = 1.7;
+        editor.viewPan = const Offset(17, -21);
+        expect(editor.currentPage.inkStrokes, isEmpty);
+        for (var i = 0; i < 2; i++) {
+          editor.addInkStroke([InkPoint(dx: 8.0 + i, dy: 9, pressure: 0.6)]);
+          await first.flush();
+          expect(editor.canUndo, isFalse);
+          expect(editor.canRedo, isFalse);
+        }
+        final pending = (await first.store.pending())
+            .map((op) => op.operationId)
+            .toList();
+        expect(pending, hasLength(2));
+        final checkpoint = (await EditorHistoryStore(first.store).load(
+          documentId: notebook.uid,
+          ownerId: first.engine.actorIdForDocument(notebook.uid),
+        ))!;
+        expect(checkpoint.undo, isEmpty);
+        expect(checkpoint.redo, isEmpty);
+        editor.undo();
+        await first.flush();
+        expect(
+          (await first.store.pending()).map((op) => op.operationId),
+          pending,
+        );
+        expect(
+          await first.store.isTombstoned(notebook.uid, 'page', sharedPageId),
+          isFalse,
+        );
+        final durable = (await first.repository.getNotebook(notebook.uid))!;
+        expect(
+          durable.pages.last.inkStrokes.map((stroke) => stroke.id),
+          contains(remoteId),
+        );
+        expect(durable.pages.last.inkStrokes, hasLength(3));
+      } finally {
+        release.complete();
+        await pull;
+        first.beforeRemotePatch = null;
+      }
+      await first.engine.stop();
+      final editor = first.editor!;
+      expect(editor.currentPage.inkStrokes, hasLength(3));
+      expect(
+        editor.currentPage.inkStrokes.map((stroke) => stroke.id),
+        contains(remoteId),
+      );
+      expect(editor.viewScale, 1.7);
+      expect(editor.viewPan, const Offset(17, -21));
+      expect(second.editor!.viewScale, 1);
+      expect(second.editor!.viewPan, Offset.zero);
+      editor.addInkStroke(const [InkPoint(dx: 20, dy: 21, pressure: 0.6)]);
+      await first.flush();
+      expect(editor.canUndo, isTrue);
+      final added = editor.currentPage.inkStrokes.last.id;
+      await first.close();
+      first = _Peer(firstFile, 'history-first', transport);
+      await first.openEditor(notebook.uid);
+      expect(first.editor!.canUndo, isTrue);
+      first.editor!.undo();
+      await first.flush();
+      final preserved = first.editor!.pages.last.inkStrokes;
+      expect(preserved, hasLength(3));
+      expect(preserved.map((stroke) => stroke.id), contains(remoteId));
+      expect(preserved.map((stroke) => stroke.id), isNot(contains(added)));
+      first.editor!.redo();
+      await first.flush();
+      expect(first.editor!.pages.last.inkStrokes, hasLength(4));
+      await first.engine.start();
+      await first.engine.stop();
+      await second.engine.start();
+      await second.engine.stop();
+      expect(
+        second.editor!.pages.last.inkStrokes.map((stroke) => stroke.id).toSet(),
+        first.editor!.pages.last.inkStrokes.map((stroke) => stroke.id).toSet(),
+      );
+      expect(
+        transport.accepted.map((op) => op.operationId).toSet(),
+        hasLength(transport.accepted.length),
+      );
+    },
+  );
 
   for (final type in ['image', 'pdf']) {
     test(

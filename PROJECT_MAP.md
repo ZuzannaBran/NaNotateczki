@@ -1612,7 +1612,11 @@ zatwierdzonej w SQLite, nie ze strony przegrywającej operacji;
 Zachowuje kolejność tekstów i obrazów (sortIndex) przy aktualizacjach.
 Aktywny gest lub niezapisana zmiana blokuje callback — `SyncEngine`
 ponawia dostarczenie; brak przełączenia `AppScope` na v2.
-Test: `test/editor_v2_remote_patch_dispatcher_test.dart`.
+28: `onRemoteCommitted` oznacza zdalny commit przed odczytem projekcji;
+41: `_dispatchRemoteCommitted` dostarcza patch. Nieudana próba pozostawia
+blokadę historii, udana zwalnia ją również dla potwierdzonego no-op.
+Test: `test/editor_v2_remote_patch_dispatcher_test.dart`, w tym odroczenie
+przez aktywny tekst, blokada Undo/Redo i wznowienie po retry.
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
 
@@ -1643,7 +1647,8 @@ bez pośredniego base64. Regresje: `test/quill_paste_plan_test.dart`
 (20 testów, w tym kopiowanie i limit strumienia),
 `test/editor_v2_rich_paste_test.dart` (45 regresji
 Quill/SQLite/pickera/widżetu) i `test/editor_v2_inline_file_sync_test.dart`
-(2 scenariusze dwóch plikowych SQLite: restart, utracony ACK, upload przed
+(3 scenariusze dwóch plikowych SQLite: historia z dwoma lokalnymi gestami
+przed zdalnym patchem, restart Undo/Redo, utracony ACK, upload przed
 attach, odrzucenie uszkodzonego downloadu, remote delete/Undo, brak repaintu
 lokalnego echa i stabilny viewport). Utrata ACK jest sprawdzana przez
 przyjęte ID i trwały deferred outbox/attempts, bez założenia utrzymania
@@ -1691,8 +1696,13 @@ Undo/Redo odrzuca checkpoint z nieaktualną głową przed inverse. W transakcji
 nowego batcha sprawdza też jego poprzednią głowę: zdalny commit podczas
 dekodowania historii wycofuje projekcję, tombstones, actorSeq i outbox.
 Stosy są czyszczone po rollbacku, bez nadpisania UI przed remote patchem.
-Dwie regresje `editor_controller_v2_test.dart` chronią cudzą kreskę na
-lokalnie utworzonej stronie i sprawdzają dalszą edycję bez luki actorSeq.
+Trzy regresje `editor_controller_v2_test.dart` chronią cudzą kreskę na
+lokalnie utworzonej stronie, także po dwóch lokalnych zapisach przed
+patchem, i sprawdzają dalszą edycję bez luki actorSeq. Zwykły zapis
+porównuje głowę przed własnym wsadem w transakcji; obca zmiana opróżnia
+checkpoint, nie tracąc gestu ani outboxu. `noteV2RemoteCommit` blokuje
+oba stosy do `completeV2RemotePatch`; udany patch odblokowuje historię
+nowych gestów. Powiadomienie historii nie odmalowuje całego dokumentu.
 Gest Quill zachowuje koniec ostatniego autosave niezależnie od debounce.
 Po zatwierdzonym odtworzeniu `_remapV2HistoryNotebook` aktualizuje ID
 w obu stosach historii. Redo następnego gestu zachowuje już odtworzone
@@ -1715,7 +1725,7 @@ ponawianie ink oraz stron bez ponownego użycia tombstones. Błąd zapisu
 wyłącza Undo/Redo; `historyRevision` powiadamia toolbar po błędzie
 oraz po wyczyszczeniu dirty flags przy udanym retry.
 Natywne importy obrazów i renderów PDF zamrażają bajty przed mutacją
-kontrolera; checkpoint nie odczytuje plików. 3853: `restoreImageCache`
+kontrolera; checkpoint nie odczytuje plików. 3909: `restoreImageCache`
 zachowuje te bajty i nie zapisuje operacji ani kroku historii.
 `test/editor_v2_native_image_history_test.dart`: sześć regresji SQLite,
 import PNG/PDF przez publiczne API z pliku, usunięcie pliku przed commitem,
@@ -1737,15 +1747,16 @@ HUD pożycza swój kontroler przez `bindHudTextController`/`unbindHudTextControl
 Import porównuje TextEditingValue (także IME), model i właściciela, zachowuje
 Delta i tworzy osobny checkpoint od wcześniejszego pisania. Jednorazowy
 handoff kursora dotyczy dokładnej Delta; odrzucony import nie wymienia HUD.
-Ważne granice: 183: `preferencesReady`; 195: `historyReady`;
-268: `bindHudTextController`; 276: `unbindHudTextController`;
-287: `hasQuillHandoff`; 291: `takeQuillHandoff`; 696: `flushPendingSaves`;
-2112: `_applyV2History`; 2272: `_restoreV2History`;
-2300: `_persistV2History`; 2441: `_remapV2HistoryNotebook`;
-2620: `prepareInlineAsset`; 2642: `pasteQuillHtml`; 2681: `insertQuillFile`;
-2699: `_pickQuillFile`; 2738: `_replaceQuillSelection`;
-2902: `updateTextBlockContent`; 2917: `updateActiveTextStyle`;
-4368: `_commitActiveTextEdit`; 4463: `_captureV2Gesture`; 4487: `_saveV2`.
+Ważne granice: 183: `preferencesReady`; 196: `historyReady`;
+269: `bindHudTextController`; 277: `unbindHudTextController`;
+288: `hasQuillHandoff`; 292: `takeQuillHandoff`; 727: `flushPendingSaves`;
+371: `noteV2RemoteCommit`; 388: `completeV2RemotePatch`;
+2143: `_applyV2History`; 2284: `_restoreV2History`;
+2356: `_persistV2History`; 2497: `_remapV2HistoryNotebook`;
+2676: `prepareInlineAsset`; 2698: `pasteQuillHtml`; 2737: `insertQuillFile`;
+2755: `_pickQuillFile`; 2794: `_replaceQuillSelection`;
+2958: `updateTextBlockContent`; 2973: `updateActiveTextStyle`;
+4424: `_commitActiveTextEdit`; 4519: `_captureV2Gesture`; 4543: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
@@ -1772,30 +1783,20 @@ tło bez powiadamiania całego edytora; odczyt i domyślne wzory
 synchronizują ten notifier. Obrazy trafiają do prywatnego katalogu danych
 aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
-- 37: `LassoSelection`; 76: `EditorController`;
-  220: `flushPendingSaves`; 1015: `setCurrentBackgroundSettings`;
-  1029: `applyInkColorPreset`.
-- 292–364: layout i transformacje viewportu; 305: start blokady transformacji,
-  330: `setViewTransform`.
-- 373–509: operacje `*OnPage` używane przez canvasy/overlaye.
-- 502–919: narzędzia, aktywne elementy, lasso i preferencje; 591: `setTool`;
-  904: `setImageTransformPreview`; 911: `clearImageTransformPreview`;
-  kształt po narysowaniu lub rozpoznaniu przechodzi na tymczasowe
-  `edit` (`startShapeEdit`), a tap poza figurą przywraca poprzednie
-  narzędzie (`finishShapeEdit`). Podgląd i commit transformacji ink
-  korzystają z `UpdateInkStrokeAction` i rewizji strony, zachowując ID
-  oraz pojedyncze undo/redo.
-  682: `commitActiveTextEdit` — zamyka edycję treści przed transformacją ramki.
-- Historia Undo/Redo pamięta UID strony, na której wykonano akcję;
-  cofanie po nawigacji nie może zmieniać obiektów innej strony.
-  Usunięcie strony usuwa powiązane wpisy historii. Regresje w
+- 95: `LassoSelection`; 134: `EditorController`;
+  1562: `setCurrentBackgroundSettings`; 1576: `applyInkColorPreset`.
+- 829: `updatePageLayout`; 844: `beginObjectTransform`;
+  869: `setViewTransform`; 998–1129: operacje `*OnPage`.
+- 1130: `setTool`; 1154: `startShapeEdit`; 1167: `finishShapeEdit`;
+  1233: `commitActiveTextEdit`; 1443: `setImageTransformPreview`;
+  1450: `clearImageTransformPreview`. Transformacja ink zachowuje ID
+  przez `UpdateInkStrokeAction` i rewizję strony, z pojedynczym Undo/Redo.
+- Historia pamięta UID strony; regresje nawigacji i usuwania stron:
   `test/editor_controller_layering_test.dart`.
-- 1407: łączenie zapisanych domyślnych teł; 1490: `undo`; 1516: `redo`;
-  1591: `toggleBookmark`; 1667: `updateActiveTextStyle` — blokowe
-  formatowanie aktywnego tekstu, opcjonalnie po zachowanym ID,
-  zapisywane jako `UpdateTextAction`.
-- 2725: `_imagesDir`; 2883: `_applyAction`; 2914: `_applyInkAction`;
-  3079: `_scheduleSave`; 3101: `_saveDirtyPages`; 3139: `_save`.
+- 1954: `_mergedBackgroundDefaults`; 2037: `undo`; 2077: `redo`;
+  2614: `toggleBookmark`; 2973: `updateActiveTextStyle`.
+- 4089: `_imagesDir`; 4247: `_applyAction`; 4280: `_applyInkAction`;
+  4492: `_scheduleSave`; 4708: `_saveDirtyPages`; 4750: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`

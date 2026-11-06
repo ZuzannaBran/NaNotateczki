@@ -189,6 +189,7 @@ class EditorController extends ChangeNotifier {
   EditorHistoryNotebookCodec? _v2HistoryCodec;
   Future<void>? _v2HistoryReady;
   bool _v2HistoryRecovering = false;
+  bool _v2HistoryAwaitingProjection = false;
   Object? _v2HistoryLoadError;
 
   /// Resolves after the local actor's history has been verified and loaded.
@@ -324,6 +325,7 @@ class EditorController extends ChangeNotifier {
   bool get canUndo => operationWriter == null
       ? _undoActions.isNotEmpty
       : !_integritySaveBlocked &&
+            !_v2HistoryAwaitingProjection &&
             (_v2Undo.isNotEmpty ||
                 _fullSavePending ||
                 _dirtyPageIds.isNotEmpty ||
@@ -331,6 +333,7 @@ class EditorController extends ChangeNotifier {
   bool get canRedo => operationWriter == null
       ? _redoActions.isNotEmpty
       : !_integritySaveBlocked &&
+            !_v2HistoryAwaitingProjection &&
             _v2Redo.isNotEmpty &&
             !_fullSavePending &&
             _dirtyPageIds.isEmpty &&
@@ -362,6 +365,29 @@ class EditorController extends ChangeNotifier {
   }
 
   bool get isV2DocumentDeleted => _v2DocumentDeleted;
+
+  /// Called after a remote SQLite commit, before its potentially deferred UI
+  /// patch. Local writes may continue, but cannot validate old inverse states.
+  void noteV2RemoteCommit() {
+    if (operationWriter == null || _isDisposed) {
+      return;
+    }
+    final changed =
+        !_v2HistoryAwaitingProjection ||
+        _v2Undo.isNotEmpty ||
+        _v2Redo.isNotEmpty;
+    _v2HistoryAwaitingProjection = true;
+    _v2Undo.clear();
+    _v2Redo.clear();
+    if (changed) {
+      _notifyHistoryChanged();
+    }
+  }
+
+  /// Only a successfully delivered projection may re-enable fresh history.
+  void completeV2RemotePatch() {
+    _v2HistoryAwaitingProjection = false;
+  }
 
   bool get canApplyConfirmedRemoteNotebook =>
       !_isDisposed &&
@@ -421,6 +447,7 @@ class EditorController extends ChangeNotifier {
       title: title,
       folder: folder,
     );
+    completeV2RemotePatch();
     _v2Undo.clear();
     _v2Redo.clear();
     _undoActions.clear();
@@ -442,6 +469,7 @@ class EditorController extends ChangeNotifier {
       return false;
     }
     _v2DocumentDeleted = true;
+    completeV2RemotePatch();
     _v2Undo.clear();
     _v2Redo.clear();
     _undoActions.clear();
@@ -491,6 +519,7 @@ class EditorController extends ChangeNotifier {
     pages = updated;
     notebook = notebook.copyWith(pages: updated);
     _v2PersistedNotebook = notebook;
+    completeV2RemotePatch();
     final selected = updated.indexWhere((entry) => entry.id == selectedId);
     currentPageIndex = selected < 0
         ? currentPageIndex.clamp(0, updated.length - 1).toInt()
@@ -537,6 +566,7 @@ class EditorController extends ChangeNotifier {
     pages = updated;
     notebook = notebook.copyWith(pages: updated);
     _v2PersistedNotebook = notebook;
+    completeV2RemotePatch();
     _undoActions.clear();
     _redoActions.clear();
     _v2Undo.clear();
@@ -646,6 +676,7 @@ class EditorController extends ChangeNotifier {
       // Remote projection is already durable. Do not re-emit its patch as
       // a new local operation during the next editor save.
       _v2PersistedNotebook = notebook;
+      completeV2RemotePatch();
     }
     // A remote operation invalidates local inverse snapshots.
     _undoActions.clear();
@@ -2110,7 +2141,8 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> _applyV2History({required bool undo}) async {
-    if (InkActivityTracker.instance.hasActiveContacts) {
+    if (_v2HistoryAwaitingProjection ||
+        InkActivityTracker.instance.hasActiveContacts) {
       return;
     }
     _commitActiveTextEdit();
@@ -2134,9 +2166,7 @@ class EditorController extends ChangeNotifier {
       ownerId: operationWriter!.syncEngine.actorIdForDocument(notebook.uid),
     );
     if (savedHistory == null) {
-      _v2Undo.clear();
-      _v2Redo.clear();
-      _notifyHistoryChanged();
+      noteV2RemoteCommit();
       return;
     }
     final entry = source.last;
@@ -2172,23 +2202,7 @@ class EditorController extends ChangeNotifier {
           // A remote commit can race with inverse preparation. Check the
           // preceding head inside the write transaction, so a stale inverse
           // rolls back its projection, tombstones, actorSeq and outbox.
-          final beforeBatch = operations.isEmpty
-              ? ''
-              : 'AND rowid < (SELECT rowid FROM operations '
-                    'WHERE operation_id = ?) ';
-          final previousHead = await operationWriter!.projector.database
-              .customSelect(
-                'SELECT operation_id FROM operations WHERE document_id = ? '
-                '$beforeBatch'
-                'ORDER BY rowid DESC LIMIT 1',
-                variables: [
-                  Variable<String>(notebook.uid),
-                  if (operations.isNotEmpty)
-                    Variable<String>(operations.first.operationId),
-                ],
-              )
-              .getSingleOrNull();
-          if (previousHead?.read<String>('operation_id') !=
+          if (await _v2HeadBeforeBatch(operations) !=
               savedHistory.headOperationId) {
             throw const _V2HistoryHeadChanged();
           }
@@ -2223,9 +2237,7 @@ class EditorController extends ChangeNotifier {
       hasCommitted = committed.isNotEmpty;
       _installV2History(checkpoint, nextUndo!, nextRedo!);
     } on _V2HistoryHeadChanged {
-      _v2Undo.clear();
-      _v2Redo.clear();
-      _notifyHistoryChanged();
+      noteV2RemoteCommit();
       return;
     } finally {
       _v2HistoryCommitting = false;
@@ -2275,7 +2287,7 @@ class EditorController extends ChangeNotifier {
         documentId: notebook.uid,
         ownerId: operationWriter!.syncEngine.actorIdForDocument(notebook.uid),
       );
-      if (_isDisposed || checkpoint == null) {
+      if (_isDisposed || _v2HistoryAwaitingProjection || checkpoint == null) {
         return;
       }
       _v2Undo
@@ -2294,6 +2306,50 @@ class EditorController extends ChangeNotifier {
     } finally {
       _v2HistoryRecovering = false;
     }
+  }
+
+  Future<bool> _v2HistoryHeadDiscontinuous(
+    List<OperationEnvelope> operations,
+  ) async {
+    if (_v2Undo.isEmpty && _v2Redo.isEmpty) {
+      return false;
+    }
+    final database = operationWriter!.projector.database;
+    final history = await database
+        .customSelect(
+          'SELECT head_operation_id FROM editor_history '
+          'WHERE document_id = ? AND owner_id = ?',
+          variables: [
+            Variable<String>(notebook.uid),
+            Variable<String>(
+              operationWriter!.syncEngine.actorIdForDocument(notebook.uid),
+            ),
+          ],
+        )
+        .getSingleOrNull();
+    if (history == null) {
+      return true;
+    }
+    return await _v2HeadBeforeBatch(operations) !=
+        history.read<String>('head_operation_id');
+  }
+
+  Future<String?> _v2HeadBeforeBatch(List<OperationEnvelope> operations) async {
+    final beforeBatch = operations.isEmpty
+        ? ''
+        : 'AND rowid < (SELECT rowid FROM operations WHERE operation_id = ?) ';
+    final previous = await operationWriter!.projector.database
+        .customSelect(
+          'SELECT operation_id FROM operations WHERE document_id = ? '
+          '$beforeBatch ORDER BY rowid DESC LIMIT 1',
+          variables: [
+            Variable<String>(notebook.uid),
+            if (operations.isNotEmpty)
+              Variable<String>(operations.first.operationId),
+          ],
+        )
+        .getSingleOrNull();
+    return previous?.read<String>('operation_id');
   }
 
   /// Runs inside the same SQLite transaction as the journal projection.
@@ -4524,16 +4580,26 @@ class EditorController extends ChangeNotifier {
               List<_V2HistoryEntry>? nextUndo;
               List<_V2HistoryEntry>? nextRedo;
               EditorHistoryCheckpoint? checkpoint;
+              var awaitingProjection = false;
               final committed = await operationWriter!.writeNotebookChange(
                 before: baseline,
                 after: target,
                 onCommittedInTransaction: (operations) async {
                   nextUndo = List<_V2HistoryEntry>.of(_v2Undo);
                   nextRedo = List<_V2HistoryEntry>.of(_v2Redo);
+                  awaitingProjection =
+                      _v2HistoryAwaitingProjection ||
+                      await _v2HistoryHeadDiscontinuous(operations);
+                  if (awaitingProjection) {
+                    nextUndo!.clear();
+                    nextRedo!.clear();
+                  }
                   final operationId = operations.isNotEmpty
                       ? operations.last.operationId
                       : textGesture?.lastOperationId;
-                  if (recordHistory && operationId != null) {
+                  if (!awaitingProjection &&
+                      recordHistory &&
+                      operationId != null) {
                     try {
                       final before = textGesture?.before ?? baseline;
                       final storedBefore = await _v2HistoryCodec!.encode(
@@ -4561,6 +4627,11 @@ class EditorController extends ChangeNotifier {
                       nextRedo!.clear();
                     }
                   }
+                  if (_v2HistoryAwaitingProjection) {
+                    awaitingProjection = true;
+                    nextUndo!.clear();
+                    nextRedo!.clear();
+                  }
                   checkpoint = await _persistV2History(
                     operations,
                     undo: nextUndo!,
@@ -4569,6 +4640,9 @@ class EditorController extends ChangeNotifier {
                 },
               );
               _v2PersistedNotebook = target;
+              if (awaitingProjection) {
+                noteV2RemoteCommit();
+              }
               if (textGesture != null && committed.isNotEmpty) {
                 textGesture.lastOperationId = committed.last.operationId;
               }

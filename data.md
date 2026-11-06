@@ -111,6 +111,17 @@ rozmiar i sygnaturę BLOB. Działa również po usunięciu widocznego właścici
 Nie wykonuje HTTP, plikowego I/O ani zapisów SQLite. Nie przywraca sam
 obiektu w bazie: inverse nadal musi być nową operacją z nowym UID.
 
+Zdalny commit unieważnia stare inverse jeszcze przed odroczonym patchem
+UI. Zwykły lokalny zapis porównuje głowę checkpointu z głową sprzed
+własnego wsadu, wewnątrz tej samej transakcji. Rozbieżność opróżnia
+historię, zachowując operacje, projekcję i outbox. Do udanego dostarczenia
+patcha kolejne gesty są trwale zapisywane z pustą historią; Undo/Redo
+pozostaje zablokowane. Flaga oczekiwania nie blokuje samego retry patcha.
+Po jego dostarczeniu nowe gesty mogą mieć normalne inverse. Restart
+czyta aktualną projekcję SQLite; checkpoint nie legalizuje starego stanu
+pozbawionego zdalnej treści. HTTP/SQLite regresja dwóch klientów obejmuje
+ten wyścig, ponowne otwarcie bazy i zbieżność po Undo/Redo.
+
 Stosy `EditorController` są podłączone w opt-in v2. Przy starcie zachowują
 metadane checkpointów, a notebook wybranej operacji odwrotnej dekodują
 przy użyciu, bez hydratacji 50 kopii mediów. Aktualne regresje kontrolera

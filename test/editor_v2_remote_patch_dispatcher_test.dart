@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:drift/native.dart';
@@ -14,6 +15,7 @@ import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/editor/state/editor_v2_remote_patch_dispatcher.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/ink_stroke.dart';
 import 'package:uuid/uuid.dart';
 
 import 'support/native_test_documents.dart';
@@ -32,6 +34,110 @@ class _OfflineGateway implements OperationGateway {
 void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'deferred remote patch blocks history until successful delivery',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final notebook = await repository.createNotebook();
+      final store = OperationStore(database);
+      final projector = EditorSqliteProjector(database);
+      final engine = SyncEngine(
+        store: store,
+        gateway: _OfflineGateway(),
+        actorId: 'deferred-history',
+        checkpointScope: 'deferred-history',
+        enableRealtime: false,
+        applyRemote: (operation, _) => projector.apply(operation),
+      );
+      addTearDown(engine.stop);
+      final editor = EditorController(
+        repository: repository,
+        notebook: notebook,
+        operationWriter: EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+        ),
+        saveDebounce: const Duration(days: 1),
+      );
+      addTearDown(editor.dispose);
+      await editor.historyReady;
+      await editor.preferencesReady;
+      final dispatcher = EditorV2RemotePatchDispatcher(
+        editor: editor,
+        repository: repository,
+      );
+      for (var i = 0; i < 2; i++) {
+        editor.addInkStroke([InkPoint(dx: 1.0 + i, dy: 2, pressure: 0.5)]);
+        await editor.flushPendingSaves();
+      }
+      editor.undo();
+      await editor.flushPendingSaves();
+      expect(editor.canUndo, isTrue);
+      expect(editor.canRedo, isTrue);
+      final pending = await store.pending();
+      final remote = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'remote-deferred-history',
+        actorSeq: 1,
+        logicalClock: pending.last.logicalClock + 1,
+        dependencies: [pending.last.operationId],
+        documentId: notebook.uid,
+        pageId: notebook.pages.single.id,
+        objectId: 'remote-deferred-stroke',
+        kind: OperationKind.strokeCreate,
+        payload: const {
+          'value': {
+            'objectType': 'stroke',
+            'colorValue': 0xFF123456,
+            'width': 2.0,
+            'toolIndex': 0,
+            'sortIndex': 1,
+            'points': [
+              [4.0, 6.0, 0.5],
+            ],
+          },
+        },
+      );
+      await store.applyRemote(
+        remote,
+        serverSequence: 100,
+        apply: () => projector.apply(remote),
+      );
+      editor.activeTextBlockId = 'active-text-edit';
+      await expectLater(dispatcher.onRemoteCommitted(remote), throwsStateError);
+      expect(editor.canUndo, isFalse);
+      expect(editor.canRedo, isFalse);
+      editor.undo();
+      editor.redo();
+      await editor.flushPendingSaves();
+      expect(
+        (await store.pending()).map((op) => op.operationId),
+        pending.map((op) => op.operationId),
+      );
+      editor.activeTextBlockId = null;
+      await dispatcher.onRemoteCommitted(remote);
+      expect(editor.currentPage.inkStrokes, hasLength(2));
+      expect(
+        editor.currentPage.inkStrokes.map((s) => s.id),
+        contains(remote.objectId),
+      );
+      editor.viewPan = const Offset(10, 20);
+      editor.addInkStroke(const [InkPoint(dx: 8, dy: 9, pressure: 0.5)]);
+      await editor.flushPendingSaves();
+      expect(editor.canUndo, isTrue);
+      editor.undo();
+      await editor.flushPendingSaves();
+      expect(editor.currentPage.inkStrokes, hasLength(2));
+      expect(
+        editor.currentPage.inkStrokes.map((s) => s.id),
+        contains(remote.objectId),
+      );
+      expect(editor.viewPan, const Offset(10, 20));
+    },
+  );
 
   test('image create does not repaint before verified remote attach', () async {
     final database = NotesDatabase(NativeDatabase.memory());
