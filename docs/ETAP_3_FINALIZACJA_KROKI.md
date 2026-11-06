@@ -1,5 +1,23 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Toolbar bez spłaszczania rich text — 2026-11-06
+
+`updateActiveTextStyle` dla v2 nie odbudowuje już Delta z `before.text`.
+Dotychczasowa ścieżka mogła zamienić obraz/PDF na niepowiązany znak
+U+FFFC i ujednolicić niezwiązane formatowanie. `patchQuillStyle` nakłada
+tylko wskazane pola na istniejące inserty. Zachowuje embedy, linki,
+niezmieniane kolory/fonty/dekoracje i atrybuty akapitów. Wynik scala
+równoważne fragmenty, aby kolejna edycja zgadzała się z trwałymi atomami.
+Protokół i schemat nie zmieniły się; legacy zachowuje swoją ścieżkę.
+
+Lokalnie zaliczono pięć testów czystej funkcji: kolory/różne style,
+akapity, czyszczenie i kanonizacja, Unicode/współdzielone embedy oraz
+odmowa niepoprawnej Delta. Regresje SQLite image/PDF sprawdzają zmianę
+fontu bez ujednolicania kolorów, color/font/alignment/clear, Undo/Redo,
+te same atom ID i wyłącznie text.format/object.set — bez przepisywania
+treści, attach/detach lub ponownego tworzenia obiektów.
+Te integracyjne regresje wymagają potwierdzenia w kolejnym Actions.
+
 ## Potwierdzone regresje i nowy import inline — 2026-11-06
 
 Przebieg `42160667069` dla `e4b1cfc` przeszedł formatowanie, analizę,

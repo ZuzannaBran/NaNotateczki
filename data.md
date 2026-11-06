@@ -39,6 +39,11 @@ Nowa scoped referencja powstaje w transakcji przed `text.insert`.
 Usunięcie samego embedu, bloku albo strony nie usuwa bajtów potrzebnych
 Undo. Nie daje to dostępu do assetów innego dokumentu ani do ścieżek/URL.
 
+Zmiana stylu przez toolbar v2 nakłada tylko żądane atrybuty na istniejącą
+Delta. Nie odbudowuje embedów ze zwykłego tekstu i nie usuwa
+niezwiązanych stylów innych fragmentów. Kanoniczne fragmenty nadal
+są zapisywane przez `text.format` z tymi samymi ID atomów i assetów.
+
 ## Przegląd v2 konta (2026-11-05)
 
 W `AppScope` istnieje odizolowana, opcjonalna ścieżka operacyjnego

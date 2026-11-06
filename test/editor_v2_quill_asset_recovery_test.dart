@@ -324,6 +324,211 @@ void main() {
   );
 
   for (final type in ['image', 'pdf']) {
+    test(
+      'toolbar styling retains $type embeds, atom IDs and unrelated styles',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'nn-quill-style-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final session = _Session(File('${directory.path}/notes.sqlite'));
+        addTearDown(session.close);
+        final notebook = await session.repository.createNotebook();
+        final asset = session.writer.stageQuillAsset(
+          documentId: notebook.uid,
+          bytes: Uint8List.fromList(
+            importBytes[type == 'pdf' ? 'application/pdf' : 'image/png']!,
+          ),
+          embedType: type,
+        );
+        final original = TextBlock(
+          id: 'toolbar-rich-text',
+          text: 'A\uFFFCB\nC',
+          deltaJson: jsonEncode([
+            {
+              'insert': 'A',
+              'attributes': {
+                'bold': true,
+                'link': 'https://example.test',
+                'color': '#123456',
+              },
+            },
+            {
+              'insert': {type: 'asset:${asset.assetId}'},
+            },
+            {
+              'insert': 'B',
+              'attributes': {
+                'italic': true,
+                'font': 'Georgia',
+                'color': '#654321',
+              },
+            },
+            {
+              'insert': '\n',
+              'attributes': {'align': 'center'},
+            },
+            {
+              'insert': 'C',
+              'attributes': {'underline': true},
+            },
+            {
+              'insert': '\n',
+              'attributes': {'align': 'right'},
+            },
+          ]),
+          position: Offset.zero,
+          fontSize: 18,
+          color: const Color(0xFF123456),
+          width: 210,
+        );
+        await session.writer.writePageChange(
+          documentId: notebook.uid,
+          before: notebook.pages.single,
+          after: notebook.pages.single.copyWith(textBlocks: [original]),
+        );
+        final persisted = (await session.repository.getNotebook(notebook.uid))!;
+        final beforeDelta = persisted.pages.single.textBlocks.single.deltaJson!;
+        final beforeAtoms = await session.store.textAtoms(
+          documentId: notebook.uid,
+          pageId: persisted.pages.single.id,
+          objectId: original.id,
+        );
+        final controller = EditorController(
+          repository: session.repository,
+          notebook: persisted,
+          operationWriter: session.writer,
+        );
+        addTearDown(controller.dispose);
+        controller.setActiveTextBlock(original.id, null);
+        session.buffer.clear();
+        final pendingBefore = (await session.store.pending()).length;
+        List<dynamic> delta() =>
+            jsonDecode(controller.currentPage.textBlocks.single.deltaJson!)
+                as List;
+        Map attrs(String text) =>
+            (delta().firstWhere(
+                  (dynamic op) => op['insert'] == text,
+                )['attributes']
+                as Map? ??
+            const {});
+        controller.updateActiveTextStyle(fontSize: 22);
+        await controller.flushPendingSaves();
+        expect(attrs('A')['color'], '#123456');
+        expect(attrs('B')['color'], '#654321');
+        expect(attrs('C').containsKey('color'), isFalse);
+        controller.undo();
+        await controller.flushPendingSaves();
+        expect(controller.currentPage.textBlocks.single.deltaJson, beforeDelta);
+        controller.setActiveTextBlock(original.id, null);
+        controller.updateActiveTextStyle(
+          color: const Color(0xFFABCDEF),
+          fontSize: 24,
+        );
+        await controller.flushPendingSaves();
+        expect(attrs('A'), {
+          'bold': true,
+          'link': 'https://example.test',
+          'color': '#abcdef',
+          'size': '24',
+        });
+        expect(attrs('B'), {
+          'italic': true,
+          'font': 'Georgia',
+          'color': '#abcdef',
+          'size': '24',
+        });
+        expect(attrs('C')['underline'], isTrue);
+        expect(
+          delta().where((dynamic op) => op['insert'] is Map).single['insert'],
+          {type: 'asset:${asset.assetId}'},
+        );
+        expect(
+          delta()
+              .where((dynamic op) => op['insert'] == '\n')
+              .map((dynamic op) => op['attributes']['align']),
+          ['center', 'right'],
+        );
+        final colored = controller.currentPage.textBlocks.single.deltaJson;
+        controller.undo();
+        await controller.flushPendingSaves();
+        expect(controller.currentPage.textBlocks.single.deltaJson, beforeDelta);
+        controller.redo();
+        await controller.flushPendingSaves();
+        expect(controller.currentPage.textBlocks.single.deltaJson, colored);
+        controller.updateActiveTextStyle(
+          targetBlockId: original.id,
+          alignment: 'left',
+        );
+        await controller.flushPendingSaves();
+        expect(attrs('A')['bold'], isTrue);
+        expect(
+          delta()
+              .where((dynamic op) => op['insert'] == '\n')
+              .every(
+                (dynamic op) =>
+                    !(op['attributes'] as Map? ?? {}).containsKey('align'),
+              ),
+          isTrue,
+        );
+        controller.updateActiveTextStyle(
+          targetBlockId: original.id,
+          clearDecorations: true,
+          clearFontFamily: true,
+        );
+        await controller.flushPendingSaves();
+        for (final dynamic op in delta()) {
+          final attributes = op['attributes'] as Map? ?? const {};
+          expect(
+            attributes.keys.toSet().intersection({
+              'bold',
+              'italic',
+              'underline',
+              'strike',
+              'font',
+            }),
+            isEmpty,
+          );
+        }
+        expect(attrs('A')['link'], 'https://example.test');
+        expect(attrs('B')['color'], '#abcdef');
+        final atoms = await session.store.textAtoms(
+          documentId: notebook.uid,
+          pageId: persisted.pages.single.id,
+          objectId: original.id,
+        );
+        expect(atoms.keys, unorderedEquals(beforeAtoms.keys));
+        expect(
+          atoms.values.where((dynamic atom) => atom['deleted'] == true),
+          isEmpty,
+        );
+        final operations = (await session.store.pending()).skip(pendingBefore);
+        expect(
+          operations.any((op) => op.kind == OperationKind.textFormat),
+          isTrue,
+        );
+        expect(
+          operations.every(
+            (op) =>
+                op.kind == OperationKind.textFormat ||
+                op.kind == OperationKind.objectSet,
+          ),
+          isTrue,
+        );
+        expect(
+          await session.projector.verifiedTextAssetBytes(
+            documentId: notebook.uid,
+            pageId: persisted.pages.single.id,
+            objectId: original.id,
+            assetId: asset.assetId,
+          ),
+          importBytes[type == 'pdf' ? 'application/pdf' : 'image/png'],
+        );
+      },
+    );
+  }
+
+  for (final type in ['image', 'pdf']) {
     for (final target in ['embed', 'block', 'page']) {
       test('offline $type Undo restores deleted $target', () async {
         final directory = await Directory.systemTemp.createTemp('nn-quill-');

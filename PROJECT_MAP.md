@@ -1546,6 +1546,16 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
+### `lib/features/editor/state/quill_style_patch.dart`
+
+`patchQuillStyle` nakłada wyłącznie żądane atrybuty inline/akapitów
+na istniejącą Delta, zachowuje embedy i pozostałe style oraz scala
+równoważne sąsiednie fragmenty do kanonicznego zapisu. Nie zmienia
+atomów ani referencji assetów i nie ma fallbacku do zwykłego tekstu.
+Regresje: `test/quill_style_patch_test.dart` (5 testów czystej logiki)
+oraz `editor_v2_quill_asset_recovery_test.dart` (SQLite, image/PDF,
+Undo/Redo, font/color/alignment/clear i stabilność atomów).
+
 ### `lib/features/editor/state/editor_controller.dart` (opt-in v2)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
@@ -1589,10 +1599,14 @@ Regresja: `test/editor_controller_v2_test.dart`, w tym cofanie i
 ponawianie ink oraz stron bez ponownego użycia tombstones.
 Ten sam test obejmuje dwa rzeczywiste autosave'y Quill, pojedyncze
 Undo/Redo/Undo, zależności inverse i edycję o zerowym efekcie.
-Ważne granice: 592: `flushPendingSaves`; 2007: `_applyV2History`;
-2152: `_remapV2HistoryNotebook`; 2331: `prepareInlineAsset`;
-2352: `updateTextBlockContent`; 3751: `_commitActiveTextEdit`;
-3846: `_captureV2Gesture`; 3870: `_saveV2`.
+`updateActiveTextStyle` w v2 używa `patchQuillStyle`: nie przebudowuje
+embedów ze stringa ani nie narzuca koloru pierwszego fragmentu innym
+przy zmianie rozmiaru. Zmieniają się tylko żądane atrybuty.
+Ważne granice: 593: `flushPendingSaves`; 2008: `_applyV2History`;
+2153: `_remapV2HistoryNotebook`; 2332: `prepareInlineAsset`;
+2353: `updateTextBlockContent`; 2368: `updateActiveTextStyle`;
+3775: `_commitActiveTextEdit`; 3870: `_captureV2Gesture`;
+3894: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod

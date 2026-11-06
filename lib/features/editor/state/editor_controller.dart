@@ -35,6 +35,7 @@ import 'editor_v2_operation_writer.dart';
 import 'input_mode.dart';
 import 'ink_color_presets.dart';
 import 'page_background.dart';
+import 'quill_style_patch.dart';
 
 class _EditorHistoryEntry {
   const _EditorHistoryEntry(this.pageId, this.action);
@@ -2441,11 +2442,34 @@ class EditorController extends ChangeNotifier {
     final after = before.copyWith(
       fontSize: nextFontSize,
       color: nextColor,
-      deltaJson: _buildTextDeltaJson(
-        before.text,
-        inline: inline,
-        paragraph: paragraph,
-      ),
+      deltaJson: operationWriter != null && before.deltaJson != null
+          ? patchQuillStyle(
+              before.deltaJson!,
+              inlineChanges: {
+                if (clearDecorations)
+                  for (final key in ['bold', 'italic', 'underline', 'strike'])
+                    key: null,
+                if (clearFontFamily)
+                  'font': null
+                else if (fontFamily != null)
+                  'font': fontFamily,
+                if (fontSize != null) 'size': nextFontSize.round().toString(),
+                if (color != null) 'color': _colorToHex(nextColor),
+                if (bold != null) 'bold': bold ? true : null,
+                if (italic != null) 'italic': italic ? true : null,
+                if (underline != null) 'underline': underline ? true : null,
+                if (strike != null) 'strike': strike ? true : null,
+              },
+              paragraphChanges: {
+                if (alignment != null)
+                  'align': alignment == 'left' ? null : alignment,
+              },
+            )
+          : _buildTextDeltaJson(
+              before.text,
+              inline: inline,
+              paragraph: paragraph,
+            ),
     );
 
     commitTextUpdateOnPage(pageIndex, before, after);

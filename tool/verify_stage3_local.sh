@@ -22,6 +22,7 @@ dart format --output=none --set-exit-if-changed \
   lib/data/sync/sync_engine.dart \
   lib/data/sync/verified_editor_asset_buffer.dart \
   lib/features/editor/state/editor_controller.dart \
+  lib/features/editor/state/quill_style_patch.dart \
   lib/features/editor/state/editor_v2_operation_writer.dart \
   lib/features/notebook/data/notebook_repository.dart \
   lib/features/library/presentation/library_screen.dart \
@@ -29,6 +30,7 @@ dart format --output=none --set-exit-if-changed \
   lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart \
   lib/features/editor/presentation/widgets/page_overlay.dart \
   test/editor_controller_v2_test.dart \
+  test/quill_style_patch_test.dart \
   test/editor_sqlite_projector_test.dart \
   test/editor_v2_operation_writer_test.dart \
   test/editor_v2_remote_patch_dispatcher_test.dart \
@@ -47,6 +49,7 @@ dart analyze
 
 echo "[stage3] Focused v2 regression tests"
 flutter test --concurrency=1 \
+  test/quill_style_patch_test.dart \
   test/operation_store_test.dart \
   test/persistent_operation_actor_test.dart \
   test/sync_engine_test.dart \
