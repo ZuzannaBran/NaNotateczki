@@ -3,6 +3,36 @@
 Status: **zestawy testów dodane, niezaliczone środowiskowo; etap 12 NIE jest
 zamknięty**. Nie włączać jeszcze produkcyjnego cutover v1 → v2.
 
+## Rzeczywiste kontrolery edytora — 2026-11-06
+
+`integration_test/stage12_live_api_test.dart` korzysta teraz z dwóch
+`EditorV2AccountRuntime`, produkcyjnych kontrolerów, projectorów i
+writerów oraz dwóch plików SQLite. Usunięto pomocniczą tabelę testową.
+Scenariusz w jednym procesie Flutter/Linux sprawdza:
+
+- rzeczywisty gest kontrolera i automatyczny odbiór przez WebSocket
+  w czasie krótszym niż polling, z zachowaniem lokalnego viewportu;
+  przed uploadem nadajnika odbiorca jest ponownie uruchamiany, aby
+  cały 15-sekundowy deadline wyprzedzał kolejny polling;
+- rich Quill z PNG oraz prawidłowym PDF, restart przed pierwszym uploadem,
+  te same operationId outboxu, checksumy/bajty i formatowanie po odbiorze;
+- skasowanie strony z mediami offline, restart autora usunięcia i propagację;
+- dwa cykle Undo z Redo pomiędzy nimi: nowe UID, zachowaną cudzą kreskę,
+  dokładnie poprawne scoped referencje oraz brak osieroconych referencji;
+- zgodność identyfikatorów aktywnych stron ze snapshotem PostgreSQL.
+
+Test używa wyłącznie lokalnego HTTP, jednorazowego właściciela v2
+z runnera oraz osobnego PostgreSQL. Nie zastępuje gestów UI na dwóch
+fizycznych urządzeniach, Share host/guest ani macierzy wszystkich OS.
+
+Job `v2-controller-e2e` w Actions uruchamia istniejący
+`server/scripts/run-stage12-real.sh --quick` i ten test na Linuxie/Xvfb.
+Pełny workflow obejmuje go automatycznie; marker
+`[ci:failed-only] [ci:v2-e2e]` wybiera analizę/testy natywne i ten stos,
+bez budowania pozostałych platform. `--quick` pomija tylko osobny stress
+1000+1000 backendu. Dotychczasowe natywne regresje są zielone w `42255399051`;
+wynik nowego scenariusza i poprawki WS jest nadal do sprawdzenia.
+
 ## Zestawy uruchamialne
 
 **SQLite/Flutter** — `test/production/stage12_operation_stress_test.dart`.
@@ -99,10 +129,10 @@ Nie dodawano nowej migracji SQL backendu, bo
 
 1. Etap 11 pozostawia dane w stanie `staged-not-activated`; publiczny
    cykl migracji i cutover dla istniejących kont nadal nie jest aktywny.
-2. Dodano `integration_test/stage12_live_api_test.dart` (dwa rzeczywiste
-   silniki Flutter + REST v2 + PostgreSQL + WebSocket), uruchamiane przez
-   `NN_STAGE12_FLUTTER_ROOT`; wyniku jeszcze nie zweryfikowano. Nadal brak
-   kontrolowanego scenariusza dwóch urządzeń z obserwacją migania i gestów.
+2. `integration_test/stage12_live_api_test.dart` obejmuje teraz rzeczywiste
+   kontrolery, media, pliki SQLite i restarty przez REST/WS/PostgreSQL.
+   Job Linux dodany, ale jego wynik wymaga potwierdzenia. Nadal brak
+   scenariusza dwóch fizycznych urządzeń z obserwacją migania i gestów.
 3. Wymagane są kontrolowane testy uszkodzenia assetu, braku miejsca,
    restartu serwera w trakcie COMMIT, starego backupu po usunięciu UID i
    przerwanej migracji. Wykonywać je wyłącznie na danych testowych.

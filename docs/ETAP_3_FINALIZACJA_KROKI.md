@@ -1,5 +1,35 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Kontrolery przez rzeczywisty backend — 2026-11-06
+
+Punkt wyjścia: natywny job `42255399051` dla `f924ad3` jest zielony,
+łącznie z rozszerzonym testem historii obrazu po odbudowie cache'u
+oraz restarcie. Nowe przyrosty tej sekcji wymagają osobnego wyniku CI.
+
+Zastąpiono pomocniczą projekcję w `stage12_live_api_test.dart` rzeczywistymi
+`EditorV2AccountRuntime`, controllerami, writerami i plikami SQLite.
+Scenariusz wykonuje gest kontrolera, odbiór WS bez ręcznego odświeżania,
+import rich PNG/PDF offline i restart przed uploadem, usunięcie strony
+z restartem oraz Undo/Redo/Undo. Sprawdza tekst i style, bajty mediów,
+scoped referencje, niezależny viewport, outbox oraz snapshot PostgreSQL.
+Działa w jednym procesie Linux; nie oznacza testu dwóch fizycznych urządzeń.
+
+Przy tym domknięto lukę połączenia WS: `authenticated` żąda catch-up REST,
+więc zapis pomiędzy pierwszym GET a subskrypcją lub podczas reconnect nie
+czeka na polling. Regresja lokalnego socketu jawnie odracza auth do końca
+GET i sprawdza pierwsze połączenie oraz restart, bez następnej wskazówki.
+
+Nowy job `v2-controller-e2e` korzysta z istniejącego izolowanego runnera
+backendu i Xvfb. Marker `[ci:failed-only] [ci:v2-e2e]` obejmuje wyłącznie
+natywną weryfikację i stos Linux/Flutter/FastAPI/PostgreSQL/WS. Wynik
+odczytać w następnej sesji; nie czekać po wypchnięciu. Backend kanoniczny
+pozostaje bez nowych zmian, a jego zielony kod jest zgodny z lustrem.
+
+**Następna sesja:** najpierw oba joby najnowszego commita aplikacji.
+Usunąć ewentualne błędy, ponawiając wyłącznie potrzebny zakres.
+Dopiero po potwierdzonym E2E kontynuować produkcyjne podłączenie z sekcji D.
+Etap 3 i cutover pozostają otwarte; nie włączano flag ani migracji.
+
 ## Rzeczywisty backend w lustrze aplikacji — 2026-11-06
 
 Przed testem kontrolerów z API porównano `server/` z kanonicznym
@@ -834,14 +864,13 @@ między urządzeniami i pełne E2E pozostają niezamknięte.
 - [x] Trwała blokada v1 dla UID mającego historię operacji v2.
 - [x] Korekty remote UI, stron, ink, z-order, podstawowego tekstu Quill.
 - [x] Ink `object.move`; obraz `object.move` tylko z referencją assetu.
-- [ ] `page.delete` usuwa zweryfikowane obrazy/Quill i ich scoped
-  referencje atomowo; nadal odrzuca obce, niepowiązane i brakujące assety.
-  Dodano regresję dla współdzielonego assetu: kasowanie strony usuwa tylko
-  jej scoped referencję, zachowując referencję drugiej strony. Wymaga
-  wykonania testów i analizy statycznej.
-- [ ] `object.delete` dla obrazu/Quill usuwa scoped referencję w tej
+- [x] Lokalny `page.delete` usuwa zweryfikowane obrazy/Quill i ich scoped
+  referencje atomowo; odrzuca obce, niepowiązane i brakujące assety.
+  Regresje projektora, w tym współdzielony asset drugiej strony, bez błędu
+  w zielonym natywnym zestawie `42255399051`; analiza zaliczona.
+- [x] Lokalny `object.delete` obrazu/Quill usuwa scoped referencję w tej
   samej transakcji; niezweryfikowany media object blokuje operację.
-  Kod dodany, ale wymaga wykonania testów i analizy statycznej.
+  Regresje projektora w zielonym `42255399051`. Nie zamyka to E2E.
 - [x] LWW właściwości na podstawie trwałej historii operacji.
 - [ ] Zweryfikować pełną spójność replay CRDT, formatowania i kolejności
   operacji, także po restarcie i przy równoczesnych edycjach.
@@ -856,9 +885,10 @@ ten sam stan i trwały outbox.
 
 ## B. Kompletny łańcuch plików i Quill
 
-- [ ] Lokalny projector Quill: trwała tabela `operation_asset_bytes`,
-  scoped `asset.attach`, walidacja `text.insert`, odczyt po restarcie.
-  Implementacja oraz test dodane; brak uruchomionych testów Flutter.
+- [x] Lokalny projector Quill: trwałe `operation_asset_bytes`, scoped
+  `asset.attach`, walidacja `text.insert` i odczyt po restarcie.
+  Regresje Quill/SQLite i odzyskiwania mediów w zielonym `42255399051`;
+  osobny Linux E2E przez rzeczywisty backend pozostaje do potwierdzenia.
 
 
 - [ ] Lokalna podmiana obrazu: attach → object.set → detach przy

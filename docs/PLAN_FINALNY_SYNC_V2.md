@@ -137,7 +137,10 @@ Ważne: fizycznej kolejności dwóch niezależnych gestów wykonywanych offline 
 Stan 2026-11-06: opt-in kontroler zapisuje lokalne checkpointy Undo/Redo
 w transakcji gestu i odczytuje je po restarcie dla aktora dokumentu.
 Natywne obrazy i renderowane strony PDF zachowują bajty przed tą granicą;
-odbudowa cache'u nie tworzy operacji. Najnowsze regresje oczekują na CI.
+odbudowa cache'u nie tworzy operacji. Dodano rzeczywisty przepływ dwóch
+kontrolerów/plików SQLite przez FastAPI/PostgreSQL/WebSocket: media offline,
+restart i usuwanie strony z Undo/Redo. Linux E2E ma osobny job; jego wynik
+oraz najnowsze regresje pozostają do potwierdzenia w CI.
 Etap i produkcyjny cutover pozostają otwarte; bieżące wykonanie i następne
 bramki: [ETAP_3_FINALIZACJA_KROKI.md](ETAP_3_FINALIZACJA_KROKI.md).
 

@@ -1,5 +1,16 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Catch-up pierwszej subskrypcji i reconnect — 2026-11-06
+
+Potwierdzenie `authenticated` uruchamia teraz tę samą ścieżkę REST co
+`operations_changed`. Domyka wyścig między początkowym GET a subskrypcją
+i odzyskuje zmiany po przerwie socketu bez czekania na polling. Kursor
+nadal zmienia się wyłącznie po transakcyjnym zatwierdzeniu feedu.
+`test/sync_engine_test.dart` używa prawdziwego lokalnego WebSocket,
+jawnie opóźnia odpowiedź auth do zakończenia pierwszego GET i sprawdza
+dwa połączenia silnika bez dalszej wskazówki. Regresja wymaga Flutter CI.
+
+
 Status: **silnik i transport zapisane; nie jest to przełączenie produkcyjne**.
 Włączenie dla istniejących notatników wymaga kontrolowanej migracji z etapu
 11. Serwer v2 celowo odrzuca zapis do UID zarządzanego przez v1, więc

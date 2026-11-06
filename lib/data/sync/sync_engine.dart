@@ -692,7 +692,11 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       (event) {
         try {
           final message = jsonDecode(event as String);
-          if (message is Map && message['type'] == 'operations_changed') {
+          if (message is Map &&
+              (message['type'] == 'operations_changed' ||
+                  message['type'] == 'authenticated')) {
+            // Catch up the gap between the initial pull and subscription,
+            // including changes missed while a socket was disconnected.
             requestSync();
           } else if (shareId != null &&
               message is Map &&

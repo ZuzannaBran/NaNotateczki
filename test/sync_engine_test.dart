@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
@@ -198,6 +200,92 @@ void main() {
       await stopping;
       expect(gateway.batches, isEmpty);
       expect(await store.isPending(operation.operationId), isTrue);
+    },
+  );
+
+  test(
+    'WebSocket authentication catches up missed events after restart',
+    () async {
+      await engine.stop();
+      engine.dispose();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final authenticated = StreamController<WebSocket>();
+      final connections = StreamIterator(authenticated.stream);
+      final sockets = <WebSocket>[];
+      final api = ApiClient(
+        baseUri: Uri.parse('http://127.0.0.1:${server.port}'),
+      )..setAccessToken('realtime-test-token');
+      final delivered = <String, Completer<void>>{};
+      server.listen((request) async {
+        expect(request.uri.path, '/v2/realtime');
+        final socket = await WebSocketTransformer.upgrade(request);
+        sockets.add(socket);
+        socket.listen((event) {
+          final message = jsonDecode(event as String) as Map;
+          expect(message['type'], 'authenticate');
+          expect(message['token'], 'realtime-test-token');
+          authenticated.add(socket);
+        });
+      });
+      engine = SyncEngine(
+        store: store,
+        gateway: gateway,
+        actorId: 'realtime-client',
+        checkpointScope: 'realtime-catch-up',
+        apiClient: api,
+        pollInterval: const Duration(days: 1),
+        applyRemote: (operation, _) async {
+          await database.customStatement(
+            'INSERT OR IGNORE INTO projection_probe VALUES (?, ?)',
+            [operation.objectId, 'remote'],
+          );
+          delivered[operation.objectId]!.complete();
+        },
+      );
+      addTearDown(() async {
+        await engine.stop();
+        await connections.cancel();
+        await authenticated.close();
+        for (final socket in sockets) {
+          await socket.close();
+        }
+        await server.close(force: true);
+        api.close();
+      });
+      for (var cycle = 0; cycle < 2; cycle++) {
+        final started = engine.start();
+        expect(
+          await connections.moveNext().timeout(const Duration(seconds: 3)),
+          isTrue,
+        );
+        await started;
+        final remote = _remote('missed-$cycle', 'missed-$cycle');
+        final applied = Completer<void>();
+        delivered[remote.objectId!] = applied;
+        gateway.seed(remote);
+        // The subscription missed the commit. No operations_changed hint,
+        // manual sync or periodic poll may rescue this missing operation.
+        final previousSync = engine.lastSuccessfulSync;
+        final synced = Completer<void>();
+        void onSynced() {
+          if (!synced.isCompleted &&
+              engine.lastSuccessfulSync != previousSync) {
+            synced.complete();
+          }
+        }
+
+        engine.addListener(onSynced);
+        try {
+          connections.current.add(jsonEncode({'type': 'authenticated'}));
+          await applied.future.timeout(const Duration(seconds: 3));
+          await synced.future.timeout(const Duration(seconds: 3));
+        } finally {
+          engine.removeListener(onSynced);
+        }
+        await engine.stop();
+        expect(await store.operation(remote.operationId), isNotNull);
+        expect(await store.checkpoint('realtime-catch-up'), cycle + 1);
+      }
     },
   );
 

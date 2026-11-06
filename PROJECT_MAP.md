@@ -648,6 +648,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   180: `writeLocalBatch` przekazuje opcjonalny checkpoint callback do
   transakcji store przed żądaniem synchronizacji; dopuszcza metadata-only
   granicę autosave bez nowego actorSeq. `lastError` znika po sukcesie.
+  677: `_connectSocket` żąda REST catch-up po `authenticated`, także dla
+  pierwszej subskrypcji i reconnect. Domyka lukę między GET a subskrypcją;
+  sama wskazówka nie zapisuje projekcji ani kursora. Regresja
+  `test/sync_engine_test.dart` opóźnia auth na rzeczywistym lokalnym WS,
+  bez ręcznego sync, dodatkowego eventu i pomocy pollingu.
   Nie podłączać do UID v1 przed etapem 11.
 - `lib/data/sync/operation_store.dart`: `pending(includeDeferred)`,
   `isPending`, `isLocalOperation`, `advanceCheckpoint`; strzeże actorSeq także przy
@@ -3066,9 +3071,14 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   Izolowany PostgreSQL 17, prawdziwe routery FastAPI/WebSocket,
   operacje i feed, share/revoke, delete/transform, tekst CRDT,
   Undo/Redo, rollback batcha i izolacja kont.
-- `integration_test/stage12_live_api_test.dart`: opt-in dwa silniki
-  Flutter synchronizujące dopiski i usunięcia z prawdziwym API v2 przez
-  lokalny serwer HTTP i PostgreSQL, bez testu rzeczywistych gestów.
+- `integration_test/stage12_live_api_test.dart`: dwa rzeczywiste kontrolery
+  i `EditorV2AccountRuntime`, dwa pliki SQLite, HTTP/WS i PostgreSQL.
+  Gest kontrolera, rich PNG/PDF offline, restart przed uploadem, usunięcie
+  strony z restartem, Undo/Redo/Undo, scoped referencje i snapshot serwera.
+  Odbiór bez ręcznego sync, z kontrolą viewportu; jeden proces Linux,
+  bez testu gestów UI na dwóch fizycznych urządzeniach. Job
+  `v2-controller-e2e` uruchamia runner w Xvfb, także po markerach
+  `[ci:failed-only] [ci:v2-e2e]`; nowy wynik wymaga potwierdzenia.
 - Etap 13: `server/migrations/0013_account_protocol_fence.sql`,
   `server/api/app/account_protocol.py`, `server/scripts/stage13-activate-empty-canary.sh`
   — trwałe, domyślnie v1, nieodwracalne przełączenie WYŁĄCZNIE pustego
@@ -3165,7 +3175,8 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
 `tool/verify_stage3_local.sh`: tylko odczytowy format-check,
 `dart analyze`, wąskie testy v2 (w tym checkpointy historii) i pełny
-`flutter test` bez GitHub Actions. Obejmuje także natywne obrazy i historię;
+`flutter test` bez GitHub Actions. Format obejmuje również test live API;
+nie uruchamia go bez izolowanego backendu. Obejmuje natywne obrazy i historię;
 render PDF na Linuxie wymaga `poppler-utils`. Job `analyze-and-unit` instaluje
 ten pakiet i dodatkowo wykonuje
 build_runner i sprawdza brak zmian wygenerowanego mapowania Drift.

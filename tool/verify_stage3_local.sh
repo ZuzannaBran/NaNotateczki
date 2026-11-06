@@ -38,6 +38,8 @@ dart format --output=none --set-exit-if-changed \
   lib/features/editor/presentation/widgets/page_overlay.dart \
   lib/features/editor/presentation/widgets/text_edit_toolbar.dart \
   lib/features/editor/presentation/widgets/text_hud_block.dart \
+  integration_test/stage12_live_api_test.dart \
+  test/sync_engine_test.dart \
   test/editor_history_checkpoint_test.dart \
   test/editor_history_notebook_codec_test.dart \
   test/editor_history_store_test.dart \

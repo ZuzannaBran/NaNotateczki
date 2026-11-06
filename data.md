@@ -1,5 +1,18 @@
 # Dane NaNotateczki
 
+## Catch-up po uwierzytelnieniu WebSocket v2 (2026-11-06)
+
+`SyncEngine` żąda REST catch-up zarówno po `operations_changed`, jak
+po `authenticated`. Początkowy odczyt REST może zakończyć się przed
+subskrypcją serwera, a podczas reconnect mogły powstać nowe operacje.
+Samo otwarcie transportu nie dowodzi pełnej subskrypcji; potwierdzenie
+serwera zamyka tę lukę bez czekania na polling co 45 sekund. Wiadomość
+pozostaje wyłącznie wskazówką: nie zapisuje treści ani nie przesuwa kursora.
+Niezmienione pozostają generation token, debounce i walidacja REST.
+Regresja z lokalnym WebSocket sprawdza pierwsze połączenie i restart
+silnika bez `operations_changed`, ręcznego sync ani pomocy timera.
+
+
 ## Nieaktualne inverse po zdalnym commicie (2026-11-06)
 
 Undo/Redo najpierw sprawdza checkpoint na aktualnej głowie dziennika.

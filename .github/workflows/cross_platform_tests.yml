@@ -18,6 +18,7 @@ concurrency:
 
 # [ci:android-only] runs only the Android emulator job after a CI-specific fix.
 # [ci:failed-only] retains the existing reduced verification mode.
+# Add [ci:v2-e2e] to include only the real Linux v2 stack alongside it.
 jobs:
   analyze-and-unit:
     if: ${{ !contains(github.event.head_commit.message, '[ci:android-only]') }}
@@ -152,6 +153,41 @@ jobs:
       - name: Destroy isolated PostgreSQL volume
         if: always()
         run: docker compose -f compose.yaml -f compose.local.yaml down -v
+
+  v2-controller-e2e:
+    if: ${{ contains(github.event.head_commit.message, '[ci:v2-e2e]') || (!contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]')) }}
+    name: Linux editor controllers and real v2 backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install Linux native prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libsqlite3-dev libsecret-1-dev xvfb xauth poppler-utils zenity
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter config --enable-linux-desktop
+      - name: Verify backend mirror tooling and isolated runner guards
+        run: |
+          python -m unittest discover -s tool -p 'test_check_server_mirror.py'
+          python -m unittest discover -s server/scripts/tests -p 'test_stage12_runner_guard.py'
+      - name: Run production controllers against disposable PostgreSQL
+        working-directory: server
+        env:
+          NN_STAGE12_FLUTTER_ROOT: ${{ github.workspace }}
+          NN_STAGE12_DEVICE_ID: linux
+          # The disposable JWT must outlive the initial native compilation.
+          access_token_minutes: '45'
+        run: xvfb-run -a bash scripts/run-stage12-real.sh --quick
 
   stylus-input:
     if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
