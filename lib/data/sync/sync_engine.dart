@@ -170,12 +170,15 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   ///
   /// Every draft is validated before the transaction. The store commits all
   /// projections, actor sequence numbers and outbox rows or none of them.
+  /// Checkpoint metadata may be committed atomically, including after an
+  /// autosave whose final gesture boundary needs no additional operation.
   Future<List<OperationEnvelope>> writeLocalBatch({
     required String documentId,
     required List<LocalOperationDraft> operations,
     required Future<void> Function(OperationEnvelope) apply,
+    Future<void> Function(List<OperationEnvelope>)? onCommittedInTransaction,
   }) async {
-    if (operations.isEmpty) {
+    if (operations.isEmpty && onCommittedInTransaction == null) {
       throw ArgumentError.value(operations, 'operations', 'Empty gesture.');
     }
     for (final draft in operations) {
@@ -192,6 +195,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       documentId: documentId,
       operations: operations,
       apply: apply,
+      onCommittedInTransaction: onCommittedInTransaction,
     );
     requestSync();
     return committed;

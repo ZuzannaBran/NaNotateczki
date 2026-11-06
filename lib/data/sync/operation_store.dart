@@ -185,13 +185,16 @@ class OperationStore {
   ///
   /// The projection must write through [database]. On failure, no counter,
   /// projection row or outbox item from the gesture may survive.
+  /// The optional checkpoint callback runs inside this transaction, after all
+  /// intents. It must only write local metadata and must not mutate UI or do I/O.
   Future<List<OperationEnvelope>> writeLocalBatch({
     required String actorId,
     required String documentId,
     required List<LocalOperationDraft> operations,
     required Future<void> Function(OperationEnvelope operation) apply,
+    Future<void> Function(List<OperationEnvelope>)? onCommittedInTransaction,
   }) {
-    if (operations.isEmpty) {
+    if (operations.isEmpty && onCommittedInTransaction == null) {
       throw ArgumentError.value(operations, 'operations', 'Empty gesture.');
     }
     return _perDocument(documentId, () {
@@ -212,6 +215,9 @@ class OperationStore {
             ),
           );
         }
+        await onCommittedInTransaction?.call(
+          List<OperationEnvelope>.unmodifiable(committed),
+        );
         return committed;
       });
     });

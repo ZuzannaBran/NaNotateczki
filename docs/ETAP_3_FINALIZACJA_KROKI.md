@@ -1,5 +1,48 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Trwałe checkpointy historii — fundament (2026-11-06)
+
+Na początku potwierdzono Actions `42197652976` dla `8d30275`:
+format, analiza, 942 zaliczone testy (2 pominięte), pokrycie 70,28%.
+Potwierdza to poprzedni import HUD/Quill i scenariusze dwóch plikowych
+baz po utracie ACK. Backend `42160118098` pozostaje zielony.
+
+SQLite v8 dodaje oddzielną, lokalną tabelę `editor_history`, indeksowaną
+przez dokument i trwałego aktora tego dokumentu. `EditorHistoryCheckpoint`
+zapisuje oba stosy, deduplikuje wspólne stany SHA-256 i waliduje wersję,
+zakres, tożsamości oraz limity 50 gestów / 4 MiB UTF-8. Nie jest snapshotem
+autorytatywnego dokumentu ani payloadem synchronizacji. `EditorHistoryStore`
+odrzuca nieistniejące/obce/zdalne operacje, dokument z tombstone i zapis
+przy nieaktualnej głowie dziennika. Nowa operacja lokalna lub zdalna
+unieważnia starszy checkpoint przy odczycie; uszkodzony checksum zgłasza
+błąd bez zmiany dokumentu, outboxu ani wiersza historii.
+
+Opcjonalny `onCommittedInTransaction` przechodzi przez writer, SyncEngine
+i OperationStore. Działa po wszystkich operacjach gestu, wewnątrz tej
+samej transakcji i przed powiadomieniem UI/backupu. Błąd checkpointu
+wycofuje projekcję, numerację aktora i outbox. Pusty wsad jest dozwolony
+wyłącznie z callbackiem: umożliwi końcową granicę już autosave'owanego
+tekstu bez sztucznej operacji. Callback nie wykonuje HTTP, plikowego I/O
+ani mutacji UI; listę zatwierdzanych operacji otrzymuje tylko do odczytu.
+
+Dodano 6 testów formatu i 9 testów natywnego SQLite/writera: restart,
+rollback dwóch operacji i retry bez luki actorSeq, rollback po zapisie
+checkpointu, metadata-only autosave, izolacja aktora/dokumentu, korupcja,
+nowa głowa lokalna/zdalna, tombstone i migracja v7→v8 bez utraty dziennika.
+Lokalnie przeszło 6 testów czystego Darta i ich analiza, próba SQL
+(schemat, rollback, FK), formatowanie 283 plików Dart oraz składnia skryptu.
+Pełna analiza, build_runner i testy Flutter są kierowane do Actions
+wyłącznie aplikacji; ich wyniku nie odczytujemy w tej sesji.
+
+**Do następnego kroku:** magazyn nie jest jeszcze wywoływany przez
+`EditorController`. Przygotować codec stanów notebooka z referencjami do
+zweryfikowanych assetów zamiast powielania BLOB/ścieżek; następnie podłączyć
+atomowe zapisy przy gestach, końcu autosave, Undo/Redo oraz odtworzenie
+stosów podczas inicjalizacji. Dodać test rzeczywistego kontrolera po
+zamknięciu/otwarciu SQLite, z usunięciem i odtworzeniem image/PDF/Quill
+oraz nowymi UID po tombstone. Historia UI po restarcie nadal nie jest
+ukończona. Flaga pozostaje wyłączona; etap 3 i produkcyjny cutover otwarte.
+
 ## Importy i rich paste prostego HUD — 2026-11-06
 
 Przed kodem potwierdzono `42185379376` dla `1f48022`: formatowanie,

@@ -32,6 +32,10 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Verify generated Drift mappings after schema migration
+        run: |
+          dart run build_runner build --delete-conflicting-outputs
+          git diff --exit-code -- lib/data/drift/notes_database.g.dart
       - name: Inspect formatting and show the exact patch
         shell: bash
         run: |

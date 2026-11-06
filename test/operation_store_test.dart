@@ -619,7 +619,7 @@ void main() {
 
     final upgraded = NotesDatabase(NativeDatabase(file));
     final upgradedStore = OperationStore(upgraded);
-    expect(upgraded.schemaVersion, 7);
+    expect(upgraded.schemaVersion, 8);
     expect(
       (await upgradedStore.pending()).single.operationId,
       original.operationId,
@@ -702,7 +702,7 @@ void main() {
         ),
         isFalse,
       );
-      expect(upgraded.schemaVersion, 7);
+      expect(upgraded.schemaVersion, 8);
     } finally {
       await upgraded.close();
     }
@@ -759,7 +759,7 @@ void main() {
           )
           .getSingle();
       expect(operations.read<String>('name'), 'operations');
-      expect(upgraded.schemaVersion, 7);
+      expect(upgraded.schemaVersion, 8);
     } finally {
       await upgraded.close();
     }

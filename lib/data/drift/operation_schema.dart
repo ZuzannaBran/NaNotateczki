@@ -109,7 +109,20 @@ const operationSchemaStatements = <String>[
     last_operation_id TEXT
   )
   ''',
+  editorHistorySchema,
 ];
+
+const editorHistorySchema = '''
+  CREATE TABLE IF NOT EXISTS editor_history (
+    document_id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    head_operation_id TEXT NOT NULL
+      REFERENCES operations(operation_id) ON DELETE RESTRICT,
+    payload_json TEXT NOT NULL,
+    checksum_sha256 TEXT NOT NULL,
+    PRIMARY KEY(document_id, owner_id)
+  )
+''';
 
 /// SQLite v3 used only objectId. Rebuild from the durable delete operation to
 /// recover its pageId without discarding a single existing tombstone.

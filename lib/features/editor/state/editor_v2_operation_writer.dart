@@ -389,11 +389,14 @@ class EditorV2OperationWriter {
   /// Ink stays unchanged during a move. Image geometry may change, but
   /// its verified asset ID and binary content must remain identical.
   /// Text moves preserve their CRDT identity and immutable atom history.
+  /// Optional local checkpoint writes run in the operation transaction before
+  /// callbacks that notify the UI or backup; failure rolls back the whole batch.
   Future<List<OperationEnvelope>> writeNotebookChange({
     required Notebook before,
     required Notebook after,
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
     String? revertsOperationId,
+    Future<void> Function(List<OperationEnvelope>)? onCommittedInTransaction,
   }) async {
     if (before.uid != after.uid ||
         before.kind != after.kind ||
@@ -752,7 +755,7 @@ class EditorV2OperationWriter {
           dependencies: draft.dependencies,
           revertsOperationId: revertsOperationId ?? draft.revertsOperationId,
         ),
-    ]);
+    ], onCommittedInTransaction: onCommittedInTransaction);
   }
 
   Future<Map<String, String>> _existingImageAssets({
@@ -870,15 +873,17 @@ class EditorV2OperationWriter {
 
   Future<List<OperationEnvelope>> _commit(
     String documentId,
-    List<LocalOperationDraft> drafts,
-  ) async {
-    if (drafts.isEmpty) {
+    List<LocalOperationDraft> drafts, {
+    Future<void> Function(List<OperationEnvelope>)? onCommittedInTransaction,
+  }) async {
+    if (drafts.isEmpty && onCommittedInTransaction == null) {
       return const <OperationEnvelope>[];
     }
     final committed = await syncEngine.writeLocalBatch(
       documentId: documentId,
       operations: drafts,
       apply: projector.apply,
+      onCommittedInTransaction: onCommittedInTransaction,
     );
     final registered = _registeredAssets[documentId];
     if (registered != null) {

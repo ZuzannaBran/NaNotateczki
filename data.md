@@ -1,5 +1,28 @@
 # Dane NaNotateczki
 
+## Lokalne checkpointy historii v2 (2026-11-06, SQLite v8)
+
+Addytywna migracja v7→v8 dodaje surową tabelę `editor_history`:
+`document_id`, `owner_id`, `head_operation_id`, `payload_json`,
+`checksum_sha256`; klucz to dokument i jego trwały lokalny aktor.
+Głowa jest referencją do `operations` (RESTRICT przy usunięciu).
+Checkpoint zawiera wersjonowane stosy Undo/Redo oraz deduplikowane stany
+SHA-256, maksymalnie 50 gestów / 4 MiB UTF-8. To wyłącznie lokalne
+metadane odzyskiwania, bez wysyłki przez API i bez użycia
+`document_snapshots`, backupu lub odtwarzania legacy snapshotów.
+
+Zapis przez `onCommittedInTransaction` należy do tej samej transakcji co
+projekcja i outbox. Błąd wycofuje również operacje i actorSeq. Callback
+może domknąć już zapisany autosave bez nowej operacji. Magazyn sprawdza
+własność lokalnych operacji, dokument, checksum i aktualną głowę; obca
+operacja lub tombstone blokuje zapis, nowsza głowa unieważnia odczyt
+starej historii. Błąd odczytu nie nadpisuje dokumentu ani outboxu.
+
+Integracja z `EditorController` i codec mediów nadal są otwarte. Nie
+przekazywać BLOB ani niezaufanych ścieżek do checkpointu; docelowy codec
+ma korzystać ze zweryfikowanych referencji assetów. Samo istnienie tabeli
+nie oznacza działającego Undo/Redo po restarcie ani aktywacji v2.
+
 ## Lokalny zapis mediów v2 (2026-11-06, opt-in)
 
 Nowy import inline używa `EditorController.prepareInlineAsset` dla

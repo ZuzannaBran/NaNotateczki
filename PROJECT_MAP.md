@@ -245,7 +245,7 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
 
 ### Drift
 
-### `lib/data/drift/notes_database.dart` (376 linii)
+### `lib/data/drift/notes_database.dart` (415 linii)
 
 Schemat SQLite i bezpieczne otwieranie bazy z trzema próbami. Start sprawdza
 `PRAGMA quick_check` i `PRAGMA foreign_key_check`; po potwierdzonej korupcji lub naruszeniu integralności natywna baza jest
@@ -259,9 +259,9 @@ Po migracji katalogu aktualizuje w SQLite prefiks trwałych ścieżek obrazów.
   110: `DatabaseOpenException`; 143: `NotesDatabase`.
 - 152: `NotesDatabase.open` (opcjonalna publiczna nazwa osobnej bazy);
   304: relokacja ścieżek obrazów; 318: kontrola integralności;
-  346: `_createOperationSchema`; 353: `schemaVersion` (`5`);
-  356: `migration` — zachowuje migrację v1→v2 i dodaje tabele operacji
-  w migracji v2→v3, zachowuje tombstones v4 i status blocked v5.
+  347: `_createOperationSchema`; 354: `schemaVersion` (`8`);
+  357: `migration` — zachowuje poprzednie migracje, tombstones v4/v6,
+  blocked v5 i asset BLOB v7; v7→v8 dodaje lokalną `editor_history`.
 
 - `lib/data/drift/operation_schema.dart`: addytywne tabele surowego SQL
   dla operacji, outboxu, ACK, tombstones, checkpointów, snapshotów,
@@ -440,6 +440,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `OperationEnvelope`, rosnący `actorSeq`, idempotencja, lokalny outbox,
   atomowe wieloobiektowe gesty przez `writeLocalBatch` (jeden commit
   projekcji, aktora i outboxu), ACK, tombstones oraz checkpointy i snapshoty.
+  190: `writeLocalBatch(onCommittedInTransaction:)` zapisuje dodatkowe
+  metadane wewnątrz transakcji po wszystkich intentach. Błąd callbacku
+  cofa cały gest; pusty wsad dozwolony wyłącznie z callbackiem. Lista
+  operacji jest niemutowalna; callback bez I/O i mutacji UI.
   Referencje nowych assetów mają klucz z pageId i objectId,
   bez usuwania starszych odwołań o nieznanej stronie.
   Snapshot jest blokowany, jeśli cofa potwierdzony kursor ACK albo
@@ -506,16 +510,31 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
   Quill CRDT, tombstones, ACK, restart i ochrona usunięć, a także
   brak obrazu do czasu zweryfikowanego `asset.attach`.
-- `lib/data/drift/operation_schema.dart`: SQLite v7 (durable Quill asset BLOB)
-  z migracją v6 → v7 oraz wcześniejszą migracją v3 → v4
-  zachowującą tombstones oraz pageId usuniętego obiektu; v5 zapisuje
+- `lib/data/drift/operation_schema.dart`: SQLite v8, `editorHistorySchema`
+  (lokalne checkpointy historii, klucz dokument/aktor i FK głowy);
+  wcześniej v7 (durable asset BLOB) oraz migracja v3 → v4
+  zachowująca tombstones oraz pageId usuniętego obiektu; v5 zapisuje
   trwały status `blocked`, a v6 dodaje kategorię tombstone `task`.
   Tabele są tworzone przez `customStatement` bez nowych mapowań `.g.dart`.
 - `notes_database_connection_io.dart`: WAL + `synchronous=FULL`.
 - `notebook_repository.dart`: `_upsertNotebookPages` i `_upsertPage`
   aktualizują rekordy zamiast pełnego kasowania i reinstalacji.
+- `lib/data/sync/editor_history_checkpoint.dart`: 44: `StoredEditorGesture`,
+  65: `EditorHistoryCheckpoint`, 138: `decode`. Niezmienny JSON obu stosów,
+  stany content-addressed SHA-256; ścisła wersja i zakres, 50 gestów /
+  4 MiB UTF-8. Metadane lokalne, bez protokołu/backupów; codec notebooka
+  i mediów oraz podłączenie kontrolera pozostają do wykonania.
+- `lib/data/sync/editor_history_store.dart`: 11: `EditorHistoryStore`,
+  68: `save`, 96: `load`. Zapis w transakcji gestu, izolacja dokument/aktor,
+  kontrola lokalnych operacji i checksum. Nowa głowa unieważnia historię,
+  tombstone blokuje zapis; korupcja nie zmienia dokumentu ani outboxu.
+- `test/editor_history_checkpoint_test.dart`: 6 testów formatu, deduplikacji,
+  niemutowalności, zakresu, wersji, korupcji i budżetu UTF-8.
+- `test/editor_history_store_test.dart`: 9 regresji SQLite/writera: restart,
+  atomowość/rollback wielu operacji, retry actorSeq, autosave bez operacji,
+  owner/document/remote scope, korupcja, nowa głowa, tombstone, migracja v7→v8.
 - `test/operation_store_test.dart`: rollback, ponawianie, ACK, usunięcia,
-  migracja z v2, snapshoty i checkpointy.
+  migracja z v2, snapshoty i checkpointy; oczekiwana wersja schematu v8.
 - `test/notebook_incremental_update_test.dart`: wyzwalacze SQL wykrywają
   niepotrzebne usuwanie stron i tekstów przy zwykłej edycji.
 - `docs/ETAP_3_SQLITE.md`: wymagania wdrożeniowe i testy crash-recovery.
@@ -579,7 +598,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   aktora nie odmalowuje widoku. Powtórny odczyt obcego envelope nie
   wywołuje drugi raz tej samej udanej notyfikacji w jednej sesji
   (pamięć 4096 ID); po restarcie może być ponowiona.
-  `lastError` znika po sukcesie.
+  175: `writeLocalBatch` przekazuje opcjonalny checkpoint callback do
+  transakcji store przed żądaniem synchronizacji; dopuszcza metadata-only
+  granicę autosave bez nowego actorSeq. `lastError` znika po sukcesie.
   Nie podłączać do UID v1 przed etapem 11.
 - `lib/data/sync/operation_store.dart`: `pending(includeDeferred)`,
   `isPending`, `isLocalOperation`, `advanceCheckpoint`; strzeże actorSeq także przy
@@ -1432,6 +1453,9 @@ tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 `writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`,
 `writeCreateNotebook`, `writeDeleteNotebook` oraz `writeNotebookChange`
 — atomowy wsad wielostronicowy lub bootstrap/del dokumentu bez v1.
+394: `writeNotebookChange(onCommittedInTransaction:)`, 874: `_commit`:
+checkpoint lokalny przed callbackiem UI/backupu, rollback całego gestu
+przy jego błędzie, metadata-only dla już zapisanego autosave.
 `stageQuillAsset` przygotowuje nowy inline import bez HTTP/outboxu,
 sprawdza sygnaturę, typ embedu i limit 64 MiB, kopiuje bajty do bufora
 i rejestruje potwierdzenie per dokument/asset ID. Commit attach zwalnia
@@ -3057,5 +3081,7 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 ### Lokalna weryfikacja etapu 3
 
 `tool/verify_stage3_local.sh`: tylko odczytowy format-check,
-`dart analyze`, wąskie testy v2 i pełny `flutter test` bez GitHub Actions.
+`dart analyze`, wąskie testy v2 (w tym checkpointy historii) i pełny
+`flutter test` bez GitHub Actions. Job `analyze-and-unit` dodatkowo wykonuje
+build_runner i sprawdza brak zmian wygenerowanego mapowania Drift.
 Nie zastępuje testu migracji na czterech platformach ani E2E.

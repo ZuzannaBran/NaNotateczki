@@ -1,16 +1,34 @@
 # Etap 3 — lokalny dziennik operacji SQLite
 
+## Aktualny przyrost: historia lokalna v8 (2026-11-06)
+
+`EditorHistoryStore.save/load` utrwala checkpoint obu stosów z kontrolą
+własności operacji, integralności i aktualnej głowy dokumentu.
+`onCommittedInTransaction` writera/SyncEngine/OperationStore zapisuje
+metadane atomowo z całym gestem; wyjątek wycofuje również projekcję,
+actorSeq i outbox. Domknięcie granicy autosave może nie dodawać operacji.
+
+`test/editor_history_checkpoint_test.dart` obejmuje format i budżety;
+`test/editor_history_store_test.dart` restart, rollback, izolację,
+remote invalidation, tombstone i migrację v7→v8. Codec mediów oraz
+podłączenie stosów `EditorController` po restarcie są kolejnym krokiem,
+nie ukończoną funkcją. Bieżący status i przekazanie pracy:
+[ETAP_3_FINALIZACJA_KROKI.md](ETAP_3_FINALIZACJA_KROKI.md).
+Poniższe datowane sekcje opisują również wcześniejsze granice implementacji.
+
 ## Zakres
 
-Migracja Drift `schemaVersion: 2 → 5` jest addytywna. Obejmuje
-kolejne migracje v2→v3, v3→v4 (tombstones z pageId) oraz v4→v5
-(trwały status blocked w outboxie). Zachowuje
+Migracja Drift `schemaVersion: 2 → 8` jest addytywna. Obejmuje
+v2→v3, v3→v4 (tombstones z pageId), v4→v5 (blocked w outboxie),
+v5→v6 (task tombstones), v6→v7 (trwałe asset BLOB) oraz v7→v8
+(lokalne checkpointy historii). Zachowuje
 `notebook_rows`, `page_rows`, `text_block_rows`,
 `image_block_rows` i `ink_stroke_rows`.
 
 Nowe tabele: `operations`, `operation_outbox`, `operation_ack`,
 `object_tombstones`, `sync_checkpoints`, `document_snapshots`,
-`asset_references` i `operation_actor_state`.
+`asset_references`, `operation_actor_state`, `operation_asset_bytes`
+i `editor_history`.
 
 Nowy kod w `lib/data/sync/operation_store.dart` zapisuje operację,
 projekcję obiektu, monotoniczną sekwencję aktora i outbox w jednej
@@ -58,8 +76,11 @@ Fizyczne usuwanie osieroconych assetów również wymaga bezpiecznego GC.
 
 Tabele są utworzone za pomocą `customStatement` Drift (raw SQL), więc
 nie zmieniają istniejących klas `Table` ani `notes_database.g.dart`.
-Po przejściu na generowane mapowania tabel należy uruchomić
-`dart run build_runner build` i dopiero wtedy zatwierdzić wynik.
+Po zmianie schematu obowiązuje `dart run build_runner build`.
+Job analizy/natywnych testów uruchamia generator i sprawdza brak różnic
+w istniejącym `notes_database.g.dart`; nowych mapowań raw SQL nie dodajemy
+ręcznie. W tej sesji generator wykonuje Actions, lokalny Flutter jest
+niedostępny. Wynik należy odczytać na początku kolejnej sesji.
 
 ## Weryfikacja lokalna
 

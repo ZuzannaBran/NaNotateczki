@@ -351,7 +351,7 @@ class NotesDatabase extends _$NotesDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -403,6 +403,9 @@ class NotesDatabase extends _$NotesDatabase {
             bytes BLOB NOT NULL
           )
         ''');
+      }
+      if (from >= 3 && from < 8 && to >= 8) {
+        await customStatement(editorHistorySchema);
       }
     },
     beforeOpen: (details) async {
