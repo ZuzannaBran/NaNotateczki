@@ -143,7 +143,7 @@ class EditorController extends ChangeNotifier {
         (operationWriter == null ||
             !identical(
               historyCodec.projector.database,
-              operationWriter.projector.database,
+              operationWriter!.projector.database,
             ))) {
       throw ArgumentError('History and editor must share one SQLite DB.');
     }
@@ -4447,7 +4447,9 @@ class EditorController extends ChangeNotifier {
                   if (recordHistory && operationId != null) {
                     try {
                       final before = textGesture?.before ?? baseline;
-                      final storedBefore = await _v2HistoryCodec!.encode(before);
+                      final storedBefore = await _v2HistoryCodec!.encode(
+                        before,
+                      );
                       final storedAfter = await _v2HistoryCodec!.encode(target);
                       nextUndo!.add(
                         _V2HistoryEntry(

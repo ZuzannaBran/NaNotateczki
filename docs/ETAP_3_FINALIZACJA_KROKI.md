@@ -1,5 +1,16 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Poprawki kompilacji i formatowania CI — 2026-11-06
+
+Przebieg `42229961890` wykrył błąd dostępu do nullable
+`operationWriter.projector` w konstruktorze kontrolera i niezgodność
+formatowania jednego wywołania kodeka oraz testu historii. Inne
+niezależne zadania CI też kończyły się na tym samym błędzie kompilacji.
+Konstruktor używa jawnie sprawdzonego writera, a test i zapis kodeka
+dostosowano do formatu z logu GitHub Actions. Przypadek użycia
+wstrzykniętego kodeka i walidacja tej samej bazy pozostają objęte
+regresją kontrolera. Weryfikacja nowego commita: GitHub Actions.
+
 ## Blokada patcha podczas odczytu historii — 2026-11-06
 
 `canApplyConfirmedRemoteNotebook` czeka teraz na zakończenie wstępnego
