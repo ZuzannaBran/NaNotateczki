@@ -1,5 +1,14 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Quill z mediami po restarcie — 2026-11-06
+
+Rozszerzono cztery testy PNG/JPEG/WebP/PDF w
+`test/editor_v2_quill_asset_recovery_test.dart`. Po restarcie SQLite
+tworzą nowy `EditorController`, ładują historię i wykonują Undo/Redo,
+sprawdzając Delta, zweryfikowane bajty i unikatowość operationId.
+Weryfikacja nowego przyrostu wymaga GitHub Actions; v2 nadal opt-in.
+
+
 ## Trwała historia bogatego tekstu po restarcie — 2026-11-06
 
 Nowa regresja rzeczywistego `EditorController` zapisuje Quill
