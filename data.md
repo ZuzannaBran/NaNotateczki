@@ -1,5 +1,15 @@
 # Dane NaNotateczki
 
+## Bariera montowania edytora konta (2026-11-06)
+
+`AppScope` nie pokazuje produkcyjnego `LibraryScreen` zalogowanemu
+użytkownikowi przed potwierdzeniem wersji protokołu serwera. Oddzielne
+warunki zwalniają ekran po zweryfikowanym v1 lub po pełnym starcie runtime
+v2 dla właściwego konta. W razie braku połączenia i braku potwierdzonej
+wersji blokuje edycję, zamiast tworzyć snapshot v1 konta v2. Nie
+włącza globalnego cutover ani nie zmienia bezpiecznej izolacji kont.
+
+
 ## Weryfikacja obrazu przed przeniesieniem i usunięciem (2026-11-06)
 
 Przed move/object.delete/page.delete obraz inline musi zachować

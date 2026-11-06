@@ -985,7 +985,10 @@ void main() {
     );
     await database.customStatement(
       'UPDATE image_block_rows SET bytes = ? WHERE uid = ?',
-      [Uint8List.fromList([1, 2, 3, 4]), imageId],
+      [
+        Uint8List.fromList([1, 2, 3, 4]),
+        imageId,
+      ],
     );
     final delete = LocalOperationDraft(
       kind: OperationKind.objectDelete,

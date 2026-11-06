@@ -40,6 +40,7 @@ import '../features/library/presentation/library_screen.dart';
 import '../features/notebook/data/notebook_repository.dart';
 import '../features/notebook/domain/notebook.dart';
 import '../features/planner/state/study_planner_controller.dart';
+import 'account_protocol_editor_gate.dart';
 import 'unsupported_account_protocol_screen.dart';
 
 class AppScope extends StatefulWidget {
@@ -195,7 +196,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (session.isSignedIn && _incompatibleProtocolUser == session.userId) {
           return UnsupportedAccountProtocolScreen(onLogOut: session.logout);
         }
-        return const LibraryScreen();
+        return AccountProtocolEditorGate(
+          isSignedIn: session.isSignedIn,
+          userId: session.userId,
+          legacyReadyUser: _legacyProtocolReadyUser,
+          v2ReadyUser: _v2AccountRuntime == null ? null : _bootstrappedAccount,
+          child: const LibraryScreen(),
+        );
       },
     );
   }
@@ -699,7 +706,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (_incompatibleProtocolUser == userId && mounted) {
           setState(() => _incompatibleProtocolUser = null);
         }
-        _legacyProtocolReadyUser = userId;
+        // Release the editor only after the server confirmed v1.
+        // The gate keeps v2 documents away from snapshot writers.
+        setState(() => _legacyProtocolReadyUser = userId);
         var restored = false;
         Object? recoveryFailure;
         // A new installation has no presence marker. If IndexedDB/SQLite

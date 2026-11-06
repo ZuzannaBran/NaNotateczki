@@ -963,6 +963,17 @@ Warunek zamknięcia D: aplikacja działa na v2 w produkcji; nie istnieje
 równoległy snapshot writer. Każde usunięcie i nowy obiekt są
 propagowane na wszystkie urządzenia.
 
+## Bariera produkcyjnego protokołu konta (2026-11-06)
+
+`AppScope` nie montuje `LibraryScreen` dla zalogowanego użytkownika,
+dopóki API nie potwierdzi v1 lub nie zostanie uruchomiony runtime v2
+w jego namespace. Dotychczas ekran mógł przyjąć lokalny zapis v1
+przed zakończeniem asynchronicznego sprawdzenia wersji konta.
+Regresja widgetowa sprawdza przejście pending → v1/v2 oraz zmianę konta.
+Niedostępne API i brak potwierdzonego protokołu blokują edycję
+(do odzyskania łączności), zamiast dopuszczać niebezpieczny zapis v1.
+Nie oznacza to aktywacji v2 na kontach produkcyjnych.
+
 ## Ochrona końcowych białych znaków w tekście (2026-11-06)
 
 Quill dodaje jeden strukturalny `\n` na końcu Delta. Poprzednie
