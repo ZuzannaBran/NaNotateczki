@@ -1,5 +1,20 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Regresje po Actions #1109 — 2026-11-06
+
+W przebiegu 42298376311 realny Linux E2E przeszedł, podobnie jak analiza
+i format. Zadanie unit zakończyło się sześcioma niepowodzeniami:
+jednym błędnym licznikiem logowań (odnowienie po restarcie), pięcioma
+timeoutami start/stop w nowym pliku testów runtime z próbą otwarcia
+WebSocket bez serwera. Test konta rozdziela teraz login i refresh, a
+`EditorV2AccountRuntime` przyjmuje opcjonalne `enableRealtime` tylko
+dla izolowanego mocka. W produkcji domyślne połączenie realtime pozostaje
+włączone. Regresje nadal sprawdzają walidację legacy, retry, zapis i
+rozłączenie; transport WS pozostaje objęty realnym Linux E2E.
+
+Wynik poprawki niezweryfikowany lokalnie: SDK Flutter/Dart niedostępne.
+Nie włączać produkcyjnego cutover na podstawie testu HTTP.
+
 ## Start/stop konta bez spóźnionego bootstrapu — 2026-11-06
 
 Na początku sesji potwierdzono zielony przebieg aplikacji

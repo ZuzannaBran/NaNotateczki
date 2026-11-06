@@ -738,9 +738,25 @@ void main() {
     textStorageReadOverride = (key) async => stored[key];
     textStorageWriteOverride = (key, value) async => stored[key] = value;
     var loginCalls = 0;
+    var refreshCalls = 0;
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/v1/auth/refresh') {
+          refreshCalls++;
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access-account_a-renewed',
+              'refreshToken': 'refresh-account_a-renewed',
+              'expiresIn': 600,
+              'userId': 'user-a',
+              'username': 'account_a',
+            }),
+            200,
+          );
+        }
+        expect(path, '/v1/auth/login');
         loginCalls++;
         final username =
             (jsonDecode(request.body) as Map<String, dynamic>)['username'];
@@ -777,6 +793,7 @@ void main() {
     await restarted.loadProfile();
     await restarted.login('account_b', 'password');
     expect(loginCalls, 2);
+    expect(refreshCalls, 1);
     expect(restarted.isSignedIn, isTrue);
     expect(restarted.userId, 'user-b');
     expect(

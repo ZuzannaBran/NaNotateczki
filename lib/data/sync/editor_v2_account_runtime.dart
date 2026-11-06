@@ -33,6 +33,7 @@ class EditorV2AccountRuntime {
     required String accountId,
     required String actorId,
     Future<void> Function()? onLibraryChanged,
+    bool enableRealtime = true,
   }) {
     if (accountId.isEmpty || actorId.isEmpty) {
       throw ArgumentError('V2 account and persistent actor IDs are required.');
@@ -51,6 +52,7 @@ class EditorV2AccountRuntime {
       actorId: actorId,
       checkpointScope: 'account:$accountId',
       apiClient: apiClient,
+      enableRealtime: enableRealtime,
       applyRemote: (operation, pendingLocal) async {
         // A conflict must not be flattened to a snapshot or silently
         // overwrite an optimistic local gesture. The engine pushes the

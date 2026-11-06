@@ -28,6 +28,9 @@ class _Fixture {
       apiClient: api,
       accountId: 'startup-account',
       actorId: 'startup-device',
+      // REST is stubbed; these ownership tests never start a real WS server.
+      // Real transport and reconnect are exercised by Linux E2E.
+      enableRealtime: false,
     );
   }
   final Future<void> Function()? beforeFeed;

@@ -1,5 +1,13 @@
 # Dane NaNotateczki
 
+## Izolacja transportu w testach startu v2 (2026-11-06)
+
+`EditorV2AccountRuntime` pozwala wyłączyć tylko `SyncEngine.enableRealtime`
+w teście izolowanego REST i SQLite, w którym nie działa serwer WebSocket.
+W produkcji domyślne realtime jest włączone. Realny Linux E2E nadal
+sprawdza HTTP i WebSocket. Test sesji odróżnia też odnowienie tokenu
+po restarcie od jawnego logowania.
+
 ## Start konta, wylogowanie i gotowość writera (2026-11-06)
 
 `AppScope` przypisuje generację do startu konta i weryfikuje ją po

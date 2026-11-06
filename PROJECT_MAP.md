@@ -622,8 +622,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   142: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
   sprawdza właściciela przed startem i po każdym await. Anulowanie
   zatrzymuje transport, zachowując blokadę snapshotów v1.
-  Regresje: `test/editor_v2_account_startup_test.dart`; realny Linux E2E
-  używa tego samego wejścia startowego co AppScope.
+  Regresje: `test/editor_v2_account_startup_test.dart` uruchamiają
+  izolowany HTTP bez prób połączenia z niedostępnym WebSocket;
+  produkcyjne realtime pozostaje domyślnie włączone i jest testowane
+  przez realny Linux E2E, który używa tego samego startu co AppScope.
 - `lib/app/app_scope.dart`: przełączenie konta v2 jest **opt-in** przez
   `--dart-define=NN_ENABLE_V2_ACCOUNT=true`. Bez tej flagi konto v2
   pozostaje na ekranie blokady zgodności; konto v1 nadal używa starego
