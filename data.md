@@ -2,6 +2,19 @@
 
 ## Lokalny zapis mediów v2 (2026-11-06, opt-in)
 
+Nowy import inline używa `EditorController.prepareInlineAsset` dla
+aktywnego bloku i `EditorV2OperationWriter.stageQuillAsset`. Typ jest
+rozpoznawany z sygnatury bajtów zgodnie z walidatorem serwera
+(PNG/JPEG/WebP/PDF), limit wynosi 64 MiB. Przygotowanie zwraca wyłącznie
+`asset:<UUID>`, nie wykonuje HTTP ani nie tworzy operacji przed zmianą
+Delta. Normalny gest Quill zapisuje attach, BLOB, atomy i outbox atomowo;
+rejestr stagingu jest zwalniany dopiero po udanym commicie.
+Clipboard aktywnego Quill v2 podłącza import obrazów z bajtów.
+Zewnętrzny HTML/rich paste jest w tym trybie wyłączony, aby URL-e nie
+omijały weryfikacji; tekst nadal można wkleić, a legacy zachowuje swój
+dotychczasowy clipboard. Bezpieczny import zewnętrznej rich Delta
+pozostaje osobnym zadaniem. Nie włącza to protokołu v2 w produkcji.
+
 Obraz/PDF jest weryfikowany lokalnie przez SHA-256, rozmiar i MIME,
 a następnie zapisany wraz z `asset.attach` i outboxem w jednej transakcji
 SQLite. `operation_asset_bytes` przechowuje również bajty zwykłych obrazów,

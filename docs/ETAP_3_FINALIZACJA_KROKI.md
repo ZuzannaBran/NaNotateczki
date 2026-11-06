@@ -1,14 +1,40 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Potwierdzone regresje i nowy import inline — 2026-11-06
+
+Przebieg `42160667069` dla `e4b1cfc` przeszedł formatowanie, analizę,
+862 testy (2 pominięte) i próg pokrycia: 69,95%. Potwierdza wcześniejsze
+przyrosty inverse, ID historii, mediów, edycji Quill i typing → delete.
+Backend `42160118098` dla `6b0da04` również zakończył się sukcesem.
+
+Nowy lokalny import `prepareInlineAsset`/`stageQuillAsset` przyjmuje
+bajty, rozpoznaje PNG/JPEG/WebP/PDF i sprawdza typ oraz limit 64 MiB.
+Nie wykonuje HTTP ani przedwczesnego zapisu operacji. Zwraca kanoniczną
+referencję `asset:`; zwykły gest tekstowy utrwala attach, BLOB, atomy
+i outbox w jednej transakcji. Rollback zachowuje staging do retry,
+a udany commit zwalnia rejestrację również pod kluczem asset ID.
+
+Podłączono clipboard obrazów aktywnego Quill v2. Zewnętrzny HTML/rich
+paste pozostaje wyłączony w tym trybie, aby nie wstawiał niezweryfikowanych
+URL; tekst i legacy clipboard pozostają dostępne. Bezpieczny import
+zewnętrznej rich Delta oraz inline PDF z interfejsu wymagają dalszych prac.
+
+Nowe regresje: cztery formaty, niezmienność kopii bajtów, brak operacji
+przed gestem, Undo/Redo po wyczyszczeniu bufora, restart pliku SQLite
+i outboxu, zły typ/rozmiar/zakres oraz rollback attach z ponowieniem.
+Test widgetowy używa rzeczywistego callbacku clipboard i sprawdza
+osadzony obraz w Delta i SQLite. Lokalnie zaliczono cztery testy bufora
+na produkcyjnym kodzie przez runner czystego Darta oraz formatowanie
+273 plików. Testy SQLite/widget tego przyrostu wymagają wyniku kolejnego
+Actions; nie były uruchamiane lokalnym Flutterem.
+
 ## Bieżący punkt przekazania — 2026-11-06
 
 Instrukcje repozytorium znajdują się w `CZAT.md` i `AGENTS.md`.
-Najpierw odczytać Actions aktualnego `dev`; poprzedni przebieg
-`42144008139` zatrzymał analizę przed uruchomieniem nowych testów.
-`2dbaee9` usuwa dwa zbędne `!` i ponawia tylko analizę/testy natywne.
-W tej samej gałęzi są przyrosty inverse, trwałych embedów, stabilnych
-ID historii, edycji rich Quill i typing → delete; nie uznawać ich
-regresji za zaliczone bez nowego wyniku CI.
+Najpierw odczytać Actions aktualnego `dev`. Poprzedni przyrost do
+`e4b1cfc` został potwierdzony zielonym przebiegiem `42160667069`;
+nowy import inline wymaga osobnego wyniku. W razie błędu najpierw
+naprawić regresję, nie uruchamiać niezmienionych platform.
 
 Backend `6b0da04` dodaje sześć kontraktów inverse mediów i tombstones.
 Lokalnie po tym przyroście: 278 passed, 8 skipped (PostgreSQL).

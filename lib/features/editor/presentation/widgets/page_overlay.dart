@@ -764,6 +764,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   void initState() {
     super.initState();
     _previewTextController = TextEditingController(text: widget.block.text);
+    _editorController = context.read<EditorController>();
     _initQuill();
   }
 
@@ -1559,6 +1560,33 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     return unset ? quill.Attribute.clone(attribute, null) : attribute;
   }
 
+  Future<String?> _preparePastedImage(Uint8List bytes) async {
+    if (!mounted ||
+        _editorController.activeTextBlockId != widget.block.id ||
+        !identical(_editorController.activeTextController, _quillController)) {
+      return null;
+    }
+    try {
+      return _editorController.prepareInlineAsset(
+        blockId: widget.block.id,
+        bytes: bytes,
+        embedType: 'image',
+      );
+    } on FormatException {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('Unsupported clipboard image format.')),
+      );
+      return null;
+    } on ArgumentError {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('Clipboard image exceeds the size limit.'),
+        ),
+      );
+      return null;
+    }
+  }
+
   void _initQuill() {
     _clearDarkDisplayController();
     final doc = _documentFromBlock(widget.block);
@@ -1566,6 +1594,17 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _quillController = quill.QuillController(
       document: doc,
       selection: TextSelection.collapsed(offset: selectionOffset),
+      config: _editorController.operationWriter == null
+          ? const quill.QuillControllerConfig()
+          : quill.QuillControllerConfig(
+              // ignore: experimental_member_use
+              clipboardConfig: quill.QuillClipboardConfig(
+                // Raw HTML embeds must not bypass verified byte imports.
+                // ignore: experimental_member_use
+                enableExternalRichPaste: false,
+                onImagePaste: _preparePastedImage,
+              ),
+            ),
     );
     _lastDeltaJson = jsonEncode(doc.toDelta().toJson());
     _docSubscription?.cancel();

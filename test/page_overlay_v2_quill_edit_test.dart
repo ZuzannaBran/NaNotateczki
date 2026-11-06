@@ -176,6 +176,25 @@ void main() {
         expect(find.byType(quill.QuillEditor), findsOneWidget);
         final active = editor.activeTextController!;
         expect(active.readOnly, isFalse);
+        String? importedReference;
+        if (kind == 'rich') {
+          final importedBytes = base64Decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC'
+            'AAAAC0lEQVR42mP8/x8AAwMCAO+a3xkAAAAASUVORK5CYII=',
+          );
+          // ignore: experimental_member_use
+          final clipboard = active.config.clipboardConfig!;
+          importedReference = await tester.runAsync(
+            () => clipboard.onImagePaste!(importedBytes),
+          );
+          expect(importedReference, startsWith('asset:'));
+          active.replaceText(
+            4,
+            0,
+            quill.BlockEmbed.image(importedReference!),
+            const TextSelection.collapsed(offset: 5),
+          );
+        }
         final renderedColors = tester
             .widgetList<RichText>(find.byType(RichText))
             .map((widget) => _colorOfText(widget.text, 'Bold'))
@@ -199,6 +218,19 @@ void main() {
         expect(saved.pages.single.textBlocks.single.text, contains('Bold!'));
         expect(jsonDecode(savedDelta).first['attributes']['bold'], isTrue);
         expect(jsonDecode(savedDelta).first['attributes']['color'], '#123456');
+        final reference = importedReference;
+        if (reference != null) {
+          expect(savedDelta, contains(reference));
+          final imported = await tester.runAsync(
+            () => projector.verifiedTextAssetBytes(
+              documentId: saved.uid,
+              pageId: saved.pages.single.id,
+              objectId: block.id,
+              assetId: reference.substring(6),
+            ),
+          );
+          expect(imported, isNotEmpty);
+        }
         if (kind != 'rich') {
           expect(savedDelta, contains('asset:${asset.assetId}'));
           expect(

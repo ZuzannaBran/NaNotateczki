@@ -5,6 +5,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/sync/verified_editor_asset_buffer.dart';
 
 void main() {
+  test('inline MIME detection matches supported server signatures', () {
+    final fixtures = <String, List<int>>{
+      'image/png': [137, 80, 78, 71, 13, 10, 26, 10, 0],
+      'image/jpeg': [255, 216, 255, 0],
+      'image/webp': [82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80],
+      'application/pdf': [37, 80, 68, 70, 45, 49],
+    };
+    for (final entry in fixtures.entries) {
+      expect(VerifiedEditorAssetBuffer.inferMediaType(entry.value), entry.key);
+    }
+    for (final bytes in <List<int>>[
+      [],
+      [137, 80, 78, 71],
+      [255, 216],
+      [37, 80, 68, 70],
+      [82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66],
+      [71, 73, 70, 56, 57, 97],
+    ]) {
+      expect(
+        () => VerifiedEditorAssetBuffer.inferMediaType(bytes),
+        throwsFormatException,
+      );
+    }
+  });
+
   const firstId = 'verified-test-asset';
   final contents = Uint8List.fromList([137, 80, 78, 71, 1, 2]);
   final sha = sha256.convert(contents).toString();

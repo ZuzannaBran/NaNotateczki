@@ -13,6 +13,7 @@ import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/operation_store.dart';
 import '../../../data/sync/operation_text_sequence.dart';
 import '../../../data/sync/sync_engine.dart';
+import '../../../data/sync/verified_editor_asset_buffer.dart';
 import '../../notebook/domain/image_block.dart';
 import '../../notebook/domain/ink_stroke.dart';
 import '../../notebook/domain/note_page.dart';
@@ -49,6 +50,43 @@ class EditorV2OperationWriter {
   final void Function(String, List<OperationEnvelope>)? onCommitted;
   final EditorOperationBridge _bridge;
   final Map<String, Map<String, VerifiedEditorAsset>> _registeredAssets = {};
+
+  /// Stages a new inline import without network or a premature journal write.
+  /// The referencing Quill gesture persists these bytes with its outbox.
+  VerifiedEditorAsset stageQuillAsset({
+    required String documentId,
+    required Uint8List bytes,
+    required String embedType,
+  }) {
+    if (bytes.isEmpty ||
+        bytes.length > OperationAssetGateway.maximumAssetBytes) {
+      throw ArgumentError('Invalid inline asset size.');
+    }
+    final mime = VerifiedEditorAssetBuffer.inferMediaType(bytes);
+    if ((embedType != 'image' && embedType != 'pdf') ||
+        (embedType == 'pdf'
+            ? mime != 'application/pdf'
+            : !mime.startsWith('image/'))) {
+      throw const FormatException('Inline embed type differs from its bytes.');
+    }
+    final buffer = projector.verifiedAssetBuffer;
+    if (buffer == null) {
+      throw StateError('Verified asset staging has not been installed.');
+    }
+    final asset = VerifiedEditorAsset(
+      assetId: const Uuid().v4(),
+      sha256: crypto.sha256.convert(bytes).toString(),
+      sizeBytes: bytes.length,
+      mediaType: mime,
+    );
+    registerVerifiedAsset(
+      documentId: documentId,
+      objectId: asset.assetId,
+      asset: asset,
+    );
+    buffer.stage(receipt: asset.attachPayload, bytes: bytes);
+    return asset;
+  }
 
   /// Call after a verified upload has been staged for the same document.
   /// The receipt survives a rolled-back editor gesture for safe retry.
@@ -783,13 +821,15 @@ class EditorV2OperationWriter {
         if (operation.kind != OperationKind.assetAttach) {
           continue;
         }
-        final previous = registered[operation.objectId];
-        if (previous != null &&
-            const DeepCollectionEquality().equals(
-              previous.attachPayload,
-              operation.payload,
-            )) {
-          registered.remove(operation.objectId);
+        for (final key in {operation.objectId, operation.payload['assetId']}) {
+          final previous = registered[key];
+          if (previous != null &&
+              const DeepCollectionEquality().equals(
+                previous.attachPayload,
+                operation.payload,
+              )) {
+            registered.remove(key);
+          }
         }
       }
       if (registered.isEmpty) {

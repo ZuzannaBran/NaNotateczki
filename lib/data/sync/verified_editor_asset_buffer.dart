@@ -14,6 +14,36 @@ import 'operation_protocol.dart';
 class VerifiedEditorAssetBuffer {
   final Map<String, _VerifiedBytes> _items = {};
 
+  /// Uses the same byte signatures as the server upload validator.
+  static String inferMediaType(List<int> bytes) {
+    bool startsWith(List<int> prefix, [int offset = 0]) {
+      if (bytes.length < offset + prefix.length) {
+        return false;
+      }
+      for (var index = 0; index < prefix.length; index++) {
+        if (bytes[offset + index] != prefix[index]) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    if (startsWith(const [37, 80, 68, 70, 45])) {
+      return 'application/pdf';
+    }
+    if (startsWith(const [137, 80, 78, 71, 13, 10, 26, 10])) {
+      return 'image/png';
+    }
+    if (startsWith(const [255, 216, 255])) {
+      return 'image/jpeg';
+    }
+    if (startsWith(const [82, 73, 70, 70]) &&
+        startsWith(const [87, 69, 66, 80], 8)) {
+      return 'image/webp';
+    }
+    throw const FormatException('Unsupported image/PDF byte signature.');
+  }
+
   void stage({
     required Map<String, dynamic> receipt,
     required Uint8List bytes,

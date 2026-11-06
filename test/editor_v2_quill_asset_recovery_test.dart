@@ -68,6 +68,261 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   useIsolatedNativeTestDocuments();
 
+  final importBytes = <String, List<int>>{
+    'image/png': [137, 80, 78, 71, 13, 10, 26, 10, 1],
+    'image/jpeg': [255, 216, 255, 1],
+    'image/webp': [82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80],
+    'application/pdf': [37, 80, 68, 70, 45, 49],
+  };
+  for (final entry in importBytes.entries) {
+    test(
+      'new inline ${entry.key} survives Undo, Redo and a file restart',
+      () async {
+        final directory = await Directory.systemTemp.createTemp('nn-import-');
+        addTearDown(() => directory.delete(recursive: true));
+        final file = File('${directory.path}/notes.sqlite');
+        var session = _Session(file);
+        addTearDown(() => session.close());
+        final notebook = await session.repository.createNotebook();
+        final original = TextBlock(
+          id: 'inline-import-target',
+          text: 'Before',
+          deltaJson: jsonEncode([
+            {'insert': 'Before\n'},
+          ]),
+          position: Offset.zero,
+          fontSize: 18,
+          color: const Color(0xFF123456),
+          width: 200,
+        );
+        await session.writer.writePageChange(
+          documentId: notebook.uid,
+          before: notebook.pages.single,
+          after: notebook.pages.single.copyWith(textBlocks: [original]),
+        );
+        final controller = EditorController(
+          repository: session.repository,
+          notebook: (await session.repository.getNotebook(notebook.uid))!,
+          operationWriter: session.writer,
+        );
+        var disposed = false;
+        addTearDown(() {
+          if (!disposed) {
+            controller.dispose();
+          }
+        });
+        controller.setActiveTextBlock(original.id, null);
+        final pendingBefore = (await session.store.pending()).length;
+        final bytes = Uint8List.fromList(entry.value);
+        final type = entry.key == 'application/pdf' ? 'pdf' : 'image';
+        final reference = controller.prepareInlineAsset(
+          blockId: original.id,
+          bytes: bytes,
+          embedType: type,
+        );
+        bytes[bytes.length - 1] ^= 1;
+        expect(await session.store.pending(), hasLength(pendingBefore));
+        expect(
+          controller.currentPage.textBlocks.single.deltaJson,
+          original.deltaJson,
+        );
+        controller.updateTextBlockContent(
+          controller.currentPage.textBlocks.single,
+          plainText: 'Before\uFFFC',
+          deltaJson: jsonEncode([
+            {'insert': 'Before'},
+            {
+              'insert': {type: reference},
+            },
+            {'insert': '\n'},
+          ]),
+        );
+        await controller.flushPendingSaves();
+        final added = (await session.store.pending())
+            .skip(pendingBefore)
+            .toList();
+        expect(added.first.kind, OperationKind.assetAttach);
+        expect(added.first.payload['mediaType'], entry.key);
+        expect(
+          added.first.payload['sha256'],
+          crypto.sha256.convert(entry.value).toString(),
+        );
+        session.buffer.clear();
+        controller.undo();
+        await controller.flushPendingSaves();
+        controller.redo();
+        await controller.flushPendingSaves();
+        final expected = controller.currentPage.textBlocks.single.deltaJson;
+        final pendingIds = (await session.store.pending())
+            .map((operation) => operation.operationId)
+            .toList();
+        controller.dispose();
+        disposed = true;
+        await session.close();
+        session = _Session(file);
+        final restored = (await session.repository.getNotebook(notebook.uid))!;
+        expect(restored.pages.single.textBlocks.single.deltaJson, expected);
+        expect(
+          (await session.store.pending()).map((op) => op.operationId),
+          pendingIds,
+        );
+        expect(
+          await session.projector.verifiedTextAssetBytes(
+            documentId: notebook.uid,
+            pageId: restored.pages.single.id,
+            objectId: original.id,
+            assetId: reference.substring(6),
+          ),
+          entry.value,
+        );
+      },
+    );
+  }
+
+  test(
+    'new inline import rolls back and retains verified staging for retry',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'nn-import-retry-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final session = _Session(File('${directory.path}/notes.sqlite'));
+      addTearDown(session.close);
+      final notebook = await session.repository.createNotebook();
+      final original = TextBlock(
+        id: 'inline-retry-target',
+        text: 'Before',
+        deltaJson: jsonEncode([
+          {'insert': 'Before\n'},
+        ]),
+        position: Offset.zero,
+        fontSize: 18,
+        color: const Color(0xFF123456),
+        width: 200,
+      );
+      await session.writer.writePageChange(
+        documentId: notebook.uid,
+        before: notebook.pages.single,
+        after: notebook.pages.single.copyWith(textBlocks: [original]),
+      );
+      final controller = EditorController(
+        repository: session.repository,
+        notebook: (await session.repository.getNotebook(notebook.uid))!,
+        operationWriter: session.writer,
+      );
+      addTearDown(controller.dispose);
+      controller.setActiveTextBlock(original.id, null);
+      final pendingBefore = (await session.store.pending()).length;
+      expect(
+        () => controller.prepareInlineAsset(
+          blockId: original.id,
+          bytes: Uint8List(64 * 1024 * 1024 + 1),
+          embedType: 'image',
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => controller.prepareInlineAsset(
+          blockId: original.id,
+          bytes: Uint8List.fromList(importBytes['image/png']!),
+          embedType: 'pdf',
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => controller.prepareInlineAsset(
+          blockId: 'missing',
+          bytes: Uint8List.fromList(importBytes['image/png']!),
+          embedType: 'image',
+        ),
+        throwsStateError,
+      );
+      final reference = controller.prepareInlineAsset(
+        blockId: original.id,
+        bytes: Uint8List.fromList(importBytes['application/pdf']!),
+        embedType: 'pdf',
+      );
+      final foreign = await session.repository.createNotebook();
+      await expectLater(
+        session.writer.writePageChange(
+          documentId: foreign.uid,
+          before: foreign.pages.single,
+          after: foreign.pages.single.copyWith(
+            textBlocks: [
+              original.copyWith(
+                id: 'foreign-import',
+                text: '\uFFFC',
+                deltaJson: jsonEncode([
+                  {
+                    'insert': {'pdf': reference},
+                  },
+                  {'insert': '\n'},
+                ]),
+              ),
+            ],
+          ),
+        ),
+        throwsStateError,
+      );
+      expect(await session.store.pending(), hasLength(pendingBefore));
+      await session.database.customStatement('''
+      CREATE TEMP TRIGGER reject_inline_attach BEFORE INSERT ON operations
+      WHEN NEW.kind = 'asset.attach'
+      BEGIN SELECT RAISE(ABORT, 'injected inline import failure'); END
+    ''');
+      controller.updateTextBlockContent(
+        controller.currentPage.textBlocks.single,
+        plainText: 'Before\uFFFC',
+        deltaJson: jsonEncode([
+          {'insert': 'Before'},
+          {
+            'insert': {'pdf': reference},
+          },
+          {'insert': '\n'},
+        ]),
+      );
+      await expectLater(
+        controller.flushPendingSaves(),
+        throwsA(isA<DataIntegrityProtectionException>()),
+      );
+      expect(await session.store.pending(), hasLength(pendingBefore));
+      expect(
+        (await session.repository.getNotebook(
+          notebook.uid,
+        ))!.pages.single.textBlocks.single.deltaJson,
+        original.deltaJson,
+      );
+      expect(
+        await session.database
+            .customSelect('SELECT * FROM asset_references')
+            .get(),
+        isEmpty,
+      );
+      expect(
+        await session.database
+            .customSelect('SELECT * FROM operation_asset_bytes')
+            .get(),
+        isEmpty,
+      );
+      await session.database.customStatement(
+        'DROP TRIGGER reject_inline_attach',
+      );
+      await controller.flushPendingSaves();
+      final added = (await session.store.pending())
+          .skip(pendingBefore)
+          .toList();
+      expect(
+        added.where((op) => op.kind == OperationKind.assetAttach),
+        hasLength(1),
+      );
+      expect(
+        added.first.actorSeq,
+        (await session.store.pending()).elementAt(pendingBefore - 1).actorSeq +
+            1,
+      );
+    },
+  );
+
   for (final type in ['image', 'pdf']) {
     for (final target in ['embed', 'block', 'page']) {
       test('offline $type Undo restores deleted $target', () async {

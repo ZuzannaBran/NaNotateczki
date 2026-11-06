@@ -2327,6 +2327,28 @@ class EditorController extends ChangeNotifier {
     _save();
   }
 
+  /// Prepares new inline media for Quill's next normal text mutation.
+  String prepareInlineAsset({
+    required String blockId,
+    required Uint8List bytes,
+    required String embedType,
+  }) {
+    final writer = operationWriter;
+    if (writer == null ||
+        _isDisposed ||
+        _v2DocumentDeleted ||
+        activeTextBlockId != blockId ||
+        _pageIndexContainingTextBlock(blockId) == null) {
+      throw StateError('Inline imports require an active v2 text block.');
+    }
+    final asset = writer.stageQuillAsset(
+      documentId: notebook.uid,
+      bytes: bytes,
+      embedType: embedType,
+    );
+    return 'asset:${asset.assetId}';
+  }
+
   void updateTextBlockContent(
     TextBlock before, {
     required String plainText,

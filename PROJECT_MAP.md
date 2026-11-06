@@ -499,6 +499,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `OperationAssetGateway.uploadAndStage/downloadAndStage` wypełnia
   bufor po potwierdzeniu uploadu/pobraniu. Po restarcie obraz
   otwiera się z trwałej kolumny BLOB. Bufor nie jest backupem.
+  `inferMediaType` rozpoznaje PNG/JPEG/WebP/PDF z tych samych sygnatur
+  co serwer; nowy import nie ufa nazwie pliku ani deklarowanemu MIME.
 - `test/verified_editor_asset_buffer_test.dart`: checksuma, ochrona
   zmiany ID i niemutowalność skopiowanych bajtów.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
@@ -1430,6 +1432,10 @@ tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 `writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`,
 `writeCreateNotebook`, `writeDeleteNotebook` oraz `writeNotebookChange`
 — atomowy wsad wielostronicowy lub bootstrap/del dokumentu bez v1.
+`stageQuillAsset` przygotowuje nowy inline import bez HTTP/outboxu,
+sprawdza sygnaturę, typ embedu i limit 64 MiB, kopiuje bajty do bufora
+i rejestruje potwierdzenie per dokument/asset ID. Commit attach zwalnia
+zarówno klucz zwykłego obrazu, jak i klucz embedu; rollback je zachowuje.
 `writeNotebookChange(revertsOperationId:)` wiąże cały inverse z końcową
 operacją cofanej grupy; OperationStore sprawdza trwałą zależność
 w tej samej transakcji. Błędne ID nie zmienia projekcji ani actorSeq.
@@ -1482,6 +1488,9 @@ wciąż wymaga zweryfikowanego stagingu; pełny rebase pozostaje otwarty.
 `test/editor_v2_quill_asset_recovery_test.dart`: restart plikowej SQLite,
 obraz/PDF × usunięcie embedu/bloku/strony, cykl Undo/Redo/Undo,
 odmowa obcego dokumentu i uszkodzonych bajtów.
+Ten sam test pokrywa nowe importy PNG/JPEG/WebP/PDF, niemutowalność
+bajtów, Undo/Redo po opróżnieniu stagingu, restart outboxu, zły typ,
+przekroczenie limitu, obcy dokument oraz retry po rollbacku attach.
 Usuwanie zweryfikowanego obrazu lub tekstu z embedem Quill usuwa
 scoped asset references razem z obiektem w transakcji SQLite;
 nie usuwa fizycznych plików i odmawia usunięcia brakującego assetu.
@@ -1581,9 +1590,9 @@ ponawianie ink oraz stron bez ponownego użycia tombstones.
 Ten sam test obejmuje dwa rzeczywiste autosave'y Quill, pojedyncze
 Undo/Redo/Undo, zależności inverse i edycję o zerowym efekcie.
 Ważne granice: 592: `flushPendingSaves`; 2007: `_applyV2History`;
-2152: `_remapV2HistoryNotebook`; 2330: `updateTextBlockContent`;
-3729: `_commitActiveTextEdit`; 3824: `_captureV2Gesture`;
-3848: `_saveV2`.
+2152: `_remapV2HistoryNotebook`; 2331: `prepareInlineAsset`;
+2352: `updateTextBlockContent`; 3751: `_commitActiveTextEdit`;
+3846: `_captureV2Gesture`; 3870: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
@@ -1925,7 +1934,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (3156 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (3195 linii)
 
 Opt-in v2: aktywny tekst ze złożonym Delta lub embedami pozostaje
 w istniejącym QuillEditor, aby edycja nie spłaszczała treści.
@@ -1938,6 +1947,10 @@ Aktywny Quill w ciemnym motywie mapuje atrybut `color` przez
 `customStyleBuilder`, bez edycji oryginalnej Delta; podgląd zachowuje
 osobną kopię display, więc nie dochodzi do podwójnego odwrócenia.
 Test sprawdza kolor wyrenderowanego TextSpan oraz zapisany kolor źródłowy.
+Clipboard Quill v2 przekazuje bajty obrazu do `prepareInlineAsset`,
+zwracając kanoniczną referencję przed zwykłą mutacją dokumentu.
+Odrzuca nieaktywny blok i nieobsługiwany format. Zewnętrzne HTML/rich
+paste jest tymczasowo wyłączone dla v2; legacy pozostaje bez zmian.
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -1978,9 +1991,9 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
   `_TextBlockWidget` / `_TextBlockWidgetState`.
   Akcje lassa korzystają z kompaktowego paska w kolorze toolbaru,
   z neutralnymi ikonami konturowymi i zachowaną obsługą akcji.
-- 1704: `_ImageBlockWidget`; 1729: `_ImageBlockWidgetState`;
-  2863: `_LassoSelectionWidget`; 2984: `LassoSelectionActionBar`;
-  3043: `_LassoActionButton`; 3102: `VerifiedQuillEmbedBuilder`.
+- 1743: `_ImageBlockWidget`; 1768: `_ImageBlockWidgetState`;
+  2902: `_LassoSelectionWidget`; 3023: `LassoSelectionActionBar`;
+  3082: `_LassoActionButton`; 3141: `VerifiedQuillEmbedBuilder`.
 
 ## 9. Board
 
