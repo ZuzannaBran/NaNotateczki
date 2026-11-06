@@ -21,6 +21,7 @@ import 'package:program/data/sync/verified_editor_asset_buffer.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/ink_stroke.dart';
 
 import 'support/native_test_documents.dart';
@@ -254,6 +255,7 @@ void main() {
         (await session.engine.store.pending()).map((op) => op.operationId),
         before.map((op) => op.operationId),
       );
+      session.editor.setTool(DrawingTool.pen);
       session.editor.addInkStroke(const [
         InkPoint(dx: 2, dy: 3, pressure: 0.6),
       ]);

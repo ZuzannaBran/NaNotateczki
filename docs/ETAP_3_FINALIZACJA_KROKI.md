@@ -1,5 +1,20 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Wynik CI i poprawka scenariusza cache — 2026-11-06, 16:42 UTC
+
+Przebieg `42252657960` dla `5133ce2` zaliczył generator, format i analizę.
+Zestaw natywny: 1002 testy zaliczone, dwa pominięte, jeden błąd.
+Naprawione wcześniej zawieszenia widżetów i regresje wyścigów historii
+nie zgłosiły kolejnego błędu. Pozostały test odbudowy cache'u obrazu
+wywoływał `addInkStroke` w narzędziu Move, które import wybiera zgodnie
+z kontraktem UI. Writer prawidłowo odrzucał niepoprawny typ kreski.
+Scenariusz wybiera teraz pióro przed rysowaniem; nie osłabiono walidacji
+ani asercji liczby assetów, operacji i kroków Undo.
+
+Weryfikacja poprawki: format i diff lokalnie; Flutter w ograniczonym
+Actions aplikacji po kolejnym spójnym commicie tej sesji. Nie czekać
+na wynik. Backend `42160118098` pozostaje zielony.
+
 ## Lokalne gesty pomiędzy zdalnym commitem a patchem — 2026-11-06
 
 Domknięto kolejny wariant wyścigu historii: po zdalnym commicie SQLite,
