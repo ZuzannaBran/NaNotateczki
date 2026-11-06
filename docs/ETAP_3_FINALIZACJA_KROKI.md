@@ -1,5 +1,20 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Naprawa niestabilnego testu preferencji — 2026-11-06
+
+Actions `42202704002` dla `2077f27`: generator Drift, format i analiza
+przeszły. Wszystkie 15 nowych testów checkpointów i SQLite przeszło.
+Przebieg zakończył się 956 zaliczonymi, 2 pominiętymi i 1 błędnym testem:
+`previous factory swatches migrate by position in every palette` odczytał
+jeszcze domyślną paletę po stałym opóźnieniu 50 ms.
+
+`EditorController.preferencesReady` udostępnia rzeczywisty koniec odczytu
+i migracji. Testy preferencji czekają na tę granicę zamiast timeoutu.
+Nowa regresja blokuje odczyt w PathProvider, sprawdza niezakończone Future,
+zwalnia bramkę i kontroluje dokładną migrację palety i wybranego koloru.
+Backend `42160118098` pozostaje zielony. Ponowienie dotyczy tylko analizy
+i natywnych testów aplikacji; wynik odczytać w kolejnej sesji.
+
 ## Trwałe checkpointy historii — fundament (2026-11-06)
 
 Na początku potwierdzono Actions `42197652976` dla `8d30275`:

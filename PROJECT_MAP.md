@@ -1611,7 +1611,9 @@ Undo/Redo, font/color/alignment/clear i stabilność atomów).
 ### `lib/features/editor/state/editor_controller.dart` (opt-in v2)
 
 Centralny `ChangeNotifier`: strony, narzędzia, undo/redo, zaznaczenie, media,
-preferencje, viewport i zapis. `applyConfirmedRemoteNotebook` odświeża
+preferencje, viewport i zapis. `preferencesReady` sygnalizuje koniec odczytu
+i migracji preferencji; testy migracji nie czekają arbitralnych 50 ms.
+Regresja blokuje odczyt w PathProvider do jawnego zwolnienia bramki. `applyConfirmedRemoteNotebook` odświeża
 zatwierdzone strony w tym samym kontrolerze, zachowując lokalny zoom, pan
 i aktualną stronę; w trakcie gestu lub dirty save odmawia nadpisania.
 W aktywnej wspólnej sesji zapis skończonego gestu nie czeka dodatkowych

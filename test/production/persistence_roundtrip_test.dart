@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -129,15 +130,19 @@ NotebookRepository _repository(NotesDatabase database) {
 }
 
 class _TestPathProvider extends PathProviderPlatform {
-  _TestPathProvider(this.documentsPath);
+  _TestPathProvider(this.documentsPath, {this.supportGate});
 
   final String documentsPath;
+  final Completer<void>? supportGate;
 
   @override
   Future<String?> getApplicationDocumentsPath() async => documentsPath;
 
   @override
-  Future<String?> getApplicationSupportPath() async => documentsPath;
+  Future<String?> getApplicationSupportPath() async {
+    await supportGate?.future;
+    return documentsPath;
+  }
 }
 
 void main() {
@@ -203,6 +208,48 @@ void main() {
     latest.dispose();
   });
 
+  test(
+    'palette migration readiness waits for a blocked storage read',
+    () async {
+      await writeStoredText(
+        'editor_prefs.json',
+        jsonEncode({
+          'penColor': '#45624e',
+          'highlighterColor': '#45624e',
+          'quickColors': ['#273526', '#45624e', '#c0cfb2'],
+        }),
+      );
+      final gate = Completer<void>();
+      PathProviderPlatform.instance = _TestPathProvider(
+        documentsDirectory.path,
+        supportGate: gate,
+      );
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final controller = EditorController(
+        repository: _repository(db),
+        notebook: _fixture(uid: 'delayed-palette-migration'),
+      );
+      addTearDown(() async {
+        if (!gate.isCompleted) {
+          gate.complete();
+        }
+        await controller.preferencesReady;
+        await controller.flushPendingSaves();
+        controller.dispose();
+      });
+      var ready = false;
+      final completion = controller.preferencesReady.then((_) => ready = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(ready, isFalse);
+      expect(controller.quickColors, InkColorPreset.blue.colors);
+      gate.complete();
+      await completion;
+      expect(controller.quickColors, InkColorPreset.green.colors);
+      expect(controller.inkColor, InkColorPreset.green.colors[1]);
+    },
+  );
+
   test('quick colors start blue and a selected palette persists', () async {
     final db = NotesDatabase(NativeDatabase.memory());
     addTearDown(db.close);
@@ -211,7 +258,7 @@ void main() {
       repository: repository,
       notebook: _fixture(uid: 'palette-default'),
     );
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await controller.preferencesReady;
 
     expect(controller.quickColors, InkColorPreset.blue.colors);
     expect(controller.penColor, InkColorPreset.blue.colors[0]);
@@ -258,7 +305,7 @@ void main() {
         repository: _repository(db),
         notebook: _fixture(uid: 'palette-migration'),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await controller.preferencesReady;
 
       expect(controller.quickColors, InkColorPreset.blue.colors);
       expect(controller.penColor, InkColorPreset.blue.colors[0]);
@@ -290,7 +337,7 @@ void main() {
         repository: _repository(db),
         notebook: _fixture(uid: 'palette-latest-migration'),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await controller.preferencesReady;
       expect(controller.quickColors, InkColorPreset.pink.colors);
       expect(controller.inkColor, InkColorPreset.pink.colors[1]);
       controller.setTool(DrawingTool.highlighter);
@@ -348,7 +395,7 @@ void main() {
             repository: _repository(db),
             notebook: _fixture(uid: 'previous-${entry.key.name}'),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await controller.preferencesReady;
           expect(controller.quickColors, entry.key.colors);
           expect(controller.inkColor, entry.key.colors[1]);
           await controller.flushPendingSaves();
@@ -378,7 +425,7 @@ void main() {
         repository: _repository(db),
         notebook: _fixture(uid: 'third-${entry.key.name}-migration'),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await controller.preferencesReady;
 
       expect(controller.quickColors, entry.key.colors);
       expect(controller.inkColor, entry.key.colors[2]);
@@ -403,7 +450,7 @@ void main() {
       repository: _repository(db),
       notebook: _fixture(uid: 'custom-palette'),
     );
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await controller.preferencesReady;
 
     expect(controller.quickColors, const [
       Color(0xFF123456),

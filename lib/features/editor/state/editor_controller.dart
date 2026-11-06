@@ -139,9 +139,11 @@ class EditorController extends ChangeNotifier {
       hasPendingWork: () => _hasPendingSaveWork,
       flush: flushPendingSaves,
     );
-    _loadEditorPrefs();
+    preferencesReady = _loadEditorPrefs();
   }
 
+  /// Completes after startup preferences and their migrations have been read.
+  late final Future<void> preferencesReady;
   final NotebookRepository repository;
   final EditorV2OperationWriter? operationWriter;
   Notebook notebook;
