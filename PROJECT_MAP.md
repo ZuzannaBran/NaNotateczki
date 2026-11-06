@@ -523,11 +523,23 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   65: `EditorHistoryCheckpoint`, 138: `decode`. Niezmienny JSON obu stosów,
   stany content-addressed SHA-256; ścisła wersja i zakres, 50 gestów /
   4 MiB UTF-8. Metadane lokalne, bez protokołu/backupów; codec notebooka
-  i mediów oraz podłączenie kontrolera pozostają do wykonania.
+  opisano poniżej, podłączenie kontrolera pozostaje do wykonania.
 - `lib/data/sync/editor_history_store.dart`: 11: `EditorHistoryStore`,
   68: `save`, 96: `load`. Zapis w transakcji gestu, izolacja dokument/aktor,
   kontrola lokalnych operacji i checksum. Nowa głowa unieważnia historię,
   tombstone blokuje zapis; korupcja nie zmienia dokumentu ani outboxu.
+- `lib/data/sync/editor_history_notebook_codec.dart`: 24:
+  `EditorHistoryNotebookCodec`, 75: `encode`, 214: `decode`, 240: `_notebook`.
+  JSON metadanych notebooka/boarda bez bajtów i ścieżek; ink, Quill,
+  kolejność stron/warstw i UTC. Media wyłącznie przez trwałe scoped
+  receipts i checksumowane BLOB-y; najwcześniejszy alias stabilizuje stan.
+  Wejścia zamrożone przed I/O, ścisłe wersje/pola/ID/geometria i budżet.
+  Path-only import wymaga wcześniejszej materializacji; decode nie zapisuje
+  bazy ani nie wskrzesza tombstones. Stosy kontrolera jeszcze niepodłączone.
+- `test/editor_history_notebook_codec_test.dart`: 16 testów plikowego SQLite:
+  media/Quill i restart, usunięcia, atomowy checkpoint i nowy inverse,
+  scope, checksum/receipt, plain text/warstwy, mutacje podczas await,
+  stabilność aliasów, budżety, korupcja i niezależne kopie bajtów.
 - `test/editor_history_checkpoint_test.dart`: 6 testów formatu, deduplikacji,
   niemutowalności, zakresu, wersji, korupcji i budżetu UTF-8.
 - `test/editor_history_store_test.dart`: 9 regresji SQLite/writera: restart,
@@ -1666,13 +1678,14 @@ HUD pożycza swój kontroler przez `bindHudTextController`/`unbindHudTextControl
 Import porównuje TextEditingValue (także IME), model i właściciela, zachowuje
 Delta i tworzy osobny checkpoint od wcześniejszego pisania. Jednorazowy
 handoff kursora dotyczy dokładnej Delta; odrzucony import nie wymienia HUD.
-Ważne granice: 220: `bindHudTextController`; 228: `unbindHudTextController`;
-239: `hasQuillHandoff`; 243: `takeQuillHandoff`; 644: `flushPendingSaves`;
-2059: `_applyV2History`; 2204: `_remapV2HistoryNotebook`;
-2383: `prepareInlineAsset`; 2405: `pasteQuillHtml`; 2444: `insertQuillFile`;
-2462: `_pickQuillFile`; 2501: `_replaceQuillSelection`;
-2665: `updateTextBlockContent`; 2680: `updateActiveTextStyle`;
-4087: `_commitActiveTextEdit`; 4182: `_captureV2Gesture`; 4206: `_saveV2`.
+Ważne granice: 146: `preferencesReady`;
+222: `bindHudTextController`; 230: `unbindHudTextController`;
+241: `hasQuillHandoff`; 245: `takeQuillHandoff`; 646: `flushPendingSaves`;
+2061: `_applyV2History`; 2206: `_remapV2HistoryNotebook`;
+2385: `prepareInlineAsset`; 2407: `pasteQuillHtml`; 2446: `insertQuillFile`;
+2464: `_pickQuillFile`; 2503: `_replaceQuillSelection`;
+2667: `updateTextBlockContent`; 2682: `updateActiveTextStyle`;
+4089: `_commitActiveTextEdit`; 4184: `_captureV2Gesture`; 4208: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod

@@ -1,5 +1,48 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Kodek notebooka i zweryfikowanych mediów historii — 2026-11-06
+
+Najpierw zdiagnozowano `42202704002`: generator Drift, analiza i 15 testów
+historii przeszły; jedynym błędem był wyścig testu palet. Poprawka
+`003ae91` jest wypchnięta. Jej ponowienia nie odczytywano w tej sesji.
+Backend `42160118098` nadal zielony; bez zmian i ponawiania.
+
+`EditorHistoryNotebookCodec` zamraża pełne metadane notebooka/boarda,
+strony, kolejność warstw, ink i plain/Quill przed pierwszym await.
+Media są reprezentowane tylko przez trwałe scoped referencje: ID assetu,
+SHA-256, MIME i rozmiar, bez BLOB, base64, ścieżek plikowych i URL.
+Najwcześniejszy receipt utrzymuje stabilność starej granicy po kolejnym
+imporcie identycznych bajtów. Odtwarzanie sprawdza format, scope,
+integralność, sygnaturę pliku i trwałe potwierdzenie w dzienniku dokumentu.
+Sprawdzenie działa po usunięciu widocznego obrazu/PDF/Quill, bez zapisu
+bazy lub samodzielnego przywracania tombstone. Daty są kanonicznym UTC.
+
+Dodano 16 regresji natywnego, plikowego SQLite: round trip i restart,
+plain text, Quill, image/PDF, crop/obrót i kolejność warstw, izolacja
+scope, uszkodzony/brakujący BLOB, sprzeczne receipts, URL, niedozwolone
+pola/wersje/ID/geometria, budżet UTF-8, mutacje wejścia podczas await,
+stabilność aliasów i niezależne kopie bajtów. Scenariusz integracyjny
+zapisuje checkpoint w transakcji usunięcia, restartuje SQLite, wykonuje
+nowy inverse pod nowymi ID i po kolejnym restarcie odczytuje stos Redo.
+To test writera/kodeka/store, **nie** jeszcze test przycisku kontrolera.
+
+Lokalnie sprawdzono formatowanie 285 plików Dart, składnię Bash i diff.
+Testy Flutter i pełna analiza są kierowane do Actions tylko aplikacji,
+bez czekania na wynik (lokalnie brak SDK Flutter). Nie zmieniono schematu
+SQLite v8 ani protokołu.
+
+**Następny spójny krok po sprawdzeniu Actions:** podłączyć do kontrolera
+odczyt checkpointu dla trwałego aktora dokumentu i atomowy zapis stosów
+w `onCommittedInTransaction` przy gestach, domykaniu autosave i Undo/Redo.
+Przenosić stosy/remap ID dopiero po commicie. Stan przed/po musi mieć
+zamrożone, zweryfikowane media; path-only import materializować przed
+callbackiem (bez I/O plikowego w transakcji). Trzymać metadane stosów,
+a wybrany notebook inverse dekodować przy użyciu, zamiast ładować
+50 kopii BLOB-ów przy starcie. Wymagane testy rzeczywistego kontrolera
+po restarcie, błędzie zapisu i przy nowym local/remote head. Domknąć
+obsługę limitu całego checkpointu bez blokowania niezwiązanej treści.
+Historia UI po restarcie pozostaje otwarta; v2 nadal opt-in, bez cutover.
+
 ## Naprawa niestabilnego testu preferencji — 2026-11-06
 
 Actions `42202704002` dla `2077f27`: generator Drift, format i analiza

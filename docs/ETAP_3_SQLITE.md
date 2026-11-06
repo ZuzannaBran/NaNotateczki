@@ -10,9 +10,12 @@ actorSeq i outbox. Domknięcie granicy autosave może nie dodawać operacji.
 
 `test/editor_history_checkpoint_test.dart` obejmuje format i budżety;
 `test/editor_history_store_test.dart` restart, rollback, izolację,
-remote invalidation, tombstone i migrację v7→v8. Codec mediów oraz
-podłączenie stosów `EditorController` po restarcie są kolejnym krokiem,
-nie ukończoną funkcją. Bieżący status i przekazanie pracy:
+remote invalidation, tombstone i migrację v7→v8.
+`EditorHistoryNotebookCodec` dodaje metadane notebooka i scoped referencje
+mediów bez BLOB w JSON. Jego 16 testów obejmuje też checkpoint w transakcji,
+restart, usunięcie i nowy inverse po tombstone. Podłączenie stosów
+`EditorController` po restarcie nadal jest kolejnym krokiem, nie ukończoną
+funkcją. Bieżący status i przekazanie pracy:
 [ETAP_3_FINALIZACJA_KROKI.md](ETAP_3_FINALIZACJA_KROKI.md).
 Poniższe datowane sekcje opisują również wcześniejsze granice implementacji.
 

@@ -16,6 +16,7 @@ dart format --output=none --set-exit-if-changed \
   lib/data/drift/notes_database.dart \
   lib/data/drift/operation_schema.dart \
   lib/data/sync/editor_history_checkpoint.dart \
+  lib/data/sync/editor_history_notebook_codec.dart \
   lib/data/sync/editor_history_store.dart \
   lib/data/sync/operation_store.dart \
   lib/data/sync/editor_sqlite_projector.dart \
@@ -37,6 +38,7 @@ dart format --output=none --set-exit-if-changed \
   lib/features/editor/presentation/widgets/text_edit_toolbar.dart \
   lib/features/editor/presentation/widgets/text_hud_block.dart \
   test/editor_history_checkpoint_test.dart \
+  test/editor_history_notebook_codec_test.dart \
   test/editor_history_store_test.dart \
   test/editor_controller_v2_test.dart \
   test/quill_style_patch_test.dart \
@@ -69,6 +71,7 @@ flutter test --concurrency=1 \
   test/persistent_operation_actor_test.dart \
   test/sync_engine_test.dart \
   test/editor_history_checkpoint_test.dart \
+  test/editor_history_notebook_codec_test.dart \
   test/editor_history_store_test.dart \
   test/editor_controller_v2_test.dart \
   test/editor_sqlite_projector_test.dart \

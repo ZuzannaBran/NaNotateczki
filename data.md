@@ -18,10 +18,25 @@ własność lokalnych operacji, dokument, checksum i aktualną głowę; obca
 operacja lub tombstone blokuje zapis, nowsza głowa unieważnia odczyt
 starej historii. Błąd odczytu nie nadpisuje dokumentu ani outboxu.
 
-Integracja z `EditorController` i codec mediów nadal są otwarte. Nie
-przekazywać BLOB ani niezaufanych ścieżek do checkpointu; docelowy codec
-ma korzystać ze zweryfikowanych referencji assetów. Samo istnienie tabeli
-nie oznacza działającego Undo/Redo po restarcie ani aktywacji v2.
+`EditorHistoryNotebookCodec.encode/decode` zapisuje wersjonowane metadane
+notebooka/boarda, kolejność stron i warstw, ink, plain text oraz Delta
+Quill. Obrazy/PDF i embedy mają wyłącznie scoped asset ID i receipt;
+JSON nie zawiera bajtów, base64 ani ścieżek. Daty są normalizowane do UTC.
+Wspólne bajty mogą mieć kilka ID: kodek wybiera najwcześniejszy trwały
+receipt, więc późniejszy import nie zmienia starej granicy historii.
+
+Encode zamraża metadane i fingerprinty mediów przed pierwszym await.
+Wymaga już utrwalonych, zweryfikowanych bajtów; path-only import trzeba
+materializować przed tą granicą. Decode zamraża wejście, waliduje format
+i zakres, sprawdza receipt w dzienniku tego dokumentu, SHA-256, MIME,
+rozmiar i sygnaturę BLOB. Działa również po usunięciu widocznego właściciela.
+Nie wykonuje HTTP, plikowego I/O ani zapisów SQLite. Nie przywraca sam
+obiektu w bazie: inverse nadal musi być nową operacją z nowym UID.
+
+Integracja stosów `EditorController` nadal jest otwarta. Nie hydratować
+50 kopii wszystkich mediów przy starcie: zachować metadane checkpointów,
+a notebook wybranej operacji odwrotnej dekodować przy użyciu. Sam kodek
+nie oznacza działającego Undo/Redo w UI po restarcie ani aktywacji v2.
 
 ## Lokalny zapis mediów v2 (2026-11-06, opt-in)
 
