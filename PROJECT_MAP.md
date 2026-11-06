@@ -574,6 +574,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   do chwili zakończenia recovery; nie wolno przywrócić nieaktualnego
   stosu po aktualizacji zdalnej. Regresja SQLite:
   `test/editor_controller_v2_test.dart` (history recovery race).
+- Regresja restartu Quill zachowuje mieszane bold/italic, Delta,
+  oraz oba Undo/Redo rzeczywistego kontrolera i plikowego SQLite;
+  `test/editor_controller_v2_test.dart` (rich Quill restart).
 - Kontroler v2 zapisuje granice Undo/Redo jako lokalne checkpointy
   `editor_history` w transakcji projekcji i outboxu; ładuje je po
   ponownym otwarciu dokumentu i dekoduje media dopiero przy inverse.

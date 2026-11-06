@@ -309,6 +309,132 @@ void main() {
     },
   );
 
+  test('rich Quill Undo and Redo survive a SQLite editor restart', () async {
+    final directory = await Directory.systemTemp.createTemp('nn-v2-quill-');
+    final file = File('${directory.path}/notes.sqlite');
+    try {
+      final firstDb = NotesDatabase(NativeDatabase(file));
+      final firstRepo = NotebookRepository(firstDb);
+      final notebook = await firstRepo.createNotebook();
+      final firstProjector = EditorSqliteProjector(firstDb);
+      final firstEngine = SyncEngine(
+        store: OperationStore(firstDb),
+        gateway: _OfflineGateway(),
+        actorId: 'durable-rich-text',
+        checkpointScope: 'durable-rich-text',
+        enableRealtime: false,
+        applyRemote: (operation, _) => firstProjector.apply(operation),
+      );
+      final firstWriter = EditorV2OperationWriter(
+        syncEngine: firstEngine,
+        projector: firstProjector,
+      );
+      final originalDelta = jsonEncode([
+        {
+          'insert': 'Bold',
+          'attributes': {'bold': true},
+        },
+        {'insert': ' and normal\n'},
+      ]);
+      final editedDelta = jsonEncode([
+        {
+          'insert': 'Bold',
+          'attributes': {'bold': true},
+        },
+        {
+          'insert': ' and italic',
+          'attributes': {'italic': true},
+        },
+        {'insert': '!\n'},
+      ]);
+      final initial = TextBlock(
+        id: 'rich-restart-block',
+        text: 'Bold and normal',
+        deltaJson: originalDelta,
+        position: Offset.zero,
+        fontSize: 18,
+        color: const Color(0xFF123456),
+        width: 220,
+      );
+      await firstWriter.writePageChange(
+        documentId: notebook.uid,
+        before: notebook.pages.single,
+        after: notebook.pages.single.copyWith(textBlocks: [initial]),
+      );
+      final before = (await firstRepo.getNotebook(notebook.uid))!;
+      final beforeDelta = before.pages.single.textBlocks.single.deltaJson;
+      final first = EditorController(
+        repository: firstRepo,
+        notebook: before,
+        operationWriter: firstWriter,
+      );
+      await first.historyReady;
+      first.setActiveTextBlock(initial.id, null);
+      first.updateTextBlockContent(
+        first.currentPage.textBlocks.single,
+        plainText: 'Bold and italic!',
+        deltaJson: editedDelta,
+      );
+      first.setActiveTextBlock(null, null);
+      await first.flushPendingSaves();
+      expect(first.canUndo, isTrue);
+      final after = (await firstRepo.getNotebook(notebook.uid))!;
+      final editedPersistedDelta =
+          after.pages.single.textBlocks.single.deltaJson;
+      expect(after.pages.single.textBlocks.single.text, 'Bold and italic!');
+      expect(editedPersistedDelta, isNot(beforeDelta));
+      first.dispose();
+      await firstEngine.stop();
+      await firstDb.close();
+
+      final secondDb = NotesDatabase(NativeDatabase(file));
+      final secondRepo = NotebookRepository(secondDb);
+      final secondProjector = EditorSqliteProjector(secondDb);
+      final secondEngine = SyncEngine(
+        store: OperationStore(secondDb),
+        gateway: _OfflineGateway(),
+        actorId: 'durable-rich-text',
+        checkpointScope: 'durable-rich-text',
+        enableRealtime: false,
+        applyRemote: (operation, _) => secondProjector.apply(operation),
+      );
+      final second = EditorController(
+        repository: secondRepo,
+        notebook: (await secondRepo.getNotebook(notebook.uid))!,
+        operationWriter: EditorV2OperationWriter(
+          syncEngine: secondEngine,
+          projector: secondProjector,
+        ),
+      );
+      await second.historyReady;
+      expect(second.canUndo, isTrue);
+      second.undo();
+      await second.flushPendingSaves();
+      expect(second.currentPage.textBlocks.single.text, 'Bold and normal');
+      expect(second.currentPage.textBlocks.single.deltaJson, beforeDelta);
+      expect(
+        (await secondRepo.getNotebook(notebook.uid))!
+            .pages.single.textBlocks.single.deltaJson,
+        beforeDelta,
+      );
+      expect(second.canRedo, isTrue);
+      second.redo();
+      await second.flushPendingSaves();
+      expect(second.currentPage.textBlocks.single.text, 'Bold and italic!');
+      expect(
+        (await secondRepo.getNotebook(notebook.uid))!
+            .pages.single.textBlocks.single.deltaJson,
+        editedPersistedDelta,
+      );
+      expect(second.canUndo, isTrue);
+      second.dispose();
+      await secondEngine.stop();
+      await secondDb.close();
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
+
   test('opt-in editor uses v2 outbox but never the snapshot writer', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);

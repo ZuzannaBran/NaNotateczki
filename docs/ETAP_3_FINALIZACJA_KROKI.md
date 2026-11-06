@@ -1,5 +1,14 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Trwała historia bogatego tekstu po restarcie — 2026-11-06
+
+Nowa regresja rzeczywistego `EditorController` zapisuje Quill
+z mieszanym bold/normal, zmienia go na bold/italic, zamyka SQLite,
+otwiera tę samą bazę z trwałym aktorem i wykonuje Undo/Redo. Test
+porównuje zarówno model UI, jak i trwałe `deltaJson` w projekcji
+SQLite; nie uznaje samego kodeka historii za wystarczający.
+Weryfikacja testu wymaga aktualnego GitHub Actions.
+
 ## Uszkodzony checkpoint nie dopuszcza zdalnego patcha — 2026-11-06
 
 Po niepowodzeniu odczytu checkpointu (`checksum_sha256` niezgodny)
