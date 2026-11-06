@@ -2,6 +2,15 @@
 
 ## Połączenie checkpointów z kontrolerem (2026-11-06)
 
+Jeżeli kompletny stan notebooka przekracza limit kodowania pojedynczej
+granicy historii, kontroler utrwala sam gest i outbox, resetując Undo/Redo
+do pustego checkpointu o aktualnej głowie. Nie wolno cofać zapisu notatnika
+z powodu wyłącznie limitu pamięci historii, ani zachowywać historii
+odwracającej operacje sprzed nieprzechwyconego gestu. Błędy checksum,
+tożsamości i brakujące media nadal blokują commit.
+
+
+
 Kontroler opt-in v2 odczytuje historię aktora po otwarciu dokumentu,
 ale nie hydratatuje wszystkich historycznych mediów. Każda granica
 gestu, autosave tekstu oraz Undo/Redo zapisuje checkpoint przez

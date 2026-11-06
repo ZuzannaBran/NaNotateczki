@@ -1,5 +1,15 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Ochrona zapisu przed limitem historii — 2026-11-06
+
+W kontrolerze zakończony gest przekraczający budżet kodowania
+checkpointu nie zatrzymuje lokalnego zapisu i outboxu. Zeruje historyczne
+Undo/Redo pod bieżącym head, żeby nie odwracać starszego gestu po
+niezarejestrowanej zmianie. Błędy zakresu, checksumy lub referencji
+mediów pozostają krytyczne. Test regresyjny kontrolera przechodzi
+przez prawdziwą transakcję v2 z wstrzykniętym limitem kodeka.
+Weryfikacja Flutter/CI wymaga wyniku GitHub Actions.
+
 ## Integracja lokalnej historii kontrolera — 2026-11-06
 
 Poprzedni przebieg aplikacji `42213343174` (commit `45eb3d9a`)

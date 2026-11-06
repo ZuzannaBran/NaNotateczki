@@ -137,7 +137,16 @@ class EditorController extends ChangeNotifier {
     required this.notebook,
     this.saveDebounce = defaultSaveDebounce,
     this.operationWriter,
+    EditorHistoryNotebookCodec? historyCodec,
   }) {
+    if (historyCodec != null &&
+        (operationWriter == null ||
+            !identical(
+              historyCodec.projector.database,
+              operationWriter.projector.database,
+            ))) {
+      throw ArgumentError('History and editor must share one SQLite DB.');
+    }
     if (operationWriter != null &&
         !identical(repository.database, operationWriter!.projector.database)) {
       throw ArgumentError('Editor and v2 journal must share one SQLite DB.');
@@ -153,7 +162,8 @@ class EditorController extends ChangeNotifier {
     currentPageIndex = 0;
     if (operationWriter != null) {
       _v2HistoryStore = EditorHistoryStore(operationWriter!.syncEngine.store);
-      _v2HistoryCodec = EditorHistoryNotebookCodec(operationWriter!.projector);
+      _v2HistoryCodec =
+          historyCodec ?? EditorHistoryNotebookCodec(operationWriter!.projector);
       _v2HistoryReady = _restoreV2History();
     }
     AppSaveCoordinator.instance.register(
@@ -4393,7 +4403,9 @@ class EditorController extends ChangeNotifier {
         .then((_) async {
           await historyReady;
           if (_v2HistoryLoadError != null) {
-            throw StateError('Cannot overwrite invalid local history.');
+            _integritySaveBlocked = true;
+            _fullSavePending = true;
+            return;
           }
           if (activeInverse != null) {
             await activeInverse;
@@ -4428,21 +4440,30 @@ class EditorController extends ChangeNotifier {
                       ? operations.last.operationId
                       : textGesture?.lastOperationId;
                   if (recordHistory && operationId != null) {
-                    nextUndo!.add(
-                      _V2HistoryEntry(
-                        textGesture?.before ?? baseline,
-                        target,
-                        operationId,
-                        stored: StoredEditorGesture(
-                          before: await _v2HistoryCodec!.encode(
-                            textGesture?.before ?? baseline,
+                    try {
+                      final before = textGesture?.before ?? baseline;
+                      final storedBefore = await _v2HistoryCodec!.encode(before);
+                      final storedAfter = await _v2HistoryCodec!.encode(target);
+                      nextUndo!.add(
+                        _V2HistoryEntry(
+                          before,
+                          target,
+                          operationId,
+                          stored: StoredEditorGesture(
+                            before: storedBefore,
+                            after: storedAfter,
+                            operationId: operationId,
                           ),
-                          after: await _v2HistoryCodec!.encode(target),
-                          operationId: operationId,
                         ),
-                      ),
-                    );
-                    nextRedo!.clear();
+                      );
+                      nextRedo!.clear();
+                    } on EditorHistoryBudgetExceeded {
+                      // A huge notebook may exceed the inverse metadata cap.
+                      // Do not roll back its real content or retain stale
+                      // history that could undo an unrecorded newer change.
+                      nextUndo!.clear();
+                      nextRedo!.clear();
+                    }
                   }
                   checkpoint = await _persistV2History(
                     operations,

@@ -562,6 +562,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 ### Produkcyjne połączenie z edytorem — preview v2 (2026-11-05)
 
+- Przekroczenie limitu rozmiaru pojedynczej historii nie cofa gestu:
+  kontroler zapisuje pusty checkpoint z nową głową i zachowuje outbox.
+  Błąd integralności nie jest traktowany jak limit. Test regresyjny:
+  `test/editor_controller_v2_test.dart` (oversized history).
 - Kontroler v2 zapisuje granice Undo/Redo jako lokalne checkpointy
   `editor_history` w transakcji projekcji i outboxu; ładuje je po
   ponownym otwarciu dokumentu i dekoduje media dopiero przy inverse.
