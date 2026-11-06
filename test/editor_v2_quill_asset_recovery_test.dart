@@ -186,7 +186,10 @@ void main() {
         reopened.undo();
         await reopened.flushPendingSaves();
         final undone = (await session.repository.getNotebook(notebook.uid))!;
-        expect(undone.pages.single.textBlocks.single.deltaJson, original.deltaJson);
+        expect(
+          undone.pages.single.textBlocks.single.deltaJson,
+          original.deltaJson,
+        );
         expect(reopened.canRedo, isTrue);
         reopened.redo();
         await reopened.flushPendingSaves();
