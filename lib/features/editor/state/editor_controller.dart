@@ -62,10 +62,10 @@ class _V2HistoryEntry {
   });
 
   _V2HistoryEntry.recovered(StoredEditorGesture gesture)
-      : before = null,
-        after = null,
-        operationId = gesture.operationId,
-        stored = gesture;
+    : before = null,
+      after = null,
+      operationId = gesture.operationId,
+      stored = gesture;
 
   final Notebook? before;
   final Notebook? after;
@@ -2153,15 +2153,11 @@ class EditorController extends ChangeNotifier {
           final moved = source.removeLast();
           destination.add(
             changed
-                ? _remapV2HistoryEntry(
-                    moved,
-                    (
-                      notebook: restored,
-                      pages: const <String, String>{},
-                      objects: const <String, String>{},
-                    ),
-                    operationId: operations.last.operationId,
-                  )
+                ? _remapV2HistoryEntry(moved, (
+                    notebook: restored,
+                    pages: const <String, String>{},
+                    objects: const <String, String>{},
+                  ), operationId: operations.last.operationId)
                 : moved,
           );
           checkpoint = await _persistV2History(
@@ -2252,11 +2248,14 @@ class EditorController extends ChangeNotifier {
     final database = operationWriter!.projector.database;
     final head = operations.isNotEmpty
         ? operations.last.operationId
-        : (await database.customSelect(
-            'SELECT operation_id FROM operations WHERE document_id = ? '
-            'ORDER BY rowid DESC LIMIT 1',
-            variables: [Variable<String>(notebook.uid)],
-          ).getSingleOrNull())?.read<String>('operation_id');
+        : (await database
+                  .customSelect(
+                    'SELECT operation_id FROM operations WHERE document_id = ? '
+                    'ORDER BY rowid DESC LIMIT 1',
+                    variables: [Variable<String>(notebook.uid)],
+                  )
+                  .getSingleOrNull())
+              ?.read<String>('operation_id');
     if (head == null) {
       return null;
     }
@@ -2304,7 +2303,8 @@ class EditorController extends ChangeNotifier {
       Notebook notebook,
       Map<String, String> pages,
       Map<String, String> objects,
-    }) restoration, {
+    })
+    restoration, {
     String? operationId,
   }) {
     final codec = _v2HistoryCodec!;

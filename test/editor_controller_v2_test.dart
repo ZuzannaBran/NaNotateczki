@@ -39,98 +39,98 @@ void main() {
   test(
     'controller recovers Undo/Redo from its durable actor checkpoint',
     () async {
-    final directory = await Directory.systemTemp.createTemp('nn-v2-ui-undo-');
-    final file = File('${directory.path}/notes.sqlite');
-    try {
-      final firstDb = NotesDatabase(NativeDatabase(file));
-      final firstRepo = NotebookRepository(firstDb);
-      final notebook = await firstRepo.createNotebook();
-      final firstProjector = EditorSqliteProjector(firstDb);
-      final firstEngine = SyncEngine(
-        store: OperationStore(firstDb),
-        gateway: _OfflineGateway(),
-        actorId: 'persisted-editor-actor',
-        checkpointScope: 'persisted-editor-actor',
-        enableRealtime: false,
-        applyRemote: (operation, _) => firstProjector.apply(operation),
-      );
-      final first = EditorController(
-        repository: firstRepo,
-        notebook: notebook,
-        operationWriter: EditorV2OperationWriter(
-          syncEngine: firstEngine,
-          projector: firstProjector,
-        ),
-      );
-      await first.historyReady;
-      await firstDb.customStatement(
-        "CREATE TRIGGER reject_editor_history BEFORE INSERT ON editor_history "
-        "BEGIN SELECT RAISE(ABORT, 'injected history failure'); END",
-      );
-      first.addInkStroke(const [InkPoint(dx: 2, dy: 3, pressure: 0.7)]);
-      await expectLater(
-        first.flushPendingSaves(),
-        throwsA(isA<DataIntegrityProtectionException>()),
-      );
-      expect(await firstEngine.store.pending(), isEmpty);
-      expect(first.currentPage.inkStrokes, hasLength(1));
-      expect(first.canUndo, isFalse);
-      await firstDb.customStatement('DROP TRIGGER reject_editor_history');
-      await first.flushPendingSaves();
-      final originalId = first.currentPage.inkStrokes.single.id;
-      expect(first.canUndo, isTrue);
-      final firstHistory = EditorHistoryStore(firstEngine.store);
-      final checkpoint = await firstHistory.load(
-        documentId: notebook.uid,
-        ownerId: firstEngine.actorId,
-      );
-      expect(checkpoint!.undo, hasLength(1));
-      first.dispose();
-      await firstEngine.stop();
-      await firstDb.close();
-
-      final secondDb = NotesDatabase(NativeDatabase(file));
-      final secondRepo = NotebookRepository(secondDb);
-      final secondProjector = EditorSqliteProjector(secondDb);
-      final secondEngine = SyncEngine(
-        store: OperationStore(secondDb),
-        gateway: _OfflineGateway(),
-        actorId: 'persisted-editor-actor',
-        checkpointScope: 'persisted-editor-actor',
-        enableRealtime: false,
-        applyRemote: (operation, _) => secondProjector.apply(operation),
-      );
-      final second = EditorController(
-        repository: secondRepo,
-        notebook: (await secondRepo.getNotebook(notebook.uid))!,
-        operationWriter: EditorV2OperationWriter(
-          syncEngine: secondEngine,
-          projector: secondProjector,
-        ),
-      );
-      await second.historyReady;
-      expect(second.canUndo, isTrue);
-      second.undo();
-      await second.flushPendingSaves();
-      expect(second.currentPage.inkStrokes, isEmpty);
-      expect(second.canRedo, isTrue);
-      second.redo();
-      await second.flushPendingSaves();
-      expect(second.currentPage.inkStrokes, hasLength(1));
-      expect(second.currentPage.inkStrokes.single.id, isNot(originalId));
-      expect(
-        (await EditorHistoryStore(secondEngine.store).load(
+      final directory = await Directory.systemTemp.createTemp('nn-v2-ui-undo-');
+      final file = File('${directory.path}/notes.sqlite');
+      try {
+        final firstDb = NotesDatabase(NativeDatabase(file));
+        final firstRepo = NotebookRepository(firstDb);
+        final notebook = await firstRepo.createNotebook();
+        final firstProjector = EditorSqliteProjector(firstDb);
+        final firstEngine = SyncEngine(
+          store: OperationStore(firstDb),
+          gateway: _OfflineGateway(),
+          actorId: 'persisted-editor-actor',
+          checkpointScope: 'persisted-editor-actor',
+          enableRealtime: false,
+          applyRemote: (operation, _) => firstProjector.apply(operation),
+        );
+        final first = EditorController(
+          repository: firstRepo,
+          notebook: notebook,
+          operationWriter: EditorV2OperationWriter(
+            syncEngine: firstEngine,
+            projector: firstProjector,
+          ),
+        );
+        await first.historyReady;
+        await firstDb.customStatement(
+          "CREATE TRIGGER reject_editor_history BEFORE INSERT ON editor_history "
+          "BEGIN SELECT RAISE(ABORT, 'injected history failure'); END",
+        );
+        first.addInkStroke(const [InkPoint(dx: 2, dy: 3, pressure: 0.7)]);
+        await expectLater(
+          first.flushPendingSaves(),
+          throwsA(isA<DataIntegrityProtectionException>()),
+        );
+        expect(await firstEngine.store.pending(), isEmpty);
+        expect(first.currentPage.inkStrokes, hasLength(1));
+        expect(first.canUndo, isFalse);
+        await firstDb.customStatement('DROP TRIGGER reject_editor_history');
+        await first.flushPendingSaves();
+        final originalId = first.currentPage.inkStrokes.single.id;
+        expect(first.canUndo, isTrue);
+        final firstHistory = EditorHistoryStore(firstEngine.store);
+        final checkpoint = await firstHistory.load(
           documentId: notebook.uid,
-          ownerId: secondEngine.actorId,
-        ))!.undo,
-        hasLength(1),
-      );
-      second.dispose();
-      await secondEngine.stop();
-      await secondDb.close();
-    } finally {
-      await directory.delete(recursive: true);
-    }
+          ownerId: firstEngine.actorId,
+        );
+        expect(checkpoint!.undo, hasLength(1));
+        first.dispose();
+        await firstEngine.stop();
+        await firstDb.close();
+
+        final secondDb = NotesDatabase(NativeDatabase(file));
+        final secondRepo = NotebookRepository(secondDb);
+        final secondProjector = EditorSqliteProjector(secondDb);
+        final secondEngine = SyncEngine(
+          store: OperationStore(secondDb),
+          gateway: _OfflineGateway(),
+          actorId: 'persisted-editor-actor',
+          checkpointScope: 'persisted-editor-actor',
+          enableRealtime: false,
+          applyRemote: (operation, _) => secondProjector.apply(operation),
+        );
+        final second = EditorController(
+          repository: secondRepo,
+          notebook: (await secondRepo.getNotebook(notebook.uid))!,
+          operationWriter: EditorV2OperationWriter(
+            syncEngine: secondEngine,
+            projector: secondProjector,
+          ),
+        );
+        await second.historyReady;
+        expect(second.canUndo, isTrue);
+        second.undo();
+        await second.flushPendingSaves();
+        expect(second.currentPage.inkStrokes, isEmpty);
+        expect(second.canRedo, isTrue);
+        second.redo();
+        await second.flushPendingSaves();
+        expect(second.currentPage.inkStrokes, hasLength(1));
+        expect(second.currentPage.inkStrokes.single.id, isNot(originalId));
+        expect(
+          (await EditorHistoryStore(secondEngine.store).load(
+            documentId: notebook.uid,
+            ownerId: secondEngine.actorId,
+          ))!.undo,
+          hasLength(1),
+        );
+        second.dispose();
+        await secondEngine.stop();
+        await secondDb.close();
+      } finally {
+        await directory.delete(recursive: true);
+      }
     },
   );
 
