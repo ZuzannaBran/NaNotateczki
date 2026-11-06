@@ -983,6 +983,26 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                               focusNode: _focusNode,
                               scrollController: _scrollController,
                               config: quill.QuillEditorConfig(
+                                customStyleBuilder: darkMode && isActive
+                                    ? (attribute) {
+                                        if (attribute.key != 'color' ||
+                                            attribute.value is! String) {
+                                          return const TextStyle();
+                                        }
+                                        final color = _parseQuillColor(
+                                          attribute.value as String,
+                                        );
+                                        return color == null
+                                            ? const TextStyle()
+                                            : TextStyle(
+                                                color:
+                                                    AppColors.displayInkColor(
+                                                      color,
+                                                      darkMode: true,
+                                                    ),
+                                              );
+                                      }
+                                    : null,
                                 embedBuilders:
                                     controller.operationWriter == null
                                     ? null

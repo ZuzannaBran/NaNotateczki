@@ -1,5 +1,33 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Bieżący punkt przekazania — 2026-11-06
+
+Instrukcje repozytorium znajdują się w `CZAT.md` i `AGENTS.md`.
+Najpierw odczytać Actions aktualnego `dev`; poprzedni przebieg
+`42144008139` zatrzymał analizę przed uruchomieniem nowych testów.
+`2dbaee9` usuwa dwa zbędne `!` i ponawia tylko analizę/testy natywne.
+W tej samej gałęzi są przyrosty inverse, trwałych embedów, stabilnych
+ID historii, edycji rich Quill i typing → delete; nie uznawać ich
+regresji za zaliczone bez nowego wyniku CI.
+
+Backend `6b0da04` dodaje sześć kontraktów inverse mediów i tombstones.
+Lokalnie po tym przyroście: 278 passed, 8 skipped (PostgreSQL).
+Nie zastępuje to E2E Flutter ↔ HTTP ↔ PostgreSQL.
+Po zielonym CI kontynuować brakujące lokalne importy Quill i pełne
+pokrycie gestów; historia po restarcie nadal nie jest odtwarzana.
+Rebase dwóch klientów, synchronizacja całego konta i aktywacja flagi
+pozostają kolejnym etapem. Produkcja nadal korzysta z v1.
+
+## Kolory aktywnego Quill bez mutowania Delta — 2026-11-06
+
+Nowa aktywna ścieżka Quill v2 korzysta z `customStyleBuilder` do
+przeliczenia koloru na ciemny motyw podczas renderowania. Kopia display
+nieaktywnego tekstu nie jest przeliczana ponownie. Wspólna regresja
+widgetowa sprawdza rzeczywiste TextSpan w obu motywach, a następnie
+niezmieniony atrybut koloru w SQLite i pełne odtworzenie Delta przez Undo.
+Formatowanie sprawdzono lokalnie; wynik testów Flutter pozostaje do
+odczytu z Actions w następnym uruchomieniu.
+
 ## Ponowna analiza po testach historii — 2026-11-06
 
 Przebieg `42144008139` dla `c6d8db3` przeszedł formatowanie,

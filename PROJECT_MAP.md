@@ -1925,7 +1925,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (3136 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (3156 linii)
 
 Opt-in v2: aktywny tekst ze złożonym Delta lub embedami pozostaje
 w istniejącym QuillEditor, aby edycja nie spłaszczała treści.
@@ -1934,6 +1934,10 @@ Stabilne klucze zachowują QuillController; sesja nie zmienia edytora
 po uproszczeniu formatowania. Prosty tekst nadal używa TextHudBlock.
 Regresja `test/page_overlay_v2_quill_edit_test.dart` obejmuje rzeczywisty
 zapis SQLite i Undo w obu motywach, dla rich text, obrazu i PDF.
+Aktywny Quill w ciemnym motywie mapuje atrybut `color` przez
+`customStyleBuilder`, bez edycji oryginalnej Delta; podgląd zachowuje
+osobną kopię display, więc nie dochodzi do podwójnego odwrócenia.
+Test sprawdza kolor wyrenderowanego TextSpan oraz zapisany kolor źródłowy.
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -1974,9 +1978,9 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
   `_TextBlockWidget` / `_TextBlockWidgetState`.
   Akcje lassa korzystają z kompaktowego paska w kolorze toolbaru,
   z neutralnymi ikonami konturowymi i zachowaną obsługą akcji.
-- 1684: `_ImageBlockWidget`; 1709: `_ImageBlockWidgetState`;
-  2843: `_LassoSelectionWidget`; 2964: `LassoSelectionActionBar`;
-  3023: `_LassoActionButton`; 3082: `VerifiedQuillEmbedBuilder`.
+- 1704: `_ImageBlockWidget`; 1729: `_ImageBlockWidgetState`;
+  2863: `_LassoSelectionWidget`; 2984: `LassoSelectionActionBar`;
+  3043: `_LassoActionButton`; 3102: `VerifiedQuillEmbedBuilder`.
 
 ## 9. Board
 

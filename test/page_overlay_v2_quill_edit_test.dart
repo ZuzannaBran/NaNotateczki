@@ -8,6 +8,7 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:program/core/input/app_preferences_controller.dart';
+import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/editor_sqlite_projector.dart';
@@ -36,6 +37,23 @@ class _OfflineGateway implements OperationGateway {
   @override
   Future<OperationFeedPage> readAfter(int cursor) async =>
       throw StateError('Widget regression stays offline.');
+}
+
+Color? _colorOfText(InlineSpan span, String text, [Color? inherited]) {
+  if (span is! TextSpan) {
+    return null;
+  }
+  final color = span.style?.color ?? inherited;
+  if (span.text?.contains(text) == true) {
+    return color;
+  }
+  for (final child in span.children ?? const <InlineSpan>[]) {
+    final found = _colorOfText(child, text, color);
+    if (found != null) {
+      return found;
+    }
+  }
+  return null;
 }
 
 void main() {
@@ -89,7 +107,7 @@ void main() {
           deltaJson: jsonEncode([
             {
               'insert': 'Bold',
-              'attributes': {'bold': true},
+              'attributes': {'bold': true, 'color': '#123456'},
             },
             if (kind != 'rich')
               {
@@ -158,6 +176,18 @@ void main() {
         expect(find.byType(quill.QuillEditor), findsOneWidget);
         final active = editor.activeTextController!;
         expect(active.readOnly, isFalse);
+        final renderedColors = tester
+            .widgetList<RichText>(find.byType(RichText))
+            .map((widget) => _colorOfText(widget.text, 'Bold'))
+            .whereType<Color>()
+            .toList();
+        expect(renderedColors, isNotEmpty);
+        expect(
+          renderedColors,
+          everyElement(
+            AppColors.displayInkColor(const Color(0xFF123456), darkMode: dark),
+          ),
+        );
         active.replaceText(4, 0, '!', const TextSelection.collapsed(offset: 5));
         await tester.pump();
         await tester.runAsync(editor.flushPendingSaves);
@@ -168,6 +198,7 @@ void main() {
         expect(jsonDecode(savedDelta), active.document.toDelta().toJson());
         expect(saved.pages.single.textBlocks.single.text, contains('Bold!'));
         expect(jsonDecode(savedDelta).first['attributes']['bold'], isTrue);
+        expect(jsonDecode(savedDelta).first['attributes']['color'], '#123456');
         if (kind != 'rich') {
           expect(savedDelta, contains('asset:${asset.assetId}'));
           expect(
