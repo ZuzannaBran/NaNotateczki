@@ -10,6 +10,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart' as quill_delta;
+import 'package:flutter_quill_delta_from_html/flutter_quill_delta_from_html.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfx/pdfx.dart';
@@ -20,6 +21,7 @@ import '../../../core/input/ink_activity_tracker.dart';
 import '../../../core/storage/app_data_directory.dart';
 import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
+import '../../../data/sync/share_text_edit_adapter.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/drawing_tool.dart';
 import '../../notebook/domain/image_block.dart';
@@ -35,6 +37,7 @@ import 'editor_v2_operation_writer.dart';
 import 'input_mode.dart';
 import 'ink_color_presets.dart';
 import 'page_background.dart';
+import 'quill_paste_plan.dart';
 import 'quill_style_patch.dart';
 
 class _EditorHistoryEntry {
@@ -2348,6 +2351,127 @@ class EditorController extends ChangeNotifier {
       embedType: embedType,
     );
     return 'asset:${asset.assetId}';
+  }
+
+  /// Owns asynchronous rich paste so a rejected or stale paste cannot delete
+  /// the current selection through Quill's default replacement callback.
+  Future<bool> pasteQuillHtml({
+    required String blockId,
+    required Future<String?> Function() readHtml,
+    Future<String?> Function()? readPlainText,
+    bool Function()? canPaste,
+  }) async {
+    final writer = operationWriter;
+    if (writer == null) {
+      return false;
+    }
+    final target = activeTextController;
+    final pageIndex = _pageIndexContainingTextBlock(blockId);
+    if (_isDisposed ||
+        _v2DocumentDeleted ||
+        target == null ||
+        target.readOnly ||
+        activeTextBlockId != blockId ||
+        pageIndex == null) {
+      return true;
+    }
+    final pageId = pages[pageIndex].id;
+    final selection = target.selection;
+    final beforeDelta = jsonEncode(target.document.toDelta().toJson());
+    final beforeModel = findTextBlockById(blockId)!.deltaJson;
+    if (!selection.isValid || selection.end >= target.document.length) {
+      return true;
+    }
+    final copiedText = target.pastePlainText;
+    final copiedDelta =
+        jsonDecode(jsonEncode(target.pasteDelta.toJson())) as List;
+    bool current() {
+      if (_isDisposed ||
+          _v2DocumentDeleted ||
+          canPaste?.call() == false ||
+          !identical(activeTextController, target) ||
+          activeTextBlockId != blockId ||
+          target.readOnly ||
+          target.selection != selection) {
+        return false;
+      }
+      final index = _pageIndexContainingTextBlock(blockId);
+      return index != null &&
+          pages[index].id == pageId &&
+          findTextBlockById(blockId)?.deltaJson == beforeModel &&
+          jsonEncode(target.document.toDelta().toJson()) == beforeDelta;
+    }
+
+    if (!current()) {
+      return true;
+    }
+    final plain = readPlainText == null ? null : await readPlainText();
+    if (!current()) {
+      return true;
+    }
+    final List<dynamic> delta;
+    if (plain != null &&
+        copiedText.isNotEmpty &&
+        plain == copiedText &&
+        copiedDelta.isNotEmpty) {
+      delta = copiedDelta;
+    } else {
+      final html = await readHtml();
+      if (!current()) {
+        return true;
+      }
+      if (html == null || html.trim().isEmpty) {
+        return false;
+      }
+      if (html.length > QuillPastePlan.maximumBytes * 3 + 65536) {
+        throw const FormatException('Rich clipboard content is too large.');
+      }
+      delta = HtmlToDelta().convert(html).toJson();
+    }
+    final plan = QuillPastePlan.fromDelta(delta);
+    if (plan.characterCount == 0) {
+      return true;
+    }
+    final beforeText = target.document.toPlainText();
+    final selected = beforeText.substring(selection.start, selection.end);
+    if (beforeText.runes.length -
+            selected.runes.length +
+            plan.characterCount +
+            2 * plan.embedCount >
+        ShareTextEditAdapter.maxCodePoints) {
+      throw const FormatException(
+        'Rich paste exceeds the text operation budget.',
+      );
+    }
+    var totalBytes = plan.importedByteLength;
+    for (final entry in plan.existingAssets.entries) {
+      final receipt = await writer.verifyQuillAssetReference(
+        documentId: notebook.uid,
+        assetId: entry.key,
+        embedType: entry.value,
+        byteLimit: QuillPastePlan.maximumBytes - totalBytes,
+      );
+      if (!current()) {
+        return true;
+      }
+      totalBytes += receipt['sizeBytes'] as int;
+    }
+    if (!current()) {
+      return true;
+    }
+    final ready = quill_delta.Delta.fromJson(
+      plan.materialize(
+        (bytes, type) =>
+            prepareInlineAsset(blockId: blockId, bytes: bytes, embedType: type),
+      ),
+    );
+    target.replaceText(
+      selection.start,
+      selection.end - selection.start,
+      ready,
+      TextSelection.collapsed(offset: selection.start + ready.length),
+    );
+    return true;
   }
 
   void updateTextBlockContent(

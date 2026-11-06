@@ -1,0 +1,417 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:flutter_test/flutter_test.dart';
+import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/editor_sqlite_projector.dart';
+import 'package:program/data/sync/operation_gateway.dart';
+import 'package:program/data/sync/operation_protocol.dart';
+import 'package:program/data/sync/operation_store.dart';
+import 'package:program/data/sync/sync_engine.dart';
+import 'package:program/data/sync/verified_editor_asset_buffer.dart';
+import 'package:program/features/editor/state/editor_controller.dart';
+import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
+import 'package:program/features/editor/state/quill_paste_plan.dart';
+import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/text_block.dart';
+
+import 'support/native_test_documents.dart';
+
+final _png = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10, 1]);
+String get _imageUri => 'data:image/png;base64,${base64Encode(_png)}';
+
+class _OfflineGateway implements OperationGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async => throw StateError('Rich paste must not access transport.');
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async =>
+      throw StateError('Rich paste must not access transport.');
+}
+
+class _Fixture {
+  final database = NotesDatabase(NativeDatabase.memory());
+  final buffer = VerifiedEditorAssetBuffer();
+  late final NotebookRepository repository;
+  late final OperationStore store;
+  late final EditorSqliteProjector projector;
+  late final SyncEngine engine;
+  late final EditorV2OperationWriter writer;
+  late final EditorController editor;
+  late final quill.QuillController text;
+  late final StreamSubscription<quill.DocChange> subscription;
+  bool disposed = false;
+  static const blockId = 'rich-paste-target';
+
+  Future<void> initialize() async {
+    repository = NotebookRepository(database);
+    store = OperationStore(database);
+    projector = EditorSqliteProjector(database, verifiedAssetBuffer: buffer);
+    engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'rich-paste',
+      checkpointScope: 'rich-paste',
+      enableRealtime: false,
+      applyRemote: (operation, _) => projector.apply(operation),
+    );
+    writer = EditorV2OperationWriter(syncEngine: engine, projector: projector);
+    final notebook = await repository.createNotebook();
+    final block = TextBlock(
+      id: blockId,
+      text: 'KeepOriginal',
+      deltaJson: jsonEncode([
+        {
+          'insert': 'Keep',
+          'attributes': {'bold': true},
+        },
+        {
+          'insert': 'Original',
+          'attributes': {'italic': true},
+        },
+        {'insert': '\n'},
+      ]),
+      position: Offset.zero,
+      fontSize: 18,
+      color: const Color(0xFF123456),
+      width: 320,
+    );
+    await writer.writePageChange(
+      documentId: notebook.uid,
+      before: notebook.pages.single,
+      after: notebook.pages.single.copyWith(textBlocks: [block]),
+    );
+    final persisted = (await repository.getNotebook(notebook.uid))!;
+    editor = EditorController(
+      repository: repository,
+      notebook: persisted,
+      operationWriter: writer,
+      saveDebounce: const Duration(days: 1),
+    );
+    text = quill.QuillController(
+      document: quill.Document.fromJson(
+        jsonDecode(persisted.pages.single.textBlocks.single.deltaJson!) as List,
+      ),
+      selection: const TextSelection(baseOffset: 0, extentOffset: 4),
+    );
+    editor.setActiveTextBlock(blockId, text);
+    subscription = text.document.changes.listen((_) {
+      if (disposed) {
+        return;
+      }
+      editor.updateTextBlockContent(
+        editor.currentPage.textBlocks.single,
+        plainText: text.document.toPlainText(),
+        deltaJson: jsonEncode(text.document.toDelta().toJson()),
+      );
+    });
+  }
+
+  Future<void> flush() async {
+    await Future<void>.delayed(Duration.zero);
+    await editor.flushPendingSaves();
+  }
+
+  Future<void> close() async {
+    if (!disposed) {
+      await flush();
+      editor.dispose();
+      disposed = true;
+    }
+    await subscription.cancel();
+    text.dispose();
+    await engine.stop();
+    await database.close();
+  }
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  useIsolatedNativeTestDocuments();
+  useInMemoryTestTextStorage();
+  late _Fixture fixture;
+  setUp(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          SystemChannels.platform,
+          (call) async => null,
+        );
+    fixture = _Fixture();
+    await fixture.initialize();
+  });
+  tearDown(() async {
+    await fixture.close();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null);
+  });
+
+  test(
+    'HTML paste atomically preserves formatting, media and Undo/Redo',
+    () async {
+      final original = fixture.editor.currentPage.textBlocks.single.deltaJson;
+      final pendingBefore = (await fixture.store.pending()).length;
+      expect(
+        await fixture.editor.pasteQuillHtml(
+          blockId: _Fixture.blockId,
+          readHtml: () async =>
+              '<p><strong>Pasted</strong> <em>rich</em>'
+              '<img src="$_imageUri"><img src="$_imageUri"></p>',
+        ),
+        isTrue,
+      );
+      await fixture.flush();
+      final block = fixture.editor.currentPage.textBlocks.single;
+      expect(block.text, contains('Pasted'));
+      expect(block.text, contains('Original'));
+      expect(block.text, isNot(contains('Keep')));
+      final delta = jsonDecode(block.deltaJson!) as List;
+      final embeds = delta.where((dynamic op) => op['insert'] is Map).toList();
+      expect(embeds, hasLength(2));
+      expect(embeds[0]['insert'], embeds[1]['insert']);
+      expect(
+        delta.any(
+          (dynamic op) => (op['attributes'] as Map? ?? {})['bold'] == true,
+        ),
+        isTrue,
+      );
+      expect(
+        delta.any(
+          (dynamic op) => (op['attributes'] as Map? ?? {})['italic'] == true,
+        ),
+        isTrue,
+      );
+      expect(block.deltaJson, isNot(contains('data:')));
+      final added = (await fixture.store.pending())
+          .skip(pendingBefore)
+          .toList();
+      final attaches = added
+          .where((op) => op.kind == OperationKind.assetAttach)
+          .toList();
+      expect(attaches, hasLength(1));
+      final receipt = attaches.single.payload;
+      expect(
+        await fixture.projector.verifiedTextAssetBytes(
+          documentId: fixture.editor.notebook.uid,
+          pageId: fixture.editor.currentPage.id,
+          objectId: _Fixture.blockId,
+          assetId: receipt['assetId'] as String,
+        ),
+        _png,
+      );
+      fixture.buffer.clear();
+      fixture.editor.undo();
+      await fixture.flush();
+      expect(fixture.editor.currentPage.textBlocks.single.deltaJson, original);
+      fixture.editor.redo();
+      await fixture.flush();
+      expect(
+        fixture.editor.currentPage.textBlocks.single.deltaJson,
+        block.deltaJson,
+      );
+    },
+  );
+
+  for (final html in [
+    '<p><img src="https://example.test/image.png"></p>',
+    '<p><img src="asset:foreign-document-asset"></p>',
+    '<p><img src="$_imageUri"><img src="file:///tmp/foreign.png"></p>',
+    '<p><img src="data:image/png;base64,JVBERi0x"></p>',
+  ]) {
+    test(
+      'rejected rich paste preserves selection, content and outbox: $html',
+      () async {
+        final original = fixture.text.document.toDelta().toJson();
+        final selection = fixture.text.selection;
+        final pendingBefore = (await fixture.store.pending())
+            .map((op) => op.operationId)
+            .toList();
+        await expectLater(
+          fixture.editor.pasteQuillHtml(
+            blockId: _Fixture.blockId,
+            readHtml: () async => html,
+          ),
+          throwsFormatException,
+        );
+        expect(fixture.text.document.toDelta().toJson(), original);
+        expect(fixture.text.selection, selection);
+        expect(
+          (await fixture.store.pending()).map((op) => op.operationId),
+          pendingBefore,
+        );
+        expect(
+          await fixture.database
+              .customSelect('SELECT * FROM operation_asset_bytes')
+              .get(),
+          isEmpty,
+        );
+      },
+    );
+  }
+
+  for (final reason in ['selection', 'typing', 'block', 'widget', 'dispose']) {
+    test(
+      'async paste cancels after $reason changes without overwriting input',
+      () async {
+        final html = Completer<String?>();
+        final original = fixture.text.document.toDelta().toJson();
+        var mounted = true;
+        final pending = fixture.editor.pasteQuillHtml(
+          blockId: _Fixture.blockId,
+          readHtml: () => html.future,
+          canPaste: () => mounted,
+        );
+        switch (reason) {
+          case 'selection':
+            fixture.text.updateSelection(
+              const TextSelection.collapsed(offset: 2),
+              quill.ChangeSource.local,
+            );
+          case 'typing':
+            fixture.text.replaceText(
+              0,
+              0,
+              'X',
+              const TextSelection.collapsed(offset: 1),
+            );
+          case 'block':
+            fixture.editor.clearActiveTextBlock();
+          case 'widget':
+            mounted = false;
+          case 'dispose':
+            await fixture.flush();
+            fixture.editor.dispose();
+            fixture.disposed = true;
+        }
+        html.complete('<p><img src="$_imageUri">Delayed</p>');
+        expect(await pending, isTrue);
+        if (reason == 'typing') {
+          await fixture.flush();
+          expect(
+            fixture.editor.currentPage.textBlocks.single.text,
+            'XKeepOriginal',
+          );
+        } else {
+          expect(fixture.text.document.toDelta().toJson(), original);
+        }
+        expect(
+          (await fixture.store.pending()).any(
+            (op) => op.kind == OperationKind.assetAttach,
+          ),
+          isFalse,
+        );
+      },
+    );
+  }
+
+  test(
+    'internal copy reuses a new staged asset before its first autosave',
+    () async {
+      await fixture.editor.pasteQuillHtml(
+        blockId: _Fixture.blockId,
+        readHtml: () async => '<p><img src="$_imageUri"></p>',
+      );
+      await Future<void>.delayed(Duration.zero);
+      var offset = 0;
+      for (final operation in fixture.text.document.toDelta().toList()) {
+        if (operation.data is Map) {
+          break;
+        }
+        offset += (operation.data as String).length;
+      }
+      fixture.text.updateSelection(
+        TextSelection(baseOffset: offset, extentOffset: offset + 1),
+        quill.ChangeSource.local,
+      );
+      // ignore: experimental_member_use
+      expect(fixture.text.clipboardSelection(true), isTrue);
+      fixture.text.updateSelection(
+        TextSelection.collapsed(offset: fixture.text.document.length - 1),
+        quill.ChangeSource.local,
+      );
+      expect(
+        (await fixture.store.pending()).any(
+          (op) => op.kind == OperationKind.assetAttach,
+        ),
+        isFalse,
+      );
+      await fixture.editor.pasteQuillHtml(
+        blockId: _Fixture.blockId,
+        readPlainText: () async => fixture.text.pastePlainText,
+        readHtml: () async =>
+            throw StateError('Internal copy must preserve Delta'),
+      );
+      await fixture.flush();
+      final delta =
+          jsonDecode(fixture.editor.currentPage.textBlocks.single.deltaJson!)
+              as List;
+      final embeds = delta.where((dynamic op) => op['insert'] is Map).toList();
+      expect(embeds, hasLength(2));
+      expect(embeds.first['insert'], embeds.last['insert']);
+      expect(
+        (await fixture.store.pending()).where(
+          (op) => op.kind == OperationKind.assetAttach,
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'empty HTML lets ordinary clipboard handling continue without deletion',
+    () async {
+      final original = fixture.text.document.toDelta().toJson();
+      expect(
+        await fixture.editor.pasteQuillHtml(
+          blockId: _Fixture.blockId,
+          readHtml: () async => null,
+        ),
+        isFalse,
+      );
+      expect(fixture.text.document.toDelta().toJson(), original);
+    },
+  );
+
+  test(
+    'copied assets require matching scope, type and remaining budget',
+    () async {
+      await fixture.editor.pasteQuillHtml(
+        blockId: _Fixture.blockId,
+        readHtml: () async => '<p><img src="$_imageUri"></p>',
+      );
+      await fixture.flush();
+      fixture.buffer.clear();
+      final attach = (await fixture.store.pending()).singleWhere(
+        (op) => op.kind == OperationKind.assetAttach,
+      );
+      final assetId = attach.payload['assetId'] as String;
+      Future<Map<String, dynamic>> verify({
+        String? documentId,
+        String type = 'image',
+        int limit = QuillPastePlan.maximumBytes,
+      }) => fixture.writer.verifyQuillAssetReference(
+        documentId: documentId ?? fixture.editor.notebook.uid,
+        assetId: assetId,
+        embedType: type,
+        byteLimit: limit,
+      );
+      expect(await verify(), attach.payload);
+      await expectLater(
+        verify(documentId: 'another-document'),
+        throwsFormatException,
+      );
+      await expectLater(verify(type: 'pdf'), throwsFormatException);
+      await expectLater(verify(limit: _png.length - 1), throwsFormatException);
+      await fixture.database.customStatement(
+        'UPDATE operation_asset_bytes SET bytes = ?',
+        [Uint8List.fromList(List.filled(_png.length, 0))],
+      );
+      await expectLater(verify(), throwsFormatException);
+    },
+  );
+}

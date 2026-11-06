@@ -1436,6 +1436,10 @@ tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 sprawdza sygnaturę, typ embedu i limit 64 MiB, kopiuje bajty do bufora
 i rejestruje potwierdzenie per dokument/asset ID. Commit attach zwalnia
 zarówno klucz zwykłego obrazu, jak i klucz embedu; rollback je zachowuje.
+93: `verifyQuillAssetReference` sprawdza kopię wewnętrzną w tym samym
+dokumencie: staging przed autosave lub trwały receipt i checksumowane bajty,
+zgodny typ embedu oraz pozostały budżet. Nie pobiera plików ani nie zapisuje
+operacji. Regresje: `test/editor_v2_rich_paste_test.dart`.
 `writeNotebookChange(revertsOperationId:)` wiąże cały inverse z końcową
 operacją cofanej grupy; OperationStore sprawdza trwałą zależność
 w tej samej transakcji. Błędne ID nie zmienia projekcji ani actorSeq.
@@ -1546,6 +1550,17 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
+### `lib/features/editor/state/quill_paste_plan.dart` (160 linii)
+
+9: `QuillPastePlan`, 26: `fromDelta`, 137: `materialize`: walidacja
+insert-only Delta i atrybutów, limit tekstu i łącznego rozmiaru, data URI
+PNG/JPEG/WebP/PDF z kontrolą sygnatur, deduplikacja źródeł i lista assetów
+do kontroli zakresu. Nie wykonuje I/O; materializacja jest dopuszczalna
+dopiero po sprawdzeniu zakresu i lifecycle w kontrolerze. Nieznane embedy,
+HTTP/file, surowy U+FFFC i błędne bajty są odrzucane przed mutacją.
+Regresje: `test/quill_paste_plan_test.dart` (12 testów) oraz
+`test/editor_v2_rich_paste_test.dart` (13 regresji Quill/SQLite).
+
 ### `lib/features/editor/state/quill_style_patch.dart`
 
 `patchQuillStyle` nakłada wyłącznie żądane atrybuty inline/akapitów
@@ -1602,11 +1617,14 @@ Undo/Redo/Undo, zależności inverse i edycję o zerowym efekcie.
 `updateActiveTextStyle` w v2 używa `patchQuillStyle`: nie przebudowuje
 embedów ze stringa ani nie narzuca koloru pierwszego fragmentu innym
 przy zmianie rozmiaru. Zmieniają się tylko żądane atrybuty.
-Ważne granice: 593: `flushPendingSaves`; 2008: `_applyV2History`;
-2153: `_remapV2HistoryNotebook`; 2332: `prepareInlineAsset`;
-2353: `updateTextBlockContent`; 2368: `updateActiveTextStyle`;
-3775: `_commitActiveTextEdit`; 3870: `_captureV2Gesture`;
-3894: `_saveV2`.
+`pasteQuillHtml` przejmuje rich clipboard i wewnętrzną Delta Quilla;
+sprawdza cały plan i assety, zanim zastąpi zaznaczenie normalną mutacją.
+Anuluje opóźniony odczyt po zmianie bloku, kontrolera, treści lub wyboru.
+Ważne granice: 596: `flushPendingSaves`; 2011: `_applyV2History`;
+2156: `_remapV2HistoryNotebook`; 2335: `prepareInlineAsset`;
+2358: `pasteQuillHtml`; 2477: `updateTextBlockContent`;
+2492: `updateActiveTextStyle`; 3899: `_commitActiveTextEdit`;
+3994: `_captureV2Gesture`; 4018: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
@@ -1948,7 +1966,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (3195 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (3245 linii)
 
 Opt-in v2: aktywny tekst ze złożonym Delta lub embedami pozostaje
 w istniejącym QuillEditor, aby edycja nie spłaszczała treści.
@@ -1963,8 +1981,12 @@ osobną kopię display, więc nie dochodzi do podwójnego odwrócenia.
 Test sprawdza kolor wyrenderowanego TextSpan oraz zapisany kolor źródłowy.
 Clipboard Quill v2 przekazuje bajty obrazu do `prepareInlineAsset`,
 zwracając kanoniczną referencję przed zwykłą mutacją dokumentu.
-Odrzuca nieaktywny blok i nieobsługiwany format. Zewnętrzne HTML/rich
-paste jest tymczasowo wyłączone dla v2; legacy pozostaje bez zmian.
+Odrzuca nieaktywny blok i nieobsługiwany format. `onClipboardPaste`
+przekazuje pojedynczy odczyt HTML/plain do `pasteQuillHtml`, który zachowuje
+formatowanie i weryfikuje media. Domyślny parser Quilla pozostaje wyłączony,
+aby nie ominąć kontroli. Callbacki wiążą konkretny kontroler; odmowa nie
+uruchamia zastępczego kasowania zaznaczenia. Legacy pozostaje bez zmian.
+1564: `_pasteRichClipboard`; 1605: `_preparePastedImage`; 1636: `_initQuill`.
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -1999,15 +2021,15 @@ overlayu. Pojedyncze wskazanie nieaktywnego Quilla jest stosowane po oknie
 double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu na
 `TextHudBlock`.
 
-- 35: `_hasUniformTextStyle`; 94: `PageOverlay`;
-  327: `DocumentPageOverlay`; 389: `ActiveImageTransformHud`.
+- 36: `_hasUniformTextStyle`; 95: `PageOverlay`;
+  328: `DocumentPageOverlay`; 390: `ActiveImageTransformHud`.
 - aktywny tekst: `TextHudBlock`; fallback nieaktywnego tekstu:
   `_TextBlockWidget` / `_TextBlockWidgetState`.
   Akcje lassa korzystają z kompaktowego paska w kolorze toolbaru,
   z neutralnymi ikonami konturowymi i zachowaną obsługą akcji.
-- 1743: `_ImageBlockWidget`; 1768: `_ImageBlockWidgetState`;
-  2902: `_LassoSelectionWidget`; 3023: `LassoSelectionActionBar`;
-  3082: `_LassoActionButton`; 3141: `VerifiedQuillEmbedBuilder`.
+- 1793: `_ImageBlockWidget`; 1818: `_ImageBlockWidgetState`;
+  2952: `_LassoSelectionWidget`; 3073: `LassoSelectionActionBar`;
+  3132: `_LassoActionButton`; 3191: `VerifiedQuillEmbedBuilder`.
 
 ## 9. Board
 
@@ -2973,6 +2995,7 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   jako atomy `U+FFFC` z kanonicznym `asset:<assetId>`. Wstawienie wymaga
   wcześniejszego `asset.attach` i zgodnego MIME; zewnętrzne URL są odrzucane.
   `asset.detach` nie usuwa assetu, dopóki widoczny embed go używa.
+  39: `validateDelta` współdzieli walidację rich paste przed stagingiem.
 - `lib/data/sync/operation_asset_gateway.dart`: osobny upload i download
   plików z kontrolą SHA-256, rozmiaru i zakresu uprawnień Share;
   `uploadAndStage/downloadAndStage` przygotowują bajty przed

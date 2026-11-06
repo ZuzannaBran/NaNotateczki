@@ -35,6 +35,13 @@ class ShareTextEditAdapter {
 
   final String Function() _createAtomId;
 
+  /// Validates a paste before registering assets or changing the document.
+  static void validateDelta(String value) {
+    if (_parseQuillDelta(value).length > maxCodePoints) {
+      throw StateError('Text edit exceeds the safe operation budget.');
+    }
+  }
+
   List<ShareTextIntent> plan({
     required Map<String, dynamic> atoms,
     required String newText,

@@ -1,5 +1,40 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Kontrolowany rich paste — 2026-11-06
+
+Najpierw naprawiono analizę z `42168819661` w commicie `6bcfbaf`.
+Wynik nowego przebiegu nie był odczytywany w tej sesji.
+Backend `42160118098` pozostaje zielony; nie wymaga zmiany ani ponowienia.
+
+`pasteQuillHtml` przejmuje clipboard aktywnego Quilla v2. Konwerter HTML
+zachowuje formatowanie; `QuillPastePlan` waliduje insert-only Delta,
+atrybuty, limit tekstu oraz łączny budżet bajtów przed mutacją dokumentu.
+Obrazy z data URI trafiają przez istniejący staging i normalny zapis gestu;
+powtórzenie tego samego źródła nie duplikuje pliku. Plan obsługuje również
+PDF w Delta, ale nie dodaje pickera PDF ani konwersji HTML object/embed.
+
+Wewnętrzne kopiowanie Quill zachowuje Delta i istniejące asset ID, także
+przed pierwszym autosave. Writer sprawdza zakres dokumentu, typ, rozmiar
+i integralność bajtów. Clipboard HTTP/file i nieznane embedy są odrzucane
+bez kasowania zaznaczenia; nie pobieramy plików z sieci. Zmiana bloku,
+kontrolera, treści, zaznaczenia lub zamknięcie widgetu anuluje opóźniony
+paste. Callbacki są związane z konkretną instancją kontrolera.
+
+Lokalnie zaliczono 47 testów na produkcyjnym kodzie czystego Darta:
+12 nowych testów planu i konwersji HTML oraz regresje adaptera tekstu,
+protokołu i stylów. Zależności runnera dopasowano do locka aplikacji. Formatowanie wszystkich
+278 plików Dart i składnia skryptu weryfikacji również przeszły.
+Dodano 13 integracyjnych regresji Quill/SQLite: formatowanie, deduplikacja,
+Undo/Redo po wyczyszczeniu bufora, odmowa całego paste, wyścigi lifecycle,
+wewnętrzna kopia przed autosave i weryfikacja trwałych referencji/bajtów.
+Ich wykonanie oraz pełna analiza Flutter wymagają Actions. Nie przedstawiamy
+ich jako lokalnie zaliczonych. Ponowienie CI obejmuje aplikację, bez backendu
+i niezmienionych buildów platform; wyniku nie czekamy.
+
+Następna sesja: najpierw wyniki Actions, następnie brakujące wejścia mediów
+w interfejsie i pozostałe wymagania etapu 3. Trwała historia Undo/Redo po
+restarcie, pełne E2E i cutover nadal nie są ukończone. Flaga pozostaje off.
+
 ## Typ wyniku callbacku clipboard — 2026-11-06
 
 Przebieg `42168819661` dla `b4d3dac` przeszedł formatowanie, ale analiza
@@ -43,10 +78,9 @@ referencję `asset:`; zwykły gest tekstowy utrwala attach, BLOB, atomy
 i outbox w jednej transakcji. Rollback zachowuje staging do retry,
 a udany commit zwalnia rejestrację również pod kluczem asset ID.
 
-Podłączono clipboard obrazów aktywnego Quill v2. Zewnętrzny HTML/rich
-paste pozostaje wyłączony w tym trybie, aby nie wstawiał niezweryfikowanych
-URL; tekst i legacy clipboard pozostają dostępne. Bezpieczny import
-zewnętrznej rich Delta oraz inline PDF z interfejsu wymagają dalszych prac.
+W tym wcześniejszym przyroście podłączono clipboard obrazów aktywnego
+Quill v2. Kontrolowany HTML/rich paste dodano w przyroście opisanym na
+górze dokumentu; inline PDF z interfejsu nadal wymaga dalszych prac.
 
 Nowe regresje: cztery formaty, niezmienność kopii bajtów, brak operacji
 przed gestem, Undo/Redo po wyczyszczeniu bufora, restart pliku SQLite
@@ -62,13 +96,13 @@ Actions; nie były uruchamiane lokalnym Flutterem.
 Instrukcje repozytorium znajdują się w `CZAT.md` i `AGENTS.md`.
 Najpierw odczytać Actions aktualnego `dev`. Poprzedni przyrost do
 `e4b1cfc` został potwierdzony zielonym przebiegiem `42160667069`;
-nowy import inline wymaga osobnego wyniku. W razie błędu najpierw
+nowe importy inline i rich paste wymagają odczytu aktualnego wyniku. W razie błędu najpierw
 naprawić regresję, nie uruchamiać niezmienionych platform.
 
 Backend `6b0da04` dodaje sześć kontraktów inverse mediów i tombstones.
 Lokalnie po tym przyroście: 278 passed, 8 skipped (PostgreSQL).
 Nie zastępuje to E2E Flutter ↔ HTTP ↔ PostgreSQL.
-Po zielonym CI kontynuować brakujące lokalne importy Quill i pełne
+Po zielonym CI kontynuować brakujące wejścia mediów w UI i pełne
 pokrycie gestów; historia po restarcie nadal nie jest odtwarzana.
 Rebase dwóch klientów, synchronizacja całego konta i aktywacja flagi
 pozostają kolejnym etapem. Produkcja nadal korzysta z v1.

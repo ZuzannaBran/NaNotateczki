@@ -12,6 +12,7 @@ import 'package:flutter_box_transform/flutter_box_transform.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:provider/provider.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 
 import '../../../../core/input/soft_keyboard.dart';
 import '../../../../data/backup/remote_backup_scheduler.dart';
@@ -1560,8 +1561,53 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     return unset ? quill.Attribute.clone(attribute, null) : attribute;
   }
 
-  Future<String?> _preparePastedImage(Uint8List bytes) async {
+  Future<bool> _pasteRichClipboard(quill.QuillController source) async {
+    if (!mounted || !identical(source, _quillController)) {
+      return true;
+    }
+    final clipboard = SystemClipboard.instance;
+    if (clipboard == null) {
+      return false;
+    }
+    Future<ClipboardReader>? pendingReader;
+    Future<ClipboardReader> reader() => pendingReader ??= clipboard.read();
+    try {
+      return await _editorController.pasteQuillHtml(
+        blockId: widget.block.id,
+        canPaste: () => mounted && identical(source, _quillController),
+        readHtml: () async {
+          final value = await reader();
+          if (!value.canProvide(Formats.htmlText)) {
+            return null;
+          }
+          final html = await value.readValue(Formats.htmlText);
+          return html is String ? html : null;
+        },
+        readPlainText: () async {
+          final value = await reader();
+          if (!value.canProvide(Formats.plainText)) {
+            return null;
+          }
+          final text = await value.readValue(Formats.plainText);
+          return text is String ? text : null;
+        },
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('Could not paste this rich content.')),
+        );
+      }
+      return true;
+    }
+  }
+
+  Future<String?> _preparePastedImage(
+    Uint8List bytes,
+    quill.QuillController source,
+  ) async {
     if (!mounted ||
+        !identical(source, _quillController) ||
         _editorController.activeTextBlockId != widget.block.id ||
         !identical(_editorController.activeTextController, _quillController)) {
       return null;
@@ -1591,7 +1637,8 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     _clearDarkDisplayController();
     final doc = _documentFromBlock(widget.block);
     final selectionOffset = doc.length > 0 ? doc.length - 1 : 0;
-    _quillController = quill.QuillController(
+    late final quill.QuillController source;
+    source = quill.QuillController(
       document: doc,
       selection: TextSelection.collapsed(offset: selectionOffset),
       config: _editorController.operationWriter == null
@@ -1599,13 +1646,16 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
           : quill.QuillControllerConfig(
               // ignore: experimental_member_use
               clipboardConfig: quill.QuillClipboardConfig(
-                // Raw HTML embeds must not bypass verified byte imports.
+                // The application owns rejection and lifecycle checks.
                 // ignore: experimental_member_use
                 enableExternalRichPaste: false,
-                onImagePaste: _preparePastedImage,
+                // ignore: experimental_member_use
+                onClipboardPaste: () => _pasteRichClipboard(source),
+                onImagePaste: (bytes) => _preparePastedImage(bytes, source),
               ),
             ),
     );
+    _quillController = source;
     _lastDeltaJson = jsonEncode(doc.toDelta().toJson());
     _docSubscription?.cancel();
     _docSubscription = _quillController.document.changes.listen((event) {

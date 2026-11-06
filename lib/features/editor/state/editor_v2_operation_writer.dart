@@ -88,6 +88,48 @@ class EditorV2OperationWriter {
     return asset;
   }
 
+  /// Validates copied references without importing assets from another scope.
+  /// A freshly pasted file may still be staged before its first autosave.
+  Future<Map<String, dynamic>> verifyQuillAssetReference({
+    required String documentId,
+    required String assetId,
+    required String embedType,
+    required int byteLimit,
+  }) async {
+    final staged = _registeredAssets[documentId]?[assetId];
+    final receipt =
+        staged?.attachPayload ??
+        await projector.localAssetReceipt(
+          documentId: documentId,
+          assetId: assetId,
+        );
+    if (receipt == null ||
+        byteLimit < 1 ||
+        (receipt['sizeBytes'] as int) > byteLimit ||
+        (embedType == 'pdf'
+            ? receipt['mediaType'] != 'application/pdf'
+            : embedType != 'image' ||
+                  !const {
+                    'image/png',
+                    'image/jpeg',
+                    'image/webp',
+                  }.contains(receipt['mediaType']))) {
+      throw const FormatException(
+        'Pasted asset is unavailable, too large or has a different type.',
+      );
+    }
+    if (staged != null) {
+      final buffer = projector.verifiedAssetBuffer;
+      if (buffer == null) {
+        throw StateError('Verified asset staging has not been installed.');
+      }
+      buffer.requireBytes(receipt);
+    } else {
+      await projector.verifiedUploadBytes(receipt);
+    }
+    return receipt;
+  }
+
   /// Call after a verified upload has been staged for the same document.
   /// The receipt survives a rolled-back editor gesture for safe retry.
   void registerVerifiedAsset({

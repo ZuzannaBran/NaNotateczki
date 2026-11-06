@@ -9,11 +9,21 @@ rozpoznawany z sygnatury bajtów zgodnie z walidatorem serwera
 `asset:<UUID>`, nie wykonuje HTTP ani nie tworzy operacji przed zmianą
 Delta. Normalny gest Quill zapisuje attach, BLOB, atomy i outbox atomowo;
 rejestr stagingu jest zwalniany dopiero po udanym commicie.
-Clipboard aktywnego Quill v2 podłącza import obrazów z bajtów.
-Zewnętrzny HTML/rich paste jest w tym trybie wyłączony, aby URL-e nie
-omijały weryfikacji; tekst nadal można wkleić, a legacy zachowuje swój
-dotychczasowy clipboard. Bezpieczny import zewnętrznej rich Delta
-pozostaje osobnym zadaniem. Nie włącza to protokołu v2 w produkcji.
+Clipboard aktywnego Quill v2 podłącza import obrazów z bajtów oraz
+kontrolowany HTML/rich paste przez `pasteQuillHtml` i `QuillPastePlan`.
+Domyślny parser clipboard Quilla jest wyłączony: aplikacja sprawdza całą
+Delta przed zastąpieniem zaznaczenia. Zachowuje tekst i formatowanie;
+nowe media wymagają data URI, sygnatury PNG/JPEG/WebP/PDF i wspólnego
+limitu 64 MiB. HTML konwerter obsługuje obrazy; osobny picker inline PDF
+pozostaje do zrobienia. HTTP, ścieżki plikowe i nieznane embedy są odrzucane.
+Kopiowanie między instancjami Quilla korzysta z jego wewnętrznej Delta,
+ale referencje `asset:` muszą przejść kontrolę zakresu dokumentu, MIME,
+rozmiaru i bajtów (również przed pierwszym autosave). Stare zdarzenie po
+zmianie aktywnego bloku, treści, zaznaczenia albo właściciela widgetu jest
+anulowane. Odmowa nie kasuje zaznaczenia ani nie tworzy operacji.
+Parser HTML 1.5.3 był już zależnością transytywną; jest teraz zależnością
+bezpośrednią bez zmiany wersji. Legacy zachowuje swój clipboard.
+Nie włącza to protokołu v2 w produkcji.
 
 Obraz/PDF jest weryfikowany lokalnie przez SHA-256, rozmiar i MIME,
 a następnie zapisany wraz z `asset.attach` i outboxem w jednej transakcji
