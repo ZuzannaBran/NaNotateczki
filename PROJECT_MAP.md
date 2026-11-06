@@ -463,6 +463,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   bloków tekstowych. Obsługuje także geometrię istniejących obrazów
   i ich `object.move`, przenosząc scoped `asset_references` w jednej
   transakcji. Brak trwałej referencji blokuje przenoszenie obrazu.
+  Rzutowanie tekstu Quill usuwa tylko końcowy `\n`, bez `trimRight()`
+  usuwającego białe znaki użytkownika.
   Rzutowanie atomów korzysta z `OperationStore.textAtoms`, a update pól
   porównuje rank `(clock, actor, seq, operationId)` z historią operacji,
   niezależnie od kolejności dostarczenia.
@@ -673,6 +675,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   atrybutów Quill oraz tożsamości strony docelowej.
 - `operation_text_sequence.dart`: deterministyczny CRDT atrybutów per atom,
   `renderDelta`, obsługa usuwania stylu przez `null`.
+  `withoutQuillTerminalNewline` usuwa jedynie końcowy strukturalny `\n`,
+  zachowując spacje, tabulatory i dodatkowe nowe linie.
 - `share_text_edit_adapter.dart`: konwersja pełnych snapshotów Delta na
   `text.insert/delete/format` (embedy wymagają jeszcze transportu assetów).
 - Testy: `test/operation_protocol_test.dart`,
@@ -1490,6 +1494,8 @@ obrazu/PDF wymaga nowego asset ID oraz starego ID z trwałej projekcji;
 generuje attach → object.set → detach, nigdy ścieżkę lokalną.
 Aktualizacja tekstu wymaga trwałych atomów CRDT; niezmieniony blok
 Quill można przenieść między stronami bez zmiany ID i utraty historii.
+Kontrola stanu Quill porównuje pełny tekst po zdjęciu jednego końcowego
+znaku nowej linii, zachowując trailing whitespace.
 Most nie jest podłączony do produkcyjnego `AppScope`.
 `quillEmbeds` udostępnia wspólną walidację kanonicznych referencji
 image/PDF do przygotowania lokalnych assetów przez writer.
@@ -1692,6 +1698,9 @@ Zamknięcie edycji zapisuje granicę gestu względem stanu sprzed pisania,
 również gdy ostatni autosave już zatwierdził wszystkie operacje.
 Powrót do pierwotnej treści/Delta nie dodaje pustego kroku Undo.
 `NotebookRepository` blokuje wtedy legacy snapshot writery na tym UID.
+`updateTextBlockContent` usuwa jedynie terminalny `\n` Quilla; import HUD
+zachowuje końcowe spacje i tabulatory. Regresja restartu rich Quill i
+Undo/Redo: `test/editor_controller_v2_test.dart`.
 Undo/Redo w trybie v2 działa na zatwierdzonych stanach przez nowe operacje
 i nowe ID odtwarzanych obiektów; nie odtwarza tombstone. Równoległy gest
 podczas asynchronicznego inverse pozostaje w UI i blokuje zapis zamiast

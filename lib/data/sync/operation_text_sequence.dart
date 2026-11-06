@@ -304,6 +304,10 @@ class OperationTextSequence {
     atoms,
   ).map((id) => (atoms[id] as Map)['text'] as String).join();
 
+  /// Removes only Quill's structural final newline, retaining user whitespace.
+  static String withoutQuillTerminalNewline(String value) =>
+      value.endsWith('\n') ? value.substring(0, value.length - 1) : value;
+
   /// Position refers to the visible text, not tombstones or local viewport.
   static String? anchorBefore(
     Map<String, dynamic> atoms,

@@ -604,7 +604,7 @@ void main() {
           'insert': ' and italic',
           'attributes': {'italic': true},
         },
-        {'insert': '!\n'},
+        {'insert': '!  \t\n'},
       ]);
       final initial = TextBlock(
         id: 'rich-restart-block',
@@ -631,7 +631,7 @@ void main() {
       first.setActiveTextBlock(initial.id, null);
       first.updateTextBlockContent(
         first.currentPage.textBlocks.single,
-        plainText: 'Bold and italic!',
+        plainText: 'Bold and italic!  \t\n',
         deltaJson: editedDelta,
       );
       first.setActiveTextBlock(null, null);
@@ -640,8 +640,9 @@ void main() {
       final after = (await firstRepo.getNotebook(notebook.uid))!;
       final editedPersistedDelta =
           after.pages.single.textBlocks.single.deltaJson;
-      expect(after.pages.single.textBlocks.single.text, 'Bold and italic!');
+      expect(after.pages.single.textBlocks.single.text, 'Bold and italic!  \t');
       expect(editedPersistedDelta, isNot(beforeDelta));
+      expect(editedPersistedDelta, contains('!  \\t'));
       first.dispose();
       await firstEngine.stop();
       await firstDb.close();
@@ -666,6 +667,7 @@ void main() {
         ),
       );
       await second.historyReady;
+      expect(second.currentPage.textBlocks.single.text, 'Bold and italic!  \t');
       expect(second.canUndo, isTrue);
       second.undo();
       await second.flushPendingSaves();
@@ -680,7 +682,7 @@ void main() {
       expect(second.canRedo, isTrue);
       second.redo();
       await second.flushPendingSaves();
-      expect(second.currentPage.textBlocks.single.text, 'Bold and italic!');
+      expect(second.currentPage.textBlocks.single.text, 'Bold and italic!  \t');
       expect(
         (await secondRepo.getNotebook(
           notebook.uid,

@@ -158,7 +158,8 @@ class EditorOperationBridge {
         if (atomText != old.text &&
             (old.deltaJson == null ||
                 !atomText.endsWith('\n') ||
-                atomText.trimRight() != old.text)) {
+                OperationTextSequence.withoutQuillTerminalNewline(atomText) !=
+                    old.text)) {
           throw StateError('Stale text atom projection cannot be edited.');
         }
         result.addAll(

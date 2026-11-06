@@ -27,6 +27,7 @@ import '../../../data/sync/editor_history_checkpoint.dart';
 import '../../../data/sync/editor_history_notebook_codec.dart';
 import '../../../data/sync/editor_history_store.dart';
 import '../../../data/sync/operation_protocol.dart';
+import '../../../data/sync/operation_text_sequence.dart';
 import '../../../data/sync/share_text_edit_adapter.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/drawing_tool.dart';
@@ -2646,10 +2647,9 @@ class EditorController extends ChangeNotifier {
   void addTextBlockFromText(Offset position, String text) {
     final baseSize = lastTextFontSize;
     final baseColor = lastTextColor;
-    final normalized = text.trimRight();
     final delta = quill_delta.Delta();
-    if (normalized.isNotEmpty) {
-      delta.insert(normalized, <String, dynamic>{
+    if (text.isNotEmpty) {
+      delta.insert(text, <String, dynamic>{
         'size': baseSize.toInt().toString(),
         'color': _colorToHex(baseColor),
         if (lastTextFontFamily != null) 'font': lastTextFontFamily,
@@ -2659,7 +2659,7 @@ class EditorController extends ChangeNotifier {
     final doc = quill.Document.fromDelta(delta);
     final block = TextBlock(
       id: _uuid.v4(),
-      text: normalized,
+      text: text,
       deltaJson: jsonEncode(doc.toDelta().toJson()),
       position: position,
       fontSize: baseSize,
@@ -2960,7 +2960,8 @@ class EditorController extends ChangeNotifier {
     required String plainText,
     required String deltaJson,
   }) {
-    final normalizedText = plainText.trimRight();
+    final normalizedText =
+        OperationTextSequence.withoutQuillTerminalNewline(plainText);
     final after = before.copyWith(text: normalizedText, deltaJson: deltaJson);
     if (before.text == after.text && before.deltaJson == after.deltaJson) {
       return;

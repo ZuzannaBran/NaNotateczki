@@ -152,6 +152,26 @@ void main() {
     );
     atoms = applyPlan(atoms, updated);
     expect(OperationTextSequence.render(atoms), 'Bye\n');
+
+    final withWhitespace = adapter.plan(
+      atoms: atoms,
+      newText: 'Bye  \t',
+      changedDeltaJson: r'[{"insert":"Bye  \t\n"}]',
+    );
+    atoms = applyPlan(atoms, withWhitespace);
+    expect(OperationTextSequence.render(atoms), 'Bye  \t\n');
+    expect(
+      OperationTextSequence.withoutQuillTerminalNewline('Bye\n\n'),
+      'Bye\n',
+    );
+    expect(
+      () => adapter.plan(
+        atoms: atoms,
+        newText: 'Bye',
+        changedDeltaJson: r'[{"insert":"Bye  \t\n"}]',
+      ),
+      throwsFormatException,
+    );
   });
 
   test('Quill content mismatch cannot hide inside whitespace', () {

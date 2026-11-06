@@ -59,12 +59,12 @@ class ShareTextEditAdapter {
         : _parseQuillDelta(changedDeltaJson);
     final nextCharacters = [for (final item in desired) item.character];
     final actualText = nextCharacters.join();
-    // The editor stores trimmed plain text but preserves Quill's terminal
-    // newline and formatting in deltaJson. Keep those CRDT atoms intact.
+    // Quill's final newline is structural. Other trailing whitespace is text.
     if (actualText != newText &&
         (changedDeltaJson == null ||
             !actualText.endsWith('\n') ||
-            actualText.trimRight() != newText)) {
+            OperationTextSequence.withoutQuillTerminalNewline(actualText) !=
+                newText)) {
       throw const FormatException('Quill delta differs from edited text.');
     }
     if (nextCharacters.length > maxCodePoints) {

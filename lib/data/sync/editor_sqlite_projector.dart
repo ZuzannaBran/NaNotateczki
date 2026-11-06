@@ -1699,7 +1699,9 @@ class EditorSqliteProjector {
       pageId: op.pageId!,
       objectId: op.objectId!,
     );
-    final previousText = OperationTextSequence.render(durable).trimRight();
+    final previousText = OperationTextSequence.withoutQuillTerminalNewline(
+      OperationTextSequence.render(durable),
+    );
     if (row['text'] != previousText) {
       throw StateError('The text projection is not at its durable frontier.');
     }
@@ -1750,7 +1752,9 @@ class EditorSqliteProjector {
         throw StateError('Quill embed has no verified matching local asset.');
       }
     }
-    final text = OperationTextSequence.render(updated).trimRight();
+    final text = OperationTextSequence.withoutQuillTerminalNewline(
+      OperationTextSequence.render(updated),
+    );
     await database.customStatement(
       'UPDATE text_block_rows SET text = ?, delta_json = ? '
       'WHERE uid = ? AND page_uid = ?',

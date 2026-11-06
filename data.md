@@ -1,5 +1,14 @@
 # Dane NaNotateczki
 
+## Tekst Quill — zachowanie końcowych białych znaków (2026-11-06)
+
+W `TextBlock.text` przechowywany jest tekst bez jednego strukturalnego
+znaku `\n` na końcu Quill Delta, ale z wszystkimi innymi spacjami,
+tabulatorami oraz świadomie wpisanymi nowymi liniami. `trimRight()`
+nie może być używane przy synchronizacji kontrolera, CRDT i projekcji.
+To poprawka zapisu v2 bez przełączania legacy v1 na nowy silnik.
+
+
 ## Catch-up po uwierzytelnieniu WebSocket v2 (2026-11-06)
 
 `SyncEngine` żąda REST catch-up zarówno po `operations_changed`, jak

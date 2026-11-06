@@ -890,8 +890,9 @@ między urządzeniami i pełne E2E pozostają niezamknięte.
   operacji, także po restarcie i przy równoczesnych edycjach.
 - [ ] Zablokować każdą operację powodującą osierocone referencje
   do obrazu, PDF lub osadzonego assetu Quill.
-- [ ] Uruchomić `dart analyze` i wąskie testy v2. Nie używać Actions
-  do czasu zakończenia etapu 3 (chyba że użytkownik zezwoli).
+- [x] `dart analyze`, natywne regresje v2 i Linux E2E z rzeczywistym
+  PostgreSQL/WebSocket: zielony przebieg Actions `42263084815`.
+  Ten przebieg nie sprawdzał Androida, iOS ani Web.
 
 Warunek zamknięcia A: rollback nie gubi danych ani aktora; ACK nie
 odmalowuje; konflikt nie nadpisuje trwającego gestu; restart odtwarza
@@ -902,7 +903,7 @@ ten sam stan i trwały outbox.
 - [x] Lokalny projector Quill: trwałe `operation_asset_bytes`, scoped
   `asset.attach`, walidacja `text.insert` i odczyt po restarcie.
   Regresje Quill/SQLite i odzyskiwania mediów w zielonym `42255399051`;
-  osobny Linux E2E przez rzeczywisty backend pozostaje do potwierdzenia.
+  Linux E2E z rzeczywistym backendem potwierdzony w `42263084815`.
 
 
 - [ ] Lokalna podmiana obrazu: attach → object.set → detach przy
@@ -959,6 +960,16 @@ bez konfliktowych kopii w zwykłym przebiegu.
 Warunek zamknięcia D: aplikacja działa na v2 w produkcji; nie istnieje
 równoległy snapshot writer. Każde usunięcie i nowy obiekt są
 propagowane na wszystkie urządzenia.
+
+## Ochrona końcowych białych znaków w tekście (2026-11-06)
+
+Quill dodaje jeden strukturalny `\n` na końcu Delta. Poprzednie
+`trimRight()` usuwało też świadomie wpisane spacje, tabulatory i kolejne
+nowe linie. Wspólna normalizacja usuwa wyłącznie jeden terminalny `\n`
+w kontrolerze, adapterze CRDT, moście i projekcji SQLite. HUD zachowuje
+tekst źródłowy bez obcinania. Rozszerzone regresje adaptera i kontrolera
+sprawdzają zachowanie whitespace, restart SQLite i Undo/Redo.
+Wynik tej poprawki musi zostać potwierdzony osobnym przebiegiem CI.
 
 ## Zasady pracy
 
