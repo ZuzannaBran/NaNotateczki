@@ -375,8 +375,13 @@ void main() {
     textStorageWriteOverride = (key, value) async => stored[key] = value;
     final drainStarted = Completer<void>();
     final allowDrain = Completer<void>();
+    final revokeStarted = Completer<void>();
+    final allowRevoke = Completer<void>();
+    final deletionStarted = Completer<void>();
+    final allowDeletion = Completer<void>();
     var gateLogout = false;
     var revokeCalled = false;
+    var drainCalls = 0;
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
@@ -395,6 +400,8 @@ void main() {
         if (request.url.path == '/v1/auth/logout') {
           revokeCalled = true;
           expect(request.headers['authorization'], 'Bearer access-test');
+          revokeStarted.complete();
+          await allowRevoke.future;
           return http.Response('', 204);
         }
         fail('Unexpected request: ${request.url}');
@@ -407,21 +414,40 @@ void main() {
         if (!gateLogout) {
           return;
         }
+        drainCalls++;
         drainStarted.complete();
         await allowDrain.future;
       },
     );
     await session.loadProfile();
     await session.login('test_user', 'password');
+    credentials.beforeDelete = () async {
+      deletionStarted.complete();
+      await allowDeletion.future;
+    };
     gateLogout = true;
     final logout = session.logout();
+    final joined = session.logout();
+    expect(identical(logout, joined), isTrue);
+    expect(session.isBusy, isTrue);
     await drainStarted.future;
     expect(revokeCalled, isFalse);
     expect(session.isSignedIn, isTrue);
     expect(credentials.value, contains('refresh-test'));
     allowDrain.complete();
-    await logout;
+    await revokeStarted.future;
+    expect(session.isBusy, isTrue);
+    expect(session.isSignedIn, isTrue);
+    allowRevoke.complete();
+    await deletionStarted.future;
+    expect(session.isBusy, isTrue);
+    expect(session.isSignedIn, isTrue);
+    expect(credentials.value, contains('refresh-test'));
+    allowDeletion.complete();
+    await Future.wait([logout, joined]);
     expect(revokeCalled, isTrue);
+    expect(drainCalls, 1);
+    expect(session.isBusy, isFalse);
     expect(credentials.value, isNull);
     expect(session.isSignedIn, isFalse);
     session.dispose();
@@ -470,8 +496,13 @@ void main() {
     rejectDrain = true;
     await expectLater(session.logout(), throwsStateError);
     expect(revokeCalls, 0);
+    expect(session.isBusy, isFalse);
     expect(session.isSignedIn, isTrue);
     expect(credentials.value, contains('refresh-test'));
+    rejectDrain = false;
+    await session.logout();
+    expect(revokeCalls, 1);
+    expect(session.isSignedIn, isFalse);
     session.dispose();
     client.close();
   });
@@ -510,6 +541,7 @@ void main() {
     credentials.failDeletes = true;
     await expectLater(session.logout(), throwsA(isA<StateError>()));
     expect(session.isSignedIn, isTrue);
+    expect(session.isBusy, isFalse);
     expect(session.preferredMode, AccountDataMode.account);
     expect(credentials.value, contains('refresh'));
     credentials.failDeletes = false;
@@ -834,6 +866,7 @@ class _MemoryAccountCredentialStore implements AccountCredentialStore {
   int writes = 0;
   int deletes = 0;
   bool failDeletes = false;
+  Future<void> Function()? beforeDelete;
 
   @override
   Future<String?> read() async => value;
@@ -846,6 +879,7 @@ class _MemoryAccountCredentialStore implements AccountCredentialStore {
 
   @override
   Future<void> delete() async {
+    await beforeDelete?.call();
     if (failDeletes) {
       throw StateError('Keyring unavailable');
     }

@@ -1,5 +1,40 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Start/stop konta bez spóźnionego bootstrapu — 2026-11-06
+
+Na początku sesji potwierdzono zielony przebieg aplikacji
+[`42285435612`](https://github.com/ZuzannaBran/NaNotateczki/actions/runs/42285435612)
+dla `1609832`: generator, format, analiza, 1010 regresji (2 pominięte),
+71,66% pokrycia oraz Linux E2E rzeczywistych kontrolerów z backendem.
+Zestaw backendowy tego E2E zaliczył 7 testów (1 wyłączony), Flutter 1.
+Kanoniczny backend: zielony `42262988799` dla `f77b20c`.
+
+Dalszy krok sekcji D zamyka wyścig wylogowania/zmiany namespace ze
+startem v2. Generacja jest unieważniana przed pierwszym await drenażu.
+Drenaż czeka na poprzedni bootstrap, zanim zmieni się SQLite/API identity.
+Spóźniony protokół lub aktor nie może uruchomić transportu ani zwolnić UI;
+to działa również po powrocie na ten sam userId. Runtime zatrzymuje się
+po anulowaniu, a dispose nie pozwala reaktywować generacji.
+Logout ma `isBusy` przez całą operację, także po drenażu, podczas HTTP
+i usuwania sekretów. Równoczesne wywołania współdzielą Future, a błąd
+zwalnia blokadę i umożliwia retry.
+
+Ponowne `enableAccountOperations` tego samego writera czeka na trwającą
+walidację legacy i jest idempotentne przy otwartym edytorze. Inny writer
+jest odrzucany. Błąd nie modyfikuje dokumentów ani nie wykonuje migracji.
+AppScope i realny E2E używają wspólnego `startForCurrentAccount`.
+
+Regresje: 8 testów bariery generacji zaliczono lokalnie; 8 scenariuszy
+runtime/SQLite dodano do `editor_v2_account_startup_test.dart`.
+Rozszerzono testy sesji o wspólny logout, blokadę podczas HTTP/sekretów i retry
+po błędzie drenażu/sekretów. Fluttera nie ma lokalnie; pełna analiza,
+natywne regresje i Linux E2E mają być uruchomione w Actions przez
+`[ci:failed-only] [ci:v2-e2e]`, bez oczekiwania na wynik w tej sesji.
+
+**Następna sesja:** odczytać wyniki tego commita; w razie błędu najpierw
+naprawić odpowiedni job. Etap 3 i globalny cutover nadal są otwarte;
+nie włączono flagi v2 ani nie usunięto writerów v1. Backend bez zmian.
+
 ## Ustawienia aktywnego dokumentu bez drugiego writera — 2026-11-06
 
 Odkryto brakujący przypadek integracji UI: ustawienia otwarte z aktywnego
@@ -23,8 +58,8 @@ używa roli `nano_app`, a URL administratora jest usuwany ze środowiska
 przed startem procesu HTTP. Test sprawdza poprawność obu URI i ten sam
 port, a guard odrzuca przypadkowe nadanie uprawnień do znacznika.
 Zmiana została wprowadzona w kanonicznym backendzie i jego lustrze.
-Nowy wynik integracji z realnym backendem wymaga potwierdzenia w Actions;
-produkcja pozostaje na v1.
+Naprawę potwierdził zielony realny E2E `42285435612`; produkcja pozostaje
+na v1. Nowsze przyrosty wymagają własnego wyniku CI.
 
 ## Kontrolery przez rzeczywisty backend — 2026-11-06
 
@@ -53,7 +88,8 @@ pozostaje bez nowych zmian, a jego zielony kod jest zgodny z lustrem.
 
 **Następna sesja:** najpierw oba joby najnowszego commita aplikacji.
 Usunąć ewentualne błędy, ponawiając wyłącznie potrzebny zakres.
-Dopiero po potwierdzonym E2E kontynuować produkcyjne podłączenie z sekcji D.
+E2E potwierdzono w `42285435612`; kontynuować sekcję D po zaliczeniu
+regresji aktualnego przyrostu.
 Etap 3 i cutover pozostają otwarte; nie włączano flag ani migracji.
 
 ## Rzeczywisty backend w lustrze aplikacji — 2026-11-06

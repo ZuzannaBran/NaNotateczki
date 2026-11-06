@@ -1,5 +1,25 @@
 # Dane NaNotateczki
 
+## Start konta, wylogowanie i gotowość writera (2026-11-06)
+
+`AppScope` przypisuje generację do startu konta i weryfikuje ją po
+odczycie protokołu, aktora, walidacji SQLite oraz starcie transportu.
+Przed zmianą konta unieważnia generację synchronicznie i czeka na stary
+bootstrap przed opróżnieniem writerów oraz podmianą namespace/tokena.
+Powrót na to samo konto nie reaktywuje starego startu. Dispose również
+unieważnia generację; anulowany runtime kończy transport i nie zwalnia UI.
+`AccountSessionController.isBusy` pozostaje ustawione przez cały logout,
+również po zakończeniu drenażu, podczas HTTP i usuwania sekretów.
+Równoczesne logouty współdzielą operację; błąd pozwala na ponowienie.
+
+`NotebookRepository.enableAccountOperations` blokuje writery v1 przed
+pierwszym await. Ponowne wywołanie z tym samym writerem musi doczekać
+tej samej walidacji legacy, również gdy edytor jest już otwarty. Inny
+writer jest odrzucany; nieudana walidacja nie zmienia dokumentów i
+pozwala ponowić wiązanie po jawnej migracji. `startForCurrentAccount`
+jest wspólną ścieżką AppScope i realnego E2E. Globalna flaga v2,
+migracje, format danych oraz granice Planera/Share/backupu są bez zmian.
+
 ## Ustawienia aktywnego edytora v2 (2026-11-06)
 
 `LibraryScreen` pobiera już zamontowany `EditorController` z

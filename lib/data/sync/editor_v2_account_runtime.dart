@@ -136,6 +136,34 @@ class EditorV2AccountRuntime {
 
   Future<void> start() => engine.start();
 
+  /// The account owner must remain current across every startup await.
+  /// Cancellation retains an established v2 write fence and stops transport.
+  /// The caller decides whether to publish the ready runtime; no v1 fallback.
+  Future<bool> startForCurrentAccount({
+    required bool Function() isCurrent,
+  }) async {
+    if (!isCurrent()) {
+      await stop();
+      return false;
+    }
+    try {
+      await repository.enableAccountOperations(writer);
+      if (!isCurrent()) {
+        await stop();
+        return false;
+      }
+      await start();
+      if (!isCurrent()) {
+        await stop();
+        return false;
+      }
+      return true;
+    } catch (_) {
+      await stop();
+      rethrow;
+    }
+  }
+
   Future<void> stop() => engine.stop();
 
   void dispose() {

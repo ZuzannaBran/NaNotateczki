@@ -43,6 +43,7 @@ class AccountSessionController extends ChangeNotifier {
   Future<void>? _profileLoad;
   Future<void>? _refreshInProgress;
   Future<void>? _restoreInProgress;
+  Future<void>? _logoutInProgress;
   bool _disposed = false;
 
   static final usernamePattern = RegExp(
@@ -393,7 +394,28 @@ class AccountSessionController extends ChangeNotifier {
     }
   }
 
-  Future<void> logout() async {
+  Future<void> logout() {
+    final running = _logoutInProgress;
+    if (running != null) {
+      return running;
+    }
+    late final Future<void> pending;
+    pending = Future<void>.microtask(_logout).whenComplete(() {
+      if (identical(_logoutInProgress, pending)) {
+        _logoutInProgress = null;
+        isBusy = false;
+        _notifyIfActive();
+      }
+    });
+    // Keep startup blocked through HTTP revocation and credential deletion,
+    // after the writer drain itself has already released its barrier.
+    _logoutInProgress = pending;
+    isBusy = true;
+    _notifyIfActive();
+    return pending;
+  }
+
+  Future<void> _logout() async {
     // Drain writers while the identity and token are still valid.
     // A failed flush must not revoke an account with unsaved local edits.
     await onBeforeAccountChange?.call();

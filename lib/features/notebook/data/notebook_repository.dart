@@ -82,10 +82,15 @@ class NotebookRepository {
   final DataIntegrityIncidentHandler? _dataIntegrityIncidentHandler;
   final Uuid _uuid = const Uuid();
   EditorV2OperationWriter? _accountOperationWriter;
+  Future<void>? _accountOperationsReady;
 
   /// Selects v2 only after the owning account protocol is verified.
   /// Existing v1 documents must be migrated before enabling this path.
   Future<void> enableAccountOperations(EditorV2OperationWriter writer) async {
+    if (identical(_accountOperationWriter, writer)) {
+      await _accountOperationsReady;
+      return;
+    }
     if (!identical(writer.projector.database, database) ||
         hasPendingSaves ||
         _operationOwnedDocuments.isNotEmpty ||
@@ -93,25 +98,29 @@ class NotebookRepository {
             !identical(_accountOperationWriter, writer))) {
       throw StateError('Cannot switch the active repository writer to v2.');
     }
-    if (identical(_accountOperationWriter, writer)) {
-      return;
-    }
     // Fence any concurrent v1 caller before the first await. Existing rows
     // must have a committed document.create in the journal.
     _accountOperationWriter = writer;
     try {
-      final legacy = await database
+      final ready = database
           .customSelect(
             'SELECT n.uid FROM notebook_rows n WHERE NOT EXISTS '
             '(SELECT 1 FROM operations o WHERE o.document_id = n.uid) LIMIT 1',
           )
-          .getSingleOrNull();
-      if (legacy != null) {
-        throw StateError('Account contains an unmigrated legacy document.');
-      }
+          .getSingleOrNull()
+          .then<void>((legacy) {
+            if (legacy != null) {
+              throw StateError(
+                'Account contains an unmigrated legacy document.',
+              );
+            }
+          });
+      _accountOperationsReady = ready;
+      await ready;
     } catch (_) {
       if (identical(_accountOperationWriter, writer)) {
         _accountOperationWriter = null;
+        _accountOperationsReady = null;
       }
       rethrow;
     }

@@ -71,7 +71,10 @@ class _Peer {
 
   Future<void> sync({bool start = false}) async {
     if (start) {
-      await runtime.start();
+      expect(
+        await runtime.startForCurrentAccount(isCurrent: () => !_closed),
+        isTrue,
+      );
     } else {
       await runtime.engine.syncNow();
     }

@@ -64,7 +64,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (1589 linii)
+### `lib/app/app_scope.dart` (1627 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -85,14 +85,27 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   niezależny od migracji bazy notatek.
 - Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
   backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
-- 45: `AppScope`; 54: `_AppScopeState`; 282: `didRequestAppExit`;
+- 47: `AppScope`; 56: `_AppScopeState`; 300: `didRequestAppExit`;
   `_startAccountSync` automatycznie odtwarza stan po logowaniu i restarcie
   na wszystkich platformach, zanim uruchomi backup.
-- 488: `_syncAccountSettings`; 588: `_v2ActorId`;
-  592: `_startV2Account`; 644: `_startAccountSync`;
-  1080: `AppUiScale`; 1128: `_ExitGuardOverlay`;
-  1211: `_FinishingExitOverlay`; 1319: `_BackupScheduler`;
-  1515: `flushForExit`.
+- 121: `_quiesceAccountWriters` unieważnia bootstrap i czeka na niego
+  przed opróżnieniem writerów oraz zmianą namespace/API identity.
+- 506: `_syncAccountSettings`; 606: `_v2ActorId`;
+  609: `_isCurrentAccountBootstrap`; 619: `_startV2Account`;
+  665: `_startAccountSync`. Każdy startup ma generację; późny odczyt
+  protokołu/aktora nie może uruchomić opuszczonego konta ani zwolnić UI.
+- 1119: `AppUiScale`; 1167: `_ExitGuardOverlay`;
+  1250: `_FinishingExitOverlay`; 1358: `_BackupScheduler`;
+  1554: `flushForExit`.
+
+### `lib/app/account_bootstrap_barrier.dart`
+
+Unieważnia start konta przed pierwszym await drenażu, łączy równoczesne
+drenaże i odrzuca stare generacje również po powrocie na to samo konto.
+Błąd pozwala ponowić operację; dispose nigdy nie odblokowuje startu.
+4: `AccountBootstrapBarrier`; 11: `canStart`; 12: `isCurrent`;
+14: `quiesce`; 43: `dispose`.
+Regresje: `test/account_bootstrap_barrier_test.dart`.
 
 ### `lib/app/account_protocol_editor_gate.dart`
 
@@ -605,6 +618,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   tylko dla konta z potwierdzonym protokołem v2. Wysyłanie lokalnego outboxu
   poprzedza przyjęcie zdalnej operacji dla tego samego dokumentu; konflikty
   bez rebase blokują kursor zamiast nadpisywać lokalny gest.
+  99: `attachEditor`; 108: `detachEditor`; 115: `editorForDocument`;
+  142: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
+  sprawdza właściciela przed startem i po każdym await. Anulowanie
+  zatrzymuje transport, zachowując blokadę snapshotów v1.
+  Regresje: `test/editor_v2_account_startup_test.dart`; realny Linux E2E
+  używa tego samego wejścia startowego co AppScope.
 - `lib/app/app_scope.dart`: przełączenie konta v2 jest **opt-in** przez
   `--dart-define=NN_ENABLE_V2_ACCOUNT=true`. Bez tej flagi konto v2
   pozostaje na ekranie blokady zgodności; konto v1 nadal używa starego
@@ -778,7 +797,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   pozwala w testach używać pamięci; implementacja
   `SecureAccountCredentialStore` korzysta z `flutter_secure_storage`
   dla natywnych systemów oraz Web.
-- `lib/data/sync/account_session_controller.dart` (531): trwały profil
+- `lib/data/sync/account_session_controller.dart` (600): trwały profil
   pierwszego uruchomienia i trybu lokalnego, rejestracja/logowanie,
   rotacja refresh tokenów i ich bezpieczne utrwalanie poza
   `account_profile.json`. Przy starcie odświeża zapisaną sesję,
@@ -787,11 +806,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   serializowane z operacjami na magazynie sekretów; ponowny login
   nie traci danych lokalnych. Przy logout kończy zapisy i synchronizację
   przed odwołaniem serwerowej sesji; błąd flush pozostawia aktywne konto.
+  `isBusy` obejmuje cały logout, także odwołanie HTTP i usunięcie sekretu;
+  równoczesne wylogowania współdzielą Future. Błąd zwalnia blokadę i
+  pozwala ponowić logout. Regresje: `test/account_session_controller_test.dart`.
   `shouldShowStartupDialog` tylko przy nieukończonym onboardingu.
   10: `AccountDataMode`; 12: `AccountSessionController`;
-  84: `_loadProfile`; 223: `_refreshSession`;
-  247: `_restorePersistedSession`; 313: `_persistRefreshCredential`;
-  343: `changePassword`; 396: `useLocalProfile`.
+  90: `_loadProfile`; 220: `_refreshSession`;
+  269: `_restorePersistedSession`; 335: `_persistRefreshCredential`;
+  365: `changePassword`; 397: `logout`; 466: `useLocalProfile`.
   Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
 - `lib/data/sync/account_settings_sync_service.dart` (aktualizowany):
   11: `AccountSettingsSyncService`; 34: `syncNow`; 164: `stop`.
@@ -937,6 +959,12 @@ Nie zastępuje to serwerowej blokady protokołu. Atomowe przywracanie i import r
 parametr `notifyChanges`, zgłaszając zmianę dopiero po zatwierdzeniu.
 Ręczny eksport pozostaje samowystarczalny
 i zachowuje obrazy inline.
+
+89: `enableAccountOperations` publikuje blokadę v1 przed pierwszym await.
+Ponowne wiązanie tego samego writera czeka na wspólną walidację legacy,
+także przy aktywnym edytorze. Inny writer pozostaje zabroniony; błąd
+walidacji nie migruje dokumentów i usuwa stan nieudanego wiązania.
+Regresje: `test/editor_v2_account_startup_test.dart`.
 
 - 23: `DataIntegrityIncidentHandler`; 30: `NotebookRepositoryChange`;
   45: `RepositoryChangeHandler`; 55: `NotebookRepository`.
@@ -3208,7 +3236,8 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 `tool/verify_stage3_local.sh`: tylko odczytowy format-check,
 `dart analyze`, wąskie testy v2 (w tym checkpointy historii) i pełny
 `flutter test` bez GitHub Actions. Format obejmuje również test live API;
-nie uruchamia go bez izolowanego backendu. Obejmuje natywne obrazy i historię;
+nie uruchamia go bez izolowanego backendu. Obejmuje natywne obrazy i historię,
+anulowanie bootstrapu, ponowne wiązanie writera oraz logout;
 render PDF na Linuxie wymaga `poppler-utils`. Job `analyze-and-unit` instaluje
 ten pakiet i dodatkowo wykonuje
 build_runner i sprawdza brak zmian wygenerowanego mapowania Drift.

@@ -34,6 +34,8 @@ dart format --output=none --set-exit-if-changed \
   lib/features/notebook/data/notebook_repository.dart \
   lib/features/library/presentation/library_screen.dart \
   lib/app/app_scope.dart \
+  lib/app/account_bootstrap_barrier.dart \
+  lib/data/sync/account_session_controller.dart \
   lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart \
   lib/features/editor/presentation/widgets/page_overlay.dart \
   lib/features/editor/presentation/widgets/text_edit_toolbar.dart \
@@ -58,6 +60,9 @@ dart format --output=none --set-exit-if-changed \
   test/verified_quill_embed_builder_test.dart \
   test/notebook_repository_v2_account_test.dart \
   test/library_v2_settings_test.dart \
+  test/account_bootstrap_barrier_test.dart \
+  test/account_session_controller_test.dart \
+  test/editor_v2_account_startup_test.dart \
   test/editor_v2_offline_media_test.dart \
   test/editor_v2_quill_asset_recovery_test.dart \
   test/page_overlay_v2_quill_edit_test.dart \
@@ -88,6 +93,9 @@ flutter test --concurrency=1 \
   test/verified_quill_embed_builder_test.dart \
   test/notebook_repository_v2_account_test.dart \
   test/library_v2_settings_test.dart \
+  test/account_bootstrap_barrier_test.dart \
+  test/account_session_controller_test.dart \
+  test/editor_v2_account_startup_test.dart \
   test/editor_v2_offline_media_test.dart \
   test/editor_v2_quill_asset_recovery_test.dart \
   test/page_overlay_v2_quill_edit_test.dart \

@@ -40,6 +40,7 @@ import '../features/library/presentation/library_screen.dart';
 import '../features/notebook/data/notebook_repository.dart';
 import '../features/notebook/domain/notebook.dart';
 import '../features/planner/state/study_planner_controller.dart';
+import 'account_bootstrap_barrier.dart';
 import 'account_protocol_editor_gate.dart';
 import 'unsupported_account_protocol_screen.dart';
 
@@ -84,6 +85,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   StudyPlannerController? _studyPlanner;
   _BackupScheduler? _backupScheduler;
   Future<void>? _accountBootstrap;
+  final AccountBootstrapBarrier _accountBootstrapBarrier =
+      AccountBootstrapBarrier();
   Timer? _rememberedLoginRetry;
   bool _appIsForeground = true;
   String? _bootstrappedAccount;
@@ -115,21 +118,26 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _quiesceAccountWriters() async {
-    await AppSaveCoordinator.instance.flushPending();
-    await _repository?.waitForPendingSaves();
-    await _backupScheduler?.flushForExit();
-    await _backupService?.waitUntilIdle();
-    await SharedRecentColors.load();
-    await waitForPendingTextStorageOperations();
-    await _liveSync?.stop();
-    await _v2AccountRuntime?.stop();
-    _plannerSync?.stop();
-    _accountSettingsSync?.stop();
-    await _remoteBackupScheduler?.stop();
-    _bootstrappedAccount = null;
-    _legacyProtocolReadyUser = null;
-    _incompatibleProtocolUser = null;
+  Future<void> _quiesceAccountWriters() {
+    return _accountBootstrapBarrier.quiesce(() async {
+      // A pending actor/protocol read must settle before its SQLite namespace
+      // or API identity is replaced. The invalidated bootstrap cannot publish UI.
+      await _accountBootstrap;
+      await AppSaveCoordinator.instance.flushPending();
+      await _repository?.waitForPendingSaves();
+      await _backupScheduler?.flushForExit();
+      await _backupService?.waitUntilIdle();
+      await SharedRecentColors.load();
+      await waitForPendingTextStorageOperations();
+      await _liveSync?.stop();
+      await _v2AccountRuntime?.stop();
+      _plannerSync?.stop();
+      _accountSettingsSync?.stop();
+      await _remoteBackupScheduler?.stop();
+      _bootstrappedAccount = null;
+      _legacyProtocolReadyUser = null;
+      _incompatibleProtocolUser = null;
+    });
   }
 
   Future<void> _switchNamespaceIfNeeded() async {
@@ -227,6 +235,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _accountBootstrapBarrier.dispose();
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     _activityWake?.dispose();
@@ -597,10 +606,23 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   Future<String> _v2ActorId() =>
       loadPersistentOperationActor(OperationStore(_repository!.database));
 
+  bool _isCurrentAccountBootstrap(String userId, int generation) =>
+      mounted &&
+      _accountBootstrapBarrier.isCurrent(generation) &&
+      !_switchingNamespace &&
+      _accountSession?.isSignedIn == true &&
+      _accountSession?.isBusy == false &&
+      _accountSession?.userId == userId &&
+      _namespace == StorageNamespace.account(userId);
+
   /// Starts the operational engine for an explicitly confirmed v2 account.
-  Future<void> _startV2Account(String userId) async {
+  Future<void> _startV2Account(String userId, int generation) async {
     if (!_enableV2AccountPreview) {
       throw AccountProtocolNotSupported();
+    }
+    bool isCurrent() => _isCurrentAccountBootstrap(userId, generation);
+    if (!isCurrent()) {
+      return;
     }
     final repository = _repository;
     final apiClient = _apiClient;
@@ -608,46 +630,36 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (repository == null || apiClient == null || library == null) {
       throw StateError('V2 account cannot start without its SQLite scope.');
     }
-    // Never silently reinterpret old document rows as an operational
-    // projection. A separate, verified migration is required first.
-    final legacy = await repository.database
-        .customSelect(
-          'SELECT n.uid FROM notebook_rows n WHERE NOT EXISTS '
-          '(SELECT 1 FROM operations o WHERE o.document_id = n.uid) LIMIT 1',
-        )
-        .getSingleOrNull();
-    if (legacy != null) {
-      throw StateError(
-        'Legacy documents must be migrated before enabling account v2.',
+    var runtime = _v2AccountRuntime;
+    if (runtime == null) {
+      final actorId = await _v2ActorId();
+      if (!isCurrent()) {
+        return;
+      }
+      runtime = EditorV2AccountRuntime(
+        repository: repository,
+        apiClient: apiClient,
+        accountId: userId,
+        actorId: actorId,
+        onLibraryChanged: library.loadItems,
       );
+      // Publish ownership before startup so logout can stop this transport.
+      _v2AccountRuntime = runtime;
     }
-    final runtime =
-        _v2AccountRuntime ??
-        EditorV2AccountRuntime(
-          repository: repository,
-          apiClient: apiClient,
-          accountId: userId,
-          actorId: await _v2ActorId(),
-          onLibraryChanged: library.loadItems,
-        );
-    _v2AccountRuntime = runtime;
-    await repository.enableAccountOperations(runtime.writer);
-    await runtime.start();
-    if (!mounted ||
-        _accountSession?.userId != userId ||
-        _accountSession?.isSignedIn != true) {
-      await runtime.stop();
+    if (!await runtime.startForCurrentAccount(isCurrent: isCurrent)) {
       return;
     }
     await library.loadItems();
+    if (!isCurrent()) {
+      await runtime.stop();
+      return;
+    }
     _bootstrappedAccount = userId;
     // Planner, Share and legacy remote snapshot services remain disabled
     // until they have their own verified v2 cutover.
-    if (mounted) {
-      setState(() {
-        _incompatibleProtocolUser = null;
-      });
-    }
+    setState(() {
+      _incompatibleProtocolUser = null;
+    });
   }
 
   Future<void> _startAccountSync() {
@@ -663,6 +675,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         !session.isSignedIn ||
         session.isBusy ||
         _switchingNamespace ||
+        !_accountBootstrapBarrier.canStart ||
         _namespace != StorageNamespace.account(session.userId!) ||
         backup == null ||
         scheduler == null ||
@@ -684,25 +697,30 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (running != null) {
       return running;
     }
+    final generation = _accountBootstrapBarrier.generation;
+    bool isCurrent() => _isCurrentAccountBootstrap(userId, generation);
     final future = () async {
       try {
         await _plannerReady;
+        if (!isCurrent()) {
+          return;
+        }
         // Never restore an older snapshot or start v1 writers for a v2
         // account. Keep local data and the outbox untouched on failure.
         try {
           await _apiClient!.ensureLegacyAccountProtocol();
         } on AccountProtocolNotSupported {
           try {
-            await _startV2Account(userId);
+            await _startV2Account(userId, generation);
           } catch (_) {
-            if (mounted && session.userId == userId && session.isSignedIn) {
+            if (isCurrent()) {
               setState(() => _incompatibleProtocolUser = userId);
             }
             rethrow;
           }
           return;
         }
-        if (!mounted || session.userId != userId || !session.isSignedIn) {
+        if (!isCurrent()) {
           return;
         }
         if (_incompatibleProtocolUser == userId && mounted) {
@@ -732,7 +750,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             );
           }
         }
-        if (!mounted || session.userId != userId) {
+        if (!isCurrent()) {
           return;
         }
         if (restored) {
@@ -743,7 +761,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         // Settings use their own versioned account record rather than
         // replacing a newer device preference with a stale backup.
         await _syncAccountSettings();
+        if (!isCurrent()) {
+          return;
+        }
         await sync.start(InitialSyncPolicy.mergeSafely);
+        if (!isCurrent()) {
+          await sync.stop();
+          return;
+        }
         try {
           await _plannerSync?.syncNow();
         } catch (error, stackTrace) {
@@ -753,7 +778,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             source: 'AppScope.initialPlannerSync',
           );
         }
-        if (!mounted || session.userId != userId) {
+        if (!isCurrent()) {
           return;
         }
         if (recoveryFailure != null) {
@@ -763,6 +788,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           return;
         }
         await backup.markDatabaseInitialized(userId);
+        if (!isCurrent()) {
+          return;
+        }
         _databaseWasReset = false;
         _databaseFreshFile = false;
         _bootstrappedAccount = userId;
@@ -774,10 +802,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           unawaited(_syncPlanner());
         });
       } catch (error, stackTrace) {
-        if (error is AccountProtocolNotSupported &&
-            mounted &&
-            session.isSignedIn &&
-            session.userId == userId) {
+        if (!isCurrent()) {
+          return;
+        }
+        if (error is AccountProtocolNotSupported) {
           setState(() => _incompatibleProtocolUser = userId);
         }
         sync.reportStartupFailure(error);
