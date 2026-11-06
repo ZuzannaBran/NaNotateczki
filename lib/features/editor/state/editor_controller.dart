@@ -2960,8 +2960,9 @@ class EditorController extends ChangeNotifier {
     required String plainText,
     required String deltaJson,
   }) {
-    final normalizedText =
-        OperationTextSequence.withoutQuillTerminalNewline(plainText);
+    final normalizedText = OperationTextSequence.withoutQuillTerminalNewline(
+      plainText,
+    );
     final after = before.copyWith(text: normalizedText, deltaJson: deltaJson);
     if (before.text == after.text && before.deltaJson == after.deltaJson) {
       return;
