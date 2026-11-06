@@ -1564,6 +1564,9 @@ podczas asynchronicznego inverse pozostaje w UI i blokuje zapis zamiast
 zostać nadpisany. `_applyV2History` wiąże inverse przez
 `revertsOperationId`; przeciwna historia pamięta ID nowego inverse.
 Gest Quill zachowuje koniec ostatniego autosave niezależnie od debounce.
+Po zatwierdzonym odtworzeniu `_remapV2HistoryNotebook` aktualizuje ID
+w obu stosach historii. Redo następnego gestu zachowuje już odtworzone
+obiekty/strony; rollback nie zmienia historycznych tożsamości.
 Historia nie jest jeszcze odtwarzana po restarcie.
 `applyConfirmedV2PagePatch` wprowadza zdalną stronę bez remountu,
 nie zmieniając zoomu i aktualnego wyboru strony. Metoda
@@ -1573,9 +1576,10 @@ Regresja: `test/editor_controller_v2_test.dart`, w tym cofanie i
 ponawianie ink oraz stron bez ponownego użycia tombstones.
 Ten sam test obejmuje dwa rzeczywiste autosave'y Quill, pojedyncze
 Undo/Redo/Undo, zależności inverse i edycję o zerowym efekcie.
-Ważne granice: 596: `flushPendingSaves`; 2011: `_applyV2History`;
-2279: `updateTextBlockContent`; 3678: `_commitActiveTextEdit`;
-3773: `_captureV2Gesture`; 3797: `_saveV2`.
+Ważne granice: 592: `flushPendingSaves`; 2007: `_applyV2History`;
+2152: `_remapV2HistoryNotebook`; 2330: `updateTextBlockContent`;
+3729: `_commitActiveTextEdit`; 3824: `_captureV2Gesture`;
+3848: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod

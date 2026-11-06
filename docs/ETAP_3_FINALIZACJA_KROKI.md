@@ -1,5 +1,21 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Stabilne ID w wielokrotnym Undo/Redo — 2026-11-06
+
+Usunięte obiekty/strony są odtwarzane pod nowymi ID, ale pozostałe
+snapshoty historii pamiętały wcześniejsze tożsamości. Redo następnego
+gestu mogło przez to kasować i tworzyć ponownie już odtworzoną kreskę
+lub stronę. Kontroler po udanym commicie przenosi mapowanie nowych ID
+do obu stosów historii. Zachowuje operationId cofanych gestów i nie
+zmienia snapshotów przy błędzie transakcji.
+
+Rozszerzony test szybkich gestów wykonuje Undo/Undo/Redo/Redo dla dwóch
+kresek i dla utworzenia strony z kreską. Sprawdza stabilność już
+odtworzonego ID oraz dokładny przyrost outboxu: tylko nowa kreska,
+bez zbędnego delete/create strony lub wcześniejszego obiektu.
+Wymusza też błąd SQLite podczas odtwarzania i bezpieczne ponowienie.
+Nowe testy pozostają do potwierdzenia w kolejnym odczycie Actions.
+
 ## Odtwarzanie osadzonych mediów w Undo — 2026-11-06
 
 Writer odzyskuje potwierdzenie istniejącego assetu Quill z dziennika

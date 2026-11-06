@@ -2023,10 +2023,11 @@ class EditorController extends ChangeNotifier {
     final entry = source.last;
     final original = _v2PersistedNotebook;
     final desired = undo ? entry.before : entry.after;
-    final restored = _reidentifyV2RestoredObjects(
+    final restoration = _reidentifyV2RestoredObjects(
       current: original,
       desired: desired,
     );
+    final restored = restoration.notebook;
     final visibleBeforeCommit = pages;
     _v2HistoryCommitting = true;
     late final bool hasCommitted;
@@ -2039,9 +2040,21 @@ class EditorController extends ChangeNotifier {
       );
       hasCommitted = committed.isNotEmpty;
       if (hasCommitted) {
+        // Later history entries refer to the same logical objects. Remap
+        // their snapshots only after the new identities are durable.
+        for (final history in [_v2Undo, _v2Redo]) {
+          for (var index = 0; index < history.length; index++) {
+            final previous = history[index];
+            history[index] = _V2HistoryEntry(
+              _remapV2HistoryNotebook(previous.before, restoration),
+              _remapV2HistoryNotebook(previous.after, restoration),
+              previous.operationId,
+            );
+          }
+        }
         oppositeEntry = _V2HistoryEntry(
-          entry.before,
-          entry.after,
+          _remapV2HistoryNotebook(entry.before, restoration),
+          _remapV2HistoryNotebook(entry.after, restoration),
           committed.last.operationId,
         );
       }
@@ -2093,7 +2106,8 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Notebook _reidentifyV2RestoredObjects({
+  ({Notebook notebook, Map<String, String> pages, Map<String, String> objects})
+  _reidentifyV2RestoredObjects({
     required Notebook current,
     required Notebook desired,
   }) {
@@ -2106,28 +2120,69 @@ class EditorController extends ChangeNotifier {
       for (final page in current.pages)
         ...page.imageBlocks.map((item) => item.id),
     };
-    return desired.copyWith(
+    final restoredPages = <String, String>{};
+    final restoredObjects = <String, String>{};
+    String restoredId(String id) =>
+        objectIds.contains(id) ? id : restoredObjects.putIfAbsent(id, _uuid.v4);
+    final restored = desired.copyWith(
       pages: [
         for (final page in desired.pages)
           page.copyWith(
-            id: pageIds.contains(page.id) ? page.id : _uuid.v4(),
+            id: pageIds.contains(page.id)
+                ? page.id
+                : restoredPages.putIfAbsent(page.id, _uuid.v4),
             inkStrokes: [
               for (final stroke in page.inkStrokes)
-                objectIds.contains(stroke.id)
-                    ? stroke
-                    : stroke.copyWith(id: _uuid.v4()),
+                stroke.copyWith(id: restoredId(stroke.id)),
             ],
             textBlocks: [
               for (final block in page.textBlocks)
-                objectIds.contains(block.id)
-                    ? block
-                    : block.copyWith(id: _uuid.v4()),
+                block.copyWith(id: restoredId(block.id)),
             ],
             imageBlocks: [
               for (final block in page.imageBlocks)
-                objectIds.contains(block.id)
-                    ? block
-                    : block.copyWith(id: _uuid.v4()),
+                block.copyWith(id: restoredId(block.id)),
+            ],
+          ),
+      ],
+    );
+    return (notebook: restored, pages: restoredPages, objects: restoredObjects);
+  }
+
+  Notebook _remapV2HistoryNotebook(
+    Notebook snapshot,
+    ({
+      Notebook notebook,
+      Map<String, String> pages,
+      Map<String, String> objects,
+    })
+    restoration,
+  ) {
+    if (restoration.pages.isEmpty && restoration.objects.isEmpty) {
+      return snapshot;
+    }
+    return snapshot.copyWith(
+      pages: [
+        for (final page in snapshot.pages)
+          page.copyWith(
+            id: restoration.pages[page.id] ?? page.id,
+            inkStrokes: [
+              for (final stroke in page.inkStrokes)
+                restoration.objects.containsKey(stroke.id)
+                    ? stroke.copyWith(id: restoration.objects[stroke.id])
+                    : stroke,
+            ],
+            textBlocks: [
+              for (final block in page.textBlocks)
+                restoration.objects.containsKey(block.id)
+                    ? block.copyWith(id: restoration.objects[block.id])
+                    : block,
+            ],
+            imageBlocks: [
+              for (final block in page.imageBlocks)
+                restoration.objects.containsKey(block.id)
+                    ? block.copyWith(id: restoration.objects[block.id])
+                    : block,
             ],
           ),
       ],

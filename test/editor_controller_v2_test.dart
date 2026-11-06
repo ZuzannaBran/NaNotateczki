@@ -531,5 +531,60 @@ void main() {
       (await repo.getNotebook(notebook.uid))!.pages.single.inkStrokes,
       hasLength(2),
     );
+    editor.undo();
+    await editor.flushPendingSaves();
+    editor.undo();
+    await editor.flushPendingSaves();
+    expect(editor.currentPage.inkStrokes, isEmpty);
+    final beforeFailedRestore = (await store.pending()).length;
+    await db.customStatement('''
+      CREATE TEMP TRIGGER reject_restore BEFORE INSERT ON operations
+      WHEN NEW.kind = 'stroke.create'
+      BEGIN SELECT RAISE(ABORT, 'injected restoration failure'); END
+    ''');
+    editor.redo();
+    await editor.flushPendingSaves();
+    expect(editor.currentPage.inkStrokes, isEmpty);
+    expect(editor.canRedo, isTrue);
+    expect(await store.pending(), hasLength(beforeFailedRestore));
+    await db.customStatement('DROP TRIGGER reject_restore');
+    editor.redo();
+    await editor.flushPendingSaves();
+    final firstRestoredId = editor.currentPage.inkStrokes.single.id;
+    final beforeSecondRedo = (await store.pending()).length;
+    editor.redo();
+    await editor.flushPendingSaves();
+    expect(editor.currentPage.inkStrokes.first.id, firstRestoredId);
+    expect(
+      (await store.pending()).skip(beforeSecondRedo).map((op) => op.kind),
+      [OperationKind.strokeCreate],
+    );
+    editor.undo();
+    await editor.flushPendingSaves();
+    expect(editor.currentPage.inkStrokes.single.id, firstRestoredId);
+
+    editor.addPage();
+    await editor.flushPendingSaves();
+    final originalPageId = editor.currentPage.id;
+    editor.addInkStroke(const [InkPoint(dx: 8, dy: 9, pressure: 0.7)]);
+    await editor.flushPendingSaves();
+    editor.undo();
+    await editor.flushPendingSaves();
+    editor.undo();
+    await editor.flushPendingSaves();
+    expect(editor.pages, hasLength(1));
+    editor.redo();
+    await editor.flushPendingSaves();
+    final restoredPageId = editor.pages.last.id;
+    expect(restoredPageId, isNot(originalPageId));
+    final beforeInkRedo = (await store.pending()).length;
+    editor.redo();
+    await editor.flushPendingSaves();
+    expect(editor.pages, hasLength(2));
+    expect(editor.pages.last.id, restoredPageId);
+    expect(editor.pages.last.inkStrokes, hasLength(1));
+    expect((await store.pending()).skip(beforeInkRedo).map((op) => op.kind), [
+      OperationKind.strokeCreate,
+    ]);
   });
 }
