@@ -1,5 +1,14 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Ponowna analiza po testach historii — 2026-11-06
+
+Przebieg `42144008139` dla `c6d8db3` przeszedł formatowanie,
+ale zatrzymał się na dwóch ostrzeżeniach `unnecessary_non_null_assertion`
+w regresji typing → delete. Callback korzysta teraz z lokalnej,
+sprawdzonej zmiennej Completer bez zbędnego `!`. Zestaw testów nie
+został w tym przebiegu uruchomiony. Ponowienie obejmuje wyłącznie
+analizę i testy natywne; wynik należy sprawdzić w następnej sesji.
+
 ## Usunięcie aktywnego tekstu przed autosave — 2026-11-06
 
 `deleteTextBlock` w v2 nie odrzuca już granicy aktywnej edycji.

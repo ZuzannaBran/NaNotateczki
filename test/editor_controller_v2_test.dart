@@ -341,8 +341,9 @@ void main() {
           syncEngine: engine,
           projector: projector,
           onCommitted: (_, __) {
-            if (typedCommitted != null && !typedCommitted!.isCompleted) {
-              typedCommitted!.complete();
+            final waiter = typedCommitted;
+            if (waiter != null && !waiter.isCompleted) {
+              waiter.complete();
             }
           },
         );
