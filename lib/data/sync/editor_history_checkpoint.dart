@@ -2,6 +2,11 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart' as crypto;
 
+/// A resource limit is distinct from corrupt or incorrectly scoped history.
+class EditorHistoryBudgetExceeded extends FormatException {
+  const EditorHistoryBudgetExceeded(super.message);
+}
+
 String _canonical(Object? value) {
   Object? normalize(Object? value, [int depth = 0]) {
     if (depth > 64) {
@@ -99,6 +104,44 @@ class EditorHistoryCheckpoint {
   final List<StoredEditorGesture> undo;
   final List<StoredEditorGesture> redo;
 
+  /// Keeps the nearest Undo/Redo boundaries without changing this checkpoint.
+  /// Oldest Undo is discarded first, then the farthest Redo. An empty history
+  /// still retains its document, actor and committed operation identity.
+  EditorHistoryCheckpoint fitToByteBudget({int byteLimit = maximumBytes}) {
+    try {
+      encode(byteLimit: byteLimit);
+      return this;
+    } on EditorHistoryBudgetExceeded {
+      // Removing boundaries can only reduce JSON and its referenced states.
+      // Binary search avoids encoding a large history once per removed entry.
+      EditorHistoryCheckpoint afterDropping(int count) =>
+          EditorHistoryCheckpoint(
+            documentId: documentId,
+            ownerId: ownerId,
+            headOperationId: headOperationId,
+            undo: undo.sublist(count < undo.length ? count : undo.length),
+            redo: redo.sublist(count > undo.length ? count - undo.length : 0),
+          );
+      final total = undo.length + redo.length;
+      var best = afterDropping(total);
+      best.encode(byteLimit: byteLimit);
+      var low = 1;
+      var high = total;
+      while (low <= high) {
+        final middle = (low + high) ~/ 2;
+        final candidate = afterDropping(middle);
+        try {
+          candidate.encode(byteLimit: byteLimit);
+          best = candidate;
+          high = middle - 1;
+        } on EditorHistoryBudgetExceeded {
+          low = middle + 1;
+        }
+      }
+      return best;
+    }
+  }
+
   String encode({int byteLimit = maximumBytes}) {
     if (byteLimit < 1 || byteLimit > maximumBytes) {
       throw ArgumentError('Invalid history size limit.');
@@ -130,14 +173,18 @@ class EditorHistoryCheckpoint {
       'redo': after,
     });
     if (utf8.encode(json).length > byteLimit) {
-      throw const FormatException('History exceeds its byte budget.');
+      throw const EditorHistoryBudgetExceeded(
+        'History exceeds its byte budget.',
+      );
     }
     return json;
   }
 
   static EditorHistoryCheckpoint decode(String json) {
     if (json.length > maximumBytes || utf8.encode(json).length > maximumBytes) {
-      throw const FormatException('History exceeds its byte budget.');
+      throw const EditorHistoryBudgetExceeded(
+        'History exceeds its byte budget.',
+      );
     }
     final root = jsonDecode(json);
     const keys = {

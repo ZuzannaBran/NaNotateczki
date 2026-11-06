@@ -1,5 +1,40 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Limit historii i metadata-only inverse — 2026-11-06
+
+Najpierw sprawdzono Actions `42210246686` dla `dce1bf6`: generator,
+format, analiza, 974 zaliczone testy (2 pominięte), pokrycie 70,78%.
+Naprawa palet `003ae91` również zielona. Backend `42160118098` bez błędów.
+
+`EditorHistoryBudgetExceeded` rozróżnia przekroczenie limitu rozmiaru od
+uszkodzonych/scoped danych. `fitToByteBudget` zachowuje największy
+mieszczący się sufiks historii: najpierw usuwa najstarsze Undo, potem
+najdalsze Redo. Wyszukiwanie binarne ogranicza liczbę kosztownych kodowań.
+Nie zmienia wejściowych stosów ani scope/head; w ostateczności zachowuje
+pustą historię zamiast blokować samą operację dokumentu. Błędy integralności
+nie są przechwytywane jako limit. Wywołanie redukcji musi być jawne;
+samo dodanie API nie zmienia jeszcze zachowania kontrolera.
+
+`EditorHistoryNotebookCodec.remapIdentities` kopiuje metadane i zmienia
+jedynie ID stron/obiektów. Nie ładuje BLOB-ów i nie odczytuje SQLite;
+Delta, asset ID i dokument pozostają takie same. Waliduje scope i kolizje.
+Istniejący scenariusz delete → checkpoint → restart → nowy inverse →
+restart Redo używa teraz tego remapu zamiast ręcznego kopiowania modeli.
+
+Dodano 6 testów pure Dart dopasowania obu stosów, granicy UTF-8,
+największego zachowanego sufiksu i typów błędów; 1 regresję transakcji
+SQLite (redukcja historii zachowuje treść i outbox) oraz 2 regresje remapu,
+w tym wykonanie przy zamkniętej bazie. Wszystkie 12 testów formatu historii
+i ich analiza przeszły lokalnie. Testy Flutter są kierowane do Actions
+wyłącznie aplikacji; nie czekamy na wynik. Nie zmieniono schematu ani API
+sieciowego.
+
+Następna sesja: sprawdzić Actions, potem podłączyć zapis/odczyt stosów w
+`EditorController`. Korzystać z jawnego dopasowania budżetu i remapu
+metadanych w callbacku transakcji, zmieniać pamięć UI dopiero po commicie.
+Nadal wymagane są testy rzeczywistego kontrolera po restarcie, autosave,
+Undo/Redo i błędach zapisu; flaga opt-in i etap 3 pozostają otwarte.
+
 ## Kodek notebooka i zweryfikowanych mediów historii — 2026-11-06
 
 Najpierw zdiagnozowano `42202704002`: generator Drift, analiza i 15 testów

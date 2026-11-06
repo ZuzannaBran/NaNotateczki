@@ -519,32 +519,41 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `notes_database_connection_io.dart`: WAL + `synchronous=FULL`.
 - `notebook_repository.dart`: `_upsertNotebookPages` i `_upsertPage`
   aktualizują rekordy zamiast pełnego kasowania i reinstalacji.
-- `lib/data/sync/editor_history_checkpoint.dart`: 44: `StoredEditorGesture`,
-  65: `EditorHistoryCheckpoint`, 138: `decode`. Niezmienny JSON obu stosów,
+- `lib/data/sync/editor_history_checkpoint.dart`: 6: `EditorHistoryBudgetExceeded`,
+  49: `StoredEditorGesture`, 70: `EditorHistoryCheckpoint`, 183: `decode`. Niezmienny JSON obu stosów,
   stany content-addressed SHA-256; ścisła wersja i zakres, 50 gestów /
-  4 MiB UTF-8. Metadane lokalne, bez protokołu/backupów; codec notebooka
+  4 MiB UTF-8. 110: `fitToByteBudget` zachowuje największą mieszczącą się
+  historię, usuwając najpierw najstarsze Undo, potem najdalsze Redo;
+  limit rozmiaru ma osobny wyjątek, nie maskuje korupcji.
+  Metadane lokalne, bez protokołu/backupów; codec notebooka
   opisano poniżej, podłączenie kontrolera pozostaje do wykonania.
 - `lib/data/sync/editor_history_store.dart`: 11: `EditorHistoryStore`,
   68: `save`, 96: `load`. Zapis w transakcji gestu, izolacja dokument/aktor,
   kontrola lokalnych operacji i checksum. Nowa głowa unieważnia historię,
   tombstone blokuje zapis; korupcja nie zmienia dokumentu ani outboxu.
 - `lib/data/sync/editor_history_notebook_codec.dart`: 24:
-  `EditorHistoryNotebookCodec`, 75: `encode`, 214: `decode`, 240: `_notebook`.
+  `EditorHistoryNotebookCodec`, 32: `remapIdentities`, 109: `encode`,
+  248: `decode`, 274: `_notebook`.
   JSON metadanych notebooka/boarda bez bajtów i ścieżek; ink, Quill,
   kolejność stron/warstw i UTC. Media wyłącznie przez trwałe scoped
   receipts i checksumowane BLOB-y; najwcześniejszy alias stabilizuje stan.
   Wejścia zamrożone przed I/O, ścisłe wersje/pola/ID/geometria i budżet.
+  Remap ID jest synchroniczny, kopiuje metadane bez SQL/BLOB, zachowuje
+  Delta i assety; kolizje tożsamości są odrzucane przed inverse.
   Path-only import wymaga wcześniejszej materializacji; decode nie zapisuje
   bazy ani nie wskrzesza tombstones. Stosy kontrolera jeszcze niepodłączone.
-- `test/editor_history_notebook_codec_test.dart`: 16 testów plikowego SQLite:
+- `test/editor_history_notebook_codec_test.dart`: 18 testów plikowego SQLite:
   media/Quill i restart, usunięcia, atomowy checkpoint i nowy inverse,
   scope, checksum/receipt, plain text/warstwy, mutacje podczas await,
-  stabilność aliasów, budżety, korupcja i niezależne kopie bajtów.
-- `test/editor_history_checkpoint_test.dart`: 6 testów formatu, deduplikacji,
-  niemutowalności, zakresu, wersji, korupcji i budżetu UTF-8.
-- `test/editor_history_store_test.dart`: 9 regresji SQLite/writera: restart,
+  stabilność aliasów, budżety, korupcja, niezależne kopie bajtów oraz
+  metadata-only remap i kolizje ID (również przy zamkniętej bazie).
+- `test/editor_history_checkpoint_test.dart`: 12 testów formatu, deduplikacji,
+  niemutowalności, zakresu, wersji, korupcji i budżetu UTF-8; dopasowanie
+  obu stosów, największy zachowany sufiks i rozróżnienie błędu limitu.
+- `test/editor_history_store_test.dart`: 10 regresji SQLite/writera: restart,
   atomowość/rollback wielu operacji, retry actorSeq, autosave bez operacji,
-  owner/document/remote scope, korupcja, nowa głowa, tombstone, migracja v7→v8.
+  owner/document/remote scope, korupcja, nowa głowa, tombstone, migracja v7→v8
+  i ograniczenie historii bez utraty treści/outboxu w transakcji gestu.
 - `test/operation_store_test.dart`: rollback, ponawianie, ACK, usunięcia,
   migracja z v2, snapshoty i checkpointy; oczekiwana wersja schematu v8.
 - `test/notebook_incremental_update_test.dart`: wyzwalacze SQL wykrywają

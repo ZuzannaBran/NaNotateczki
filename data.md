@@ -11,6 +11,18 @@ SHA-256, maksymalnie 50 gestów / 4 MiB UTF-8. To wyłącznie lokalne
 metadane odzyskiwania, bez wysyłki przez API i bez użycia
 `document_snapshots`, backupu lub odtwarzania legacy snapshotów.
 
+`fitToByteBudget` jawnie przygotowuje mniejszy checkpoint: usuwa najstarsze
+Undo, następnie najdalsze Redo, zachowując najbliższe kroki i scope/head.
+Może zwrócić puste stosy, ale nie usuwa notatki, operacji ani outboxu.
+`EditorHistoryBudgetExceeded` odróżnia limit zasobów od niepoprawnego
+formatu, scope lub checksum. Wyłącznie limit można obsłużyć redukcją
+historii; pozostałych błędów nie wolno w ten sposób maskować.
+`remapIdentities` kodeka kopiuje wyłącznie metadane i zmienia typed ID
+stron/obiektów, bez odczytu BLOB-ów lub SQLite. Zachowuje tekst Delta,
+asset ID i zakres dokumentu; odrzuca kolizje. To granica przygotowania
+inverse, nie operacja przywracająca wiersze. Podłączenie wywołań przez
+kontroler nadal jest osobnym, otwartym krokiem.
+
 Zapis przez `onCommittedInTransaction` należy do tej samej transakcji co
 projekcja i outbox. Błąd wycofuje również operacje i actorSeq. Callback
 może domknąć już zapisany autosave bez nowej operacji. Magazyn sprawdza

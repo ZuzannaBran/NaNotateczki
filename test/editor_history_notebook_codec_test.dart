@@ -526,6 +526,84 @@ void main() {
   );
 
   test(
+    'identity remapping uses metadata only and preserves assets and Delta',
+    () async {
+      final value = await codec.encode(fixture);
+      final originalJson = jsonEncode(value);
+      await engine.stop();
+      await database.close();
+      late Map<String, dynamic> remapped;
+      try {
+        remapped = codec.remapIdentities(
+          value,
+          documentId: fixture.uid,
+          pageIds: {fixture.pages.single.id: 'new-page'},
+          objectIds: {
+            'png': 'new-png',
+            'pdf': 'new-pdf',
+            'quill': 'new-quill',
+            'stroke': 'new-stroke',
+          },
+        );
+      } finally {
+        open();
+      }
+      expect(jsonEncode(value), originalJson);
+      expect(remapped['assets'], value['assets']);
+      final decoded = await codec.decode(remapped, documentId: fixture.uid);
+      final page = decoded.pages.single;
+      expect(page.id, 'new-page');
+      expect(page.imageBlocks.map((image) => image.id), ['new-png', 'new-pdf']);
+      expect(page.textBlocks.single.id, 'new-quill');
+      expect(
+        page.textBlocks.single.deltaJson,
+        fixture.pages.single.textBlocks.single.deltaJson,
+      );
+      expect(page.inkStrokes.single.id, 'new-stroke');
+      expect(
+        (await repository.getNotebook(fixture.uid))!.pages.single.id,
+        fixture.pages.single.id,
+      );
+    },
+  );
+
+  test(
+    'identity remapping rejects collisions, invalid targets and foreign scope',
+    () async {
+      final value = await codec.encode(fixture);
+      final originalJson = jsonEncode(value);
+      for (final mapping in [
+        {'png': 'pdf'},
+        {'png': 'same', 'pdf': 'same'},
+        {'stroke': fixture.uid},
+        {'png': ''},
+      ]) {
+        expect(
+          () => codec.remapIdentities(
+            value,
+            documentId: fixture.uid,
+            objectIds: mapping,
+          ),
+          throwsFormatException,
+        );
+      }
+      expect(
+        () => codec.remapIdentities(
+          value,
+          documentId: fixture.uid,
+          pageIds: {fixture.pages.single.id: 'png'},
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => codec.remapIdentities(value, documentId: 'another-document'),
+        throwsFormatException,
+      );
+      expect(jsonEncode(value), originalJson);
+    },
+  );
+
+  test(
     'large metadata is bounded while large media stays outside JSON',
     () async {
       final encoded = await codec.encode(fixture);
@@ -533,11 +611,11 @@ void main() {
         ..['title'] = 'x' * EditorHistoryCheckpoint.maximumBytes;
       await expectLater(
         codec.decode(copy, documentId: fixture.uid),
-        throwsFormatException,
+        throwsA(isA<EditorHistoryBudgetExceeded>()),
       );
       await expectLater(
         codec.encode(fixture.copyWith(title: copy['title'] as String)),
-        throwsFormatException,
+        throwsA(isA<EditorHistoryBudgetExceeded>()),
       );
       expect(jsonEncode(encoded).length, lessThan(10000));
     },
@@ -615,31 +693,21 @@ void main() {
       final history = (await EditorHistoryStore(
         engine.store,
       ).load(documentId: fixture.uid, ownerId: saved.ownerId))!;
-      final boundary = await codec.decode(
-        history.undo.single.before,
-        documentId: fixture.uid,
-      );
+      final beforeMetadata = history.undo.single.before;
       final current = (await repository.getNotebook(fixture.uid))!;
       expect(current.pages.single.imageBlocks, isEmpty);
-      final page = boundary.pages.single;
-      final recreated = boundary.copyWith(
-        pages: [
-          page.copyWith(
-            imageBlocks: [
-              for (final image in page.imageBlocks)
-                image.copyWith(id: 'restored-${image.id}'),
-            ],
-            textBlocks: [
-              for (final text in page.textBlocks)
-                text.copyWith(id: 'restored-${text.id}'),
-            ],
-            inkStrokes: [
-              for (final stroke in page.inkStrokes)
-                stroke.copyWith(id: 'restored-${stroke.id}'),
-            ],
-          ),
-        ],
+      final page = (beforeMetadata['pages'] as List).single as Map;
+      final replacements = <String, String>{
+        for (final layer in ['images', 'texts', 'ink'])
+          for (final object in page[layer] as List)
+            object['id'] as String: 'restored-${object['id']}',
+      };
+      final remapped = codec.remapIdentities(
+        beforeMetadata,
+        documentId: fixture.uid,
+        objectIds: replacements,
       );
+      final recreated = await codec.decode(remapped, documentId: fixture.uid);
       final inverse = await writer.writeNotebookChange(
         before: current,
         after: recreated,

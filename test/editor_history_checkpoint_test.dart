@@ -21,6 +21,99 @@ EditorHistoryCheckpoint checkpoint({
 );
 
 void main() {
+  test('a checkpoint that fits keeps the same stacks and identity', () {
+    final saved = checkpoint(redo: [gesture('redo', 2, 3)]);
+    expect(identical(saved.fitToByteBudget(), saved), isTrue);
+    expect(saved.fitToByteBudget().encode(), saved.encode());
+  });
+
+  test('byte fitting removes oldest Undo before any Redo without mutation', () {
+    final old = StoredEditorGesture(
+      before: {'uid': 'doc', 'text': '😀' * 2048},
+      after: {'uid': 'doc', 'value': 1},
+      operationId: 'old',
+    );
+    final recent = gesture('recent', 1, 2);
+    final redo = gesture('redo', 2, 3);
+    final saved = checkpoint(undo: [old, recent], redo: [redo]);
+    final expected = checkpoint(undo: [recent], redo: [redo]);
+    final limit = utf8.encode(expected.encode()).length;
+    final fitted = saved.fitToByteBudget(byteLimit: limit);
+    expect(fitted.encode(), expected.encode());
+    expect(saved.undo.map((entry) => entry.operationId), ['old', 'recent']);
+    expect(saved.redo.single.operationId, 'redo');
+    expect(fitted.headOperationId, saved.headOperationId);
+    expect(fitted.ownerId, saved.ownerId);
+  });
+
+  test('byte fitting drops the farthest Redo and retains its next step', () {
+    final far = StoredEditorGesture(
+      before: {'uid': 'doc', 'text': 'x' * 4096},
+      after: {'uid': 'doc', 'value': 2},
+      operationId: 'far',
+    );
+    final near = gesture('near', 1, 2);
+    final saved = checkpoint(undo: [], redo: [far, near]);
+    final expected = checkpoint(undo: [], redo: [near]);
+    final limit = utf8.encode(expected.encode()).length;
+    expect(saved.fitToByteBudget(byteLimit: limit).encode(), expected.encode());
+    expect(saved.redo, hasLength(2));
+  });
+
+  test('an oversized single gesture becomes empty scoped metadata', () {
+    final saved = checkpoint(
+      undo: [
+        StoredEditorGesture(
+          before: {'uid': 'doc', 'text': 'x' * 4096},
+          after: {'uid': 'doc', 'text': 'y' * 4096},
+          operationId: 'huge',
+        ),
+      ],
+    );
+    final empty = checkpoint(undo: []);
+    final limit = utf8.encode(empty.encode()).length;
+    final fitted = saved.fitToByteBudget(byteLimit: limit);
+    expect(fitted.encode(), empty.encode());
+    expect(saved.undo, hasLength(1));
+    expect(
+      () => fitted.fitToByteBudget(byteLimit: limit - 1),
+      throwsA(isA<EditorHistoryBudgetExceeded>()),
+    );
+    expect(() => fitted.fitToByteBudget(byteLimit: 0), throwsArgumentError);
+  });
+
+  test('only resource limits use the budget exception type', () {
+    expect(
+      () => checkpoint().encode(byteLimit: 1),
+      throwsA(isA<EditorHistoryBudgetExceeded>()),
+    );
+    try {
+      EditorHistoryCheckpoint.decode('{}');
+      fail('Malformed history was accepted.');
+    } on FormatException catch (error) {
+      expect(error, isNot(isA<EditorHistoryBudgetExceeded>()));
+    }
+  });
+
+  test('fitting retains the largest possible suffix of a full history', () {
+    final entries = List.generate(
+      50,
+      (index) => StoredEditorGesture(
+        before: {'uid': 'doc', 'value': index, 'text': 'x' * 1000},
+        after: {'uid': 'doc', 'value': index + 1, 'text': 'x' * 1000},
+        operationId: 'gesture-$index',
+      ),
+    );
+    final expected = checkpoint(undo: entries.sublist(43));
+    final limit = utf8.encode(expected.encode()).length;
+    final fitted = checkpoint(undo: entries).fitToByteBudget(byteLimit: limit);
+    expect(fitted.encode(), expected.encode());
+    expect(
+      () => checkpoint(undo: entries.sublist(42)).encode(byteLimit: limit),
+      throwsA(isA<EditorHistoryBudgetExceeded>()),
+    );
+  });
+
   test(
     'checkpoint round trip preserves both stacks and deduplicates boundary states',
     () {

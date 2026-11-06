@@ -27,6 +27,40 @@ class EditorHistoryNotebookCodec {
   final EditorSqliteProjector projector;
   static const _equal = DeepCollectionEquality();
 
+  /// Reidentifies already captured metadata for an inverse without hydrating
+  /// all historical BLOBs. Asset IDs, Delta content and document scope stay put.
+  Map<String, dynamic> remapIdentities(
+    Map<String, dynamic> value, {
+    required String documentId,
+    Map<String, String> pageIds = const {},
+    Map<String, String> objectIds = const {},
+  }) {
+    final root = jsonDecode(_budget(value)) as Map<String, dynamic>;
+    _notebook(root, documentId, {});
+    for (final mapping in [pageIds, objectIds]) {
+      final targets = <String>{};
+      for (final entry in mapping.entries) {
+        _id(entry.key);
+        if (!targets.add(_id(entry.value))) {
+          throw const FormatException('Ambiguous history identity remapping.');
+        }
+      }
+    }
+    for (final rawPage in root['pages'] as List) {
+      final page = rawPage as Map;
+      page['id'] = pageIds[page['id']] ?? page['id'];
+      for (final layer in ['images', 'texts', 'ink']) {
+        for (final rawObject in page[layer] as List) {
+          final object = rawObject as Map;
+          object['id'] = objectIds[object['id']] ?? object['id'];
+        }
+      }
+    }
+    _notebook(root, documentId, {});
+    _budget(root);
+    return root;
+  }
+
   Future<Map<String, Map<String, dynamic>>> _receipts(String documentId) async {
     final rows = await projector.database
         .customSelect(
@@ -545,7 +579,7 @@ class EditorHistoryNotebookCodec {
     try {
       final json = jsonEncode(value);
       if (utf8.encode(json).length > EditorHistoryCheckpoint.maximumBytes) {
-        throw const FormatException(
+        throw const EditorHistoryBudgetExceeded(
           'History notebook exceeds its byte budget.',
         );
       }

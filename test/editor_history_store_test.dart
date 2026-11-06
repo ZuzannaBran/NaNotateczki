@@ -323,6 +323,52 @@ void main() {
   );
 
   test(
+    'fitting history in the gesture transaction preserves content and outbox',
+    () async {
+      final notebook = await session.create();
+      late EditorHistoryCheckpoint saved;
+      final committed = await session.writer.writeNotebookChange(
+        before: notebook,
+        after: addStroke(notebook, 'kept-content'),
+        onCommittedInTransaction: (ops) async {
+          final oversized = EditorHistoryCheckpoint(
+            documentId: notebook.uid,
+            ownerId: ops.last.actorId,
+            headOperationId: ops.last.operationId,
+            undo: [
+              StoredEditorGesture(
+                before: {'uid': notebook.uid, 'padding': 'x' * 4096},
+                after: {'uid': notebook.uid, 'padding': 'y' * 4096},
+                operationId: ops.last.operationId,
+              ),
+            ],
+            redo: [],
+          );
+          saved = oversized.fitToByteBudget(byteLimit: 512);
+          await session.history.save(saved);
+        },
+      );
+      final loaded = (await session.history.load(
+        documentId: notebook.uid,
+        ownerId: saved.ownerId,
+      ))!;
+      expect(loaded.undo, isEmpty);
+      expect(loaded.redo, isEmpty);
+      expect(loaded.headOperationId, committed.last.operationId);
+      expect(
+        (await session.repository.getNotebook(
+          notebook.uid,
+        ))!.pages.single.inkStrokes.single.id,
+        'kept-content',
+      );
+      expect(
+        (await session.store.pending()).map((op) => op.operationId),
+        contains(committed.last.operationId),
+      );
+    },
+  );
+
+  test(
     'owner mismatch and missing operations cannot replace valid history',
     () async {
       final notebook = await session.create();
