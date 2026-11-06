@@ -175,6 +175,38 @@ void main() {
           ),
           entry.value,
         );
+        final reopened = EditorController(
+          repository: session.repository,
+          notebook: restored,
+          operationWriter: session.writer,
+        );
+        addTearDown(reopened.dispose);
+        await reopened.historyReady;
+        expect(reopened.canUndo, isTrue);
+        reopened.undo();
+        await reopened.flushPendingSaves();
+        final undone = (await session.repository.getNotebook(notebook.uid))!;
+        expect(undone.pages.single.textBlocks.single.deltaJson, original.deltaJson);
+        expect(reopened.canRedo, isTrue);
+        reopened.redo();
+        await reopened.flushPendingSaves();
+        final redone = (await session.repository.getNotebook(notebook.uid))!;
+        expect(redone.pages.single.textBlocks.single.deltaJson, expected);
+        expect(
+          await session.projector.verifiedTextAssetBytes(
+            documentId: notebook.uid,
+            pageId: redone.pages.single.id,
+            objectId: original.id,
+            assetId: reference.substring(6),
+          ),
+          entry.value,
+        );
+        final replayed = await session.store.pending();
+        expect(replayed.length, greaterThan(pendingIds.length));
+        expect(
+          replayed.map((item) => item.operationId).toSet().length,
+          replayed.length,
+        );
       },
     );
   }
