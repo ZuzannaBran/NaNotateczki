@@ -468,6 +468,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   metadane wewnątrz transakcji po wszystkich intentach. Błąd callbacku
   cofa cały gest; pusty wsad dozwolony wyłącznie z callbackiem. Lista
   operacji jest niemutowalna; callback bez I/O i mutacji UI.
+  `wasObjectDeleted` sprawdza trwały tombstone UID na dowolnej stronie
+  dokumentu, ponieważ spóźniony move może wskazywać starszą stronę.
   Referencje nowych assetów mają klucz z pageId i objectId,
   bez usuwania starszych odwołań o nieznanej stronie.
   Snapshot jest blokowany, jeśli cofa potwierdzony kursor ACK albo
@@ -644,6 +646,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   pozostają dostępne bez legacy snapshotów. Regresja
   `test/library_v2_settings_test.dart` obejmuje katalog, aktywny edytor,
   powrót z ustawień i kolejny zapis operacyjny.
+  `EditorV2RemotePatchDispatcher` ignoruje spóźniony no-op
+  `object.move` wyłącznie przy tombstone obiektu lub strony źródłowej
+  i braku obiektu w SQLite oraz aktywnym UI; brak tombstone dalej
+  blokuje kursor. Regresja w
+  `test/editor_v2_remote_patch_dispatcher_test.dart`.
   Druga regresja przechodzi prawdziwy katalog → NotebookScreen przez
   interaktywny preview kafelka (etykieta nie jest klikalna), wykonuje
   gest ink i sprawdza outbox v2 oraz odmowę legacy saveNotebook.

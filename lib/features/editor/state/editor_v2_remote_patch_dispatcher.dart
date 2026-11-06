@@ -1,4 +1,5 @@
 import '../../../data/sync/operation_protocol.dart';
+import '../../../data/sync/operation_store.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/note_page.dart';
 import 'editor_controller.dart';
@@ -120,6 +121,27 @@ class EditorV2RemotePatchDispatcher {
         for (final page in notebook.pages)
           if (_ownsObject(page, movedId)) page,
       ];
+      if (owners.isEmpty) {
+        final store = OperationStore(repository.database);
+        final deleted =
+            await store.wasObjectDeleted(
+              documentId: operation.documentId,
+              objectId: movedId,
+            ) ||
+            await store.isTombstoned(
+              operation.documentId,
+              'page',
+              sourceId,
+            );
+        if (deleted) {
+          // The operation store accepted a stale move as a no-op. Do not
+          // advance the UI cursor if an earlier deletion was not rendered.
+          if (editor.pages.any((page) => _ownsObject(page, movedId))) {
+            throw StateError('The editor still displays a deleted object.');
+          }
+          return;
+        }
+      }
       if (source == null || owners.length != 1) {
         throw StateError('Committed move has no unique SQLite target.');
       }

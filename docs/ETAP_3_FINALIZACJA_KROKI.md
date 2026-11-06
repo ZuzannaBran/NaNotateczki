@@ -1,5 +1,21 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## No-op zdalnego move po tombstone — 2026-11-06
+
+Actions #1111 na `a8fdfc9` jest zielony (natywna analiza i regresje).
+Uzupełniono dispatch UI dla spóźnionego `object.move` po usunięciu
+obiektu albo strony źródłowej: poprzednio lokalny journal poprawnie
+zapisywał no-op, lecz callback odrzucał brak celu w SQLite i
+blokował postęp kursora. Nowy warunek wymaga trwałego tombstone
+obiektu (również na wcześniejszej/innej stronie) lub strony
+i potwierdza brak obiektu w SQLite i aktywnym UI. Bez tombstone
+brak celu nadal jest błędem fail-closed. Rozszerzono regresję
+`editor_v2_remote_patch_dispatcher_test.dart` o spóźniony move
+i brak niepotwierdzonego usunięcia.
+
+Nowe testy Flutter/Dart wymagają wyniku CI. Etap 3 nadal opt-in;
+backend, format danych i produkcyjny cutover bez zmian.
+
 ## Naprawa regresji start/stop z Actions — 2026-11-06, 22:00 UTC
 
 Przebieg [`42298376311`](https://github.com/ZuzannaBran/NaNotateczki/actions/runs/42298376311)

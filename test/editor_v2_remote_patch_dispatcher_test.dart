@@ -412,6 +412,54 @@ void main() {
     await dispatcher.onRemoteCommitted(pageDeleted);
     expect(editor.pages, hasLength(2));
     expect(editor.currentPage.id, notebook.pages.first.id);
+
+    // A lower-ranked move can arrive after the object and its last page
+    // have been deleted. SQLite records its actor sequence as a no-op.
+    // The UI delivery must also succeed without resurrecting the object.
+    final lateMove = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'late-concurrent-move',
+      actorSeq: 1,
+      logicalClock: 2,
+      documentId: notebook.uid,
+      pageId: notebook.pages.first.id,
+      objectId: 'remote-ink',
+      kind: OperationKind.objectMove,
+      payload: const {'toPageId': 'losing-destination', 'sortIndex': 0},
+      dependencies: [created.operationId],
+    );
+    expect(
+      await store.applyRemote(
+        lateMove,
+        serverSequence: 7,
+        apply: () => projector.apply(lateMove),
+      ),
+      isTrue,
+    );
+    await dispatcher.onRemoteCommitted(lateMove);
+    expect(
+      editor.pages.expand((page) => page.inkStrokes),
+      isEmpty,
+    );
+
+    // A missing target without a durable tombstone is still corruption,
+    // not a reason to discard a remote move notification.
+    final unverifiedMissing = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'missing-without-delete',
+      actorSeq: 1,
+      logicalClock: 2,
+      documentId: notebook.uid,
+      pageId: notebook.pages.first.id,
+      objectId: 'not-a-deleted-object',
+      kind: OperationKind.objectMove,
+      payload: const {'toPageId': 'losing-destination', 'sortIndex': 0},
+      dependencies: [created.operationId],
+    );
+    await expectLater(
+      dispatcher.onRemoteCommitted(unverifiedMissing),
+      throwsStateError,
+    );
     expect(await store.checkpoint('remote-patch-test'), 6);
     expect(await store.pending(), isEmpty);
   });

@@ -1,5 +1,16 @@
 # Dane NaNotateczki
 
+## Spóźniony object.move po usunięciu (2026-11-06)
+
+Zdalna operacja `object.move`, przyjęta jako no-op po usunięciu obiektu
+lub strony źródłowej, nie może blokować kursora tylko dlatego, że nie ma
+już celu w SQLite. Dispatcher pomija ją wyłącznie wtedy, gdy trwały
+tombstone dowodzi usunięcia, a obiekt jest nieobecny także w pamięci
+aktywnego edytora. Tombstone obiektu jest wyszukiwany po UID w całym
+dokumencie, bo historia move mogła zmienić jego stronę. Brak tombstone
+lub stale widoczny obiekt nadal powoduje odmowę ACK/UI i retry.
+Nie zmienia to schematu bazy, porządku operacji ani protokołu serwera.
+
 ## Zamykanie transportu i restart konta (2026-11-06)
 
 `SyncEngine.stop()` współdzieli jeden Future drenażu, odłącza wskazówki

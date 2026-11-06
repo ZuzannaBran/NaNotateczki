@@ -483,6 +483,24 @@ class OperationStore {
         null;
   }
 
+  /// Object identities are unique within a document, even after a move.
+  /// A late remote event may refer to the page where an object used to live.
+  Future<bool> wasObjectDeleted({
+    required String documentId,
+    required String objectId,
+  }) async {
+    if (documentId.isEmpty || objectId.isEmpty) {
+      throw ArgumentError('Object tombstone lookup needs complete identity.');
+    }
+    return await _row(
+          'SELECT operation_id FROM object_tombstones '
+          "WHERE document_id = ? AND target_kind = 'object' "
+          'AND object_id = ? LIMIT 1',
+          [documentId, objectId],
+        ) !=
+        null;
+  }
+
   Future<void> _writeTombstone(OperationEnvelope entry) async {
     final targetKind = switch (entry.kind) {
       OperationKind.documentDelete => 'document',
