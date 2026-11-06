@@ -413,8 +413,9 @@ void main() {
       expect(second.currentPage.textBlocks.single.text, 'Bold and normal');
       expect(second.currentPage.textBlocks.single.deltaJson, beforeDelta);
       expect(
-        (await secondRepo.getNotebook(notebook.uid))!
-            .pages.single.textBlocks.single.deltaJson,
+        (await secondRepo.getNotebook(
+          notebook.uid,
+        ))!.pages.single.textBlocks.single.deltaJson,
         beforeDelta,
       );
       expect(second.canRedo, isTrue);
@@ -422,8 +423,9 @@ void main() {
       await second.flushPendingSaves();
       expect(second.currentPage.textBlocks.single.text, 'Bold and italic!');
       expect(
-        (await secondRepo.getNotebook(notebook.uid))!
-            .pages.single.textBlocks.single.deltaJson,
+        (await secondRepo.getNotebook(
+          notebook.uid,
+        ))!.pages.single.textBlocks.single.deltaJson,
         editedPersistedDelta,
       );
       expect(second.canUndo, isTrue);
