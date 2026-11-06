@@ -32,6 +32,7 @@ dart format --output=none --set-exit-if-changed \
   lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart \
   lib/features/editor/presentation/widgets/page_overlay.dart \
   lib/features/editor/presentation/widgets/text_edit_toolbar.dart \
+  lib/features/editor/presentation/widgets/text_hud_block.dart \
   test/editor_controller_v2_test.dart \
   test/quill_style_patch_test.dart \
   test/quill_paste_plan_test.dart \

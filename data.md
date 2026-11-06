@@ -9,6 +9,9 @@ rozpoznawany z sygnatury bajtów zgodnie z walidatorem serwera
 `asset:<UUID>`, nie wykonuje HTTP ani nie tworzy operacji przed zmianą
 Delta. Normalny gest Quill zapisuje attach, BLOB, atomy i outbox atomowo;
 rejestr stagingu jest zwalniany dopiero po udanym commicie.
+Podgląd nowego embedu czyta zweryfikowany staging w tym samym dokumencie
+przed autosave, a następnie scoped BLOB z SQLite. Nie zapamiętuje błędu
+spowodowanego samym oczekiwaniem na pierwszy commit.
 Clipboard aktywnego Quill v2 podłącza import obrazów z bajtów oraz
 kontrolowany HTML/rich paste przez `pasteQuillHtml` i `QuillPastePlan`.
 Domyślny parser clipboard Quilla jest wyłączony: aplikacja sprawdza całą
@@ -17,8 +20,15 @@ nowe media wymagają data URI, sygnatury PNG/JPEG/WebP/PDF i wspólnego
 limitu 64 MiB. HTML konwerter obsługuje obrazy. Przycisk aktywnego Quilla
 `Insert image or PDF into text` używa `insertQuillFile` i tego samego planu
 z bajtów; PDF jest osadzony w tekście. Picker native sprawdza długość pliku
-przed odczytem, Web korzysta z bytes. Przycisk nie zmienia prostego HUD
-ani legacy. Ścieżka pliku pochodzi wyłącznie z jawnego wyboru użytkownika;
+przed odczytem, Web korzysta z bytes. Przycisk obsługuje także prosty HUD v2;
+legacy pozostaje bez zmian. HUD pożycza swój TextEditingController na czas
+montażu. Import sprawdza całą TextEditingValue i model, zachowuje resztę
+Delta i przekazuje kursor do nowego Quilla dopiero po poprawnym przyroście.
+Anulowanie pozostawia HUD; pisanie przed importem zachowuje własne Undo.
+Ctrl/Cmd+V i menu Paste używają tej samej walidacji. Surowe PNG/JPEG mają
+limit strumienia 64 MiB, bez syntezy plików z URI schowka. Niepoprawna
+selekcja UTF-16 lub zmiana kompozycji IME anuluje import.
+Ścieżka pliku pochodzi wyłącznie z jawnego wyboru użytkownika;
 HTTP, ścieżki w clipboardzie i nieznane embedy są odrzucane.
 Kopiowanie między instancjami Quilla korzysta z jego wewnętrznej Delta,
 ale referencje `asset:` muszą przejść kontrolę zakresu dokumentu, MIME,

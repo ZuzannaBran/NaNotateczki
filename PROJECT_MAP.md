@@ -1436,10 +1436,13 @@ tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 sprawdza sygnaturę, typ embedu i limit 64 MiB, kopiuje bajty do bufora
 i rejestruje potwierdzenie per dokument/asset ID. Commit attach zwalnia
 zarówno klucz zwykłego obrazu, jak i klucz embedu; rollback je zachowuje.
-93: `verifyQuillAssetReference` sprawdza kopię wewnętrzną w tym samym
+116: `verifyQuillAssetReference` sprawdza kopię wewnętrzną w tym samym
 dokumencie: staging przed autosave lub trwały receipt i checksumowane bajty,
 zgodny typ embedu oraz pozostały budżet. Nie pobiera plików ani nie zapisuje
-operacji. Regresje: `test/editor_v2_rich_paste_test.dart`.
+operacji. 92: `quillAssetBytes` odczytuje podgląd ze zweryfikowanego
+stagingu tego samego dokumentu, a po commicie ze scoped BLOB. Zapobiega
+zapamiętaniu błędu nieistniejącej jeszcze referencji przed autosave.
+Regresje: `test/editor_v2_rich_paste_test.dart`.
 `writeNotebookChange(revertsOperationId:)` wiąże cały inverse z końcową
 operacją cofanej grupy; OperationStore sprawdza trwałą zależność
 w tej samej transakcji. Błędne ID nie zmienia projekcji ani actorSeq.
@@ -1550,18 +1553,20 @@ Model tła Plain/Grid/Lines i jego serializacja.
 - 3: `PageBackgroundStyle`; 5: `PageBackgroundStyleX`;
   15: `PageBackgroundSettings`; 64: `backgroundPrefsKeyForKind`.
 
-### `lib/features/editor/state/quill_paste_plan.dart` (187 linii)
+### `lib/features/editor/state/quill_paste_plan.dart` (207 linii)
 
-9: `QuillPastePlan`, 26: `fromMediaBytes`, 53: `fromDelta`,
-164: `materialize`: walidacja
+9: `QuillPastePlan`, 26: `readMediaBytes`, 46: `fromMediaBytes`,
+73: `fromDelta`, 184: `materialize`: walidacja
 insert-only Delta i atrybutów, limit tekstu i łącznego rozmiaru, data URI
 PNG/JPEG/WebP/PDF z kontrolą sygnatur, deduplikacja źródeł i lista assetów
-do kontroli zakresu. Nie wykonuje I/O; materializacja jest dopuszczalna
+do kontroli zakresu. Nie otwiera plików ani sieci; `readMediaBytes` odczytuje
+przekazany strumień z limitem. Materializacja jest dopuszczalna
 dopiero po sprawdzeniu zakresu i lifecycle w kontrolerze. Nieznane embedy,
 HTTP/file, surowy U+FFFC i błędne bajty są odrzucane przed mutacją.
 `fromMediaBytes` rozpoznaje wybrany plik z sygnatury i kopiuje jego bajty,
 bez pośredniego base64. Regresje: `test/quill_paste_plan_test.dart`
-(17 testów), `test/editor_v2_rich_paste_test.dart` (27 regresji
+(20 testów, w tym kopiowanie i limit strumienia),
+`test/editor_v2_rich_paste_test.dart` (45 regresji
 Quill/SQLite/pickera/widżetu) i `test/editor_v2_inline_file_sync_test.dart`
 (2 scenariusze dwóch plikowych SQLite: restart, utracony ACK, upload przed
 attach, odrzucenie uszkodzonego downloadu, remote delete/Undo, brak repaintu
@@ -1631,12 +1636,17 @@ Anuluje opóźniony odczyt po zmianie bloku, kontrolera, treści lub wyboru.
 `insertQuillFile` korzysta z tej samej granicy `_replaceQuillSelection`
 i FilePickera PNG/JPEG/WebP/PDF; weryfikuje rzeczywisty rozmiar native,
 bajty Web i podpis pliku przed przygotowaniem embedu.
-Ważne granice: 596: `flushPendingSaves`; 2011: `_applyV2History`;
-2156: `_remapV2HistoryNotebook`; 2335: `prepareInlineAsset`;
-2357: `pasteQuillHtml`; 2392: `insertQuillFile`; 2410: `_pickQuillFile`;
-2449: `_replaceQuillSelection`; 2551: `updateTextBlockContent`;
-2566: `updateActiveTextStyle`; 3973: `_commitActiveTextEdit`;
-4068: `_captureV2Gesture`; 4092: `_saveV2`.
+HUD pożycza swój kontroler przez `bindHudTextController`/`unbindHudTextController`.
+Import porównuje TextEditingValue (także IME), model i właściciela, zachowuje
+Delta i tworzy osobny checkpoint od wcześniejszego pisania. Jednorazowy
+handoff kursora dotyczy dokładnej Delta; odrzucony import nie wymienia HUD.
+Ważne granice: 220: `bindHudTextController`; 228: `unbindHudTextController`;
+239: `hasQuillHandoff`; 243: `takeQuillHandoff`; 644: `flushPendingSaves`;
+2059: `_applyV2History`; 2204: `_remapV2HistoryNotebook`;
+2383: `prepareInlineAsset`; 2405: `pasteQuillHtml`; 2444: `insertQuillFile`;
+2462: `_pickQuillFile`; 2501: `_replaceQuillSelection`;
+2665: `updateTextBlockContent`; 2680: `updateActiveTextStyle`;
+4087: `_commitActiveTextEdit`; 4182: `_captureV2Gesture`; 4206: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
@@ -1876,7 +1886,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   oraz 2 px pionowego paddingu.
   Dla aktywnego Quilla v2 przycisk `Insert image or PDF into text` wywołuje
   `insertQuillFile`, respektuje read-only i mounted oraz pokazuje odmowę
-  bez kasowania zaznaczenia. Nie jest widoczny dla prostego HUD/legacy.
+  bez kasowania zaznaczenia. Działa też w prostym HUD v2; legacy bez zmiany.
   11: `TextEditToolbar`; 56: `build`; 195: `_insertFile`.
 
 - `lib/features/editor/presentation/interaction/object_transform_engine.dart` (362):
@@ -1920,10 +1930,16 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   gesty wyłącznie w obszarze figury/uchwytów, blokuje viewport podczas
   przesuwania i zmiany rozmiaru, zapisuje transformację jako undo/redo.
 
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (583):
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (737):
   podgląd używa tych samych zamienników Georgii co UI, ale nie narzuca
   ich blokom z indywidualnie wybranym fontem;
   aktywny `TextBlock` renderowany przez Flutter `EditableText`;
+  kontroler jest pożyczany do importu v2 tylko podczas montażu.
+  Ctrl/Cmd+V i menu Paste kierują rich dane do wspólnej walidacji, a zwykły
+  tekst do natywnego EditableText. PNG/JPEG mają ograniczony strumień,
+  bez otwierania URI schowka jako plików. 94: `_bindController`;
+  105: `_pasteRichClipboard`; 170: `_readClipboardImage`; 199: `build`;
+  393: `_onTextChanged`; 649: `textBlockAppearance`.
   Delete usuwa obiekt tylko przy pustym tekście, w przeciwnym razie
   pozostaje natywną edycją tekstu (znak po prawej stronie kursora). ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
@@ -1981,7 +1997,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (3245 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart` (3253 linii)
 
 Opt-in v2: aktywny tekst ze złożonym Delta lub embedami pozostaje
 w istniejącym QuillEditor, aby edycja nie spłaszczała treści.
@@ -2001,7 +2017,10 @@ przekazuje pojedynczy odczyt HTML/plain do `pasteQuillHtml`, który zachowuje
 formatowanie i weryfikuje media. Domyślny parser Quilla pozostaje wyłączony,
 aby nie ominąć kontroli. Callbacki wiążą konkretny kontroler; odmowa nie
 uruchamia zastępczego kasowania zaznaczenia. Legacy pozostaje bez zmian.
-1564: `_pasteRichClipboard`; 1605: `_preparePastedImage`; 1636: `_initQuill`.
+`hasQuillHandoff` wymusza przejście także dla jednolitego HTML z HUD;
+`_initQuill` odbiera kursor wyłącznie dla dokładnej Delta. Odczyt nowych
+embedów obejmuje sprawdzony staging przed autosave, potem trwały BLOB.
+1567: `_pasteRichClipboard`; 1608: `_preparePastedImage`; 1639: `_initQuill`.
 
 Interaktywna warstwa tekstu, obrazów i lassa nad ink; osobne warianty boarda
 i dokumentu. Aktywny blok tekstu przechodzi do `TextHudBlock`: `EditableText`
@@ -2037,19 +2056,20 @@ double tap, aby arena gestów Quilla zakończyła się przed podmianą widgetu n
 `TextHudBlock`.
 
 - 36: `_hasUniformTextStyle`; 95: `PageOverlay`;
-  328: `DocumentPageOverlay`; 390: `ActiveImageTransformHud`.
+  329: `DocumentPageOverlay`; 391: `ActiveImageTransformHud`.
 - aktywny tekst: `TextHudBlock`; fallback nieaktywnego tekstu:
   `_TextBlockWidget` / `_TextBlockWidgetState`.
   Akcje lassa korzystają z kompaktowego paska w kolorze toolbaru,
   z neutralnymi ikonami konturowymi i zachowaną obsługą akcji.
-- 1793: `_ImageBlockWidget`; 1818: `_ImageBlockWidgetState`;
-  2952: `_LassoSelectionWidget`; 3073: `LassoSelectionActionBar`;
-  3132: `_LassoActionButton`; 3191: `VerifiedQuillEmbedBuilder`.
+- 1801: `_ImageBlockWidget`; 1826: `_ImageBlockWidgetState`;
+  2960: `_LassoSelectionWidget`; 3081: `LassoSelectionActionBar`;
+  3140: `_LassoActionButton`; 3199: `VerifiedQuillEmbedBuilder`.
 
 ## 9. Board
 
 Quill embed renderer opt-in v2 `VerifiedQuillEmbedBuilder` czyta
-obrazy/PDF z trwałej tabeli assetów; bez URL i ścieżek lokalnych.
+obrazy/PDF ze zweryfikowanego stagingu przed pierwszym autosave, następnie
+ze scoped BLOB; bez URL i ścieżek lokalnych.
 Regresja widgetowa: `test/verified_quill_embed_builder_test.dart`.
 `test/editor_sqlite_projector_test.dart` weryfikuje rollback złego MIME
 osadzonego PDF, w tym brak nowej referencji i BLOB po błędzie.

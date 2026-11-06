@@ -88,6 +88,29 @@ class EditorV2OperationWriter {
     return asset;
   }
 
+  /// Previews locally verified imports before autosave, then uses durable bytes.
+  Future<Uint8List> quillAssetBytes({
+    required String documentId,
+    required String pageId,
+    required String objectId,
+    required String assetId,
+  }) async {
+    final staged = _registeredAssets[documentId]?[assetId];
+    if (staged != null) {
+      final buffer = projector.verifiedAssetBuffer;
+      if (buffer == null) {
+        throw StateError('Verified asset staging has not been installed.');
+      }
+      return buffer.requireBytes(staged.attachPayload);
+    }
+    return projector.verifiedTextAssetBytes(
+      documentId: documentId,
+      pageId: pageId,
+      objectId: objectId,
+      assetId: assetId,
+    );
+  }
+
   /// Validates copied references without importing assets from another scope.
   /// A freshly pasted file may still be staged before its first autosave.
   Future<Map<String, dynamic>> verifyQuillAssetReference({

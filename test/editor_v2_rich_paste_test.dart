@@ -9,6 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:program/core/input/app_preferences_controller.dart';
+import 'package:program/core/theme/app_theme.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/editor_sqlite_projector.dart';
 import 'package:program/data/sync/operation_gateway.dart';
@@ -16,11 +19,14 @@ import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
 import 'package:program/data/sync/sync_engine.dart';
 import 'package:program/data/sync/verified_editor_asset_buffer.dart';
+import 'package:program/features/editor/presentation/widgets/page_overlay.dart';
 import 'package:program/features/editor/presentation/widgets/text_edit_toolbar.dart';
+import 'package:program/features/editor/presentation/widgets/text_hud_block.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/editor/state/quill_paste_plan.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
 
 import 'support/native_test_documents.dart';
@@ -543,6 +549,496 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, null);
   });
+
+  TextEditingController activateHud() {
+    fixture.editor.setTool(DrawingTool.text);
+    fixture.editor.setActiveTextBlock(_Fixture.blockId, null);
+    final hud = TextEditingController(text: 'KeepOriginal')
+      ..selection = const TextSelection(baseOffset: 4, extentOffset: 0);
+    fixture.editor.bindHudTextController(_Fixture.blockId, hud);
+    addTearDown(() {
+      fixture.editor.unbindHudTextController(_Fixture.blockId, hud);
+      hud.dispose();
+    });
+    return hud;
+  }
+
+  for (final type in ['image', 'pdf']) {
+    for (final dark in [false, true]) {
+      testWidgets(
+        'plain HUD imports $type and hands the caret to Quill, dark=$dark',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(1500, 900));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          await tester.runAsync(() async {
+            fixture.editor.setTool(DrawingTool.text);
+            fixture.editor.setActiveTextBlock(_Fixture.blockId, null);
+            fixture.editor.updateTextBlockContent(
+              fixture.editor.currentPage.textBlocks.single,
+              plainText: 'KeepOriginal',
+              deltaJson: jsonEncode([
+                {'insert': 'KeepOriginal\n'},
+              ]),
+            );
+            await fixture.flush();
+          });
+          final original =
+              fixture.editor.currentPage.textBlocks.single.deltaJson;
+          final preferences = AppPreferencesController();
+          addTearDown(preferences.dispose);
+          picker.result = () async => FilePickerResult([
+            PlatformFile(
+              name: type == 'pdf' ? 'selected.pdf' : 'selected.png',
+              size: type == 'pdf' ? 6 : _png.length,
+              bytes: type == 'pdf'
+                  ? Uint8List.fromList(inlineFiles['pdf']!)
+                  : _png,
+            ),
+          ]);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: dark ? AppTheme.dark() : AppTheme.light(),
+              home: MultiProvider(
+                providers: [
+                  ChangeNotifierProvider<EditorController>.value(
+                    value: fixture.editor,
+                  ),
+                  ChangeNotifierProvider<AppPreferencesController>.value(
+                    value: preferences,
+                  ),
+                ],
+                child: Scaffold(
+                  body: Consumer<EditorController>(
+                    builder: (_, editor, _) => Stack(
+                      children: [
+                        Positioned.fill(
+                          child: PageOverlay(
+                            controller: editor,
+                            renderBackground: false,
+                          ),
+                        ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: TextEditToolbar(
+                            editorController: editor,
+                            block: editor.currentPage.textBlocks.single,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          expect(find.byType(TextHudBlock), findsOneWidget);
+          expect(find.byType(quill.QuillEditor), findsNothing);
+          final hud = tester.widget<EditableText>(find.byType(EditableText));
+          expect(hud.contextMenuBuilder, isNotNull);
+          hud.controller.selection = const TextSelection(
+            baseOffset: 0,
+            extentOffset: 4,
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('text-inline-file-button')),
+          );
+          await tester.pump();
+          await tester.pump();
+          expect(find.byType(TextHudBlock), findsNothing);
+          expect(find.byType(quill.QuillEditor), findsOneWidget);
+          final active = fixture.editor.activeTextController!;
+          expect(active.selection.isCollapsed, isTrue);
+          expect(
+            active.selection.extentOffset,
+            lessThan(active.document.length - 1),
+          );
+          expect(active.document.toPlainText(), contains('Original'));
+          expect(active.document.toPlainText(), isNot(contains('Keep')));
+          await tester.runAsync(fixture.flush);
+          await tester.pump();
+          if (type == 'pdf') {
+            expect(find.text('Embedded PDF'), findsOneWidget);
+          }
+          fixture.editor.undo();
+          await tester.runAsync(fixture.flush);
+          await tester.pump();
+          expect(
+            fixture.editor.currentPage.textBlocks.single.deltaJson,
+            original,
+          );
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  }
+
+  test(
+    'inline preview uses verified staging until the durable commit',
+    () async {
+      activateHud();
+      await fixture.editor.insertQuillFile(
+        blockId: _Fixture.blockId,
+        readBytes: () async => _png,
+      );
+      final delta =
+          jsonDecode(fixture.editor.currentPage.textBlocks.single.deltaJson!)
+              as List;
+      final embed =
+          (delta.singleWhere((dynamic op) => op['insert'] is Map)
+                  as Map)['insert']
+              as Map;
+      final assetId = (embed.values.single as String).substring(6);
+      Future<Uint8List> preview(String documentId) =>
+          fixture.writer.quillAssetBytes(
+            documentId: documentId,
+            pageId: fixture.editor.currentPage.id,
+            objectId: _Fixture.blockId,
+            assetId: assetId,
+          );
+      expect(await preview(fixture.editor.notebook.uid), _png);
+      await expectLater(preview('foreign-document'), throwsStateError);
+      await fixture.flush();
+      fixture.buffer.clear();
+      expect(await preview(fixture.editor.notebook.uid), _png);
+    },
+  );
+
+  testWidgets(
+    'HUD cancel preserves the field and uniform rich paste still hands off',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1500, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.runAsync(() async {
+        fixture.editor.setTool(DrawingTool.text);
+        fixture.editor.setActiveTextBlock(_Fixture.blockId, null);
+        fixture.editor.updateTextBlockContent(
+          fixture.editor.currentPage.textBlocks.single,
+          plainText: 'KeepOriginal',
+          deltaJson: jsonEncode([
+            {'insert': 'KeepOriginal\n'},
+          ]),
+        );
+        await fixture.flush();
+      });
+      final preferences = AppPreferencesController();
+      addTearDown(preferences.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MultiProvider(
+            providers: [
+              ChangeNotifierProvider<EditorController>.value(
+                value: fixture.editor,
+              ),
+              ChangeNotifierProvider<AppPreferencesController>.value(
+                value: preferences,
+              ),
+            ],
+            child: Scaffold(
+              body: Consumer<EditorController>(
+                builder: (_, editor, _) => Stack(
+                  children: [
+                    Positioned.fill(
+                      child: PageOverlay(
+                        controller: editor,
+                        renderBackground: false,
+                      ),
+                    ),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: TextEditToolbar(
+                        editorController: editor,
+                        block: editor.currentPage.textBlocks.single,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final hud = tester.widget<EditableText>(find.byType(EditableText));
+      hud.controller.selection = const TextSelection(
+        baseOffset: 2,
+        extentOffset: 5,
+      );
+      final value = hud.controller.value;
+      await tester.tap(find.byKey(const ValueKey('text-inline-file-button')));
+      await tester.pump();
+      expect(find.byType(TextHudBlock), findsOneWidget);
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller,
+        same(hud.controller),
+      );
+      expect(hud.controller.value, value);
+      hud.controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: hud.controller.text.length,
+      );
+      await tester.runAsync(
+        () => fixture.editor.pasteQuillHtml(
+          blockId: _Fixture.blockId,
+          readHtml: () async => '<p>Replacement</p>',
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(TextHudBlock), findsNothing);
+      expect(find.byType(quill.QuillEditor), findsOneWidget);
+      expect(
+        fixture.editor.activeTextController!.document.toPlainText(),
+        contains('Replacement'),
+      );
+      expect(
+        fixture.editor.activeTextController!.document.toDelta().toJson().every(
+          (op) => op['insert'] is String,
+        ),
+        isTrue,
+      );
+      await tester.runAsync(fixture.flush);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  for (final type in ['image', 'pdf']) {
+    test(
+      'HUD $type import preserves text, selection handoff and Undo',
+      () async {
+        final original = fixture.editor.currentPage.textBlocks.single.deltaJson;
+        final hud = activateHud();
+        final value = hud.value;
+        await fixture.editor.insertQuillFile(
+          blockId: _Fixture.blockId,
+          readBytes: () async =>
+              type == 'pdf' ? Uint8List.fromList(inlineFiles['pdf']!) : _png,
+        );
+        expect(hud.value, value);
+        final block = fixture.editor.currentPage.textBlocks.single;
+        expect(block.text, contains('Original'));
+        expect(block.text, isNot(contains('Keep')));
+        expect(block.deltaJson, contains('"$type"'));
+        expect(fixture.editor.hasQuillHandoff(_Fixture.blockId), isTrue);
+        final selection = fixture.editor.takeQuillHandoff(
+          _Fixture.blockId,
+          block.deltaJson,
+        );
+        expect(selection, isNotNull);
+        expect(selection!.isCollapsed, isTrue);
+        expect(selection.extentOffset, greaterThan(0));
+        expect(
+          fixture.editor.takeQuillHandoff(_Fixture.blockId, block.deltaJson),
+          isNull,
+        );
+        await fixture.flush();
+        fixture.editor.undo();
+        await fixture.flush();
+        expect(
+          fixture.editor.currentPage.textBlocks.single.deltaJson,
+          original,
+        );
+        fixture.editor.redo();
+        await fixture.flush();
+        expect(
+          fixture.editor.currentPage.textBlocks.single.deltaJson,
+          block.deltaJson,
+        );
+      },
+    );
+  }
+
+  test(
+    'HUD rich paste preserves formatting and stages canonical media',
+    () async {
+      activateHud();
+      await fixture.editor.pasteQuillHtml(
+        blockId: _Fixture.blockId,
+        readHtml: () async =>
+            '<p><strong>Rich</strong><img src="$_imageUri"></p>',
+      );
+      await fixture.flush();
+      final block = fixture.editor.currentPage.textBlocks.single;
+      expect(block.deltaJson, contains('"bold":true'));
+      expect(block.deltaJson, contains('asset:'));
+      expect(block.deltaJson, isNot(contains('data:')));
+      expect(block.text, contains('Original'));
+    },
+  );
+
+  test(
+    'HUD import respects UTF-16 selection and keeps earlier typing as separate Undo',
+    () async {
+      final original = fixture.editor.currentPage.textBlocks.single.deltaJson;
+      final hud = activateHud();
+      const typed = 'A😀B\nsecond';
+      hud.value = const TextEditingValue(
+        text: typed,
+        selection: TextSelection(baseOffset: 1, extentOffset: 3),
+      );
+      fixture.editor.updateTextBlockContent(
+        fixture.editor.currentPage.textBlocks.single,
+        plainText: typed,
+        deltaJson: jsonEncode([
+          {'insert': '$typed\n'},
+        ]),
+      );
+      await fixture.editor.insertQuillFile(
+        blockId: _Fixture.blockId,
+        readBytes: () async => Uint8List.fromList(inlineFiles['pdf']!),
+      );
+      await fixture.flush();
+      final imported = fixture.editor.currentPage.textBlocks.single;
+      expect(imported.text, isNot(contains('😀')));
+      expect(imported.text, contains('A'));
+      expect(imported.text, contains('B\nsecond'));
+      fixture.editor.undo();
+      await fixture.flush();
+      expect(fixture.editor.currentPage.textBlocks.single.text, typed);
+      fixture.editor.undo();
+      await fixture.flush();
+      expect(fixture.editor.currentPage.textBlocks.single.deltaJson, original);
+    },
+  );
+
+  for (final source in ['hud', 'quill']) {
+    test('$source import rejects selection inside a surrogate pair', () async {
+      const value = 'A😀B';
+      if (source == 'hud') {
+        final hud = activateHud();
+        hud.value = const TextEditingValue(
+          text: value,
+          selection: TextSelection.collapsed(offset: 2),
+        );
+        fixture.editor.updateTextBlockContent(
+          fixture.editor.currentPage.textBlocks.single,
+          plainText: value,
+          deltaJson: jsonEncode([
+            {'insert': '$value\n'},
+          ]),
+        );
+      } else {
+        fixture.text.replaceText(
+          0,
+          fixture.text.document.length - 1,
+          value,
+          const TextSelection.collapsed(offset: 2),
+        );
+        await Future<void>.delayed(Duration.zero);
+      }
+      final original = fixture.editor.currentPage.textBlocks.single.deltaJson;
+      await expectLater(
+        fixture.editor.insertQuillFile(
+          blockId: _Fixture.blockId,
+          readBytes: () async => _png,
+        ),
+        throwsFormatException,
+      );
+      expect(fixture.editor.currentPage.textBlocks.single.deltaJson, original);
+      expect(
+        (await fixture.store.pending()).any(
+          (op) => op.kind == OperationKind.assetAttach,
+        ),
+        isFalse,
+      );
+    });
+  }
+
+  for (final reason in [
+    'selection',
+    'typing',
+    'composing',
+    'unmounted',
+    'replaced',
+  ]) {
+    test('HUD pending import cancels after $reason changes', () async {
+      final hud = activateHud();
+      final original = fixture.editor.currentPage.textBlocks.single.deltaJson;
+      final bytes = Completer<Uint8List?>();
+      final pending = fixture.editor.insertQuillFile(
+        blockId: _Fixture.blockId,
+        readBytes: () => bytes.future,
+      );
+      switch (reason) {
+        case 'selection':
+          hud.selection = const TextSelection.collapsed(offset: 2);
+        case 'typing':
+          hud.value = const TextEditingValue(
+            text: 'Changed',
+            selection: TextSelection.collapsed(offset: 7),
+          );
+        case 'composing':
+          hud.value = hud.value.copyWith(
+            composing: const TextRange(start: 0, end: 2),
+          );
+        case 'unmounted':
+          fixture.editor.unbindHudTextController(_Fixture.blockId, hud);
+        case 'replaced':
+          final replacement = TextEditingController(text: hud.text)
+            ..selection = hud.selection;
+          addTearDown(replacement.dispose);
+          fixture.editor.bindHudTextController(_Fixture.blockId, replacement);
+          fixture.editor.unbindHudTextController(_Fixture.blockId, hud);
+          expect(fixture.editor.activeHudTextController, same(replacement));
+      }
+      bytes.complete(_png);
+      await pending;
+      expect(fixture.editor.currentPage.textBlocks.single.deltaJson, original);
+      expect(fixture.editor.hasQuillHandoff(_Fixture.blockId), isFalse);
+      expect(
+        (await fixture.store.pending()).any(
+          (op) => op.kind == OperationKind.assetAttach,
+        ),
+        isFalse,
+      );
+    });
+  }
+
+  test(
+    'HUD rejects bytes, stale Delta and stale caret without changing the document',
+    () async {
+      final hud = activateHud();
+      final original = fixture.editor.currentPage.textBlocks.single.deltaJson;
+      await expectLater(
+        fixture.editor.insertQuillFile(
+          blockId: _Fixture.blockId,
+          readBytes: () async => Uint8List.fromList([1, 2, 3]),
+        ),
+        throwsFormatException,
+      );
+      expect(fixture.editor.hasQuillHandoff(_Fixture.blockId), isFalse);
+      expect(fixture.editor.currentPage.textBlocks.single.deltaJson, original);
+      hud.value = const TextEditingValue(
+        text: 'Not the model',
+        selection: TextSelection.collapsed(offset: 3),
+      );
+      await expectLater(
+        fixture.editor.insertQuillFile(
+          blockId: _Fixture.blockId,
+          readBytes: () async => _png,
+        ),
+        throwsFormatException,
+      );
+      expect(fixture.editor.currentPage.textBlocks.single.deltaJson, original);
+      hud.value = const TextEditingValue(
+        text: 'KeepOriginal',
+        selection: TextSelection.collapsed(offset: 4),
+      );
+      await fixture.editor.insertQuillFile(
+        blockId: _Fixture.blockId,
+        readBytes: () async => _png,
+      );
+      expect(
+        fixture.editor.takeQuillHandoff(_Fixture.blockId, original),
+        isNull,
+      );
+      expect(fixture.editor.hasQuillHandoff(_Fixture.blockId), isFalse);
+    },
+  );
 
   test(
     'HTML paste atomically preserves formatting, media and Undo/Redo',

@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_box_transform/flutter_box_transform.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 
 import '../../../../core/input/soft_keyboard.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -11,6 +14,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/text_block.dart';
 import '../../state/editor_controller.dart';
+import '../../state/quill_paste_plan.dart';
 import '../interaction/object_transform_engine.dart';
 import 'object_transform_hud.dart';
 
@@ -42,6 +46,8 @@ class _TextHudBlockState extends State<TextHudBlock> {
   static const double _maxTextFontSize = 192;
 
   final GlobalKey _contentKey = GlobalKey();
+  final GlobalKey<EditableTextState> _editableKey =
+      GlobalKey<EditableTextState>();
   late final TextEditingController _textController;
   final FocusNode _focusNode = FocusNode();
 
@@ -54,11 +60,20 @@ class _TextHudBlockState extends State<TextHudBlock> {
   void initState() {
     super.initState();
     _textController = TextEditingController(text: widget.block.text);
+    _bindController();
   }
 
   @override
   void didUpdateWidget(covariant TextHudBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller) ||
+        oldWidget.block.id != widget.block.id) {
+      oldWidget.controller.unbindHudTextController(
+        oldWidget.block.id,
+        _textController,
+      );
+    }
+    _bindController();
     if (oldWidget.block.id != widget.block.id ||
         (!_focusNode.hasFocus && _textController.text != widget.block.text)) {
       _textController.value = TextEditingValue(
@@ -70,9 +85,114 @@ class _TextHudBlockState extends State<TextHudBlock> {
 
   @override
   void dispose() {
+    widget.controller.unbindHudTextController(widget.block.id, _textController);
     _focusNode.dispose();
     _textController.dispose();
     super.dispose();
+  }
+
+  void _bindController() {
+    if (widget.interactionEnabled) {
+      widget.controller.bindHudTextController(widget.block.id, _textController);
+    } else {
+      widget.controller.unbindHudTextController(
+        widget.block.id,
+        _textController,
+      );
+    }
+  }
+
+  Future<void> _pasteRichClipboard([
+    SelectionChangedCause cause = SelectionChangedCause.keyboard,
+  ]) async {
+    final editor = widget.controller;
+    final originalValue = _textController.value;
+    bool current() =>
+        mounted &&
+        identical(editor.activeHudTextController, _textController) &&
+        _textController.value == originalValue;
+    if (!current()) {
+      return;
+    }
+    try {
+      final clipboard = SystemClipboard.instance;
+      Future<ClipboardReader>? snapshot;
+      Future<ClipboardReader> reader() => snapshot ??= clipboard!.read();
+      final handled =
+          clipboard != null &&
+          await editor.pasteQuillHtml(
+            blockId: widget.block.id,
+            canPaste: current,
+            readHtml: () async {
+              final value = await reader();
+              return value.canProvide(Formats.htmlText)
+                  ? await value.readValue(Formats.htmlText)
+                  : null;
+            },
+            readPlainText: () async {
+              final value = await reader();
+              return value.canProvide(Formats.plainText)
+                  ? await value.readValue(Formats.plainText)
+                  : null;
+            },
+          );
+      if (!handled && current()) {
+        if (clipboard != null) {
+          final value = await reader();
+          final format = value.canProvide(Formats.png)
+              ? Formats.png
+              : value.canProvide(Formats.jpeg)
+              ? Formats.jpeg
+              : null;
+          if (format != null && current()) {
+            await editor.insertQuillFile(
+              blockId: widget.block.id,
+              canInsert: current,
+              readBytes: () => _readClipboardImage(value, format),
+            );
+            return;
+          }
+        }
+        if (!current()) {
+          return;
+        }
+        await _editableKey.currentState?.pasteText(cause);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('Could not paste this rich content.')),
+        );
+      }
+    }
+  }
+
+  Future<Uint8List?> _readClipboardImage(
+    ClipboardReader reader,
+    SimpleFileFormat format,
+  ) {
+    final result = Completer<Uint8List?>();
+    reader.getFile(
+      format,
+      (file) async {
+        try {
+          result.complete(
+            await QuillPastePlan.readMediaBytes(file.getStream()),
+          );
+        } catch (error, stack) {
+          if (!result.isCompleted) {
+            result.completeError(error, stack);
+          }
+        }
+      },
+      onError: (error) {
+        if (!result.isCompleted) {
+          result.completeError(error);
+        }
+      },
+      synthesizeFilesFromURIs: false,
+    );
+    return result.future.timeout(const Duration(seconds: 20));
   }
 
   @override
@@ -162,17 +282,29 @@ class _TextHudBlockState extends State<TextHudBlock> {
           child: IgnorePointer(
             ignoring: !isEditing,
             child: CallbackShortcuts(
-              bindings: isEditing && _textController.text.isEmpty
-                  ? <ShortcutActivator, VoidCallback>{
-                      const SingleActivator(LogicalKeyboardKey.delete): () {
-                        widget.controller.deleteTextBlockOnPage(
-                          widget.pageIndex,
-                          widget.block.id,
-                        );
-                      },
-                    }
-                  : const <ShortcutActivator, VoidCallback>{},
+              bindings: <ShortcutActivator, VoidCallback>{
+                if (isEditing && widget.controller.operationWriter != null) ...{
+                  const SingleActivator(
+                    LogicalKeyboardKey.keyV,
+                    control: true,
+                  ): () =>
+                      _pasteRichClipboard(),
+                  const SingleActivator(
+                    LogicalKeyboardKey.keyV,
+                    meta: true,
+                  ): () =>
+                      _pasteRichClipboard(),
+                },
+                if (isEditing && _textController.text.isEmpty)
+                  const SingleActivator(LogicalKeyboardKey.delete): () {
+                    widget.controller.deleteTextBlockOnPage(
+                      widget.pageIndex,
+                      widget.block.id,
+                    );
+                  },
+              },
               child: EditableText(
+                key: _editableKey,
                 controller: _textController,
                 focusNode: _focusNode,
                 readOnly: !isEditing,
@@ -189,6 +321,28 @@ class _TextHudBlockState extends State<TextHudBlock> {
                 ).colorScheme.primary.withValues(alpha: 0.24),
                 showSelectionHandles: isEditing,
                 onChanged: _onTextChanged,
+                contextMenuBuilder: widget.controller.operationWriter == null
+                    ? null
+                    : (context, state) =>
+                          AdaptiveTextSelectionToolbar.buttonItems(
+                            anchors: state.contextMenuAnchors,
+                            buttonItems: state.contextMenuButtonItems
+                                .map(
+                                  (item) =>
+                                      item.type == ContextMenuButtonType.paste
+                                      ? ContextMenuButtonItem(
+                                          type: ContextMenuButtonType.paste,
+                                          onPressed: () {
+                                            state.hideToolbar();
+                                            _pasteRichClipboard(
+                                              SelectionChangedCause.toolbar,
+                                            );
+                                          },
+                                        )
+                                      : item,
+                                )
+                                .toList(),
+                          ),
               ),
             ),
           ),

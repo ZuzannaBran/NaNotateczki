@@ -237,7 +237,8 @@ class PageOverlay extends StatelessWidget {
               if (block.id == activeTextId)
                 if (controller.operationWriter != null &&
                     (!_hasUniformTextStyle(block.deltaJson) ||
-                        controller.activeTextController != null))
+                        controller.activeTextController != null ||
+                        controller.hasQuillHandoff(block.id)))
                   _TextBlockWidget(
                     key: ValueKey('quill-text-${block.id}'),
                     block: block,
@@ -825,7 +826,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     final pageId = _editorController.pageAt(widget.pageIndex).id;
     return _embedReads.putIfAbsent(
       '$pageId:$id',
-      () => writer.projector.verifiedTextAssetBytes(
+      () => writer.quillAssetBytes(
         documentId: _editorController.notebook.uid,
         pageId: pageId,
         objectId: widget.block.id,
@@ -864,7 +865,9 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         controller.activeTextController != _quillController &&
         canEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
+        if (mounted &&
+            controller.activeTextBlockId == widget.block.id &&
+            controller.tool == DrawingTool.text) {
           controller.setActiveTextBlock(widget.block.id, _quillController);
           _focusNode.requestFocus();
           requestSoftKeyboardForFocus(context, _focusNode);
@@ -1640,7 +1643,12 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     late final quill.QuillController source;
     source = quill.QuillController(
       document: doc,
-      selection: TextSelection.collapsed(offset: selectionOffset),
+      selection:
+          _editorController.takeQuillHandoff(
+            widget.block.id,
+            widget.block.deltaJson,
+          ) ??
+          TextSelection.collapsed(offset: selectionOffset),
       config: _editorController.operationWriter == null
           ? const quill.QuillControllerConfig()
           : quill.QuillControllerConfig(

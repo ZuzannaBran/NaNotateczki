@@ -1,5 +1,50 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Importy i rich paste prostego HUD — 2026-11-06
+
+Przed kodem potwierdzono `42185379376` dla `1f48022`: formatowanie,
+analiza, 921 zaliczonych testów (2 pominięte), pokrycie 70,35%.
+Oba scenariusze dwóch baz po utracie ACK są już zielone. Backend
+`42160118098` nadal zielony i nie wymaga ponowienia.
+
+Przycisk importu jest dostępny także w zwykłym HUD v2. HUD pożycza
+kontroler tekstu tylko na czas montażu. Wspólna walidacja porównuje całą
+TextEditingValue, treść Delta, blok i właściciela; zmiana tekstu,
+zaznaczenia, kompozycji IME lub wymiana/unmount kontrolera anuluje import.
+Dopiero po pełnej walidacji powstaje tymczasowa Delta Quill. Normalna
+ścieżka aktualizacji i checkpointów zapisuje zmianę bez snapshotów v1.
+Przejście do Quilla przenosi rzeczywisty kursor, jest jednorazowe i dotyczy
+dokładnej Delta. Obejmuje również import zwykłego HTML o jednolitym stylu.
+Anulowanie pickera pozostawia tę samą instancję HUD i zaznaczenie.
+Wcześniejsze pisanie i import mają oddzielne granice Undo. Sprawdzane są
+UTF-16/emoji; zaznaczenie rozcinające parę surogatów jest odrzucane.
+
+Ctrl/Cmd+V i menu Paste HUD korzystają z kontrolowanego rich clipboardu.
+Przy braku rich danych pozostaje natywna ścieżka tekstu. PNG/JPEG ze
+schowka są odczytywane z limitem 64 MiB; strumień kończy się błędem przy
+przekroczeniu limitu, bez otwierania URI jako plików. Nowe embedy mają
+podgląd ze zweryfikowanego bufora jeszcze przed autosave; po commicie
+odczyt przechodzi na scoped BLOB. Eliminuje to zapamiętanie błędu odczytu
+SQLite, zanim nowy attach zdąży się utrwalić. Granica dokumentu pozostaje
+sprawdzana; nowe URL-e nie są źródłem bajtów.
+
+Dodano 18 regresji Flutter/kontrolera/SQLite: przejście HUD → Quill dla
+image/PDF w jasnym i ciemnym motywie, kursor, Undo/Redo, nieaktywny lub
+wymieniony kontroler, IME, niezgodny model, uniform paste, Unicode i
+podgląd przed/po commicie. Dodano 3 testy czystego Darta dla strumieni
+(kopia chunków, limit, pusty strumień, błąd źródła i walidacja przed odczytem).
+Lokalnie przeszło 55 testów czystego Darta na produkcyjnym kodzie oraz
+analiza testu planu; formatowanie 279 plików Dart i składnia skryptu są
+poprawne. Testy Flutter oraz pełna analiza tego przyrostu wymagają Actions,
+bez czekania na wynik. Flaga v2 pozostaje wyłączona. Historia po restarcie,
+pełne E2E PostgreSQL i produkcyjny cutover nadal nie są ukończone.
+
+Ręczne sprawdzenie wejścia platformowego po zielonym CI: w zwykłym polu
+zaznaczyć środek tekstu, wkleić PNG przez Ctrl/Cmd+V i menu Paste, następnie
+HTML z formatowaniem. Zweryfikować zachowanie reszty tekstu i Undo.
+Powtórzyć zmianę zaznaczenia podczas odczytu schowka oraz anulowanie
+pickera PDF. To scenariusz ręczny, nie deklaracja zaliczenia platform.
+
 ## Regresja utraconego ACK — 2026-11-06
 
 Przebieg `42180248467` dla `030456f` przeszedł formatowanie i analizę,
@@ -53,8 +98,8 @@ skryptu weryfikacji poprawne. Nowe testy Flutter/SQLite/widget i pełna analiza
 pozostają do wykonania w Actions, bez czekania na wynik. Zmieniona jest
 wyłącznie aplikacja; CI ograniczamy do analizy i testów natywnych.
 Następna sesja zaczyna od Actions. Historia Undo/Redo po restarcie,
-przejście prostego HUD do embedów, pełne E2E i produkcyjny cutover pozostają
-otwarte; nie aktywowano flagi i nie usunięto v1.
+pełne E2E i produkcyjny cutover pozostają otwarte; przejście HUD opisano
+w nowszym przyroście powyżej. Nie aktywowano flagi i nie usunięto v1.
 
 ## Kontrolowany rich paste — 2026-11-06
 
@@ -160,8 +205,8 @@ W razie błędu najpierw naprawić regresję; nie ponawiać niezmienionych platf
 Backend `6b0da04` dodaje sześć kontraktów inverse mediów i tombstones.
 Lokalnie po tym przyroście: 278 passed, 8 skipped (PostgreSQL).
 Nie zastępuje to E2E Flutter ↔ HTTP ↔ PostgreSQL.
-Po zielonym CI kontynuować brakujące przejście prostego HUD do embedów
-i pełne pokrycie gestów; historia po restarcie nadal nie jest odtwarzana.
+Po zielonym CI kontynuować trwałą historię po restarcie oraz pełne E2E.
+HUD i importy opisano w nowszym przyroście na górze dokumentu.
 Rebase dwóch klientów, synchronizacja całego konta i aktywacja flagi
 pozostają kolejnym etapem. Produkcja nadal korzysta z v1.
 

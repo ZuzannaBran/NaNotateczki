@@ -23,6 +23,26 @@ class QuillPastePlan {
   final int characterCount;
   int get embedCount => _operations.where((op) => op['insert'] is Map).length;
 
+  static Future<Uint8List> readMediaBytes(
+    Stream<Uint8List> stream, {
+    int byteLimit = maximumBytes,
+  }) async {
+    if (byteLimit < 1 || byteLimit > maximumBytes) {
+      throw ArgumentError('Invalid paste byte limit.');
+    }
+    final bytes = BytesBuilder();
+    await for (final chunk in stream) {
+      if (chunk.length > byteLimit - bytes.length) {
+        throw const FormatException('Inline media exceeds the size limit.');
+      }
+      bytes.add(chunk);
+    }
+    if (bytes.isEmpty) {
+      throw const FormatException('Inline media is empty.');
+    }
+    return bytes.takeBytes();
+  }
+
   factory QuillPastePlan.fromMediaBytes(
     Uint8List bytes, {
     int byteLimit = maximumBytes,

@@ -9,6 +9,56 @@ String _uri(String mime, List<int> bytes) =>
     'data:$mime;base64,${base64Encode(bytes)}';
 
 void main() {
+  test(
+    'inline stream owns chunks and enforces its aggregate byte budget',
+    () async {
+      final first = Uint8List.fromList([1, 2]);
+      Stream<Uint8List> chunks() async* {
+        yield first;
+        first[0] = 99;
+        yield Uint8List.fromList([3]);
+      }
+
+      expect(await QuillPastePlan.readMediaBytes(chunks(), byteLimit: 3), [
+        1,
+        2,
+        3,
+      ]);
+      await expectLater(
+        QuillPastePlan.readMediaBytes(
+          Stream.fromIterable([
+            Uint8List.fromList([1, 2]),
+            Uint8List.fromList([3, 4]),
+          ]),
+          byteLimit: 3,
+        ),
+        throwsFormatException,
+      );
+    },
+  );
+  test('inline stream propagates failure and rejects empty input', () async {
+    await expectLater(
+      QuillPastePlan.readMediaBytes(const Stream.empty()),
+      throwsFormatException,
+    );
+    await expectLater(
+      QuillPastePlan.readMediaBytes(Stream.error(StateError('read failed'))),
+      throwsStateError,
+    );
+  });
+  test('inline stream validates its limit before consuming input', () async {
+    var read = false;
+    Stream<Uint8List> chunks() async* {
+      read = true;
+      yield Uint8List.fromList([1]);
+    }
+
+    await expectLater(
+      QuillPastePlan.readMediaBytes(chunks(), byteLimit: 0),
+      throwsArgumentError,
+    );
+    expect(read, isFalse);
+  });
   final files = <String, List<int>>{
     'image/png': [137, 80, 78, 71, 13, 10, 26, 10, 1],
     'image/jpeg': [255, 216, 255, 1],

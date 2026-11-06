@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show TextEditingController;
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart' as quill_delta;
 import 'package:flutter_quill_delta_from_html/flutter_quill_delta_from_html.dart';
@@ -203,6 +204,53 @@ class EditorController extends ChangeNotifier {
 
   String? activeTextBlockId;
   quill.QuillController? activeTextController;
+  TextEditingController? _hudTextController;
+  String? _hudTextBlockId;
+  ({String blockId, String deltaJson, TextSelection selection})? _quillHandoff;
+
+  TextEditingController? get activeHudTextController =>
+      operationWriter != null &&
+          activeTextController == null &&
+          activeTextBlockId == _hudTextBlockId &&
+          tool == DrawingTool.text
+      ? _hudTextController
+      : null;
+
+  /// Borrows the mounted HUD controller; its widget retains ownership.
+  void bindHudTextController(String blockId, TextEditingController controller) {
+    if (_isDisposed || operationWriter == null) {
+      return;
+    }
+    _hudTextBlockId = blockId;
+    _hudTextController = controller;
+  }
+
+  void unbindHudTextController(
+    String blockId,
+    TextEditingController controller,
+  ) {
+    if (_hudTextBlockId == blockId &&
+        identical(_hudTextController, controller)) {
+      _hudTextBlockId = null;
+      _hudTextController = null;
+    }
+  }
+
+  bool hasQuillHandoff(String blockId) =>
+      activeTextBlockId == blockId && _quillHandoff?.blockId == blockId;
+
+  /// Consumes the caret only for the exact Delta that replaced the HUD.
+  TextSelection? takeQuillHandoff(String blockId, String? deltaJson) {
+    final handoff = _quillHandoff;
+    if (handoff == null || handoff.blockId != blockId) {
+      return null;
+    }
+    _quillHandoff = null;
+    return activeTextBlockId == blockId && handoff.deltaJson == deltaJson
+        ? handoff.selection
+        : null;
+  }
+
   int? _activeTextEditPageIndex;
   TextBlock? _activeTextEditBefore;
   _V2TextGesture? _activeV2TextGesture;
@@ -2363,9 +2411,13 @@ class EditorController extends ChangeNotifier {
     blockId: blockId,
     canInsert: canPaste,
     readPlan: (target, current) async {
-      final copiedText = target.pastePlainText;
+      final clipboardSource = target ?? quill.QuillController.basic();
+      final copiedText = clipboardSource.pastePlainText;
       final copiedDelta =
-          jsonDecode(jsonEncode(target.pasteDelta.toJson())) as List;
+          jsonDecode(jsonEncode(clipboardSource.pasteDelta.toJson())) as List;
+      if (target == null) {
+        clipboardSource.dispose();
+      }
       final plain = readPlainText == null ? null : await readPlainText();
       if (!current()) {
         return null;
@@ -2449,7 +2501,7 @@ class EditorController extends ChangeNotifier {
   Future<bool> _replaceQuillSelection({
     required String blockId,
     required Future<QuillPastePlan?> Function(
-      quill.QuillController target,
+      quill.QuillController? target,
       bool Function() current,
     )
     readPlan,
@@ -2460,20 +2512,27 @@ class EditorController extends ChangeNotifier {
       return false;
     }
     final target = activeTextController;
+    final hud = target == null ? activeHudTextController : null;
     final pageIndex = _pageIndexContainingTextBlock(blockId);
     if (_isDisposed ||
         _v2DocumentDeleted ||
-        target == null ||
-        target.readOnly ||
+        (target == null && hud == null) ||
+        target?.readOnly == true ||
         activeTextBlockId != blockId ||
         pageIndex == null) {
       return true;
     }
     final pageId = pages[pageIndex].id;
-    final selection = target.selection;
-    final beforeDelta = jsonEncode(target.document.toDelta().toJson());
+    final selection = target?.selection ?? hud!.selection;
+    final beforeDelta = target == null
+        ? null
+        : jsonEncode(target.document.toDelta().toJson());
+    final beforeHud = hud?.value;
     final beforeModel = findTextBlockById(blockId)!.deltaJson;
-    if (!selection.isValid || selection.end >= target.document.length) {
+    if (!selection.isValid ||
+        (target != null
+            ? selection.end >= target.document.length
+            : selection.end > beforeHud!.text.length)) {
       return true;
     }
     bool current() {
@@ -2482,15 +2541,19 @@ class EditorController extends ChangeNotifier {
           canInsert?.call() == false ||
           !identical(activeTextController, target) ||
           activeTextBlockId != blockId ||
-          target.readOnly ||
-          target.selection != selection) {
+          target?.readOnly == true ||
+          (target != null
+              ? target.selection != selection
+              : !identical(activeHudTextController, hud) ||
+                    hud!.value != beforeHud)) {
         return false;
       }
       final index = _pageIndexContainingTextBlock(blockId);
       return index != null &&
           pages[index].id == pageId &&
           findTextBlockById(blockId)?.deltaJson == beforeModel &&
-          jsonEncode(target.document.toDelta().toJson()) == beforeDelta;
+          (target == null ||
+              jsonEncode(target.document.toDelta().toJson()) == beforeDelta);
     }
 
     if (!current()) {
@@ -2506,7 +2569,32 @@ class EditorController extends ChangeNotifier {
     if (plan.characterCount == 0) {
       return true;
     }
-    final beforeText = target.document.toPlainText();
+    final document =
+        target?.document ??
+        quill.Document.fromJson(
+          beforeModel == null
+              ? [
+                  {'insert': '${beforeHud!.text}\n'},
+                ]
+              : jsonDecode(beforeModel) as List,
+        );
+    final beforeText = document.toPlainText();
+    bool splitsSurrogate(int offset) =>
+        offset > 0 &&
+        offset < beforeText.length &&
+        beforeText.codeUnitAt(offset - 1) >= 0xD800 &&
+        beforeText.codeUnitAt(offset - 1) <= 0xDBFF &&
+        beforeText.codeUnitAt(offset) >= 0xDC00 &&
+        beforeText.codeUnitAt(offset) <= 0xDFFF;
+    if (splitsSurrogate(selection.start) || splitsSurrogate(selection.end)) {
+      throw const FormatException('Text selection splits a Unicode character.');
+    }
+    if (hud != null &&
+        beforeText != '${beforeHud!.text}\n' &&
+        !(beforeText.startsWith(beforeHud.text) &&
+            beforeText.substring(beforeHud.text.length).trim().isEmpty)) {
+      throw const FormatException('HUD text differs from its rich document.');
+    }
     final selected = beforeText.substring(selection.start, selection.end);
     if (beforeText.runes.length -
             selected.runes.length +
@@ -2539,12 +2627,38 @@ class EditorController extends ChangeNotifier {
             prepareInlineAsset(blockId: blockId, bytes: bytes, embedType: type),
       ),
     );
-    target.replaceText(
-      selection.start,
-      selection.end - selection.start,
-      ready,
-      TextSelection.collapsed(offset: selection.start + ready.length),
-    );
+    final editing =
+        target ??
+        quill.QuillController(document: document, selection: selection);
+    try {
+      editing.replaceText(
+        selection.start,
+        selection.end - selection.start,
+        ready,
+        TextSelection.collapsed(offset: selection.start + ready.length),
+      );
+      if (target == null) {
+        final deltaJson = jsonEncode(editing.document.toDelta().toJson());
+        _commitActiveTextEdit();
+        updateTextBlockContentOnPage(
+          pageIndex,
+          findTextBlockById(blockId)!,
+          plainText: editing.document.toPlainText(),
+          deltaJson: deltaJson,
+        );
+        _commitActiveTextEdit();
+        _quillHandoff = (
+          blockId: blockId,
+          deltaJson: deltaJson,
+          selection: editing.selection,
+        );
+        notifyListeners();
+      }
+    } finally {
+      if (target == null) {
+        editing.dispose();
+      }
+    }
     return true;
   }
 

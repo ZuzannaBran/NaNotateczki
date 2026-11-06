@@ -163,15 +163,15 @@ class TextEditToolbar extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     if (editorController.operationWriter != null &&
-                        editorController.activeTextBlockId == block.id &&
-                        editorController.activeTextController != null)
+                        editorController.activeTextBlockId == block.id)
                       IconButton(
                         key: const ValueKey('text-inline-file-button'),
                         icon: const Icon(Icons.attach_file),
                         tooltip: 'Insert image or PDF into text',
                         iconSize: 20,
                         onPressed:
-                            editorController.activeTextController!.readOnly
+                            editorController.activeTextController?.readOnly ==
+                                true
                             ? null
                             : () => _insertFile(context),
                       ),
