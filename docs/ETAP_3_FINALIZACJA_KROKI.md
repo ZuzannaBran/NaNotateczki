@@ -1,5 +1,21 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Wynik CI po przyroście offline — 2026-11-06
+
+Przebieg `42132119898` przeszedł formatowanie i analizę Darta oraz 841
+testów (2 pominięte); cztery testy nie przeszły. Nowe regresje aktora,
+Quill, autosave, katalogu, offline mediów i restartów przeszły.
+Backend `42128518866` zakończył się sukcesem.
+
+Naprawa czterech regresji: test CRUD sprawdza kolejkę konkretnego
+dokumentu i trwały tombstone zamiast globalnego porządku różnych aktorów;
+test przełączania widoku planuje zajęcia od początku godziny, aby końcówka
+doby nie zamieniała ich w miniaturowy blok bez etykiety. Krótkie bloki
+kalendarza zachowują teraz barwę completed/review. Test obu motywów
+wymusza jednominutowe sesje, więc regresja jest niezależna od pory CI.
+Ponowny przebieg celuje w analizę i testy natywne; nie uruchamia innych
+platform. Wynik należy sprawdzić na początku następnej pracy.
+
 Stan na 2026-11-05. Aktywna produkcja pozostaje na v1. Każdy przyrost
 jest realizowany na `NaNotateczki/dev`. Żaden punkt nie może być
 uznany za zaliczony na podstawie samego dodania testu.

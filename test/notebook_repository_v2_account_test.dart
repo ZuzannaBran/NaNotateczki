@@ -98,7 +98,9 @@ void main() {
 
     await repository.deleteNotebook(board.uid);
     expect(await repository.getNotebook(board.uid), isNull);
-    expect((await store.pending()).last.kind, OperationKind.documentDelete);
+    final boardOperations = await store.pending(documentId: board.uid);
+    expect(boardOperations.last.kind, OperationKind.documentDelete);
+    expect(await store.isTombstoned(board.uid, 'document', board.uid), isTrue);
     expect(commits, 4);
     await expectLater(repository.createPlanner(), throwsUnsupportedError);
     await expectLater(

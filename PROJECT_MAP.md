@@ -12,6 +12,11 @@ mapie. Każdy nowy plik w `lib/` musi dostać tu własny wpis.
 
 ## 1. Architektura w skrócie
 
+Regresja kalendarza (2026-11-06): `_timelineTile` w
+`lib/features/planner/presentation/planner_screen.dart` zachowuje kolory
+completed/review również dla segmentów poniżej 19 px. Test
+`study_planner_widget_test.dart` wymusza krótkie sesje w obu motywach.
+
 - Flutter / Dart `^3.11.1`, Material 3.
 - Stan: Provider + ChangeNotifier; bez Bloc/Riverpod.
 - Dane: Drift + SQLite; web używa SQLite WASM/IndexedDB.

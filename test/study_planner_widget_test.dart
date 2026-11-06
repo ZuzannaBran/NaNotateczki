@@ -472,11 +472,12 @@ void main() {
 
   testWidgets('calendar changes between today week and month', (tester) async {
     final planner = await loadPlanner();
+    final now = DateTime.now();
     await tester.binding.setSurfaceSize(const Size(1440, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     planner.create(
       title: 'Calculus',
-      scheduledAt: DateTime.now(),
+      scheduledAt: DateTime(now.year, now.month, now.day, now.hour),
       description: 'Integrals',
     );
 
@@ -1606,6 +1607,7 @@ void main() {
       final finished = planner.create(
         title: 'Finished lesson',
         scheduledAt: DateTime.now(),
+        minutes: 1,
       );
       planner.start(finished.id);
       planner.stop();
@@ -1613,6 +1615,7 @@ void main() {
       final planned = planner.create(
         title: 'Planned lesson',
         scheduledAt: DateTime.now(),
+        minutes: 1,
       );
 
       await tester.pumpWidget(

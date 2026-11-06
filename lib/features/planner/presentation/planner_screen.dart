@@ -625,9 +625,23 @@ class _PlannerScreenState extends State<PlannerScreen> {
   Widget _timelineTile(StudySession session, double height) {
     if (height < 19) {
       final theme = Theme.of(context);
+      final done = session.status == StudyStatus.completed;
+      final reviewing = session.status == StudyStatus.review;
+      final colors = theme.colorScheme;
+      final base = reviewing
+          ? colors.tertiaryContainer
+          : done
+          ? (theme.brightness == Brightness.dark
+                ? colors.surfaceContainerLowest
+                : colors.surfaceContainerHighest)
+          : StudyActionStyles.plannedSessionColor(theme);
       return Material(
         key: ValueKey('planner-session-tile:${session.id}'),
-        color: StudyActionStyles.sessionCardColor(theme, session.colorValue),
+        color: StudyActionStyles.sessionCardColor(
+          theme,
+          session.colorValue,
+          baseColor: base,
+        ),
         shape: StudyActionStyles.sessionCardShape(theme.colorScheme),
         child: InkWell(
           onTap: () => _sessionOptions(session),
