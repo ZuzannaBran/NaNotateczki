@@ -87,7 +87,10 @@ void main() {
     );
     expect(renamed?.title, 'Renamed through operations');
     expect(renamed?.folder, 'School');
-    expect((await store.pending()).last.kind, OperationKind.documentSet);
+    expect(
+      (await store.pending(documentId: notebook.uid)).last.kind,
+      OperationKind.documentSet,
+    );
     final pending = (await store.pending()).length;
     await repository.updateNotebookMetadata(
       notebook.uid,
