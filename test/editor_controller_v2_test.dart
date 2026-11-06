@@ -36,8 +36,9 @@ void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('controller recovers Undo/Redo from its durable actor checkpoint',
-      () async {
+  test(
+    'controller recovers Undo/Redo from its durable actor checkpoint',
+    () async {
     final directory = await Directory.systemTemp.createTemp('nn-v2-ui-undo-');
     final file = File('${directory.path}/notes.sqlite');
     try {
@@ -62,7 +63,19 @@ void main() {
         ),
       );
       await first.historyReady;
+      await firstDb.customStatement(
+        "CREATE TRIGGER reject_editor_history BEFORE INSERT ON editor_history "
+        "BEGIN SELECT RAISE(ABORT, 'injected history failure'); END",
+      );
       first.addInkStroke(const [InkPoint(dx: 2, dy: 3, pressure: 0.7)]);
+      await expectLater(
+        first.flushPendingSaves(),
+        throwsA(isA<DataIntegrityProtectionException>()),
+      );
+      expect(await firstEngine.store.pending(), isEmpty);
+      expect(first.currentPage.inkStrokes, hasLength(1));
+      expect(first.canUndo, isFalse);
+      await firstDb.customStatement('DROP TRIGGER reject_editor_history');
       await first.flushPendingSaves();
       final originalId = first.currentPage.inkStrokes.single.id;
       expect(first.canUndo, isTrue);
@@ -118,7 +131,8 @@ void main() {
     } finally {
       await directory.delete(recursive: true);
     }
-  });
+    },
+  );
 
   test('opt-in editor uses v2 outbox but never the snapshot writer', () async {
     final database = NotesDatabase(NativeDatabase.memory());
