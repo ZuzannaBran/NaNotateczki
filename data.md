@@ -1,5 +1,18 @@
 # Dane NaNotateczki
 
+## Połączenie checkpointów z kontrolerem (2026-11-06)
+
+Kontroler opt-in v2 odczytuje historię aktora po otwarciu dokumentu,
+ale nie hydratatuje wszystkich historycznych mediów. Każda granica
+gestu, autosave tekstu oraz Undo/Redo zapisuje checkpoint przez
+`onCommittedInTransaction`. Stosy UI zmieniają się dopiero po udanym
+commicie operacji i historii. Ograniczenie 50 gestów / 4 MiB usuwa
+najstarsze granice, nie treść notatnika. Odtwarzanie konkretnego
+inverse weryfikuje bajty na żądanie; zmienione UID po tombstone
+są przenoszone przez metadata-only remap. Zły checksum/scoping
+blokuje nadpisanie historii, a nie zastępuje jej pustym snapshotem.
+
+
 ## Lokalne checkpointy historii v2 (2026-11-06, SQLite v8)
 
 Addytywna migracja v7→v8 dodaje surową tabelę `editor_history`:

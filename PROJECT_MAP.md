@@ -562,6 +562,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 ### Produkcyjne połączenie z edytorem — preview v2 (2026-11-05)
 
+- Kontroler v2 zapisuje granice Undo/Redo jako lokalne checkpointy
+  `editor_history` w transakcji projekcji i outboxu; ładuje je po
+  ponownym otwarciu dokumentu i dekoduje media dopiero przy inverse.
+  Uszkodzony checkpoint blokuje nadpisanie historii; v2 pozostaje opt-in.
+  Regresja: `test/editor_controller_v2_test.dart` (restart Undo/Redo).
+
+
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Wysyłanie lokalnego outboxu

@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/editor_history_store.dart';
 import 'package:program/data/sync/editor_sqlite_projector.dart';
 import 'package:program/data/sync/operation_gateway.dart';
 import 'package:program/data/sync/operation_protocol.dart';
@@ -33,6 +35,90 @@ class _OfflineGateway implements OperationGateway {
 void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('controller recovers Undo/Redo from its durable actor checkpoint',
+      () async {
+    final directory = await Directory.systemTemp.createTemp('nn-v2-ui-undo-');
+    final file = File('${directory.path}/notes.sqlite');
+    try {
+      final firstDb = NotesDatabase(NativeDatabase(file));
+      final firstRepo = NotebookRepository(firstDb);
+      final notebook = await firstRepo.createNotebook();
+      final firstProjector = EditorSqliteProjector(firstDb);
+      final firstEngine = SyncEngine(
+        store: OperationStore(firstDb),
+        gateway: _OfflineGateway(),
+        actorId: 'persisted-editor-actor',
+        checkpointScope: 'persisted-editor-actor',
+        enableRealtime: false,
+        applyRemote: (operation, _) => firstProjector.apply(operation),
+      );
+      final first = EditorController(
+        repository: firstRepo,
+        notebook: notebook,
+        operationWriter: EditorV2OperationWriter(
+          syncEngine: firstEngine,
+          projector: firstProjector,
+        ),
+      );
+      await first.historyReady;
+      first.addInkStroke(const [InkPoint(dx: 2, dy: 3, pressure: 0.7)]);
+      await first.flushPendingSaves();
+      final originalId = first.currentPage.inkStrokes.single.id;
+      expect(first.canUndo, isTrue);
+      final firstHistory = EditorHistoryStore(firstEngine.store);
+      final checkpoint = await firstHistory.load(
+        documentId: notebook.uid,
+        ownerId: firstEngine.actorId,
+      );
+      expect(checkpoint!.undo, hasLength(1));
+      first.dispose();
+      await firstEngine.stop();
+      await firstDb.close();
+
+      final secondDb = NotesDatabase(NativeDatabase(file));
+      final secondRepo = NotebookRepository(secondDb);
+      final secondProjector = EditorSqliteProjector(secondDb);
+      final secondEngine = SyncEngine(
+        store: OperationStore(secondDb),
+        gateway: _OfflineGateway(),
+        actorId: 'persisted-editor-actor',
+        checkpointScope: 'persisted-editor-actor',
+        enableRealtime: false,
+        applyRemote: (operation, _) => secondProjector.apply(operation),
+      );
+      final second = EditorController(
+        repository: secondRepo,
+        notebook: (await secondRepo.getNotebook(notebook.uid))!,
+        operationWriter: EditorV2OperationWriter(
+          syncEngine: secondEngine,
+          projector: secondProjector,
+        ),
+      );
+      await second.historyReady;
+      expect(second.canUndo, isTrue);
+      second.undo();
+      await second.flushPendingSaves();
+      expect(second.currentPage.inkStrokes, isEmpty);
+      expect(second.canRedo, isTrue);
+      second.redo();
+      await second.flushPendingSaves();
+      expect(second.currentPage.inkStrokes, hasLength(1));
+      expect(second.currentPage.inkStrokes.single.id, isNot(originalId));
+      expect(
+        (await EditorHistoryStore(secondEngine.store).load(
+          documentId: notebook.uid,
+          ownerId: secondEngine.actorId,
+        ))!.undo,
+        hasLength(1),
+      );
+      second.dispose();
+      await secondEngine.stop();
+      await secondDb.close();
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
 
   test('opt-in editor uses v2 outbox but never the snapshot writer', () async {
     final database = NotesDatabase(NativeDatabase.memory());

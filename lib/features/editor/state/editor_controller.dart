@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:drift/drift.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
@@ -22,6 +23,10 @@ import '../../../core/input/ink_activity_tracker.dart';
 import '../../../core/storage/app_data_directory.dart';
 import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
+import '../../../data/sync/editor_history_checkpoint.dart';
+import '../../../data/sync/editor_history_notebook_codec.dart';
+import '../../../data/sync/editor_history_store.dart';
+import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/share_text_edit_adapter.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/drawing_tool.dart';
@@ -49,11 +54,23 @@ class _EditorHistoryEntry {
 }
 
 class _V2HistoryEntry {
-  const _V2HistoryEntry(this.before, this.after, this.operationId);
+  const _V2HistoryEntry(
+    this.before,
+    this.after,
+    this.operationId, {
+    required this.stored,
+  });
 
-  final Notebook before;
-  final Notebook after;
+  _V2HistoryEntry.recovered(StoredEditorGesture gesture)
+      : before = null,
+        after = null,
+        operationId = gesture.operationId,
+        stored = gesture;
+
+  final Notebook? before;
+  final Notebook? after;
   final String operationId;
+  final StoredEditorGesture stored;
 }
 
 class _V2TextGesture {
@@ -134,6 +151,11 @@ class EditorController extends ChangeNotifier {
     pages = notebook.pages;
     _v2PersistedNotebook = notebook;
     currentPageIndex = 0;
+    if (operationWriter != null) {
+      _v2HistoryStore = EditorHistoryStore(operationWriter!.syncEngine.store);
+      _v2HistoryCodec = EditorHistoryNotebookCodec(operationWriter!.projector);
+      _v2HistoryReady = _restoreV2History();
+    }
     AppSaveCoordinator.instance.register(
       this,
       hasPendingWork: () => _hasPendingSaveWork,
@@ -148,6 +170,14 @@ class EditorController extends ChangeNotifier {
   final EditorV2OperationWriter? operationWriter;
   Notebook notebook;
   late Notebook _v2PersistedNotebook;
+  EditorHistoryStore? _v2HistoryStore;
+  EditorHistoryNotebookCodec? _v2HistoryCodec;
+  Future<void>? _v2HistoryReady;
+  Object? _v2HistoryLoadError;
+
+  /// Resolves after the local actor's history has been verified and loaded.
+  Future<void> get historyReady => _v2HistoryReady ?? Future<void>.value();
+
   Future<void>? _v2SaveTail;
   Future<void>? _v2HistoryTail;
   bool _v2HistoryCommitting = false;
@@ -665,6 +695,7 @@ class EditorController extends ChangeNotifier {
 
     await repository.waitForPendingSaves();
     if (operationWriter != null) {
+      await historyReady;
       // The v2 journal and its projection commit together; no legacy writer
       // is allowed to run on the same document during flush or shutdown.
       await _v2HistoryTail;
@@ -2063,6 +2094,10 @@ class EditorController extends ChangeNotifier {
       return;
     }
     _commitActiveTextEdit();
+    await historyReady;
+    if (_v2HistoryLoadError != null) {
+      throw StateError('Cannot undo with invalid local history.');
+    }
     await _v2SaveTail;
     if (_fullSavePending || _dirtyPageIds.isNotEmpty) {
       await _saveV2();
@@ -2076,7 +2111,17 @@ class EditorController extends ChangeNotifier {
     }
     final entry = source.last;
     final original = _v2PersistedNotebook;
-    final desired = undo ? entry.before : entry.after;
+    final desired = undo
+        ? entry.before ??
+              await _v2HistoryCodec!.decode(
+                entry.stored.before,
+                documentId: notebook.uid,
+              )
+        : entry.after ??
+              await _v2HistoryCodec!.decode(
+                entry.stored.after,
+                documentId: notebook.uid,
+              );
     final restoration = _reidentifyV2RestoredObjects(
       current: original,
       desired: desired,
@@ -2085,39 +2130,53 @@ class EditorController extends ChangeNotifier {
     final visibleBeforeCommit = pages;
     _v2HistoryCommitting = true;
     late final bool hasCommitted;
-    var oppositeEntry = entry;
+    List<_V2HistoryEntry>? nextUndo;
+    List<_V2HistoryEntry>? nextRedo;
+    EditorHistoryCheckpoint? checkpoint;
     try {
       final committed = await operationWriter!.writeNotebookChange(
         before: original,
         after: restored,
         revertsOperationId: entry.operationId,
+        onCommittedInTransaction: (operations) async {
+          final changed = operations.isNotEmpty;
+          nextUndo = [
+            for (final item in _v2Undo)
+              changed ? _remapV2HistoryEntry(item, restoration) : item,
+          ];
+          nextRedo = [
+            for (final item in _v2Redo)
+              changed ? _remapV2HistoryEntry(item, restoration) : item,
+          ];
+          final source = undo ? nextUndo! : nextRedo!;
+          final destination = undo ? nextRedo! : nextUndo!;
+          final moved = source.removeLast();
+          destination.add(
+            changed
+                ? _remapV2HistoryEntry(
+                    moved,
+                    (
+                      notebook: restored,
+                      pages: const <String, String>{},
+                      objects: const <String, String>{},
+                    ),
+                    operationId: operations.last.operationId,
+                  )
+                : moved,
+          );
+          checkpoint = await _persistV2History(
+            operations,
+            undo: nextUndo!,
+            redo: nextRedo!,
+          );
+        },
       );
       hasCommitted = committed.isNotEmpty;
-      if (hasCommitted) {
-        // Later history entries refer to the same logical objects. Remap
-        // their snapshots only after the new identities are durable.
-        for (final history in [_v2Undo, _v2Redo]) {
-          for (var index = 0; index < history.length; index++) {
-            final previous = history[index];
-            history[index] = _V2HistoryEntry(
-              _remapV2HistoryNotebook(previous.before, restoration),
-              _remapV2HistoryNotebook(previous.after, restoration),
-              previous.operationId,
-            );
-          }
-        }
-        oppositeEntry = _V2HistoryEntry(
-          _remapV2HistoryNotebook(entry.before, restoration),
-          _remapV2HistoryNotebook(entry.after, restoration),
-          committed.last.operationId,
-        );
-      }
+      _installV2History(checkpoint, nextUndo!, nextRedo!);
     } finally {
       _v2HistoryCommitting = false;
     }
     if (!hasCommitted) {
-      source.removeLast();
-      (undo ? _v2Redo : _v2Undo).add(oppositeEntry);
       _notifyHistoryChanged();
       return;
     }
@@ -2129,8 +2188,6 @@ class EditorController extends ChangeNotifier {
       _integritySaveBlocked = true;
       _fullSavePending = true;
       _dirtyPageIds.addAll(pages.map((page) => page.id));
-      source.removeLast();
-      (undo ? _v2Redo : _v2Undo).add(oppositeEntry);
       _notifyHistoryChanged();
       notifyListeners();
       return;
@@ -2151,13 +2208,131 @@ class EditorController extends ChangeNotifier {
     _dirtyPageIds.clear();
     _expectedRemovedIdsByPage.clear();
     _expectedRemovedPageIds.clear();
-    source.removeLast();
-    (undo ? _v2Redo : _v2Undo).add(oppositeEntry);
     _notifyHistoryChanged();
     for (final page in pages) {
       _touchInkPageRevision(page.id);
     }
     notifyListeners();
+  }
+
+  Future<void> _restoreV2History() async {
+    try {
+      final checkpoint = await _v2HistoryStore!.load(
+        documentId: notebook.uid,
+        ownerId: operationWriter!.syncEngine.actorId,
+      );
+      if (_isDisposed || checkpoint == null) {
+        return;
+      }
+      _v2Undo
+        ..clear()
+        ..addAll(checkpoint.undo.map(_V2HistoryEntry.recovered));
+      _v2Redo
+        ..clear()
+        ..addAll(checkpoint.redo.map(_V2HistoryEntry.recovered));
+      _notifyHistoryChanged();
+    } catch (error, stackTrace) {
+      _v2HistoryLoadError = error;
+      _integritySaveBlocked = true;
+      debugPrint(
+        'EditorController v2 history recovery blocked: $error\n$stackTrace',
+      );
+    }
+  }
+
+  /// Runs inside the same SQLite transaction as the journal projection.
+  Future<EditorHistoryCheckpoint?> _persistV2History(
+    List<OperationEnvelope> operations, {
+    required List<_V2HistoryEntry> undo,
+    required List<_V2HistoryEntry> redo,
+  }) async {
+    if (operations.isEmpty && undo.isEmpty && redo.isEmpty) {
+      return null;
+    }
+    final database = operationWriter!.projector.database;
+    final head = operations.isNotEmpty
+        ? operations.last.operationId
+        : (await database.customSelect(
+            'SELECT operation_id FROM operations WHERE document_id = ? '
+            'ORDER BY rowid DESC LIMIT 1',
+            variables: [Variable<String>(notebook.uid)],
+          ).getSingleOrNull())?.read<String>('operation_id');
+    if (head == null) {
+      return null;
+    }
+    final keepUndo = List<_V2HistoryEntry>.of(undo);
+    final keepRedo = List<_V2HistoryEntry>.of(redo);
+    while (keepUndo.length + keepRedo.length >
+        EditorHistoryCheckpoint.maximumGestures) {
+      if (keepUndo.isNotEmpty) {
+        keepUndo.removeAt(0);
+      } else {
+        keepRedo.removeAt(0);
+      }
+    }
+    final requested = EditorHistoryCheckpoint(
+      documentId: notebook.uid,
+      ownerId: operationWriter!.syncEngine.actorId,
+      headOperationId: head,
+      undo: [for (final item in keepUndo) item.stored],
+      redo: [for (final item in keepRedo) item.stored],
+    );
+    final fitted = requested.fitToByteBudget();
+    await _v2HistoryStore!.save(fitted);
+    return fitted;
+  }
+
+  void _installV2History(
+    EditorHistoryCheckpoint? checkpoint,
+    List<_V2HistoryEntry> undo,
+    List<_V2HistoryEntry> redo,
+  ) {
+    if (checkpoint == null) {
+      return;
+    }
+    _v2Undo
+      ..clear()
+      ..addAll(undo.skip(undo.length - checkpoint.undo.length));
+    _v2Redo
+      ..clear()
+      ..addAll(redo.skip(redo.length - checkpoint.redo.length));
+  }
+
+  _V2HistoryEntry _remapV2HistoryEntry(
+    _V2HistoryEntry entry,
+    ({
+      Notebook notebook,
+      Map<String, String> pages,
+      Map<String, String> objects,
+    }) restoration, {
+    String? operationId,
+  }) {
+    final codec = _v2HistoryCodec!;
+    final stored = StoredEditorGesture(
+      before: codec.remapIdentities(
+        entry.stored.before,
+        documentId: notebook.uid,
+        pageIds: restoration.pages,
+        objectIds: restoration.objects,
+      ),
+      after: codec.remapIdentities(
+        entry.stored.after,
+        documentId: notebook.uid,
+        pageIds: restoration.pages,
+        objectIds: restoration.objects,
+      ),
+      operationId: operationId ?? entry.operationId,
+    );
+    return _V2HistoryEntry(
+      entry.before == null
+          ? null
+          : _remapV2HistoryNotebook(entry.before!, restoration),
+      entry.after == null
+          ? null
+          : _remapV2HistoryNotebook(entry.after!, restoration),
+      stored.operationId,
+      stored: stored,
+    );
   }
 
   ({Notebook notebook, Map<String, String> pages, Map<String, String> objects})
@@ -4216,6 +4391,10 @@ class EditorController extends ChangeNotifier {
     late final Future<void> next;
     next = previous
         .then((_) async {
+          await historyReady;
+          if (_v2HistoryLoadError != null) {
+            throw StateError('Cannot overwrite invalid local history.');
+          }
           if (activeInverse != null) {
             await activeInverse;
           }
@@ -4236,29 +4415,50 @@ class EditorController extends ChangeNotifier {
               bool recordHistory = true,
             }) async {
               final baseline = _v2PersistedNotebook;
+              List<_V2HistoryEntry>? nextUndo;
+              List<_V2HistoryEntry>? nextRedo;
+              EditorHistoryCheckpoint? checkpoint;
               final committed = await operationWriter!.writeNotebookChange(
                 before: baseline,
                 after: target,
+                onCommittedInTransaction: (operations) async {
+                  nextUndo = List<_V2HistoryEntry>.of(_v2Undo);
+                  nextRedo = List<_V2HistoryEntry>.of(_v2Redo);
+                  final operationId = operations.isNotEmpty
+                      ? operations.last.operationId
+                      : textGesture?.lastOperationId;
+                  if (recordHistory && operationId != null) {
+                    nextUndo!.add(
+                      _V2HistoryEntry(
+                        textGesture?.before ?? baseline,
+                        target,
+                        operationId,
+                        stored: StoredEditorGesture(
+                          before: await _v2HistoryCodec!.encode(
+                            textGesture?.before ?? baseline,
+                          ),
+                          after: await _v2HistoryCodec!.encode(target),
+                          operationId: operationId,
+                        ),
+                      ),
+                    );
+                    nextRedo!.clear();
+                  }
+                  checkpoint = await _persistV2History(
+                    operations,
+                    undo: nextUndo!,
+                    redo: nextRedo!,
+                  );
+                },
               );
               _v2PersistedNotebook = target;
-              final operationId = committed.isNotEmpty
-                  ? committed.last.operationId
-                  : textGesture?.lastOperationId;
               if (textGesture != null && committed.isNotEmpty) {
-                textGesture.lastOperationId = operationId;
+                textGesture.lastOperationId = committed.last.operationId;
               }
-              if (recordHistory && operationId != null) {
-                _v2Undo.add(
-                  _V2HistoryEntry(
-                    textGesture?.before ?? baseline,
-                    target,
-                    operationId,
-                  ),
-                );
-                if (_v2Undo.length > 50) {
-                  _v2Undo.removeAt(0);
-                }
-                _v2Redo.clear();
+              _installV2History(checkpoint, nextUndo!, nextRedo!);
+              if (recordHistory &&
+                  (committed.isNotEmpty ||
+                      textGesture?.lastOperationId != null)) {
                 _undoActions.clear();
                 _redoActions.clear();
                 _notifyHistoryChanged();

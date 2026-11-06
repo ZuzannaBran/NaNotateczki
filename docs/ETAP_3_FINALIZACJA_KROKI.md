@@ -1,5 +1,20 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Integracja lokalnej historii kontrolera — 2026-11-06
+
+Poprzedni przebieg aplikacji `42213343174` (commit `45eb3d9a`)
+jest zielony, podobnie jak backend `42160118098`.
+W `EditorController` podłączono odczyt checkpointu aktora przy starcie
+oraz zapis obu stosów w atomowym callbacku `writeNotebookChange`.
+Granice Quill kończone po wcześniejszych autosave nie tworzą
+fikcyjnej operacji, ale utrwalają historię na bieżącej głowie dziennika.
+Undo/Redo zapisuje nowe operacje i remapowane ID, a odzyskane
+stany historyczne są dekodowane dopiero po wybraniu inverse.
+Regresja plikowego SQLite: edycja → restart → Undo → Redo.
+Wymagane potwierdzenie analizy i testów Flutter w CI; flagi v2
+ani produkcyjnego cutover nie zmieniono.
+
+
 ## Limit historii i metadata-only inverse — 2026-11-06
 
 Najpierw sprawdzono Actions `42210246686` dla `dce1bf6`: generator,
