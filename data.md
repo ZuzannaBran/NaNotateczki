@@ -2,6 +2,14 @@
 
 ## Połączenie checkpointów z kontrolerem (2026-11-06)
 
+Właścicielem checkpointu jest `SyncEngine.actorIdForDocument(uid)`, czyli
+niezmieniony SHA-256 z JSON `[actorId, checkpointScope, documentId]`.
+To ten sam aktor, który faktycznie trafia do `operations.actor_id`.
+`SyncEngine.actorId` jest wyłącznie seedem urządzenia/konta i nie może
+być użyty jako `editor_history.owner_id`. Zmiana naprawia wywołującego,
+nie zmienia istniejącego formatu ID ani sekwencji dziennika. Różne
+dokumenty tego samego konta zachowują niezależne historie i actorSeq.
+
 Jeżeli kompletny stan notebooka przekracza limit kodowania pojedynczej
 granicy historii, kontroler utrwala sam gest i outbox, resetując Undo/Redo
 do pustego checkpointu o aktualnej głowie. Nie wolno cofać zapisu notatnika
@@ -42,8 +50,8 @@ historii; pozostałych błędów nie wolno w ten sposób maskować.
 `remapIdentities` kodeka kopiuje wyłącznie metadane i zmienia typed ID
 stron/obiektów, bez odczytu BLOB-ów lub SQLite. Zachowuje tekst Delta,
 asset ID i zakres dokumentu; odrzuca kolizje. To granica przygotowania
-inverse, nie operacja przywracająca wiersze. Podłączenie wywołań przez
-kontroler nadal jest osobnym, otwartym krokiem.
+inverse, nie operacja przywracająca wiersze. Kontroler preview używa go
+wewnątrz transakcyjnego zapisu Undo/Redo; produkcyjny cutover jest otwarty.
 
 Zapis przez `onCommittedInTransaction` należy do tej samej transakcji co
 projekcja i outbox. Błąd wycofuje również operacje i actorSeq. Callback

@@ -641,7 +641,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   aktora nie odmalowuje widoku. Powtórny odczyt obcego envelope nie
   wywołuje drugi raz tej samej udanej notyfikacji w jednej sesji
   (pamięć 4096 ID); po restarcie może być ponowiona.
-  175: `writeLocalBatch` przekazuje opcjonalny checkpoint callback do
+  166: `actorIdForDocument` wyznacza ten sam trwały SHA-256 aktora dla
+  operacji i historii (seed + checkpointScope + UID dokumentu). Nie używać
+  bazowego `actorId` jako właściciela checkpointu.
+  180: `writeLocalBatch` przekazuje opcjonalny checkpoint callback do
   transakcji store przed żądaniem synchronizacji; dopuszcza metadata-only
   granicę autosave bez nowego actorSeq. `lastError` znika po sukcesie.
   Nie podłączać do UID v1 przed etapem 11.
@@ -1684,7 +1687,11 @@ Gest Quill zachowuje koniec ostatniego autosave niezależnie od debounce.
 Po zatwierdzonym odtworzeniu `_remapV2HistoryNotebook` aktualizuje ID
 w obu stosach historii. Redo następnego gestu zachowuje już odtworzone
 obiekty/strony; rollback nie zmienia historycznych tożsamości.
-Historia nie jest jeszcze odtwarzana po restarcie.
+Odtwarzanie historii po restarcie jest podłączone w preview v2 przez
+`historyReady`. Odczyt i zapis używają `actorIdForDocument(notebook.uid)`;
+bazowy seed silnika nie jest aktorem operacji. Regresja dwóch dokumentów
+w jednym silniku sprawdza oddzielne stosy i actorSeq; test restartu
+porównuje właściciela checkpointu z rzeczywistym aktorem dziennika.
 `deleteTextBlock` w v2 zamyka checkpoint aktywnego pisania przed
 usunięciem: Undo przywraca najnowszy szkic także przed autosave,
 a kolejne Undo cofa pisanie. Test obejmuje oba warianty debounce
@@ -1710,14 +1717,15 @@ HUD pożycza swój kontroler przez `bindHudTextController`/`unbindHudTextControl
 Import porównuje TextEditingValue (także IME), model i właściciela, zachowuje
 Delta i tworzy osobny checkpoint od wcześniejszego pisania. Jednorazowy
 handoff kursora dotyczy dokładnej Delta; odrzucony import nie wymienia HUD.
-Ważne granice: 146: `preferencesReady`;
-222: `bindHudTextController`; 230: `unbindHudTextController`;
-241: `hasQuillHandoff`; 245: `takeQuillHandoff`; 646: `flushPendingSaves`;
-2061: `_applyV2History`; 2206: `_remapV2HistoryNotebook`;
-2385: `prepareInlineAsset`; 2407: `pasteQuillHtml`; 2446: `insertQuillFile`;
-2464: `_pickQuillFile`; 2503: `_replaceQuillSelection`;
-2667: `updateTextBlockContent`; 2682: `updateActiveTextStyle`;
-4089: `_commitActiveTextEdit`; 4184: `_captureV2Gesture`; 4208: `_saveV2`.
+Ważne granice: 179: `preferencesReady`; 191: `historyReady`;
+264: `bindHudTextController`; 272: `unbindHudTextController`;
+283: `hasQuillHandoff`; 287: `takeQuillHandoff`; 690: `flushPendingSaves`;
+2106: `_applyV2History`; 2228: `_restoreV2History`;
+2256: `_persistV2History`; 2397: `_remapV2HistoryNotebook`;
+2576: `prepareInlineAsset`; 2598: `pasteQuillHtml`; 2637: `insertQuillFile`;
+2655: `_pickQuillFile`; 2694: `_replaceQuillSelection`;
+2858: `updateTextBlockContent`; 2873: `updateActiveTextStyle`;
+4280: `_commitActiveTextEdit`; 4375: `_captureV2Gesture`; 4399: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod

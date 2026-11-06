@@ -1,5 +1,31 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Naprawa właściciela historii dokumentu — 2026-11-06
+
+Na początku sprawdzono `42235986370` dla `8405bcc`: format, generator
+Drift i analiza przeszły; natywne testy oraz macOS Release nadal trwały,
+część zadań iOS była anulowana. Nie czekano na zakończenie. Poprzednia
+awaria `42231406584` zatrzymała się przed testami; jej poprawki formatu
+są już w bieżącej gałęzi. Backend `42160118098` pozostaje zielony.
+
+W integracji kontrolera znaleziono niezgodność: checkpoint korzystał
+z bazowego `SyncEngine.actorId`, a operacje z SHA-256 przypisanego do
+konkretnego dokumentu. `EditorHistoryStore` prawidłowo odrzuca taki zapis,
+co wycofuje projekcję i outbox całego gestu. Odczyt też szukał złego klucza.
+
+`SyncEngine.actorIdForDocument` udostępnia istniejący, niezmieniony
+algorytm aktora. Używają go oba writery oraz odczyt/zapis historii
+kontrolera. Nie osłabiono walidacji właściciela w magazynie historii.
+Naprawiono również zakres SQL w teście uszkodzonej checksumy.
+
+Dodano regresję dwóch rzeczywistych kontrolerów/dokumentów w jednym
+silniku: odrębne historie, actorSeq i brak odczytu przez obcego aktora.
+Test restartu porównuje owner checkpointu z faktyczną operacją i odrzuca
+lookup bazowym seedem. Test SyncEngine utrwala dotychczasowy wektor SHA-256
+i zgodność publicznego lookupu z aktorami operacji. Nowe testy Flutter
+kierowane są do CI wyłącznie aplikacji; wynik odczytać w kolejnej sesji.
+Pełny cutover, E2E i domknięcie etapu 3 nadal wymagają weryfikacji.
+
 ## Quill z mediami po restarcie — 2026-11-06
 
 Rozszerzono cztery testy PNG/JPEG/WebP/PDF w

@@ -147,7 +147,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     // may edit unrelated documents concurrently, and guests cannot fetch
     // dependencies on private documents belonging to the owner.
     final operation = await store.writeLocal(
-      actorId: _scopedActorId(documentId),
+      actorId: actorIdForDocument(documentId),
       documentId: documentId,
       kind: kind,
       payload: payload,
@@ -161,7 +161,12 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     return operation;
   }
 
-  String _scopedActorId(String documentId) {
+  /// The stable journal actor shared by writes and local history recovery.
+  /// The account/device seed alone is not an operation actor ID.
+  String actorIdForDocument(String documentId) {
+    if (documentId.isEmpty) {
+      throw ArgumentError.value(documentId, 'documentId', 'Empty document ID.');
+    }
     final actorData = jsonEncode([actorId, checkpointScope, documentId]);
     return sha256.convert(utf8.encode(actorData)).toString();
   }
@@ -191,7 +196,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       );
     }
     final committed = await store.writeLocalBatch(
-      actorId: _scopedActorId(documentId),
+      actorId: actorIdForDocument(documentId),
       documentId: documentId,
       operations: operations,
       apply: apply,

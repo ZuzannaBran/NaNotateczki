@@ -51,6 +51,72 @@ void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'shared engine keeps controller history scoped to each document actor',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final first = await repository.createNotebook();
+      final second = await repository.createNotebook();
+      final projector = EditorSqliteProjector(database);
+      final engine = SyncEngine(
+        store: OperationStore(database),
+        gateway: _OfflineGateway(),
+        actorId: 'two-document-seed',
+        checkpointScope: 'two-document-account',
+        enableRealtime: false,
+        applyRemote: (operation, _) => projector.apply(operation),
+      );
+      addTearDown(engine.stop);
+      final writer = EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: projector,
+      );
+      final one = EditorController(
+        repository: repository,
+        notebook: first,
+        operationWriter: writer,
+      );
+      final two = EditorController(
+        repository: repository,
+        notebook: second,
+        operationWriter: writer,
+      );
+      addTearDown(one.dispose);
+      addTearDown(two.dispose);
+      await Future.wait([one.historyReady, two.historyReady]);
+      one.addInkStroke(const [InkPoint(dx: 1, dy: 2, pressure: 0.5)]);
+      two.addInkStroke(const [InkPoint(dx: 3, dy: 4, pressure: 0.7)]);
+      await Future.wait([one.flushPendingSaves(), two.flushPendingSaves()]);
+      final store = EditorHistoryStore(engine.store);
+      final actorOne = engine.actorIdForDocument(first.uid);
+      final actorTwo = engine.actorIdForDocument(second.uid);
+      expect(actorOne, isNot(actorTwo));
+      final historyOne = (await store.load(
+        documentId: first.uid,
+        ownerId: actorOne,
+      ))!;
+      final historyTwo = (await store.load(
+        documentId: second.uid,
+        ownerId: actorTwo,
+      ))!;
+      expect(historyOne.undo, hasLength(1));
+      expect(historyTwo.undo, hasLength(1));
+      expect(historyOne.undo.single.after['uid'], first.uid);
+      expect(historyTwo.undo.single.after['uid'], second.uid);
+      expect(
+        await store.load(documentId: first.uid, ownerId: actorTwo),
+        isNull,
+      );
+      expect(
+        await store.load(documentId: second.uid, ownerId: actorOne),
+        isNull,
+      );
+      expect((await engine.store.pending()).map((op) => op.actorSeq), [1, 1]);
+    },
+  );
+
   test('remote v2 patch waits for history recovery to settle', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
@@ -133,7 +199,7 @@ void main() {
     await database.customStatement(
       'UPDATE editor_history SET checksum_sha256 = ? '
       'WHERE document_id = ? AND owner_id = ?',
-      ['0' * 64, notebook.uid, engine.actorId],
+      ['0' * 64, notebook.uid, engine.actorIdForDocument(notebook.uid)],
     );
     final stored = (await repository.getNotebook(notebook.uid))!;
     final second = EditorController(
@@ -202,9 +268,10 @@ void main() {
     final committed = await store.pending();
     expect(committed, hasLength(1));
     expect(committed.single.kind, OperationKind.strokeCreate);
-    final checkpoint = await EditorHistoryStore(
-      store,
-    ).load(documentId: notebook.uid, ownerId: engine.actorId);
+    final checkpoint = await EditorHistoryStore(store).load(
+      documentId: notebook.uid,
+      ownerId: engine.actorIdForDocument(notebook.uid),
+    );
     expect(checkpoint, isNotNull);
     expect(checkpoint!.headOperationId, committed.last.operationId);
     expect(checkpoint.undo, isEmpty);
@@ -257,9 +324,19 @@ void main() {
         final firstHistory = EditorHistoryStore(firstEngine.store);
         final checkpoint = await firstHistory.load(
           documentId: notebook.uid,
-          ownerId: firstEngine.actorId,
+          ownerId: firstEngine.actorIdForDocument(notebook.uid),
         );
         expect(checkpoint!.undo, hasLength(1));
+        final pending = await firstEngine.store.pending();
+        expect(checkpoint.ownerId, pending.single.actorId);
+        expect(checkpoint.ownerId, isNot(firstEngine.actorId));
+        expect(
+          await firstHistory.load(
+            documentId: notebook.uid,
+            ownerId: firstEngine.actorId,
+          ),
+          isNull,
+        );
         first.dispose();
         await firstEngine.stop();
         await firstDb.close();
@@ -296,7 +373,7 @@ void main() {
         expect(
           (await EditorHistoryStore(secondEngine.store).load(
             documentId: notebook.uid,
-            ownerId: secondEngine.actorId,
+            ownerId: secondEngine.actorIdForDocument(notebook.uid),
           ))!.undo,
           hasLength(1),
         );

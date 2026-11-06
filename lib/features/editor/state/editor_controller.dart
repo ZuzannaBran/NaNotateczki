@@ -2229,7 +2229,7 @@ class EditorController extends ChangeNotifier {
     try {
       final checkpoint = await _v2HistoryStore!.load(
         documentId: notebook.uid,
-        ownerId: operationWriter!.syncEngine.actorId,
+        ownerId: operationWriter!.syncEngine.actorIdForDocument(notebook.uid),
       );
       if (_isDisposed || checkpoint == null) {
         return;
@@ -2287,7 +2287,7 @@ class EditorController extends ChangeNotifier {
     }
     final requested = EditorHistoryCheckpoint(
       documentId: notebook.uid,
-      ownerId: operationWriter!.syncEngine.actorId,
+      ownerId: operationWriter!.syncEngine.actorIdForDocument(notebook.uid),
       headOperationId: head,
       undo: [for (final item in keepUndo) item.stored],
       redo: [for (final item in keepRedo) item.stored],

@@ -445,8 +445,22 @@ void main() {
     expect(first.actorSeq, 1);
     expect(second.actorSeq, 1);
     expect(first.actorId, isNot(second.actorId));
+    expect(first.actorId, engine.actorIdForDocument('document-one'));
+    expect(second.actorId, engine.actorIdForDocument('document-two'));
     expect(second.dependencies, isNot(contains(first.operationId)));
   });
+
+  test(
+    'history actor lookup preserves the existing document actor encoding',
+    () {
+      expect(
+        engine.actorIdForDocument('document-one'),
+        '994ee16e52a1361eabf1528db04575617bac67bdd7fc51e2b447bf8d91e4d4ea',
+      );
+      expect(engine.actorIdForDocument('document-one'), isNot(engine.actorId));
+      expect(() => engine.actorIdForDocument(''), throwsArgumentError);
+    },
+  );
 
   test('a bad later operation cannot block a valid batch prefix', () async {
     await engine.stop();
