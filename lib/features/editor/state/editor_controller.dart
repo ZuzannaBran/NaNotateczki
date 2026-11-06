@@ -163,8 +163,8 @@ class EditorController extends ChangeNotifier {
     if (operationWriter != null) {
       _v2HistoryRecovering = true;
       _v2HistoryStore = EditorHistoryStore(operationWriter!.syncEngine.store);
-      _v2HistoryCodec =
-          historyCodec ?? EditorHistoryNotebookCodec(operationWriter!.projector);
+      final projector = operationWriter!.projector;
+      _v2HistoryCodec = historyCodec ?? EditorHistoryNotebookCodec(projector);
       _v2HistoryReady = _restoreV2History();
     }
     AppSaveCoordinator.instance.register(
