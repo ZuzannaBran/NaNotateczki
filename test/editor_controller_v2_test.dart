@@ -99,6 +99,69 @@ void main() {
     expect(await engine.store.pending(), isEmpty);
   });
 
+  test('corrupt recovered Undo checkpoint refuses remote patches', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final projector = EditorSqliteProjector(database);
+    final store = OperationStore(database);
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'corrupt-history-actor',
+      checkpointScope: 'corrupt-history',
+      enableRealtime: false,
+      applyRemote: (operation, _) => projector.apply(operation),
+    );
+    addTearDown(engine.stop);
+    final writer = EditorV2OperationWriter(
+      syncEngine: engine,
+      projector: projector,
+    );
+    final first = EditorController(
+      repository: repository,
+      notebook: notebook,
+      operationWriter: writer,
+    );
+    await first.historyReady;
+    first.addInkStroke(const [InkPoint(dx: 9, dy: 7, pressure: 0.6)]);
+    await first.flushPendingSaves();
+    expect(first.canUndo, isTrue);
+    first.dispose();
+
+    await database.customStatement(
+      'UPDATE editor_history SET checksum_sha256 = ? '
+      'WHERE document_id = ? AND owner_id = ?',
+      ['0' * 64, notebook.uid, engine.actorId],
+    );
+    final stored = (await repository.getNotebook(notebook.uid))!;
+    final second = EditorController(
+      repository: repository,
+      notebook: stored,
+      operationWriter: writer,
+    );
+    addTearDown(second.dispose);
+    await second.historyReady;
+    expect(second.canApplyConfirmedRemoteNotebook, isFalse);
+    expect(
+      second.applyConfirmedV2PagePatch(
+        pageId: stored.pages.single.id,
+        page: stored.pages.single,
+      ),
+      isFalse,
+    );
+    await expectLater(
+      second.flushPendingSaves(),
+      throwsA(isA<DataIntegrityProtectionException>()),
+    );
+    expect(await store.pending(), hasLength(1));
+    expect(
+      (await repository.getNotebook(notebook.uid))!.pages.single.inkStrokes,
+      hasLength(1),
+    );
+  });
+
   test('history size limit preserves the v2 gesture and its outbox', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);

@@ -1,5 +1,16 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Uszkodzony checkpoint nie dopuszcza zdalnego patcha — 2026-11-06
+
+Po niepowodzeniu odczytu checkpointu (`checksum_sha256` niezgodny)
+`EditorController` pozostaje w stanie `_integritySaveBlocked`.
+Wcześniej zdalny patch mógł przejść po zakończeniu odczytu, mimo że
+lokalna historia nie była zaufana. Teraz wspólna bramka
+`canApplyConfirmedRemoteNotebook` odmawia także przy aktywnej
+blokadzie integralności. Test na prawdziwym SQLite zapisuje gest,
+uszkadza checksum checkpointu i potwierdza odmowę patcha, odmowę
+flush oraz niezmieniony outbox i treść notatnika.
+
 ## Poprawki kompilacji i formatowania CI — 2026-11-06
 
 Przebieg `42229961890` wykrył błąd dostępu do nullable

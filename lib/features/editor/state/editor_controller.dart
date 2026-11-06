@@ -360,6 +360,7 @@ class EditorController extends ChangeNotifier {
   bool get canApplyConfirmedRemoteNotebook =>
       !_isDisposed &&
       !_v2DocumentDeleted &&
+      !_integritySaveBlocked &&
       !_hasPendingSaveWork &&
       !repository.hasPendingSaves &&
       activeTextBlockId == null &&

@@ -566,6 +566,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   kontroler zapisuje pusty checkpoint z nową głową i zachowuje outbox.
   Błąd integralności nie jest traktowany jak limit. Test regresyjny:
   `test/editor_controller_v2_test.dart` (oversized history).
+- Nieudany odczyt uszkodzonego checkpointu historii blokuje
+  zdalne patchowanie kontrolera, dopóki historia nie zostanie
+  rozstrzygnięta; regresja SQLite z błędnym checksum:
+  `test/editor_controller_v2_test.dart`.
 - Odczyt checkpointu przy otwarciu blokuje przyjęcie zdalnego patcha
   do chwili zakończenia recovery; nie wolno przywrócić nieaktualnego
   stosu po aktualizacji zdalnej. Regresja SQLite:
