@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
+import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -306,8 +307,28 @@ void main() {
         expect(first.editor!.currentPage.textBlocks.first.deltaJson, expected);
         transport.loseNextAck = true;
         await first.engine.start();
-        expect(first.engine.lastError, isNotNull);
-        expect(await first.store.pending(), isNotEmpty);
+        expect(transport.loseNextAck, isFalse);
+        expect(transport.holdFeed, isTrue);
+        expect(
+          transport.accepted.map((op) => op.operationId),
+          containsAll(pendingIds),
+        );
+        // An actor retry is durable even if the completed drain clears its
+        // transient global error. Deferred entries are not eligible to send.
+        expect(
+          (await first.store.pending(
+            includeDeferred: true,
+          )).map((op) => op.operationId),
+          pendingIds,
+        );
+        final retry = await first.database
+            .customSelect(
+              'SELECT attempts, status FROM operation_outbox WHERE operation_id = ?',
+              variables: [Variable<String>(pendingIds.first)],
+            )
+            .getSingle();
+        expect(retry.read<int>('attempts'), greaterThanOrEqualTo(1));
+        expect(retry.read<String>('status'), 'queued');
         await first.close();
         first = _Peer(file, 'inline-first', transport);
         await first.openEditor(notebook.uid);

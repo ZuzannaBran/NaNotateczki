@@ -1,5 +1,20 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Regresja utraconego ACK — 2026-11-06
+
+Przebieg `42180248467` dla `030456f` przeszedł formatowanie i analizę,
+zaliczył 919 testów (2 pominięte), ale oba scenariusze dwóch baz zatrzymały
+się na błędnym oczekiwaniu globalnego `lastError` po utracie ACK.
+SyncEngine zapisuje retry danego aktora; końcowy drain może wyczyścić
+przejściowy globalny błąd. `pending()` bez `includeDeferred` celowo pomija
+jeszcze niewysyłalne operacje.
+Test sprawdza teraz faktyczne przyjęcie wszystkich ID przez transport,
+utratę odpowiedzi, identyczny trwały outbox z `includeDeferred: true`
+i licznik attempts/status queued pierwszego wpisu retry. Nie osłabia
+sprawdzeń restartu, braku duplikatów i późniejszego ACK. Kod produkcyjny
+nie został zmieniony w tej poprawce. Wynik ponowienia odczytać w kolejnej
+sesji; ponawiamy wyłącznie analizę/natywne testy aplikacji. Backend zielony.
+
 ## Import pliku do aktywnego Quilla — 2026-11-06
 
 Na początku sesji potwierdzono zielone Actions `42175319331` dla

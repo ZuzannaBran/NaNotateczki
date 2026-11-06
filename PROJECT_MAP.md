@@ -1565,7 +1565,9 @@ bez pośredniego base64. Regresje: `test/quill_paste_plan_test.dart`
 Quill/SQLite/pickera/widżetu) i `test/editor_v2_inline_file_sync_test.dart`
 (2 scenariusze dwóch plikowych SQLite: restart, utracony ACK, upload przed
 attach, odrzucenie uszkodzonego downloadu, remote delete/Undo, brak repaintu
-lokalnego echa i stabilny viewport). HTTP jest kontrolowany, bez PostgreSQL.
+lokalnego echa i stabilny viewport). Utrata ACK jest sprawdzana przez
+przyjęte ID i trwały deferred outbox/attempts, bez założenia utrzymania
+globalnego lastError po zakończeniu drain. HTTP kontrolowany, bez PostgreSQL.
 
 ### `lib/features/editor/state/quill_style_patch.dart`
 
