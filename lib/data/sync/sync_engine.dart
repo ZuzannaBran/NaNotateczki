@@ -11,6 +11,7 @@ import 'api_client.dart';
 import 'operation_gateway.dart';
 import 'operation_protocol.dart';
 import 'operation_store.dart';
+import 'realtime_channel_cleanup.dart';
 
 /// Applies one remote intent inside the OperationStore SQLite transaction.
 ///
@@ -55,7 +56,8 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     this.refreshAuthentication,
     this.enableRealtime = true,
     this.pollInterval = const Duration(seconds: 45),
-  }) {
+    WebSocketChannel Function(Uri)? connectRealtime,
+  }) : _connectRealtime = connectRealtime ?? WebSocketChannel.connect {
     if (actorId.isEmpty || checkpointScope.isEmpty) {
       throw ArgumentError('An actor and isolated checkpoint are required.');
     }
@@ -97,8 +99,10 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   final Future<void> Function()? refreshAuthentication;
   final bool enableRealtime;
   final Duration pollInterval;
+  final WebSocketChannel Function(Uri) _connectRealtime;
 
   bool _started = false;
+  Future<void>? _stopping;
   bool _disposed = false;
   bool _requested = false;
   int _generation = 0;
@@ -206,9 +210,16 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     return committed;
   }
 
-  Future<void> start() async {
+  /// A new generation waits for the previous REST drain, then checks its owner.
+  Future<void> start({bool Function()? isCurrent}) async {
+    while (_stopping != null) {
+      await _stopping;
+    }
     if (_disposed) {
       throw StateError('A disposed sync engine cannot restart.');
+    }
+    if (isCurrent != null && !isCurrent()) {
+      return;
     }
     if (_started) {
       return syncNow();
@@ -223,7 +234,33 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     await syncNow();
   }
 
-  Future<void> stop() async {
+  /// Concurrent stops share the authoritative drain; hints cannot hold it open.
+  Future<void> stop() {
+    final running = _stopping;
+    if (running != null) {
+      return running;
+    }
+    final completion = Completer<void>();
+    late final Future<void> stopped;
+    stopped = completion.future.whenComplete(() {
+      if (identical(_stopping, stopped)) {
+        _stopping = null;
+      }
+    });
+    // Publish before cancelling a stream: cleanup may invoke callbacks.
+    _stopping = stopped;
+    unawaited(
+      Future<void>.sync(_stop).then<void>(
+        (_) => completion.complete(),
+        onError: (Object error, StackTrace stack) {
+          completion.completeError(error, stack);
+        },
+      ),
+    );
+    return stopped;
+  }
+
+  Future<void> _stop() async {
     WidgetsBinding.instance.removeObserver(this);
     _started = false;
     ++_generation;
@@ -239,12 +276,15 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     _socketRetry = null;
     _notifiedRemoteOperations.clear();
     final subscription = _socketSubscription;
-    _socketSubscription = null;
-    await subscription?.cancel();
     final socket = _socket;
+    final active = _active;
+    _socketSubscription = null;
     _socket = null;
-    await socket?.sink.close();
-    await _active;
+    await subscription?.cancel();
+    if (socket != null) {
+      requestRealtimeChannelClose(socket);
+    }
+    await active;
     // A callback finishing during stop must not leave stale UI deliveries
     // after the engine is restarted with a different editor instance.
     _notifiedRemoteOperations.clear();
@@ -686,7 +726,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     final uri = api
         .resolve('/v2/realtime')
         .replace(scheme: api.baseUri.scheme == 'https' ? 'wss' : 'ws');
-    final socket = WebSocketChannel.connect(uri);
+    final socket = _connectRealtime(uri);
     _socket = socket;
     _socketSubscription = socket.stream.listen(
       (event) {
@@ -735,7 +775,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     }
     _socket = null;
     _socketSubscription = null;
-    unawaited(socket.sink.close());
+    requestRealtimeChannelClose(socket);
     if (!_isActive(generation)) {
       return;
     }

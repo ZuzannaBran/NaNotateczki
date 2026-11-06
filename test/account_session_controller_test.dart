@@ -784,13 +784,14 @@ void main() {
       )['boundUserId'],
       'user-a',
     );
-    first.useLocalOnly();
+    first.dispose();
 
     final restarted = AccountSessionController(
       client,
       credentialStore: credentials,
     );
     await restarted.loadProfile();
+    expect(restarted.userId, 'user-a');
     await restarted.login('account_b', 'password');
     expect(loginCalls, 2);
     expect(refreshCalls, 1);
@@ -802,10 +803,100 @@ void main() {
       )['boundUserId'],
       'user-b',
     );
-    first.dispose();
     restarted.dispose();
     client.close();
   });
+
+  test(
+    'waits for persisted Local before switching to another account',
+    () async {
+      final stored = <String, String>{};
+      textStorageReadOverride = (key) async => stored[key];
+      textStorageWriteOverride = (key, value) async => stored[key] = value;
+      var loginCalls = 0;
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          expect(request.method, 'POST');
+          expect(request.url.path, '/v1/auth/login');
+          loginCalls++;
+          final username =
+              (jsonDecode(request.body) as Map<String, dynamic>)['username'];
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access-$username',
+              'refreshToken': 'refresh-$username',
+              'expiresIn': 600,
+              'userId': username == 'account_a' ? 'user-a' : 'user-b',
+              'username': username,
+            }),
+            200,
+          );
+        }),
+      );
+      final first = AccountSessionController(
+        client,
+        credentialStore: credentials,
+      );
+      await first.loadProfile();
+      await first.login('account_a', 'password');
+      expect(
+        jsonDecode(
+          stored[AccountSessionController.profileStorageKey]!,
+        )['boundUserId'],
+        'user-a',
+      );
+      final deleting = Completer<void>();
+      final releaseDelete = Completer<void>();
+      credentials.beforeDelete = () async {
+        deleting.complete();
+        await releaseDelete.future;
+      };
+      var localReady = false;
+      final local = first
+          .useLocalProfile('Local user')
+          .then((_) => localReady = true);
+      addTearDown(() async {
+        if (!releaseDelete.isCompleted) {
+          releaseDelete.complete();
+        }
+        await local;
+      });
+      await deleting.future;
+      expect(localReady, isFalse);
+      expect(credentials.value, isNotNull);
+      releaseDelete.complete();
+      await local;
+      credentials.beforeDelete = null;
+      expect(credentials.value, isNull);
+      expect(
+        jsonDecode(
+          stored[AccountSessionController.profileStorageKey]!,
+        )['preferredMode'],
+        AccountDataMode.localOnly.name,
+      );
+
+      final restarted = AccountSessionController(
+        client,
+        credentialStore: credentials,
+      );
+      await restarted.loadProfile();
+      await restarted.login('account_b', 'password');
+      expect(loginCalls, 2);
+      expect(restarted.isSignedIn, isTrue);
+      expect(restarted.userId, 'user-b');
+      expect(jsonDecode(credentials.value!)['userId'], 'user-b');
+      expect(
+        jsonDecode(
+          stored[AccountSessionController.profileStorageKey]!,
+        )['boundUserId'],
+        'user-b',
+      );
+      first.dispose();
+      restarted.dispose();
+      client.close();
+    },
+  );
 
   test('legacy account name is not a barrier with isolated storage', () async {
     textStorageWriteOverride = (_, _) async {};

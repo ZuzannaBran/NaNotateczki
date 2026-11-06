@@ -23,6 +23,7 @@ dart format --output=none --set-exit-if-changed \
   lib/data/sync/editor_v2_account_runtime.dart \
   lib/data/sync/persistent_operation_actor.dart \
   lib/data/sync/operation_asset_gateway.dart \
+  lib/data/sync/realtime_channel_cleanup.dart \
   lib/data/sync/sync_engine.dart \
   lib/data/sync/verified_editor_asset_buffer.dart \
   lib/features/editor/state/editor_controller.dart \
@@ -42,6 +43,7 @@ dart format --output=none --set-exit-if-changed \
   lib/features/editor/presentation/widgets/text_hud_block.dart \
   integration_test/stage12_live_api_test.dart \
   test/sync_engine_test.dart \
+  test/realtime_channel_cleanup_test.dart \
   test/editor_history_checkpoint_test.dart \
   test/editor_history_notebook_codec_test.dart \
   test/editor_history_store_test.dart \
@@ -80,6 +82,7 @@ flutter test --concurrency=1 \
   test/operation_store_test.dart \
   test/persistent_operation_actor_test.dart \
   test/sync_engine_test.dart \
+  test/realtime_channel_cleanup_test.dart \
   test/editor_history_checkpoint_test.dart \
   test/editor_history_notebook_codec_test.dart \
   test/editor_history_store_test.dart \

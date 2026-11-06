@@ -1,5 +1,26 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Stop bez blokady handshake i seryjny restart — 2026-11-06
+
+`stop()` współdzieli trwającą operację i nadal czeka na aktywny REST.
+Pomocniczy WebSocket dostaje żądanie zamknięcia przez
+`requestRealtimeChannelClose`; zakończenie close nie jest warunkiem
+drenażu. `IOWebSocketChannel` po zamknięciu przed nieudanym handshake
+może nigdy nie zakończyć tego Future. Spóźnione udane połączenie zostaje
+zamknięte przez wcześniej zlecony close; błędy cleanupu są izolowane.
+
+`start(isCurrent:)` czeka na poprzedni stop i ponownie sprawdza właściciela
+przed nową generacją. Runtime przekazuje ten warunek z bootstrapu konta.
+Anulowanie lub dispose podczas oczekiwania nie uruchamia nowego REST.
+Opcjonalny `connectRealtime` pozwala opóźnić handshake prawdziwego kanału
+w regresjach, bez zastępowania implementacji WebSocketu atrapą.
+
+Trzy testy cleanupu zaliczono lokalnie w czystym Darcie na produkcyjnym
+helperze i rzeczywistym `web_socket_channel`. Pięć regresji silnika
+sprawdza stop/restart, zachowanie outboxu, spóźniony błąd, anulowanie
+i dispose. Regresja runtime sprawdza anulowanie podczas starego drenażu.
+Te testy Flutter wymagają potwierdzenia w kolejnym natywnym Actions.
+
 ## Catch-up pierwszej subskrypcji i reconnect — 2026-11-06
 
 Potwierdzenie `authenticated` uruchamia teraz tę samą ścieżkę REST co

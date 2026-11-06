@@ -1,5 +1,45 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Naprawa regresji start/stop z Actions — 2026-11-06, 22:00 UTC
+
+Przebieg [`42298376311`](https://github.com/ZuzannaBran/NaNotateczki/actions/runs/42298376311)
+dla `3bb3607` zaliczył realny Linux E2E kontrolerów i backendu
+(job `128169435528`). Analiza i format były poprawne, lecz natywne testy
+miały wynik 1020 passed, 2 skipped, 6 failed. Pięć przypadków startupu
+kończyło się po trzyminutowym timeout, jeden dotyczył zmiany konta.
+Kanoniczny backend `42262988799` dla `f77b20c` jest zielony.
+
+Przyczynę zawieszenia odtworzono na rzeczywistym `IOWebSocketChannel`:
+close zlecony przed nieudanym handshake może nigdy nie zakończyć Future.
+Silnik inicjuje teraz cleanup pomocniczego kanału bez oczekiwania na
+close, ale nadal czeka na aktywny REST przed zmianą namespace. Stop
+współdzieli Future; restart czeka na stary drenaż i ponownie sprawdza
+właściciela konta. Anulowany lub zwolniony runtime nie wznawia transportu.
+
+Dodano 10 regresji: 3 cleanupu z prawdziwym kanałem, 5 silnika,
+1 runtime i 1 profilu Local. Obejmują pending/failed handshake,
+spóźnione udane połączenie,
+błąd close, zachowanie niewysłanego outboxu, współdzielony stop, restart,
+anulowanie i dispose podczas drenażu. Nowy test zmiany konta kontroluje
+oczekiwanie na usunięcie sekretu i trwały profil Local przez produkcyjne
+`useLocalProfile`; ta ścieżka nie powinna odnawiać konta po restarcie.
+Zachowano równoległy commit `519e81c` z izolacją testów REST i rozróżnieniem
+login/refresh. Jego scenariusz restartu zostawia zapisane konto przez
+dispose kontrolera, zamiast ścigać usuwanie sekretu; przed loginem B
+sprawdza rzeczywiste odnowienie konta A. Oba przypadki są oddzielne.
+
+Lokalnie: 3 testy cleanupu i ich analiza zaliczone w czystym Darcie.
+Format 291 plików Dart i składnia `verify_stage3_local.sh` są poprawne;
+nowy helper i jego test dołączono do tego zestawu weryfikacji.
+Pełny Flutter pozostaje do potwierdzenia przez Actions. Nowy przyrost
+używa tylko `[ci:failed-only]`: analiza, natywne regresje i pokrycie.
+Zielony Linux E2E oraz niezmieniony backend nie są ponawiane.
+
+**Następna sesja:** najpierw sprawdzić wynik tego commita; w razie błędu
+naprawić natywny job. Po zielonym wyniku wrócić do sekcji D i integracji
+całego konta. Etap 3 oraz globalny cutover nadal są otwarte; v2 pozostaje
+opt-in. Nie czekać na nowo uruchomione Actions w bieżącej sesji.
+
 ## Regresje po Actions #1109 — 2026-11-06
 
 W przebiegu 42298376311 realny Linux E2E przeszedł, podobnie jak analiza

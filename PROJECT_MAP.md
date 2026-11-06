@@ -618,10 +618,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   tylko dla konta z potwierdzonym protokołem v2. Wysyłanie lokalnego outboxu
   poprzedza przyjęcie zdalnej operacji dla tego samego dokumentu; konflikty
   bez rebase blokują kursor zamiast nadpisywać lokalny gest.
-  99: `attachEditor`; 108: `detachEditor`; 115: `editorForDocument`;
-  142: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
+  101: `attachEditor`; 110: `detachEditor`; 117: `editorForDocument`;
+  144: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
   sprawdza właściciela przed startem i po każdym await. Anulowanie
-  zatrzymuje transport, zachowując blokadę snapshotów v1.
+  zatrzymuje transport, zachowując blokadę snapshotów v1. Przekazuje
+  `isCurrent` do silnika, aby ponowił kontrolę po drenażu starej generacji.
   Regresje: `test/editor_v2_account_startup_test.dart` uruchamiają
   izolowany HTTP bez prób połączenia z niedostępnym WebSocket;
   produkcyjne realtime pozostaje domyślnie włączone i jest testowane
@@ -683,18 +684,30 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   aktora nie odmalowuje widoku. Powtórny odczyt obcego envelope nie
   wywołuje drugi raz tej samej udanej notyfikacji w jednej sesji
   (pamięć 4096 ID); po restarcie może być ponowiona.
-  166: `actorIdForDocument` wyznacza ten sam trwały SHA-256 aktora dla
+  170: `actorIdForDocument` wyznacza ten sam trwały SHA-256 aktora dla
   operacji i historii (seed + checkpointScope + UID dokumentu). Nie używać
   bazowego `actorId` jako właściciela checkpointu.
-  180: `writeLocalBatch` przekazuje opcjonalny checkpoint callback do
+  184: `writeLocalBatch` przekazuje opcjonalny checkpoint callback do
   transakcji store przed żądaniem synchronizacji; dopuszcza metadata-only
   granicę autosave bez nowego actorSeq. `lastError` znika po sukcesie.
-  677: `_connectSocket` żąda REST catch-up po `authenticated`, także dla
+  214: `start(isCurrent:)` czeka na poprzedni stop i ponownie sprawdza
+  właściciela przed nowym REST. 238: `stop` współdzieli Future drenażu,
+  unieważnia generację i czeka na aktywny REST, bez oczekiwania na close
+  pomocniczego kanału. `connectRealtime` umożliwia test rzeczywistego
+  kanału z kontrolowanym handshake. Regresje `sync_engine_test.dart`:
+  spóźniony handshake, trwały outbox, restart, anulowanie i dispose.
+  717: `_connectSocket` żąda REST catch-up po `authenticated`, także dla
   pierwszej subskrypcji i reconnect. Domyka lukę między GET a subskrypcją;
   sama wskazówka nie zapisuje projekcji ani kursora. Regresja
   `test/sync_engine_test.dart` opóźnia auth na rzeczywistym lokalnym WS,
   bez ręcznego sync, dodatkowego eventu i pomocy pollingu.
   Nie podłączać do UID v1 przed etapem 11.
+- `lib/data/sync/realtime_channel_cleanup.dart`: 7:
+  `requestRealtimeChannelClose` żąda zamknięcia pomocniczego WebSocketu
+  i izoluje błąd close. Nie oczekuje na jego Future: w kanale IO close
+  przed nieudanym handshake może nigdy się nie zakończyć. Regresje
+  `test/realtime_channel_cleanup_test.dart` obejmują ten przypadek,
+  spóźnione udane połączenie i synchroniczny błąd close.
 - `lib/data/sync/operation_store.dart`: `pending(includeDeferred)`,
   `isPending`, `isLocalOperation`, `advanceCheckpoint`; strzeże actorSeq także przy
   retry, lokalne operacje zależą od trwałych zdalnych frontierów,
@@ -811,6 +824,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `isBusy` obejmuje cały logout, także odwołanie HTTP i usunięcie sekretu;
   równoczesne wylogowania współdzielą Future. Błąd zwalnia blokadę i
   pozwala ponowić logout. Regresje: `test/account_session_controller_test.dart`.
+  Regresja Local wstrzymuje usunięcie sekretu i oczekuje na trwały
+  `useLocalProfile` przed restartem; akceptuje wyłącznie żądania login.
+  Oddzielny restart zachowuje sekret i sprawdza refresh poprzedniego konta.
   `shouldShowStartupDialog` tylko przy nieukończonym onboardingu.
   10: `AccountDataMode`; 12: `AccountSessionController`;
   90: `_loadProfile`; 220: `_refreshSession`;

@@ -12,12 +12,14 @@ import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
 import 'package:program/data/sync/sync_engine.dart';
 import 'package:uuid/uuid.dart';
+import 'package:web_socket_channel/io.dart';
 
 class _FakeGateway implements OperationGateway {
   final List<SequencedOperation> accepted = [];
   final Map<String, int> cursors = {};
   final List<List<String>> batches = [];
   bool dropNextAck = false;
+  int reads = 0;
 
   void seed(OperationEnvelope operation) {
     final cursor = accepted.length + 1;
@@ -51,12 +53,27 @@ class _FakeGateway implements OperationGateway {
 
   @override
   Future<OperationFeedPage> readAfter(int cursor) async {
+    reads++;
     final unread = accepted.where((entry) => entry.cursor > cursor).toList();
     return OperationFeedPage(
       cursor: unread.isEmpty ? cursor : unread.last.cursor,
       hasMore: false,
       operations: unread,
     );
+  }
+}
+
+class _HeldFeedGateway extends _FakeGateway {
+  final entered = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async {
+    if (!entered.isCompleted) {
+      entered.complete();
+    }
+    await release.future;
+    return super.readAfter(cursor);
   }
 }
 
@@ -288,6 +305,223 @@ void main() {
       }
     },
   );
+
+  test(
+    'stalled handshake cannot block stop or corrupt the next generation',
+    () async {
+      await engine.stop();
+      engine.dispose();
+      final api = ApiClient(baseUri: Uri.parse('http://127.0.0.1:9'))
+        ..setAccessToken('test-token');
+      addTearDown(api.close);
+      final handshakes = <Completer<WebSocket>>[];
+      final ready = <Future<void>>[];
+      engine = SyncEngine(
+        store: store,
+        gateway: gateway,
+        actorId: 'stalled-handshake',
+        checkpointScope: 'stalled-handshake',
+        apiClient: api,
+        connectRealtime: (uri) {
+          expect(uri.path, '/v2/realtime');
+          final handshake = Completer<WebSocket>();
+          handshakes.add(handshake);
+          final channel = IOWebSocketChannel(handshake.future);
+          ready.add(channel.ready.catchError((Object _) {}));
+          return channel;
+        },
+        applyRemote: (_, _) async {},
+      );
+      addTearDown(() async {
+        for (final handshake in handshakes) {
+          if (!handshake.isCompleted) {
+            handshake.completeError(const SocketException('Test cleanup'));
+          }
+        }
+        await Future.wait(ready);
+        await engine.stop();
+      });
+      await engine.start();
+      await engine.stop().timeout(const Duration(seconds: 1));
+      await engine.start();
+      expect(handshakes, hasLength(2));
+      final before = gateway.reads;
+      handshakes.first.completeError(const SocketException('Late old failure'));
+      await ready.first;
+      await engine.syncNow();
+      expect(gateway.reads, greaterThan(before));
+      expect(handshakes, hasLength(2));
+      await engine.stop().timeout(const Duration(seconds: 1));
+      final stoppedReads = gateway.reads;
+      handshakes.last.completeError(const SocketException('Stopped failure'));
+      await ready.last;
+      await Future<void>.delayed(Duration.zero);
+      expect(gateway.reads, stoppedReads);
+    },
+  );
+
+  test(
+    'stop still awaits in-flight REST and preserves its unsent outbox',
+    () async {
+      await engine.stop();
+      engine.dispose();
+      final held = _HeldFeedGateway();
+      final handshake = Completer<WebSocket>();
+      final channel = IOWebSocketChannel(handshake.future);
+      final ready = channel.ready.catchError((Object _) {});
+      final api = ApiClient(baseUri: Uri.parse('http://127.0.0.1:9'))
+        ..setAccessToken('test-token');
+      addTearDown(api.close);
+      engine = SyncEngine(
+        store: store,
+        gateway: held,
+        actorId: 'rest-drain',
+        checkpointScope: 'rest-drain',
+        apiClient: api,
+        connectRealtime: (_) => channel,
+        applyRemote: (_, _) async {},
+      );
+      addTearDown(() async {
+        if (!held.release.isCompleted) {
+          held.release.complete();
+        }
+        if (!handshake.isCompleted) {
+          handshake.completeError(const SocketException('Test cleanup'));
+        }
+        await ready;
+        await engine.stop();
+      });
+      final operation = await engine.writeLocal(
+        documentId: 'document-one',
+        pageId: 'page-one',
+        objectId: 'pending',
+        kind: OperationKind.objectCreate,
+        payload: {
+          'value': {'label': 'pending'},
+        },
+        apply: (_) async {},
+      );
+      final started = engine.start();
+      await held.entered.future;
+      var stopped = false;
+      final drain = engine.stop();
+      expect(identical(engine.stop(), drain), isTrue);
+      final stopping = drain.then((_) => stopped = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(stopped, isFalse);
+      held.release.complete();
+      await stopping.timeout(const Duration(seconds: 1));
+      await started;
+      expect(
+        (await store.pending(
+          includeDeferred: true,
+        )).map((op) => op.operationId),
+        [operation.operationId],
+      );
+      expect(held.accepted, isEmpty);
+      handshake.completeError(const SocketException('Cancelled handshake'));
+      await ready;
+    },
+  );
+
+  test(
+    'a restart waits for the previous REST drain and performs its own pull',
+    () async {
+      await engine.stop();
+      engine.dispose();
+      final held = _HeldFeedGateway();
+      engine = SyncEngine(
+        store: store,
+        gateway: held,
+        actorId: 'serial-restart',
+        checkpointScope: 'serial-restart',
+        enableRealtime: false,
+        applyRemote: (_, _) async {},
+      );
+      addTearDown(() {
+        if (!held.release.isCompleted) {
+          held.release.complete();
+        }
+      });
+      final first = engine.start();
+      await held.entered.future;
+      final stopping = engine.stop();
+      var restarted = false;
+      final restart = engine.start().then((_) => restarted = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(restarted, isFalse);
+      held.release.complete();
+      await stopping;
+      await first;
+      await restart;
+      expect(held.reads, 3);
+      expect(restarted, isTrue);
+    },
+  );
+
+  test(
+    'an owner cancelled during the old drain cannot start a new pass',
+    () async {
+      await engine.stop();
+      engine.dispose();
+      final held = _HeldFeedGateway();
+      engine = SyncEngine(
+        store: store,
+        gateway: held,
+        actorId: 'cancelled-restart',
+        checkpointScope: 'cancelled-restart',
+        enableRealtime: false,
+        applyRemote: (_, _) async {},
+      );
+      addTearDown(() {
+        if (!held.release.isCompleted) {
+          held.release.complete();
+        }
+      });
+      final first = engine.start();
+      await held.entered.future;
+      final stopping = engine.stop();
+      var current = true;
+      final restart = engine.start(isCurrent: () => current);
+      current = false;
+      held.release.complete();
+      await stopping;
+      await first;
+      await restart;
+      expect(held.reads, 1);
+      await engine.syncNow();
+      expect(held.reads, 1);
+    },
+  );
+
+  test('dispose prevents a restart queued behind the old REST drain', () async {
+    await engine.stop();
+    engine.dispose();
+    final held = _HeldFeedGateway();
+    engine = SyncEngine(
+      store: store,
+      gateway: held,
+      actorId: 'disposed-restart',
+      checkpointScope: 'disposed-restart',
+      enableRealtime: false,
+      applyRemote: (_, _) async {},
+    );
+    addTearDown(() {
+      if (!held.release.isCompleted) {
+        held.release.complete();
+      }
+    });
+    final first = engine.start();
+    await held.entered.future;
+    final stopping = engine.stop();
+    final restart = expectLater(engine.start(), throwsStateError);
+    engine.dispose();
+    held.release.complete();
+    await stopping;
+    await first;
+    await restart;
+    expect(held.reads, 1);
+  });
 
   test('batch API commits and ACKs a completed gesture once', () async {
     final drafts = [

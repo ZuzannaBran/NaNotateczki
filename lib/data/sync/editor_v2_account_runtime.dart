@@ -154,7 +154,7 @@ class EditorV2AccountRuntime {
         await stop();
         return false;
       }
-      await start();
+      await engine.start(isCurrent: isCurrent);
       if (!isCurrent()) {
         await stop();
         return false;

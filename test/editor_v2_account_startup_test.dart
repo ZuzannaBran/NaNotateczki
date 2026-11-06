@@ -250,6 +250,53 @@ void main() {
   });
 
   test(
+    'an owner cancelled while the prior engine drains cannot send REST',
+    () async {
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      final fixture = _Fixture(
+        NativeDatabase.memory(),
+        beforeFeed: () async {
+          if (!entered.isCompleted) {
+            entered.complete();
+          }
+          await release.future;
+        },
+      );
+      addTearDown(() async {
+        if (!release.isCompleted) {
+          release.complete();
+        }
+        await fixture.close();
+      });
+      await fixture.repository.enableAccountOperations(fixture.runtime.writer);
+      final oldStart = fixture.runtime.start();
+      await entered.future;
+      final stopping = fixture.runtime.stop();
+      final afterValidation = Completer<void>();
+      var current = true;
+      var checks = 0;
+      final restart = fixture.runtime.startForCurrentAccount(
+        isCurrent: () {
+          checks++;
+          if (checks == 2) {
+            afterValidation.complete();
+          }
+          return current;
+        },
+      );
+      await afterValidation.future.timeout(const Duration(seconds: 1));
+      current = false;
+      release.complete();
+      await stopping.timeout(const Duration(seconds: 1));
+      await oldStart;
+      expect(await restart, isFalse);
+      expect(fixture.requests, hasLength(1));
+      expect(fixture.requests.single.method, 'GET');
+    },
+  );
+
+  test(
     'legacy validation preserves data and retries after explicit cleanup',
     () async {
       final fixture = _Fixture(NativeDatabase.memory());

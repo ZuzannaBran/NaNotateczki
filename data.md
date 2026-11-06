@@ -1,5 +1,23 @@
 # Dane NaNotateczki
 
+## Zamykanie transportu i restart konta (2026-11-06)
+
+`SyncEngine.stop()` współdzieli jeden Future drenażu, odłącza wskazówki
+WebSocket i unieważnia generację przed oczekiwaniem na aktywny REST.
+`requestRealtimeChannelClose` inicjuje close i izoluje jego błąd, ale
+nie uzależnia zmiany konta od zakończenia tego Future. Kanał IO zamknięty
+przed nieudanym handshake może pozostawić close bez zakończenia.
+Spóźnione udane połączenie otrzymuje już zlecone zamknięcie.
+REST i transakcje SQLite nadal muszą zakończyć się przed zwolnieniem
+namespace; niewysłane operacje pozostają w outboxie.
+
+Nowy `start(isCurrent:)` czeka na poprzedni stop i dopiero wtedy ponownie
+sprawdza właściciela. Anulowanie konta lub dispose podczas tego oczekiwania
+nie pozwala uruchomić kolejnego odczytu ani wysyłki. Runtime przekazuje
+ten sam warunek właściciela co AppScope. Zapis profilu lokalnego i usunięcie
+sekretu w teście zmiany konta są oczekiwane przez `useLocalProfile`, tak
+jak w produkcyjnej ścieżce wyboru Local. Format danych pozostaje bez zmian.
+
 ## Izolacja transportu w testach startu v2 (2026-11-06)
 
 `EditorV2AccountRuntime` pozwala wyłączyć tylko `SyncEngine.enableRealtime`
