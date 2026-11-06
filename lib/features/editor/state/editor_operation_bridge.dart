@@ -337,8 +337,8 @@ class EditorOperationBridge {
     required String? afterDelta,
     required Map<String, VerifiedEditorAsset> verifiedAssets,
   }) {
-    final previous = _quillEmbeds(beforeDelta);
-    final next = _quillEmbeds(afterDelta);
+    final previous = quillEmbeds(beforeDelta);
+    final next = quillEmbeds(afterDelta);
     final drafts = <LocalOperationDraft>[];
     for (final entry in next.entries) {
       if (previous.containsKey(entry.key)) {
@@ -381,8 +381,8 @@ class EditorOperationBridge {
     required String? beforeDelta,
     required String? afterDelta,
   }) {
-    final previous = _quillEmbeds(beforeDelta);
-    final next = _quillEmbeds(afterDelta);
+    final previous = quillEmbeds(beforeDelta);
+    final next = quillEmbeds(afterDelta);
     return [
       for (final id in previous.keys)
         if (!next.containsKey(id))
@@ -395,7 +395,8 @@ class EditorOperationBridge {
     ];
   }
 
-  static Map<String, String> _quillEmbeds(String? deltaJson) {
+  /// Validates canonical image/PDF references and rejects conflicting types.
+  static Map<String, String> quillEmbeds(String? deltaJson) {
     if (deltaJson == null) {
       return const {};
     }

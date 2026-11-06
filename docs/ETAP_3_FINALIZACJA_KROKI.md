@@ -1,5 +1,22 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Odtwarzanie osadzonych mediów w Undo — 2026-11-06
+
+Writer odzyskuje potwierdzenie istniejącego assetu Quill z dziennika
+tego samego dokumentu. Sprawdza niezmienność potwierdzeń i trwałe bajty
+(SHA-256, MIME, rozmiar), stage'uje je przed transakcją i zapisuje nową
+scoped referencję przed odtworzeniem atomów. Dotyczy Undo usunięcia
+samego embedu, całego tekstu i strony, również po restarcie bez bufora.
+Obiekty/strony po tombstone nadal otrzymują nowe ID. Nie potrzeba sieci
+ani nowej kolejki/schematu. Obce dokumenty i niezweryfikowane URL nie
+są źródłem odzyskiwania; nowe importy wymagają osobnego stagingu.
+
+`editor_v2_quill_asset_recovery_test.dart` zawiera sześć scenariuszy
+obraz/PDF × embed/blok/strona na plikowej SQLite, powtarzane
+Undo/Redo/Undo oraz odmowę obcego zakresu i uszkodzonego BLOB.
+Dodano go do lokalnego zestawu etapu 3 i automatycznie zbieranego CI.
+Testy tego przyrostu wymagają odczytu wyniku w następnym uruchomieniu.
+
 ## Potwierdzony CI i powiązania Undo/Redo — 2026-11-06
 
 Przebieg `42134609370` dla `1d867df` zakończył się sukcesem:

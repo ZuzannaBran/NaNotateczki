@@ -18,6 +18,14 @@ PUT; wyłącznie potwierdzenie operacji usuwa ją z outboxu.
 Schemat SQLite pozostaje bez zmian. Pełny cutover i automatyczne
 przygotowanie wszystkich wariantów embedów Quill pozostają do ukończenia.
 
+Przy odtwarzaniu embedów Quill writer może ponownie użyć assetu
+z historii `asset.attach` tego samego dokumentu. `localAssetReceipt`
+sprawdza zgodność wszystkich utrwalonych potwierdzeń dla danego ID,
+a bajty z SQLite przechodzą ponowną kontrolę SHA-256, MIME i rozmiaru.
+Nowa scoped referencja powstaje w transakcji przed `text.insert`.
+Usunięcie samego embedu, bloku albo strony nie usuwa bajtów potrzebnych
+Undo. Nie daje to dostępu do assetów innego dokumentu ani do ścieżek/URL.
+
 ## Przegląd v2 konta (2026-11-05)
 
 W `AppScope` istnieje odizolowana, opcjonalna ścieżka operacyjnego

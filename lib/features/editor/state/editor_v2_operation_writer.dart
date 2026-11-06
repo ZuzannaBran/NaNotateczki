@@ -87,6 +87,64 @@ class EditorV2OperationWriter {
     Map<String, VerifiedEditorAsset> explicit,
   ) => {...?_registeredAssets[documentId], ...explicit};
 
+  /// Reuses only assets previously committed in this document, including
+  /// embeds detached by deletion. New imports still require verified staging.
+  Future<Map<String, VerifiedEditorAsset>> _prepareAssets({
+    required String documentId,
+    required Iterable<NotePage> before,
+    required Iterable<NotePage> after,
+    required Map<String, VerifiedEditorAsset> verifiedAssets,
+  }) async {
+    await _prepareImageAssets(
+      documentId: documentId,
+      before: before,
+      after: after,
+      verifiedAssets: verifiedAssets,
+    );
+    final assets = _assetsFor(documentId, verifiedAssets);
+    final previous = <String, TextBlock>{
+      for (final page in before)
+        for (final block in page.textBlocks) block.id: block,
+    };
+    for (final page in after) {
+      for (final block in page.textBlocks) {
+        final old = previous[block.id];
+        if (old != null && old.deltaJson == block.deltaJson) {
+          continue;
+        }
+        final oldEmbeds = EditorOperationBridge.quillEmbeds(old?.deltaJson);
+        final nextEmbeds = EditorOperationBridge.quillEmbeds(block.deltaJson);
+        for (final id in nextEmbeds.keys) {
+          if (oldEmbeds.containsKey(id) || assets.containsKey(id)) {
+            continue;
+          }
+          final receipt = await projector.localAssetReceipt(
+            documentId: documentId,
+            assetId: id,
+          );
+          if (receipt == null) {
+            throw StateError('Quill asset has no verified document history.');
+          }
+          final buffer = projector.verifiedAssetBuffer;
+          if (buffer == null) {
+            throw StateError('Verified asset staging has not been installed.');
+          }
+          buffer.stage(
+            receipt: receipt,
+            bytes: await projector.verifiedUploadBytes(receipt),
+          );
+          assets[id] = VerifiedEditorAsset(
+            assetId: id,
+            sha256: receipt['sha256'] as String,
+            sizeBytes: receipt['sizeBytes'] as int,
+            mediaType: receipt['mediaType'] as String,
+          );
+        }
+      }
+    }
+    return assets;
+  }
+
   /// Verifies local media before the SQLite batch, without requiring network.
   Future<void> _prepareImageAssets({
     required String documentId,
@@ -193,7 +251,7 @@ class EditorV2OperationWriter {
         notebook.folder.isEmpty) {
       throw ArgumentError('Invalid operational notebook identity or kind.');
     }
-    await _prepareImageAssets(
+    final assets = await _prepareAssets(
       documentId: notebook.uid,
       before: const <NotePage>[],
       after: notebook.pages,
@@ -212,10 +270,7 @@ class EditorV2OperationWriter {
         },
       ),
       for (final page in notebook.pages)
-        ..._bridge.planCreatePage(
-          page,
-          verifiedAssets: _assetsFor(notebook.uid, verifiedAssets),
-        ),
+        ..._bridge.planCreatePage(page, verifiedAssets: assets),
     ];
     return _commit(notebook.uid, drafts);
   }
@@ -287,7 +342,7 @@ class EditorV2OperationWriter {
     if (!const ListEquality<String>().equals(originalOrder, nextOrder)) {
       throw UnsupportedError('Page reordering is not yet in v2.');
     }
-    await _prepareImageAssets(
+    final assets = await _prepareAssets(
       documentId: after.uid,
       before: before.pages,
       after: after.pages,
@@ -494,7 +549,7 @@ class EditorV2OperationWriter {
           before: baseline,
           after: page,
           textAtomsById: atoms,
-          verifiedAssets: _assetsFor(after.uid, verifiedAssets),
+          verifiedAssets: assets,
           existingAssetIds: await _existingImageAssets(
             documentId: after.uid,
             before: baseline,
@@ -630,7 +685,7 @@ class EditorV2OperationWriter {
     required NotePage after,
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
   }) async {
-    await _prepareImageAssets(
+    final assets = await _prepareAssets(
       documentId: documentId,
       before: [before],
       after: [after],
@@ -646,7 +701,7 @@ class EditorV2OperationWriter {
       before: before,
       after: after,
       textAtomsById: atoms,
-      verifiedAssets: _assetsFor(documentId, verifiedAssets),
+      verifiedAssets: assets,
       existingAssetIds: await _existingImageAssets(
         documentId: documentId,
         before: before,
@@ -663,7 +718,7 @@ class EditorV2OperationWriter {
     required NotePage after,
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
   }) async {
-    await _prepareImageAssets(
+    final assets = await _prepareAssets(
       documentId: documentId,
       before: [before],
       after: [after],
@@ -678,7 +733,7 @@ class EditorV2OperationWriter {
       before: before,
       after: after,
       textAtomsById: atoms,
-      verifiedAssets: _assetsFor(documentId, verifiedAssets),
+      verifiedAssets: assets,
       existingAssetIds: await _existingImageAssets(
         documentId: documentId,
         before: before,
@@ -693,7 +748,7 @@ class EditorV2OperationWriter {
     required NotePage page,
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
   }) async {
-    await _prepareImageAssets(
+    final assets = await _prepareAssets(
       documentId: documentId,
       before: const <NotePage>[],
       after: [page],
@@ -701,10 +756,7 @@ class EditorV2OperationWriter {
     );
     return _commit(
       documentId,
-      _bridge.planCreatePage(
-        page,
-        verifiedAssets: _assetsFor(documentId, verifiedAssets),
-      ),
+      _bridge.planCreatePage(page, verifiedAssets: assets),
     );
   }
 

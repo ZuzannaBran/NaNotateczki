@@ -947,6 +947,51 @@ class EditorSqliteProjector {
     return receipt;
   }
 
+  /// Recovers an immutable receipt from this document's durable history.
+  /// Deleted owners need not retain a live scoped asset reference.
+  Future<Map<String, dynamic>?> localAssetReceipt({
+    required String documentId,
+    required String assetId,
+  }) async {
+    final rows = await database
+        .customSelect(
+          'SELECT envelope_json FROM operations '
+          'WHERE document_id = ? AND kind = ? LIMIT 50001',
+          variables: [
+            Variable<String>(documentId),
+            const Variable<String>('asset.attach'),
+          ],
+        )
+        .get();
+    if (rows.length > 50000) {
+      throw StateError('Asset history requires a checkpoint.');
+    }
+    Map<String, dynamic>? receipt;
+    for (final row in rows) {
+      final decoded = jsonDecode(row.read<String>('envelope_json'));
+      if (decoded is! Map) {
+        throw const FormatException('Malformed asset operation.');
+      }
+      final candidate = OperationEnvelope.fromJson(
+        Map<String, dynamic>.from(decoded),
+      );
+      if (candidate.documentId != documentId ||
+          candidate.kind != OperationKind.assetAttach) {
+        throw const FormatException('Asset journal scope is inconsistent.');
+      }
+      if (candidate.payload['assetId'] != assetId) {
+        continue;
+      }
+      candidate.validateForV2Projection();
+      if (receipt != null &&
+          !const DeepCollectionEquality().equals(receipt, candidate.payload)) {
+        throw StateError('Asset identity has conflicting durable receipts.');
+      }
+      receipt = candidate.payload;
+    }
+    return receipt;
+  }
+
   /// Downloads verified bytes before a remote attach or image switch.
   ///
   /// An already committed attach may precede an object.set by a restart.

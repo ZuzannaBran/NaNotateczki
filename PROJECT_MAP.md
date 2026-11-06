@@ -475,6 +475,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   zdalnym `object.set`. Nie ma fizycznego kasowania plików.
   Nowe embedy Quill przechowują bajty w `operation_asset_bytes` i
   wymagają powiązanej referencji SHA-256 oraz zgodnego MIME.
+  `localAssetReceipt` odczytuje niezmienne potwierdzenia assetu
+  wyłącznie z historii wskazanego dokumentu, również po usunięciu
+  ostatniego właściciela; nie zastępuje kontroli BLOB przez
+  `verifiedUploadBytes`. Rozbieżne potwierdzenia są odrzucane.
   Nadal brak pełnego renderera embedów, text object.move,
   pełnego rebase oraz podłączenia produkcyjnego. Blokuje niejednoznaczne
   identyfikatory i rozbieżny Delta Quill.
@@ -1405,13 +1409,15 @@ usunięte stroke'y i ich pierwotne indeksy zamiast pełnej kopii strony.
 `EditorOperationBridge` planuje v2 z już zatwierdzonych zmian strony,
 korzystając z istniejących adapterów Ink/Quill. Obsługuje stronę,
 rysowanie/gumkę, geometrię i tworzenie tekstu. Dla Quill embedów
-wymaga ukończonego, zweryfikowanego uploadu (asset.attach przed
+wymaga zweryfikowanych bajtów (asset.attach przed
 text.insert, asset.detach dopiero po usunięciu referencji). Wymiana
 obrazu/PDF wymaga nowego asset ID oraz starego ID z trwałej projekcji;
 generuje attach → object.set → detach, nigdy ścieżkę lokalną.
 Aktualizacja tekstu wymaga trwałych atomów CRDT; niezmieniony blok
 Quill można przenieść między stronami bez zmiany ID i utraty historii.
 Most nie jest podłączony do produkcyjnego `AppScope`.
+`quillEmbeds` udostępnia wspólną walidację kanonicznych referencji
+image/PDF do przygotowania lokalnych assetów przez writer.
 Regresje: `test/editor_operation_bridge_test.dart` oraz batch/rollback
 w `test/sync_engine_test.dart`.
 
@@ -1468,8 +1474,14 @@ odczyt BLOB z SQLite. Błąd uploadu pozostawia operacje w outboxie,
 a ponowny PUT po restarcie jest idempotentny. Sam lokalny zapis działa
 bez sieci i bez gateway. Zatrzymanie silnika podczas uploadu blokuje
 późniejsze wysłanie wsadu starego konta; regresja jest w
-`test/sync_engine_test.dart`. Automatyczne przygotowanie nowych embedów
-Quill i pełny zdalny rebase wymagają dalszych prac.
+`test/sync_engine_test.dart`. `_prepareAssets` odzyskuje wcześniej
+zatwierdzone embedy Quill z trwałych potwierdzeń tego samego dokumentu
+i weryfikuje BLOB przed odtworzeniem scoped referencji. Działa także
+po opróżnieniu bufora i zmianie ID właściciela w Undo. Nowy import
+wciąż wymaga zweryfikowanego stagingu; pełny rebase pozostaje otwarty.
+`test/editor_v2_quill_asset_recovery_test.dart`: restart plikowej SQLite,
+obraz/PDF × usunięcie embedu/bloku/strony, cykl Undo/Redo/Undo,
+odmowa obcego dokumentu i uszkodzonych bajtów.
 Usuwanie zweryfikowanego obrazu lub tekstu z embedem Quill usuwa
 scoped asset references razem z obiektem w transakcji SQLite;
 nie usuwa fizycznych plików i odmawia usunięcia brakującego assetu.

@@ -38,6 +38,7 @@ dart format --output=none --set-exit-if-changed \
   test/notebook_repository_v2_account_test.dart \
   test/library_v2_settings_test.dart \
   test/editor_v2_offline_media_test.dart \
+  test/editor_v2_quill_asset_recovery_test.dart \
   test/operation_asset_gateway_test.dart
 
 echo "[stage3] Dart static analysis"
@@ -57,6 +58,7 @@ flutter test --concurrency=1 \
   test/notebook_repository_v2_account_test.dart \
   test/library_v2_settings_test.dart \
   test/editor_v2_offline_media_test.dart \
+  test/editor_v2_quill_asset_recovery_test.dart \
   test/operation_asset_gateway_test.dart
 
 echo "[stage3] Full unit and widget test suite"
