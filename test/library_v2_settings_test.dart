@@ -143,17 +143,21 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(
-      find.descendant(
-        of: find.byKey(const ValueKey('catalog-folder-grid')),
-        matching: find.text('Notes'),
-      ).first,
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('catalog-folder-grid')),
+            matching: find.text('Notes'),
+          )
+          .first,
     );
     await tester.pumpAndSettle();
     await tester.tap(
-      find.descendant(
-        of: find.byKey(const ValueKey('catalog-document-grid')),
-        matching: find.text('Real v2 editor'),
-      ).first,
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('catalog-document-grid')),
+            matching: find.text('Real v2 editor'),
+          )
+          .first,
     );
     await tester.pumpAndSettle();
     final editor = tester
