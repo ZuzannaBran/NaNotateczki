@@ -317,6 +317,95 @@ void main() {
     },
   );
 
+  for (final autosaved in [false, true]) {
+    test(
+      'typing then deleting preserves both history gestures, saved=$autosaved',
+      () async {
+        final database = NotesDatabase(NativeDatabase.memory());
+        addTearDown(database.close);
+        final repository = NotebookRepository(database);
+        final notebook = await repository.createNotebook();
+        final store = OperationStore(database);
+        final projector = EditorSqliteProjector(database);
+        final engine = SyncEngine(
+          store: store,
+          gateway: _OfflineGateway(),
+          actorId: 'type-delete-test',
+          checkpointScope: 'type-delete-test',
+          enableRealtime: false,
+          applyRemote: (operation, _) => projector.apply(operation),
+        );
+        addTearDown(engine.stop);
+        Completer<void>? typedCommitted;
+        final writer = EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+          onCommitted: (_, __) {
+            if (typedCommitted != null && !typedCommitted!.isCompleted) {
+              typedCommitted!.complete();
+            }
+          },
+        );
+        final block = TextBlock(
+          id: 'type-then-delete',
+          text: 'Original',
+          deltaJson: jsonEncode([
+            {'insert': 'Original\n'},
+          ]),
+          position: Offset.zero,
+          fontSize: 18,
+          color: const Color(0xFF123456),
+          width: 200,
+        );
+        await writer.writePageChange(
+          documentId: notebook.uid,
+          before: notebook.pages.single,
+          after: notebook.pages.single.copyWith(textBlocks: [block]),
+        );
+        final controller = EditorController(
+          repository: repository,
+          notebook: (await repository.getNotebook(notebook.uid))!,
+          operationWriter: writer,
+          saveDebounce: const Duration(milliseconds: 10),
+        );
+        addTearDown(controller.dispose);
+        controller.setActiveTextBlock(block.id, null);
+        final typedSaved = Completer<void>();
+        typedCommitted = typedSaved;
+        controller.updateTextBlockContent(
+          controller.currentPage.textBlocks.single,
+          plainText: 'Latest draft',
+          deltaJson: jsonEncode([
+            {'insert': 'Latest draft\n'},
+          ]),
+        );
+        if (autosaved) {
+          await typedSaved.future.timeout(const Duration(seconds: 5));
+        }
+        controller.deleteTextBlock(block.id);
+        await controller.flushPendingSaves();
+        expect(controller.currentPage.textBlocks, isEmpty);
+        controller.undo();
+        await controller.flushPendingSaves();
+        final restoredId = controller.currentPage.textBlocks.single.id;
+        expect(restoredId, isNot(block.id));
+        expect(controller.currentPage.textBlocks.single.text, 'Latest draft');
+        controller.undo();
+        await controller.flushPendingSaves();
+        expect(controller.currentPage.textBlocks.single.id, restoredId);
+        expect(controller.currentPage.textBlocks.single.text, 'Original');
+        expect(controller.canUndo, isFalse);
+        controller.redo();
+        await controller.flushPendingSaves();
+        expect(controller.currentPage.textBlocks.single.id, restoredId);
+        expect(controller.currentPage.textBlocks.single.text, 'Latest draft');
+        controller.redo();
+        await controller.flushPendingSaves();
+        expect(controller.currentPage.textBlocks, isEmpty);
+      },
+    );
+  }
+
   for (final restoreOriginal in [false, true]) {
     test(
       'text autosaves share one history gesture, noop=$restoreOriginal',

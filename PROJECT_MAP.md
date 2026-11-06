@@ -1568,6 +1568,10 @@ Po zatwierdzonym odtworzeniu `_remapV2HistoryNotebook` aktualizuje ID
 w obu stosach historii. Redo następnego gestu zachowuje już odtworzone
 obiekty/strony; rollback nie zmienia historycznych tożsamości.
 Historia nie jest jeszcze odtwarzana po restarcie.
+`deleteTextBlock` w v2 zamyka checkpoint aktywnego pisania przed
+usunięciem: Undo przywraca najnowszy szkic także przed autosave,
+a kolejne Undo cofa pisanie. Test obejmuje oba warianty debounce
+i obie operacje Redo ze stabilnym ID odtworzonego tekstu.
 `applyConfirmedV2PagePatch` wprowadza zdalną stronę bez remountu,
 nie zmieniając zoomu i aktualnego wyboru strony. Metoda
 `registerVerifiedImageAsset` wiąże potwierdzony upload z blokiem

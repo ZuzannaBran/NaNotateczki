@@ -2460,7 +2460,7 @@ class EditorController extends ChangeNotifier {
 
   void deleteTextBlock(String id) {
     final block = currentPage.textBlocks.firstWhere((item) => item.id == id);
-    if (activeTextBlockId == id) {
+    if (activeTextBlockId == id && operationWriter == null) {
       _discardActiveTextEdit();
     }
     _applyAction(DeleteTextAction(block));

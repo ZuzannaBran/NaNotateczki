@@ -1,5 +1,18 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Usunięcie aktywnego tekstu przed autosave — 2026-11-06
+
+`deleteTextBlock` w v2 nie odrzuca już granicy aktywnej edycji.
+Przed usunięciem zatwierdza jej checkpoint przez istniejące
+`_applyAction`. Inaczej szybkie pisanie → usuń mogło cofnąć usunięcie
+do starej treści sprzed autosave, tracąc ostatni szkic.
+
+Testy kontrolera obejmują usunięcie zarówno przed pierwszym autosave,
+jak i po nim. Sprawdzają Undo usunięcia do najnowszej treści, Undo edycji
+do oryginału i obie operacje Redo, ze stabilnym ID odtworzonego bloku.
+Nie zmieniono ścieżki legacy. Wynik nowych regresji wymaga kolejnego
+odczytu Actions; nie oznacza zamknięcia całego etapu 3.
+
 ## Produkcyjna edycja złożonego Quill v2 — 2026-11-06
 
 Aktywacja tekstu v2 z mieszanym formatowaniem lub embedem korzysta
