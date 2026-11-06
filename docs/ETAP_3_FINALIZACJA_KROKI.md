@@ -1,5 +1,16 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Typ wyniku callbacku clipboard — 2026-11-06
+
+Przebieg `42168819661` dla `b4d3dac` przeszedł formatowanie, ale analiza
+zatrzymała się na niejednoznacznej inferencji `tester.runAsync`: callback
+zwraca `Future<String?>`, a kontekst wymagał `Future<String>`.
+Test określa teraz `runAsync<String?>` jawnie. Dodano również odmowę
+starego callbacku po opuszczeniu aktywnego bloku: `null` i niezmieniona
+Delta, przed ponownym prawidłowym importem. Zestaw Flutter nie został
+w tym przebiegu uruchomiony; ponowienie dotyczy tylko analizy/natywnych
+regresji aplikacji. Wynik należy odczytać w następnej sesji.
+
 ## Toolbar bez spłaszczania rich text — 2026-11-06
 
 `updateActiveTextStyle` dla v2 nie odbudowuje już Delta z `before.text`.

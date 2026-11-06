@@ -184,7 +184,17 @@ void main() {
           );
           // ignore: experimental_member_use
           final clipboard = active.config.clipboardConfig!;
-          importedReference = await tester.runAsync(
+          editor.clearActiveTextBlock();
+          final canceled = await tester.runAsync<String?>(
+            () => clipboard.onImagePaste!(importedBytes),
+          );
+          expect(canceled, isNull);
+          expect(
+            editor.pages.single.textBlocks.single.deltaJson,
+            originalDelta,
+          );
+          editor.setActiveTextBlock(block.id, active);
+          importedReference = await tester.runAsync<String?>(
             () => clipboard.onImagePaste!(importedBytes),
           );
           expect(importedReference, startsWith('asset:'));
