@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIRROR = ROOT / "server"
+APP_ONLY = {Path("api/tests/test_dart_python_operation_contract.py")}
 SHARED = (
     ".env.example",
     ".gitignore",
@@ -21,11 +22,14 @@ SHARED = (
     "docs/OPERATION_PROTOCOL_V1.md",
     "compose.yaml",
     "compose.local.yaml",
+    "compose.stage12.yaml",
     "compose.public.yaml",
     "postgres-init/01-create-app-role.sh",
     "scripts/apply-migrations.sh",
     "scripts/backup-server.sh",
     "scripts/smoke-local-api.py",
+    "scripts/run-stage12-real.sh",
+    "scripts/tests/test_stage12_runner_guard.py",
 )
 
 
@@ -38,7 +42,7 @@ def managed_files(root: Path) -> set[Path]:
                 path.relative_to(root)
                 for path in directory.rglob("*")
                 if path.is_file()
-                and "__pycache__" not in path.parts
+                and not {"__pycache__", ".pytest_cache"}.intersection(path.parts)
                 and path.suffix not in {".pyc", ".pyo"}
             )
     paths.update(
@@ -79,7 +83,7 @@ def main() -> int:
 
     # App-only pytest.ini and deployment notes intentionally remain outside
     # the managed source directories. Never delete files automatically.
-    extras = sorted(str(path) for path in mirror_paths - source_paths)
+    extras = sorted(str(path) for path in mirror_paths - source_paths - APP_ONLY)
     if missing or different or extras:
         print("Missing:", ", ".join(missing) or "none")
         print("Different:", ", ".join(different) or "none")

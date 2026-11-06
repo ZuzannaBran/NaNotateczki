@@ -287,21 +287,53 @@ def apply_operation(
             or destination_id == op.page_id
         ):
             raise ProjectionError("Invalid object.move destination.")
+        # A competing actor may have moved the object away already.
+        # Resolve all locations before trusting the stale source page.
+        owners = [
+            (page_id, page_node["objects"][op.object_id])
+            for page_id, page_node in pages.items()
+            if op.object_id in page_node.get("objects", {})
+        ]
+        if len(owners) != 1:
+            raise ProjectionError("Move target is missing or ambiguous.")
+        actual_source, moved = owners[0]
+        previous = moved.get("lastMove")
+        rank = list(precedence(op))
+        if previous is not None:
+            if not isinstance(previous, dict) or set(previous) != {
+                "rank", "actorId", "operationId"
+            }:
+                raise ProjectionError("Corrupt persisted move version.")
+            if rank <= previous["rank"]:
+                # A losing operation must not resurrect a removed destination.
+                return current, None
         destination_page = pages.get(destination_id)
         if destination_page is None or (
             "page", "", destination_id
         ) in tombstones:
             raise ProjectionError("Destination page does not exist.")
-        if op.object_id not in objects:
-            raise ProjectionError("Source object does not exist.")
+        if actual_source != op.page_id:
+            if (
+                previous is None
+                or previous["actorId"] == op.actor_id
+                or previous["operationId"] in op.dependencies
+            ):
+                raise ProjectionError("Causal move source is inconsistent.")
+        if ("object", destination_id, op.object_id or "") in tombstones:
+            raise ProjectionError("Destination identity was deleted.")
         destination_objects = destination_page.setdefault("objects", {})
-        if op.object_id in destination_objects or (
-            "object", destination_id, op.object_id or ""
-        ) in tombstones:
+        if (op.object_id in destination_objects
+                and actual_source != destination_id):
             raise ProjectionError("Destination identity is occupied.")
-        moved = objects.pop(op.object_id)
+        if actual_source != destination_id:
+            pages[actual_source]["objects"].pop(op.object_id)
+            destination_objects[op.object_id] = moved
         _merge(moved, {"sortIndex": sort_index}, op)
-        destination_objects[op.object_id] = moved
+        moved["lastMove"] = {
+            "rank": rank,
+            "actorId": op.actor_id,
+            "operationId": op.operation_id,
+        }
         return current, None
     if kind == "object.delete":
         objects.pop(op.object_id, None)
@@ -345,6 +377,10 @@ def apply_operation(
                     raise ProjectionError(
                         "Cannot detach or replace an embedded asset."
                     )
+            if kind == "asset.detach" and (
+                node.get("properties", {}).get("assetId") == asset_id
+            ):
+                raise ProjectionError("Cannot detach the active image asset.")
             if kind == "asset.attach":
                 assets[asset_id] = {
                     "sha256": payload["sha256"],
@@ -366,6 +402,16 @@ def apply_operation(
         return current, None
     if "textAtoms" in node and ({"text", "delta"} & fields.keys()):
         raise ProjectionError("CRDT text cannot be replaced by object.set.")
+    if "assetId" in fields:
+        if (
+            node.get("type") != "object.create"
+            or node.get("properties", {}).get("objectType") != "image"
+            or not isinstance(fields["assetId"], str)
+            or fields["assetId"] not in node.get("assets", {})
+        ):
+            raise ProjectionError(
+                "Image asset replacement needs a verified attachment."
+            )
     _merge(node, fields, op)
     return current, None
 

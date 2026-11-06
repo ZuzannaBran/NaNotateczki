@@ -1,5 +1,19 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Rzeczywisty backend w lustrze aplikacji — 2026-11-06
+
+Przed testem kontrolerów z API porównano `server/` z kanonicznym
+`NaNotateczki-serwer/main` (`6b0da04`, zielony backend). Uzupełniono
+brakujący `compose.stage12.yaml` i istniejące już w kanonicznym repo
+poprawki projekcji move/assetów, testy oraz dokumentację. Nie wprowadzano
+nowego zachowania ani migracji w kanonicznym backendzie.
+
+Kontrola lustra obejmuje teraz konfigurację/runner E2E, ignoruje cache
+Pythona i zachowuje jawny app-only kontrakt Dart/Python, nadal odrzucając
+nieznane dodatkowe źródła. Trzy nowe testy narzędzia i dwa guardy runnera
+zaliczono lokalnie; kontrola zgodności lustra również przeszła.
+
+
 ## Cache obrazu, historia po restarcie i ponowienie CI — 2026-11-06
 
 Poprzedni job `42252657960` zaliczył 1002 regresje (2 pominięte);

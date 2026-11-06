@@ -2240,6 +2240,11 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
   GitHub Actions uruchamia także prawdziwe HTTP E2E na odizolowanym
   PostgreSQL: migracje, konto, sync, scalanie edycji dwóch gości,
   feed hosta, PNG i verified backup.
+  Lustro obejmuje również `compose.stage12.yaml` i runner rzeczywistego
+  stosu v2. Tool ignoruje cache Pythona oraz zachowuje jawny test kontraktu
+  Dart/Python tylko aplikacji; nie ignoruje nieznanych dodatkowych źródeł.
+  `tool/test_check_server_mirror.py`: trzy regresje cache/extra, brakującego
+  Compose i aktualizacji starszej projekcji z kanonicznego repozytorium.
 
 - `LICENSE.md`: niezmieniony oficjalny tekst PolyForm Noncommercial 1.0.0
   obejmujący prawa licencjodawcy do oryginalnych elementów projektu.
