@@ -963,6 +963,14 @@ Warunek zamknięcia D: aplikacja działa na v2 w produkcji; nie istnieje
 równoległy snapshot writer. Każde usunięcie i nowy obiekt są
 propagowane na wszystkie urządzenia.
 
+## Realna ścieżka UI katalog → edytor v2 (2026-11-06)
+
+`test/library_v2_settings_test.dart` sprawdza dodatkowo otwarcie
+notatnika przez rzeczywisty `LibraryScreen`, powiązanie kontrolera z
+writerem runtime i trwały zapis gestu ink do outboxu v2. W tym samym
+scenariuszu `saveNotebook` ma odmówić snapshotu legacy.
+Wynik testu wymaga potwierdzenia CI. Nie włącza produkcyjnego cutover.
+
 ## Bariera produkcyjnego protokołu konta (2026-11-06)
 
 `AppScope` nie montuje `LibraryScreen` dla zalogowanego użytkownika,
