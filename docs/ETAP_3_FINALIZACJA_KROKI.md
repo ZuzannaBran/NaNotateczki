@@ -1,5 +1,27 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Wyścig zdalnej projekcji z Undo/Redo — 2026-11-06
+
+Zdalny commit SQLite może poprzedzać dostarczenie patcha do kontrolera.
+Wtedy stary inverse utworzenia strony mógł usunąć stronę, na której inne
+urządzenie zdążyło dopisać obiekt. Kontroler sprawdza teraz aktualność
+checkpointu przed przygotowaniem inverse oraz poprzednią głowę dziennika
+wewnątrz transakcji nowego wsadu. Zmiana w trakcie odczytu/dekodowania
+historii powoduje rollback projekcji, tombstones, actorSeq i outboxu;
+stare stosy są odrzucane po rollbacku. Nie odtwarza się snapshotu v1.
+
+Dwie regresje `editor_controller_v2_test.dart` tworzą stronę, potwierdzają
+lokalny outbox i zapisują zdalną kreskę przed Undo albo podczas jawnie
+zablokowanego dekodowania odzyskanej historii. Bez arbitralnych opóźnień
+sprawdzają zachowanie obu stron, cudzej kreski, brak tombstone i nowych
+operacji inverse. Dostarczenie patcha odblokowuje normalną dalszą edycję;
+nowy gest używa kolejnego actorSeq bez luki i można go cofnąć bez utraty
+zdalnej treści. Zmiana dotyczy wyłącznie aplikacji.
+
+Lokalnie przeprowadzono format-check i kontrolę diffu. Analizę i regresje
+Flutter wykona ograniczony job Actions; wynik sprawdzić w następnej sesji,
+bez czekania po puszczeniu commita. Cutover i etap 3 pozostają otwarte.
+
 ## Natywne obrazy/PDF w historii kontrolera — 2026-11-06
 
 Zamrożono bajty nowych obrazów natywnych i renderowanych stron PDF przed

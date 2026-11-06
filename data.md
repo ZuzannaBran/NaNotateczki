@@ -1,5 +1,18 @@
 # Dane NaNotateczki
 
+## Nieaktualne inverse po zdalnym commicie (2026-11-06)
+
+Undo/Redo najpierw sprawdza checkpoint na aktualnej głowie dziennika.
+Zdalny commit unieważnia stare stosy nawet wtedy, gdy odpowiadający mu
+patch UI jeszcze nie dotarł. Druga kontrola działa w transakcji inverse:
+operacja bezpośrednio poprzedzająca nowy batch musi być głową tego samego
+checkpointu. Zmiana podczas dekodowania mediów wycofuje cały inverse,
+łącznie z projekcją, tombstones, actorSeq i outboxem. Dopiero po rollbacku
+kontroler odrzuca stare stosy, zachowując widok do dostarczenia patcha.
+ACK ani echo istniejącej operacji nie dopisuje głowy i nie kasuje historii.
+Nowy gest po odebraniu patcha zaczyna historię od zdalnie potwierdzonego
+stanu; nie może cofnąć starszego utworzenia strony z cudzą zawartością.
+
 ## Natywne media i historia v2 (2026-11-06)
 
 Import obrazu z pliku lub bajtów i renderowanych stron PDF zamraża

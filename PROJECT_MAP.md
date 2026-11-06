@@ -1687,6 +1687,12 @@ i nowe ID odtwarzanych obiektów; nie odtwarza tombstone. Równoległy gest
 podczas asynchronicznego inverse pozostaje w UI i blokuje zapis zamiast
 zostać nadpisany. `_applyV2History` wiąże inverse przez
 `revertsOperationId`; przeciwna historia pamięta ID nowego inverse.
+Undo/Redo odrzuca checkpoint z nieaktualną głową przed inverse. W transakcji
+nowego batcha sprawdza też jego poprzednią głowę: zdalny commit podczas
+dekodowania historii wycofuje projekcję, tombstones, actorSeq i outbox.
+Stosy są czyszczone po rollbacku, bez nadpisania UI przed remote patchem.
+Dwie regresje `editor_controller_v2_test.dart` chronią cudzą kreskę na
+lokalnie utworzonej stronie i sprawdzają dalszą edycję bez luki actorSeq.
 Gest Quill zachowuje koniec ostatniego autosave niezależnie od debounce.
 Po zatwierdzonym odtworzeniu `_remapV2HistoryNotebook` aktualizuje ID
 w obu stosach historii. Redo następnego gestu zachowuje już odtworzone
@@ -1709,7 +1715,7 @@ ponawianie ink oraz stron bez ponownego użycia tombstones. Błąd zapisu
 wyłącza Undo/Redo; `historyRevision` powiadamia toolbar po błędzie
 oraz po wyczyszczeniu dirty flags przy udanym retry.
 Natywne importy obrazów i renderów PDF zamrażają bajty przed mutacją
-kontrolera; checkpoint nie odczytuje plików. 3811: `restoreImageCache`
+kontrolera; checkpoint nie odczytuje plików. 3853: `restoreImageCache`
 zachowuje te bajty i nie zapisuje operacji ani kroku historii.
 `test/editor_v2_native_image_history_test.dart`: sześć regresji SQLite,
 import PNG/PDF przez publiczne API z pliku, usunięcie pliku przed commitem,
@@ -1731,15 +1737,15 @@ HUD pożycza swój kontroler przez `bindHudTextController`/`unbindHudTextControl
 Import porównuje TextEditingValue (także IME), model i właściciela, zachowuje
 Delta i tworzy osobny checkpoint od wcześniejszego pisania. Jednorazowy
 handoff kursora dotyczy dokładnej Delta; odrzucony import nie wymienia HUD.
-Ważne granice: 179: `preferencesReady`; 191: `historyReady`;
-264: `bindHudTextController`; 272: `unbindHudTextController`;
-283: `hasQuillHandoff`; 287: `takeQuillHandoff`; 692: `flushPendingSaves`;
-2108: `_applyV2History`; 2230: `_restoreV2History`;
-2258: `_persistV2History`; 2399: `_remapV2HistoryNotebook`;
-2578: `prepareInlineAsset`; 2600: `pasteQuillHtml`; 2639: `insertQuillFile`;
-2657: `_pickQuillFile`; 2696: `_replaceQuillSelection`;
-2860: `updateTextBlockContent`; 2875: `updateActiveTextStyle`;
-4326: `_commitActiveTextEdit`; 4421: `_captureV2Gesture`; 4445: `_saveV2`.
+Ważne granice: 183: `preferencesReady`; 195: `historyReady`;
+268: `bindHudTextController`; 276: `unbindHudTextController`;
+287: `hasQuillHandoff`; 291: `takeQuillHandoff`; 696: `flushPendingSaves`;
+2112: `_applyV2History`; 2272: `_restoreV2History`;
+2300: `_persistV2History`; 2441: `_remapV2HistoryNotebook`;
+2620: `prepareInlineAsset`; 2642: `pasteQuillHtml`; 2681: `insertQuillFile`;
+2699: `_pickQuillFile`; 2738: `_replaceQuillSelection`;
+2902: `updateTextBlockContent`; 2917: `updateActiveTextStyle`;
+4368: `_commitActiveTextEdit`; 4463: `_captureV2Gesture`; 4487: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod

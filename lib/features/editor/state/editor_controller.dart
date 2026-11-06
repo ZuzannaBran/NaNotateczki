@@ -53,6 +53,10 @@ class _EditorHistoryEntry {
   final EditorAction action;
 }
 
+class _V2HistoryHeadChanged implements Exception {
+  const _V2HistoryHeadChanged();
+}
+
 class _V2HistoryEntry {
   const _V2HistoryEntry(
     this.before,
@@ -2125,6 +2129,16 @@ class EditorController extends ChangeNotifier {
     if (source.isEmpty) {
       return;
     }
+    final savedHistory = await _v2HistoryStore!.load(
+      documentId: notebook.uid,
+      ownerId: operationWriter!.syncEngine.actorIdForDocument(notebook.uid),
+    );
+    if (savedHistory == null) {
+      _v2Undo.clear();
+      _v2Redo.clear();
+      _notifyHistoryChanged();
+      return;
+    }
     final entry = source.last;
     final original = _v2PersistedNotebook;
     final desired = undo
@@ -2155,6 +2169,29 @@ class EditorController extends ChangeNotifier {
         after: restored,
         revertsOperationId: entry.operationId,
         onCommittedInTransaction: (operations) async {
+          // A remote commit can race with inverse preparation. Check the
+          // preceding head inside the write transaction, so a stale inverse
+          // rolls back its projection, tombstones, actorSeq and outbox.
+          final beforeBatch = operations.isEmpty
+              ? ''
+              : 'AND rowid < (SELECT rowid FROM operations '
+                    'WHERE operation_id = ?) ';
+          final previousHead = await operationWriter!.projector.database
+              .customSelect(
+                'SELECT operation_id FROM operations WHERE document_id = ? '
+                '$beforeBatch'
+                'ORDER BY rowid DESC LIMIT 1',
+                variables: [
+                  Variable<String>(notebook.uid),
+                  if (operations.isNotEmpty)
+                    Variable<String>(operations.first.operationId),
+                ],
+              )
+              .getSingleOrNull();
+          if (previousHead?.read<String>('operation_id') !=
+              savedHistory.headOperationId) {
+            throw const _V2HistoryHeadChanged();
+          }
           final changed = operations.isNotEmpty;
           nextUndo = [
             for (final item in _v2Undo)
@@ -2185,6 +2222,11 @@ class EditorController extends ChangeNotifier {
       );
       hasCommitted = committed.isNotEmpty;
       _installV2History(checkpoint, nextUndo!, nextRedo!);
+    } on _V2HistoryHeadChanged {
+      _v2Undo.clear();
+      _v2Redo.clear();
+      _notifyHistoryChanged();
+      return;
     } finally {
       _v2HistoryCommitting = false;
     }

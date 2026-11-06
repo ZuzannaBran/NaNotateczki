@@ -47,9 +47,161 @@ class _OversizedHistoryCodec extends EditorHistoryNotebookCodec {
   }
 }
 
+class _GatedHistoryCodec extends EditorHistoryNotebookCodec {
+  _GatedHistoryCodec(super.projector, this.entered, this.release);
+
+  final Completer<void> entered;
+  final Completer<void> release;
+
+  @override
+  Future<Notebook> decode(
+    Map<String, dynamic> value, {
+    required String documentId,
+  }) async {
+    entered.complete();
+    await release.future;
+    return super.decode(value, documentId: documentId);
+  }
+}
+
 void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final duringDecode in [false, true]) {
+    test(
+      'remote commit invalidates page Undo (during decode: $duringDecode)',
+      () async {
+        final database = NotesDatabase(NativeDatabase.memory());
+        addTearDown(database.close);
+        final repository = NotebookRepository(database);
+        final notebook = await repository.createNotebook();
+        final projector = EditorSqliteProjector(database);
+        final store = OperationStore(database);
+        final engine = SyncEngine(
+          store: store,
+          gateway: _OfflineGateway(),
+          actorId: 'inverse-race-peer',
+          checkpointScope: 'inverse-race-account',
+          enableRealtime: false,
+          applyRemote: (operation, _) => projector.apply(operation),
+        );
+        addTearDown(engine.stop);
+        final writer = EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+        );
+        final first = EditorController(
+          repository: repository,
+          notebook: notebook,
+          operationWriter: writer,
+        );
+        await first.historyReady;
+        await first.preferencesReady;
+        first.addPage();
+        await first.flushPendingSaves();
+        final created = await store.pending();
+        expect(created.last.kind, OperationKind.pageCreate);
+        final pageId = first.pages.last.id;
+        for (var i = 0; i < created.length; i++) {
+          await store.acknowledge(
+            created[i].operationId,
+            serverSequence: i + 1,
+          );
+        }
+        first.dispose();
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        final editor = EditorController(
+          repository: repository,
+          notebook: (await repository.getNotebook(notebook.uid))!,
+          operationWriter: writer,
+          historyCodec: duringDecode
+              ? _GatedHistoryCodec(projector, entered, release)
+              : null,
+        );
+        addTearDown(editor.dispose);
+        await editor.historyReady;
+        await editor.preferencesReady;
+        expect(editor.canUndo, isTrue);
+        final remote = OperationEnvelope(
+          operationId: '00000000-0000-4000-8000-000000000123',
+          actorId: 'other-device',
+          actorSeq: 1,
+          logicalClock: created.last.logicalClock + 1,
+          dependencies: [created.last.operationId],
+          documentId: notebook.uid,
+          pageId: pageId,
+          objectId: 'other-device-stroke',
+          kind: OperationKind.strokeCreate,
+          payload: {
+            'value': {
+              'objectType': 'stroke',
+              'colorValue': 0xFF123456,
+              'width': 2,
+              'toolIndex': 0,
+              'sortIndex': 0,
+              'points': [
+                [1, 2, 0.5],
+              ],
+            },
+          },
+        );
+        Future<void> commitRemote() async {
+          await store.applyRemote(
+            remote,
+            serverSequence: 100,
+            apply: () => projector.apply(remote),
+          );
+        }
+
+        if (duringDecode) {
+          editor.undo();
+          await entered.future;
+          try {
+            await commitRemote();
+          } finally {
+            release.complete();
+          }
+        } else {
+          await commitRemote();
+          editor.undo();
+        }
+        await editor.flushPendingSaves();
+        expect(editor.canUndo, isFalse);
+        expect(editor.canRedo, isFalse);
+        expect(await store.pending(), isEmpty);
+        expect(await store.isTombstoned(notebook.uid, 'page', pageId), isFalse);
+        final durable = (await repository.getNotebook(notebook.uid))!;
+        expect(durable.pages, hasLength(2));
+        expect(durable.pages.last.inkStrokes.single.id, remote.objectId);
+        expect(editor.pages, hasLength(2));
+        expect(
+          editor.applyConfirmedV2PagePatch(
+            pageId: pageId,
+            page: durable.pages.last,
+          ),
+          isTrue,
+        );
+        editor.addInkStroke(const [InkPoint(dx: 8, dy: 9, pressure: 0.6)]);
+        await editor.flushPendingSaves();
+        expect(
+          (await store.pending()).first.actorSeq,
+          created.last.actorSeq + 1,
+        );
+        expect(editor.canUndo, isTrue);
+        editor.undo();
+        await editor.flushPendingSaves();
+        expect(
+          (await repository.getNotebook(
+            notebook.uid,
+          ))!.pages.last.inkStrokes.single.id,
+          remote.objectId,
+        );
+        expect(editor.pages, hasLength(2));
+      },
+    );
+  }
 
   test(
     'shared engine keeps controller history scoped to each document actor',
