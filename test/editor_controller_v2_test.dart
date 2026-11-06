@@ -51,56 +51,58 @@ void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('history size limit preserves the v2 gesture and its outbox',
-      () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    final notebook = await repository.createNotebook();
-    final store = OperationStore(database);
-    final projector = EditorSqliteProjector(database);
-    final engine = SyncEngine(
-      store: store,
-      gateway: _OfflineGateway(),
-      actorId: 'oversized-history-actor',
-      checkpointScope: 'oversized-history',
-      enableRealtime: false,
-      applyRemote: (operation, _) => projector.apply(operation),
-    );
-    addTearDown(engine.stop);
-    final controller = EditorController(
-      repository: repository,
-      notebook: notebook,
-      operationWriter: EditorV2OperationWriter(
-        syncEngine: engine,
-        projector: projector,
-      ),
-      historyCodec: _OversizedHistoryCodec(projector),
-    );
-    addTearDown(controller.dispose);
-    await controller.historyReady;
+  test(
+    'history size limit preserves the v2 gesture and its outbox',
+    () async {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final notebook = await repository.createNotebook();
+      final store = OperationStore(database);
+      final projector = EditorSqliteProjector(database);
+      final engine = SyncEngine(
+        store: store,
+        gateway: _OfflineGateway(),
+        actorId: 'oversized-history-actor',
+        checkpointScope: 'oversized-history',
+        enableRealtime: false,
+        applyRemote: (operation, _) => projector.apply(operation),
+      );
+      addTearDown(engine.stop);
+      final controller = EditorController(
+        repository: repository,
+        notebook: notebook,
+        operationWriter: EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+        ),
+        historyCodec: _OversizedHistoryCodec(projector),
+      );
+      addTearDown(controller.dispose);
+      await controller.historyReady;
 
-    controller.addInkStroke(const [InkPoint(dx: 4, dy: 9, pressure: 0.5)]);
-    await controller.flushPendingSaves();
-    expect(controller.canUndo, isFalse);
-    expect(controller.canRedo, isFalse);
-    expect(controller.currentPage.inkStrokes, hasLength(1));
-    expect(
-      (await repository.getNotebook(notebook.uid))!.pages.single.inkStrokes,
-      hasLength(1),
-    );
-    final committed = await store.pending();
-    expect(committed, hasLength(1));
-    expect(committed.single.kind, OperationKind.strokeCreate);
-    final checkpoint = await EditorHistoryStore(store).load(
-      documentId: notebook.uid,
-      ownerId: engine.actorId,
-    );
-    expect(checkpoint, isNotNull);
-    expect(checkpoint!.headOperationId, committed.last.operationId);
-    expect(checkpoint.undo, isEmpty);
-    expect(checkpoint.redo, isEmpty);
-  });
+      controller.addInkStroke(const [InkPoint(dx: 4, dy: 9, pressure: 0.5)]);
+      await controller.flushPendingSaves();
+      expect(controller.canUndo, isFalse);
+      expect(controller.canRedo, isFalse);
+      expect(controller.currentPage.inkStrokes, hasLength(1));
+      expect(
+        (await repository.getNotebook(notebook.uid))!.pages.single.inkStrokes,
+        hasLength(1),
+      );
+      final committed = await store.pending();
+      expect(committed, hasLength(1));
+      expect(committed.single.kind, OperationKind.strokeCreate);
+      final checkpoint = await EditorHistoryStore(store).load(
+        documentId: notebook.uid,
+        ownerId: engine.actorId,
+      );
+      expect(checkpoint, isNotNull);
+      expect(checkpoint!.headOperationId, committed.last.operationId);
+      expect(checkpoint.undo, isEmpty);
+      expect(checkpoint.redo, isEmpty);
+    },
+  );
 
   test(
     'controller recovers Undo/Redo from its durable actor checkpoint',
