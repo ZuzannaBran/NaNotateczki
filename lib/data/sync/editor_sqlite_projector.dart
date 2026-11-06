@@ -446,6 +446,11 @@ class EditorSqliteProjector {
           'Deleting an image/PDF page requires verified asset references.',
         );
       }
+      await _verifyInlineImage(
+        documentId: op.documentId,
+        pageId: pageId,
+        objectId: id,
+      );
     }
     for (final row in textRows) {
       final deltaJson = row.readNullable<String>('delta_json');
@@ -668,6 +673,13 @@ class EditorSqliteProjector {
         'Image moves require durable scoped asset references.',
       );
     }
+    if (image != null) {
+      await _verifyInlineImage(
+        documentId: op.documentId,
+        pageId: actualSourceId,
+        objectId: op.objectId!,
+      );
+    }
     if ((image != null || text != null) && actualSourceId != destinationId) {
       final destinationRefs = await _row(
         'SELECT asset_id FROM asset_references '
@@ -804,6 +816,13 @@ class EditorSqliteProjector {
     }
     if (ink != null && assetIds.isNotEmpty) {
       throw UnsupportedError('Ink cannot own a verified media asset.');
+    }
+    if (image != null) {
+      await _verifyInlineImage(
+        documentId: op.documentId,
+        pageId: op.pageId!,
+        objectId: op.objectId!,
+      );
     }
     if (text != null && text['delta_json'] != null) {
       final delta = jsonDecode(text['delta_json'] as String);
@@ -1034,6 +1053,29 @@ class EditorSqliteProjector {
       return;
     } on StateError {
       await gateway.downloadAndStage(receipt: receipt, buffer: buffer);
+    }
+  }
+
+  /// Checks current inline bytes against their scoped durable asset.
+  /// File-backed legacy rows have a separate migration boundary.
+  Future<void> _verifyInlineImage({
+    required String documentId,
+    required String pageId,
+    required String objectId,
+  }) async {
+    final image = await _row(
+      'SELECT path FROM image_block_rows WHERE uid = ? AND page_uid = ?',
+      [Variable<String>(objectId), Variable<String>(pageId)],
+    );
+    if (image == null) {
+      throw StateError('Image disappeared before its integrity check.');
+    }
+    if (image['path'] == '') {
+      await verifiedImageAssetId(
+        documentId: documentId,
+        pageId: pageId,
+        objectId: objectId,
+      );
     }
   }
 

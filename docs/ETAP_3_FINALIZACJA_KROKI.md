@@ -890,6 +890,8 @@ między urządzeniami i pełne E2E pozostają niezamknięte.
   operacji, także po restarcie i przy równoczesnych edycjach.
 - [ ] Zablokować każdą operację powodującą osierocone referencje
   do obrazu, PDF lub osadzonego assetu Quill.
+  Dodano kontrolę SHA-256 obrazu inline przed move/object.delete/page.delete
+  i regresję atomowego rollbacku; pozostałe ścieżki wymagają audytu.
 - [x] `dart analyze`, natywne regresje v2 i Linux E2E z rzeczywistym
   PostgreSQL/WebSocket: zielony przebieg Actions `42263084815`.
   Ten przebieg nie sprawdzał Androida, iOS ani Web.

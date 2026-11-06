@@ -973,15 +973,38 @@ void main() {
     await expectLater(write([move]), throwsUnsupportedError);
     expect(await store.pending(), hasLength(queued.length));
 
+    final sha = crypto.sha256.convert(bytes).toString();
     await store.attachAssetReference(
       documentId: documentId,
       pageId: pageId,
       objectId: imageId,
       assetId: 'media-asset-one',
-      storagePath: 'assets/media-asset-one',
-      checksumSha256:
-          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      byteLength: 4,
+      storagePath: 'sqlite-blob:$sha',
+      checksumSha256: sha,
+      byteLength: bytes.length,
+    );
+    await database.customStatement(
+      'UPDATE image_block_rows SET bytes = ? WHERE uid = ?',
+      [Uint8List.fromList([1, 2, 3, 4]), imageId],
+    );
+    final delete = LocalOperationDraft(
+      kind: OperationKind.objectDelete,
+      pageId: pageId,
+      objectId: imageId,
+      payload: const {},
+    );
+    final deletePage = LocalOperationDraft(
+      kind: OperationKind.pageDelete,
+      objectId: pageId,
+      payload: const {},
+    );
+    for (final operation in [move, delete, deletePage]) {
+      await expectLater(write([operation]), throwsStateError);
+      expect(await store.pending(), hasLength(queued.length));
+    }
+    await database.customStatement(
+      'UPDATE image_block_rows SET bytes = ? WHERE uid = ?',
+      [bytes, imageId],
     );
     await write([
       move,

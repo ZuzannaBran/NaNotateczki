@@ -1,5 +1,12 @@
 # Dane NaNotateczki
 
+## Weryfikacja obrazu przed przeniesieniem i usunięciem (2026-11-06)
+
+Przed move/object.delete/page.delete obraz inline musi zachować
+SHA-256 bajtów zgodny z unikalnym scoped assetem. Korupcja zatrzymuje
+transakcję i pozostawia operacje, tombstones i outbox bez zmian.
+Legacy file-backed images są poza nową ścieżką do osobnej migracji.
+
 ## Tekst Quill — zachowanie końcowych białych znaków (2026-11-06)
 
 W `TextBlock.text` przechowywany jest tekst bez jednego strukturalnego

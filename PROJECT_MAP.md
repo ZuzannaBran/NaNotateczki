@@ -460,7 +460,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   i ink (create/style/transform/reorder/delete oraz ink object.move
   między stronami z zachowaniem ID), tekstowe object.create,
   geometrię, plain-text Quill CRDT insert/delete/format oraz usunięcia
-  bloków tekstowych. Obsługuje także geometrię istniejących obrazów
+  bloków tekstowych. Move/delete obrazu inline oraz page.delete sprawdza
+  SHA-256 bieżących bajtów i scoped assetu przed commit; legacy path-only
+  pozostaje w osobnej granicy migracji. Obsługuje geometrię obrazów
   i ich `object.move`, przenosząc scoped `asset_references` w jednej
   transakcji. Brak trwałej referencji blokuje przenoszenie obrazu.
   Rzutowanie tekstu Quill usuwa tylko końcowy `\n`, bez `trimRight()`
