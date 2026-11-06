@@ -1,5 +1,42 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Natywne obrazy/PDF w historii kontrolera — 2026-11-06
+
+Zamrożono bajty nowych obrazów natywnych i renderowanych stron PDF przed
+mutacją kontrolera. Dotychczas path-only model pozwalał writerowi zapisać
+asset, lecz kodek historii nie miał bajtów do jego weryfikacji i wycofywał
+cały gest. Teraz cache plikowy może zniknąć także przed transakcją SQLite;
+historia odwołuje się do BLOB-u zatwierdzanego razem z operacjami.
+Odczyt obrazu sprawdza pusty plik i istniejący limit 64 MiB przed alokacją.
+
+`restoreImageCache` zachowuje inline bajty v2 i nie tworzy zapisu ani kroku
+Undo. Wspólne `EditorOperationBridge.sameImageContent` porównuje niepuste
+bajty, MIME i rozszerzenie niezależnie od ścieżki cache. Path-only, puste
+bufory, zmienione bajty i typ nadal wymagają weryfikacji podmiany. Legacy
+import pozostaje plikowy. Po błędzie transakcji przyciski Undo/Redo są
+blokowane, a po udanym retry toolbar otrzymuje aktualną dostępność.
+
+Dodano sześć regresji rzeczywistego kontrolera/SQLite w
+`test/editor_v2_native_image_history_test.dart`: usunięcie źródła i cache'u
+przed commitem, restart i Undo/Redo PNG, odbudowa cache bez dodatkowych
+assetów, rzeczywisty render PDF przez Popplera na Linuxie, legacy import
+oraz pusty i zbyt duży plik. Dwie regresje bridge'a sprawdzają granice
+porównania treści; istniejący test awarii checkpointu sprawdza także
+powiadomienie toolbaru po błędzie i retry.
+
+Zestaw etapu 3 obejmuje nowe testy. Job `analyze-and-unit` instaluje
+`poppler-utils`, żeby scenariusz PDF wykonywał produkcyjne `pdftoppm`;
+na innych systemach pomijany jest tylko ten test. Lokalnie sprawdzono
+format, składnię Bash/YAML i diff. Flutter oraz pełna analiza wymagają
+Actions wyłącznie aplikacji; nie czekano na wynik. Nie zmieniono schematu
+SQLite, API, backendu ani flag aktywacji v2.
+
+**Następna sesja:** najpierw odczytać najnowszy wynik aplikacji i naprawić
+błędy. Następnie kontynuować otwarte bramki etapu 3 z checklisty poniżej:
+rzeczywisty przepływ dwóch klientów, trwała historia przy zmianach zdalnych
+oraz kompletność produkcyjnego podłączenia. Nie oznaczać etapu 3 ani
+cutover jako ukończonych na podstawie samego kodeka lub testu writera.
+
 ## Naprawa właściciela historii dokumentu — 2026-11-06
 
 Na początku sprawdzono `42235986370` dla `8405bcc`: format, generator

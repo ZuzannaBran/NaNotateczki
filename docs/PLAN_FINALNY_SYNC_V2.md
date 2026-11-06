@@ -134,6 +134,13 @@ Ważne: fizycznej kolejności dwóch niezależnych gestów wykonywanych offline 
 
 ## Etap 3. Przebudowa lokalnej bazy SQLite
 
+Stan 2026-11-06: opt-in kontroler zapisuje lokalne checkpointy Undo/Redo
+w transakcji gestu i odczytuje je po restarcie dla aktora dokumentu.
+Natywne obrazy i renderowane strony PDF zachowują bajty przed tą granicą;
+odbudowa cache'u nie tworzy operacji. Najnowsze regresje oczekują na CI.
+Etap i produkcyjny cutover pozostają otwarte; bieżące wykonanie i następne
+bramki: [ETAP_3_FINALIZACJA_KROKI.md](ETAP_3_FINALIZACJA_KROKI.md).
+
 Nie wymieniamy Drift. Wykorzystujemy jego transakcje do atomowego utrwalania danych i operacji.
 
 

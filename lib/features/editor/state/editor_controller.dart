@@ -319,13 +319,15 @@ class EditorController extends ChangeNotifier {
 
   bool get canUndo => operationWriter == null
       ? _undoActions.isNotEmpty
-      : _v2Undo.isNotEmpty ||
-            _fullSavePending ||
-            _dirtyPageIds.isNotEmpty ||
-            _activeTextEditBefore != null;
+      : !_integritySaveBlocked &&
+            (_v2Undo.isNotEmpty ||
+                _fullSavePending ||
+                _dirtyPageIds.isNotEmpty ||
+                _activeTextEditBefore != null);
   bool get canRedo => operationWriter == null
       ? _redoActions.isNotEmpty
-      : _v2Redo.isNotEmpty &&
+      : !_integritySaveBlocked &&
+            _v2Redo.isNotEmpty &&
             !_fullSavePending &&
             _dirtyPageIds.isEmpty &&
             _activeTextEditBefore == null;
@@ -3431,11 +3433,37 @@ class EditorController extends ChangeNotifier {
     return Size(maxHeight * sourceAspect, maxHeight);
   }
 
+  Uint8List? _freezeV2ImageBytes(Uint8List bytes) {
+    if (operationWriter == null) {
+      return null;
+    }
+    if (bytes.isEmpty || bytes.length > QuillPastePlan.maximumBytes) {
+      throw const FormatException('Invalid image size for v2 history.');
+    }
+    return Uint8List.fromList(bytes);
+  }
+
+  Future<Uint8List?> _readV2ImageBytes(File file) async {
+    if (operationWriter == null) {
+      return null;
+    }
+    final size = await file.length();
+    if (size <= 0 || size > QuillPastePlan.maximumBytes) {
+      throw const FormatException('Invalid image size for v2 history.');
+    }
+    final bytes = await file.readAsBytes();
+    if (bytes.length != size) {
+      throw const FormatException('Image changed while being read.');
+    }
+    return bytes;
+  }
+
   Future<String?> _addImageBlockFromBytes(
     Uint8List bytes,
     Offset position,
     String extension,
   ) async {
+    bytes = _freezeV2ImageBytes(bytes) ?? bytes;
     if (kIsWeb) {
       final size = await _imageSizeFromBytes(bytes);
       final initialSize = _initialImageBlockSize(size);
@@ -3460,11 +3488,14 @@ class EditorController extends ChangeNotifier {
     }
     final filename = 'clip_${DateTime.now().millisecondsSinceEpoch}.$extension';
     final file = await _persistImageBytes(bytes, filename);
-    final size = await _imageSize(file);
+    final size = operationWriter == null
+        ? await _imageSize(file)
+        : await _imageSizeFromBytes(bytes);
     final initialSize = _initialImageBlockSize(size);
     final block = ImageBlock(
       id: _uuid.v4(),
       path: file.path,
+      bytes: operationWriter == null ? null : bytes,
       ocrText: '',
       position: position,
       width: initialSize.width,
@@ -3500,7 +3531,10 @@ class EditorController extends ChangeNotifier {
 
   Future<String?> _addImageBlockFromFile(File file, Offset position) async {
     final persisted = await _persistImageFile(file);
-    final size = await _imageSize(persisted);
+    final bytes = await _readV2ImageBytes(persisted);
+    final size = bytes == null
+        ? await _imageSize(persisted)
+        : await _imageSizeFromBytes(bytes);
     final initialSize = _initialImageBlockSize(size);
     final extension = file.path.split('.').last.toLowerCase();
     String mime = 'image/jpeg';
@@ -3514,6 +3548,7 @@ class EditorController extends ChangeNotifier {
     final block = ImageBlock(
       id: _uuid.v4(),
       path: persisted.path,
+      bytes: bytes,
       ocrText: '',
       position: position,
       width: initialSize.width,
@@ -3594,10 +3629,11 @@ class EditorController extends ChangeNotifier {
         if (render == null) {
           continue;
         }
+        final frozenBytes = _freezeV2ImageBytes(render.bytes);
         final file = storeInline
             ? null
             : await _persistImageBytes(
-                render.bytes,
+                frozenBytes ?? render.bytes,
                 'pdf_${DateTime.now().millisecondsSinceEpoch}_$pageIndex.png',
               );
         final renderWidth = (render.width ?? page.width).toDouble();
@@ -3631,7 +3667,7 @@ class EditorController extends ChangeNotifier {
               : targetHeight.clamp(80, 520).toDouble(),
           imageExt: 'png',
           imageMime: 'image/png',
-          bytes: storeInline ? render.bytes : null,
+          bytes: frozenBytes ?? (storeInline ? render.bytes : null),
         );
         additions.putIfAbsent(targetIndex, () => <ImageBlock>[]).add(block);
         if (notebook.kind == NotebookKind.board) {
@@ -3706,9 +3742,12 @@ class EditorController extends ChangeNotifier {
       final targetPosition = notebook.kind == NotebookKind.board
           ? localOffset + Offset(0, pageOffset)
           : targetOrigin + localOffset;
+      final persisted = await _persistImageFile(file);
+      final bytes = await _readV2ImageBytes(persisted);
       final block = ImageBlock(
         id: _uuid.v4(),
-        path: (await _persistImageFile(file)).path,
+        path: persisted.path,
+        bytes: bytes,
         ocrText: '',
         position: targetPosition,
         width: targetWidth,
@@ -3787,12 +3826,17 @@ class EditorController extends ChangeNotifier {
         'restored_${block.id}_${DateTime.now().millisecondsSinceEpoch}.$extension';
     final file = await _persistImageBytes(block.bytes!, filename);
 
-    final updatedBlock = block.copyWith(path: file.path, clearBytes: true);
+    final updatedBlock = block.copyWith(
+      path: file.path,
+      clearBytes: operationWriter == null,
+    );
     final updated = pages[currentBlockPageIndex].imageBlocks
         .map((item) => item.id == blockId ? updatedBlock : item)
         .toList();
     _updatePage(pages[currentBlockPageIndex].copyWith(imageBlocks: updated));
-    _save();
+    if (operationWriter == null) {
+      _save();
+    }
   }
 
   void deleteImageBlock(String id) {
@@ -3926,7 +3970,9 @@ class EditorController extends ChangeNotifier {
         : 'png';
     final imagesDir = await _imagesDir();
     final target = File('${imagesDir.path}/img_${_uuid.v4()}.$safeExtension');
-    final bytes = await source.readAsBytes();
+    final bytes = operationWriter == null
+        ? await source.readAsBytes()
+        : (await _readV2ImageBytes(source))!;
     await target.writeAsBytes(bytes, flush: true);
     return target;
   }
@@ -4520,11 +4566,17 @@ class EditorController extends ChangeNotifier {
               _expectedRemovedIdsByPage.clear();
               _expectedRemovedPageIds.clear();
             }
+            if (!_isDisposed) {
+              _notifyHistoryChanged();
+            }
           } catch (error, stackTrace) {
             // Never fall back to saveNotebook after a failed v2 batch. Leave
             // optimistic state dirty and block shutdown until it can be saved.
             _integritySaveBlocked = true;
             _fullSavePending = true;
+            if (!_isDisposed) {
+              _notifyHistoryChanged();
+            }
             debugPrint('EditorController._saveV2 blocked: $error\n$stackTrace');
           }
         })

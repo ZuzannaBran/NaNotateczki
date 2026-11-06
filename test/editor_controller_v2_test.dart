@@ -310,6 +310,8 @@ void main() {
           "BEGIN SELECT RAISE(ABORT, 'injected history failure'); END",
         );
         first.addInkStroke(const [InkPoint(dx: 2, dy: 3, pressure: 0.7)]);
+        expect(first.canUndo, isTrue);
+        final revisionBeforeFailure = first.historyRevision.value;
         await expectLater(
           first.flushPendingSaves(),
           throwsA(isA<DataIntegrityProtectionException>()),
@@ -317,10 +319,13 @@ void main() {
         expect(await firstEngine.store.pending(), isEmpty);
         expect(first.currentPage.inkStrokes, hasLength(1));
         expect(first.canUndo, isFalse);
+        expect(first.historyRevision.value, greaterThan(revisionBeforeFailure));
+        final revisionAfterFailure = first.historyRevision.value;
         await firstDb.customStatement('DROP TRIGGER reject_editor_history');
         await first.flushPendingSaves();
         final originalId = first.currentPage.inkStrokes.single.id;
         expect(first.canUndo, isTrue);
+        expect(first.historyRevision.value, greaterThan(revisionAfterFailure));
         final firstHistory = EditorHistoryStore(firstEngine.store);
         final checkpoint = await firstHistory.load(
           documentId: notebook.uid,

@@ -1,5 +1,28 @@
 # Dane NaNotateczki
 
+## Natywne media i historia v2 (2026-11-06)
+
+Import obrazu z pliku lub bajtów i renderowanych stron PDF zamraża
+własne bajty w `ImageBlock` przed mutacją kontrolera i transakcją historii.
+Plik w `images/` pozostaje prywatnym cache'em; jego usunięcie przed commitem
+nie usuwa źródła v2. Odczyt natywnego obrazu sprawdza istniejący limit
+protokołu 64 MiB przed alokacją; pusty lub większy plik nie zmienia
+notatnika ani dziennika. Writer nadal weryfikuje sygnaturę, SHA-256 i MIME
+oraz zapisuje BLOB z operacjami w jednej transakcji. Kodek checkpointu
+odczytuje wyłącznie te trwałe, scoped bajty i nie wykonuje plikowego I/O.
+
+Odbudowa cache'u v2 zachowuje bajty w modelu i nie generuje operacji,
+nowego asset ID ani kroku Undo. Gdy oba modele zawierają takie same
+niepuste bajty oraz MIME/ext, zmiana samej lokalnej ścieżki nie jest
+podmianą treści. Path-only legacy i puste tablice nadal wymagają zgodnej
+ścieżki; zmiana bajtów lub typu wymaga zweryfikowanego nowego assetu.
+Ścieżka legacy zachowuje dotychczasowe pliki bez inline BLOB w modelu.
+
+Nieudany zapis v2 wyłącza `canUndo/canRedo` i powiadamia toolbar przez
+`historyRevision`; udana ponowna próba odświeża dostępność historii po
+wyczyszczeniu dirty flags. Nie wolno stosować inverse do niezapisanego,
+zablokowanego gestu. Testy natywnego kontrolera są kierowane do Actions.
+
 ## Połączenie checkpointów z kontrolerem (2026-11-06)
 
 Właścicielem checkpointu jest `SyncEngine.actorIdForDocument(uid)`, czyli
@@ -75,10 +98,10 @@ rozmiar i sygnaturę BLOB. Działa również po usunięciu widocznego właścici
 Nie wykonuje HTTP, plikowego I/O ani zapisów SQLite. Nie przywraca sam
 obiektu w bazie: inverse nadal musi być nową operacją z nowym UID.
 
-Integracja stosów `EditorController` nadal jest otwarta. Nie hydratować
-50 kopii wszystkich mediów przy starcie: zachować metadane checkpointów,
-a notebook wybranej operacji odwrotnej dekodować przy użyciu. Sam kodek
-nie oznacza działającego Undo/Redo w UI po restarcie ani aktywacji v2.
+Stosy `EditorController` są podłączone w opt-in v2. Przy starcie zachowują
+metadane checkpointów, a notebook wybranej operacji odwrotnej dekodują
+przy użyciu, bez hydratacji 50 kopii mediów. Aktualne regresje kontrolera
+po restarcie wymagają potwierdzenia CI; produkcyjny cutover jest otwarty.
 
 ## Lokalny zapis mediów v2 (2026-11-06, opt-in)
 

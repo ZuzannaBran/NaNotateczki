@@ -13,9 +13,13 @@ actorSeq i outbox. Domknięcie granicy autosave może nie dodawać operacji.
 remote invalidation, tombstone i migrację v7→v8.
 `EditorHistoryNotebookCodec` dodaje metadane notebooka i scoped referencje
 mediów bez BLOB w JSON. Jego 18 testów obejmuje też checkpoint w transakcji,
-restart, usunięcie i nowy inverse po tombstone. Podłączenie stosów
-`EditorController` po restarcie nadal jest kolejnym krokiem, nie ukończoną
-funkcją. `fitToByteBudget` ogranicza tylko historię, zachowując scope i head;
+restart, usunięcie i nowy inverse po tombstone. Stosy `EditorController`
+są podłączone w opt-in v2 z właścicielem `actorIdForDocument(uid)`;
+regresje restartu kontrolera wymagają aktualnego potwierdzenia CI.
+Importy natywnego obrazu i renderu PDF przekazują zamrożone bajty przed
+callbackiem, więc nie zależą od życia pliku cache w transakcji historii.
+Odbudowa tego cache'u nie dodaje assetu ani granicy Undo.
+`fitToByteBudget` ogranicza tylko historię, zachowując scope i head;
 nie maskuje błędów integralności. `remapIdentities` przygotowuje nowe ID
 w metadanych bez hydratacji BLOB-ów i odrzuca kolizje.
 Bieżący status i przekazanie pracy:

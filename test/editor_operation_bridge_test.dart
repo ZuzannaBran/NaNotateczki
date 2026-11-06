@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -54,6 +55,57 @@ ImageBlock _image() => ImageBlock(
 void main() {
   late EditorOperationBridge bridge;
   setUp(() => bridge = EditorOperationBridge());
+
+  test('a local cache path change is not a verified image content change', () {
+    final original = _image().copyWith(
+      bytes: Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10, 1]),
+    );
+    final cached = original.copyWith(
+      path: '/private/rebuilt-cache.png',
+      position: const Offset(20, 30),
+    );
+    final drafts = bridge.planPageChange(
+      before: _page(images: [original]),
+      after: _page(images: [cached]),
+    );
+    expect(drafts, hasLength(1));
+    expect(drafts.single.kind, OperationKind.objectSet);
+    expect(drafts.single.payload['properties'], {'dx': 20.0, 'dy': 30.0});
+    expect(EditorOperationBridge.sameImageContent(original, cached), isTrue);
+  });
+
+  test('path-only or changed bytes still require a verified replacement', () {
+    final pathOnly = _image();
+    expect(
+      () => bridge.planPageChange(
+        before: _page(images: [pathOnly]),
+        after: _page(images: [pathOnly.copyWith(path: '/other.png')]),
+      ),
+      throwsStateError,
+    );
+    final empty = pathOnly.copyWith(bytes: Uint8List(0));
+    expect(
+      () => bridge.planPageChange(
+        before: _page(images: [empty]),
+        after: _page(images: [empty.copyWith(path: '/other.png')]),
+      ),
+      throwsStateError,
+    );
+    final original = pathOnly.copyWith(bytes: Uint8List.fromList([1, 2, 3]));
+    for (final changed in [
+      original.copyWith(bytes: Uint8List.fromList([1, 2, 4])),
+      original.copyWith(path: '/other.png', clearBytes: true),
+      original.copyWith(imageMime: 'image/jpeg'),
+    ]) {
+      expect(
+        () => bridge.planPageChange(
+          before: _page(images: [original]),
+          after: _page(images: [changed]),
+        ),
+        throwsStateError,
+      );
+    }
+  });
 
   test('stroke action creates exactly one typed operation', () {
     final before = _page();

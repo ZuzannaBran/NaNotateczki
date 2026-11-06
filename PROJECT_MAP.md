@@ -526,7 +526,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   historię, usuwając najpierw najstarsze Undo, potem najdalsze Redo;
   limit rozmiaru ma osobny wyjątek, nie maskuje korupcji.
   Metadane lokalne, bez protokołu/backupów; codec notebooka
-  opisano poniżej, podłączenie kontrolera pozostaje do wykonania.
+  i podłączenie kontrolera opt-in opisano poniżej; cutover pozostaje otwarty.
 - `lib/data/sync/editor_history_store.dart`: 11: `EditorHistoryStore`,
   68: `save`, 96: `load`. Zapis w transakcji gestu, izolacja dokument/aktor,
   kontrola lokalnych operacji i checksum. Nowa głowa unieważnia historię,
@@ -540,8 +540,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Wejścia zamrożone przed I/O, ścisłe wersje/pola/ID/geometria i budżet.
   Remap ID jest synchroniczny, kopiuje metadane bez SQL/BLOB, zachowuje
   Delta i assety; kolizje tożsamości są odrzucane przed inverse.
-  Path-only import wymaga wcześniejszej materializacji; decode nie zapisuje
-  bazy ani nie wskrzesza tombstones. Stosy kontrolera jeszcze niepodłączone.
+  Path-only import wymaga wcześniejszej materializacji; kontroler opt-in
+  zamraża natywne obrazy/render PDF przed mutacją. Decode nie zapisuje bazy
+  ani nie wskrzesza tombstones; stosy kontrolera są podłączone w preview.
 - `test/editor_history_notebook_codec_test.dart`: 18 testów plikowego SQLite:
   media/Quill i restart, usunięcia, atomowy checkpoint i nowy inverse,
   scope, checksum/receipt, plain text/warstwy, mutacje podczas await,
@@ -1487,8 +1488,11 @@ Quill można przenieść między stronami bez zmiany ID i utraty historii.
 Most nie jest podłączony do produkcyjnego `AppScope`.
 `quillEmbeds` udostępnia wspólną walidację kanonicznych referencji
 image/PDF do przygotowania lokalnych assetów przez writer.
-Regresje: `test/editor_operation_bridge_test.dart` oraz batch/rollback
-w `test/sync_engine_test.dart`.
+472: `sameImageContent` współdzieli porównanie z writerem: niepuste inline
+bajty i MIME/ext określają treść niezależnie od lokalnej ścieżki cache.
+Path-only lub puste bufory wymagają także tej samej ścieżki.
+Regresje: `test/editor_operation_bridge_test.dart` (również cache path,
+zmiana bajtów/typu i brak receipt) oraz batch/rollback w `sync_engine_test.dart`.
 
 ### `lib/features/editor/state/editor_v2_operation_writer.dart`
 
@@ -1499,7 +1503,7 @@ tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 `writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`,
 `writeCreateNotebook`, `writeDeleteNotebook` oraz `writeNotebookChange`
 — atomowy wsad wielostronicowy lub bootstrap/del dokumentu bez v1.
-394: `writeNotebookChange(onCommittedInTransaction:)`, 874: `_commit`:
+390: `writeNotebookChange(onCommittedInTransaction:)`, 864: `_commit`:
 checkpoint lokalny przed callbackiem UI/backupu, rollback całego gestu
 przy jego błędzie, metadata-only dla już zapisanego autosave.
 `stageQuillAsset` przygotowuje nowy inline import bez HTTP/outboxu,
@@ -1701,8 +1705,18 @@ nie zmieniając zoomu i aktualnego wyboru strony. Metoda
 `registerVerifiedImageAsset` wiąże potwierdzony upload z blokiem
 obrazu i ponawia nieukończony v2 zapis bez snapshotów v1.
 Regresja: `test/editor_controller_v2_test.dart`, w tym cofanie i
-ponawianie ink oraz stron bez ponownego użycia tombstones.
-Ten sam test obejmuje dwa rzeczywiste autosave'y Quill, pojedyncze
+ponawianie ink oraz stron bez ponownego użycia tombstones. Błąd zapisu
+wyłącza Undo/Redo; `historyRevision` powiadamia toolbar po błędzie
+oraz po wyczyszczeniu dirty flags przy udanym retry.
+Natywne importy obrazów i renderów PDF zamrażają bajty przed mutacją
+kontrolera; checkpoint nie odczytuje plików. 3811: `restoreImageCache`
+zachowuje te bajty i nie zapisuje operacji ani kroku historii.
+`test/editor_v2_native_image_history_test.dart`: sześć regresji SQLite,
+import PNG/PDF przez publiczne API z pliku, usunięcie pliku przed commitem,
+restart i Undo/Redo, odbudowa cache bez assetów, pusty/oversized plik
+oraz zachowanie legacy; tylko render PDF wymaga Linuksa z `pdftoppm`.
+`editor_controller_v2_test.dart` obejmuje też dwa rzeczywiste autosave'y Quill,
+pojedyncze
 Undo/Redo/Undo, zależności inverse i edycję o zerowym efekcie.
 `updateActiveTextStyle` w v2 używa `patchQuillStyle`: nie przebudowuje
 embedów ze stringa ani nie narzuca koloru pierwszego fragmentu innym
@@ -1719,13 +1733,13 @@ Delta i tworzy osobny checkpoint od wcześniejszego pisania. Jednorazowy
 handoff kursora dotyczy dokładnej Delta; odrzucony import nie wymienia HUD.
 Ważne granice: 179: `preferencesReady`; 191: `historyReady`;
 264: `bindHudTextController`; 272: `unbindHudTextController`;
-283: `hasQuillHandoff`; 287: `takeQuillHandoff`; 690: `flushPendingSaves`;
-2106: `_applyV2History`; 2228: `_restoreV2History`;
-2256: `_persistV2History`; 2397: `_remapV2HistoryNotebook`;
-2576: `prepareInlineAsset`; 2598: `pasteQuillHtml`; 2637: `insertQuillFile`;
-2655: `_pickQuillFile`; 2694: `_replaceQuillSelection`;
-2858: `updateTextBlockContent`; 2873: `updateActiveTextStyle`;
-4280: `_commitActiveTextEdit`; 4375: `_captureV2Gesture`; 4399: `_saveV2`.
+283: `hasQuillHandoff`; 287: `takeQuillHandoff`; 692: `flushPendingSaves`;
+2108: `_applyV2History`; 2230: `_restoreV2History`;
+2258: `_persistV2History`; 2399: `_remapV2HistoryNotebook`;
+2578: `prepareInlineAsset`; 2600: `pasteQuillHtml`; 2639: `insertQuillFile`;
+2657: `_pickQuillFile`; 2696: `_replaceQuillSelection`;
+2860: `updateTextBlockContent`; 2875: `updateActiveTextStyle`;
+4326: `_commitActiveTextEdit`; 4421: `_captureV2Gesture`; 4445: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
@@ -2710,8 +2724,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 7. OCR jest wyłączony na wszystkich platformach; stare `ocrText` zachowuj dla
    zgodności danych. Import PDF na Linuxie używa `pdftoppm` (`poppler-utils`),
    a pozostałe platformy `pdfx`.
-8. Obrazy natywne mają trwałe ścieżki; inline `bytes` są przeznaczone dla web
-   lub migracji starych danych i są czyszczone po utrwaleniu pliku.
+8. Obrazy legacy mają trwałe ścieżki; opt-in v2 zachowuje inline `bytes`
+   również natywnie dla zapisu historii niezależnego od cache. Web zawsze
+   zachowuje bajty. Tylko legacy odbudowa cache'u czyści je po zapisie pliku.
 9. `DrawingTool.eraser*` pozostają w enumie wyłącznie dla zgodności indeksów
    i wyboru narzędzia. Eraser nie może być zapisanym `InkStroke`; runtime
    kasuje destrukcyjnie, a legacy maski wolno interpretować tylko w
@@ -3137,6 +3152,8 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
 
 `tool/verify_stage3_local.sh`: tylko odczytowy format-check,
 `dart analyze`, wąskie testy v2 (w tym checkpointy historii) i pełny
-`flutter test` bez GitHub Actions. Job `analyze-and-unit` dodatkowo wykonuje
+`flutter test` bez GitHub Actions. Obejmuje także natywne obrazy i historię;
+render PDF na Linuxie wymaga `poppler-utils`. Job `analyze-and-unit` instaluje
+ten pakiet i dodatkowo wykonuje
 build_runner i sprawdza brak zmian wygenerowanego mapowania Drift.
 Nie zastępuje testu migracji na czterech platformach ani E2E.

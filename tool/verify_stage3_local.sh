@@ -26,6 +26,7 @@ dart format --output=none --set-exit-if-changed \
   lib/data/sync/sync_engine.dart \
   lib/data/sync/verified_editor_asset_buffer.dart \
   lib/features/editor/state/editor_controller.dart \
+  lib/features/editor/state/editor_operation_bridge.dart \
   lib/features/editor/state/quill_style_patch.dart \
   lib/features/editor/state/quill_paste_plan.dart \
   lib/data/sync/share_text_edit_adapter.dart \
@@ -41,6 +42,8 @@ dart format --output=none --set-exit-if-changed \
   test/editor_history_notebook_codec_test.dart \
   test/editor_history_store_test.dart \
   test/editor_controller_v2_test.dart \
+  test/editor_operation_bridge_test.dart \
+  test/editor_v2_native_image_history_test.dart \
   test/quill_style_patch_test.dart \
   test/quill_paste_plan_test.dart \
   test/editor_v2_rich_paste_test.dart \
@@ -74,6 +77,8 @@ flutter test --concurrency=1 \
   test/editor_history_notebook_codec_test.dart \
   test/editor_history_store_test.dart \
   test/editor_controller_v2_test.dart \
+  test/editor_operation_bridge_test.dart \
+  test/editor_v2_native_image_history_test.dart \
   test/editor_sqlite_projector_test.dart \
   test/editor_v2_operation_writer_test.dart \
   test/editor_v2_remote_patch_dispatcher_test.dart \

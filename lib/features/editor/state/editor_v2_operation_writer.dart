@@ -265,11 +265,7 @@ class EditorV2OperationWriter {
         if (old != null && old.ocrText != image.ocrText) {
           throw UnsupportedError('OCR metadata is not yet a v2 operation.');
         }
-        if (old != null &&
-            old.path == image.path &&
-            old.imageMime == image.imageMime &&
-            old.imageExt == image.imageExt &&
-            const ListEquality<int>().equals(old.bytes, image.bytes)) {
+        if (old != null && EditorOperationBridge.sameImageContent(old, image)) {
           continue;
         }
         final verified =
@@ -521,11 +517,8 @@ class EditorV2OperationWriter {
         final newImage = newImages[entry.key];
         if (oldImage == null ||
             newImage == null ||
-            oldImage.path != newImage.path ||
             oldImage.ocrText != newImage.ocrText ||
-            oldImage.imageMime != newImage.imageMime ||
-            oldImage.imageExt != newImage.imageExt ||
-            !const ListEquality<int>().equals(oldImage.bytes, newImage.bytes)) {
+            !EditorOperationBridge.sameImageContent(oldImage, newImage)) {
           throw UnsupportedError(
             'Cross-page moves require unchanged ink, text or image assets.',
           );
@@ -768,11 +761,8 @@ class EditorV2OperationWriter {
     for (final next in after.imageBlocks) {
       final old = previous[next.id];
       if (old == null ||
-          (old.path == next.path &&
-              old.ocrText == next.ocrText &&
-              old.imageMime == next.imageMime &&
-              old.imageExt == next.imageExt &&
-              const ListEquality<int>().equals(old.bytes, next.bytes))) {
+          (old.ocrText == next.ocrText &&
+              EditorOperationBridge.sameImageContent(old, next))) {
         continue;
       }
       result[next.id] = await projector.verifiedImageAssetId(

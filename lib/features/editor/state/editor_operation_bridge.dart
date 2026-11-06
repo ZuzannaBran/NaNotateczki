@@ -224,7 +224,7 @@ class EditorOperationBridge {
       }
       final oldIndex = before.imageBlocks.indexWhere((b) => b.id == image.id);
       final changed = _diff(_imageGeometry(old, oldIndex), geometry);
-      if (!_sameImageAsset(old, image)) {
+      if (!sameImageContent(old, image)) {
         final asset = verifiedAssets[image.id];
         final previousId = existingAssetIds[image.id];
         if (asset == null ||
@@ -467,14 +467,17 @@ class EditorOperationBridge {
     'sortIndex': index,
   };
 
-  static bool _sameImageAsset(ImageBlock before, ImageBlock after) =>
-      before.path == after.path &&
+  /// Verified inline bytes define v2 content independently of a local cache.
+  /// Path-only legacy images still require an identical path.
+  static bool sameImageContent(ImageBlock before, ImageBlock after) =>
+      ((before.bytes?.isNotEmpty == true && after.bytes?.isNotEmpty == true) ||
+          before.path == after.path) &&
       before.imageMime == after.imageMime &&
       before.imageExt == after.imageExt &&
       _bytes.equals(before.bytes, after.bytes);
 
   static void _assertSameImageAsset(ImageBlock before, ImageBlock after) {
-    if (!_sameImageAsset(before, after)) {
+    if (!sameImageContent(before, after)) {
       throw StateError('Cross-page moves cannot replace image content.');
     }
   }
