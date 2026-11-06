@@ -238,8 +238,8 @@ void main() {
   test(
     'restoring native image cache keeps bytes without duplicating assets or Undo steps',
     () async {
-      final session = await _Session.open(databaseFile);
-      addTearDown(session.close);
+      var session = await _Session.open(databaseFile);
+      addTearDown(() => session.close());
       expect(await session.editor.insertFromFilePicker(Offset.zero), isNull);
       await session.editor.flushPendingSaves();
       final original = session.editor.currentPage.imageBlocks.single;
@@ -272,6 +272,25 @@ void main() {
       await session.editor.flushPendingSaves();
       expect(session.editor.currentPage.inkStrokes, isEmpty);
       expect(session.editor.currentPage.imageBlocks.single.bytes, _png);
+
+      final documentId = session.editor.notebook.uid;
+      await session.close();
+      session = await _Session.open(databaseFile, documentId: documentId);
+      expect(session.editor.canUndo, isTrue);
+      expect(session.editor.canRedo, isTrue);
+      expect(session.editor.currentPage.imageBlocks.single.bytes, _png);
+      session.editor.undo();
+      await session.editor.flushPendingSaves();
+      expect(session.editor.currentPage.imageBlocks, isEmpty);
+      expect(session.editor.canRedo, isTrue);
+      session.editor.redo();
+      await session.editor.flushPendingSaves();
+      expect(session.editor.currentPage.imageBlocks.single.bytes, _png);
+      final recoveredOperations = await session.engine.store.pending();
+      expect(
+        recoveredOperations.map((op) => op.operationId).toSet().length,
+        recoveredOperations.length,
+      );
     },
   );
 

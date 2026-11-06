@@ -1,5 +1,20 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Cache obrazu, historia po restarcie i ponowienie CI — 2026-11-06
+
+Poprzedni job `42252657960` zaliczył 1002 regresje (2 pominięte);
+pozostały błąd testu cache'u, który używał narzędzia Move podczas
+rysowania. Commit `5c691dd` zmienił narzędzie na Pen, ale miał
+`[skip ci]`, więc poprawka nie była weryfikowana.
+
+Rozszerzony test `editor_v2_native_image_history_test.dart` po
+odbudowie cache'u i cofnięciu kreski zamyka plik SQLite, otwiera
+kontroler ponownie i sprawdza dwa stosy Undo/Redo. Cofnięcie
+pierwotnego obrazu i jego Redo nie mogą wymagać nieistniejących
+lokalnych plików ani powielać operationId. Commit uruchamia tylko
+regresje aplikacji `[ci:failed-only]`; nie przełącza v2 na produkcję.
+
+
 ## Wynik CI i poprawka scenariusza cache — 2026-11-06, 16:42 UTC
 
 Przebieg `42252657960` dla `5133ce2` zaliczył generator, format i analizę.

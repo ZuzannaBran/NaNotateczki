@@ -1729,7 +1729,8 @@ kontrolera; checkpoint nie odczytuje plików. 3909: `restoreImageCache`
 zachowuje te bajty i nie zapisuje operacji ani kroku historii.
 `test/editor_v2_native_image_history_test.dart`: sześć regresji SQLite,
 import PNG/PDF przez publiczne API z pliku, usunięcie pliku przed commitem,
-restart i Undo/Redo, odbudowa cache bez assetów, pusty/oversized plik
+restart i Undo/Redo, odbudowa cache bez assetów i po restarcie
+z zachowaniem obu stosów oraz unikatowych operationId, pusty/oversized plik
 oraz zachowanie legacy; tylko render PDF wymaga Linuksa z `pdftoppm`.
 `editor_controller_v2_test.dart` obejmuje też dwa rzeczywiste autosave'y Quill,
 pojedyncze
