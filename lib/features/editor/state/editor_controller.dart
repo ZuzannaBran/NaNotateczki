@@ -161,6 +161,7 @@ class EditorController extends ChangeNotifier {
     _v2PersistedNotebook = notebook;
     currentPageIndex = 0;
     if (operationWriter != null) {
+      _v2HistoryRecovering = true;
       _v2HistoryStore = EditorHistoryStore(operationWriter!.syncEngine.store);
       _v2HistoryCodec =
           historyCodec ?? EditorHistoryNotebookCodec(operationWriter!.projector);
@@ -183,6 +184,7 @@ class EditorController extends ChangeNotifier {
   EditorHistoryStore? _v2HistoryStore;
   EditorHistoryNotebookCodec? _v2HistoryCodec;
   Future<void>? _v2HistoryReady;
+  bool _v2HistoryRecovering = false;
   Object? _v2HistoryLoadError;
 
   /// Resolves after the local actor's history has been verified and loaded.
@@ -673,6 +675,7 @@ class EditorController extends ChangeNotifier {
   }
 
   bool get _hasPendingSaveWork =>
+      _v2HistoryRecovering ||
       _prefsSaveDebounce != null ||
       _activePrefsSave != null ||
       _notebookSaveDebounce != null ||
@@ -2243,6 +2246,8 @@ class EditorController extends ChangeNotifier {
       debugPrint(
         'EditorController v2 history recovery blocked: $error\n$stackTrace',
       );
+    } finally {
+      _v2HistoryRecovering = false;
     }
   }
 

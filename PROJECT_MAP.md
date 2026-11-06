@@ -566,6 +566,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   kontroler zapisuje pusty checkpoint z nową głową i zachowuje outbox.
   Błąd integralności nie jest traktowany jak limit. Test regresyjny:
   `test/editor_controller_v2_test.dart` (oversized history).
+- Odczyt checkpointu przy otwarciu blokuje przyjęcie zdalnego patcha
+  do chwili zakończenia recovery; nie wolno przywrócić nieaktualnego
+  stosu po aktualizacji zdalnej. Regresja SQLite:
+  `test/editor_controller_v2_test.dart` (history recovery race).
 - Kontroler v2 zapisuje granice Undo/Redo jako lokalne checkpointy
   `editor_history` w transakcji projekcji i outboxu; ładuje je po
   ponownym otwarciu dokumentu i dekoduje media dopiero przy inverse.

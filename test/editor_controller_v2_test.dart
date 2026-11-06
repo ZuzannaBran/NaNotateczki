@@ -51,6 +51,54 @@ void main() {
   useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('remote v2 patch waits for history recovery to settle', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final projector = EditorSqliteProjector(database);
+    final engine = SyncEngine(
+      store: OperationStore(database),
+      gateway: _OfflineGateway(),
+      actorId: 'history-recovery-race',
+      checkpointScope: 'history-recovery-race',
+      enableRealtime: false,
+      applyRemote: (operation, _) => projector.apply(operation),
+    );
+    addTearDown(engine.stop);
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    final transaction = database.transaction(() async {
+      entered.complete();
+      await release.future;
+    });
+    await entered.future;
+    final controller = EditorController(
+      repository: repository,
+      notebook: notebook,
+      operationWriter: EditorV2OperationWriter(
+        syncEngine: engine,
+        projector: projector,
+      ),
+    );
+    addTearDown(controller.dispose);
+    final page = notebook.pages.single;
+    expect(controller.canApplyConfirmedRemoteNotebook, isFalse);
+    expect(
+      controller.applyConfirmedV2PagePatch(pageId: page.id, page: page),
+      isFalse,
+    );
+    release.complete();
+    await transaction;
+    await controller.historyReady;
+    expect(controller.canApplyConfirmedRemoteNotebook, isTrue);
+    expect(
+      controller.applyConfirmedV2PagePatch(pageId: page.id, page: page),
+      isTrue,
+    );
+    expect(await engine.store.pending(), isEmpty);
+  });
+
   test(
     'history size limit preserves the v2 gesture and its outbox',
     () async {

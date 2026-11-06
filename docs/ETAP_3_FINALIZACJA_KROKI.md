@@ -1,5 +1,13 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Blokada patcha podczas odczytu historii — 2026-11-06
+
+`canApplyConfirmedRemoteNotebook` czeka teraz na zakończenie wstępnego
+odczytu lokalnego checkpointu, aby późniejsza odpowiedź SQLite nie
+przywróciła starego Undo po zmianie zdalnej. Test utrzymuje aktywną
+transakcję SQLite, sprawdza odmowę patcha i ponowne dopuszczenie
+po `historyReady`. Nie dodano nowego transportu ani writerów.
+
 ## Ochrona zapisu przed limitem historii — 2026-11-06
 
 W kontrolerze zakończony gest przekraczający budżet kodowania
