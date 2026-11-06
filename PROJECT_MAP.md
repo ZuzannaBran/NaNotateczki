@@ -3070,7 +3070,10 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `compose.stage12.yaml` i `scripts/run-stage12-real.sh`.
   Izolowany PostgreSQL 17, prawdziwe routery FastAPI/WebSocket,
   operacje i feed, share/revoke, delete/transform, tekst CRDT,
-  Undo/Redo, rollback batcha i izolacja kont.
+  Undo/Redo, rollback batcha i izolacja kont. Przygotowanie kont w runnerze
+  używa osobnego administracyjnego URL wyłącznie dla disposable fixture;
+  rola API pozostaje tylko z SELECT na `account_sync_protocol`.
+  Guard `scripts/tests/test_stage12_runner_guard.py` pilnuje rozdziału.
 - `integration_test/stage12_live_api_test.dart`: dwa rzeczywiste kontrolery
   i `EditorV2AccountRuntime`, dwa pliki SQLite, HTTP/WS i PostgreSQL.
   Gest kontrolera, rich PNG/PDF offline, restart przed uploadem, usunięcie

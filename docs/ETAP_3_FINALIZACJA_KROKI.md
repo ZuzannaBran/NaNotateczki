@@ -1,5 +1,19 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Naprawa konfiguracji realnego E2E — 2026-11-06
+
+Ostatni przebieg `42257638993` zaliczył analizę i natywne regresje,
+lecz nowy test Linux/Flutter/PostgreSQL zatrzymał się przy przygotowaniu
+konta: rola API `nano_app` nie ma i nie powinna mieć INSERT do
+`account_sync_protocol`. Runner używa teraz wyłącznie w tymczasowej
+bazie oddzielnego URL administratora do danych fixture. Samo API nadal
+używa roli `nano_app`, a URL administratora jest usuwany ze środowiska
+przed startem procesu HTTP. Test sprawdza poprawność obu URI i ten sam
+port, a guard odrzuca przypadkowe nadanie uprawnień do znacznika.
+Zmiana została wprowadzona w kanonicznym backendzie i jego lustrze.
+Nowy wynik integracji z realnym backendem wymaga potwierdzenia w Actions;
+produkcja pozostaje na v1.
+
 ## Kontrolery przez rzeczywisty backend — 2026-11-06
 
 Punkt wyjścia: natywny job `42255399051` dla `f924ad3` jest zielony,
