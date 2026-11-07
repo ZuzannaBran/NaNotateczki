@@ -2133,7 +2133,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   uchwytu i odrzuca podgląd przy anulowaniu lub odmontowaniu.
   10: `ShapeEditGeometry`; 255: `ShapeEditOverlay`.
 
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (737):
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (742):
   podgląd używa tych samych zamienników Georgii co UI, ale nie narzuca
   ich blokom z indywidualnie wybranym fontem;
   aktywny `TextBlock` renderowany przez Flutter `EditableText`;
@@ -2142,7 +2142,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   tekst do natywnego EditableText. PNG/JPEG mają ograniczony strumień,
   bez otwierania URI schowka jako plików. 94: `_bindController`;
   105: `_pasteRichClipboard`; 170: `_readClipboardImage`; 199: `build`;
-  393: `_onTextChanged`; 649: `textBlockAppearance`.
+  394: `_onTextChanged`; 654: `textBlockAppearance`.
   Delete usuwa obiekt tylko przy pustym tekście, w przeciwnym razie
   pozostaje natywną edycją tekstu (znak po prawej stronie kursora). ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
@@ -2150,7 +2150,11 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   pozostają aktywne, a środek ramki przepuszcza gesty do `EditableText`.
   Start transformacji zapisuje najnowszą treść, włącza blokadę viewportu
   i używa tej treści jako snapshotu resize, więc zmiana rozmiaru ani anulowanie
-  gestu nie przywracają starszego tekstu. Kolor aktywnego tekstu jest
+  gestu nie przywracają starszego tekstu.
+  427: `_previewTransform`; 467: `_commitTransform`. Podczas move/resize HUD
+  renderuje lokalny podgląd bez zmiany modelu. Puszczenie uchwytu zapisuje
+  jedną akcję historii; anulowanie i odmontowanie porzucają podgląd.
+  Kolor aktywnego tekstu jest
   wyznaczany z pierwszego formatowanego fragmentu Delta (lub bloku),
   a jego jasność odwracana w dark mode. Funkcja `textBlockAppearance`
   współdzieli metryki czcionki obu trybów. Aktywny tekst i podgląd Quill
@@ -2202,7 +2206,7 @@ tusz, a ścieżki pióra i markera są wygładzane od trzeciego punktu.
   `dashPath` kompensuje skalę viewportu i nie zmienia źródłowej ścieżki.
   11: `dashedSelectionOutline`; 22: `paintSelectionOutline`.
 
-### `lib/features/editor/presentation/widgets/page_overlay.dart` (3253 linii)
+### `lib/features/editor/presentation/widgets/page_overlay.dart`
 
 Opt-in v2: aktywny tekst ze złożonym Delta lub embedami pozostaje
 w istniejącym QuillEditor, aby edycja nie spłaszczała treści.
@@ -2211,6 +2215,11 @@ Stabilne klucze zachowują QuillController; sesja nie zmienia edytora
 po uproszczeniu formatowania. Prosty tekst nadal używa TextHudBlock.
 Regresja `test/page_overlay_v2_quill_edit_test.dart` obejmuje rzeczywisty
 zapis SQLite i Undo w obu motywach, dla rich text, obrazu i PDF.
+Przesuwanie, zmiana szerokości i skalowanie tekstu w Quillu renderują podgląd
+bez mutacji stron i Delta. Anulowanie wskaźnika odrzuca podgląd przed
+ewentualnym callbackiem końca gestu. Test widgetowy wymusza flush w trakcie
+gestu, a po puszczeniu uchwytu sprawdza operacje i pojedyncze Undo dla obu
+rodzajów ramki tekstowej.
 Aktywny Quill w ciemnym motywie mapuje atrybut `color` przez
 `customStyleBuilder`, bez edycji oryginalnej Delta; podgląd zachowuje
 osobną kopię display, więc nie dochodzi do podwójnego odwrócenia.

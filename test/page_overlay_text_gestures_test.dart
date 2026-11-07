@@ -529,8 +529,11 @@ void main() {
     await gesture.moveBy(const Offset(4, 0));
     await tester.pump();
 
-    final liveResizeBlock = controller.pages.single.textBlocks.single;
-    expect(liveResizeBlock.width, greaterThan(widthBeforeResize));
+    expect(controller.pages.single.textBlocks.single.width, widthBeforeResize);
+    expect(
+      tester.getSize(find.byType(EditableText)).width,
+      greaterThan(widthBeforeResize - 15),
+    );
 
     await gesture.up();
     await tester.pump();

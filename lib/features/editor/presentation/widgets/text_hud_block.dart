@@ -55,6 +55,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
   bool _metricsScheduled = false;
   bool _focusRequestScheduled = false;
   TextBlock? _transformBefore;
+  TextBlock? _transformPreview;
 
   @override
   void initState() {
@@ -224,7 +225,7 @@ class _TextHudBlockState extends State<TextHudBlock> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          _buildContent(isEditing),
+          _buildContent(isEditing, _transformPreview ?? widget.block),
           ObjectTransformHud<TextBlock>(
             key: ValueKey('object-hud-text-${widget.block.id}'),
             data: widget.block,
@@ -261,19 +262,19 @@ class _TextHudBlockState extends State<TextHudBlock> {
     );
   }
 
-  Widget _buildContent(bool isEditing) {
-    final style = _styleFor(widget.block, widget.block.fontSize);
-    final localPosition = widget.block.position - widget.worldOrigin;
+  Widget _buildContent(bool isEditing, TextBlock block) {
+    final style = _styleFor(block, block.fontSize);
+    final localPosition = block.position - widget.worldOrigin;
     return Positioned(
       left: localPosition.dx,
       top: localPosition.dy,
-      width: widget.block.width,
+      width: block.width,
       child: Transform.rotate(
-        angle: widget.block.rotation,
+        angle: block.rotation,
         alignment: Alignment.center,
         child: Container(
           key: _contentKey,
-          width: widget.block.width,
+          width: block.width,
           constraints: const BoxConstraints(minHeight: _frameMinHeight),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
           decoration: BoxDecoration(
@@ -424,7 +425,16 @@ class _TextHudBlockState extends State<TextHudBlock> {
   }
 
   void _previewTransform(TextBlock before, ObjectTransformSnapshot preview) {
-    final transformBefore = _transformBefore ?? before;
+    setState(
+      () =>
+          _transformPreview = _transformed(_transformBefore ?? before, preview),
+    );
+  }
+
+  TextBlock _transformed(
+    TextBlock transformBefore,
+    ObjectTransformSnapshot preview,
+  ) {
     final scale =
         preview.kind == ObjectTransformKind.resize &&
             preview.handle?.isDiagonal == true &&
@@ -445,36 +455,31 @@ class _TextHudBlockState extends State<TextHudBlock> {
             fallbackSize: transformBefore.fontSize,
           );
 
-    widget.controller.updateTextBlockOnPage(
-      widget.pageIndex,
-      transformBefore.copyWith(
-        position: preview.rect.topLeft + widget.worldOrigin,
-        width: preview.rect.width,
-        fontSize: nextFontSize,
-        rotation: preview.rotation,
-        deltaJson: nextDelta,
-      ),
+    return transformBefore.copyWith(
+      position: preview.rect.topLeft + widget.worldOrigin,
+      width: preview.rect.width,
+      fontSize: nextFontSize,
+      rotation: preview.rotation,
+      deltaJson: nextDelta,
     );
   }
 
   void _commitTransform(TextBlock before, ObjectTransformSnapshot preview) {
-    final transformBefore = _transformBefore ?? before;
-    _transformBefore = null;
     final current = widget.controller.findTextBlockById(before.id);
-    if (current == null) {
+    _cancelTransform(before);
+    if (current == null || widget.controller.activeTextBlockId != before.id) {
       return;
     }
     widget.controller.commitTextUpdateOnPage(
       widget.pageIndex,
-      transformBefore,
       current,
+      _transformed(current, preview),
     );
   }
 
   void _cancelTransform(TextBlock before) {
-    final transformBefore = _transformBefore ?? before;
     _transformBefore = null;
-    widget.controller.updateTextBlockOnPage(widget.pageIndex, transformBefore);
+    setState(() => _transformPreview = null);
   }
 
   void _scheduleMetrics() {

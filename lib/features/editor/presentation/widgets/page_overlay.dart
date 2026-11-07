@@ -730,8 +730,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   double? _startWidth;
   Offset? _fontScaleStart;
   double? _startFontSize;
-  String? _startDeltaJson;
-  TextBlock? _transformBefore;
+  TextBlock? _transformPreview;
   final GlobalKey _textContentKey = GlobalKey();
   double _frameHeight = 44.0;
   bool _frameMeasureScheduled = false;
@@ -806,6 +805,9 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 
   @override
   void dispose() {
+    if (_dragStart != null || _resizeStart != null || _fontScaleStart != null) {
+      _editorController.endObjectTransform();
+    }
     _selectionTimer?.cancel();
     _docSubscription?.cancel();
     _clearDarkDisplayController();
@@ -844,7 +846,11 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     final canTransform = !controller.tool.isInk && widget.interactionEnabled;
     final canDoubleTapEdit = widget.interactionEnabled;
     final darkMode = Theme.of(context).brightness == Brightness.dark;
-    final typography = textBlockAppearance(context, widget.block);
+    final displayedBlock = _transformPreview ?? widget.block;
+    final typography = textBlockAppearance(context, displayedBlock);
+    final fontScale = _startFontSize == null || _startFontSize == 0
+        ? 1.0
+        : displayedBlock.fontSize / _startFontSize!;
     final useEditablePreview =
         !isActive && _hasUniformTextStyle(widget.block.deltaJson);
     final paragraphStyle = quill.DefaultTextBlockStyle(
@@ -907,7 +913,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                         if (!_dragFromFrame) {
                           return;
                         }
-                        _updateMove(details.globalPosition, controller);
+                        _updateMove(details.globalPosition);
                       }
                     : null,
                 onPanEnd: canTransform
@@ -918,6 +924,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                         _endMove(controller);
                       }
                     : null,
+                onPanCancel: canTransform ? _cancelMove : null,
                 child: NotificationListener<SizeChangedLayoutNotification>(
                   onNotification: (_) {
                     _scheduleFrameMeasure();
@@ -926,7 +933,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                   child: SizeChangedLayoutNotifier(
                     child: Container(
                       key: _textContentKey,
-                      width: widget.block.width,
+                      width: displayedBlock.width,
                       constraints: const BoxConstraints(minHeight: 44),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
@@ -988,9 +995,26 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
                               focusNode: _focusNode,
                               scrollController: _scrollController,
                               config: quill.QuillEditorConfig(
-                                customStyleBuilder: darkMode && isActive
+                                customStyleBuilder:
+                                    (darkMode && isActive) || fontScale != 1
                                     ? (attribute) {
-                                        if (attribute.key != 'color' ||
+                                        if (attribute.key == 'size' &&
+                                            fontScale != 1) {
+                                          final size = double.tryParse(
+                                            attribute.value.toString(),
+                                          );
+                                          if (size != null) {
+                                            return TextStyle(
+                                              fontSize: _scaledFontSize(
+                                                size,
+                                                fontScale,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                        if (!darkMode ||
+                                            !isActive ||
+                                            attribute.key != 'color' ||
                                             attribute.value is! String) {
                                           return const TextStyle();
                                         }
@@ -1046,24 +1070,36 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     );
 
     Widget positioned(Offset lassoDelta, Widget child) {
-      final displayPosition = widget.block.position + lassoDelta;
+      final displayPosition = displayedBlock.position + lassoDelta;
       final left = displayPosition.dx - widget.worldOrigin.dx;
       final top = displayPosition.dy - widget.worldOrigin.dy;
       if (!isActive || !canTransform || widget.doubleTapOnly) {
-        return Positioned(left: left, top: top, child: child);
+        return Positioned(
+          left: left,
+          top: top,
+          child: Listener(onPointerCancel: _cancelPointer, child: child),
+        );
       }
       return Positioned.fill(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(left: left, top: top, child: child),
-            _transformFrame(controller: controller, left: left, top: top),
-            Positioned(
-              left: left + (widget.block.width - _actionButtonSize) / 2,
-              top: top + _frameHeight + _moveButtonGap,
-              child: _moveHandle(controller),
-            ),
-          ],
+        child: Listener(
+          onPointerCancel: _cancelPointer,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(left: left, top: top, child: child),
+              _transformFrame(
+                controller: controller,
+                left: left,
+                top: top,
+                width: displayedBlock.width,
+              ),
+              Positioned(
+                left: left + (displayedBlock.width - _actionButtonSize) / 2,
+                top: top + _frameHeight + _moveButtonGap,
+                child: _moveHandle(controller),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -1086,9 +1122,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     required EditorController controller,
     required double left,
     required double top,
+    required double width,
   }) {
     return TransformableBox(
-      rect: Rect.fromLTWH(left, top, widget.block.width, _frameHeight),
+      rect: Rect.fromLTWH(left, top, width, _frameHeight),
       draggable: false,
       allowContentFlipping: false,
       allowFlippingWhileResizing: false,
@@ -1107,7 +1144,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         _startPackageResize(handle, event.globalPosition);
       },
       onResizeUpdate: (result, event) {
-        _updatePackageResize(result.handle, event.globalPosition, controller);
+        _updatePackageResize(result.handle, event.globalPosition);
       },
       onResizeEnd: (handle, event) {
         _endTransform(controller);
@@ -1146,6 +1183,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
 
   Widget _sideHandle() {
     return MouseRegion(
+      key: const ValueKey('quill-text-width-handle'),
       cursor: SystemMouseCursors.resizeLeftRight,
       child: Container(
         width: _sideHandleWidth,
@@ -1228,17 +1266,13 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
     if (handle == HandlePosition.right) {
       _resizeStart = globalPosition;
       _startWidth = widget.block.width;
-      _transformBefore = widget.block;
+      _beginTransform();
     }
   }
 
-  void _updatePackageResize(
-    HandlePosition handle,
-    Offset globalPosition,
-    EditorController controller,
-  ) {
+  void _updatePackageResize(HandlePosition handle, Offset globalPosition) {
     if (handle == HandlePosition.topLeft) {
-      _updateFontScale(globalPosition, controller);
+      _updateFontScale(globalPosition);
       return;
     }
     if (handle != HandlePosition.right ||
@@ -1255,21 +1289,25 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       _minTextWidth,
       _maxTextWidth,
     );
-    controller.updateTextBlockOnPage(
-      widget.pageIndex,
-      widget.block.copyWith(width: nextWidth),
-    );
+    setState(() => _transformPreview = widget.block.copyWith(width: nextWidth));
   }
 
   void _startFontScale(Offset globalPosition) {
     _fontScaleStart = globalPosition;
     _startWidth = widget.block.width;
     _startFontSize = widget.block.fontSize;
-    _startDeltaJson = widget.block.deltaJson;
-    _transformBefore = widget.block;
+    _beginTransform();
   }
 
-  void _updateFontScale(Offset globalPosition, EditorController controller) {
+  void _beginTransform() {
+    _editorController.beginObjectTransform();
+    _editorController.commitActiveTextEdit();
+  }
+
+  double _scaledFontSize(double size, double scale) =>
+      (size * scale).clamp(_minTextFontSize, _maxTextFontSize).roundToDouble();
+
+  void _updateFontScale(Offset globalPosition) {
     if (_fontScaleStart == null ||
         _startWidth == null ||
         _startFontSize == null) {
@@ -1290,16 +1328,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       _minTextWidth,
       _maxTextWidth,
     );
-    controller.updateTextBlockOnPage(
-      widget.pageIndex,
-      widget.block.copyWith(
+    setState(
+      () => _transformPreview = widget.block.copyWith(
         fontSize: nextFontSize,
         width: nextWidth,
-        deltaJson: _scaledDeltaJson(
-          _startDeltaJson,
-          scale: scale,
-          fallbackSize: _startFontSize!,
-        ),
       ),
     );
   }
@@ -1333,10 +1365,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         final currentSize =
             double.tryParse(attributes['size']?.toString() ?? '') ??
             fallbackSize;
-        final nextSize = (currentSize * scale).clamp(
-          _minTextFontSize,
-          _maxTextFontSize,
-        );
+        final nextSize = _scaledFontSize(currentSize, scale);
         attributes['size'] = nextSize.round().toString();
         next['attributes'] = attributes;
         return next;
@@ -1349,23 +1378,52 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   }
 
   void _endTransform(EditorController controller) {
-    final before = _transformBefore;
-    if (before != null) {
-      final current = controller.findTextBlockById(widget.block.id);
-      if (current != null) {
-        controller.commitTextUpdateOnPage(widget.pageIndex, before, current);
-      }
-    }
+    final preview = _transformPreview;
+    final startFontSize = _startFontSize;
+    final current = controller.findTextBlockById(widget.block.id);
     _cancelTransform();
+    if (preview == null ||
+        current == null ||
+        controller.activeTextBlockId != current.id) {
+      return;
+    }
+    final scale = startFontSize == null || startFontSize == 0
+        ? 1.0
+        : preview.fontSize / startFontSize;
+    controller.commitTextUpdateOnPage(
+      widget.pageIndex,
+      current,
+      current.copyWith(
+        width: preview.width,
+        fontSize: scale == 1 ? current.fontSize : preview.fontSize,
+        deltaJson: scale == 1
+            ? current.deltaJson
+            : _scaledDeltaJson(
+                current.deltaJson,
+                scale: scale,
+                fallbackSize: current.fontSize,
+              ),
+      ),
+    );
   }
 
   void _cancelTransform() {
+    if (_resizeStart == null && _fontScaleStart == null) {
+      return;
+    }
     _resizeStart = null;
     _startWidth = null;
     _fontScaleStart = null;
     _startFontSize = null;
-    _startDeltaJson = null;
-    _transformBefore = null;
+    setState(() => _transformPreview = null);
+    _editorController.endObjectTransform();
+  }
+
+  void _cancelPointer(PointerCancelEvent _) {
+    // An accepted Flutter drag can report onPanEnd after pointer cancellation.
+    // Drop the preview before the recognizer can treat that event as release.
+    _cancelTransform();
+    _cancelMove();
   }
 
   Widget _moveHandle(EditorController controller) {
@@ -1381,7 +1439,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
         _startMove(details.globalPosition);
       },
       onPanUpdate: (details) {
-        _updateMove(details.globalPosition, controller);
+        _updateMove(details.globalPosition);
       },
       onPanEnd: (_) {
         setState(() => _isMoveDragging = false);
@@ -1389,9 +1447,7 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       },
       onPanCancel: () {
         setState(() => _isMoveDragging = false);
-        _dragStart = null;
-        _startPosition = null;
-        _dragFromFrame = false;
+        _cancelMove();
       },
     );
   }
@@ -1445,9 +1501,10 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
   void _startMove(Offset globalPosition) {
     _dragStart = globalPosition;
     _startPosition = widget.block.position;
+    _beginTransform();
   }
 
-  void _updateMove(Offset globalPosition, EditorController controller) {
+  void _updateMove(Offset globalPosition) {
     if (_dragStart == null || _startPosition == null) {
       return;
     }
@@ -1456,29 +1513,36 @@ class _TextBlockWidgetState extends State<_TextBlockWidget> {
       start: _dragStart!,
       end: globalPosition,
     );
-    controller.updateTextBlockPositionOnPage(
-      widget.pageIndex,
-      widget.block.id,
-      _startPosition! + delta,
+    setState(
+      () => _transformPreview = widget.block.copyWith(
+        position: _startPosition! + delta,
+      ),
     );
   }
 
   void _endMove(EditorController controller) {
-    if (_dragStart == null || _startPosition == null) {
-      return;
-    }
-    final current = controller.findTextBlockById(widget.block.id)?.position;
-    if (current != null) {
+    final target = _transformPreview?.position;
+    final current = controller.findTextBlockById(widget.block.id);
+    _cancelMove();
+    if (current != null && target != null) {
       controller.commitTextMoveOnPage(
         widget.pageIndex,
         widget.block.id,
-        _startPosition!,
-        current,
+        current.position,
+        target,
       );
+    }
+  }
+
+  void _cancelMove() {
+    if (_dragStart == null) {
+      return;
     }
     _dragStart = null;
     _startPosition = null;
     _dragFromFrame = false;
+    setState(() => _transformPreview = null);
+    _editorController.endObjectTransform();
   }
 
   KeyEventResult? _handleKeyPressed(KeyEvent event) {

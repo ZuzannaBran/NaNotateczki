@@ -1,5 +1,21 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Zapis wyłącznie zakończonej transformacji ramki tekstu (2026-11-07)
+
+Dla prostego HUD i bogatego Quilla podgląd pozycji, szerokości i rozmiaru
+czcionki należy do widżetu. Flush w trakcie gestu odczytuje zatwierdzony
+model. Puszczenie uchwytu stosuje istniejącą akcję edytora, a anulowanie
+odrzuca podgląd również wtedy, gdy rozpoznany drag zgłasza callback końca.
+Quill zachowuje formatowanie podczas zmiany geometrii i zapisuje zmianę
+rozmiaru czcionki razem z transformacją w jednym kroku Undo.
+
+Na bazie `7dd998f` regresja zmiany szerokości nie przeszła dla obu ramek.
+Nowy test rzeczywistych gestów sprawdza model, SQLite i outbox w trakcie
+flusha, anulowanie, zapis po puszczeniu i pełne cofnięcie gestu.
+Sprawdza również zapis wcześniejszej edycji treści przy aktywnym podglądzie
+i porzucenie ramki po odmontowaniu. Odtworzenie operacji od
+`document.create` w świeżej bazie daje tę samą geometrię, treść i Delta.
+
 ## Zapis wyłącznie zakończonej transformacji figury (2026-11-07)
 
 Przebieg `42356536414` dla `cc5a1f6` zaliczył analizę, regresje natywne
