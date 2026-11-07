@@ -116,7 +116,6 @@ class EditorV2RemotePatchDispatcher {
     }
     if (operation.kind == OperationKind.objectMove) {
       final movedId = operation.objectId!;
-      final source = _page(notebook.pages, sourceId);
       final owners = [
         for (final page in notebook.pages)
           if (_ownsObject(page, movedId)) page,
@@ -128,11 +127,7 @@ class EditorV2RemotePatchDispatcher {
               documentId: operation.documentId,
               objectId: movedId,
             ) ||
-            await store.isTombstoned(
-              operation.documentId,
-              'page',
-              sourceId,
-            );
+            await store.isTombstoned(operation.documentId, 'page', sourceId);
         if (deleted) {
           // The operation store accepted a stale move as a no-op. Do not
           // advance the UI cursor if an earlier deletion was not rendered.
@@ -142,8 +137,25 @@ class EditorV2RemotePatchDispatcher {
           return;
         }
       }
-      if (source == null || owners.length != 1) {
+      if (owners.length != 1) {
         throw StateError('Committed move has no unique SQLite target.');
+      }
+      final visibleOwners = [
+        for (final page in editor.pages)
+          if (_ownsObject(page, movedId)) page.id,
+      ];
+      if (visibleOwners.length > 1) {
+        throw StateError('Committed move has no unique visible source.');
+      }
+      // Concurrent moves may share the original envelope page. Remove the
+      // object from its last rendered location, including an intermediate
+      // losing destination, before displaying the durable winner.
+      final source = _page(
+        notebook.pages,
+        visibleOwners.isEmpty ? sourceId : visibleOwners.single,
+      );
+      if (source == null) {
+        throw StateError('Committed move has no readable source page.');
       }
       // A concurrent operation with a lower rank may have committed as a
       // no-op. Use the durable winning location, not its stale toPageId.

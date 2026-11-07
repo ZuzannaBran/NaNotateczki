@@ -90,7 +90,9 @@ Na Linuxie użytkownik instaluje `zenity` i `poppler-utils`; agent nie używa
   współrzędnych.
 - Nie dodawaj komentarzy typu „added for issue” ani komentarzy opisujących
   oczywiste „co”.
-- Nie commituj bez wyraźnej prośby użytkownika.
+- Użytkownik udzielił stałej zgody na commit i push ukończonych zmian
+  do `NaNotateczki/dev` oraz `NaNotateczki-serwer/main`. Nie pytaj ponownie
+  o zgodę dla tych gałęzi; stosuj procedurę z `CZAT.md`.
 
 ## 6. Komunikacja
 

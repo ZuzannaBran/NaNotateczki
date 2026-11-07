@@ -1690,17 +1690,20 @@ czemu katalog może odświeżać się niezależnie od aktywnego edytora.
 Dla `object.move` usuwa źródłowy obiekt z widoku i dodaje go w celu.
 Przy image `object.create` nie powiadamia UI o pustym
 placeholderze; dopiero zweryfikowany `asset.attach` dodaje obraz.
-Przy konflikcie `object.move` korzysta ze strony obiektu rzeczywiście
-zatwierdzonej w SQLite, nie ze strony przegrywającej operacji;
-żadna taka notyfikacja nie może blokować kursora bez powodu.
+Przy konflikcie `object.move` pobiera cel z SQLite, a źródło z jedynego
+widocznego właściciela w kontrolerze. Kolejny zwycięski move usuwa więc
+obiekt także z pośredniej strony; nie może pozostawić duplikatu w UI.
+Niejednoznaczna widoczna tożsamość blokuje dostarczenie do wyjaśnienia.
 Zachowuje kolejność tekstów i obrazów (sortIndex) przy aktualizacjach.
 Aktywny gest lub niezapisana zmiana blokuje callback — `SyncEngine`
 ponawia dostarczenie; brak przełączenia `AppScope` na v2.
-28: `onRemoteCommitted` oznacza zdalny commit przed odczytem projekcji;
-41: `_dispatchRemoteCommitted` dostarcza patch. Nieudana próba pozostawia
+30: `onRemoteCommitted` oznacza zdalny commit przed odczytem projekcji;
+43: `_dispatchRemoteCommitted` dostarcza patch. Nieudana próba pozostawia
 blokadę historii, udana zwalnia ją również dla potwierdzonego no-op.
 Test: `test/editor_v2_remote_patch_dispatcher_test.dart`, w tym odroczenie
-przez aktywny tekst, blokada Undo/Redo i wznowienie po retry.
+przez aktywny tekst, blokada Undo/Redo i wznowienie po retry. Sześć
+scenariuszy konkurencyjnego move obejmuje obie kolejności dla kreski,
+rich Quill z embedem i obrazu, atomowy repaint, media i stały viewport.
 
 ### `lib/features/editor/state/input_mode.dart` (30 linii)
 

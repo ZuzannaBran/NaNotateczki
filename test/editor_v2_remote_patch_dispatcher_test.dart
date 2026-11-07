@@ -16,6 +16,7 @@ import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/editor/state/editor_v2_remote_patch_dispatcher.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/ink_stroke.dart';
+import 'package:program/features/notebook/domain/note_page.dart';
 import 'package:uuid/uuid.dart';
 
 import 'support/native_test_documents.dart';
@@ -437,10 +438,7 @@ void main() {
       isTrue,
     );
     await dispatcher.onRemoteCommitted(lateMove);
-    expect(
-      editor.pages.expand((page) => page.inkStrokes),
-      isEmpty,
-    );
+    expect(editor.pages.expand((page) => page.inkStrokes), isEmpty);
 
     // A missing target without a durable tombstone is still corruption,
     // not a reason to discard a remote move notification.
@@ -567,4 +565,250 @@ void main() {
       OperationKind.documentSet,
     ]);
   });
+
+  for (final objectType in ['stroke', 'text', 'image']) {
+    for (final winnerFirst in [false, true]) {
+      test('concurrent $objectType moves keep one UI owner '
+          '(winner first: $winnerFirst)', () async {
+        final database = NotesDatabase(NativeDatabase.memory());
+        addTearDown(database.close);
+        final repository = NotebookRepository(database);
+        final notebook = await repository.createNotebook();
+        final store = OperationStore(database);
+        final buffer = VerifiedEditorAssetBuffer();
+        final projector = EditorSqliteProjector(
+          database,
+          verifiedAssetBuffer: buffer,
+        );
+        final engine = SyncEngine(
+          store: store,
+          gateway: _OfflineGateway(),
+          actorId: 'local-move-observer',
+          checkpointScope: 'concurrent-moves',
+          enableRealtime: false,
+          applyRemote: (operation, _) => projector.apply(operation),
+        );
+        addTearDown(engine.stop);
+        final editor = EditorController(
+          repository: repository,
+          notebook: notebook,
+          operationWriter: EditorV2OperationWriter(
+            syncEngine: engine,
+            projector: projector,
+          ),
+        );
+        addTearDown(editor.dispose);
+        await editor.historyReady;
+        await editor.preferencesReady;
+        final dispatcher = EditorV2RemotePatchDispatcher(
+          editor: editor,
+          repository: repository,
+        );
+        var sequence = 0;
+        var serverSequence = 0;
+        String? previous;
+        Future<OperationEnvelope> setup(
+          OperationKind kind,
+          String objectId,
+          Map<String, dynamic> payload, {
+          String? pageId,
+        }) async {
+          sequence++;
+          final operation = OperationEnvelope(
+            operationId: const Uuid().v4(),
+            actorId: 'move-setup',
+            actorSeq: sequence,
+            logicalClock: sequence,
+            documentId: notebook.uid,
+            objectId: objectId,
+            pageId: pageId,
+            kind: kind,
+            payload: payload,
+            dependencies: previous == null ? [] : [previous!],
+          );
+          await store.applyRemote(
+            operation,
+            serverSequence: ++serverSequence,
+            apply: () => projector.apply(operation),
+          );
+          await dispatcher.onRemoteCommitted(operation);
+          previous = operation.operationId;
+          return operation;
+        }
+
+        for (final pageId in ['losing-page', 'winning-page']) {
+          await setup(OperationKind.pageCreate, pageId, {
+            'value': {'title': pageId, 'isBookmarked': false},
+          });
+        }
+        final sourceId = notebook.pages.single.id;
+        const objectId = 'concurrent-object';
+        final value = <String, dynamic>{
+          'objectType': objectType,
+          'sortIndex': 0,
+          if (objectType == 'stroke') ...{
+            'colorValue': 0xFF223344,
+            'width': 2.0,
+            'toolIndex': 0,
+            'points': [
+              [4.0, 6.0, 0.5],
+            ],
+          } else ...{
+            'dx': 5.0,
+            'dy': 6.0,
+            'width': 110.0,
+            'rotation': 0.0,
+            if (objectType == 'text') ...{
+              'fontSize': 18.0,
+              'colorValue': 0xFF223344,
+            } else ...{
+              'assetId': 'move-image-asset',
+              'height': 90.0,
+              'cropLeft': 0.0,
+              'cropTop': 0.0,
+              'cropRight': 1.0,
+              'cropBottom': 1.0,
+            },
+          },
+        };
+        await setup(
+          objectType == 'stroke'
+              ? OperationKind.strokeCreate
+              : OperationKind.objectCreate,
+          objectId,
+          {'value': value},
+          pageId: sourceId,
+        );
+        final imageBytes = Uint8List.fromList([137, 80, 78, 71, 1, 2, 3]);
+        if (objectType != 'stroke') {
+          final receipt = <String, dynamic>{
+            'assetId': 'move-image-asset',
+            'sha256': crypto.sha256.convert(imageBytes).toString(),
+            'sizeBytes': imageBytes.length,
+            'mediaType': 'image/png',
+          };
+          buffer.stage(receipt: receipt, bytes: imageBytes);
+          await setup(
+            OperationKind.assetAttach,
+            objectId,
+            receipt,
+            pageId: sourceId,
+          );
+        }
+        if (objectType == 'text') {
+          await setup(OperationKind.textInsert, objectId, {
+            'afterAtomId': null,
+            'atoms': [
+              {
+                'id': const Uuid().v4(),
+                'text': 'T',
+                'attributes': {'bold': true},
+              },
+              {
+                'id': const Uuid().v4(),
+                'text': '\uFFFC',
+                'embed': {'image': 'asset:move-image-asset'},
+              },
+              {'id': const Uuid().v4(), 'text': '\n'},
+            ],
+          }, pageId: sourceId);
+        }
+        final originalText = objectType == 'text'
+            ? editor.pages.first.textBlocks.single.deltaJson
+            : null;
+        editor.setCurrentPage(1);
+        editor.viewScale = 1.6;
+        editor.viewPan = const Offset(12, 34);
+
+        List<String> owners(Iterable<NotePage> pages) => [
+          for (final page in pages)
+            if ([
+              ...page.inkStrokes.map((item) => item.id),
+              ...page.textBlocks.map((item) => item.id),
+              ...page.imageBlocks.map((item) => item.id),
+            ].contains(objectId))
+              page.id,
+        ];
+        OperationEnvelope move(bool winning) => OperationEnvelope(
+          operationId: const Uuid().v4(),
+          actorId: winning ? 'move-winner' : 'move-loser',
+          actorSeq: 1,
+          logicalClock: winning ? 200 : 100,
+          documentId: notebook.uid,
+          pageId: sourceId,
+          objectId: objectId,
+          kind: OperationKind.objectMove,
+          payload: {
+            'toPageId': winning ? 'winning-page' : 'losing-page',
+            'sortIndex': 0,
+          },
+          dependencies: [previous!],
+        );
+        final moves = [move(winnerFirst), move(!winnerFirst)];
+        for (var i = 0; i < moves.length; i++) {
+          final operation = moves[i];
+          final beforeOwners = owners(editor.pages);
+          await store.applyRemote(
+            operation,
+            serverSequence: ++serverSequence,
+            apply: () => projector.apply(operation),
+          );
+          if (i == 1) {
+            editor.activeTextBlockId = 'busy-edit';
+            await expectLater(
+              dispatcher.onRemoteCommitted(operation),
+              throwsStateError,
+            );
+            expect(owners(editor.pages), beforeOwners);
+            editor.activeTextBlockId = null;
+          }
+          var repaints = 0;
+          void onPaint() {
+            repaints++;
+            expect(owners(editor.pages), hasLength(1));
+          }
+
+          editor.addListener(onPaint);
+          try {
+            await dispatcher.onRemoteCommitted(operation);
+          } finally {
+            editor.removeListener(onPaint);
+          }
+          expect(repaints, 1);
+          final saved = (await repository.getNotebook(notebook.uid))!;
+          expect(owners(editor.pages), owners(saved.pages));
+        }
+        await dispatcher.onRemoteCommitted(moves.last);
+        expect(owners(editor.pages), ['winning-page']);
+        expect(editor.currentPage.id, 'losing-page');
+        expect(editor.viewScale, 1.6);
+        expect(editor.viewPan, const Offset(12, 34));
+        expect(await store.pending(), isEmpty);
+        final target = editor.pages.last;
+        if (objectType == 'image') {
+          expect(target.imageBlocks.single.bytes, orderedEquals(imageBytes));
+          expect(
+            await projector.verifiedUploadBytes({
+              'assetId': 'move-image-asset',
+              'sha256': crypto.sha256.convert(imageBytes).toString(),
+              'sizeBytes': imageBytes.length,
+              'mediaType': 'image/png',
+            }),
+            orderedEquals(imageBytes),
+          );
+        } else if (objectType == 'text') {
+          expect(target.textBlocks.single.deltaJson, originalText);
+          expect(
+            await projector.verifiedTextAssetBytes(
+              documentId: notebook.uid,
+              pageId: 'winning-page',
+              objectId: objectId,
+              assetId: 'move-image-asset',
+            ),
+            orderedEquals(imageBytes),
+          );
+        }
+      });
+    }
+  }
 }

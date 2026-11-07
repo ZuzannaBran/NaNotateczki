@@ -1,5 +1,49 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Konkurencyjne move bez duplikatu w widoku — 2026-11-07
+
+Punkt wyjścia: najnowszy `42305905301` dla `df2a5dd` zaliczył rzeczywisty
+Linux E2E v2, ale job natywny zatrzymał się na formatowaniu dispatchera
+i jego testu. Kanoniczny backend `42262988799` dla `f77b20c` jest zielony.
+Formatter trzeba uruchamiać z rozwiązanym package config albo z jawnym
+`--language-version=3.11`, zgodnie z `pubspec.yaml`. Bez konfiguracji
+sam SDK 3.13 zmienia też format wielu poprawnych plików; te dodatkowe
+zmiany wycofano mechanicznie. Łączna poprawka formatowania obejmuje
+tylko dispatcher i jego test; schemat i wygenerowane DAO są bez zmian.
+
+Potwierdzono w kodzie kolejny błąd: ruchy A→B i A→C różnych aktorów
+mają to samo źródło w envelope. Jeżeli C wygrywa po wyświetleniu B,
+dispatcher aktualizujący tylko A i C pozostawiał obiekt również na B.
+Źródło patcha musi odpowiadać stronie, która faktycznie wyświetla obiekt
+w kontrolerze; cel nadal pochodzi z zatwierdzonego SQLite. Obie strony
+są aktualizowane w jednej rewizji, a zduplikowany widoczny UID jest
+odrzucany zamiast maskowany. Dotychczasowe warunki tombstone pozostają.
+
+Dodano sześć regresji prawdziwego kontrolera i SQLite dla kreski,
+sformatowanego Quill z obrazem inline oraz osobnego obrazu. Oba porządki
+zwycięskiego/przegrywającego ruchu obejmują busy/retry, ponowienie patcha,
+pojedynczy widoczny UID w każdym repaint, zgodność z SQLite, zachowanie
+bajtów i scoped embedów oraz zoomu, pan i wybranej strony. Sprawdzana
+jest też pusta lokalna kolejka: odbiór nie może wytwarzać własnych zmian.
+
+Weryfikacja lokalna: parser Darta akceptuje oba zmienione pliki;
+`dart format --language-version=3.11 --output=none --set-exit-if-changed`
+sprawdził 293 pliki bez zmian; `git diff --check` i składnia skryptu
+weryfikacji są poprawne. Flutter 3.47.6 udało się uruchomić z `CI=true`
+i wyłączoną telemetrią, co pomija sondę metadanych środowiska chmurowego.
+Pobieranie zależności aplikacji przekroczyło 240 s, a próba offline
+zgłosiła brak `path_provider_platform_interface`. Pełnej analizy oraz
+testów kontrolera nie wykonano lokalnie; nowe regresje i Linux E2E v2
+uruchamia końcowy push z `[ci:failed-only] [ci:v2-e2e]`. Nie czekać na
+wynik nowego przebiegu w tej sesji; następna ma od niego zacząć.
+
+Etap 3 nadal otwarty, v2 opt-in. Zgodnie z uzupełniającym planem
+użytkownika jego zamknięcie dotyczy lokalnego edytora: kompletu mutacji,
+offline/recovery i rzeczywistego UI. Pełny rebase oraz aktywacja silnika
+całego konta należą do etapu 4, a globalne usunięcie v1 wymaga kolejnych
+etapów; historyczna sekcja D nie powinna być mylona z samym etapem 3.
+Stałą zgodę na commit/push do obu gałęzi zapisano w `AGENTS.md`.
+
 ## No-op zdalnego move po tombstone — 2026-11-06
 
 Actions #1111 na `a8fdfc9` jest zielony (natywna analiza i regresje).

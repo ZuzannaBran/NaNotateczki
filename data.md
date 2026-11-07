@@ -1,5 +1,16 @@
 # Dane NaNotateczki
 
+## Widoczny właściciel konkurencyjnego move (2026-11-07)
+
+Przy `object.move` dispatcher wybiera stronę źródłową z aktualnego
+widoku kontrolera, a cel z zatwierdzonej projekcji SQLite. Dwa równoczesne
+move mogą wskazywać tę samą pierwotną stronę, mimo że pierwszy patch
+przeniósł już obiekt gdzie indziej. Drugi patch musi atomowo usunąć go
+z tej widocznej lokalizacji i pokazać na zwycięskiej stronie. Więcej niż
+jeden widoczny właściciel blokuje dostarczenie do wyjaśnienia.
+Kreski, rich Quill z embedami i obrazy zachowują UID oraz scoped media;
+odroczenie podczas gestu i retry nie tworzą lokalnych operacji ani kopii.
+
 ## Spóźniony object.move po usunięciu (2026-11-06)
 
 Zdalna operacja `object.move`, przyjęta jako no-op po usunięciu obiektu
