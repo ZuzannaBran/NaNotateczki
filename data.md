@@ -1,5 +1,16 @@
 # Dane NaNotateczki
 
+## Podgląd transformacji figury (2026-11-07)
+
+Podgląd uchwytów figury w notatniku i na tablicy jest przechowywany poza
+`EditorController.pages`. Renderery ink i uchwyty odczytują go według UID
+strony oraz kreski. Autosave innego gestu może zapisać rzeczywistą zmianę
+bez zapisywania współrzędnych podglądu. Anulowanie, zmiana narzędzia i
+odmontowanie overlayu odrzucają podgląd. Puszczenie uchwytu zatwierdza
+`UpdateInkStrokeAction`. V2 zapisuje `object.transform`, SQLite, historię
+i outbox w dotychczasowej transakcji. Przy błędzie pozycja zapisana w bazie,
+outbox i `actorSeq` zostają zachowane do ponowienia tego gestu.
+
 ## Widoczny właściciel konkurencyjnego move (2026-11-07)
 
 Przy `object.move` dispatcher wybiera stronę źródłową z aktualnego

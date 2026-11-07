@@ -12,12 +12,16 @@ import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
 import 'package:program/data/sync/sync_engine.dart';
 import 'package:program/data/sync/verified_editor_asset_buffer.dart';
+import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/editor/state/editor_operation_bridge.dart';
 import 'package:program/features/editor/state/editor_v2_operation_writer.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
 import 'package:program/features/notebook/domain/ink_stroke.dart';
+import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:program/features/notebook/domain/text_block.dart';
+
+import 'support/native_test_documents.dart';
 
 class _OfflineGateway implements OperationGateway {
   @override
@@ -31,6 +35,7 @@ class _OfflineGateway implements OperationGateway {
 }
 
 void main() {
+  useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('v2 journal, verified inline asset and outbox survive reopen', () async {
@@ -135,4 +140,195 @@ void main() {
     );
     await expectLater(recovered.saveNotebook(loaded), throwsStateError);
   });
+
+  for (final kind in [NotebookKind.notebook, NotebookKind.board]) {
+    test('v2 $kind never saves an unfinished shape drag', () async {
+      final directory = await Directory.systemTemp.createTemp('nn-v2-shape-');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/notes.sqlite');
+
+      EditorV2OperationWriter writerFor(NotesDatabase database) {
+        final projector = EditorSqliteProjector(database);
+        return EditorV2OperationWriter(
+          syncEngine: SyncEngine(
+            store: OperationStore(database),
+            gateway: _OfflineGateway(),
+            actorId: 'offline-shape-editor',
+            checkpointScope: 'shape-recovery',
+            enableRealtime: false,
+            applyRemote: (op, _) => projector.apply(op),
+          ),
+          projector: projector,
+        );
+      }
+
+      final database = NotesDatabase(NativeDatabase(file));
+      final repository = NotebookRepository(database);
+      final writer = writerFor(database);
+      final store = OperationStore(database);
+      late final String documentId;
+      late final String shapeId;
+      late final String otherId;
+      late final List<String> durableOperations;
+      const originalEnd = Offset(100, 0);
+      const committedEnd = Offset(140, 30);
+      try {
+        await repository.enableAccountOperations(writer);
+        final notebook = kind == NotebookKind.board
+            ? await repository.createBoard()
+            : await repository.createNotebook();
+        documentId = notebook.uid;
+        final editor = EditorController(
+          repository: repository,
+          notebook: notebook,
+          operationWriter: writer,
+          saveDebounce: const Duration(days: 1),
+        );
+        try {
+          await editor.preferencesReady;
+          shapeId = editor.addInkStroke(const [
+            InkPoint(dx: 0, dy: 0, pressure: 1),
+            InkPoint(dx: 100, dy: 0, pressure: 1),
+          ], toolOverride: DrawingTool.line)!;
+          await editor.flushPendingSaves();
+          final before = editor.shapeStrokeOnPage(0, shapeId)!;
+
+          // Flush an earlier, valid gesture while a shape preview is visible.
+          otherId = editor.addInkStroke(const [
+            InkPoint(dx: 3, dy: 4, pressure: 0.5),
+          ], toolOverride: DrawingTool.pen)!;
+          editor.startShapeEdit(0, shapeId);
+          editor.beginObjectTransform();
+          editor.previewShapeStrokeOnPage(
+            0,
+            before.copyWith(
+              points: const [
+                InkPoint(dx: 0, dy: 0, pressure: 1),
+                InkPoint(dx: 150, dy: 80, pressure: 1),
+              ],
+            ),
+          );
+          expect(
+            editor.shapeStrokeOnPage(0, shapeId)!.points.last.toOffset(),
+            const Offset(150, 80),
+          );
+          await editor.flushPendingSaves();
+          final duringDrag = (await repository.getNotebook(documentId))!;
+          expect(duringDrag.pages.single.inkStrokes.map((s) => s.id), [
+            shapeId,
+            otherId,
+          ]);
+          expect(
+            duringDrag.pages.single.inkStrokes.first.points.last.toOffset(),
+            originalEnd,
+          );
+          expect(
+            (await store.pending()).where(
+              (op) => op.kind == OperationKind.objectTransform,
+            ),
+            isEmpty,
+          );
+
+          // Leaving the shape tool cancels the preview without a write.
+          editor.finishShapeEdit();
+          editor.endObjectTransform();
+          expect(
+            editor.shapeStrokeOnPage(0, shapeId)!.points.last.toOffset(),
+            originalEnd,
+          );
+          await editor.flushPendingSaves();
+          expect(
+            (await store.pending()).where(
+              (op) => op.kind == OperationKind.objectTransform,
+            ),
+            isEmpty,
+          );
+
+          editor.startShapeEdit(0, shapeId);
+          editor.beginObjectTransform();
+          final after = before.copyWith(
+            points: const [
+              InkPoint(dx: 0, dy: 0, pressure: 1),
+              InkPoint(dx: 140, dy: 30, pressure: 1),
+            ],
+          );
+          editor.previewShapeStrokeOnPage(0, after);
+          final beforeFailure = await store.pending();
+          await database.customStatement('''
+            CREATE TEMP TRIGGER reject_shape_transform
+            BEFORE INSERT ON operations WHEN NEW.kind = 'object.transform'
+            BEGIN SELECT RAISE(ABORT, 'injected shape commit failure'); END
+          ''');
+          editor.commitShapeStrokeOnPage(0, before, after);
+          editor.endObjectTransform();
+          try {
+            await expectLater(
+              editor.flushPendingSaves(),
+              throwsA(isA<DataIntegrityProtectionException>()),
+            );
+            final rolledBack = (await repository.getNotebook(documentId))!;
+            expect(
+              rolledBack.pages.single.inkStrokes.first.points.last.toOffset(),
+              originalEnd,
+            );
+            expect(
+              (await store.pending()).map((op) => op.operationId),
+              beforeFailure.map((op) => op.operationId),
+            );
+          } finally {
+            await database.customStatement(
+              'DROP TRIGGER reject_shape_transform',
+            );
+          }
+          await editor.flushPendingSaves();
+          final pending = await store.pending();
+          final transform = pending.singleWhere(
+            (op) => op.kind == OperationKind.objectTransform,
+          );
+          expect(transform.objectId, shapeId);
+          expect(transform.actorSeq, beforeFailure.last.actorSeq + 1);
+          durableOperations = pending.map((op) => op.operationId).toList();
+        } finally {
+          editor.dispose();
+        }
+      } finally {
+        await writer.syncEngine.stop();
+        await database.close();
+      }
+
+      final reopened = NotesDatabase(NativeDatabase(file));
+      addTearDown(reopened.close);
+      final recovered = NotebookRepository(reopened);
+      final loaded = (await recovered.getNotebook(documentId))!;
+      final recoveredStore = OperationStore(reopened);
+      expect(
+        loaded.pages.single.inkStrokes.first.points.last.toOffset(),
+        committedEnd,
+      );
+      expect(
+        (await recoveredStore.pending()).map((op) => op.operationId),
+        durableOperations,
+      );
+      final resumedWriter = writerFor(reopened);
+      addTearDown(resumedWriter.syncEngine.stop);
+      final resumed = EditorController(
+        repository: recovered,
+        notebook: loaded,
+        operationWriter: resumedWriter,
+      );
+      addTearDown(resumed.dispose);
+      await resumed.historyReady;
+      expect(resumed.canUndo, isTrue);
+      resumed.undo();
+      await resumed.flushPendingSaves();
+      expect(resumed.currentPage.inkStrokes.map((stroke) => stroke.id), [
+        shapeId,
+        otherId,
+      ]);
+      expect(
+        resumed.currentPage.inkStrokes.first.points.last.toOffset(),
+        originalEnd,
+      );
+    });
+  }
 }

@@ -308,6 +308,7 @@ class EditorController extends ChangeNotifier {
   String? activeShapeStrokeId;
   int? activeShapePageIndex;
   DrawingTool? _toolBeforeShapeEdit;
+  ({String pageId, InkStroke stroke})? _shapeStrokePreview;
   LassoSelection? lassoSelection;
   final ValueNotifier<Offset> lassoDragDelta = ValueNotifier(Offset.zero);
   final ValueNotifier<ImageBlock?> imageTransformPreview =
@@ -1129,6 +1130,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void setTool(DrawingTool newTool) {
+    cancelShapeStrokePreview();
     activeShapeStrokeId = null;
     activeShapePageIndex = null;
     _toolBeforeShapeEdit = null;
@@ -1177,28 +1179,70 @@ class EditorController extends ChangeNotifier {
     if (pageIndex < 0 || pageIndex >= pages.length) {
       return null;
     }
-    for (final stroke in pages[pageIndex].inkStrokes) {
+    final page = pages[pageIndex];
+    final preview = _shapeStrokePreview;
+    for (final stroke in page.inkStrokes) {
       if (stroke.id == id) {
+        if (preview != null &&
+            preview.pageId == page.id &&
+            preview.stroke.id == id) {
+          return preview.stroke;
+        }
         return stroke;
       }
     }
     return null;
   }
 
+  /// Keeps the in-progress shape geometry out of snapshots and the outbox.
+  List<InkStroke> inkStrokesForDisplay(NotePage page) {
+    final preview = _shapeStrokePreview;
+    if (preview == null || preview.pageId != page.id) {
+      return page.inkStrokes;
+    }
+    return [
+      for (final stroke in page.inkStrokes)
+        if (stroke.id == preview.stroke.id) preview.stroke else stroke,
+    ];
+  }
+
   void previewShapeStrokeOnPage(int pageIndex, InkStroke stroke) {
-    if (shapeStrokeOnPage(pageIndex, stroke.id) == null) {
+    if (_isDisposed ||
+        activeShapePageIndex != pageIndex ||
+        activeShapeStrokeId != stroke.id ||
+        shapeStrokeOnPage(pageIndex, stroke.id) == null) {
       return;
     }
-    _ensurePageSelected(pageIndex);
-    _updatePage(
-      currentPage.copyWith(
-        inkStrokes: [
-          for (final item in currentPage.inkStrokes)
-            if (item.id == stroke.id) stroke else item,
-        ],
-      ),
-    );
-    _touchInkPageRevision(currentPage.id);
+    final pageId = pages[pageIndex].id;
+    _shapeStrokePreview = (pageId: pageId, stroke: stroke);
+    _notifyShapePreviewChanged(pageId);
+  }
+
+  void cancelShapeStrokePreview({String? strokeId}) {
+    final preview = _shapeStrokePreview;
+    if (preview == null ||
+        (strokeId != null && preview.stroke.id != strokeId)) {
+      return;
+    }
+    _shapeStrokePreview = null;
+    if (_isDisposed) {
+      return;
+    }
+    // The overlay can disappear during widget-tree finalization.
+    final binding = SchedulerBinding.instance;
+    binding.addPostFrameCallback((_) {
+      if (!_isDisposed) {
+        _notifyShapePreviewChanged(preview.pageId);
+      }
+    });
+    binding.ensureVisualUpdate();
+  }
+
+  void _notifyShapePreviewChanged(String pageId) {
+    _touchInkPageRevision(pageId);
+    if (notebook.kind != NotebookKind.board) {
+      notifyListeners();
+    }
   }
 
   void commitShapeStrokeOnPage(
@@ -1211,7 +1255,11 @@ class EditorController extends ChangeNotifier {
           before.points.map((point) => point.toOffset()).toList(),
           after.points.map((point) => point.toOffset()).toList(),
         )) {
+      cancelShapeStrokePreview(strokeId: before.id);
       return;
+    }
+    if (_shapeStrokePreview?.stroke.id == before.id) {
+      _shapeStrokePreview = null;
     }
     _ensurePageSelected(pageIndex);
     _applyInkAction(UpdateInkStrokeAction(before: before, after: after));

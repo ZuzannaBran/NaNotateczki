@@ -39,6 +39,8 @@ dart format --output=none --set-exit-if-changed \
   lib/data/sync/account_session_controller.dart \
   lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart \
   lib/features/editor/presentation/widgets/page_overlay.dart \
+  lib/features/editor/presentation/widgets/drawing_canvas.dart \
+  lib/features/editor/presentation/widgets/shape_edit_overlay.dart \
   lib/features/editor/presentation/widgets/text_edit_toolbar.dart \
   lib/features/editor/presentation/widgets/text_hud_block.dart \
   integration_test/stage12_live_api_test.dart \
@@ -58,6 +60,7 @@ dart format --output=none --set-exit-if-changed \
   test/editor_v2_operation_writer_test.dart \
   test/editor_v2_remote_patch_dispatcher_test.dart \
   test/editor_v2_crash_recovery_test.dart \
+  test/shape_edit_test.dart \
   test/persistent_operation_actor_test.dart \
   test/verified_quill_embed_builder_test.dart \
   test/notebook_repository_v2_account_test.dart \
@@ -93,6 +96,7 @@ flutter test --concurrency=1 \
   test/editor_v2_operation_writer_test.dart \
   test/editor_v2_remote_patch_dispatcher_test.dart \
   test/editor_v2_crash_recovery_test.dart \
+  test/shape_edit_test.dart \
   test/verified_quill_embed_builder_test.dart \
   test/notebook_repository_v2_account_test.dart \
   test/library_v2_settings_test.dart \

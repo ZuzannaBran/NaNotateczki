@@ -455,6 +455,31 @@ void main() {
       await tester.pump();
       expect(find.byKey(const ValueKey('shape-hud-shape')), findsOneWidget);
 
+      final cancelled = await tester.startGesture(const Offset(110, 90));
+      await cancelled.moveBy(const Offset(20, 10));
+      await tester.pump();
+      expect(
+        controller
+            .inkStrokesForDisplay(controller.currentPage)
+            .single
+            .points
+            .first
+            .toOffset(),
+        const Offset(60, 60),
+      );
+      expect(
+        controller.currentPage.inkStrokes.single.points.first.toOffset(),
+        const Offset(40, 50),
+      );
+      await cancelled.cancel();
+      await tester.pumpAndSettle();
+      expect(
+        controller.inkStrokesForDisplay(controller.currentPage),
+        same(controller.currentPage.inkStrokes),
+      );
+      expect(controller.isObjectTransformActive, isFalse);
+      expect(controller.canUndo, isFalse);
+
       await tester.dragFrom(const Offset(110, 90), const Offset(30, 20));
       await tester.pump();
       expect(
@@ -696,12 +721,21 @@ void main() {
     await tester.pumpWidget(buildEditor(showOverlay: true));
     await tester.pump();
     final gesture = await tester.startGesture(const Offset(110, 90));
+    await gesture.moveBy(const Offset(20, 10));
     await tester.pump();
     expect(controller.isObjectTransformActive, isTrue);
+    expect(
+      controller.shapeStrokeOnPage(0, 'shape')!.points.first.toOffset(),
+      const Offset(60, 60),
+    );
 
     await tester.pumpWidget(buildEditor(showOverlay: false));
     expect(tester.takeException(), isNull);
     expect(controller.isObjectTransformActive, isFalse);
+    expect(
+      controller.shapeStrokeOnPage(0, 'shape')!.points.first.toOffset(),
+      const Offset(40, 50),
+    );
     await tester.pump();
     expect(tester.takeException(), isNull);
     controller.panBy(const Offset(15, 0));

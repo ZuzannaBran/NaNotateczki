@@ -284,6 +284,7 @@ class _ShapeEditOverlayState extends State<ShapeEditOverlay> {
   @override
   void dispose() {
     if (_pointer != null) {
+      widget.controller.cancelShapeStrokePreview(strokeId: widget.stroke.id);
       widget.controller.endObjectTransform();
     }
     super.dispose();
@@ -297,7 +298,15 @@ class _ShapeEditOverlayState extends State<ShapeEditOverlay> {
       _onCancel();
       return;
     }
-    final handles = ShapeEditGeometry.handles(_displayStroke);
+    final before = widget.controller.shapeStrokeOnPage(
+      widget.pageIndex,
+      widget.stroke.id,
+    );
+    if (before == null) {
+      return;
+    }
+    final displayStroke = ShapeEditGeometry.moved(before, -widget.origin);
+    final handles = ShapeEditGeometry.handles(displayStroke);
     var handleIndex = -1;
     for (var i = 0; i < handles.length; i++) {
       if ((handles[i] - event.localPosition).distance <= 14) {
@@ -306,13 +315,13 @@ class _ShapeEditOverlayState extends State<ShapeEditOverlay> {
       }
     }
     if (handleIndex < 0 &&
-        !ShapeEditGeometry.hitTest(_displayStroke, event.localPosition)) {
+        !ShapeEditGeometry.hitTest(displayStroke, event.localPosition)) {
       return;
     }
     _pointer = event.pointer;
     _handle = handleIndex;
     _start = event.localPosition;
-    _before = widget.stroke;
+    _before = before;
     widget.controller.beginObjectTransform();
   }
 
@@ -346,15 +355,17 @@ class _ShapeEditOverlayState extends State<ShapeEditOverlay> {
         before,
         after,
       );
+    } else {
+      widget.controller.cancelShapeStrokePreview(strokeId: before.id);
     }
   }
 
   void _onCancel() {
     final before = _before;
-    _clear();
     if (before != null) {
-      widget.controller.previewShapeStrokeOnPage(widget.pageIndex, before);
+      widget.controller.cancelShapeStrokePreview(strokeId: before.id);
     }
+    _clear();
   }
 
   void _clear() {

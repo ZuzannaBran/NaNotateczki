@@ -1020,7 +1020,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
                             perfLog: _inkPerf,
                             darkMode:
                                 Theme.of(context).brightness == Brightness.dark,
-                            strokes: page.inkStrokes,
+                            strokes: controller.inkStrokesForDisplay(page),
                             worldOrigin: widget.worldOrigin,
                             lod: _staticInkLodForScale(widget.effectiveScale),
                             selectedStrokeIds: selectedStrokeIds,
@@ -4201,7 +4201,7 @@ class _InkPageLayer extends StatelessWidget {
           painter: _PageInkPainter(
             perfLog: perfLog,
             darkMode: Theme.of(context).brightness == Brightness.dark,
-            page: page,
+            strokes: controller.inkStrokesForDisplay(page),
             lod: lod,
             selectedStrokeIds: selectedStrokeIds,
             selectionDelta: selectionDelta,
@@ -4217,7 +4217,7 @@ class _InkPageLayer extends StatelessWidget {
 class _PageInkPainter extends CustomPainter {
   _PageInkPainter({
     required this.perfLog,
-    required this.page,
+    required this.strokes,
     required this.darkMode,
     required this.lod,
     required this.selectedStrokeIds,
@@ -4226,7 +4226,7 @@ class _PageInkPainter extends CustomPainter {
   });
 
   final _InkPerfLog perfLog;
-  final NotePage page;
+  final List<InkStroke> strokes;
   final bool darkMode;
   final _StaticInkLod lod;
   final Set<String> selectedStrokeIds;
@@ -4237,14 +4237,14 @@ class _PageInkPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paintStopwatch = perfLog.startPaint();
     final layerBounds = _savedInkLayerBounds(
-      strokes: page.inkStrokes,
+      strokes: strokes,
       canvasBounds: Offset.zero & size,
       translation: Offset.zero,
       selectedStrokeIds: selectedStrokeIds,
       selectionDelta: selectionDelta,
     );
     if (layerBounds != null) {
-      for (final stroke in page.inkStrokes) {
+      for (final stroke in strokes) {
         final isSelected = selectedStrokeIds.contains(stroke.id);
         _drawSavedStroke(
           canvas,
@@ -4264,7 +4264,7 @@ class _PageInkPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PageInkPainter oldDelegate) {
     return oldDelegate.darkMode != darkMode ||
-        oldDelegate.page != page ||
+        oldDelegate.strokes != strokes ||
         oldDelegate.lod != lod ||
         !setEquals(oldDelegate.selectedStrokeIds, selectedStrokeIds) ||
         oldDelegate.selectionDelta != selectionDelta;

@@ -1847,7 +1847,7 @@ Ważne granice: 183: `preferencesReady`; 196: `historyReady`;
 2676: `prepareInlineAsset`; 2698: `pasteQuillHtml`; 2737: `insertQuillFile`;
 2755: `_pickQuillFile`; 2794: `_replaceQuillSelection`;
 2958: `updateTextBlockContent`; 2973: `updateActiveTextStyle`;
-4424: `_commitActiveTextEdit`; 4519: `_captureV2Gesture`; 4543: `_saveV2`.
+4474: `_commitActiveTextEdit`; 4569: `_captureV2Gesture`; 4593: `_saveV2`.
 Nowo wstawiony lub wklejony tekst i obraz
 przechodzą od razu do trybu `edit` i pozostają aktywne do transformacji;
 wklejone zaznaczenie zachowuje lasso w trybie `edit`. Obrazy pozostają pod
@@ -1861,6 +1861,11 @@ jeśli trwa faza budowania/finalizacji drzewa. Callback sprawdza dispose.
 `imageTransformPreview` jest osobnym `ValueNotifier<ImageBlock?>` dla
 gestów uchwytów obrazów/PDF: aktualizuje wyłącznie ich renderer, bez
 `notifyListeners()` całego edytora i bez mutowania `pages` aż do commita.
+Podgląd kształtu jest przechowywany per UID strony i kreski poza `pages`.
+`inkStrokesForDisplay` przekazuje go wyłącznie rendererom ink. Anulowanie
+gestu, zmiana narzędzia lub odmontowanie overlayu czyszczą podgląd,
+a zatwierdzenie używa istniejącej `UpdateInkStrokeAction`. Flush innych
+gestów podczas przeciągania nie zapisuje położenia z podglądu.
 Ruch korpusu jednym palcem działa niezależnie od preferencji pisania palcem;
 dwa kontakty wyłączają ten drag i nie transformują obiektu ani canvasa.
 Trzy szybkie kolory domyślnie używają niebieskiego zestawu; wszystkie
@@ -1875,19 +1880,24 @@ synchronizują ten notifier. Obrazy trafiają do prywatnego katalogu danych
 aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
 - 95: `LassoSelection`; 134: `EditorController`;
-  1562: `setCurrentBackgroundSettings`; 1576: `applyInkColorPreset`.
+  1611: `setCurrentBackgroundSettings`; 1625: `applyInkColorPreset`.
 - 829: `updatePageLayout`; 844: `beginObjectTransform`;
   869: `setViewTransform`; 998–1129: operacje `*OnPage`.
-- 1130: `setTool`; 1154: `startShapeEdit`; 1167: `finishShapeEdit`;
-  1233: `commitActiveTextEdit`; 1443: `setImageTransformPreview`;
-  1450: `clearImageTransformPreview`. Transformacja ink zachowuje ID
+- 1132: `setTool`; 1157: `startShapeEdit`; 1170: `finishShapeEdit`;
+  1198: `inkStrokesForDisplay`; 1209: `previewShapeStrokeOnPage`;
+  1221: `cancelShapeStrokePreview`; 1248: `commitShapeStrokeOnPage`;
+  1282: `commitActiveTextEdit`; 1492: `setImageTransformPreview`;
+  1499: `clearImageTransformPreview`. Transformacja ink zachowuje ID
   przez `UpdateInkStrokeAction` i rewizję strony, z pojedynczym Undo/Redo.
+  Regresje: `test/shape_edit_test.dart` (anulowanie i odmontowanie podczas
+  przeciągania), `test/editor_v2_crash_recovery_test.dart` (SQLite, outbox,
+  rollback, retry i Undo po restarcie dla notatnika i tablicy).
 - Historia pamięta UID strony; regresje nawigacji i usuwania stron:
   `test/editor_controller_layering_test.dart`.
-- 1954: `_mergedBackgroundDefaults`; 2037: `undo`; 2077: `redo`;
-  2614: `toggleBookmark`; 2973: `updateActiveTextStyle`.
-- 4089: `_imagesDir`; 4247: `_applyAction`; 4280: `_applyInkAction`;
-  4492: `_scheduleSave`; 4708: `_saveDirtyPages`; 4750: `_save`.
+- 2003: `_mergedBackgroundDefaults`; 2086: `undo`; 2126: `redo`;
+  2663: `toggleBookmark`; 3023: `updateActiveTextStyle`.
+- 4139: `_imagesDir`; 4297: `_applyAction`; 4330: `_applyInkAction`;
+  4542: `_scheduleSave`; 4758: `_saveDirtyPages`; 4800: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`
@@ -2119,7 +2129,9 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   dla trójkąta i strzałki blokowej oraz cztery dla
   prostokąta/kwadratu/elipsy/koła. `ShapeEditOverlay` przechwytuje
   gesty wyłącznie w obszarze figury/uchwytów, blokuje viewport podczas
-  przesuwania i zmiany rozmiaru, zapisuje transformację jako undo/redo.
+  przesuwania i zmiany rozmiaru. Zatwierdza transformację po puszczeniu
+  uchwytu i odrzuca podgląd przy anulowaniu lub odmontowaniu.
+  10: `ShapeEditGeometry`; 255: `ShapeEditOverlay`.
 
 - `lib/features/editor/presentation/widgets/text_hud_block.dart` (737):
   podgląd używa tych samych zamienników Georgii co UI, ale nie narzuca
@@ -2171,6 +2183,8 @@ zakresowa mają wspólny podgląd przerywanego konturu przez `path_drawing`,
 bez zmiany danych wejściowych używanych przez selekcję i eraser.
 Notebookowe operacje
 zmieniające ink zawsze czytają bieżący stan z `EditorController.pageAt(...)`.
+Oba renderery zapisanej kreski pobierają `inkStrokesForDisplay`, więc
+przeciągana figura zachowuje kolejność warstw bez modyfikacji `NotePage`.
 Statyczne i aktywne kreski oraz podgląd zapisu renderują kontrastowe
 szarości w trybie ciemnym bez zmian modelu. Podczas rysowania
 pen/highlighter overlay stosuje ten sam LOD co zapisany

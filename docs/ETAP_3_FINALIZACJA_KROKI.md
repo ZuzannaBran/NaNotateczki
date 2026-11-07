@@ -1,5 +1,31 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Zapis wyłącznie zakończonej transformacji figury (2026-11-07)
+
+Przebieg `42356536414` dla `cc5a1f6` zaliczył analizę, regresje natywne
+i Linux E2E v2. Kolejną lukę odtworzono na rzeczywistym kontrolerze oraz
+plikowym SQLite w notatniku i na tablicy. Flush wcześniejszej kreski
+w trakcie przeciągania figury zapisywał tymczasowy koniec `(150, 80)`
+zamiast zatwierdzonego `(100, 0)`.
+
+Podgląd nie zmienia `pages`. Oba canvasy i uchwyty renderują tymczasową
+geometrię według UID strony i kreski. Anulowanie, zmiana narzędzia
+i odmontowanie odrzucają podgląd. Zakończenie gestu nadal używa
+`UpdateInkStrokeAction`. Regresje sprawdzają zapis niezależnej kreski
+podczas podglądu, brak operacji po anulowaniu, rollback po błędzie
+wstawienia do dziennika, retry z zachowaniem `actorSeq`, trwały outbox
+po ponownym otwarciu i Undo bez usunięcia niezależnej kreski. Testy
+widgetowe obejmują widoczną geometrię podglądu, anulowanie i odmontowanie.
+
+Oba nowe scenariusze SQLite odtworzyły błąd przed poprawką i przechodzą
+po niej. Lokalny zestaw zależności Flutter 3.47.6 przygotowano z wersji
+i sum SHA-256 w lockfile, dzięki czemu można wykonywać testy offline.
+Formatowanie 293 plików i `dart analyze` przeszły. Zestaw natywny
+z wyłączeniem osobnego testu renderowania eksportu zaliczył 1044 testy
+przy dwóch pominiętych. Push uruchamia analizę i regresje oraz Linux E2E v2.
+Kolejny krok audytu lokalnych mutacji to sprawdzenie analogicznego
+podglądu przesuwania i zmiany rozmiaru ramki tekstu.
+
 ## Konkurencyjne move bez duplikatu w widoku — 2026-11-07
 
 Punkt wyjścia: najnowszy `42305905301` dla `df2a5dd` zaliczył rzeczywisty
