@@ -2073,7 +2073,18 @@ void main() {
     }
 
     final bytes = Uint8List.fromList([
-      137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3, 4,
+      137,
+      80,
+      78,
+      71,
+      13,
+      10,
+      26,
+      10,
+      1,
+      2,
+      3,
+      4,
     ]);
     final receipt = <String, dynamic>{
       'assetId': assetId,
