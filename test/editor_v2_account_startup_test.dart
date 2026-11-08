@@ -688,8 +688,9 @@ void main() {
     );
     fixture.accepted.add(remote.toJson());
     await fixture.runtime.engine.syncNow();
-    final merged = (await fixture.repository.getNotebook(notebook.uid))!
-        .pages.single.textBlocks.single;
+    final merged = (await fixture.repository.getNotebook(
+      notebook.uid,
+    ))!.pages.single.textBlocks.single;
     expect(merged.deltaJson, contains('"bold":true'));
     expect(merged.deltaJson, contains('"italic":true'));
     final cursor = await fixture.runtime.store.checkpoint(
@@ -718,12 +719,10 @@ void main() {
       await fixture.runtime.store.checkpoint('account:startup-account'),
       cursor,
     );
-    expect(
-      await fixture.runtime.store.operation(conflict.operationId),
-      isNull,
-    );
-    final afterConflict = (await fixture.repository.getNotebook(notebook.uid))!
-        .pages.single.textBlocks.single;
+    expect(await fixture.runtime.store.operation(conflict.operationId), isNull);
+    final afterConflict = (await fixture.repository.getNotebook(
+      notebook.uid,
+    ))!.pages.single.textBlocks.single;
     expect(afterConflict.deltaJson, merged.deltaJson);
     expect(
       (await fixture.runtime.store.pending(
