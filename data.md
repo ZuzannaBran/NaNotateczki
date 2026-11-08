@@ -1,5 +1,14 @@
 # Dane NaNotateczki
 
+## Kontrola Quill przy każdej kolejnej edycji (2026-11-08)
+
+`EditorSqliteProjector._applyText` weryfikuje SHA-256 oraz długość
+każdego aktualnie widocznego embedu przed zmianą atomów/Delta Quill.
+Nawet poprawna scoped referencja i MIME nie wystarczą po korupcji BLOB.
+Błędna edycja nie przesuwa actorSeq ani outboxu; po odtworzeniu
+oryginalnych bajtów można bezpiecznie ponowić operację. Regresja
+`text.format` korzysta z tej samej trwałej SQLite co delete.
+
 ## Bezstratne usuwanie Quill v2 przy korupcji assetu (2026-11-08)
 
 Usunięcie bloku tekstowego lub całej strony najpierw weryfikuje SHA-256

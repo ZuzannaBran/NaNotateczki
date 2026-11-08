@@ -1793,6 +1793,13 @@ class EditorSqliteProjector {
       if (!checkedAssets.add(assetId)) {
         continue;
       }
+      // A valid scoped reference alone does not prove the BLOB survived.
+      await verifiedTextAssetBytes(
+        documentId: op.documentId,
+        pageId: op.pageId!,
+        objectId: op.objectId!,
+        assetId: assetId,
+      );
       final owner = 'page:${jsonEncode([op.pageId, op.objectId])}';
       final linked = await _row(
         'SELECT b.media_type FROM asset_references r '

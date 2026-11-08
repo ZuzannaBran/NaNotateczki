@@ -32,18 +32,13 @@ void registerV2PlatformReplayChecks() {
     test('all six independent Quill insert/format orders converge', () {
       final initial = OperationTextSequence.apply(
         {},
-        _op(
-          10,
-          OperationKind.textInsert,
-          {
-            'afterAtomId': null,
-            'atoms': [
-              {'id': _id(1), 'text': 'A'},
-              {'id': _id(2), 'text': '\n'},
-            ],
-          },
-          clock: 3,
-        ),
+        _op(10, OperationKind.textInsert, {
+          'afterAtomId': null,
+          'atoms': [
+            {'id': _id(1), 'text': 'A'},
+            {'id': _id(2), 'text': '\n'},
+          ],
+        }, clock: 3),
       );
       final alpha = _op(
         11,
@@ -114,34 +109,22 @@ void registerV2PlatformReplayChecks() {
     test('tombstoned atom stays an anchor in both delivery orders', () {
       final initial = OperationTextSequence.apply(
         {},
-        _op(
-          20,
-          OperationKind.textInsert,
-          {
-            'afterAtomId': null,
-            'atoms': [
-              {'id': _id(1), 'text': 'A'},
-            ],
-          },
-        ),
-      );
-      final removal = _op(
-        21,
-        OperationKind.textDelete,
-        {
-          'atomIds': [_id(1)],
-        },
-      );
-      final insertion = _op(
-        22,
-        OperationKind.textInsert,
-        {
-          'afterAtomId': _id(1),
+        _op(20, OperationKind.textInsert, {
+          'afterAtomId': null,
           'atoms': [
-            {'id': _id(2), 'text': 'B'},
+            {'id': _id(1), 'text': 'A'},
           ],
-        },
+        }),
       );
+      final removal = _op(21, OperationKind.textDelete, {
+        'atomIds': [_id(1)],
+      });
+      final insertion = _op(22, OperationKind.textInsert, {
+        'afterAtomId': _id(1),
+        'atoms': [
+          {'id': _id(2), 'text': 'B'},
+        ],
+      });
       final first = OperationTextSequence.apply(
         OperationTextSequence.apply(initial, removal),
         insertion,
@@ -160,21 +143,16 @@ void registerV2PlatformReplayChecks() {
     test('formatting ties preserve independent attributes', () {
       final initial = OperationTextSequence.apply(
         {},
-        _op(
-          30,
-          OperationKind.textInsert,
-          {
-            'afterAtomId': null,
-            'atoms': [
-              {
-                'id': _id(1),
-                'text': 'Q',
-                'attributes': {'italic': true, 'color': 'red'},
-              },
-            ],
-          },
-          clock: 2,
-        ),
+        _op(30, OperationKind.textInsert, {
+          'afterAtomId': null,
+          'atoms': [
+            {
+              'id': _id(1),
+              'text': 'Q',
+              'attributes': {'italic': true, 'color': 'red'},
+            },
+          ],
+        }, clock: 2),
       );
       final alpha = _op(
         31,
@@ -222,41 +200,29 @@ void registerV2PlatformReplayChecks() {
     test('external embeds and duplicate atom IDs fail closed', () {
       final initial = OperationTextSequence.apply(
         {},
-        _op(
-          40,
-          OperationKind.textInsert,
+        _op(40, OperationKind.textInsert, {
+          'afterAtomId': null,
+          'atoms': [
+            {'id': _id(1), 'text': 'A'},
+          ],
+        }),
+      );
+      final external = _op(41, OperationKind.textInsert, {
+        'afterAtomId': _id(1),
+        'atoms': [
           {
-            'afterAtomId': null,
-            'atoms': [
-              {'id': _id(1), 'text': 'A'},
-            ],
+            'id': _id(3),
+            'text': '\uFFFC',
+            'embed': {'image': 'https://invalid.example/photo.png'},
           },
-        ),
-      );
-      final external = _op(
-        41,
-        OperationKind.textInsert,
-        {
-          'afterAtomId': _id(1),
-          'atoms': [
-            {
-              'id': _id(3),
-              'text': '\uFFFC',
-              'embed': {'image': 'https://invalid.example/photo.png'},
-            },
-          ],
-        },
-      );
-      final duplicate = _op(
-        42,
-        OperationKind.textInsert,
-        {
-          'afterAtomId': _id(1),
-          'atoms': [
-            {'id': _id(1), 'text': 'duplicate'},
-          ],
-        },
-      );
+        ],
+      });
+      final duplicate = _op(42, OperationKind.textInsert, {
+        'afterAtomId': _id(1),
+        'atoms': [
+          {'id': _id(1), 'text': 'duplicate'},
+        ],
+      });
       expect(
         () => OperationTextSequence.apply(initial, external),
         throwsFormatException,
@@ -265,42 +231,37 @@ void registerV2PlatformReplayChecks() {
         () => OperationTextSequence.apply(initial, duplicate),
         throwsFormatException,
       );
-      final attached = _op(
-        43,
-        OperationKind.textInsert,
-        {
-          'afterAtomId': _id(1),
-          'atoms': [
-            {
-              'id': _id(3),
-              'text': '\uFFFC',
-              'embed': {'pdf': 'asset:pdf-7'},
-            },
-          ],
-        },
+      final attached = _op(43, OperationKind.textInsert, {
+        'afterAtomId': _id(1),
+        'atoms': [
+          {
+            'id': _id(3),
+            'text': '\uFFFC',
+            'embed': {'pdf': 'asset:pdf-7'},
+          },
+        ],
+      });
+      expect(
+        OperationTextSequence.renderDelta(
+          OperationTextSequence.apply(initial, attached),
+        ),
+        [
+          {'insert': 'A'},
+          {
+            'insert': {'pdf': 'asset:pdf-7'},
+          },
+        ],
       );
-      expect(OperationTextSequence.renderDelta(
-        OperationTextSequence.apply(initial, attached),
-      ), [
-        {'insert': 'A'},
-        {
-          'insert': {'pdf': 'asset:pdf-7'},
-        },
-      ]);
       expect(OperationTextSequence.render(initial), 'A');
     });
 
     test('transport preserves Quill whitespace and UTF-8 operations', () {
-      final source = _op(
-        50,
-        OperationKind.textInsert,
-        {
-          'afterAtomId': null,
-          'atoms': [
-            {'id': _id(1), 'text': 'One  \t\n\n'},
-          ],
-        },
-      );
+      final source = _op(50, OperationKind.textInsert, {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': _id(1), 'text': 'One  \t\n\n'},
+        ],
+      });
       final encoded = jsonDecode(jsonEncode(source.toJson()));
       final decoded = OperationEnvelope.fromJson(
         Map<String, dynamic>.from(encoded as Map),
@@ -322,25 +283,17 @@ void registerV2PlatformReplayChecks() {
     test('invalid format target does not alter the existing projection', () {
       final initial = OperationTextSequence.apply(
         {},
-        _op(
-          60,
-          OperationKind.textInsert,
-          {
-            'afterAtomId': null,
-            'atoms': [
-              {'id': _id(1), 'text': 'A'},
-            ],
-          },
-        ),
+        _op(60, OperationKind.textInsert, {
+          'afterAtomId': null,
+          'atoms': [
+            {'id': _id(1), 'text': 'A'},
+          ],
+        }),
       );
-      final missing = _op(
-        61,
-        OperationKind.textFormat,
-        {
-          'atomIds': [_id(9)],
-          'attributes': {'italic': true},
-        },
-      );
+      final missing = _op(61, OperationKind.textFormat, {
+        'atomIds': [_id(9)],
+        'attributes': {'italic': true},
+      });
       expect(
         () => OperationTextSequence.apply(initial, missing),
         throwsFormatException,

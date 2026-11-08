@@ -2239,7 +2239,10 @@ void main() {
     expect(blobs, isEmpty);
   });
 
-  Future<void> checkCorruptQuillDeletion({required bool deletePage}) async {
+  Future<void> checkCorruptQuillDeletion({
+    required bool deletePage,
+    bool formatOnly = false,
+  }) async {
     const extraPage = 'corrupt-embed-page';
     final targetPage = deletePage ? extraPage : pageId;
     final objectId = deletePage ? 'corrupt-embed-page-text' : 'corrupt-text';
@@ -2283,6 +2286,7 @@ void main() {
       verifiedAssetBuffer: buffer,
     );
 
+    final embedAtomId = const Uuid().v4();
     await store.writeLocalBatch(
       actorId: 'valid-quill-setup',
       documentId: documentId,
@@ -2318,7 +2322,7 @@ void main() {
             'afterAtomId': null,
             'atoms': [
               {
-                'id': const Uuid().v4(),
+                'id': embedAtomId,
                 'text': '\uFFFC',
                 'embed': {'image': 'asset:$assetId'},
               },
@@ -2330,12 +2334,23 @@ void main() {
       apply: checkedProjector.apply,
     );
 
-    final deletion = LocalOperationDraft(
-      kind: deletePage ? OperationKind.pageDelete : OperationKind.objectDelete,
-      pageId: deletePage ? null : targetPage,
-      objectId: deletePage ? targetPage : objectId,
-      payload: const {},
-    );
+    final deletion = formatOnly
+        ? LocalOperationDraft(
+            kind: OperationKind.textFormat,
+            pageId: targetPage,
+            objectId: objectId,
+            payload: {
+              'atomIds': [embedAtomId],
+              'attributes': {'bold': true},
+            },
+          )
+        : LocalOperationDraft(
+            kind:
+                deletePage ? OperationKind.pageDelete : OperationKind.objectDelete,
+            pageId: deletePage ? null : targetPage,
+            objectId: deletePage ? targetPage : objectId,
+            payload: const {},
+          );
     final pendingBefore = await store.pending();
     await database.customStatement(
       'UPDATE operation_asset_bytes SET bytes = ? WHERE checksum_sha256 = ?',
@@ -2375,6 +2390,24 @@ void main() {
       [bytes, receipt['sha256']],
     );
     await write([deletion]);
+    if (formatOnly) {
+      final block = (await notebooks.getNotebook(documentId))!
+          .pages.single.textBlocks.single;
+      expect(block.deltaJson, contains('"bold":true'));
+      expect(
+        await database.customSelect(
+          'SELECT asset_id FROM asset_references '
+          'WHERE document_id = ? AND asset_id = ?',
+          variables: [
+            Variable<String>(documentId),
+            Variable<String>(assetId),
+          ],
+        ).get(),
+        hasLength(1),
+      );
+      expect(await store.pending(), hasLength(pendingBefore.length + 1));
+      return;
+    }
     expect(
       await database
           .customSelect(
@@ -2417,5 +2450,12 @@ void main() {
 
   test('page.delete refuses corrupt durable Quill BLOB', () async {
     await checkCorruptQuillDeletion(deletePage: true);
+  });
+
+  test('text.format refuses corrupt durable Quill BLOB', () async {
+    await checkCorruptQuillDeletion(
+      deletePage: false,
+      formatOnly: true,
+    );
   });
 }

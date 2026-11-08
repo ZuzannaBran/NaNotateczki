@@ -511,7 +511,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   wymagają powiązanej referencji SHA-256 oraz zgodnego MIME.
   Usunięcie bloku Quill lub całej strony odmawia commita przy uszkodzonym
   checksumowanym BLOB; path-only legacy pozostaje granicą migracji.
-  Regresje: `test/editor_sqlite_projector_test.dart` (object/page delete).
+  Regresje: `test/editor_sqlite_projector_test.dart`
+  (object/page delete i text.format przy uszkodzonym BLOB Quill).
   `localAssetReceipt` odczytuje niezmienne potwierdzenia assetu
   wyłącznie z historii wskazanego dokumentu, również po usunięciu
   ostatniego właściciela; nie zastępuje kontroli BLOB przez

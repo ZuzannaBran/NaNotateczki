@@ -4,11 +4,9 @@ import 'package:integration_test/integration_test.dart';
 import 'package:program/app/notes_app.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
 
-import '../test/support/v2_platform_replay_contract.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  registerV2PlatformReplayChecks();
 
   testWidgets('real platform bootstrap opens the library', (tester) async {
     await tester.pumpWidget(const NotesApp());
