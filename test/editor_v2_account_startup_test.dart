@@ -609,7 +609,7 @@ void main() {
       [local.operationId, localSet.operationId],
     );
   });
-  test('offline Quill formatting merges only disjoint atom attributes', () async {
+  test('offline Quill formatting merges distinct attributes', () async {
     final fixture = _Fixture(NativeDatabase.memory());
     addTearDown(fixture.close);
     expect(
@@ -651,7 +651,7 @@ void main() {
       payload: const {
         'afterAtomId': null,
         'atoms': [
-          {'id': atomId, 'text': 'Hello\\n'},
+          {'id': atomId, 'text': 'Hello\n'},
         ],
       },
       apply: fixture.runtime.projector.apply,
@@ -726,10 +726,10 @@ void main() {
         .pages.single.textBlocks.single;
     expect(afterConflict.deltaJson, merged.deltaJson);
     expect(
-      (await fixture.runtime.store.pending(includeDeferred: true))
-          .map((operation) => operation.operationId),
+      (await fixture.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
       [local.operationId],
     );
   });
-
 }

@@ -19,6 +19,10 @@ if bash .github/scripts/ios_integration_matrix.sh; then
 fi
 test ! -e "$TRACE_FILE"
 
+for suite in bootstrap.main documents.main pointer.main; do
+  grep -Fq "$suite" integration_test/native_platform_matrix_test.dart
+done
+
 bash .github/scripts/ios_integration_matrix.sh 'device-123'
 test "$(wc -l < "$TRACE_FILE")" -eq 1
 grep -Fx 'test integration_test/native_platform_matrix_test.dart -d device-123 --dart-define=NANOTATECZKI_ISOLATED_CI=true --reporter expanded --timeout 3m' "$TRACE_FILE"
