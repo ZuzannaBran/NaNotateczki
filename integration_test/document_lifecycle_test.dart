@@ -94,10 +94,7 @@ void main() {
       final now = DateTime.now().toUtc().toIso8601String();
 
       Future<List<OperationEnvelope>> pendingDocument() async {
-        final entries = await store.pending(
-          limit: 1000,
-          includeDeferred: true,
-        );
+        final entries = await store.pending(limit: 1000, includeDeferred: true);
         return entries.where((op) => op.documentId == documentId).toList();
       }
 
@@ -181,8 +178,9 @@ void main() {
         );
         expect(await pendingDocument(), hasLength(4));
         expect(
-          (await repository.getNotebook(documentId))!
-              .pages.single.textBlocks.single.deltaJson,
+          (await repository.getNotebook(
+            documentId,
+          ))!.pages.single.textBlocks.single.deltaJson,
           saved.pages.single.textBlocks.single.deltaJson,
         );
 
@@ -204,8 +202,9 @@ void main() {
         );
         expect(formatted.single.actorSeq, 5);
         expect(
-          (await repository.getNotebook(documentId))!
-              .pages.single.textBlocks.single.deltaJson,
+          (await repository.getNotebook(
+            documentId,
+          ))!.pages.single.textBlocks.single.deltaJson,
           contains('"bold":true'),
         );
         expect(await pendingDocument(), hasLength(5));

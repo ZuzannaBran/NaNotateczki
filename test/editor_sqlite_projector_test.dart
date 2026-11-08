@@ -2392,18 +2392,21 @@ void main() {
     );
     await write([deletion]);
     if (formatOnly) {
-      final block = (await notebooks.getNotebook(documentId))!
-          .pages.single.textBlocks.single;
+      final block = (await notebooks.getNotebook(
+        documentId,
+      ))!.pages.single.textBlocks.single;
       expect(block.deltaJson, contains('"bold":true'));
       expect(
-        await database.customSelect(
-          'SELECT asset_id FROM asset_references '
-          'WHERE document_id = ? AND asset_id = ?',
-          variables: [
-            Variable<String>(documentId),
-            Variable<String>(assetId),
-          ],
-        ).get(),
+        await database
+            .customSelect(
+              'SELECT asset_id FROM asset_references '
+              'WHERE document_id = ? AND asset_id = ?',
+              variables: [
+                Variable<String>(documentId),
+                Variable<String>(assetId),
+              ],
+            )
+            .get(),
         hasLength(1),
       );
       expect(await store.pending(), hasLength(pendingBefore.length + 1));
@@ -2454,9 +2457,6 @@ void main() {
   });
 
   test('text.format refuses corrupt durable Quill BLOB', () async {
-    await checkCorruptQuillDeletion(
-      deletePage: false,
-      formatOnly: true,
-    );
+    await checkCorruptQuillDeletion(deletePage: false, formatOnly: true);
   });
 }

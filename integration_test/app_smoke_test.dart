@@ -4,7 +4,6 @@ import 'package:integration_test/integration_test.dart';
 import 'package:program/app/notes_app.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
 
-
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 

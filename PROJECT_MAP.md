@@ -2758,6 +2758,11 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `test/editor_v2_offline_media_test.dart`: dodatkowy test PNG i PDF
   zastąpienia assetu przed restartem, potem replay na drugim SQLite,
   zgodność BLOB/referencji, kursora i brak duplikatów w outboxie.
+- `.github/scripts/flutter_sqlite3_download_retry.sh`:
+  tylko pojedyncza ponowna próba Chrome po błędzie SHA-256 pobrania
+  natywnej binarki sqlite3, bez pomijania kontroli checksum lub
+  ignorowania błędów testów; sam skrypt chroniony testem powtórzeń
+  `test_flutter_sqlite3_download_retry.sh`.
 - `test/support/v2_platform_replay_contract.dart` i
   `test/cross_platform/v2_replay_contract_test.dart`: sześć przenośnych
   regresji Quill, kolejności, tombstone, asset embed, transportu i formatowania;

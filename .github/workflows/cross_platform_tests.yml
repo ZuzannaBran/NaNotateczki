@@ -50,6 +50,8 @@ jobs:
         run: dart analyze
       - name: Verify DDS startup retry handles only infrastructure failures
         run: bash .github/scripts/test_flutter_integration_retry.sh
+      - name: Verify sqlite3 hash retry never masks test failures
+        run: bash .github/scripts/test_flutter_sqlite3_download_retry.sh
       - name: Execute non-render native test suite
         shell: bash
         run: |
@@ -281,7 +283,9 @@ jobs:
       - run: flutter config --enable-web
       - run: flutter pub get
       - name: Browser-compatible regressions
-        run: flutter test --platform chrome test/cross_platform --reporter expanded
+        run: >-
+          bash .github/scripts/flutter_sqlite3_download_retry.sh
+          --platform chrome test/cross_platform --reporter expanded
       - name: Compile complete web application
         run: flutter build web --release --no-web-resources-cdn
       - name: Validate runtime assets and package the Cloudflare upload

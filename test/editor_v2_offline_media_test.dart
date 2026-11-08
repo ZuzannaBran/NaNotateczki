@@ -452,9 +452,7 @@ void main() {
         final previous = (await repository.getNotebook(notebook.uid))!;
         final next = previous.pages.single.copyWith(
           imageBlocks: [
-            previous.pages.single.imageBlocks.single.copyWith(
-              bytes: newBytes,
-            ),
+            previous.pages.single.imageBlocks.single.copyWith(bytes: newBytes),
           ],
         );
         final replacement = await writer.writePageChange(
@@ -474,8 +472,9 @@ void main() {
         await engine.stop();
         await first.close();
         first = NotesDatabase(NativeDatabase(file));
-        final recovered = (await NotebookRepository(first)
-            .getNotebook(notebook.uid))!;
+        final recovered = (await NotebookRepository(
+          first,
+        ).getNotebook(notebook.uid))!;
         expect(
           recovered.pages.single.imageBlocks.single.bytes,
           orderedEquals(newBytes),
@@ -514,10 +513,7 @@ void main() {
             final properties = operation.payload['properties'];
             final assetId = properties is Map ? properties['assetId'] : null;
             if (assetId is String) {
-              peerBuffer.stage(
-                receipt: receipts[assetId]!,
-                bytes: newBytes,
-              );
+              peerBuffer.stage(receipt: receipts[assetId]!, bytes: newBytes);
             }
           }
           expect(
@@ -530,16 +526,17 @@ void main() {
             isTrue,
           );
         }
-        final peer = (await NotebookRepository(second)
-            .getNotebook(notebook.uid))!;
+        final peer = (await NotebookRepository(
+          second,
+        ).getNotebook(notebook.uid))!;
         expect(peer.pages.single.imageBlocks.single.id, image.id);
         expect(
           peer.pages.single.imageBlocks.single.bytes,
           orderedEquals(newBytes),
         );
-        final references = await second.customSelect(
-          'SELECT asset_id FROM asset_references',
-        ).get();
+        final references = await second
+            .customSelect('SELECT asset_id FROM asset_references')
+            .get();
         expect(references, hasLength(1));
         expect(
           references.single.read<String>('asset_id'),
