@@ -732,202 +732,371 @@ void main() {
     );
   });
 
-  test(
-    'remote metadata preserves offline ink; delete waits for ACK',
-    () async {
-      final f = _Fixture(NativeDatabase.memory());
-      addTearDown(f.close);
-      expect(
-        await f.runtime.startForCurrentAccount(isCurrent: () => true),
-        isTrue,
-      );
-      final note = await f.repository.createNotebook();
-      await f.runtime.engine.syncNow();
-      final page = note.pages.single.id;
-      final local = await f.runtime.store.writeLocal(
-        actorId: f.runtime.engine.actorIdForDocument(note.uid),
-        documentId: note.uid,
-        kind: OperationKind.strokeCreate,
-        pageId: page,
-        objectId: 'offline-ink',
-        payload: const {
-          'value': {
-            'objectType': 'stroke',
-            'colorValue': 0xFF123456,
-            'width': 2.0,
-            'toolIndex': 0,
-            'sortIndex': 0,
-            'points': [
-              [1.0, 2.0, 0.5],
-            ],
-          },
+  test('remote metadata preserves offline ink; delete waits for ACK', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final page = note.pages.single.id;
+    final local = await f.runtime.store.writeLocal(
+      actorId: f.runtime.engine.actorIdForDocument(note.uid),
+      documentId: note.uid,
+      kind: OperationKind.strokeCreate,
+      pageId: page,
+      objectId: 'offline-ink',
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF123456,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
         },
-        apply: f.runtime.projector.apply,
-      );
-      f.rejectPosts = true;
-      final rename = OperationEnvelope(
-        operationId: '00000000-0000-4000-8000-000000009911',
-        actorId: 'metadata-peer',
-        actorSeq: 1,
-        logicalClock: local.logicalClock + 1,
-        dependencies: [f.accepted.last['operationId'] as String],
-        documentId: note.uid,
-        kind: OperationKind.documentSet,
-        payload: const {'properties': {'title': 'Remote title'}},
-      );
-      f.accepted.add(rename.toJson());
-      await f.runtime.engine.syncNow();
-      final bookmark = OperationEnvelope(
-        operationId: '00000000-0000-4000-8000-000000009912',
-        actorId: 'metadata-peer',
-        actorSeq: 2,
-        logicalClock: rename.logicalClock + 1,
-        dependencies: [rename.operationId],
-        documentId: note.uid,
-        objectId: page,
-        kind: OperationKind.pageSet,
-        payload: const {'properties': {'isBookmarked': true}},
-      );
-      f.accepted.add(bookmark.toJson());
-      await f.runtime.engine.syncNow();
-      final merged = (await f.repository.getNotebook(note.uid))!;
-      expect(merged.title, 'Remote title');
-      expect(merged.pages.single.isBookmarked, isTrue);
-      expect(merged.pages.single.inkStrokes.single.id, local.objectId);
-      final cursor = await f.runtime.store.checkpoint(
-        'account:startup-account',
-      );
-      expect(cursor, 4);
-      final deletion = OperationEnvelope(
-        operationId: '00000000-0000-4000-8000-000000009913',
-        actorId: 'metadata-peer',
-        actorSeq: 3,
-        logicalClock: bookmark.logicalClock + 1,
-        dependencies: [bookmark.operationId],
-        documentId: note.uid,
-        kind: OperationKind.documentDelete,
-        payload: const {},
-      );
-      f.accepted.add(deletion.toJson());
-      await f.runtime.engine.syncNow();
-      expect(
-        await f.runtime.store.checkpoint('account:startup-account'),
-        cursor,
-      );
-      expect(
-        await f.runtime.store.operation(deletion.operationId),
-        isNull,
-      );
-      final preserved = (await f.repository.getNotebook(note.uid))!;
-      expect(preserved.pages.single.inkStrokes.single.id, local.objectId);
-      expect(
-        (await f.runtime.store.pending(
-          includeDeferred: true,
-        )).map((operation) => operation.operationId),
-        [local.operationId],
-      );
-    },
-  );
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final rename = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009911',
+      actorId: 'metadata-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Remote title'},
+      },
+    );
+    f.accepted.add(rename.toJson());
+    await f.runtime.engine.syncNow();
+    final bookmark = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009912',
+      actorId: 'metadata-peer',
+      actorSeq: 2,
+      logicalClock: rename.logicalClock + 1,
+      dependencies: [rename.operationId],
+      documentId: note.uid,
+      objectId: page,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+    );
+    f.accepted.add(bookmark.toJson());
+    await f.runtime.engine.syncNow();
+    final merged = (await f.repository.getNotebook(note.uid))!;
+    expect(merged.title, 'Remote title');
+    expect(merged.pages.single.isBookmarked, isTrue);
+    expect(merged.pages.single.inkStrokes.single.id, local.objectId);
+    final cursor = await f.runtime.store.checkpoint('account:startup-account');
+    expect(cursor, 4);
+    final deletion = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009913',
+      actorId: 'metadata-peer',
+      actorSeq: 3,
+      logicalClock: bookmark.logicalClock + 1,
+      dependencies: [bookmark.operationId],
+      documentId: note.uid,
+      kind: OperationKind.documentDelete,
+      payload: const {},
+    );
+    f.accepted.add(deletion.toJson());
+    await f.runtime.engine.syncNow();
+    expect(await f.runtime.store.checkpoint('account:startup-account'), cursor);
+    expect(await f.runtime.store.operation(deletion.operationId), isNull);
+    final preserved = (await f.repository.getNotebook(note.uid))!;
+    expect(preserved.pages.single.inkStrokes.single.id, local.objectId);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [local.operationId],
+    );
+  });
 
-  test(
-    'offline Quill insert commutes with format on existing atom',
-    () async {
-      final f = _Fixture(NativeDatabase.memory());
-      addTearDown(f.close);
-      expect(
-        await f.runtime.startForCurrentAccount(isCurrent: () => true),
-        isTrue,
-      );
-      final note = await f.repository.createNotebook();
-      await f.runtime.engine.syncNow();
-      final page = note.pages.single.id;
-      final actor = f.runtime.engine.actorIdForDocument(note.uid);
-      const textId = 'offline-quill-insert';
-      const first = '00000000-0000-4000-8000-000000009951';
-      const second = '00000000-0000-4000-8000-000000009952';
-      await f.runtime.store.writeLocal(
-        actorId: actor,
-        documentId: note.uid,
-        pageId: page,
-        objectId: textId,
-        kind: OperationKind.objectCreate,
-        payload: const {
-          'value': {
-            'objectType': 'text',
-            'dx': 5.0,
-            'dy': 6.0,
-            'width': 160.0,
-            'fontSize': 18.0,
-            'rotation': 0.0,
-            'colorValue': 0xFF224466,
-            'sortIndex': 0,
-          },
+  test('offline Quill insert commutes with format on existing atom', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final page = note.pages.single.id;
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    const textId = 'offline-quill-insert';
+    const first = '00000000-0000-4000-8000-000000009951';
+    const second = '00000000-0000-4000-8000-000000009952';
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: page,
+      objectId: textId,
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {
+          'objectType': 'text',
+          'dx': 5.0,
+          'dy': 6.0,
+          'width': 160.0,
+          'fontSize': 18.0,
+          'rotation': 0.0,
+          'colorValue': 0xFF224466,
+          'sortIndex': 0,
         },
-        apply: f.runtime.projector.apply,
-      );
-      await f.runtime.store.writeLocal(
-        actorId: actor,
-        documentId: note.uid,
-        pageId: page,
-        objectId: textId,
-        kind: OperationKind.textInsert,
-        payload: const {
-          'afterAtomId': null,
-          'atoms': [
-            {'id': first, 'text': 'Hello\n'},
-          ],
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: page,
+      objectId: textId,
+      kind: OperationKind.textInsert,
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': first, 'text': 'Hello\n'},
+        ],
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final local = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: page,
+      objectId: textId,
+      kind: OperationKind.textInsert,
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': second, 'text': 'Offline '},
+        ],
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009953',
+      actorId: 'quill-insert-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      pageId: page,
+      objectId: textId,
+      kind: OperationKind.textFormat,
+      payload: const {
+        'atomIds': [first],
+        'attributes': {'bold': true},
+      },
+    );
+    f.accepted.add(remote.toJson());
+    await f.runtime.engine.syncNow();
+    final block = (await f.repository.getNotebook(
+      note.uid,
+    ))!.pages.single.textBlocks.single;
+    expect(block.text, contains('Offline '));
+    expect(block.text, contains('Hello'));
+    expect(block.deltaJson, contains('"bold":true'));
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 5);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [local.operationId],
+    );
+  });
+
+  test('offline page title and remote bookmark keep both edits', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final page = note.pages.single.id;
+    final local = await f.runtime.store.writeLocal(
+      actorId: f.runtime.engine.actorIdForDocument(note.uid),
+      documentId: note.uid,
+      kind: OperationKind.pageSet,
+      objectId: page,
+      payload: const {
+        'properties': {'title': 'Offline page title'},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009961',
+      actorId: 'page-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      objectId: page,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+    );
+    f.accepted.add(remote.toJson());
+    await f.runtime.engine.syncNow();
+    final merged = (await f.repository.getNotebook(note.uid))!;
+    expect(merged.pages.single.title, 'Offline page title');
+    expect(merged.pages.single.isBookmarked, isTrue);
+    final cursor = await f.runtime.store.checkpoint(
+      'account:startup-account',
+    );
+    expect(cursor, 3);
+
+    final conflicting = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009962',
+      actorId: 'page-peer',
+      actorSeq: 2,
+      logicalClock: remote.logicalClock + 1,
+      dependencies: [remote.operationId],
+      documentId: note.uid,
+      objectId: page,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'title': 'Conflicting title'},
+      },
+    );
+    f.accepted.add(conflicting.toJson());
+    await f.runtime.engine.syncNow();
+    expect(
+      await f.runtime.store.checkpoint('account:startup-account'),
+      cursor,
+    );
+    expect(await f.runtime.store.operation(conflicting.operationId), isNull);
+    final unchanged = (await f.repository.getNotebook(note.uid))!;
+    expect(unchanged.pages.single.title, 'Offline page title');
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [local.operationId],
+    );
+  });
+
+  test('offline Quill inserts survive replay without duplicates', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final page = note.pages.single.id;
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    const textId = 'quill-concurrent-inserts';
+    const originalId = '00000000-0000-4000-8000-000000009971';
+    const offlineId = '00000000-0000-4000-8000-000000009972';
+    const remoteId = '00000000-0000-4000-8000-000000009973';
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: page,
+      objectId: textId,
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {
+          'objectType': 'text',
+          'dx': 5.0,
+          'dy': 6.0,
+          'width': 160.0,
+          'fontSize': 18.0,
+          'rotation': 0.0,
+          'colorValue': 0xFF224466,
+          'sortIndex': 0,
         },
-        apply: f.runtime.projector.apply,
-      );
-      await f.runtime.engine.syncNow();
-      final local = await f.runtime.store.writeLocal(
-        actorId: actor,
-        documentId: note.uid,
-        pageId: page,
-        objectId: textId,
-        kind: OperationKind.textInsert,
-        payload: const {
-          'afterAtomId': null,
-          'atoms': [
-            {'id': second, 'text': 'Offline '},
-          ],
-        },
-        apply: f.runtime.projector.apply,
-      );
-      f.rejectPosts = true;
-      final remote = OperationEnvelope(
-        operationId: '00000000-0000-4000-8000-000000009953',
-        actorId: 'quill-insert-peer',
-        actorSeq: 1,
-        logicalClock: local.logicalClock + 1,
-        dependencies: [f.accepted.last['operationId'] as String],
-        documentId: note.uid,
-        pageId: page,
-        objectId: textId,
-        kind: OperationKind.textFormat,
-        payload: const {
-          'atomIds': [first],
-          'attributes': {'bold': true},
-        },
-      );
-      f.accepted.add(remote.toJson());
-      await f.runtime.engine.syncNow();
-      final block = (await f.repository.getNotebook(
-        note.uid,
-      ))!.pages.single.textBlocks.single;
-      expect(block.text, contains('Offline '));
-      expect(block.text, contains('Hello'));
-      expect(block.deltaJson, contains('"bold":true'));
-      expect(
-        await f.runtime.store.checkpoint('account:startup-account'),
-        5,
-      );
-      expect(
-        (await f.runtime.store.pending(
-          includeDeferred: true,
-        )).map((operation) => operation.operationId),
-        [local.operationId],
-      );
-    },
-  );
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: page,
+      objectId: textId,
+      kind: OperationKind.textInsert,
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': originalId, 'text': 'Base\n'},
+        ],
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final local = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: page,
+      objectId: textId,
+      kind: OperationKind.textInsert,
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': offlineId, 'text': 'Offline '},
+        ],
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009974',
+      actorId: 'insert-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      pageId: page,
+      objectId: textId,
+      kind: OperationKind.textInsert,
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': remoteId, 'text': 'Remote '},
+        ],
+      },
+    );
+    f.accepted.add(remote.toJson());
+    await f.runtime.engine.syncNow();
+    final merged = (await f.repository.getNotebook(
+      note.uid,
+    ))!.pages.single.textBlocks.single;
+    expect(merged.text, contains('Base'));
+    expect(merged.text, contains('Offline '));
+    expect(merged.text, contains('Remote '));
+    final cursor = await f.runtime.store.checkpoint(
+      'account:startup-account',
+    );
+    expect(cursor, 5);
+    await f.runtime.engine.syncNow();
+    final replayed = (await f.repository.getNotebook(
+      note.uid,
+    ))!.pages.single.textBlocks.single;
+    expect(replayed.deltaJson, merged.deltaJson);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [local.operationId],
+    );
+  });
+
 }

@@ -1,5 +1,34 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Kolejny pakiet rebase + diagnostyka (2026-11-08)
+
+Czysty moduł V2OutboxConflictPolicy oddziela decyzję o bezpiecznym
+scaleniu od transportu. Dopuszcza zdalne document.set/page.set
+z rozłącznymi zmianami obiektow i innych pól metadanych. Rozłączne
+pola tego samego obiektu oraz niezależne text.insert/text.delete/
+text.format na atomach Quill mogą przejsc bez przepisywania outboxu.
+Zachowane sa kotwice CRDT i porządek aktora.
+
+Wspólny atrybut, wspolny atom, kolizja assetId (również wewnątrz
+Quill embed), kotwica wymagająca niepotwierdzonego atomu, zmiana
+kontenera lub usuniecie danych blokuje dalszy cursor do pełnego rebase.
+Nie ma fallbacku do snapshotow v1.
+
+Nowe testy jednostkowe test/v2_outbox_conflict_policy_test.dart
+sprawdzają metadane, CRDT, kolejnosc, konflikty i media. Testy
+test/editor_v2_account_startup_test.dart zawieraja dodatkowe REST +
+SQLite przypadki równoległych zmian strony i Quill, sprawdzając
+outbox oraz brak duplikacji po powtórnym pull.
+
+Macierz iPad po 20 minutach bez ukończenia testu przerywa oczekiwanie
+zamiast po 30 minutach i zapisuje diagnostyke symulatora (logi,
+procesy, ekran). To narzędzie do ustalenia przyczyny zawieszenia,
+a nie potwierdzenie naprawy uruchomienia.
+
+Backend etapu 4 zaliczyl CI 42511643976. Aplikacja pozostaje opt-in:
+migracja starszych kont, pelny rebase move/delete i produkcyjny
+cutover nadal sa niedokończone. Testy tego pakietu wymagają CI.
+
 ## Niezależne metadane i atomy przy zaległym outboxie (2026-11-08)
 
 W opt-in v2 'document.set' i 'page.set' mogą zostać odebrane podczas

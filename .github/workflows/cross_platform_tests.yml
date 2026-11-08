@@ -587,5 +587,29 @@ jobs:
           xcrun simctl bootstatus "$SIMULATOR_UDID" -b
           echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
       - name: Run all iOS integration cases in a single app process
-        timeout-minutes: 30
+        timeout-minutes: 20
         run: bash .github/scripts/ios_integration_matrix.sh "$SIMULATOR_UDID"
+      - name: Capture iPad simulator launch diagnostics on failure
+        if: ${{ failure() && matrix.device == 'iPad' }}
+        shell: bash
+        timeout-minutes: 3
+        continue-on-error: true
+        run: |
+          mkdir -p .ci-artifacts/ipad
+          xcrun simctl list devices booted > .ci-artifacts/ipad/devices.txt
+          ps aux | grep -E 'Runner|flutter|xcodebuild|simctl' \
+            > .ci-artifacts/ipad/processes.txt || true
+          xcrun simctl spawn "$SIMULATOR_UDID" log show \
+            --last 5m --style compact \
+            --predicate '(process == "Runner") OR (process == "testmanagerd")' \
+            > .ci-artifacts/ipad/simulator.log 2>&1 || true
+          xcrun simctl io "$SIMULATOR_UDID" screenshot \
+            .ci-artifacts/ipad/screen.png || true
+      - name: Upload iPad integration diagnostics
+        if: ${{ failure() && matrix.device == 'iPad' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ipad-integration-diagnostics
+          path: .ci-artifacts/ipad
+          retention-days: 5
+          if-no-files-found: warn

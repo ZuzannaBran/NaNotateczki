@@ -623,6 +623,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Regresja: `test/editor_controller_v2_test.dart` (restart Undo/Redo).
 
 
+- lib/data/sync/v2_outbox_conflict_policy.dart:
+  V2OutboxConflictPolicy.canApply jest bezstanowa kontrola
+  bezpiecznego scalania kazdego remote z calym lokalnym outboxem
+  danego dokumentu. Obejmuje metadane, rozlaczne pola, Quill
+  insert/delete/format, atomy, kotwice i assety embedow.
+  Regresje: test/v2_outbox_conflict_policy_test.dart.
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
@@ -631,8 +637,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   zapisane mimo lokalnego outboxu. Tak samo `text.format` na
   rozłącznych atomach/atrybutach Quill. Kolizje pól, formatowania
   i assetów oraz zmiany kontenera blokują kursor do pełnego rebase.
-  201: `attachEditor`; 210: `detachEditor`; 217: `editorForDocument`;
-  244: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
+  101: `attachEditor`; 110: `detachEditor`; 117: `editorForDocument`;
+  144: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
   sprawdza właściciela przed startem i po każdym await. Anulowanie
   zatrzymuje transport, zachowując blokadę snapshotów v1. Przekazuje
   `isCurrent` do silnika, aby ponowił kontrolę po drenażu starej generacji.
@@ -642,6 +648,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   formatowanie Quill i konflikt wspólnego atrybutu/atomu;
   dodatkowe regresje: zdalne metadane przy offline ink, ochrona
   przed document.delete i niezależny Quill insert + format;
+  Dodatkowe przypadki: konkurencyjne metadane strony i inserty Quill;
   produkcyjne realtime pozostaje domyślnie włączone i jest testowane
   przez realny Linux E2E, który używa tego samego startu co AppScope.
 - `lib/app/app_scope.dart`: przełączenie konta v2 jest **opt-in** przez

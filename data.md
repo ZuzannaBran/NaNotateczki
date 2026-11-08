@@ -1,5 +1,14 @@
 # Dane NaNotateczki
 
+## Częściowy rebase offline v2 (2026-11-08)
+
+Reguły V2OutboxConflictPolicy dopuszczają rozlaczne metadane dokumentu
+i strony oraz niezależne operacje atomowe Quill. Nie przesuwają
+actorSeq, nie usuwają z outboxu ani nie przywracają snapshotow.
+Niepotwierdzone kotwice CRDT, kolizja assetow (w tym Quill embed),
+wspólne pola i usunięcia sa blokowane do pełnego rebase.
+Nowe testy REST/SQLite i jednostkowe musza przejsc Actions.
+
 ## Bezkolizyjne metadane i Quill przy offline outboxie (2026-11-08)
 
 Opt-in runtime v2 dopuszcza 'document.set'/'page.set' podczas lokalnych
