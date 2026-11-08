@@ -93,6 +93,14 @@ void main() {
       const atomId = '12345678-1234-4234-8234-123456789abc';
       final now = DateTime.now().toUtc().toIso8601String();
 
+      Future<List<OperationEnvelope>> pendingDocument() async {
+        final entries = await store.pending(
+          limit: 1000,
+          includeDeferred: true,
+        );
+        return entries.where((op) => op.documentId == documentId).toList();
+      }
+
       try {
         final created = await store.writeLocalBatch(
           actorId: actorId,
@@ -150,7 +158,7 @@ void main() {
         expect(created, hasLength(4));
         final saved = (await repository.getNotebook(documentId))!;
         expect(saved.pages.single.textBlocks.single.text, 'Hello  ');
-        expect(await store.pending(), hasLength(4));
+        expect(await pendingDocument(), hasLength(4));
 
         await expectLater(
           store.writeLocalBatch(
@@ -171,7 +179,7 @@ void main() {
           ),
           throwsFormatException,
         );
-        expect(await store.pending(), hasLength(4));
+        expect(await pendingDocument(), hasLength(4));
         expect(
           (await repository.getNotebook(documentId))!
               .pages.single.textBlocks.single.deltaJson,
@@ -200,7 +208,7 @@ void main() {
               .pages.single.textBlocks.single.deltaJson,
           contains('"bold":true'),
         );
-        expect(await store.pending(), hasLength(5));
+        expect(await pendingDocument(), hasLength(5));
       } finally {
         if (await repository.getNotebook(documentId) != null) {
           await store.writeLocal(
@@ -215,5 +223,4 @@ void main() {
     },
     skip: !_isolated,
   );
-
 }
