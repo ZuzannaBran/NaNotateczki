@@ -513,12 +513,46 @@ void main() {
     expect(merged.width, 3.0);
     expect(merged.color.toARGB32(), 0xFF345678);
 
-    final competing = OperationEnvelope(
+    final remoteShape = OperationEnvelope(
       operationId: '00000000-0000-4000-8000-000000000503',
       actorId: 'other-device',
       actorSeq: 3,
       logicalClock: remoteColor.logicalClock + 1,
       dependencies: [remoteColor.operationId],
+      documentId: notebook.uid,
+      pageId: pageId,
+      objectId: remote.objectId,
+      kind: OperationKind.objectTransform,
+      payload: const {
+        'properties': {
+          'points': [
+            [10.0, 20.0, 0.5],
+            [11.0, 21.0, 0.5],
+          ],
+        },
+      },
+    );
+    fixture.accepted.add(remoteShape.toJson());
+    await fixture.runtime.engine.syncNow();
+    expect(
+      await fixture.runtime.store.checkpoint('account:startup-account'),
+      5,
+    );
+    final afterShape = (await fixture.repository.getNotebook(notebook.uid))!
+        .pages.single.inkStrokes.singleWhere(
+          (stroke) => stroke.id == remote.objectId,
+        );
+    expect(afterShape.width, 3.0);
+    expect(afterShape.color.toARGB32(), 0xFF345678);
+    expect(afterShape.points, hasLength(2));
+    expect(afterShape.points.last.dx, 11.0);
+
+    final competing = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000000504',
+      actorId: 'other-device',
+      actorSeq: 4,
+      logicalClock: remoteShape.logicalClock + 1,
+      dependencies: [remoteShape.operationId],
       documentId: notebook.uid,
       pageId: pageId,
       objectId: remote.objectId,
@@ -531,7 +565,7 @@ void main() {
     await fixture.runtime.engine.syncNow();
     expect(
       await fixture.runtime.store.checkpoint('account:startup-account'),
-      4,
+      5,
     );
     expect(
       await fixture.runtime.store.operation(competing.operationId),

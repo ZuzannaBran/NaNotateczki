@@ -3,13 +3,16 @@
 ## Przyrost rebase niezależnych obiektów — 2026-11-08
 
 Runtime konta v2 aplikuje zdalną operację obiektu przy lokalnym outboxie
-gdy wszystkie oczekujące operacje dotyczą innych UID albo zmieniają
-rozłączne pola `object.set` tego samego UID, bez `assetId`. Kolizja ID
-assetu na różnych obiektach jest również traktowana jako konflikt.
+gdy wszystkie oczekujące operacje dotyczą innych UID albo rozłącznych
+pól `object.set`, `object.transform`, `object.reorder` tego samego
+UID (bez `assetId`). Dzięki temu zmiana geometrii kreski i niezależna
+zmiana koloru/szerokości nie blokują wzajemnie kursora. Kolizja ID
+assetu na różnych obiektach nadal jest traktowana jako konflikt.
 SQLite zatwierdza patch i envelope bez modyfikowania lokalnego outboxu.
 Zmiany kontenera, współdzielonego pola lub assetu blokują kursor do
 pełnego rebase. Test HTTP/SQLite obejmuje offline ink, rozłączne
-zmiany koloru i szerokości oraz konflikt wspólnej szerokości.
+zmiany koloru, szerokości i punktów kształtu, a także konflikt
+wspólnej szerokości.
 Nie włączać produkcyjnego cutover na podstawie tego przyrostu.
 
 ## Regresje Dart, Android i izolacja testów iOS (2026-11-08)

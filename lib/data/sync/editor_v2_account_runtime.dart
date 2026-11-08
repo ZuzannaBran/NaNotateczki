@@ -11,13 +11,18 @@ import 'operation_store.dart';
 import 'sync_engine.dart';
 import 'verified_editor_asset_buffer.dart';
 
-/// Two scalar property edits of the same UID can merge by field.
+/// Disjoint object properties commute, including geometry and ordering.
 bool _canMergeDifferentFields(
   OperationEnvelope remote,
   OperationEnvelope local,
 ) {
-  if (remote.kind != OperationKind.objectSet ||
-      local.kind != OperationKind.objectSet ||
+  const safeKinds = {
+    OperationKind.objectSet,
+    OperationKind.objectTransform,
+    OperationKind.objectReorder,
+  };
+  if (!safeKinds.contains(remote.kind) ||
+      !safeKinds.contains(local.kind) ||
       remote.pageId != local.pageId) {
     return false;
   }

@@ -626,17 +626,18 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
-  dotyczące różnych UID oraz rozłączne pola `object.set` tego samego
-  UID mogą być zapisane mimo lokalnego outboxu. Kolizje pól, assetów
+  dotyczące różnych UID oraz rozłączne pola `object.set`,
+  `object.transform` i `object.reorder` tego samego UID mogą być
+  zapisane mimo lokalnego outboxu. Kolizje pól, assetów
   i zmiany kontenera blokują kursor do pełnego rebase.
-  165: `attachEditor`; 174: `detachEditor`; 181: `editorForDocument`;
-  208: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
+  170: `attachEditor`; 179: `detachEditor`; 186: `editorForDocument`;
+  213: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
   sprawdza właściciela przed startem i po każdym await. Anulowanie
   zatrzymuje transport, zachowując blokadę snapshotów v1. Przekazuje
   `isCurrent` do silnika, aby ponowił kontrolę po drenażu starej generacji.
   Regresje: `test/editor_v2_account_startup_test.dart` obejmują
   izolowany HTTP, outbox offline, niezależną zdalną kreskę, rozłączne
-  pola tego samego UID i konflikt wspólnego pola bez WebSocket;
+  kolor/szerokość/transformację tego samego UID i konflikt wspólnego pola;
   produkcyjne realtime pozostaje domyślnie włączone i jest testowane
   przez realny Linux E2E, który używa tego samego startu co AppScope.
 - `lib/app/app_scope.dart`: przełączenie konta v2 jest **opt-in** przez
