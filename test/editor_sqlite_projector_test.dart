@@ -2166,7 +2166,10 @@ void main() {
           .customSelect(
             'SELECT asset_id FROM asset_references '
             'WHERE document_id = ? AND asset_id = ?',
-            variables: [Variable<String>(documentId), Variable<String>(assetId)],
+            variables: [
+              Variable<String>(documentId),
+              Variable<String>(assetId),
+            ],
           )
           .get(),
       hasLength(1),
@@ -2191,7 +2194,10 @@ void main() {
           .customSelect(
             'SELECT asset_id FROM asset_references '
             'WHERE document_id = ? AND asset_id = ?',
-            variables: [Variable<String>(documentId), Variable<String>(assetId)],
+            variables: [
+              Variable<String>(documentId),
+              Variable<String>(assetId),
+            ],
           )
           .get(),
       isEmpty,
