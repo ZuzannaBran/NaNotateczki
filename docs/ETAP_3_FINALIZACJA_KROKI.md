@@ -1,5 +1,19 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Uzupełnienie pokrycia po audycie (2026-11-08)
+
+Test `editor_sqlite_projector_test.dart` odtwarza uszkodzony embed przy
+`text.format` i wymaga atomowego rollbacku, nie tylko na delete.
+`editor_v2_offline_media_test.dart` dodaje dwa przypadki podmiany
+PNG/PDF: attach → set → detach, ponowne otwarcie źródłowej SQLite,
+replay całego dziennika na drugiej bazie, jeden aktywny asset i outbox.
+`integration_test/document_lifecycle_test.dart` uruchamia bezpośredni
+zapis v2 na rzeczywistym magazynie platformowym (desktop, Android, iOS
+i przeglądarka), z Quill, rollbackiem i kolejnym actorSeq. Uruchamiany
+wyłącznie w izolowanych przebiegach CI. Nie aktywuje v2 produkcyjnie.
+Poprawiono też błędy starej macierzy: import poza katalogiem
+`integration_test` w Web i formatowanie wspólnego helpera.
+
 ## Pełna macierz regresji platform (2026-11-08)
 
 Sześć wspólnych testów kontraktu operacji v2 uruchamia się w Chrome

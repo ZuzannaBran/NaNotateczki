@@ -542,7 +542,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `test/verified_editor_asset_buffer_test.dart`: checksuma, ochrona
   zmiany ID i niemutowalność skopiowanych bajtów.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
-  Quill CRDT, tombstones, ACK, restart i ochrona usunięć, a także
+  Quill CRDT, tombstones, ACK, restart i ochrona usunięć, w tym odmowa
+  formatowania z uszkodzonym embedem Quill, a także
   brak obrazu do czasu zweryfikowanego `asset.attach`.
   Regresje równoczesnych insertów Quill w obu kolejnościach dostarczenia
   z formatowaniem, restartem plikowej SQLite i duplikatem envelope
@@ -2747,9 +2748,16 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   gumki z kontrolą unikalności i niepowracania raz usuniętych ID.
 - `test/library_controller_lifecycle_test.dart`: dispose podczas
   asynchronicznego ładowania biblioteki.
+- `integration_test/document_lifecycle_test.dart`: izolowany rzeczywisty
+  SQLite każdej platformy zapisuje dokument/stronę/Quill przez operacje v2,
+  rollback błędnego text.format i retry bez luki actorSeq i outboxu;
+  istniejący test CRUD legacy pozostaje niezależny.
 - `integration_test/app_smoke_test.dart`: start rzeczywistej aplikacji
   i inicjalizacja platformy bez utknięcia na ekranie ładowania;
   wspólny kontrakt CRDT v2 jest też uruchamiany na desktopie i urządzeniach.
+- `test/editor_v2_offline_media_test.dart`: dodatkowy test PNG i PDF
+  zastąpienia assetu przed restartem, potem replay na drugim SQLite,
+  zgodność BLOB/referencji, kursora i brak duplikatów w outboxie.
 - `test/support/v2_platform_replay_contract.dart` i
   `test/cross_platform/v2_replay_contract_test.dart`: sześć przenośnych
   regresji Quill, kolejności, tombstone, asset embed, transportu i formatowania;

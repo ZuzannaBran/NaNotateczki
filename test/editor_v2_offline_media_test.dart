@@ -393,4 +393,162 @@ void main() {
       );
     }
   }
+  for (final mime in ['image/png', 'application/pdf']) {
+    test(
+      'offline $mime replacement converges after restart and replay',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'nn-replace-replay-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final file = File('${directory.path}/notes.sqlite');
+        var first = NotesDatabase(NativeDatabase(file));
+        addTearDown(() => first.close());
+        final repository = NotebookRepository(first);
+        final buffer = VerifiedEditorAssetBuffer();
+        final projector = EditorSqliteProjector(
+          first,
+          verifiedAssetBuffer: buffer,
+        );
+        final store = OperationStore(first);
+        final engine = SyncEngine(
+          store: store,
+          gateway: _AcknowledgingGateway([]),
+          actorId: 'replacement-origin',
+          checkpointScope: 'replacement-origin',
+          enableRealtime: false,
+          applyRemote: (operation, _) => projector.apply(operation),
+        );
+        addTearDown(engine.stop);
+        final writer = EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+        );
+        await repository.enableAccountOperations(writer);
+        final notebook = await repository.createNotebook();
+        final page = notebook.pages.single;
+        final oldBytes = Uint8List.fromList(
+          mime == 'image/png'
+              ? [137, 80, 78, 71, 13, 10, 26, 10, 1]
+              : [37, 80, 68, 70, 45, 49, 46, 52, 10],
+        );
+        final newBytes = Uint8List.fromList([...oldBytes, 2]);
+        final image = ImageBlock(
+          id: 'replaced-inline',
+          path: '',
+          ocrText: '',
+          bytes: oldBytes,
+          imageMime: mime,
+          imageExt: mime == 'image/png' ? 'png' : 'pdf',
+          position: const Offset(10, 20),
+          width: 100,
+          height: 80,
+        );
+        await writer.writePageChange(
+          documentId: notebook.uid,
+          before: page,
+          after: page.copyWith(imageBlocks: [image]),
+        );
+        final previous = (await repository.getNotebook(notebook.uid))!;
+        final next = previous.pages.single.copyWith(
+          imageBlocks: [
+            previous.pages.single.imageBlocks.single.copyWith(
+              bytes: newBytes,
+            ),
+          ],
+        );
+        final replacement = await writer.writePageChange(
+          documentId: notebook.uid,
+          before: previous.pages.single,
+          after: next,
+        );
+        expect(replacement.map((op) => op.kind), [
+          OperationKind.assetAttach,
+          OperationKind.objectSet,
+          OperationKind.assetDetach,
+        ]);
+        final beforeRestart = await store.pending(
+          limit: 1000,
+          includeDeferred: true,
+        );
+        await engine.stop();
+        await first.close();
+        first = NotesDatabase(NativeDatabase(file));
+        final recovered = (await NotebookRepository(first)
+            .getNotebook(notebook.uid))!;
+        expect(
+          recovered.pages.single.imageBlocks.single.bytes,
+          orderedEquals(newBytes),
+        );
+        expect(
+          (await OperationStore(first).pending(
+            limit: 1000,
+            includeDeferred: true,
+          )).map((op) => op.operationId),
+          beforeRestart.map((op) => op.operationId),
+        );
+
+        final second = NotesDatabase(NativeDatabase.memory());
+        addTearDown(second.close);
+        final peerStore = OperationStore(second);
+        final peerBuffer = VerifiedEditorAssetBuffer();
+        final peerProjector = EditorSqliteProjector(
+          second,
+          verifiedAssetBuffer: peerBuffer,
+        );
+        final receipts = <String, Map<String, dynamic>>{};
+        for (var index = 0; index < beforeRestart.length; index++) {
+          final operation = beforeRestart[index];
+          if (operation.kind == OperationKind.assetAttach) {
+            final receipt = operation.payload;
+            final checksum = receipt['sha256'] as String;
+            receipts[receipt['assetId'] as String] = receipt;
+            peerBuffer.stage(
+              receipt: receipt,
+              bytes: checksum == crypto.sha256.convert(oldBytes).toString()
+                  ? oldBytes
+                  : newBytes,
+            );
+          }
+          if (operation.kind == OperationKind.objectSet) {
+            final properties = operation.payload['properties'];
+            final assetId = properties is Map ? properties['assetId'] : null;
+            if (assetId is String) {
+              peerBuffer.stage(
+                receipt: receipts[assetId]!,
+                bytes: newBytes,
+              );
+            }
+          }
+          expect(
+            await peerStore.applyRemote(
+              operation,
+              serverSequence: index + 1,
+              checkpointScope: 'peer-replay',
+              apply: () => peerProjector.apply(operation),
+            ),
+            isTrue,
+          );
+        }
+        final peer = (await NotebookRepository(second)
+            .getNotebook(notebook.uid))!;
+        expect(peer.pages.single.imageBlocks.single.id, image.id);
+        expect(
+          peer.pages.single.imageBlocks.single.bytes,
+          orderedEquals(newBytes),
+        );
+        final references = await second.customSelect(
+          'SELECT asset_id FROM asset_references',
+        ).get();
+        expect(references, hasLength(1));
+        expect(
+          references.single.read<String>('asset_id'),
+          replacement.first.payload['assetId'],
+        );
+        expect(await peerStore.pending(), isEmpty);
+        expect(await peerStore.checkpoint('peer-replay'), beforeRestart.length);
+      },
+    );
+  }
+
 }

@@ -2345,8 +2345,9 @@ void main() {
             },
           )
         : LocalOperationDraft(
-            kind:
-                deletePage ? OperationKind.pageDelete : OperationKind.objectDelete,
+            kind: deletePage
+                ? OperationKind.pageDelete
+                : OperationKind.objectDelete,
             pageId: deletePage ? null : targetPage,
             objectId: deletePage ? targetPage : objectId,
             payload: const {},
