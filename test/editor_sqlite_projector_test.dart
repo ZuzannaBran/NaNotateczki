@@ -593,7 +593,9 @@ void main() {
           );
         }
 
-        final savedNotebook = await isolatedRepository.getNotebook(notebook.uid);
+        final savedNotebook = await isolatedRepository.getNotebook(
+          notebook.uid,
+        );
         final saved = savedNotebook!.pages.single.textBlocks.single;
         expect(saved.text, 'Ayx');
         expect(jsonDecode(saved.deltaJson!), [
@@ -617,6 +619,7 @@ void main() {
         expect(persisted.deltaJson, saved.deltaJson);
 
         final recoveredStore = OperationStore(reopenedDatabase);
+        final recoveredProjector = EditorSqliteProjector(reopenedDatabase);
         expect(
           await recoveredStore.textAtoms(
             documentId: notebook.uid,
@@ -632,9 +635,7 @@ void main() {
             order.last,
             serverSequence: 3,
             checkpointScope: 'quill-concurrent',
-            apply: () => EditorSqliteProjector(
-              reopenedDatabase,
-            ).apply(order.last),
+            apply: () => recoveredProjector.apply(order.last),
           ),
           isFalse,
         );
