@@ -547,12 +547,39 @@ void main() {
     expect(afterShape.points, hasLength(2));
     expect(afterShape.points.last.dx, 11.0);
 
-    final competing = OperationEnvelope(
+    final remoteOrder = OperationEnvelope(
       operationId: '00000000-0000-4000-8000-000000000504',
       actorId: 'other-device',
       actorSeq: 4,
       logicalClock: remoteShape.logicalClock + 1,
       dependencies: [remoteShape.operationId],
+      documentId: notebook.uid,
+      pageId: pageId,
+      objectId: remote.objectId,
+      kind: OperationKind.objectReorder,
+      payload: const {
+        'properties': {'sortIndex': 1},
+      },
+    );
+    fixture.accepted.add(remoteOrder.toJson());
+    await fixture.runtime.engine.syncNow();
+    expect(
+      await fixture.runtime.store.checkpoint('account:startup-account'),
+      6,
+    );
+    final afterOrder = (await fixture.repository.getNotebook(notebook.uid))!;
+    expect(afterOrder.pages.single.inkStrokes.last.id, remote.objectId);
+    expect(
+      afterOrder.pages.single.inkStrokes.last.width,
+      3.0,
+    );
+
+    final competing = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000000505',
+      actorId: 'other-device',
+      actorSeq: 5,
+      logicalClock: remoteOrder.logicalClock + 1,
+      dependencies: [remoteOrder.operationId],
       documentId: notebook.uid,
       pageId: pageId,
       objectId: remote.objectId,
@@ -565,7 +592,7 @@ void main() {
     await fixture.runtime.engine.syncNow();
     expect(
       await fixture.runtime.store.checkpoint('account:startup-account'),
-      5,
+      6,
     );
     expect(
       await fixture.runtime.store.operation(competing.operationId),

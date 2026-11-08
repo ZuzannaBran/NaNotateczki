@@ -11,8 +11,8 @@ assetu na różnych obiektach nadal jest traktowana jako konflikt.
 SQLite zatwierdza patch i envelope bez modyfikowania lokalnego outboxu.
 Zmiany kontenera, współdzielonego pola lub assetu blokują kursor do
 pełnego rebase. Test HTTP/SQLite obejmuje offline ink, rozłączne
-zmiany koloru, szerokości i punktów kształtu, a także konflikt
-wspólnej szerokości.
+zmiany koloru, szerokości, punktów kształtu i kolejności warstw,
+a także konflikt wspólnej szerokości.
 Nie włączać produkcyjnego cutover na podstawie tego przyrostu.
 
 ## Regresje Dart, Android i izolacja testów iOS (2026-11-08)

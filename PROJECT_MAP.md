@@ -637,7 +637,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `isCurrent` do silnika, aby ponowił kontrolę po drenażu starej generacji.
   Regresje: `test/editor_v2_account_startup_test.dart` obejmują
   izolowany HTTP, outbox offline, niezależną zdalną kreskę, rozłączne
-  kolor/szerokość/transformację tego samego UID i konflikt wspólnego pola;
+  kolor, szerokość, transformację i kolejność warstw tego samego UID
+  oraz konflikt wspólnego pola;
   produkcyjne realtime pozostaje domyślnie włączone i jest testowane
   przez realny Linux E2E, który używa tego samego startu co AppScope.
 - `lib/app/app_scope.dart`: przełączenie konta v2 jest **opt-in** przez
