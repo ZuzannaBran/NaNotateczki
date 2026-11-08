@@ -506,10 +506,10 @@ void main() {
       await fixture.runtime.store.checkpoint('account:startup-account'),
       4,
     );
-    final merged = (await fixture.repository.getNotebook(notebook.uid))!
-        .pages.single.inkStrokes.singleWhere(
-          (stroke) => stroke.id == remote.objectId,
-        );
+    final updated = (await fixture.repository.getNotebook(notebook.uid))!;
+    final merged = updated.pages.single.inkStrokes.singleWhere(
+      (stroke) => stroke.id == remote.objectId,
+    );
     expect(merged.width, 3.0);
     expect(merged.color.toARGB32(), 0xFF345678);
 

@@ -29,10 +29,9 @@ bool _canMergeDifferentFields(
       localProperties.containsKey('assetId')) {
     return false;
   }
-  return remoteProperties.keys
-      .toSet()
-      .intersection(localProperties.keys.toSet())
-      .isEmpty;
+  final remoteKeys = remoteProperties.keys.toSet();
+  final localKeys = localProperties.keys.toSet();
+  return remoteKeys.intersection(localKeys).isEmpty;
 }
 
 String? _referencedAssetId(OperationEnvelope operation) {
@@ -70,9 +69,10 @@ bool _canProjectIndependentRemote(
       return _canMergeDifferentFields(remote, local);
     }
     final localAssetId = _referencedAssetId(local);
-    return remoteAssetId == null ||
-        localAssetId == null ||
-        remoteAssetId != localAssetId;
+    if (remoteAssetId == null || localAssetId == null) {
+      return true;
+    }
+    return remoteAssetId != localAssetId;
   });
 }
 
