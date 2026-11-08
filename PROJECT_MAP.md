@@ -794,6 +794,15 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 ### Nowa synchronizacja serwerowa
 
+- `server/api/app/operation_projection.py`: zgodnościowe lustro projektora
+  z `NaNotateczki-serwer/main`. Usunięcie `object.delete` wyszukuje
+  rzeczywistego właściciela UID po konkurencyjnym `object.move` i
+  utrwala tombstone także po zmianie strony; historyczne tombstones
+  chronią UID globalnie. Tworzenie zdublowanego UID jest zabronione.
+  Regresje lustrzane: `server/api/tests/test_operation_projection.py`
+  i `server/api/tests/test_stage12_real_stack.py` (prawdziwy PostgreSQL).
+  Produkcyjny cutover pozostaje wyłączony.
+
 - `lib/data/sync/api_client.dart`: klient REST z wymuszeniem HTTPS,
   timeoutem, limitem odpowiedzi, Bearer tokenem i request ID.
   HTTP 5xx oraz błędy transportu wpisuje automatycznie do `Errors`

@@ -184,6 +184,15 @@ Kryterium: po zabiciu aplikacji w dowolnym momencie można odtworzyć cały osta
 
 Repozytorium: `NaNotateczki-serwer`, gałąź `main`.
 
+Stan audytu 2026-11-08: migracja `0010_operation_journal.sql` zawiera
+`document_operations`, `actor_checkpoints`, `document_states`,
+`object_tombstones`, unikalne klucze i indeksy kursora. API v2 obsługuje
+transakcyjne batche, powtórzenia, snapshot, feed i checkpoint.
+Nowa regresja naprawia usunięcie obiektu po równoczesnym przeniesieniu
+na inną stronę, blokuje ponowne użycie UID i podwójne utworzenie obiektu.
+Bez zmiany schematu; zachowano starsze tombstones ze scoped pageId.
+Potwierdzenie wymaga Python CI oraz prawdziwego PostgreSQL E2E.
+
 ### Zadania
 
 - Dodać nową migrację SQL bez zmieniania wcześniejszych migracji.
