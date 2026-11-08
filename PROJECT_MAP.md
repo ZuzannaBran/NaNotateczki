@@ -2361,6 +2361,11 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
   a nie źródła Dart.
 - `test/website_widget_demo_test.dart`: pusty notatnik demonstracyjny oraz
   przekazanie osobnej nazwy bazy danych do publicznego API otwierania.
+- `test/support/pointer_contact_matrix.dart`: regresja trwałości ostatniej
+  kreski; fixture przed zamknięciem SQLite musi poczekać na flush edytora.
+- `.github/scripts/reset_ios_simulator_between_suites.sh`: restartuje
+  symulator między natywnymi testami Flutter, żeby zlikwidować pozostały
+  runner iOS; test kontraktu w `test_reset_ios_simulator_between_suites.sh`.
 
 
 - `data.md`: źródło prawdy dla lokalnego układu plików, trybów konta,

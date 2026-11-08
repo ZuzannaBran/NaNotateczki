@@ -54,6 +54,8 @@ jobs:
         run: bash .github/scripts/test_flutter_integration_retry.sh
       - name: Verify sqlite3 hash retry never masks test failures
         run: bash .github/scripts/test_flutter_sqlite3_download_retry.sh
+      - name: Verify iOS suite restart does not reuse a stale runner
+        run: bash .github/scripts/test_reset_ios_simulator_between_suites.sh
       - name: Execute non-render native test suite
         shell: bash
         run: |
@@ -589,6 +591,11 @@ jobs:
         run: >-
           flutter test integration_test/app_smoke_test.dart
           -d "$SIMULATOR_UDID" --reporter expanded
+      - name: Reset simulator after bootstrap
+        timeout-minutes: 5
+        run: >-
+          bash .github/scripts/reset_ios_simulator_between_suites.sh
+          "$SIMULATOR_UDID"
       - name: Verify iOS isolated document lifecycle
         timeout-minutes: 12
         run: >-
@@ -596,6 +603,11 @@ jobs:
           -d "$SIMULATOR_UDID"
           --dart-define=NANOTATECZKI_ISOLATED_CI=true
           --reporter expanded
+      - name: Reset simulator after document lifecycle
+        timeout-minutes: 5
+        run: >-
+          bash .github/scripts/reset_ios_simulator_between_suites.sh
+          "$SIMULATOR_UDID"
       - name: Verify iOS pointer contact matrix
         timeout-minutes: 10
         run: >-

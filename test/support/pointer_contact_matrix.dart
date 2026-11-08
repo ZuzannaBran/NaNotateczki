@@ -168,6 +168,7 @@ class _CanvasFixture {
         ),
       ],
     );
+    expect(await repository.saveNotebook(notebook), isTrue);
     final controller = EditorController(
       repository: repository,
       notebook: notebook,
@@ -224,6 +225,8 @@ class _CanvasFixture {
 
   Future<void> close() async {
     await tester.pumpWidget(const SizedBox.shrink());
+    // Dispose is synchronous: finish scheduled writes before closing Drift.
+    await controller.flushPendingSaves();
     controller.dispose();
     preferences.dispose();
     await repository.waitForPendingSaves();
@@ -276,6 +279,24 @@ void registerPointerContactMatrix({Size? surfaceSize}) {
   useInMemoryTestTextStorage();
 
   for (final kind in [NotebookKind.notebook, NotebookKind.board]) {
+    testWidgets('pointer matrix: teardown persists pending ink $kind', (
+      tester,
+    ) async {
+      final fixture = await _CanvasFixture.create(tester, kind);
+      try {
+        final pen = _Contact(tester, 99, PointerDeviceKind.stylus);
+        await _stroke(pen, fixture.inkStart);
+        fixture.expectStrokeCount(1);
+        await fixture.controller.flushPendingSaves();
+        final stored = await fixture.repository.getNotebook(
+          fixture.controller.notebook.uid,
+        );
+        expect(stored?.pages.single.inkStrokes, hasLength(1));
+      } finally {
+        await fixture.close();
+      }
+    });
+
     testWidgets('pointer matrix: finger acceptance and cancellation $kind', (
       tester,
     ) async {

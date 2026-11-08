@@ -12,14 +12,20 @@ pełnego rebase. Test HTTP/SQLite obejmuje offline ink, rozłączne
 zmiany koloru i szerokości oraz konflikt wspólnej szerokości.
 Nie włączać produkcyjnego cutover na podstawie tego przyrostu.
 
-## Diagnostyka zawieszenia iOS (2026-11-08)
+## Regresje Dart, Android i izolacja testów iOS (2026-11-08)
 
-W poprzednim pełnym przebiegu (42499752832) iPhone zakończył Xcode build
-dla `document_lifecycle_test.dart`, lecz nie zwrócił wyniku przed limitem
-25 minut. Ten sam scenariusz przeszedł na iPadzie. W celu ustalenia miejsca
-blokady CI uruchamia osobne kroki smoke, lifecycle i pointer, każdy z
-limitem czasu oraz `--reporter expanded`. To nie jest potwierdzenie
-naprawy zawieszenia; wynik wymaga nowego iOS CI.
+Pełny przebieg 42503975095 ujawnił kolizję importu `isNull` w teście
+startu konta v2; ograniczono import Drift do `QueryExecutor`.
+Testy pointerów na Androidzie wykryły rozpoczęty zapis ink po zamknięciu
+testowej bazy SQLite. Fixture zapisuje notatnik przed uruchomieniem
+edytora, wywołuje `flushPendingSaves` przed `dispose` i dopiero potem
+zamyka Drift. Dodatkowa regresja sprawdza trwałość ostatniej kreski.
+
+Na iPhone drugi osobny proces `flutter test` wisi po udanym Xcode build,
+zanim rozpocznie pierwszy test. Każda kolejna paczka testów w macOS CI
+otrzymuje zrestartowany, gotowy symulator (`simctl shutdown/boot/bootstatus`).
+Skrypt resetu ma niezależny test shell bez sprzętu. To izolacja problemu
+runnera, nie potwierdzenie naprawy natywnego błędu — wymaga CI iPhone.
 
 ## Stop bez blokady handshake i seryjny restart — 2026-11-06
 
