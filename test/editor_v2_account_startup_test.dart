@@ -538,10 +538,10 @@ void main() {
       await fixture.runtime.store.checkpoint('account:startup-account'),
       5,
     );
-    final afterShape = (await fixture.repository.getNotebook(notebook.uid))!
-        .pages.single.inkStrokes.singleWhere(
-          (stroke) => stroke.id == remote.objectId,
-        );
+    final shapeNotebook = (await fixture.repository.getNotebook(notebook.uid))!;
+    final afterShape = shapeNotebook.pages.single.inkStrokes.singleWhere(
+      (stroke) => stroke.id == remote.objectId,
+    );
     expect(afterShape.width, 3.0);
     expect(afterShape.color.toARGB32(), 0xFF345678);
     expect(afterShape.points, hasLength(2));
@@ -569,10 +569,7 @@ void main() {
     );
     final afterOrder = (await fixture.repository.getNotebook(notebook.uid))!;
     expect(afterOrder.pages.single.inkStrokes.last.id, remote.objectId);
-    expect(
-      afterOrder.pages.single.inkStrokes.last.width,
-      3.0,
-    );
+    expect(afterOrder.pages.single.inkStrokes.last.width, 3.0);
 
     final competing = OperationEnvelope(
       operationId: '00000000-0000-4000-8000-000000000505',
