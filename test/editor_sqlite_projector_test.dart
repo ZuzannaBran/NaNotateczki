@@ -2144,24 +2144,31 @@ void main() {
     final pendingBefore = await store.pending();
     await database.customStatement(
       'UPDATE operation_asset_bytes SET bytes = ? WHERE checksum_sha256 = ?',
-      [Uint8List.fromList(List<int>.filled(bytes.length, 0)), receipt['sha256']],
+      [
+        Uint8List.fromList(List<int>.filled(bytes.length, 0)),
+        receipt['sha256'],
+      ],
     );
 
     await expectLater(write([deletion]), throwsFormatException);
     expect(await store.pending(), hasLength(pendingBefore.length));
     expect(
-      await database.customSelect(
-        'SELECT uid FROM text_block_rows WHERE uid = ?',
-        variables: [Variable<String>(objectId)],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT uid FROM text_block_rows WHERE uid = ?',
+            variables: [Variable<String>(objectId)],
+          )
+          .get(),
       hasLength(1),
     );
     expect(
-      await database.customSelect(
-        'SELECT asset_id FROM asset_references '
-        'WHERE document_id = ? AND asset_id = ?',
-        variables: [Variable<String>(documentId), Variable<String>(assetId)],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT asset_id FROM asset_references '
+            'WHERE document_id = ? AND asset_id = ?',
+            variables: [Variable<String>(documentId), Variable<String>(assetId)],
+          )
+          .get(),
       hasLength(1),
     );
 
@@ -2171,27 +2178,33 @@ void main() {
     );
     await write([deletion]);
     expect(
-      await database.customSelect(
-        'SELECT uid FROM text_block_rows WHERE uid = ?',
-        variables: [Variable<String>(objectId)],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT uid FROM text_block_rows WHERE uid = ?',
+            variables: [Variable<String>(objectId)],
+          )
+          .get(),
       isEmpty,
     );
     expect(
-      await database.customSelect(
-        'SELECT asset_id FROM asset_references '
-        'WHERE document_id = ? AND asset_id = ?',
-        variables: [Variable<String>(documentId), Variable<String>(assetId)],
-      ).get(),
+      await database
+          .customSelect(
+            'SELECT asset_id FROM asset_references '
+            'WHERE document_id = ? AND asset_id = ?',
+            variables: [Variable<String>(documentId), Variable<String>(assetId)],
+          )
+          .get(),
       isEmpty,
     );
     expect(await store.pending(), hasLength(pendingBefore.length + 1));
     if (deletePage) {
       expect(
-        await database.customSelect(
-          'SELECT uid FROM page_rows WHERE uid = ?',
-          variables: [Variable<String>(targetPage)],
-        ).get(),
+        await database
+            .customSelect(
+              'SELECT uid FROM page_rows WHERE uid = ?',
+              variables: [Variable<String>(targetPage)],
+            )
+            .get(),
         isEmpty,
       );
     }
