@@ -1659,6 +1659,8 @@ i weryfikuje BLOB przed odtworzeniem scoped referencji. Działa także
 po opróżnieniu bufora i zmianie ID właściciela w Undo. Nowy import
 wciąż wymaga zweryfikowanego stagingu; pełny rebase pozostaje otwarty.
 `test/editor_v2_quill_asset_recovery_test.dart`: restart plikowej SQLite,
+selektywne usunięcie jednego z dwóch embedów Quill (druga scoped
+referencja pozostaje, historyczny BLOB nadal służy outboxowi),
 obraz/PDF × usunięcie embedu/bloku/strony, cykl Undo/Redo/Undo,
 odmowa obcego dokumentu i uszkodzonych bajtów.
 Ten sam test pokrywa nowe importy PNG/JPEG/WebP/PDF, niemutowalność

@@ -74,6 +74,127 @@ void main() {
     'image/webp': [82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80],
     'application/pdf': [37, 80, 68, 70, 45, 49],
   };
+
+  test(
+    'removing one Quill embed preserves the other and recovery bytes',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'nn-quill-partial-detach-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/notes.sqlite');
+      var session = _Session(file);
+      addTearDown(() => session.close());
+      final notebook = await session.repository.createNotebook();
+      final imageBytes = Uint8List.fromList(importBytes['image/png']!);
+      final pdfBytes = Uint8List.fromList(importBytes['application/pdf']!);
+      final image = session.writer.stageQuillAsset(
+        documentId: notebook.uid,
+        bytes: imageBytes,
+        embedType: 'image',
+      );
+      final pdf = session.writer.stageQuillAsset(
+        documentId: notebook.uid,
+        bytes: pdfBytes,
+        embedType: 'pdf',
+      );
+      final block = TextBlock(
+        id: 'partial-detach-text',
+        text: 'A\uFFFC\uFFFC',
+        deltaJson: jsonEncode([
+          {'insert': 'A'},
+          {
+            'insert': {'image': 'asset:' + image.assetId},
+          },
+          {
+            'insert': {'pdf': 'asset:' + pdf.assetId},
+          },
+          {'insert': '\n'},
+        ]),
+        position: Offset.zero,
+        fontSize: 18,
+        color: const Color(0xFF123456),
+        width: 210,
+      );
+      await session.writer.writePageChange(
+        documentId: notebook.uid,
+        before: notebook.pages.single,
+        after: notebook.pages.single.copyWith(textBlocks: [block]),
+      );
+      final original = (await session.repository.getNotebook(notebook.uid))!;
+      final page = original.pages.single;
+      final changed = page.copyWith(
+        textBlocks: [
+          page.textBlocks.single.copyWith(
+            text: 'A\uFFFC',
+            deltaJson: jsonEncode([
+              {'insert': 'A'},
+              {
+                'insert': {'pdf': 'asset:' + pdf.assetId},
+              },
+              {'insert': '\n'},
+            ]),
+          ),
+        ],
+      );
+      final operations = await session.writer.writePageChange(
+        documentId: notebook.uid,
+        before: page,
+        after: changed,
+      );
+      expect(
+        operations.where((op) => op.kind == OperationKind.assetDetach)
+            .map((op) => op.payload['assetId']),
+        [image.assetId],
+      );
+      final refs = await session.database.customSelect(
+        'SELECT asset_id FROM asset_references WHERE document_id = ?',
+        variables: [Variable<String>(notebook.uid)],
+      ).get();
+      expect(refs.map((row) => row.read<String>('asset_id')), [pdf.assetId]);
+      expect(
+        await session.projector.verifiedTextAssetBytes(
+          documentId: notebook.uid,
+          pageId: page.id,
+          objectId: block.id,
+          assetId: pdf.assetId,
+        ),
+        orderedEquals(pdfBytes),
+      );
+      // Detached BLOBs must survive while journal uploads are pending.
+      expect(
+        await session.projector.verifiedUploadBytes(image.attachPayload),
+        orderedEquals(imageBytes),
+      );
+      final pending = (await session.store.pending())
+          .map((op) => op.operationId).toList();
+      await session.close();
+      session = _Session(file);
+      final reopened = (await session.repository.getNotebook(notebook.uid))!;
+      expect(
+        reopened.pages.single.textBlocks.single.deltaJson,
+        changed.textBlocks.single.deltaJson,
+      );
+      expect(
+        (await session.store.pending()).map((op) => op.operationId),
+        pending,
+      );
+      expect(
+        await session.projector.verifiedTextAssetBytes(
+          documentId: notebook.uid,
+          pageId: page.id,
+          objectId: block.id,
+          assetId: pdf.assetId,
+        ),
+        orderedEquals(pdfBytes),
+      );
+      expect(
+        await session.projector.verifiedUploadBytes(image.attachPayload),
+        orderedEquals(imageBytes),
+      );
+    },
+  );
+
   for (final entry in importBytes.entries) {
     test(
       'new inline ${entry.key} survives Undo, Redo and a file restart',

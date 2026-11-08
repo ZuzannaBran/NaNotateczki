@@ -1,5 +1,32 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Audyt domknięcia lokalnej części etapu 3 (2026-11-08)
+
+- Integralność mediów: `_applyText` przed każdym projekcyjnym zapisem
+  sprawdza SHA-256 widocznych embedów; `object.delete` i
+  `page.delete` również odrzucają uszkodzone bajty. Dodatkowa
+  regresja `editor_v2_quill_asset_recovery_test.dart` sprawdza,
+  że usunięcie jednego z dwóch embedów nie gubi pozostałej referencji
+  ani historycznego BLOB-u potrzebnego do uploadu po restarcie.
+- Most operacji: `EditorOperationBridge.planAction` obsługuje
+  wszystkie akcje pojedynczej strony przez różnicę zatwierdzonych
+  stron, a przeniesienie między stronami obsługuje osobny writer.
+  Odrzucana jest zmiana kolejności stron, której obecny kontroler
+  nie udostępnia jako osobnej akcji.
+- Cofanie/anulowanie: `editor_controller_v2_test.dart`,
+  `editor_v2_quill_asset_recovery_test.dart` i regresje podglądu
+  transformacji pokrywają atomowe Undo/Redo, historię po restarcie,
+  autosave, blokadę legacy writera oraz odrzucenie anulowanych
+  podglądów bez zapisu operacji.
+- Pozostała bramka: wynik pełnych Actions dla bieżącej wersji
+  wszystkich systemów, wraz z Dart analyze, testami natywnymi
+  i rzeczywistym Linux backend E2E. Wyniku nie uznajemy przed CI.
+- Zakres poza lokalnym etapem 3: deterministyczny rebase całego konta
+  (dwóch klientów po kolizji i offline), migracja v1→v2 oraz globalny
+  produkcyjny cutover pozostają wyłączone i wymagają osobnego etapu.
+  Nie usuwać ścieżek v1 ani nie włączać `NN_ENABLE_V2_ACCOUNT`
+  na danych produkcyjnych.
+
 ## Uzupełnienie pokrycia po audycie (2026-11-08)
 
 Test `editor_sqlite_projector_test.dart` odtwarza uszkodzony embed przy
